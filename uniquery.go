@@ -1,15 +1,15 @@
 package uniquery
 
-type ColumnType string
+type Datatype string
 
 const (
-	ColumnString = "string"
-	ColumnInt    = "int"
+	ColumnString Datatype = "string"
+	ColumnInt    Datatype = "int"
 )
 
-type Column struct {
+type Field struct {
 	Name string
-	Type ColumnType
+	Type Datatype
 }
 
 type Value struct {
@@ -17,10 +17,10 @@ type Value struct {
 }
 
 type Record interface {
-	Value(column string) Value
-	Columns() []Column
+	Value(field string) Value
+	Fields() []Field
 }
 
-type RecordGetter interface {
+type RecordStream interface {
 	Next() (Record, error)
 }

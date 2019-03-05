@@ -17,6 +17,7 @@ type GetByPrimaryKey interface {
 
 type FieldType string
 
+// TODO: composite primary key?
 const (
 	Primary   FieldType = "primary"
 	Secondary FieldType = "secondary"
@@ -30,8 +31,10 @@ const (
 	MoreThan FilterType = "more_than"
 	LessThan FilterType = "less_than"
 	Like     FilterType = "like"
+	In       FilterType = "in"
 )
 
+// TODO: Co jesli zaleznosc miedzy kolumnami?
 type Predicate struct {
 	Field  string
 	Filter FilterType

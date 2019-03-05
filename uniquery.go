@@ -1,5 +1,7 @@
 package uniquery
 
+import "errors"
+
 type Datatype string
 
 const (
@@ -7,8 +9,10 @@ const (
 	ColumnInt    Datatype = "int"
 )
 
+type FieldIdentifier string
+
 type Field struct {
-	Name string
+	Name FieldIdentifier
 	Type Datatype
 }
 
@@ -17,10 +21,12 @@ type Value struct {
 }
 
 type Record interface {
-	Value(field string) Value
+	Value(field FieldIdentifier) Value
 	Fields() []Field
 }
 
 type RecordStream interface {
 	Next() (Record, error)
 }
+
+var ErrEndOfStream = errors.New("end of stream")

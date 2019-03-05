@@ -1,4 +1,4 @@
-package uniquery
+package octosql
 
 import "context"
 

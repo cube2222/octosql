@@ -1,13 +1,15 @@
 package main
 
 import (
+	"context"
 	"log"
 
-	"github.com/xwb1989/sqlparser"
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/storage/json"
 )
 
 func main() {
-	stmt, err := sqlparser.Parse("SELECT prefix(name, 3), age FROM (SELECT * FROM users) g")
+	/*stmt, err := sqlparser.Parse("SELECT prefix(name, 3), age FROM (SELECT * FROM users) g")
 	if err != nil {
 		log.Println(err)
 	}
@@ -17,7 +19,7 @@ func main() {
 	if typed, ok := stmt.(*sqlparser.Select); ok {
 		log.Println(typed)
 		log.Println(typed)
-	}
+	}*/
 
 	/*client := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
@@ -44,4 +46,25 @@ func main() {
 	}
 	log.Printf("%+v", result)*/
 
+	desc := json.NewJSONDataSourceDescription("people.json")
+	ds, err := desc.Initialize(context.Background(), nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	records, err := ds.Get(nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var record *octosql.Record
+	for record, err = records.Next(); err == nil; record, err = records.Next() {
+		log.Printf("%+v", record.Fields())
+		log.Printf("%+v", record.Value("city"))
+		poch := record.Value("pochodzenie")
+		if poch != nil {
+			log.Printf("%+v", poch.([]interface{})[0])
+		}
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
 }

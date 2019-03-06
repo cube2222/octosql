@@ -33,14 +33,15 @@ type UnionAll struct {
 }
 
 func (union *UnionAll) Get(predicateValues []interface{}) (RecordStream, error) {
-	stream, err := union.left.Get(predicateValues)
+	panic("not implemented yet")
+
+	/*stream, err := union.left.Get(predicateValues)
 	if err != nil {
 		return nil, err
 	}
 	streamSecond, err := union.right.Get(predicateValues)
 	if err != nil {
 		return nil, err
-	}
-
-	return ConcatStreams(stream, streamSecond), nil
+	}*/
+	//return ConcatStreams(stream, streamSecond), nil
 }

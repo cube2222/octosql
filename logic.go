@@ -1,5 +1,6 @@
 package octosql
 
+// TODO: Probably should be interface
 type RelationType string
 
 const (
@@ -11,8 +12,12 @@ const (
 	In       RelationType = "in"
 )
 
+func (RelationType) Apply(left, right interface{}) (bool, error) {
+	panic("not implemented yet")
+}
+
 type Formula interface {
-	Evaluate(record Record, primitives map[string]interface{}) bool
+	Evaluate(record Record, primitives map[string]interface{}) (bool, error)
 	Fields() map[string]struct{}
 	Primitives() map[string]struct{}
 }
@@ -37,10 +42,8 @@ type Predicate struct {
 	Right  Expression
 }
 
-// TODO: Evaluate should probably return an error, as the RelationType may be invalid for the operand types
-func (p *Predicate) Evaluate(record Record, variables map[VariableName]interface{}) bool {
-	panic("implement me")
-	return true
+func (p *Predicate) Evaluate(record Record, variables map[VariableName]interface{}) (bool, error) {
+	return p.Filter.Apply(p.Left, p.Right)
 }
 
 type Expression interface {

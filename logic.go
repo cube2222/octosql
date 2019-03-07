@@ -37,37 +37,38 @@ type Predicate struct {
 	Right  Expression
 }
 
-func (p *Predicate) Evaluate(record Record, primitives map[string]interface{}) bool {
+// TODO: Evaluate should probably return an error, as the RelationType may be invalid for the operand types
+func (p *Predicate) Evaluate(record Record, variables map[VariableName]interface{}) bool {
 	panic("implement me")
 	return true
 }
 
 type Expression interface {
-	ExpressionValue(record Record, primitives map[string]interface{}) interface{}
+	ExpressionValue(record Record, variables map[VariableName]interface{}) interface{}
 }
 
-type Primitive struct {
-	id string
+type Variable struct {
+	id VariableName
 }
 
-func (p *Primitive) ExpressionValue(record Record, primitives map[string]interface{}) interface{} {
-	return primitives[p.id]
+func (p *Variable) ExpressionValue(record Record, variables map[VariableName]interface{}) interface{} {
+	return variables[p.id]
 }
 
-type FieldReference struct {
+type RecordField struct {
 	id FieldIdentifier
 }
 
-func (f *FieldReference) ExpressionValue(record Record, primitives map[string]interface{}) interface{} {
+func (f *RecordField) ExpressionValue(record Record, variables map[VariableName]interface{}) interface{} {
 	return record.Value(f.id)
 }
 
 var expression = Predicate{
-	Left: &FieldReference{
+	Left: &RecordField{
 		id: "City",
 	},
 	Filter: Equal,
-	Right: &Primitive{
+	Right: &Variable{
 		id: "city_x",
 	},
 }

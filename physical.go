@@ -2,10 +2,10 @@ package octosql
 
 import "context"
 
-type Variable interface{}
+type VariableName interface{}
 
 type NodeDescription interface {
-	GetVariables() []Variable
+	GetVariables() []VariableName
 	Initialize(ctx context.Context) Node
 }
 
@@ -17,7 +17,7 @@ type UnionAllDescription struct {
 	left, right NodeDescription
 }
 
-func (union *UnionAllDescription) GetVariables() []Variable {
+func (union *UnionAllDescription) GetVariables() []VariableName {
 	return append(union.left.GetVariables(), union.right.GetVariables()...)
 }
 

@@ -1,5 +1,6 @@
 package octosql
 
+// TODO: Probably should be interface
 type RelationType string
 
 const (
@@ -11,8 +12,12 @@ const (
 	In       RelationType = "in"
 )
 
+func (RelationType) Apply(left, right interface{}) (bool, error) {
+	panic("not implemented yet")
+}
+
 type Formula interface {
-	Evaluate(record Record, primitives map[string]interface{}) bool
+	Evaluate(record Record, primitives map[string]interface{}) (bool, error)
 	Fields() map[string]struct{}
 	Primitives() map[string]struct{}
 }
@@ -37,37 +42,36 @@ type Predicate struct {
 	Right  Expression
 }
 
-func (p *Predicate) Evaluate(record Record, primitives map[string]interface{}) bool {
-	panic("implement me")
-	return true
+func (p *Predicate) Evaluate(record Record, variables map[VariableName]interface{}) (bool, error) {
+	return p.Filter.Apply(p.Left, p.Right)
 }
 
 type Expression interface {
-	ExpressionValue(record Record, primitives map[string]interface{}) interface{}
+	ExpressionValue(record Record, variables map[VariableName]interface{}) interface{}
 }
 
-type Primitive struct {
-	id string
+type Variable struct {
+	id VariableName
 }
 
-func (p *Primitive) ExpressionValue(record Record, primitives map[string]interface{}) interface{} {
-	return primitives[p.id]
+func (p *Variable) ExpressionValue(record Record, variables map[VariableName]interface{}) interface{} {
+	return variables[p.id]
 }
 
-type FieldReference struct {
+type RecordField struct {
 	id FieldIdentifier
 }
 
-func (f *FieldReference) ExpressionValue(record Record, primitives map[string]interface{}) interface{} {
+func (f *RecordField) ExpressionValue(record Record, variables map[VariableName]interface{}) interface{} {
 	return record.Value(f.id)
 }
 
 var expression = Predicate{
-	Left: &FieldReference{
+	Left: &RecordField{
 		id: "City",
 	},
 	Filter: Equal,
-	Right: &Primitive{
+	Right: &Variable{
 		id: "city_x",
 	},
 }

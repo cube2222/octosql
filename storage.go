@@ -21,5 +21,5 @@ type DataSourceDescription interface {
 }
 
 type DataSource interface {
-	Get(primitiveValues map[string]interface{}) (RecordStream, error)
+	Get(variableValues map[string]interface{}) (RecordStream, error)
 }

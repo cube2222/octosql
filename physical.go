@@ -10,7 +10,7 @@ type NodeDescription interface {
 }
 
 type Node interface {
-	Get(predicateValues []interface{}) (RecordStream, error)
+	Get(variableValues map[string]interface{}) (RecordStream, error)
 }
 
 type UnionAllDescription struct {
@@ -32,7 +32,7 @@ type UnionAll struct {
 	left, right Node
 }
 
-func (union *UnionAll) Get(predicateValues []interface{}) (RecordStream, error) {
+func (union *UnionAll) Get(variableValues map[string]interface{}) (RecordStream, error) {
 	panic("not implemented yet")
 
 	/*stream, err := union.left.Get(predicateValues)

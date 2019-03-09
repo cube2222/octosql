@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 )
 
@@ -13,7 +14,7 @@ type JSONDataSource struct {
 	path string
 }
 
-func (ds *JSONDataSource) Get(primitiveValues map[string]interface{}) (octosql.RecordStream, error) {
+func (ds *JSONDataSource) Get(variables octosql.Variables) (execution.RecordStream, error) {
 	file, err := os.Open(ds.path)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't open file")
@@ -32,22 +33,27 @@ type JSONRecordStream struct {
 	isDone bool
 }
 
-func (rs *JSONRecordStream) Next() (*octosql.Record, error) {
+func (rs *JSONRecordStream) Next() (*execution.Record, error) {
 	if rs.isDone {
-		return nil, octosql.ErrEndOfStream
+		return nil, execution.ErrEndOfStream
 	}
 
 	if !rs.sc.Scan() {
 		rs.isDone = true
 		rs.file.Close()
-		return nil, octosql.ErrEndOfStream
+		return nil, execution.ErrEndOfStream
 	}
 
-	var record map[string]interface{}
+	var record map[octosql.VariableName]interface{}
 	err := json.Unmarshal(rs.sc.Bytes(), &record)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't unmarshal json record")
 	}
 
-	return octosql.NewRecord(record), nil
+	fields := make([]octosql.VariableName, 0)
+	for k := range record {
+		fields = append(fields, k)
+	}
+
+	return execution.NewRecord(fields, record), nil
 }

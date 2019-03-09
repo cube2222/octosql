@@ -10,7 +10,7 @@ import (
 )
 
 type Formula interface {
-	Physical(ctx context.Context, physicalCreator PhysicalPlanCreator) (physical.Formula, octosql.Variables, error)
+	Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Formula, octosql.Variables, error)
 }
 
 type BooleanConstant struct {
@@ -21,7 +21,7 @@ func NewBooleanConstant(value bool) *BooleanConstant {
 	return &BooleanConstant{Value: value}
 }
 
-func (f *BooleanConstant) Physical(ctx context.Context, physicalCreator PhysicalPlanCreator) (physical.Formula, octosql.Variables, error) {
+func (f *BooleanConstant) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Formula, octosql.Variables, error) {
 	return physical.NewConstant(f.Value), octosql.NoVariables(), nil
 }
 
@@ -34,7 +34,7 @@ func NewInfixOperator(left Formula, right Formula, operator string) *InfixOperat
 	return &InfixOperator{Left: left, Right: right, Operator: operator}
 }
 
-func (f *InfixOperator) Physical(ctx context.Context, physicalCreator PhysicalPlanCreator) (physical.Formula, octosql.Variables, error) {
+func (f *InfixOperator) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Formula, octosql.Variables, error) {
 	left, leftVariables, err := f.Left.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for left operand")
@@ -68,7 +68,7 @@ func NewPrefixOperator(operator string) *PrefixOperator {
 	return &PrefixOperator{Operator: operator}
 }
 
-func (f *PrefixOperator) Physical(ctx context.Context, physicalCreator PhysicalPlanCreator) (physical.Formula, octosql.Variables, error) {
+func (f *PrefixOperator) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Formula, octosql.Variables, error) {
 	child, variables, err := f.Child.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for operand")
@@ -91,7 +91,7 @@ func NewPredicate(left Expression, relation Relation, right Expression) *Predica
 	return &Predicate{Left: left, Relation: relation, Right: right}
 }
 
-func (f *Predicate) Physical(ctx context.Context, physicalCreator PhysicalPlanCreator) (physical.Formula, octosql.Variables, error) {
+func (f *Predicate) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Formula, octosql.Variables, error) {
 	left, leftVariables, err := f.Left.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for left operand")

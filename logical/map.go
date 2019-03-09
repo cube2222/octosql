@@ -17,7 +17,7 @@ func NewMap(expressions []Expression, child Node) *Map {
 	return &Map{expressions: expressions, child: child}
 }
 
-func (node *Map) Physical(ctx context.Context, physicalCreator PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
+func (node *Map) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
 	physicalExprs := make([]physical.Expression, len(node.expressions))
 	variables := octosql.NoVariables()
 	for i := range node.expressions {
@@ -36,7 +36,7 @@ func (node *Map) Physical(ctx context.Context, physicalCreator PhysicalPlanCreat
 			)
 		}
 
-		physicalExprs = append(physicalExprs, physicalExpr)
+		physicalExprs[i] = physicalExpr
 	}
 
 	child, childVariables, err := node.child.Physical(ctx, physicalCreator)

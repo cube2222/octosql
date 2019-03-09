@@ -2,6 +2,7 @@ package execution
 
 import (
 	"github.com/cube2222/octosql"
+	"github.com/pkg/errors"
 )
 
 type Formula interface {
@@ -17,7 +18,7 @@ func NewConstant(value bool) *Constant {
 }
 
 func (f Constant) Evaluate(variables octosql.Variables) (bool, error) {
-	return c.Value, nil
+	return f.Value, nil
 }
 
 // TODO: Implement:
@@ -31,7 +32,16 @@ func NewAnd(left Formula, right Formula) *And {
 }
 
 func (f *And) Evaluate(variables octosql.Variables) (bool, error) {
-	panic("implement me")
+	left, err := f.Left.Evaluate(variables)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't evaluate left operand in and")
+	}
+	right, err := f.Right.Evaluate(variables)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't evaluate right operand in and")
+	}
+
+	return left && right, nil
 }
 
 type Or struct {
@@ -69,5 +79,5 @@ func NewPredicate(left Expression, relation Relation, right Expression) *Predica
 }
 
 func (f *Predicate) Evaluate(variables octosql.Variables) (bool, error) {
-	return p.Filter.Apply(p.Left, p.Right)
+	return f.Relation.Apply(variables, f.Left, f.Right)
 }

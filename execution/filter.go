@@ -15,7 +15,7 @@ func NewFilter(formula Formula, child Node) *Filter {
 }
 
 func (node *Filter) Get(variables octosql.Variables) (RecordStream, error) {
-	recordStream, err := node.Get(variables)
+	recordStream, err := node.child.Get(variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get record stream")
 	}

@@ -51,8 +51,9 @@ func (ne *NodeExpression) ExpressionValue(variables octosql.Variables) (interfac
 
 	outRecords := make([]Record, 0)
 
-	for record, err := records.Next(); err == nil; record, err = records.Next() {
-		outRecords = append(outRecords, *record)
+	var curRecord *Record
+	for curRecord, err = records.Next(); err == nil; curRecord, err = records.Next() {
+		outRecords = append(outRecords, *curRecord)
 	}
 	if err != ErrEndOfStream {
 		return nil, errors.Wrap(err, "couldn't get records from stream")

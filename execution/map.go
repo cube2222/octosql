@@ -15,7 +15,7 @@ func NewMap(expressions []Expression, child Node) *Map {
 }
 
 func (node *Map) Get(variables octosql.Variables) (RecordStream, error) {
-	recordStream, err := node.Get(variables)
+	recordStream, err := node.child.Get(variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get record stream")
 	}
@@ -42,7 +42,7 @@ func (stream *MappedStream) Next() (*Record, error) {
 		return nil, errors.Wrap(err, "couldn't get source record")
 	}
 
-	variables, err := stream.variables.MergeWith(octosql.VariablesFromRecord(*srcRecord))
+	variables, err := stream.variables.MergeWith(srcRecord.AsVariables())
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't merge given variables with record variables")
 	}
@@ -65,7 +65,7 @@ func (stream *MappedStream) Next() (*Record, error) {
 			if len(record.Fields()) > 1 {
 				return nil, errors.Wrapf(err, "multi field record ended up in one select field %+v", value)
 			}
-			outValues[stream.expressions[i].Name()] = record.Value(record.Fields()[0])
+			outValues[stream.expressions[i].Name()] = record.Value(record.Fields()[0].Name)
 			continue
 		}
 		outValues[stream.expressions[i].Name()] = value

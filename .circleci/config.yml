@@ -19,7 +19,7 @@ jobs:
     steps:
       - checkout
 
-      - run: touch /tmp/test-results/go-test.out
+      - run: echo -n > /tmp/test-results/go-test.out
       - run: go test -v ./... | tee /tmp/test-results/go-test.out
 
       - store_test_results:

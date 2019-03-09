@@ -32,4 +32,6 @@ jobs:
       - checkout
 
       - run: go install -v ./...
-      - run: ls $GOPATH/bin
+
+    - store_artifacts:
+        path: $GOPATH/bin

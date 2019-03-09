@@ -6,9 +6,6 @@ workflows:
   release:
     jobs:
       - release
-    filters:
-      branches:
-        only: master
 
 version: 2
 jobs:

@@ -1,3 +1,9 @@
+workflows:
+  version: 2
+  test:
+    jobs:
+      - test
+
 version: 2
 jobs:
   test:

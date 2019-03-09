@@ -121,6 +121,11 @@ func main() {
 		log.Printf("{ %s }", strings.Join(fields, ", "))
 	}
 
+	/* prints:
+	2019/03/09 03:12:27 { people.name = wojtek, people.surname = kuzminski, people.city = warsaw }
+	2019/03/09 03:12:27 { people.name = adam, people.surname = cz, people.city = ciechanowo }
+	*/
+
 	// ************************* przyklad 2
 	log.Println("Przyklad 2:")
 
@@ -199,4 +204,9 @@ func main() {
 		}
 		log.Printf("{ %s }", strings.Join(fields, ", "))
 	}
+
+	/* prints:
+	2019/03/09 03:12:27 { p3.name = jan, city = <nil> }
+	2019/03/09 03:12:27 { p3.name = Kuba, city = ciechanowo }
+	*/
 }

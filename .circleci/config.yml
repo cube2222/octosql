@@ -33,5 +33,5 @@ jobs:
 
       - run: go install -v ./...
 
-    - store_artifacts:
-        path: $GOPATH/bin
+      - store_artifacts:
+          path: $GOPATH/bin

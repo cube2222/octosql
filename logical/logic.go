@@ -26,8 +26,9 @@ func (f *BooleanConstant) Physical(ctx context.Context, physicalCreator *Physica
 }
 
 type InfixOperator struct {
-	Left, Right Formula
-	Operator    string
+	Left     Formula
+	Operator string
+	Right    Formula
 }
 
 func NewInfixOperator(left Formula, right Formula, operator string) *InfixOperator {
@@ -83,8 +84,9 @@ func (f *PrefixOperator) Physical(ctx context.Context, physicalCreator *Physical
 }
 
 type Predicate struct {
-	Left, Right Expression
-	Relation    Relation
+	Left     Expression
+	Relation Relation
+	Right    Expression
 }
 
 func NewPredicate(left Expression, relation Relation, right Expression) *Predicate {

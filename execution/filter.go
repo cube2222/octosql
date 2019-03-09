@@ -7,15 +7,15 @@ import (
 
 type Filter struct {
 	formula Formula
-	child   Node
+	source  Node
 }
 
 func NewFilter(formula Formula, child Node) *Filter {
-	return &Filter{formula: formula, child: child}
+	return &Filter{formula: formula, source: child}
 }
 
 func (node *Filter) Get(variables octosql.Variables) (RecordStream, error) {
-	recordStream, err := node.child.Get(variables)
+	recordStream, err := node.source.Get(variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get record stream")
 	}

@@ -10,11 +10,11 @@ import (
 
 type Filter struct {
 	formula Formula
-	child   Node
+	source  Node
 }
 
 func NewFilter(formula Formula, child Node) *Filter {
-	return &Filter{formula: formula, child: child}
+	return &Filter{formula: formula, source: child}
 }
 
 func (node *Filter) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
@@ -22,14 +22,14 @@ func (node *Filter) Physical(ctx context.Context, physicalCreator *PhysicalPlanC
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for formula")
 	}
-	child, childVariables, err := node.child.Physical(ctx, physicalCreator)
+	child, childVariables, err := node.source.Physical(ctx, physicalCreator)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get physical plan for filter child node")
+		return nil, nil, errors.Wrap(err, "couldn't get physical plan for filter source node")
 	}
 
 	variables, err := childVariables.MergeWith(formulaVariables)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't merge variables for filter child")
+		return nil, nil, errors.Wrap(err, "couldn't merge variables for filter source")
 	}
 
 	return physical.NewFilter(formula, child), variables, nil

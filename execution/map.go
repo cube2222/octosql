@@ -7,15 +7,15 @@ import (
 
 type Map struct {
 	expressions []Expression
-	child       Node
+	source      Node
 }
 
 func NewMap(expressions []Expression, child Node) *Map {
-	return &Map{expressions: expressions, child: child}
+	return &Map{expressions: expressions, source: child}
 }
 
 func (node *Map) Get(variables octosql.Variables) (RecordStream, error) {
-	recordStream, err := node.child.Get(variables)
+	recordStream, err := node.source.Get(variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get record stream")
 	}

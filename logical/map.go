@@ -10,11 +10,11 @@ import (
 
 type Map struct {
 	expressions []Expression
-	child       Node
+	source      Node
 }
 
 func NewMap(expressions []Expression, child Node) *Map {
-	return &Map{expressions: expressions, child: child}
+	return &Map{expressions: expressions, source: child}
 }
 
 func (node *Map) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
@@ -39,14 +39,14 @@ func (node *Map) Physical(ctx context.Context, physicalCreator *PhysicalPlanCrea
 		physicalExprs[i] = physicalExpr
 	}
 
-	child, childVariables, err := node.child.Physical(ctx, physicalCreator)
+	child, childVariables, err := node.source.Physical(ctx, physicalCreator)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get physical plan for map child node")
+		return nil, nil, errors.Wrap(err, "couldn't get physical plan for map source node")
 	}
 
 	variables, err = childVariables.MergeWith(variables)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't merge variables for map child")
+		return nil, nil, errors.Wrap(err, "couldn't merge variables for map source")
 	}
 
 	return physical.NewMap(physicalExprs, child), variables, nil

@@ -8,11 +8,11 @@ import (
 
 type Map struct {
 	expressions []Expression
-	child       Node
+	source      Node
 }
 
 func NewMap(expressions []Expression, child Node) *Map {
-	return &Map{expressions: expressions, child: child}
+	return &Map{expressions: expressions, source: child}
 }
 
 func (node *Map) Materialize(ctx context.Context) execution.Node {
@@ -21,5 +21,5 @@ func (node *Map) Materialize(ctx context.Context) execution.Node {
 		matExprs[i] = node.expressions[i].Materialize(ctx)
 	}
 
-	return execution.NewMap(matExprs, node.child.Materialize(ctx))
+	return execution.NewMap(matExprs, node.source.Materialize(ctx))
 }

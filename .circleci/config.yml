@@ -19,8 +19,10 @@ jobs:
     steps:
       - checkout
 
-      - run: go test -v ./...
+      - run: go test -v ./... | tee /tmp/test-results/go-test.out
 
+      - store_test_results:
+          path: /tmp/test-results/go-test.out
   release:
     docker:
       - image: circleci/golang:1.12

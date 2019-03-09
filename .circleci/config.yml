@@ -3,6 +3,9 @@ workflows:
   test:
     jobs:
       - test
+  release:
+    jobs:
+      - release
 
 version: 2
 jobs:

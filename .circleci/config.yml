@@ -1,10 +1,8 @@
 workflows:
   version: 2
-  test:
+  test-release:
     jobs:
       - test
-  release:
-    jobs:
       - release:
           filters:
             branches:

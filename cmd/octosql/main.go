@@ -4,26 +4,40 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
+	"github.com/bradleyjkemp/memviz"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/logical"
+	"github.com/cube2222/octosql/parser"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/storage/json"
+	"github.com/xwb1989/sqlparser"
 )
 
 func main() {
-	/*stmt, err := sqlparser.Parse("SELECT prefix(name, 3), age FROM (SELECT * FROM users) g")
+	stmt, err := sqlparser.Parse(`
+SELECT p3.name, (SELECT p1.city FROM people p1 WHERE p3.name = 'Kuba' AND p1.name = 'adam') as city
+FROM (Select * from people p4) p3
+WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age`)
 	if err != nil {
 		log.Println(err)
 	}
 
-	log.Println(stmt)
-
 	if typed, ok := stmt.(*sqlparser.Select); ok {
-		log.Println(typed)
-		log.Println(typed)
-	}*/
+		parsed, err := parser.ParseSelect(typed)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		f, err := os.Create("diag")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer f.Close()
+		memmap.Map(f, parsed)
+	}
 
 	/*client := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
@@ -71,6 +85,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}*/
+
+}
+
+func hello() {
 	var record *execution.Record
 	ctx := context.Background()
 
@@ -84,7 +102,7 @@ func main() {
 
 	// SELECT name, city FROM people WHERE age > 3
 	logicalPlan := logical.NewMap(
-		[]logical.Expression{
+		[]logical.NamedExpression{
 			logical.NewVariable("people.name"),
 			logical.NewVariable("people.surname"),
 			logical.NewVariable("people.city"),
@@ -134,45 +152,49 @@ func main() {
 	// WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age
 
 	logicalPlan2 := logical.NewMap(
-		[]logical.Expression{
+		[]logical.NamedExpression{
 			logical.NewVariable("p3.name"),
-			logical.NewNodeExpression(
+			logical.NewAliasedExpression(
 				"city",
-				logical.NewMap(
-					[]logical.Expression{logical.NewVariable("p1.city")},
-					logical.NewFilter(
-						logical.NewInfixOperator(
-							logical.NewPredicate(
-								logical.NewVariable("p3.name"),
-								logical.NewRelation("="),
-								logical.NewConstant("Kuba"),
+				logical.NewNodeExpression(
+					logical.NewMap(
+						[]logical.NamedExpression{logical.NewVariable("p1.city")},
+						logical.NewFilter(
+							logical.NewInfixOperator(
+								logical.NewPredicate(
+									logical.NewVariable("p3.name"),
+									logical.NewRelation("="),
+									logical.NewConstant("Kuba"),
+								),
+								logical.NewPredicate(
+									logical.NewVariable("p1.name"),
+									logical.NewRelation("="),
+									logical.NewConstant("adam"),
+								),
+								"AND",
 							),
-							logical.NewPredicate(
-								logical.NewVariable("p1.name"),
-								logical.NewRelation("="),
-								logical.NewConstant("adam"),
-							),
-							"AND",
-						),
 
-						logical.NewDataSource("people", "p1"),
+							logical.NewDataSource("people", "p1"),
+						),
 					),
 				),
 			),
 		},
 		logical.NewFilter(
 			logical.NewPredicate(
-				logical.NewNodeExpression(
+				logical.NewAliasedExpression(
 					"wojtek_age",
-					logical.NewMap(
-						[]logical.Expression{logical.NewVariable("p2.age")},
-						logical.NewFilter(
-							logical.NewPredicate(
-								logical.NewVariable("p2.name"),
-								logical.NewRelation("="),
-								logical.NewConstant("wojtek"),
+					logical.NewNodeExpression(
+						logical.NewMap(
+							[]logical.NamedExpression{logical.NewVariable("p2.age")},
+							logical.NewFilter(
+								logical.NewPredicate(
+									logical.NewVariable("p2.name"),
+									logical.NewRelation("="),
+									logical.NewConstant("wojtek"),
+								),
+								logical.NewDataSource("people", "p2"),
 							),
-							logical.NewDataSource("people", "p2"),
 						),
 					),
 				),

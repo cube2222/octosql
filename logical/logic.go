@@ -65,8 +65,8 @@ type PrefixOperator struct {
 	Operator string
 }
 
-func NewPrefixOperator(operator string) *PrefixOperator {
-	return &PrefixOperator{Operator: operator}
+func NewPrefixOperator(child Formula, operator string) *PrefixOperator {
+	return &PrefixOperator{Child: child, Operator: operator}
 }
 
 func (f *PrefixOperator) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Formula, octosql.Variables, error) {

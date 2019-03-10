@@ -6,7 +6,7 @@ import (
 	"github.com/cube2222/octosql/execution"
 )
 
-// TODO: Here's the place for functions which make optimizations based on the formula possible
+// TODO: Here's the place (in this package) for functions which make optimizations based on the formula possible
 type Filter struct {
 	formula Formula
 	source  Node

@@ -6,11 +6,11 @@ import (
 )
 
 type Map struct {
-	expressions []Expression
+	expressions []NamedExpression
 	source      Node
 }
 
-func NewMap(expressions []Expression, child Node) *Map {
+func NewMap(expressions []NamedExpression, child Node) *Map {
 	return &Map{expressions: expressions, source: child}
 }
 
@@ -28,7 +28,7 @@ func (node *Map) Get(variables octosql.Variables) (RecordStream, error) {
 }
 
 type MappedStream struct {
-	expressions []Expression
+	expressions []NamedExpression
 	variables   octosql.Variables
 	source      RecordStream
 }

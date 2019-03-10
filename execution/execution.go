@@ -11,6 +11,10 @@ type Node interface {
 
 type Expression interface {
 	ExpressionValue(variables octosql.Variables) (interface{}, error)
+}
+
+type NamedExpression interface {
+	Expression
 	Name() octosql.VariableName
 }
 
@@ -35,12 +39,11 @@ func (v *Variable) Name() octosql.VariableName {
 }
 
 type NodeExpression struct {
-	name octosql.VariableName
 	node Node
 }
 
-func NewNodeExpression(name octosql.VariableName, node Node) *NodeExpression {
-	return &NodeExpression{name: name, node: node}
+func NewNodeExpression(node Node) *NodeExpression {
+	return &NodeExpression{node: node}
 }
 
 func (ne *NodeExpression) ExpressionValue(variables octosql.Variables) (interface{}, error) {
@@ -79,6 +82,19 @@ func (ne *NodeExpression) ExpressionValue(variables octosql.Variables) (interfac
 	return record.Value(record.Fields()[0].Name), nil
 }
 
-func (ne *NodeExpression) Name() octosql.VariableName {
-	return ne.name
+type AliasedExpression struct {
+	name octosql.VariableName
+	expr Expression
+}
+
+func NewAliasedExpression(name octosql.VariableName, expr Expression) *AliasedExpression {
+	return &AliasedExpression{name: name, expr: expr}
+}
+
+func (alExpr *AliasedExpression) ExpressionValue(variables octosql.Variables) (interface{}, error) {
+	return alExpr.expr.ExpressionValue(variables)
+}
+
+func (alExpr *AliasedExpression) Name() octosql.VariableName {
+	return alExpr.name
 }

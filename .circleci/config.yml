@@ -1,11 +1,11 @@
 workflows:
   version: 2
-  test:
+  test-release:
     jobs:
       - test
-  release:
-    jobs:
       - release:
+          requires:
+            - test
           filters:
             branches:
               only: master

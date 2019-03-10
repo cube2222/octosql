@@ -38,7 +38,7 @@ type RequalifiedStream struct {
 }
 
 // TODO: Do table name validation on logical -> physical plan transformation
-var simpleQualifierMatcher = regexp.MustCompile("[a-zA-Z0-9-_]")
+var simpleQualifierMatcher = regexp.MustCompile("[a-zA-Z0-9-_]+")
 
 func (stream *RequalifiedStream) Next() (*Record, error) {
 	record, err := stream.source.Next()

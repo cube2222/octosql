@@ -37,24 +37,24 @@ func (v *Variable) MaterializeNamed(ctx context.Context) execution.NamedExpressi
 }
 
 type NodeExpression struct {
-	node Node
+	Node Node
 }
 
 func NewNodeExpression(node Node) *NodeExpression {
-	return &NodeExpression{node: node}
+	return &NodeExpression{Node: node}
 }
 
 func (ne *NodeExpression) Materialize(ctx context.Context) execution.Expression {
-	return execution.NewNodeExpression(ne.node.Materialize(ctx))
+	return execution.NewNodeExpression(ne.Node.Materialize(ctx))
 }
 
 type AliasedExpression struct {
 	name octosql.VariableName
-	expr Expression
+	Expr Expression
 }
 
 func NewAliasedExpression(name octosql.VariableName, expr Expression) *AliasedExpression {
-	return &AliasedExpression{name: name, expr: expr}
+	return &AliasedExpression{name: name, Expr: expr}
 }
 
 func (alExpr *AliasedExpression) Materialize(ctx context.Context) execution.Expression {
@@ -62,5 +62,5 @@ func (alExpr *AliasedExpression) Materialize(ctx context.Context) execution.Expr
 }
 
 func (alExpr *AliasedExpression) MaterializeNamed(ctx context.Context) execution.NamedExpression {
-	return execution.NewAliasedExpression(alExpr.name, alExpr.expr.Materialize(ctx))
+	return execution.NewAliasedExpression(alExpr.name, alExpr.Expr.Materialize(ctx))
 }

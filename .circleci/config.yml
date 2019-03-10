@@ -5,7 +5,10 @@ workflows:
       - test
   release:
     jobs:
-      - release
+      - release:
+          filters:
+            branches:
+              only: master
 
 version: 2
 jobs:

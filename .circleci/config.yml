@@ -4,6 +4,8 @@ workflows:
     jobs:
       - test
       - release:
+          requires:
+            - test
           filters:
             branches:
               only: master

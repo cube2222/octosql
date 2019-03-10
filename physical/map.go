@@ -7,19 +7,19 @@ import (
 )
 
 type Map struct {
-	expressions []Expression
-	source      Node
+	Expressions []NamedExpression
+	Source      Node
 }
 
-func NewMap(expressions []Expression, child Node) *Map {
-	return &Map{expressions: expressions, source: child}
+func NewMap(expressions []NamedExpression, child Node) *Map {
+	return &Map{Expressions: expressions, Source: child}
 }
 
 func (node *Map) Materialize(ctx context.Context) execution.Node {
-	matExprs := make([]execution.Expression, len(node.expressions))
-	for i := range node.expressions {
-		matExprs[i] = node.expressions[i].Materialize(ctx)
+	matExprs := make([]execution.NamedExpression, len(node.Expressions))
+	for i := range node.Expressions {
+		matExprs[i] = node.Expressions[i].MaterializeNamed(ctx)
 	}
 
-	return execution.NewMap(matExprs, node.source.Materialize(ctx))
+	return execution.NewMap(matExprs, node.Source.Materialize(ctx))
 }

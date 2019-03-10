@@ -9,19 +9,19 @@ import (
 )
 
 type Map struct {
-	expressions []Expression
+	expressions []NamedExpression
 	source      Node
 }
 
-func NewMap(expressions []Expression, child Node) *Map {
+func NewMap(expressions []NamedExpression, child Node) *Map {
 	return &Map{expressions: expressions, source: child}
 }
 
 func (node *Map) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
-	physicalExprs := make([]physical.Expression, len(node.expressions))
+	physicalExprs := make([]physical.NamedExpression, len(node.expressions))
 	variables := octosql.NoVariables()
 	for i := range node.expressions {
-		physicalExpr, exprVariables, err := node.expressions[i].Physical(ctx, physicalCreator)
+		physicalExpr, exprVariables, err := node.expressions[i].PhysicalNamed(ctx, physicalCreator)
 		if err != nil {
 			return nil, nil, errors.Wrapf(
 				err,

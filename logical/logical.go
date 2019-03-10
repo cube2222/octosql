@@ -52,6 +52,11 @@ type Expression interface {
 	Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error)
 }
 
+type NamedExpression interface {
+	Expression
+	PhysicalNamed(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.NamedExpression, octosql.Variables, error)
+}
+
 type Variable struct {
 	name octosql.VariableName
 }
@@ -61,6 +66,10 @@ func NewVariable(name octosql.VariableName) *Variable {
 }
 
 func (v *Variable) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
+	return v.PhysicalNamed(ctx, physicalCreator)
+}
+
+func (v *Variable) PhysicalNamed(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.NamedExpression, octosql.Variables, error) {
 	return physical.NewVariable(v.name), octosql.NoVariables(), nil
 }
 
@@ -80,12 +89,11 @@ func (v *Constant) Physical(ctx context.Context, physicalCreator *PhysicalPlanCr
 }
 
 type NodeExpression struct {
-	name octosql.VariableName
 	node Node
 }
 
-func NewNodeExpression(name octosql.VariableName, node Node) *NodeExpression {
-	return &NodeExpression{name: name, node: node}
+func NewNodeExpression(node Node) *NodeExpression {
+	return &NodeExpression{node: node}
 }
 
 func (ne *NodeExpression) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
@@ -93,5 +101,26 @@ func (ne *NodeExpression) Physical(ctx context.Context, physicalCreator *Physica
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for node expression")
 	}
-	return physical.NewNodeExpression(ne.name, physicalNode), variables, nil
+	return physical.NewNodeExpression(physicalNode), variables, nil
+}
+
+type AliasedExpression struct {
+	name octosql.VariableName
+	expr Expression
+}
+
+func NewAliasedExpression(name octosql.VariableName, expr Expression) NamedExpression {
+	return &AliasedExpression{name: name, expr: expr}
+}
+
+func (alExpr *AliasedExpression) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
+	return alExpr.PhysicalNamed(ctx, physicalCreator)
+}
+
+func (alExpr *AliasedExpression) PhysicalNamed(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.NamedExpression, octosql.Variables, error) {
+	physicalNode, variables, err := alExpr.expr.Physical(ctx, physicalCreator)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't get physical plan for aliased expression")
+	}
+	return physical.NewAliasedExpression(alExpr.name, physicalNode), variables, nil
 }

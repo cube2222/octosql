@@ -12,6 +12,7 @@ import (
 )
 
 // TODO: W sumie to jeszcze moze byc "boolean node expression" chociaz oczywiscie dziala przez (costam) = TRUE
+// TODO: Better error handling everywhere (not panic because of invalid typecast)
 
 func ParseSelect(statement sqlparser.SelectStatement) (logical.Node, error) {
 	switch statement := statement.(type) {
@@ -106,7 +107,9 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 		var err error
 		switch expr.Type {
 		case sqlparser.IntVal:
-			value, err = strconv.ParseInt(string(expr.Val), 10, 64)
+			var i int64
+			i, err = strconv.ParseInt(string(expr.Val), 10, 64)
+			value = int(i)
 		case sqlparser.FloatVal:
 			value, err = strconv.ParseFloat(string(expr.Val), 64)
 		case sqlparser.StrVal:
@@ -122,8 +125,8 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 	case *sqlparser.NullVal:
 		return logical.NewConstant(nil), nil
 
-	case *sqlparser.BoolVal:
-		return logical.NewConstant(*expr), nil
+	case sqlparser.BoolVal:
+		return logical.NewConstant(expr), nil
 
 	default:
 		return nil, errors.Errorf("unsupported expression %+v of type %v", expr, reflect.TypeOf(expr))
@@ -132,6 +135,8 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 
 func ParseLogic(expr sqlparser.Expr) (logical.Formula, error) {
 	switch expr := expr.(type) {
+	case sqlparser.BoolVal:
+		return logical.NewBooleanConstant(bool(expr)), nil
 	case *sqlparser.AndExpr:
 		return ParseInfixOperator(expr.Left, expr.Right, "AND")
 	case *sqlparser.OrExpr:

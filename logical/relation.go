@@ -12,7 +12,7 @@ type Relation string
 
 const (
 	Equal    Relation = "="
-	NotEqual Relation = "<>"
+	NotEqual Relation = "!="
 	MoreThan Relation = ">"
 	LessThan Relation = "<"
 	Like     Relation = "like"

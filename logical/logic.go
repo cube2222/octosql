@@ -13,6 +13,7 @@ type Formula interface {
 	Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Formula, octosql.Variables, error)
 }
 
+// TODO: Check if parsed in sql
 type BooleanConstant struct {
 	Value bool
 }

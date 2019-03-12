@@ -12,7 +12,6 @@ import (
 )
 
 // TODO: W sumie to jeszcze moze byc "boolean node expression" chociaz oczywiscie dziala przez (costam) = TRUE
-// TODO: Better error handling everywhere (not panic because of invalid typecast)
 
 func ParseSelect(statement sqlparser.SelectStatement) (logical.Node, error) {
 	switch statement := statement.(type) {
@@ -20,7 +19,17 @@ func ParseSelect(statement sqlparser.SelectStatement) (logical.Node, error) {
 		var err error
 		var root logical.Node
 
-		root, err = ParseTableExpression(statement.From[0].(*sqlparser.AliasedTableExpr))
+		if len(statement.From) != 1 {
+			return nil, errors.Errorf("currently only one expression in from supported, got %v", len(statement.From))
+		}
+
+		aliasedTableFrom, ok := statement.From[0].(*sqlparser.AliasedTableExpr)
+		if !ok {
+			return nil, errors.Errorf("expected aliased table expression in from, got %v %v",
+				statement.From[0], reflect.TypeOf(statement.From[0]))
+		}
+
+		root, err = ParseTableExpression(aliasedTableFrom)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't parse from expression")
 		}
@@ -41,7 +50,13 @@ func ParseSelect(statement sqlparser.SelectStatement) (logical.Node, error) {
 
 		expressions := make([]logical.NamedExpression, len(statement.SelectExprs))
 		for i := range statement.SelectExprs {
-			expressions[i], err = ParseAliasedExpression(statement.SelectExprs[i].(*sqlparser.AliasedExpr))
+			aliasedExpression, ok := statement.SelectExprs[i].(*sqlparser.AliasedExpr)
+			if !ok {
+				return nil, errors.Errorf("expected aliased expression in select on index %v, got %v %v",
+					i, statement.SelectExprs[i], reflect.TypeOf(statement.SelectExprs[i]))
+			}
+
+			expressions[i], err = ParseAliasedExpression(aliasedExpression)
 			if err != nil {
 				return nil, errors.Wrapf(err, "couldn't parse aliased expression with index %d", i)
 			}
@@ -96,7 +111,12 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 		return logical.NewVariable(octosql.VariableName(name)), nil
 
 	case *sqlparser.Subquery:
-		subquery, err := ParseSelect(expr.Select.(*sqlparser.Select))
+		selectExpr, ok := expr.Select.(*sqlparser.Select)
+		if !ok {
+			return nil, errors.Errorf("expected select statement in subquery, go %v %v",
+				expr.Select, reflect.TypeOf(expr.Select))
+		}
+		subquery, err := ParseSelect(selectExpr)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't parse select expression")
 		}

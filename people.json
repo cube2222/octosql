@@ -1,6 +1,4 @@
 {"name": "jan", "surname": "chomiak", "age": 3, "city": "warsaw"}
 {"name": "wojtek", "surname": "kuzminski", "age": 4, "city": "warsaw"}
 {"name": "adam", "surname": "cz", "age": 5, "city": "ciechanowo"}
-{"name": "Kuba", "surname": "M", "age": 2, "city": {"name": "ciechanowo",
-  "population": 3500
-}, "pochodzenie": ["polska", "niemcy"]}
+{"name": "Kuba", "surname": "M", "age": 2, "city": "warsaw", "pochodzenie": ["polska", "niemcy"]}

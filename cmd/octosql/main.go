@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/bradleyjkemp/memviz"
+	memmap "github.com/bradleyjkemp/memviz"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/parser"
@@ -18,9 +18,10 @@ import (
 
 func main() {
 	stmt, err := sqlparser.Parse(`
-SELECT p3.name, (SELECT p1.city FROM people p1 WHERE p3.name = 'Kuba' AND p1.name = 'adam') as city
-FROM (Select * from people p4) p3
-WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age`)
+	SELECT p3.name, (SELECT p1.city FROM people p1 WHERE p3.name = 'Kuba' AND p1.name = 'adam') as city
+	FROM (Select * from people p4) p3
+	WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age`)
+	//stmt, err := sqlparser.Parse("SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 3")
 	if err != nil {
 		log.Println(err)
 	}
@@ -31,12 +32,25 @@ WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age`)
 			log.Fatal(err)
 		}
 
+		ctx := context.Background()
+
+		dataSourceRespository := physical.NewDataSourceRepository()
+		err = dataSourceRespository.Register("people", json.NewDataSourceBuilderFactory("people.json"))
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		phys, _, err := parsed.Physical(ctx, logical.NewPhysicalPlanCreator(dataSourceRespository))
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		f, err := os.Create("diag")
 		if err != nil {
 			log.Fatal(err)
 		}
 		defer f.Close()
-		memmap.Map(f, parsed)
+		memmap.Map(f, phys)
 	}
 
 	/*client := redis.NewClient(&redis.Options{
@@ -125,7 +139,10 @@ func hello() {
 		log.Fatal(err)
 	}
 
-	executor := physicalPlan.Materialize(ctx)
+	executor, err := physicalPlan.Materialize(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
 	stream, err := executor.Get(variables)
 	if err != nil {
 		log.Fatal(err)
@@ -213,7 +230,10 @@ func hello() {
 		log.Fatal(err)
 	}
 
-	executor2 := physicalPlan2.Materialize(ctx)
+	executor2, err := physicalPlan2.Materialize(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
 	stream2, err := executor2.Get(variables2)
 	if err != nil {
 		log.Fatal(err)

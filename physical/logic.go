@@ -4,10 +4,11 @@ import (
 	"context"
 
 	"github.com/cube2222/octosql/execution"
+	"github.com/pkg/errors"
 )
 
 type Formula interface {
-	Materialize(ctx context.Context) execution.Formula
+	Materialize(ctx context.Context) (execution.Formula, error)
 }
 
 type Constant struct {
@@ -18,8 +19,8 @@ func NewConstant(value bool) *Constant {
 	return &Constant{Value: value}
 }
 
-func (f *Constant) Materialize(ctx context.Context) execution.Formula {
-	return execution.NewConstant(f.Value)
+func (f *Constant) Materialize(ctx context.Context) (execution.Formula, error) {
+	return execution.NewConstant(f.Value), nil
 }
 
 type And struct {
@@ -30,8 +31,16 @@ func NewAnd(left Formula, right Formula) *And {
 	return &And{Left: left, Right: right}
 }
 
-func (f *And) Materialize(ctx context.Context) execution.Formula {
-	return execution.NewAnd(f.Left.Materialize(ctx), f.Right.Materialize(ctx))
+func (f *And) Materialize(ctx context.Context) (execution.Formula, error) {
+	materializedLeft, err := f.Left.Materialize(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't materialize left operand")
+	}
+	materializedRight, err := f.Right.Materialize(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't materialize right operand")
+	}
+	return execution.NewAnd(materializedLeft, materializedRight), nil
 }
 
 type Or struct {
@@ -42,8 +51,16 @@ func NewOr(left Formula, right Formula) *Or {
 	return &Or{Left: left, Right: right}
 }
 
-func (f *Or) Materialize(ctx context.Context) execution.Formula {
-	return execution.NewOr(f.Left.Materialize(ctx), f.Right.Materialize(ctx))
+func (f *Or) Materialize(ctx context.Context) (execution.Formula, error) {
+	materializedLeft, err := f.Left.Materialize(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't materialize left operand")
+	}
+	materializedRight, err := f.Right.Materialize(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't materialize right operand")
+	}
+	return execution.NewOr(materializedLeft, materializedRight), nil
 }
 
 type Not struct {
@@ -54,8 +71,12 @@ func NewNot(child Formula) *Not {
 	return &Not{Child: child}
 }
 
-func (f *Not) Materialize(ctx context.Context) execution.Formula {
-	return execution.NewNot(f.Child.Materialize(ctx))
+func (f *Not) Materialize(ctx context.Context) (execution.Formula, error) {
+	materialized, err := f.Child.Materialize(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't materialize operand")
+	}
+	return execution.NewNot(materialized), nil
 }
 
 type Predicate struct {
@@ -68,6 +89,14 @@ func NewPredicate(left Expression, relation Relation, right Expression) *Predica
 	return &Predicate{Left: left, Relation: relation, Right: right}
 }
 
-func (f *Predicate) Materialize(ctx context.Context) execution.Formula {
-	return execution.NewPredicate(f.Left.Materialize(ctx), f.Relation.Materialize(ctx), f.Right.Materialize(ctx))
+func (f *Predicate) Materialize(ctx context.Context) (execution.Formula, error) {
+	materializedLeft, err := f.Left.Materialize(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't materialize left operand")
+	}
+	materializedRight, err := f.Right.Materialize(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't materialize right operand")
+	}
+	return execution.NewPredicate(materializedLeft, f.Relation.Materialize(ctx), materializedRight), nil
 }

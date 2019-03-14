@@ -24,11 +24,11 @@ type DataSource struct {
 
 func NewDataSourceBuilderFactory(path string) func(alias string) *physical.DataSourceBuilder {
 	return physical.NewDataSourceBuilderFactory(
-		func(filter physical.Formula, alias string) execution.Node {
+		func(filter physical.Formula, alias string) (execution.Node, error) {
 			return &DataSource{
 				path:  path,
 				alias: alias,
-			}
+			}, nil
 		},
 		nil,
 		availableFilters,

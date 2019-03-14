@@ -48,14 +48,14 @@ func (repo *DataSourceRepository) Register(dataSourceName string, factory func(a
 }
 
 type DataSourceBuilder struct {
-	executor         func(formula Formula, alias string) execution.Node
+	executor         func(formula Formula, alias string) (execution.Node, error)
 	primaryKeys      []octosql.VariableName
 	availableFilters map[FieldType]map[Relation]struct{}
 	filter           Formula
 	alias            string
 }
 
-func NewDataSourceBuilderFactory(executor func(filter Formula, alias string) execution.Node, primaryKeys []octosql.VariableName, availableFilters map[FieldType]map[Relation]struct{}) func(alias string) *DataSourceBuilder {
+func NewDataSourceBuilderFactory(executor func(filter Formula, alias string) (execution.Node, error), primaryKeys []octosql.VariableName, availableFilters map[FieldType]map[Relation]struct{}) func(alias string) *DataSourceBuilder {
 	return func(alias string) *DataSourceBuilder {
 		return &DataSourceBuilder{
 			executor:         executor,
@@ -83,6 +83,6 @@ func (ds *DataSourceBuilder) AddFilter(formula Formula) {
 	ds.filter = NewAnd(ds.filter, formula)
 }
 
-func (ds *DataSourceBuilder) Materialize(ctx context.Context) execution.Node {
+func (ds *DataSourceBuilder) Materialize(ctx context.Context) (execution.Node, error) {
 	return ds.executor(ds.filter, ds.alias)
 }

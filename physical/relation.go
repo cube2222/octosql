@@ -37,7 +37,7 @@ func (rel Relation) Materialize(ctx context.Context) execution.Relation {
 	case In:
 		return execution.NewIn()
 	default:
-		log.Fatalf("Invalid relation: %+v", rel)
+		log.Fatalf("Invalid relation: %+v", rel) // This should be filtered at the logical plan level
 		return nil
 	}
 }

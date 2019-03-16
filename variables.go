@@ -3,6 +3,15 @@ package octosql
 import "github.com/pkg/errors"
 
 type VariableName string
+
+func NewVariableName(varname string) VariableName {
+	return VariableName(varname)
+}
+
+func (vn *VariableName) String() string {
+	return string(*vn)
+}
+
 type Variables map[VariableName]interface{}
 
 func NoVariables() Variables {

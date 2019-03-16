@@ -19,7 +19,9 @@ type AnyNodeMatcher struct {
 }
 
 func (m *AnyNodeMatcher) Match(match *Match, node physical.Node) bool {
-	match.Nodes[m.Name] = node
+	if len(m.Name) > 0 {
+		match.Nodes[m.Name] = node
+	}
 	return true
 }
 
@@ -46,7 +48,9 @@ func (m *RequalifierMatcher) Match(match *Match, node physical.Node) bool {
 			return false
 		}
 	}
-	match.Nodes[m.Name] = node
+	if len(m.Name) > 0 {
+		match.Nodes[m.Name] = node
+	}
 	return true
 }
 
@@ -62,7 +66,7 @@ func (m *FilterMatcher) Match(match *Match, node physical.Node) bool {
 		return false
 	}
 	if m.Formula != nil {
-		matched := m.Formula.Match(match, filter.Formula) // Fomuly dopiero potem matchowac
+		matched := m.Formula.Match(match, filter.Formula)
 		if !matched {
 			return false
 		}
@@ -73,13 +77,37 @@ func (m *FilterMatcher) Match(match *Match, node physical.Node) bool {
 			return false
 		}
 	}
-	match.Nodes[m.Name] = node
+	if len(m.Name) > 0 {
+		match.Nodes[m.Name] = node
+	}
 	return true
 }
 
-type DataSourceMatcher struct {
+type DataSourceBuilderMatcher struct {
+	Name    string
+	Formula FormulaMatcher
+	Alias   StringMatcher
 }
 
-func (*DataSourceMatcher) Match(match *Match, node physical.Node) bool {
-	panic("implement me")
+func (m *DataSourceBuilderMatcher) Match(match *Match, node physical.Node) bool {
+	dsb, ok := node.(*physical.DataSourceBuilder)
+	if !ok {
+		return false
+	}
+	if m.Formula != nil {
+		matched := m.Formula.Match(match, dsb.Filter)
+		if !matched {
+			return false
+		}
+	}
+	if m.Alias != nil {
+		matched := m.Alias.Match(match, dsb.Alias)
+		if !matched {
+			return false
+		}
+	}
+	if len(m.Name) > 0 {
+		match.Nodes[m.Name] = node
+	}
+	return true
 }

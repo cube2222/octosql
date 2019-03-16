@@ -7,7 +7,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// TODO: Here's the place (in this package) for functions which make optimizations based on the formula possible
 type Filter struct {
 	Formula Formula
 	Source  Node

@@ -9,6 +9,8 @@ type AnyStringMatcher struct {
 }
 
 func (m *AnyStringMatcher) Match(match *Match, text string) bool {
-	match.Strings[m.Name] = text
+	if len(m.Name) > 0 {
+		match.Strings[m.Name] = text
+	}
 	return true
 }

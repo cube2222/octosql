@@ -48,41 +48,25 @@ func (repo *DataSourceRepository) Register(dataSourceName string, factory func(a
 }
 
 type DataSourceBuilder struct {
-	executor         func(formula Formula, alias string) (execution.Node, error)
-	primaryKeys      []octosql.VariableName
-	availableFilters map[FieldType]map[Relation]struct{}
-	filter           Formula
-	alias            string
+	Executor         func(formula Formula, alias string) (execution.Node, error)
+	PrimaryKeys      []octosql.VariableName
+	AvailableFilters map[FieldType]map[Relation]struct{}
+	Filter           Formula
+	Alias            string
 }
 
 func NewDataSourceBuilderFactory(executor func(filter Formula, alias string) (execution.Node, error), primaryKeys []octosql.VariableName, availableFilters map[FieldType]map[Relation]struct{}) func(alias string) *DataSourceBuilder {
 	return func(alias string) *DataSourceBuilder {
 		return &DataSourceBuilder{
-			executor:         executor,
-			primaryKeys:      primaryKeys,
-			availableFilters: availableFilters,
-			filter:           NewConstant(true),
-			alias:            alias,
+			Executor:         executor,
+			PrimaryKeys:      primaryKeys,
+			AvailableFilters: availableFilters,
+			Filter:           NewConstant(true),
+			Alias:            alias,
 		}
 	}
 }
 
-func (ds *DataSourceBuilder) PrimaryKeys() map[octosql.VariableName]struct{} {
-	out := make(map[octosql.VariableName]struct{})
-	for _, k := range ds.primaryKeys {
-		out[k] = struct{}{}
-	}
-	return out
-}
-
-func (ds *DataSourceBuilder) AvailableFilters() map[FieldType]map[Relation]struct{} {
-	return ds.availableFilters
-}
-
-func (ds *DataSourceBuilder) AddFilter(formula Formula) {
-	ds.filter = NewAnd(ds.filter, formula)
-}
-
 func (ds *DataSourceBuilder) Materialize(ctx context.Context) (execution.Node, error) {
-	return ds.executor(ds.filter, ds.alias)
+	return ds.Executor(ds.Filter, ds.Alias)
 }

@@ -19,7 +19,9 @@ type AnyFormulaMatcher struct {
 }
 
 func (m *AnyFormulaMatcher) Match(match *Match, formula physical.Formula) bool {
-	match.Formulas[m.Name] = formula
+	if len(m.Name) > 0 {
+		match.Formulas[m.Name] = formula
+	}
 	return true
 }
 

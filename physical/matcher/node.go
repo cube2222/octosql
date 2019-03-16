@@ -1,14 +1,11 @@
 package matcher
 
 import (
-	"log"
-
 	"github.com/cube2222/octosql/physical"
 )
 
 type NodeMatcher interface {
-	Match(node physical.Node) bool
-	Replace(match *Match) physical.Node
+	Match(match *Match, node physical.Node) bool
 }
 
 func MatchNode(name string) *AnyNodeMatcher {
@@ -21,61 +18,68 @@ type AnyNodeMatcher struct {
 	Name string
 }
 
-func (m *AnyNodeMatcher) Match(node physical.Node) bool {
+func (m *AnyNodeMatcher) Match(match *Match, node physical.Node) bool {
+	match.Nodes[m.Name] = node
 	return true
 }
 
-func (m *AnyNodeMatcher) Replace(match *Match) physical.Node {
-	node, ok := match.nodes[m.Name]
-	if !ok {
-		log.Panicf("Expected to find node named %v after match, found %+v", m.Name, match.nodes)
-	}
-	return node
+type RequalifierMatcher struct {
+	Name      string
+	Qualifier StringMatcher
+	Source    NodeMatcher
 }
 
-func (m *AnyNodeMatcher) MatchFilter() *FilterMatcher {
-	panic("implement me")
-	return &FilterMatcher{
-		Formula: &AnyFormulaMatcher{"unique"},
-		Source:  &AnyNodeMatcher{"unique"},
+func (m *RequalifierMatcher) Match(match *Match, node physical.Node) bool {
+	requalifier, ok := node.(*physical.Requalifier)
+	if !ok {
+		return false
 	}
+	if m.Qualifier != nil {
+		matched := m.Qualifier.Match(match, requalifier.Qualifier)
+		if !matched {
+			return false
+		}
+	}
+	if m.Source != nil {
+		matched := m.Source.Match(match, requalifier.Source)
+		if !matched {
+			return false
+		}
+	}
+	match.Nodes[m.Name] = node
+	return true
 }
 
 type FilterMatcher struct {
+	Name    string
 	Formula FormulaMatcher
 	Source  NodeMatcher
 }
 
-func (m *FilterMatcher) Match(node physical.Node) bool {
-	panic("implement me")
-}
-
-func (m *FilterMatcher) Replace(match *Match) physical.Node {
-	return &physical.Filter{
-		Formula: m.Formula.Replace(match),
-		Source:  m.Source.Replace(match),
+func (m *FilterMatcher) Match(match *Match, node physical.Node) bool {
+	filter, ok := node.(*physical.Filter)
+	if !ok {
+		return false
 	}
-}
-
-func (m *FilterMatcher) MatchSource(matcher NodeMatcher) *FilterMatcher {
-	panic("implement me")
-}
-
-func (m *FilterMatcher) MatchFormula(matcher FormulaMatcher) *FilterMatcher {
-	panic("implement me")
-}
-
-func (m *AnyNodeMatcher) MatchDataSource() *DataSourceMatcher {
-	return &DataSourceMatcher{}
+	if m.Formula != nil {
+		matched := m.Formula.Match(match, filter.Formula) // Fomuly dopiero potem matchowac
+		if !matched {
+			return false
+		}
+	}
+	if m.Source != nil {
+		matched := m.Source.Match(match, filter.Source)
+		if !matched {
+			return false
+		}
+	}
+	match.Nodes[m.Name] = node
+	return true
 }
 
 type DataSourceMatcher struct {
 }
 
-func (*DataSourceMatcher) Match(node physical.Node) bool {
-	panic("implement me")
-}
-
-func (*DataSourceMatcher) Replace(match *Match) physical.Node {
+func (*DataSourceMatcher) Match(match *Match, node physical.Node) bool {
 	panic("implement me")
 }

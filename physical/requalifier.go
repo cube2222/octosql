@@ -8,18 +8,18 @@ import (
 )
 
 type Requalifier struct {
-	qualifier string
-	source    Node
+	Qualifier string
+	Source    Node
 }
 
 func NewRequalifier(qualifier string, child Node) *Requalifier {
-	return &Requalifier{qualifier: qualifier, source: child}
+	return &Requalifier{Qualifier: qualifier, Source: child}
 }
 
 func (node *Requalifier) Materialize(ctx context.Context) (execution.Node, error) {
-	materialized, err := node.source.Materialize(ctx)
+	materialized, err := node.Source.Materialize(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't materialize source node")
+		return nil, errors.Wrap(err, "couldn't materialize Source node")
 	}
-	return execution.NewRequalifier(node.qualifier, materialized), nil
+	return execution.NewRequalifier(node.Qualifier, materialized), nil
 }

@@ -24,7 +24,7 @@ func (node *Filter) Materialize(ctx context.Context) (execution.Node, error) {
 	}
 	materializedSource, err := node.Source.Materialize(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't materialize source")
+		return nil, errors.Wrap(err, "couldn't materialize Source")
 	}
 	return execution.NewFilter(materializedFormula, materializedSource), nil
 }

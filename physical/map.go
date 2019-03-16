@@ -27,7 +27,7 @@ func (node *Map) Materialize(ctx context.Context) (execution.Node, error) {
 	}
 	materialized, err := node.Source.Materialize(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't materialize source node")
+		return nil, errors.Wrap(err, "couldn't materialize Source node")
 	}
 
 	return execution.NewMap(matExprs, materialized), nil

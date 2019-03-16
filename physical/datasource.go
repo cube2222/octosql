@@ -41,7 +41,7 @@ func (repo *DataSourceRepository) Get(dataSourceName, alias string) (*DataSource
 func (repo *DataSourceRepository) Register(dataSourceName string, factory func(alias string) *DataSourceBuilder) error {
 	_, ok := repo.factories[dataSourceName]
 	if ok {
-		return errors.Errorf("data source with name %s already registered", dataSourceName)
+		return errors.Errorf("data Source with name %s already registered", dataSourceName)
 	}
 	repo.factories[dataSourceName] = factory
 	return nil

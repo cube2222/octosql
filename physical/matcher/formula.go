@@ -1,14 +1,11 @@
 package matcher
 
 import (
-	"log"
-
 	"github.com/cube2222/octosql/physical"
 )
 
 type FormulaMatcher interface {
-	Match(node physical.Formula) bool
-	Replace(match *Match) physical.Formula
+	Match(match *Match, formula physical.Formula) bool
 }
 
 func MatchFormula(name string) *AnyFormulaMatcher {
@@ -21,16 +18,9 @@ type AnyFormulaMatcher struct {
 	Name string
 }
 
-func (m *AnyFormulaMatcher) Match(node physical.Formula) bool {
+func (m *AnyFormulaMatcher) Match(match *Match, formula physical.Formula) bool {
+	match.Formulas[m.Name] = formula
 	return true
-}
-
-func (m *AnyFormulaMatcher) Replace(match *Match) physical.Formula {
-	node, ok := match.formulas[m.Name]
-	if !ok {
-		log.Panicf("Expected to find formula named %v after match, found %+v", m.Name, match.nodes)
-	}
-	return node
 }
 
 // ExtractAnd(MatchKeyVariablePredicate(dataSourceName))

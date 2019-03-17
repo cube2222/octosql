@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	memmap "github.com/bradleyjkemp/memviz"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/parser"
@@ -17,238 +16,58 @@ import (
 )
 
 func main() {
-	stmt, err := sqlparser.Parse(`
-	SELECT p3.name, (SELECT p1.city FROM people p1 WHERE p3.name = 'Kuba' AND p1.name = 'adam') as city
-	FROM (Select * from people p4) p3
-	WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age`)
-	//stmt, err := sqlparser.Parse("SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 3")
-	if err != nil {
-		log.Println(err)
-	}
-
-	if typed, ok := stmt.(*sqlparser.Select); ok {
-		parsed, err := parser.ParseSelect(typed)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		ctx := context.Background()
-
-		dataSourceRespository := physical.NewDataSourceRepository()
-		err = dataSourceRespository.Register("people", json.NewDataSourceBuilderFactory("people.json"))
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		phys, _, err := parsed.Physical(ctx, logical.NewPhysicalPlanCreator(dataSourceRespository))
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		f, err := os.Create("diag")
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer f.Close()
-		memmap.Map(f, phys)
-	}
-
-	/*client := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "", // no password set
-		DB:       0,  // use default DB
-	})
-
-	pipe := client.Pipeline()
-	pipe.HSet("Jan", "Surname", "Chomik")
-	pipe.HSet("Jan", "Age", 5)
-	status := pipe.Save()
-	log.Println(status.Err())*/
-
-	/*status := client.HMSet("Wojciech", map[string]interface{}{
-		"Surname": "Kuźminski",
-		"Age": "6",
-	})
-	log.Println(status.Err())*/
-
-	/*res := client.HGetAll("Jan")
-	result, err := res.Result()
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("%+v", result)*/
-
-	/*desc := json.NewJSONDataSourceDescription("people.json")
-	ds, err := desc.Initialize(context.Background(), nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	records, err := ds.Get(nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var record *octosql.Record
-	for record, err = records.Next(); err == nil; record, err = records.Next() {
-		log.Printf("%+v", record.Fields())
-		log.Printf("%+v", record.Value("city"))
-		poch := record.Value("pochodzenie")
-		if poch != nil {
-			log.Printf("%+v", poch.([]interface{})[0])
-		}
-	}
-	if err != nil {
-		log.Fatal(err)
-	}*/
-
-}
-
-func hello() {
-	var record *execution.Record
 	ctx := context.Background()
+	query := os.Args[1]
+
+	stmt, err := sqlparser.Parse(query)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	typed, ok := stmt.(*sqlparser.Select)
+	if !ok {
+		log.Fatal("invalid statement type")
+	}
+	parsed, err := parser.ParseSelect(typed)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	dataSourceRespository := physical.NewDataSourceRepository()
-	err := dataSourceRespository.Register("people", json.NewDataSourceBuilderFactory("people.json"))
+	err = dataSourceRespository.Register("people", json.NewDataSourceBuilderFactory("people.json"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = dataSourceRespository.Register("cities", json.NewDataSourceBuilderFactory("cities.json"))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// ************************* przyklad 1
-
-	// SELECT name, city FROM people WHERE age > 3
-	logicalPlan := logical.NewMap(
-		[]logical.NamedExpression{
-			logical.NewVariable("people.name"),
-			logical.NewVariable("people.surname"),
-			logical.NewVariable("people.city"),
-		},
-		logical.NewFilter(
-			logical.NewPredicate(
-				logical.NewVariable("people.age"),
-				logical.NewRelation(">"),
-				logical.NewConstant(3),
-			),
-			logical.NewDataSource("people", "people"),
-		),
-	)
-
-	physicalPlan, variables, err := logicalPlan.Physical(
-		ctx,
-		logical.NewPhysicalPlanCreator(dataSourceRespository),
-	)
+	phys, variables, err := parsed.Physical(ctx, logical.NewPhysicalPlanCreator(dataSourceRespository))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	executor, err := physicalPlan.Materialize(ctx)
-	if err != nil {
-		log.Fatal(err)
-	}
-	stream, err := executor.Get(variables)
+	exec, err := phys.Materialize(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	for record, err = stream.Next(); err == nil; record, err = stream.Next() {
-		fields := make([]string, len(record.Fields()))
-		for i, field := range record.Fields() {
-			fields[i] = fmt.Sprintf("%s = %v", field.Name, record.Value(field.Name))
+	stream, err := exec.Get(variables)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var rec *execution.Record
+	for rec, err = stream.Next(); err == nil; rec, err = stream.Next() {
+		var out []string
+		fields := rec.Fields()
+		for i := range fields {
+			out = append(out, fmt.Sprintf("%v: %v", fields[i].Name, rec.Value(fields[i].Name)))
 		}
-		log.Printf("{ %s }", strings.Join(fields, ", "))
+		fmt.Println(strings.Join(out, ", "))
 	}
-
-	/* prints:
-	2019/03/09 03:12:27 { people.name = wojtek, people.surname = kuzminski, people.city = warsaw }
-	2019/03/09 03:12:27 { people.name = adam, people.surname = cz, people.city = ciechanowo }
-	*/
-
-	// ************************* przyklad 2
-	log.Println("Przyklad 2:")
-
-	// SELECT p3.name, (SELECT p1.city FROM people p1 WHERE p3.name = 'Kuba' AND p1.name = 'adam') as city
-	// FROM people p3
-	// WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age
-
-	logicalPlan2 := logical.NewMap(
-		[]logical.NamedExpression{
-			logical.NewVariable("p3.name"),
-			logical.NewAliasedExpression(
-				"city",
-				logical.NewNodeExpression(
-					logical.NewMap(
-						[]logical.NamedExpression{logical.NewVariable("p1.city")},
-						logical.NewFilter(
-							logical.NewInfixOperator(
-								logical.NewPredicate(
-									logical.NewVariable("p3.name"),
-									logical.NewRelation("="),
-									logical.NewConstant("Kuba"),
-								),
-								logical.NewPredicate(
-									logical.NewVariable("p1.name"),
-									logical.NewRelation("="),
-									logical.NewConstant("adam"),
-								),
-								"AND",
-							),
-
-							logical.NewDataSource("people", "p1"),
-						),
-					),
-				),
-			),
-		},
-		logical.NewFilter(
-			logical.NewPredicate(
-				logical.NewAliasedExpression(
-					"wojtek_age",
-					logical.NewNodeExpression(
-						logical.NewMap(
-							[]logical.NamedExpression{logical.NewVariable("p2.age")},
-							logical.NewFilter(
-								logical.NewPredicate(
-									logical.NewVariable("p2.name"),
-									logical.NewRelation("="),
-									logical.NewConstant("wojtek"),
-								),
-								logical.NewDataSource("people", "p2"),
-							),
-						),
-					),
-				),
-				logical.NewRelation(">"),
-				logical.NewVariable("p3.age"),
-			),
-			logical.NewDataSource("people", "p3"),
-		),
-	)
-
-	physicalPlan2, variables2, err := logicalPlan2.Physical(
-		ctx,
-		logical.NewPhysicalPlanCreator(dataSourceRespository),
-	)
-	if err != nil {
+	if err != execution.ErrEndOfStream {
 		log.Fatal(err)
 	}
-
-	executor2, err := physicalPlan2.Materialize(ctx)
-	if err != nil {
-		log.Fatal(err)
-	}
-	stream2, err := executor2.Get(variables2)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for record, err = stream2.Next(); err == nil; record, err = stream2.Next() {
-		fields := make([]string, len(record.Fields()))
-		for i, field := range record.Fields() {
-			fields[i] = fmt.Sprintf("%s = %v", field.Name, record.Value(field.Name))
-		}
-		log.Printf("{ %s }", strings.Join(fields, ", "))
-	}
-
-	/* prints:
-	2019/03/09 03:12:27 { p3.name = jan, city = <nil> }
-	2019/03/09 03:12:27 { p3.name = Kuba, city = ciechanowo }
-	*/
 }

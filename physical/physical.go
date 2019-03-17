@@ -8,19 +8,37 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Transformers is a structure containing functions to transform each of the physical plan components.
+type Transformers struct {
+	NodeT      func(Node) Node
+	ExprT      func(Expression) Expression
+	NamedExprT func(NamedExpression) NamedExpression
+	FormulaT   func(Formula) Formula
+}
+
+// Node describes a single record stream source.
 type Node interface {
+	// Transform returns a new Node after recursively calling Transform
+	Transform(ctx context.Context, transformers *Transformers) Node
 	Materialize(ctx context.Context) (execution.Node, error)
 }
 
+// Expressions describes a single value source.
 type Expression interface {
+	// Transform returns a new Expression after recursively calling Transform
+	Transform(ctx context.Context, transformers *Transformers) Expression
 	Materialize(ctx context.Context) (execution.Expression, error)
 }
 
+// NamedExpressions describes a single named value source.
 type NamedExpression interface {
 	Expression
+	// TransformNamed returns a new NamedExpression after recursively calling Transform
+	TransformNamed(ctx context.Context, transformers *Transformers) NamedExpression
 	MaterializeNamed(ctx context.Context) (execution.NamedExpression, error)
 }
 
+// Variables describes a variable name.
 type Variable struct {
 	name octosql.VariableName
 }
@@ -29,20 +47,45 @@ func NewVariable(name octosql.VariableName) *Variable {
 	return &Variable{name: name}
 }
 
+func (v *Variable) Transform(ctx context.Context, transformers *Transformers) Expression {
+	return v.TransformNamed(ctx, transformers)
+}
+
 func (v *Variable) Materialize(ctx context.Context) (execution.Expression, error) {
 	return v.MaterializeNamed(ctx)
+}
+
+func (v *Variable) TransformNamed(ctx context.Context, transformers *Transformers) NamedExpression {
+	var expr NamedExpression = &Variable{
+		name: v.name,
+	}
+	if transformers.NamedExprT != nil {
+		expr = transformers.NamedExprT(expr)
+	}
+	return expr
 }
 
 func (v *Variable) MaterializeNamed(ctx context.Context) (execution.NamedExpression, error) {
 	return execution.NewVariable(v.name), nil
 }
 
+// NodeExpressions describes an expression which gets it's value from a node underneath.
 type NodeExpression struct {
 	Node Node
 }
 
 func NewNodeExpression(node Node) *NodeExpression {
 	return &NodeExpression{Node: node}
+}
+
+func (ne *NodeExpression) Transform(ctx context.Context, transformers *Transformers) Expression {
+	var expr Expression = &NodeExpression{
+		Node: ne.Node.Transform(ctx, transformers),
+	}
+	if transformers.ExprT != nil {
+		expr = transformers.ExprT(expr)
+	}
+	return expr
 }
 
 func (ne *NodeExpression) Materialize(ctx context.Context) (execution.Expression, error) {
@@ -53,6 +96,7 @@ func (ne *NodeExpression) Materialize(ctx context.Context) (execution.Expression
 	return execution.NewNodeExpression(materialized), nil
 }
 
+// AliasedExpression describes an expression which is explicitly named.
 type AliasedExpression struct {
 	name octosql.VariableName
 	Expr Expression
@@ -62,8 +106,23 @@ func NewAliasedExpression(name octosql.VariableName, expr Expression) *AliasedEx
 	return &AliasedExpression{name: name, Expr: expr}
 }
 
+func (alExpr *AliasedExpression) Transform(ctx context.Context, transformers *Transformers) Expression {
+	return alExpr.TransformNamed(ctx, transformers)
+}
+
 func (alExpr *AliasedExpression) Materialize(ctx context.Context) (execution.Expression, error) {
 	return alExpr.MaterializeNamed(ctx)
+}
+
+func (alExpr *AliasedExpression) TransformNamed(ctx context.Context, transformers *Transformers) NamedExpression {
+	var expr NamedExpression = &AliasedExpression{
+		name: alExpr.name,
+		Expr: alExpr.Expr.Transform(ctx, transformers),
+	}
+	if transformers.NamedExprT != nil {
+		expr = transformers.NamedExprT(expr)
+	}
+	return expr
 }
 
 func (alExpr *AliasedExpression) MaterializeNamed(ctx context.Context) (execution.NamedExpression, error) {

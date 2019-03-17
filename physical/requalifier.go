@@ -16,6 +16,17 @@ func NewRequalifier(qualifier string, child Node) *Requalifier {
 	return &Requalifier{Qualifier: qualifier, Source: child}
 }
 
+func (node *Requalifier) Transform(ctx context.Context, transformers *Transformers) Node {
+	var transformed Node = &Requalifier{
+		Qualifier: node.Qualifier,
+		Source:    node.Source.Transform(ctx, transformers),
+	}
+	if transformers.NodeT != nil {
+		transformed = transformers.NodeT(transformed)
+	}
+	return transformed
+}
+
 func (node *Requalifier) Materialize(ctx context.Context) (execution.Node, error) {
 	materialized, err := node.Source.Materialize(ctx)
 	if err != nil {

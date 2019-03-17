@@ -4,16 +4,13 @@ import (
 	"github.com/cube2222/octosql/physical"
 )
 
+// NodeMatcher is used to match formulas on different predicates.
 type NodeMatcher interface {
+	// Match tries to match a node filling the match. Returns true on success.
 	Match(match *Match, node physical.Node) bool
 }
 
-func MatchNode(name string) *AnyNodeMatcher {
-	return &AnyNodeMatcher{
-		Name: name,
-	}
-}
-
+// AnyNodeMatcher matches any node.
 type AnyNodeMatcher struct {
 	Name string
 }
@@ -25,6 +22,7 @@ func (m *AnyNodeMatcher) Match(match *Match, node physical.Node) bool {
 	return true
 }
 
+// RequalifierMatcher matches a requalifier with the given attributed matches.
 type RequalifierMatcher struct {
 	Name      string
 	Qualifier StringMatcher
@@ -54,6 +52,7 @@ func (m *RequalifierMatcher) Match(match *Match, node physical.Node) bool {
 	return true
 }
 
+// FilterMatcher matches a filter with the given attribute matches.
 type FilterMatcher struct {
 	Name    string
 	Formula FormulaMatcher
@@ -83,6 +82,7 @@ func (m *FilterMatcher) Match(match *Match, node physical.Node) bool {
 	return true
 }
 
+// DataSourceBuilderMatcher matches a data source builder with the given attribute matches.
 type DataSourceBuilderMatcher struct {
 	Name    string
 	Formula FormulaMatcher

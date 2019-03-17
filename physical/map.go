@@ -16,6 +16,21 @@ func NewMap(expressions []NamedExpression, child Node) *Map {
 	return &Map{Expressions: expressions, Source: child}
 }
 
+func (node *Map) Transform(ctx context.Context, transformers *Transformers) Node {
+	exprs := make([]NamedExpression, len(node.Expressions))
+	for i := range node.Expressions {
+		exprs[i] = node.Expressions[i].TransformNamed(ctx, transformers)
+	}
+	var transformed Node = &Map{
+		Expressions: exprs,
+		Source:      node.Source.Transform(ctx, transformers),
+	}
+	if transformers.NodeT != nil {
+		transformed = transformers.NodeT(transformed)
+	}
+	return transformed
+}
+
 func (node *Map) Materialize(ctx context.Context) (execution.Node, error) {
 	matExprs := make([]execution.NamedExpression, len(node.Expressions))
 	for i := range node.Expressions {

@@ -16,6 +16,17 @@ func NewFilter(formula Formula, child Node) *Filter {
 	return &Filter{Formula: formula, Source: child}
 }
 
+func (node *Filter) Transform(ctx context.Context, transformers *Transformers) Node {
+	var transformed Node = &Filter{
+		Formula: node.Formula.Transform(ctx, transformers),
+		Source:  node.Source.Transform(ctx, transformers),
+	}
+	if transformers.NodeT != nil {
+		transformed = transformers.NodeT(transformed)
+	}
+	return transformed
+}
+
 func (node *Filter) Materialize(ctx context.Context) (execution.Node, error) {
 	materializedFormula, err := node.Formula.Materialize(ctx)
 	if err != nil {

@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// FieldType describes if a key is a primary or secondary attribute.
 type FieldType string
 
 const (
@@ -15,6 +16,8 @@ const (
 	Secondary FieldType = "secondary"
 )
 
+// DataSourceRepository is used to register factories for builders for any data source.
+// It can also later create a builder for any of those data source.
 type DataSourceRepository struct {
 	factories map[string]func(alias string) *DataSourceBuilder
 }
@@ -25,6 +28,7 @@ func NewDataSourceRepository() *DataSourceRepository {
 	}
 }
 
+// Get gets a new builder for a given data source.
 func (repo *DataSourceRepository) Get(dataSourceName, alias string) (*DataSourceBuilder, error) {
 	ds, ok := repo.factories[dataSourceName]
 	if !ok {
@@ -38,6 +42,7 @@ func (repo *DataSourceRepository) Get(dataSourceName, alias string) (*DataSource
 	return ds(alias), nil
 }
 
+// Register registers a builder factory for the given data source name.
 func (repo *DataSourceRepository) Register(dataSourceName string, factory func(alias string) *DataSourceBuilder) error {
 	_, ok := repo.factories[dataSourceName]
 	if ok {
@@ -47,6 +52,8 @@ func (repo *DataSourceRepository) Register(dataSourceName string, factory func(a
 	return nil
 }
 
+// DataSourceBuilder is used to build a data source instance with an alias.
+// It may be given filters, which are later executed at the database level.
 type DataSourceBuilder struct {
 	Executor         func(formula Formula, alias string) (execution.Node, error)
 	PrimaryKeys      []octosql.VariableName
@@ -67,6 +74,20 @@ func NewDataSourceBuilderFactory(executor func(filter Formula, alias string) (ex
 	}
 }
 
-func (ds *DataSourceBuilder) Materialize(ctx context.Context) (execution.Node, error) {
-	return ds.Executor(ds.Filter, ds.Alias)
+func (dsb *DataSourceBuilder) Transform(ctx context.Context, transformers *Transformers) Node {
+	var transformed Node = &DataSourceBuilder{
+		Executor:         dsb.Executor,
+		PrimaryKeys:      dsb.PrimaryKeys,
+		AvailableFilters: dsb.AvailableFilters,
+		Filter:           dsb.Filter.Transform(ctx, transformers),
+		Alias:            dsb.Alias,
+	}
+	if transformers.NodeT != nil {
+		transformed = transformers.NodeT(transformed)
+	}
+	return transformed
+}
+
+func (dsb *DataSourceBuilder) Materialize(ctx context.Context) (execution.Node, error) {
+	return dsb.Executor(dsb.Filter, dsb.Alias)
 }

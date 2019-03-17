@@ -7,6 +7,7 @@ import (
 	"github.com/cube2222/octosql/execution"
 )
 
+// Relation describes a comparison operator.
 type Relation string
 
 const (

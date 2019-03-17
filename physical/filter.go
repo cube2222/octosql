@@ -7,7 +7,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// TODO: Here's the place (in this package) for functions which make optimizations based on the formula possible
 type Filter struct {
 	Formula Formula
 	Source  Node
@@ -17,6 +16,17 @@ func NewFilter(formula Formula, child Node) *Filter {
 	return &Filter{Formula: formula, Source: child}
 }
 
+func (node *Filter) Transform(ctx context.Context, transformers *Transformers) Node {
+	var transformed Node = &Filter{
+		Formula: node.Formula.Transform(ctx, transformers),
+		Source:  node.Source.Transform(ctx, transformers),
+	}
+	if transformers.NodeT != nil {
+		transformed = transformers.NodeT(transformed)
+	}
+	return transformed
+}
+
 func (node *Filter) Materialize(ctx context.Context) (execution.Node, error) {
 	materializedFormula, err := node.Formula.Materialize(ctx)
 	if err != nil {
@@ -24,7 +34,7 @@ func (node *Filter) Materialize(ctx context.Context) (execution.Node, error) {
 	}
 	materializedSource, err := node.Source.Materialize(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't materialize source")
+		return nil, errors.Wrap(err, "couldn't materialize Source")
 	}
 	return execution.NewFilter(materializedFormula, materializedSource), nil
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// FieldType describes if a key is a primary or secondary attribute.
 type FieldType string
 
 const (
@@ -15,6 +16,8 @@ const (
 	Secondary FieldType = "secondary"
 )
 
+// DataSourceRepository is used to register factories for builders for any data source.
+// It can also later create a builder for any of those data source.
 type DataSourceRepository struct {
 	factories map[string]func(alias string) *DataSourceBuilder
 }
@@ -25,6 +28,7 @@ func NewDataSourceRepository() *DataSourceRepository {
 	}
 }
 
+// Get gets a new builder for a given data source.
 func (repo *DataSourceRepository) Get(dataSourceName, alias string) (*DataSourceBuilder, error) {
 	ds, ok := repo.factories[dataSourceName]
 	if !ok {
@@ -38,51 +42,52 @@ func (repo *DataSourceRepository) Get(dataSourceName, alias string) (*DataSource
 	return ds(alias), nil
 }
 
+// Register registers a builder factory for the given data source name.
 func (repo *DataSourceRepository) Register(dataSourceName string, factory func(alias string) *DataSourceBuilder) error {
 	_, ok := repo.factories[dataSourceName]
 	if ok {
-		return errors.Errorf("data source with name %s already registered", dataSourceName)
+		return errors.Errorf("data Source with name %s already registered", dataSourceName)
 	}
 	repo.factories[dataSourceName] = factory
 	return nil
 }
 
+// DataSourceBuilder is used to build a data source instance with an alias.
+// It may be given filters, which are later executed at the database level.
 type DataSourceBuilder struct {
-	executor         func(formula Formula, alias string) (execution.Node, error)
-	primaryKeys      []octosql.VariableName
-	availableFilters map[FieldType]map[Relation]struct{}
-	filter           Formula
-	alias            string
+	Executor         func(formula Formula, alias string) (execution.Node, error)
+	PrimaryKeys      []octosql.VariableName
+	AvailableFilters map[FieldType]map[Relation]struct{}
+	Filter           Formula
+	Alias            string
 }
 
 func NewDataSourceBuilderFactory(executor func(filter Formula, alias string) (execution.Node, error), primaryKeys []octosql.VariableName, availableFilters map[FieldType]map[Relation]struct{}) func(alias string) *DataSourceBuilder {
 	return func(alias string) *DataSourceBuilder {
 		return &DataSourceBuilder{
-			executor:         executor,
-			primaryKeys:      primaryKeys,
-			availableFilters: availableFilters,
-			filter:           NewConstant(true),
-			alias:            alias,
+			Executor:         executor,
+			PrimaryKeys:      primaryKeys,
+			AvailableFilters: availableFilters,
+			Filter:           NewConstant(true),
+			Alias:            alias,
 		}
 	}
 }
 
-func (ds *DataSourceBuilder) PrimaryKeys() map[octosql.VariableName]struct{} {
-	out := make(map[octosql.VariableName]struct{})
-	for _, k := range ds.primaryKeys {
-		out[k] = struct{}{}
+func (dsb *DataSourceBuilder) Transform(ctx context.Context, transformers *Transformers) Node {
+	var transformed Node = &DataSourceBuilder{
+		Executor:         dsb.Executor,
+		PrimaryKeys:      dsb.PrimaryKeys,
+		AvailableFilters: dsb.AvailableFilters,
+		Filter:           dsb.Filter.Transform(ctx, transformers),
+		Alias:            dsb.Alias,
 	}
-	return out
+	if transformers.NodeT != nil {
+		transformed = transformers.NodeT(transformed)
+	}
+	return transformed
 }
 
-func (ds *DataSourceBuilder) AvailableFilters() map[FieldType]map[Relation]struct{} {
-	return ds.availableFilters
-}
-
-func (ds *DataSourceBuilder) AddFilter(formula Formula) {
-	ds.filter = NewAnd(ds.filter, formula)
-}
-
-func (ds *DataSourceBuilder) Materialize(ctx context.Context) (execution.Node, error) {
-	return ds.executor(ds.filter, ds.alias)
+func (dsb *DataSourceBuilder) Materialize(ctx context.Context) (execution.Node, error) {
+	return dsb.Executor(dsb.Filter, dsb.Alias)
 }

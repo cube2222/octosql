@@ -359,6 +359,59 @@ func TestMergeDataSourceWithRequalifier(t *testing.T) {
 			},
 		},
 		{
+			name: "multi merge",
+			args: args{
+				plan: &physical.Requalifier{
+					Qualifier: "a",
+					Source: &physical.Requalifier{
+						Qualifier: "b",
+						Source: &physical.DataSourceBuilder{
+							Executor:    nil,
+							PrimaryKeys: []octosql.VariableName{octosql.NewVariableName("a")},
+							AvailableFilters: map[physical.FieldType]map[physical.Relation]struct{}{
+								physical.Primary: {
+									physical.Equal:    struct{}{},
+									physical.NotEqual: struct{}{},
+								},
+								physical.Secondary: {
+									physical.Equal:    struct{}{},
+									physical.NotEqual: struct{}{},
+									physical.MoreThan: struct{}{},
+									physical.LessThan: struct{}{},
+								},
+							},
+							Filter: physical.NewAnd(
+								physical.NewConstant(true),
+								physical.NewConstant(false),
+							),
+							Alias: "c",
+						},
+					},
+				},
+			},
+			want: &physical.DataSourceBuilder{
+				Executor:    nil,
+				PrimaryKeys: []octosql.VariableName{octosql.NewVariableName("a")},
+				AvailableFilters: map[physical.FieldType]map[physical.Relation]struct{}{
+					physical.Primary: {
+						physical.Equal:    struct{}{},
+						physical.NotEqual: struct{}{},
+					},
+					physical.Secondary: {
+						physical.Equal:    struct{}{},
+						physical.NotEqual: struct{}{},
+						physical.MoreThan: struct{}{},
+						physical.LessThan: struct{}{},
+					},
+				},
+				Filter: physical.NewAnd(
+					physical.NewConstant(true),
+					physical.NewConstant(false),
+				),
+				Alias: "a",
+			},
+		},
+		{
 			name: "simple single merge",
 			args: args{
 				plan: &physical.Map{
@@ -418,6 +471,119 @@ func TestMergeDataSourceWithRequalifier(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := Optimize(context.Background(), []Scenario{MergeDataSourceBuilderWithRequalifier}, tt.args.plan); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("MergeDataSourceWithRequalifier() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMultiOptimization(t *testing.T) {
+	type args struct {
+		plan physical.Node
+	}
+	tests := []struct {
+		name string
+		args args
+		want physical.Node
+	}{
+		{
+			name: "multiple optimizations",
+			args: args{
+				plan: &physical.Map{
+					Expressions: []physical.NamedExpression{physical.NewVariable("expr")},
+					Source: &physical.Requalifier{
+						Qualifier: "a",
+						Source: &physical.Requalifier{
+							Qualifier: "b",
+							Source: &physical.Filter{
+								Formula: physical.NewConstant(true),
+								Source: &physical.Filter{
+									Formula: physical.NewConstant(false),
+									Source: &physical.Filter{
+										Formula: physical.NewConstant(true),
+										Source: &physical.Requalifier{
+											Qualifier: "a",
+											Source: &physical.Requalifier{
+												Qualifier: "b",
+												Source: &physical.DataSourceBuilder{
+													Executor:    nil,
+													PrimaryKeys: []octosql.VariableName{octosql.NewVariableName("a")},
+													AvailableFilters: map[physical.FieldType]map[physical.Relation]struct{}{
+														physical.Primary: {
+															physical.Equal:    struct{}{},
+															physical.NotEqual: struct{}{},
+														},
+														physical.Secondary: {
+															physical.Equal:    struct{}{},
+															physical.NotEqual: struct{}{},
+															physical.MoreThan: struct{}{},
+															physical.LessThan: struct{}{},
+														},
+													},
+													Filter: physical.NewAnd(
+														physical.NewConstant(true),
+														physical.NewConstant(false),
+													),
+													Alias: "c",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &physical.Map{
+				Expressions: []physical.NamedExpression{physical.NewVariable("expr")},
+				Source: &physical.Requalifier{
+					Qualifier: "a",
+					Source: &physical.Filter{
+						Formula: physical.NewAnd(
+							physical.NewConstant(true),
+							physical.NewAnd(
+								physical.NewConstant(false),
+								physical.NewConstant(true),
+							),
+						),
+						Source: &physical.DataSourceBuilder{
+							Executor:    nil,
+							PrimaryKeys: []octosql.VariableName{octosql.NewVariableName("a")},
+							AvailableFilters: map[physical.FieldType]map[physical.Relation]struct{}{
+								physical.Primary: {
+									physical.Equal:    struct{}{},
+									physical.NotEqual: struct{}{},
+								},
+								physical.Secondary: {
+									physical.Equal:    struct{}{},
+									physical.NotEqual: struct{}{},
+									physical.MoreThan: struct{}{},
+									physical.LessThan: struct{}{},
+								},
+							},
+							Filter: physical.NewAnd(
+								physical.NewConstant(true),
+								physical.NewConstant(false),
+							),
+							Alias: "a",
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Optimize(
+				context.Background(),
+				[]Scenario{
+					MergeRequalifiers,
+					MergeFilters,
+					MergeDataSourceBuilderWithRequalifier,
+				},
+				tt.args.plan,
+			); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("MergeDataSourceWithRequalifier() = %v, want %v", got, tt.want)
 			}
 		})

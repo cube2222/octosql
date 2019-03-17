@@ -2,6 +2,8 @@ package execution
 
 import (
 	"reflect"
+	"regexp"
+	"time"
 
 	"github.com/cube2222/octosql"
 	"github.com/pkg/errors"
@@ -19,7 +21,6 @@ func NewEqual() Relation {
 }
 
 func (rel *Equal) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
-	// TODO: HAX fixme
 	leftValue, err := left.ExpressionValue(variables)
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get value of left operator in more than")
@@ -28,8 +29,13 @@ func (rel *Equal) Apply(variables octosql.Variables, left, right Expression) (bo
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get value of right operator in more than")
 	}
+	if reflect.TypeOf(leftValue).Kind() != reflect.TypeOf(rightValue).Kind() {
+		return false, errors.Errorf(
+			"invalid operands to equal %v and %v with types %v and %v",
+			leftValue, rightValue, getType(leftValue), getType(rightValue))
+	}
 
-	return reflect.DeepEqual(leftValue, rightValue), nil
+	return AreEqual(leftValue, rightValue), nil
 }
 
 type NotEqual struct {
@@ -40,7 +46,11 @@ func NewNotEqual() Relation {
 }
 
 func (rel *NotEqual) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
-	panic("implement me")
+	equal, err := (*Equal).Apply(nil, variables, left, right)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't check equality")
+	}
+	return !equal, nil
 }
 
 type MoreThan struct {
@@ -51,7 +61,6 @@ func NewMoreThan() Relation {
 }
 
 func (rel *MoreThan) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
-	allowed := []octosql.Datatype{octosql.DatatypeInt, octosql.DatatypeFloat32, octosql.DatatypeFloat64}
 	leftValue, err := left.ExpressionValue(variables)
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get value of left operator in more than")
@@ -60,32 +69,29 @@ func (rel *MoreThan) Apply(variables octosql.Variables, left, right Expression) 
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get value of right operator in more than")
 	}
-
-	if octosql.OneOf(getType(leftValue), allowed) && octosql.OneOf(getType(rightValue), allowed) {
-		// TODO: HAX fixme
-		var leftValueTyped float64
-		var rightValueTyped float64
-		switch getType(leftValue) {
-		case octosql.DatatypeInt:
-			leftValueTyped = float64(leftValue.(int))
-		case octosql.DatatypeFloat32:
-			leftValueTyped = float64(leftValue.(float32))
-		case octosql.DatatypeFloat64:
-			leftValueTyped = leftValue.(float64)
-		}
-		switch getType(rightValue) {
-		case octosql.DatatypeInt:
-			rightValueTyped = float64(rightValue.(int))
-		case octosql.DatatypeFloat32:
-			rightValueTyped = float64(rightValue.(float32))
-		case octosql.DatatypeFloat64:
-			rightValueTyped = rightValue.(float64)
-		}
-
-		return leftValueTyped > rightValueTyped, nil
+	if reflect.TypeOf(leftValue).Kind() != reflect.TypeOf(rightValue).Kind() {
+		return false, errors.Errorf(
+			"invalid operands to more_than %v and %v with types %v and %v",
+			leftValue, rightValue, getType(leftValue), getType(rightValue))
 	}
+
+	switch leftValue := leftValue.(type) {
+	case int:
+		rightValue := rightValue.(int)
+		return leftValue > rightValue, nil
+	case float64:
+		rightValue := rightValue.(float64)
+		return leftValue > rightValue, nil
+	case string:
+		rightValue := rightValue.(string)
+		return leftValue > rightValue, nil
+	case time.Time:
+		rightValue := rightValue.(time.Time)
+		return leftValue.After(rightValue), nil
+	}
+
 	return false, errors.Errorf(
-		"invalid operands to more_than %v and %v with types %v and %v",
+		"invalid operands to more_than %v and %v with types %v and %v, only int, float, string and time allowed",
 		leftValue, rightValue, getType(leftValue), getType(rightValue))
 }
 
@@ -97,7 +103,11 @@ func NewLessThan() Relation {
 }
 
 func (rel *LessThan) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
-	panic("implement me")
+	more, err := (*MoreThan).Apply(nil, variables, right, left)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't check reverse more_than")
+	}
+	return more, nil
 }
 
 type Like struct {
@@ -108,7 +118,32 @@ func NewLike() Relation {
 }
 
 func (rel *Like) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
-	panic("implement me")
+	leftValue, err := left.ExpressionValue(variables)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't get value of left operator in more than")
+	}
+	rightValue, err := right.ExpressionValue(variables)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't get value of right operator in more than")
+	}
+	leftString, ok := leftValue.(string)
+	if !ok {
+		return false, errors.Errorf(
+			"invalid operands to like %v and %v with types %v and %v, only string allowed",
+			leftValue, rightValue, getType(leftValue), getType(rightValue))
+	}
+	rightString, ok := rightValue.(string)
+	if !ok {
+		return false, errors.Errorf(
+			"invalid operands to like %v and %v with types %v and %v, only string allowed",
+			leftValue, rightValue, getType(leftValue), getType(rightValue))
+	}
+
+	match, err := regexp.MatchString(rightString, leftString)
+	if err != nil {
+		return false, errors.Wrapf(err, "couldn't match string in like relation with pattern %v", rightString)
+	}
+	return match, nil
 }
 
 type In struct {
@@ -119,5 +154,31 @@ func NewIn() Relation {
 }
 
 func (rel *In) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
-	panic("implement me")
+	leftValue, err := left.ExpressionValue(variables)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't get value of left operator in more than")
+	}
+	rightValue, err := right.ExpressionValue(variables)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't get value of right operator in more than")
+	}
+
+	switch set := rightValue.(type) {
+	case []Record:
+		for i := range set {
+			if len(set[i].Fields()) == 1 {
+				right := set[i].Value(set[i].Fields()[0].Name)
+				if AreEqual(leftValue, right) {
+					return true, nil
+				}
+				continue
+			}
+			if AreEqual(leftValue, set[i]) {
+				return true, nil
+			}
+		}
+		return false, nil
+	default:
+		return AreEqual(leftValue, rightValue), nil
+	}
 }

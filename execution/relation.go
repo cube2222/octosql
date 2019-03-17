@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/execution/types"
 	"github.com/pkg/errors"
 )
 
@@ -30,6 +29,11 @@ func (rel *Equal) Apply(variables octosql.Variables, left, right Expression) (bo
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get value of right operator in more than")
 	}
+	if reflect.TypeOf(leftValue).Kind() != reflect.TypeOf(rightValue).Kind() {
+		return false, errors.Errorf(
+			"invalid operands to equal %v and %v with types %v and %v",
+			leftValue, rightValue, getType(leftValue), getType(rightValue))
+	}
 
 	return AreEqual(leftValue, rightValue), nil
 }
@@ -46,7 +50,7 @@ func (rel *NotEqual) Apply(variables octosql.Variables, left, right Expression) 
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't check equality")
 	}
-	return equal, nil
+	return !equal, nil
 }
 
 type MoreThan struct {
@@ -65,7 +69,7 @@ func (rel *MoreThan) Apply(variables octosql.Variables, left, right Expression) 
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get value of right operator in more than")
 	}
-	if reflect.TypeOf(left) != reflect.TypeOf(right) {
+	if reflect.TypeOf(leftValue).Kind() != reflect.TypeOf(rightValue).Kind() {
 		return false, errors.Errorf(
 			"invalid operands to more_than %v and %v with types %v and %v",
 			leftValue, rightValue, getType(leftValue), getType(rightValue))

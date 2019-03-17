@@ -7,36 +7,39 @@ import (
 	"time"
 )
 
-func ParseType(text string) interface{} {
-	integer, err := strconv.ParseInt(text, 10, 64)
+// ParseType tries to parse the given string into any type it succeeds to. Returns back the string on failure.
+func ParseType(str string) interface{} {
+	integer, err := strconv.ParseInt(str, 10, 64)
 	if err == nil {
 		return int(integer)
 	}
 
-	float, err := strconv.ParseFloat(text, 64)
+	float, err := strconv.ParseFloat(str, 64)
 	if err == nil {
 		return float
 	}
 
-	boolean, err := strconv.ParseBool(text)
+	boolean, err := strconv.ParseBool(str)
 	if err == nil {
 		return boolean
 	}
 
 	var jsonObject map[string]interface{}
-	err = json.Unmarshal([]byte(text), &jsonObject)
+	err = json.Unmarshal([]byte(str), &jsonObject)
 	if err == nil {
 		return NormalizeType(jsonObject)
 	}
 
-	t, err := time.Parse(time.RFC3339, text)
+	t, err := time.Parse(time.RFC3339, str)
 	if err == nil {
 		return t
 	}
 
-	return text
+	return str
 }
 
+// NormalizeType brings various primitive types into the type we want them to be.
+// All types coming out of data sources should be already normalized this way.
 func NormalizeType(value interface{}) interface{} {
 	switch value := value.(type) {
 	case int8:
@@ -53,6 +56,8 @@ func NormalizeType(value interface{}) interface{} {
 		return int(value)
 	case float32:
 		return float64(value)
+	case []byte:
+		return string(value)
 	case []interface{}:
 		out := make([]interface{}, len(value))
 		for i := range value {
@@ -70,33 +75,49 @@ func NormalizeType(value interface{}) interface{} {
 	}
 }
 
+// AreEqual checks the equality of the given values, returning false if the types don't match.
 func AreEqual(left, right interface{}) bool {
-	if reflect.TypeOf(left) != reflect.TypeOf(right) {
-		return false
-	}
 	switch left := left.(type) {
 	case int:
-		right := right.(int)
+		right, ok := right.(int)
+		if !ok {
+			return false
+		}
 		return left == right
 
 	case float64:
-		right := right.(float64)
+		right, ok := right.(float64)
+		if !ok {
+			return false
+		}
 		return left == right
 
 	case bool:
-		right := right.(bool)
+		right, ok := right.(bool)
+		if !ok {
+			return false
+		}
 		return left == right
 
 	case string:
-		right := right.(string)
+		right, ok := right.(string)
+		if !ok {
+			return false
+		}
 		return left == right
 
 	case time.Time:
-		right := right.(time.Time)
+		right, ok := right.(time.Time)
+		if !ok {
+			return false
+		}
 		return left.Equal(right)
 
 	case []interface{}:
-		right := right.([]interface{})
+		right, ok := right.([]interface{})
+		if !ok {
+			return false
+		}
 		if len(left) != len(right) {
 			return false
 		}
@@ -108,7 +129,10 @@ func AreEqual(left, right interface{}) bool {
 		return true
 
 	case map[string]interface{}:
-		right := right.(map[string]interface{})
+		right, ok := right.(map[string]interface{})
+		if !ok {
+			return false
+		}
 		if len(left) != len(right) {
 			return false
 		}
@@ -131,17 +155,21 @@ func AreEqual(left, right interface{}) bool {
 
 	case *Record:
 		// albo rekord, albo jesli
-		right := right.(*Record)
+		rightRecord, ok := right.(*Record)
+		if !ok {
+			temp, ok := right.(Record)
+			if !ok {
+				return false
+			}
+			rightRecord = &temp
+		}
 		leftFields := left.Fields()
-		rightFields := right.Fields()
+		rightFields := rightRecord.Fields()
 		if len(leftFields) != len(rightFields) {
 			return false
 		}
 		for i := range leftFields {
-			if leftFields[i].Name != rightFields[i].Name {
-				return false
-			}
-			if !AreEqual(left.Value(leftFields[i].Name), right.Value(rightFields[i].Name)) {
+			if !AreEqual(left.Value(leftFields[i].Name), rightRecord.Value(rightFields[i].Name)) {
 				return false
 			}
 		}

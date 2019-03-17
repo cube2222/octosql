@@ -70,7 +70,7 @@ func (ne *NodeExpression) ExpressionValue(variables octosql.Variables) (interfac
 	}
 
 	// There is exactly one record
-	record := outRecords[0]
+	record := &outRecords[0]
 	if len(record.Fields()) > 1 {
 		return record, nil
 	}

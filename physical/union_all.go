@@ -16,10 +16,14 @@ func NewUnionAll(left, right Node) *UnionAll {
 }
 
 func (node *UnionAll) Transform(ctx context.Context, transformers *Transformers) Node {
-	return &UnionAll{
+	var transformed Node = &UnionAll{
 		first:  node.first.Transform(ctx, transformers),
 		second: node.second.Transform(ctx, transformers),
 	}
+	if transformers.NodeT != nil {
+		transformed = transformers.NodeT(transformed)
+	}
+	return transformed
 }
 
 func (node *UnionAll) Materialize(ctx context.Context) (execution.Node, error) {
@@ -27,7 +31,7 @@ func (node *UnionAll) Materialize(ctx context.Context) (execution.Node, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize first node")
 	}
-	secondNode, err := node.first.Materialize(ctx)
+	secondNode, err := node.second.Materialize(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize second node")
 	}

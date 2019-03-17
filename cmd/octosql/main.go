@@ -11,6 +11,7 @@ import (
 	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/parser"
 	"github.com/cube2222/octosql/physical"
+	"github.com/cube2222/octosql/physical/optimizer"
 	"github.com/cube2222/octosql/storage/json"
 	"github.com/xwb1989/sqlparser"
 )
@@ -47,6 +48,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	phys = optimizer.Optimize(ctx, optimizer.DefaultScenarios, phys)
 
 	exec, err := phys.Materialize(ctx)
 	if err != nil {

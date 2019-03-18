@@ -58,12 +58,12 @@ func (stream *MappedStream) Next() (*Record, error) {
 		}
 
 		if _, ok := value.([]Record); ok {
-			return nil, errors.Wrapf(err, "multiple records ended up in one select field %+v", value)
+			return nil, errors.Errorf("multiple records ended up in one select field %+v", value)
 		}
 
 		if record, ok := value.(Record); ok {
 			if len(record.Fields()) > 1 {
-				return nil, errors.Wrapf(err, "multi field record ended up in one select field %+v", value)
+				return nil, errors.Errorf("multi field record ended up in one select field %+v", value)
 			}
 			outValues[stream.expressions[i].Name()] = record.Value(record.Fields()[0].Name)
 			continue

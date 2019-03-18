@@ -8,17 +8,17 @@ import (
 )
 
 type UnionAll struct {
-	first, second Node
+	First, Second Node
 }
 
-func NewUnionAll(left, right Node) *UnionAll {
-	return &UnionAll{first: left, second: right}
+func NewUnionAll(first, second Node) *UnionAll {
+	return &UnionAll{First: first, Second: second}
 }
 
 func (node *UnionAll) Transform(ctx context.Context, transformers *Transformers) Node {
 	var transformed Node = &UnionAll{
-		first:  node.first.Transform(ctx, transformers),
-		second: node.second.Transform(ctx, transformers),
+		First:  node.First.Transform(ctx, transformers),
+		Second: node.Second.Transform(ctx, transformers),
 	}
 	if transformers.NodeT != nil {
 		transformed = transformers.NodeT(transformed)
@@ -27,11 +27,11 @@ func (node *UnionAll) Transform(ctx context.Context, transformers *Transformers)
 }
 
 func (node *UnionAll) Materialize(ctx context.Context) (execution.Node, error) {
-	firstNode, err := node.first.Materialize(ctx)
+	firstNode, err := node.First.Materialize(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize first node")
 	}
-	secondNode, err := node.second.Materialize(ctx)
+	secondNode, err := node.Second.Materialize(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize second node")
 	}

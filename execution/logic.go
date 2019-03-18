@@ -53,7 +53,17 @@ func NewOr(left Formula, right Formula) *Or {
 }
 
 func (f *Or) Evaluate(variables octosql.Variables) (bool, error) {
-	panic("implement me")
+	left, err := f.Left.Evaluate(variables)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't evaluate left operand in or")
+	}
+
+	right, err := f.Right.Evaluate(variables)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't evaluate right operand in or")
+	}
+
+	return left || right, nil
 }
 
 type Not struct {
@@ -65,7 +75,12 @@ func NewNot(child Formula) *Not {
 }
 
 func (f *Not) Evaluate(variables octosql.Variables) (bool, error) {
-	panic("implement me")
+	child, err := f.Child.Evaluate(variables)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't evaluate child formula in not")
+	}
+
+	return !child, nil
 }
 
 type Predicate struct {

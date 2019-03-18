@@ -21,8 +21,6 @@ func (f Constant) Evaluate(variables octosql.Variables) (bool, error) {
 	return f.Value, nil
 }
 
-// TODO: Implement:
-
 type And struct {
 	Left, Right Formula
 }

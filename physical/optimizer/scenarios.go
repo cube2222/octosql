@@ -74,7 +74,7 @@ var MergeDataSourceBuilderWithRequalifier = Scenario{
 			Executor:         dataSourceBuilder.Executor,
 			PrimaryKeys:      dataSourceBuilder.PrimaryKeys,
 			AvailableFilters: dataSourceBuilder.AvailableFilters,
-			Filter:           dataSourceBuilder.Filter,
+			Filter:           dataSourceBuilder.Filter, // TODO: fixme variable names
 			Alias:            match.Strings["qualifier"],
 		}
 	},

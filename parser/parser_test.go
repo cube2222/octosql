@@ -1,16 +1,16 @@
 package parser
 
 import (
+	"github.com/bradleyjkemp/memviz"
 	"log"
 	"os"
 	"testing"
 
-	memmap "github.com/bradleyjkemp/memviz"
 	"github.com/cube2222/octosql/logical"
 	"github.com/xwb1989/sqlparser"
 )
 
-func TestParseSelect(t *testing.T) {
+func TestParseNode(t *testing.T) {
 	type args struct {
 		statement string
 	}
@@ -20,6 +20,126 @@ func TestParseSelect(t *testing.T) {
 		want    logical.Node
 		wantErr bool
 	}{
+		{
+			name: "simple union all",
+			args: args{
+				"SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 3 " +
+					"UNION ALL " +
+					"SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 4",
+			},
+			want: logical.NewUnionAll(
+				logical.NewMap(
+					[]logical.NamedExpression{
+						logical.NewVariable("p2.name"),
+						logical.NewVariable("p2.age"),
+					},
+					logical.NewFilter(
+						logical.NewPredicate(
+							logical.NewVariable("p2.age"),
+							logical.MoreThan,
+							logical.NewConstant(3),
+						),
+						logical.NewDataSource("people", "p2"),
+					),
+				),
+				logical.NewMap(
+					[]logical.NamedExpression{
+						logical.NewVariable("p2.name"),
+						logical.NewVariable("p2.age"),
+					},
+					logical.NewFilter(
+						logical.NewPredicate(
+							logical.NewVariable("p2.age"),
+							logical.MoreThan,
+							logical.NewConstant(4),
+						),
+						logical.NewDataSource("people", "p2"),
+					),
+				),
+			),
+			wantErr: false,
+		},
+		//{ TODO - ani NodeExpression ani AliasedExpression nie działają przy UnionAll (Node) ????
+		//	name: "complicated union all",
+		//	args: args{
+		//		"(SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 3 UNION ALL SELECT p2.name, p2.age FROM people p2 WHERE p2.age < 5) as first " +
+		//			"UNION ALL" +
+		//			" (SELECT p2.name, p2.age FROM people p2 WHERE p2.city > 'ciechanowo' UNION ALL SELECT p2.name, p2.age FROM people p2 WHERE p2.city < 'wwa') as second ",
+		//	},
+		//	want: logical.NewUnionAll(
+		//		logical.NewAliasedExpression(
+		//			"first",
+		//			logical.NewNodeExpression(
+		//				logical.NewUnionAll(
+		//					logical.NewMap(
+		//						[]logical.NamedExpression{
+		//							logical.NewVariable("p2.name"),
+		//							logical.NewVariable("p2.age"),
+		//						},
+		//						logical.NewFilter(
+		//							logical.NewPredicate(
+		//								logical.NewVariable("p2.age"),
+		//								logical.MoreThan,
+		//								logical.NewConstant(3),
+		//							),
+		//							logical.NewDataSource("people", "p2"),
+		//						),
+		//					),
+		//					logical.NewMap(
+		//						[]logical.NamedExpression{
+		//							logical.NewVariable("p2.name"),
+		//							logical.NewVariable("p2.age"),
+		//						},
+		//						logical.NewFilter(
+		//							logical.NewPredicate(
+		//								logical.NewVariable("p2.age"),
+		//								logical.MoreThan,
+		//								logical.NewConstant(4),
+		//							),
+		//							logical.NewDataSource("people", "p2"),
+		//						),
+		//					),
+		//				),
+		//				),
+		//		),
+		//		logical.NewAliasedExpression(
+		//			"second",
+		//			logical.NewNodeExpression(
+		//				logical.NewUnionAll(
+		//					logical.NewMap(
+		//						[]logical.NamedExpression{
+		//							logical.NewVariable("p2.name"),
+		//							logical.NewVariable("p2.age"),
+		//						},
+		//						logical.NewFilter(
+		//							logical.NewPredicate(
+		//								logical.NewVariable("p2.age"),
+		//								logical.MoreThan,
+		//								logical.NewConstant(3),
+		//							),
+		//							logical.NewDataSource("people", "p2"),
+		//						),
+		//					),
+		//					logical.NewMap(
+		//						[]logical.NamedExpression{
+		//							logical.NewVariable("p2.name"),
+		//							logical.NewVariable("p2.age"),
+		//						},
+		//						logical.NewFilter(
+		//							logical.NewPredicate(
+		//								logical.NewVariable("p2.age"),
+		//								logical.MoreThan,
+		//								logical.NewConstant(4),
+		//							),
+		//							logical.NewDataSource("people", "p2"),
+		//						),
+		//					),
+		//				),
+		//				),
+		//		),
+		//	),
+		//	wantErr: false,
+		//},
 		{
 			name: "simple select",
 			args: args{
@@ -196,7 +316,7 @@ WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age`,
 				t.Fatal(err)
 			}
 
-			statement := stmt.(*sqlparser.Select)
+			statement := stmt.(sqlparser.SelectStatement)
 
 			got, err := ParseSelect(statement)
 			if (err != nil) != tt.wantErr {

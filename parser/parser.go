@@ -13,6 +13,35 @@ import (
 
 // TODO: W sumie to jeszcze moze byc "boolean node expression" chociaz oczywiscie dziala przez (costam) = TRUE
 
+func ParseUnionAll(statement *sqlparser.Union) (logical.Node, error) {
+	switch statement.Type {
+	case sqlparser.UnionAllStr:
+		var err error
+
+		if statement.Limit != nil {
+			return nil, errors.Errorf("limit is currently unsupported, got %+v", statement)
+		}
+		if statement.OrderBy != nil {
+			return nil, errors.Errorf("order by is currently unsupported, got %+v", statement)
+		}
+
+		firstNode, err := ParseSelect(statement.Left)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't parse first select expression")
+		}
+
+		secondNode, err := ParseSelect(statement.Right)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't parse second select expression")
+		}
+
+		return logical.NewUnionAll(firstNode, secondNode), nil
+
+	default:
+		return nil, errors.Errorf("unsupported union %+v of type %v", statement, statement.Type)
+	}
+}
+
 func ParseSelect(statement sqlparser.SelectStatement) (logical.Node, error) {
 	switch statement := statement.(type) {
 	case *sqlparser.Select:
@@ -63,6 +92,9 @@ func ParseSelect(statement sqlparser.SelectStatement) (logical.Node, error) {
 		}
 
 		return logical.NewMap(expressions, root), nil
+
+	case *sqlparser.Union:
+		return ParseUnionAll(statement)
 
 	default:
 		// Union

@@ -308,9 +308,9 @@ WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age`,
 
 			statement := stmt.(sqlparser.SelectStatement)
 
-			got, err := ParseSelect(statement)
+			got, err := ParseNode(statement)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ParseSelect() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ParseNode() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if err := logical.EqualNodes(got, tt.want); err != nil {
@@ -327,7 +327,7 @@ WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age`,
 				}
 				memmap.Map(f, tt.want)
 				f.Close()
-				t.Errorf("ParseSelect() = %v, want %v: %v", got, tt.want, err)
+				t.Errorf("ParseNode() = %v, want %v: %v", got, tt.want, err)
 			}
 		})
 	}

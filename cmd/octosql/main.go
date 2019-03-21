@@ -29,7 +29,7 @@ func main() {
 	if !ok {
 		log.Fatal("invalid statement type")
 	}
-	parsed, err := parser.ParseNode(typed)
+	parsed, err := parser.ParseSelect(typed)
 	if err != nil {
 		log.Fatal(err)
 	}

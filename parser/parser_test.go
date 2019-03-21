@@ -59,87 +59,77 @@ func TestParseNode(t *testing.T) {
 			),
 			wantErr: false,
 		},
-		//{ TODO - ani NodeExpression ani AliasedExpression nie działają przy UnionAll (Node) ????
-		//	name: "complicated union all",
-		//	args: args{
-		//		"(SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 3 UNION ALL SELECT p2.name, p2.age FROM people p2 WHERE p2.age < 5) as first " +
-		//			"UNION ALL" +
-		//			" (SELECT p2.name, p2.age FROM people p2 WHERE p2.city > 'ciechanowo' UNION ALL SELECT p2.name, p2.age FROM people p2 WHERE p2.city < 'wwa') as second ",
-		//	},
-		//	want: logical.NewUnionAll(
-		//		logical.NewAliasedExpression(
-		//			"first",
-		//			logical.NewNodeExpression(
-		//				logical.NewUnionAll(
-		//					logical.NewMap(
-		//						[]logical.NamedExpression{
-		//							logical.NewVariable("p2.name"),
-		//							logical.NewVariable("p2.age"),
-		//						},
-		//						logical.NewFilter(
-		//							logical.NewPredicate(
-		//								logical.NewVariable("p2.age"),
-		//								logical.MoreThan,
-		//								logical.NewConstant(3),
-		//							),
-		//							logical.NewDataSource("people", "p2"),
-		//						),
-		//					),
-		//					logical.NewMap(
-		//						[]logical.NamedExpression{
-		//							logical.NewVariable("p2.name"),
-		//							logical.NewVariable("p2.age"),
-		//						},
-		//						logical.NewFilter(
-		//							logical.NewPredicate(
-		//								logical.NewVariable("p2.age"),
-		//								logical.MoreThan,
-		//								logical.NewConstant(4),
-		//							),
-		//							logical.NewDataSource("people", "p2"),
-		//						),
-		//					),
-		//				),
-		//				),
-		//		),
-		//		logical.NewAliasedExpression(
-		//			"second",
-		//			logical.NewNodeExpression(
-		//				logical.NewUnionAll(
-		//					logical.NewMap(
-		//						[]logical.NamedExpression{
-		//							logical.NewVariable("p2.name"),
-		//							logical.NewVariable("p2.age"),
-		//						},
-		//						logical.NewFilter(
-		//							logical.NewPredicate(
-		//								logical.NewVariable("p2.age"),
-		//								logical.MoreThan,
-		//								logical.NewConstant(3),
-		//							),
-		//							logical.NewDataSource("people", "p2"),
-		//						),
-		//					),
-		//					logical.NewMap(
-		//						[]logical.NamedExpression{
-		//							logical.NewVariable("p2.name"),
-		//							logical.NewVariable("p2.age"),
-		//						},
-		//						logical.NewFilter(
-		//							logical.NewPredicate(
-		//								logical.NewVariable("p2.age"),
-		//								logical.MoreThan,
-		//								logical.NewConstant(4),
-		//							),
-		//							logical.NewDataSource("people", "p2"),
-		//						),
-		//					),
-		//				),
-		//				),
-		//		),
-		//	),
-		//	wantErr: false,
-		//},
+		{
+			name: "complex union all",
+			args: args{
+				"(SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 3 UNION ALL SELECT p2.name, p2.age FROM people p2 WHERE p2.age < 5) " +
+					"UNION ALL" +
+					" (SELECT p2.name, p2.age FROM people p2 WHERE p2.city > 'ciechanowo' UNION ALL SELECT p2.name, p2.age FROM people p2 WHERE p2.city < 'wwa')",
+			},
+			want: logical.NewUnionAll(
+				logical.NewUnionAll(
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewVariable("p2.name"),
+							logical.NewVariable("p2.age"),
+						},
+						logical.NewFilter(
+							logical.NewPredicate(
+								logical.NewVariable("p2.age"),
+								logical.MoreThan,
+								logical.NewConstant(3),
+							),
+							logical.NewDataSource("people", "p2"),
+						),
+					),
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewVariable("p2.name"),
+							logical.NewVariable("p2.age"),
+						},
+						logical.NewFilter(
+							logical.NewPredicate(
+								logical.NewVariable("p2.age"),
+								logical.LessThan,
+								logical.NewConstant(5),
+							),
+							logical.NewDataSource("people", "p2"),
+						),
+					),
+				),
+				logical.NewUnionAll(
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewVariable("p2.name"),
+							logical.NewVariable("p2.age"),
+						},
+						logical.NewFilter(
+							logical.NewPredicate(
+								logical.NewVariable("p2.city"),
+								logical.MoreThan,
+								logical.NewConstant("ciechanowo"),
+							),
+							logical.NewDataSource("people", "p2"),
+						),
+					),
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewVariable("p2.name"),
+							logical.NewVariable("p2.age"),
+						},
+						logical.NewFilter(
+							logical.NewPredicate(
+								logical.NewVariable("p2.city"),
+								logical.LessThan,
+								logical.NewConstant("wwa"),
+							),
+							logical.NewDataSource("people", "p2"),
+						),
+					),
+				),
+			),
+			wantErr: false,
+		},
 		{
 			name: "simple select",
 			args: args{

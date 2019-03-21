@@ -96,6 +96,9 @@ func ParseSelect(statement sqlparser.SelectStatement) (logical.Node, error) {
 	case *sqlparser.Union:
 		return ParseUnionAll(statement)
 
+	case *sqlparser.ParenSelect:
+		return ParseSelect(statement.Select)
+
 	default:
 		// Union
 		return nil, errors.Errorf("unsupported select %+v of type %v", statement, reflect.TypeOf(statement))

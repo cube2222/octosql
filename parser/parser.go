@@ -13,95 +13,56 @@ import (
 
 // TODO: W sumie to jeszcze moze byc "boolean node expression" chociaz oczywiscie dziala przez (costam) = TRUE
 
-func ParseUnionAll(statement *sqlparser.Union) (logical.Node, error) {
-	switch statement.Type {
-	case sqlparser.UnionAllStr:
-		var err error
-
-		if statement.Limit != nil {
-			return nil, errors.Errorf("limit is currently unsupported, got %+v", statement)
-		}
-		if statement.OrderBy != nil {
-			return nil, errors.Errorf("order by is currently unsupported, got %+v", statement)
-		}
-
-		firstNode, err := ParseNode(statement.Left)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't parse first select expression")
-		}
-
-		secondNode, err := ParseNode(statement.Right)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't parse second select expression")
-		}
-
-		return logical.NewUnionAll(firstNode, secondNode), nil
-
-	default:
-		return nil, errors.Errorf("unsupported union %+v of type %v", statement, statement.Type)
-	}
-}
-
-func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
-	var err error
-	var root logical.Node
-
-	if len(statement.From) != 1 {
-		return nil, errors.Errorf("currently only one expression in from supported, got %v", len(statement.From))
-	}
-
-	aliasedTableFrom, ok := statement.From[0].(*sqlparser.AliasedTableExpr)
-	if !ok {
-		return nil, errors.Errorf("expected aliased table expression in from, got %v %v",
-			statement.From[0], reflect.TypeOf(statement.From[0]))
-	}
-
-	root, err = ParseTableExpression(aliasedTableFrom)
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't parse from expression")
-	}
-
-	if statement.Where != nil {
-		filterFormula, err := ParseLogic(statement.Where.Expr)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't parse where expression")
-		}
-		root = logical.NewFilter(filterFormula, root)
-	}
-
-	if len(statement.SelectExprs) == 1 {
-		if _, ok := statement.SelectExprs[0].(*sqlparser.StarExpr); ok {
-			return root, nil
-		}
-	}
-
-	expressions := make([]logical.NamedExpression, len(statement.SelectExprs))
-	for i := range statement.SelectExprs {
-		aliasedExpression, ok := statement.SelectExprs[i].(*sqlparser.AliasedExpr)
-		if !ok {
-			return nil, errors.Errorf("expected aliased expression in select on index %v, got %v %v",
-				i, statement.SelectExprs[i], reflect.TypeOf(statement.SelectExprs[i]))
-		}
-
-		expressions[i], err = ParseAliasedExpression(aliasedExpression)
-		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't parse aliased expression with index %d", i)
-		}
-	}
-
-	return logical.NewMap(expressions, root), nil
-}
-
-func ParseNode(statement sqlparser.SelectStatement) (logical.Node, error) {
+func ParseSelect(statement sqlparser.SelectStatement) (logical.Node, error) {
 	switch statement := statement.(type) {
 	case *sqlparser.Select:
-		return ParseSelect(statement)
+		var err error
+		var root logical.Node
 
-	case *sqlparser.Union:
-		return ParseUnionAll(statement)
+		if len(statement.From) != 1 {
+			return nil, errors.Errorf("currently only one expression in from supported, got %v", len(statement.From))
+		}
 
-	case *sqlparser.ParenSelect:
-		return ParseNode(statement.Select)
+		aliasedTableFrom, ok := statement.From[0].(*sqlparser.AliasedTableExpr)
+		if !ok {
+			return nil, errors.Errorf("expected aliased table expression in from, got %v %v",
+				statement.From[0], reflect.TypeOf(statement.From[0]))
+		}
+
+		root, err = ParseTableExpression(aliasedTableFrom)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't parse from expression")
+		}
+
+		if statement.Where != nil {
+			filterFormula, err := ParseLogic(statement.Where.Expr)
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't parse where expression")
+			}
+			root = logical.NewFilter(filterFormula, root)
+		}
+
+		if len(statement.SelectExprs) == 1 {
+			if _, ok := statement.SelectExprs[0].(*sqlparser.StarExpr); ok {
+				return root, nil
+			}
+		}
+
+		expressions := make([]logical.NamedExpression, len(statement.SelectExprs))
+		for i := range statement.SelectExprs {
+			aliasedExpression, ok := statement.SelectExprs[i].(*sqlparser.AliasedExpr)
+			if !ok {
+				return nil, errors.Errorf("expected aliased expression in select on index %v, got %v %v",
+					i, statement.SelectExprs[i], reflect.TypeOf(statement.SelectExprs[i]))
+			}
+
+			expressions[i], err = ParseAliasedExpression(aliasedExpression)
+			if err != nil {
+				return nil, errors.Wrapf(err, "couldn't parse aliased expression with index %d", i)
+			}
+		}
+
+		return logical.NewMap(expressions, root), nil
 
 	default:
 		// Union
@@ -115,7 +76,7 @@ func ParseTableExpression(expr *sqlparser.AliasedTableExpr) (logical.Node, error
 		return logical.NewDataSource(subExpr.Name.String(), expr.As.String()), nil
 
 	case *sqlparser.Subquery:
-		subQuery, err := ParseNode(subExpr.Select)
+		subQuery, err := ParseSelect(subExpr.Select)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't parse subquery")
 		}
@@ -155,7 +116,7 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 			return nil, errors.Errorf("expected select statement in subquery, go %v %v",
 				expr.Select, reflect.TypeOf(expr.Select))
 		}
-		subquery, err := ParseNode(selectExpr)
+		subquery, err := ParseSelect(selectExpr)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't parse select expression")
 		}

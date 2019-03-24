@@ -8,44 +8,43 @@ import (
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
-	"github.com/pkg/errors"
 	_ "github.com/lib/pq"
+	"github.com/pkg/errors"
 )
 
 var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 	physical.Primary: {
-		physical.Equal: {},
+		physical.Equal:    {},
 		physical.NotEqual: {},
 		physical.MoreThan: {},
 		physical.LessThan: {},
-		physical.Like: {},
-		physical.In: {},
+		physical.Like:     {},
+		physical.In:       {},
 	},
 	physical.Secondary: {
-		physical.Equal: {},
+		physical.Equal:    {},
 		physical.NotEqual: {},
 		physical.MoreThan: {},
 		physical.LessThan: {},
-		physical.Like: {},
-		physical.In: {},
+		physical.Like:     {},
+		physical.In:       {},
 	},
 }
 
 type DataSource struct {
-	db 	  *sql.DB
-	stmt *sql.Stmt
+	db      *sql.DB
+	stmt    *sql.Stmt
 	aliases *Aliases
-	alias string
+	alias   string
 }
 
 func NewDataSourceBuilderFactory(host, user, password, dbname, tablename string,
-	pkey []octosql.VariableName, port int) func (alias string) *physical.DataSourceBuilder {
+	pkey []octosql.VariableName, port int) func(alias string) *physical.DataSourceBuilder {
 
-		psqlInfo := fmt.Sprintf("host=%s port=%d user=%s " +
+	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
 
-
-		return physical.NewDataSourceBuilderFactory(
+	return physical.NewDataSourceBuilderFactory(
 		func(filter physical.Formula, alias string) (execution.Node, error) {
 			db, err := sql.Open("postgres", psqlInfo)
 			if err != nil {
@@ -58,7 +57,9 @@ func NewDataSourceBuilderFactory(host, user, password, dbname, tablename string,
 				return nil, errors.Wrap(err, "couldn't get query from formula")
 			}
 
-			query = "SELECT * FROM " + tablename + " " + alias + " WHERE " + query
+			query = fmt.Sprintf("SELECT * FROM %s %s WHERE %s", tablename, alias, query)
+
+			//query = "SELECT * FROM " + tablename + " " + alias + " WHERE " + query
 
 			stmt, err := db.Prepare(query)
 			if err != nil {
@@ -66,10 +67,10 @@ func NewDataSourceBuilderFactory(host, user, password, dbname, tablename string,
 			}
 
 			return &DataSource{
-				stmt: stmt,
+				stmt:    stmt,
 				aliases: aliases,
-				alias: alias,
-				db:	db,
+				alias:   alias,
+				db:      db,
 			}, nil
 		},
 		pkey,
@@ -77,12 +78,11 @@ func NewDataSourceBuilderFactory(host, user, password, dbname, tablename string,
 	)
 }
 
-
 func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, error) {
 	values := make([]interface{}, 0)
 
-	for i := 0; i < ds.aliases.Counter; i++ {
-		placeholder := "$" + strconv.Itoa(i + 1)
+	for i := 0; i < ds.aliases.Counter-1; i++ {
+		placeholder := "$" + strconv.Itoa(i+1)
 		originalName, ok := ds.aliases.PlaceholderToVariable[placeholder]
 
 		if !ok {
@@ -98,7 +98,7 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 		values = append(values, value)
 	}
 
-	rows, err := ds.stmt.Query(values)
+	rows, err := ds.stmt.Query(values...)
 
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't execute statement")
@@ -111,21 +111,20 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 	}
 
 	return &RecordStream{
-		rows: rows,
+		rows:    rows,
 		columns: columns,
-		isDone: false,
-		alias: ds.alias,
+		isDone:  false,
+		alias:   ds.alias,
 	}, nil
 
 }
 
 type RecordStream struct {
-	rows *sql.Rows
+	rows    *sql.Rows
 	columns []string
-	isDone bool
-	alias string
+	isDone  bool
+	alias   string
 }
-
 
 func (rs *RecordStream) Next() (*execution.Record, error) {
 	if rs.isDone {
@@ -151,7 +150,7 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 
 	for i, columnName := range rs.columns {
 		val := colPointers[i].(*interface{})
-		newName := octosql.VariableName(fmt.Sprint("%s.%s",rs.alias, columnName))
+		newName := octosql.VariableName(fmt.Sprintf("%s.%s", rs.alias, columnName))
 		resultMap[newName] = val
 	}
 

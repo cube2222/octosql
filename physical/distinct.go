@@ -1,5 +1,6 @@
 package physical
 
+/*
 import (
 	"context"
 
@@ -35,3 +36,4 @@ func (node *Distinct) Materialize(ctx context.Context) (execution.Node, error) {
 
 	return execution.NewDistinct(childNode), nil
 }
+*/

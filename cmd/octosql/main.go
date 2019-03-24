@@ -13,6 +13,7 @@ import (
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/optimizer"
 	"github.com/cube2222/octosql/storage/json"
+	"github.com/cube2222/octosql/storage/postgres"
 	"github.com/xwb1989/sqlparser"
 )
 
@@ -44,10 +45,26 @@ func main() {
 		log.Fatal(err)
 	}
 
+	err = dataSourceRespository.Register("users",
+		postgres.NewDataSourceBuilderFactory("localhost", "postgres",
+			"", "mydb", "users", nil, 5432))
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	phys, variables, err := parsed.Physical(ctx, logical.NewPhysicalPlanCreator(dataSourceRespository))
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	physTyped := phys.(*physical.Filter)
+
+	aliases := postgres.NewAliases("u")
+
+	translated, err := postgres.FormulaToSQL(physTyped.Formula, aliases)
+
+	log.Println(translated)
 
 	phys = optimizer.Optimize(ctx, optimizer.DefaultScenarios, phys)
 

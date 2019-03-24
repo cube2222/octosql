@@ -38,13 +38,13 @@ type NamedExpression interface {
 	MaterializeNamed(ctx context.Context) (execution.NamedExpression, error)
 }
 
-// Variables describes a variable name.
+// Variables describes a variable Name.
 type Variable struct {
-	name octosql.VariableName
+	Name octosql.VariableName
 }
 
 func NewVariable(name octosql.VariableName) *Variable {
-	return &Variable{name: name}
+	return &Variable{Name: name}
 }
 
 func (v *Variable) Transform(ctx context.Context, transformers *Transformers) Expression {
@@ -57,7 +57,7 @@ func (v *Variable) Materialize(ctx context.Context) (execution.Expression, error
 
 func (v *Variable) TransformNamed(ctx context.Context, transformers *Transformers) NamedExpression {
 	var expr NamedExpression = &Variable{
-		name: v.name,
+		Name: v.Name,
 	}
 	if transformers.NamedExprT != nil {
 		expr = transformers.NamedExprT(expr)
@@ -66,7 +66,7 @@ func (v *Variable) TransformNamed(ctx context.Context, transformers *Transformer
 }
 
 func (v *Variable) MaterializeNamed(ctx context.Context) (execution.NamedExpression, error) {
-	return execution.NewVariable(v.name), nil
+	return execution.NewVariable(v.Name), nil
 }
 
 // NodeExpressions describes an expression which gets it's value from a node underneath.

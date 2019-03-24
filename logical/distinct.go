@@ -1,5 +1,6 @@
 package logical
 
+/*
 import (
 	"context"
 
@@ -25,3 +26,4 @@ func (node *Distinct) Physical(ctx context.Context, physicalCreator *PhysicalPla
 	return physical.NewDistinct(childNode), variables, nil
 
 }
+*/

@@ -77,6 +77,9 @@ func NormalizeType(value interface{}) interface{} {
 
 // AreEqual checks the equality of the given values, returning false if the types don't match.
 func AreEqual(left, right interface{}) bool {
+	if left == nil && right == nil {
+		return true
+	}
 	switch left := left.(type) {
 	case int:
 		right, ok := right.(int)

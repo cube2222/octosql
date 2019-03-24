@@ -104,7 +104,7 @@ var MergeDataSourceBuilderWithFilter = Scenario{
 			predicates := filter.ExtractPredicates()
 			foundAnyLocalVariables := false
 			for _, predicate := range predicates {
-				allPredicatesMovable := false
+				predicateMovable := false
 
 				varsLeft := GetVariables(context.Background(), predicate.Left)
 				varsRight := GetVariables(context.Background(), predicate.Right)
@@ -128,15 +128,15 @@ var MergeDataSourceBuilderWithFilter = Scenario{
 
 				if _, ok := ds.AvailableFilters[physical.Primary][predicate.Relation]; ok {
 					if subset(ds.PrimaryKeys, localVarsLeft) && subset(ds.PrimaryKeys, localVarsRight) {
-						allPredicatesMovable = true
+						predicateMovable = true
 					}
 				}
 
 				if _, ok := ds.AvailableFilters[physical.Secondary][predicate.Relation]; ok {
-					allPredicatesMovable = true
+					predicateMovable = true
 				}
 
-				if !allPredicatesMovable {
+				if !predicateMovable {
 					continue filterChecker
 				}
 			}

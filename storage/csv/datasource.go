@@ -21,6 +21,14 @@ var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 	physical.Secondary: make(map[physical.Relation]struct{}),
 }
 
+// for datasource_test.go usage only
+func newDataSource(path, alias string) *DataSource {
+	return &DataSource{
+		path:  path,
+		alias: alias,
+	}
+}
+
 // at the moment no "fields" field there - I cannot see how it could be used; easy to implement, though
 type DataSource struct {
 	path  string
@@ -84,6 +92,7 @@ type RecordStream struct {
 	aliasedFields []octosql.VariableName
 }
 
+// only name uniqueness and record field number check
 func (rs *RecordStream) Next() (*execution.Record, error) {
 	if rs.isDone {
 		return nil, execution.ErrEndOfStream
@@ -102,7 +111,7 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 
 	aliasedRecord := make(map[octosql.VariableName]interface{})
 	for i, v := range line {
-		aliasedRecord[rs.aliasedFields[i]] = execution.NormalizeType(execution.ParseType(v)) //is ParseType needed?
+		aliasedRecord[rs.aliasedFields[i]] = execution.NormalizeType(execution.ParseType(v)) //is NormalizeType needed?
 	}
 
 	return execution.NewRecord(rs.aliasedFields, aliasedRecord), nil

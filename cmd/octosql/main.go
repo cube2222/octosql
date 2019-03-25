@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/cube2222/octosql/storage/csv"
-	"github.com/cube2222/octosql/storage/json"
 	"log"
 	"os"
 	"strings"
@@ -15,6 +13,9 @@ import (
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/optimizer"
 	"github.com/xwb1989/sqlparser"
+
+	"github.com/cube2222/octosql/storage/csv"
+	"github.com/cube2222/octosql/storage/json"
 )
 
 func main() {

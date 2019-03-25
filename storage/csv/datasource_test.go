@@ -3,7 +3,6 @@ package csv
 import (
 	"fmt"
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/execution"
 	"reflect"
 	"testing"
 )
@@ -16,11 +15,11 @@ type csvDsc struct {
 var csvDbs = map[string]csvDsc{
 	"people": {
 		alias: "p",
-		path:  "people.csv",
+		path:  "../../people.csv",
 	},
 	"cities": {
 		alias: "c",
-		path:  "cities.csv",
+		path:  "../../cities.csv",
 	},
 	"wrongCount": {
 		alias: "wc",
@@ -39,7 +38,7 @@ var csvDbs = map[string]csvDsc{
 func TestRecordStream_Next(t *testing.T) {
 	type wanted struct {
 		record map[string]interface{}
-		error  interface{}
+		error  bool
 	}
 
 	tests := []struct {
@@ -49,7 +48,7 @@ func TestRecordStream_Next(t *testing.T) {
 		want    []wanted
 	}{
 		{
-			name:    "SELECT * from people p",
+			name:    "reading people.csv - happy path",
 			csvName: "people",
 			fields:  []string{"name", "surname", "age", "city"},
 			want: []wanted{
@@ -60,7 +59,7 @@ func TestRecordStream_Next(t *testing.T) {
 						"age":     3,
 						"city":    "warsaw",
 					},
-					error: nil,
+					error: false,
 				},
 				{
 					record: map[string]interface{}{
@@ -69,7 +68,7 @@ func TestRecordStream_Next(t *testing.T) {
 						"age":     4,
 						"city":    "warsaw",
 					},
-					error: nil,
+					error: false,
 				},
 				{
 					record: map[string]interface{}{
@@ -78,7 +77,7 @@ func TestRecordStream_Next(t *testing.T) {
 						"age":     5,
 						"city":    "ciechanowo",
 					},
-					error: nil,
+					error: false,
 				},
 				{
 					record: map[string]interface{}{
@@ -87,15 +86,33 @@ func TestRecordStream_Next(t *testing.T) {
 						"age":     2,
 						"city":    "warsaw",
 					},
-					error: nil,
+					error: false,
 				},
 				{
 					record: nil,
-					error:  execution.ErrEndOfStream,
+					error:  true,
 				},
 				{
 					record: nil,
-					error:  execution.ErrEndOfStream,
+					error:  true,
+				},
+			},
+		},
+		{
+			name:    "wrong numbers of columns in a row",
+			csvName: "wrongCount",
+			fields:  []string{"name", "surname"},
+			want: []wanted{
+				{
+					record: map[string]interface{}{
+						"name":    "andrzej",
+						"surname": "lepper",
+					},
+					error: false,
+				},
+				{
+					record: nil,
+					error:  true,
 				},
 			},
 		},
@@ -106,6 +123,7 @@ func TestRecordStream_Next(t *testing.T) {
 		rs, err := ds.Get(octosql.NoVariables())
 		if err != nil {
 			t.Errorf("DataSource.Get() error: %v", err)
+			continue
 		}
 
 		aliasedFields := make([]string, 0)
@@ -116,8 +134,13 @@ func TestRecordStream_Next(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			for _, expected := range tt.want {
 				got, err := rs.Next()
-				if !reflect.DeepEqual(err, expected.error) {
+
+				if (err != nil) != expected.error {
 					t.Errorf("DataSource.Get() error is %v, want %v", err, expected.error)
+					continue
+				}
+				if err != nil {
+					continue
 				}
 
 				record := got.AsVariables()

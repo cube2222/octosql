@@ -1,18 +1,21 @@
 package postgres
 
 import (
+	"context"
 	"fmt"
+
 	"github.com/cube2222/octosql/physical"
+	"github.com/pkg/errors"
 )
 
-type Aliases struct {
+type aliases struct {
 	PlaceholderToExpression map[string]physical.Expression
 	Counter                 int
 	Alias                   string
 }
 
-func NewAliases(alias string) *Aliases {
-	return &Aliases{
+func NewAliases(alias string) *aliases {
+	return &aliases{
 		PlaceholderToExpression: make(map[string]physical.Expression),
 		Counter:                 1,
 		Alias:                   alias,
@@ -38,13 +41,13 @@ func RelationToSQL(rel physical.Relation) string {
 	}
 }
 
-func (aliases *Aliases) newPlaceholder() string {
+func (aliases *aliases) newPlaceholder() string {
 	str := fmt.Sprintf("$%d", aliases.Counter)
 	aliases.Counter++
 	return str
 }
 
-func ExpressionToSQL(expression physical.Expression, aliases *Aliases) string {
+func ExpressionToSQL(expression physical.Expression, aliases *aliases) string {
 	switch expression := expression.(type) {
 	case *physical.Variable:
 		if expression.Name.Source() == aliases.Alias {
@@ -64,7 +67,7 @@ func ExpressionToSQL(expression physical.Expression, aliases *Aliases) string {
 	}
 }
 
-func FormulaToSQL(formula physical.Formula, aliases *Aliases) string {
+func FormulaToSQL(formula physical.Formula, aliases *aliases) string {
 	switch formula := formula.(type) {
 	case *physical.And:
 		left := FormulaToSQL(formula.Left, aliases)
@@ -105,4 +108,21 @@ func FormulaToSQL(formula physical.Formula, aliases *Aliases) string {
 
 func parenthesize(str string) string {
 	return fmt.Sprintf("(%s)", str)
+}
+
+func (aliases *aliases) materializeAliases() (*executionAliases, error) {
+	result := newExecutionAliases()
+
+	ctx := context.Background()
+
+	for placeholder, expression := range aliases.PlaceholderToExpression {
+		exec, err := expression.Materialize(ctx)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't materialize expression")
+		}
+
+		result.PlaceholderToExpression[placeholder] = exec
+	}
+
+	return result, nil
 }

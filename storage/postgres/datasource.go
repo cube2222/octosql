@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"strconv"
@@ -35,7 +34,7 @@ var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 type DataSource struct {
 	db      *sql.DB
 	stmt    *sql.Stmt
-	aliases *Aliases
+	aliases *executionAliases
 	alias   string
 }
 
@@ -53,6 +52,7 @@ func NewDataSourceBuilderFactory(host, user, password, dbname, tablename string,
 			}
 
 			aliases := NewAliases(alias)
+
 			query := FormulaToSQL(filter, aliases)
 			query = fmt.Sprintf("SELECT * FROM %s %s WHERE %s", tablename, alias, query)
 
@@ -61,9 +61,15 @@ func NewDataSourceBuilderFactory(host, user, password, dbname, tablename string,
 				return nil, errors.Wrap(err, "couldn't prepare db for query")
 			}
 
+			execAliases, err := aliases.materializeAliases()
+
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't materialize aliases")
+			}
+
 			return &DataSource{
 				stmt:    stmt,
-				aliases: aliases,
+				aliases: execAliases,
 				alias:   alias,
 				db:      db,
 			}, nil
@@ -76,7 +82,7 @@ func NewDataSourceBuilderFactory(host, user, password, dbname, tablename string,
 func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, error) {
 	values := make([]interface{}, 0)
 
-	for i := 0; i < ds.aliases.Counter-1; i++ {
+	for i := 0; i < len(ds.aliases.PlaceholderToExpression); i++ {
 		placeholder := "$" + strconv.Itoa(i+1)
 		expression, ok := ds.aliases.PlaceholderToExpression[placeholder]
 
@@ -84,14 +90,7 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 			return nil, errors.Errorf("couldn't get variable name for placeholder %s", placeholder)
 		}
 
-		ctx := context.Background()
-
-		exec, err := expression.Materialize(ctx)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't materialize expression")
-		}
-
-		value, err := exec.ExpressionValue(variables)
+		value, err := expression.ExpressionValue(variables)
 
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't get actual value from variables")
@@ -162,6 +161,21 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 		fields = append(fields, k)
 	}
 
-	execution.NormalizeType(resultMap)
+	resultMap, ok := execution.NormalizeType(resultMap).(map[octosql.VariableName]interface{})
+
+	if !ok {
+		return nil, errors.New("couldn't cast resultMap to map[octosql.VariableName]interface{}")
+	}
+
 	return execution.NewRecord(fields, resultMap), nil
+}
+
+type executionAliases struct {
+	PlaceholderToExpression map[string]execution.Expression
+}
+
+func newExecutionAliases() *executionAliases {
+	return &executionAliases{
+		PlaceholderToExpression: make(map[string]execution.Expression),
+	}
 }

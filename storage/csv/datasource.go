@@ -29,7 +29,6 @@ func newDataSource(path, alias string) *DataSource {
 	}
 }
 
-// at the moment no "fields" field there - I cannot see how it could be used; easy to implement, though
 type DataSource struct {
 	path  string
 	alias string
@@ -92,7 +91,6 @@ type RecordStream struct {
 	aliasedFields []octosql.VariableName
 }
 
-// only name uniqueness and record field number check
 func (rs *RecordStream) Next() (*execution.Record, error) {
 	if rs.isDone {
 		return nil, execution.ErrEndOfStream

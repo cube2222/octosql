@@ -161,11 +161,10 @@ func TestRecordStream_Next(t *testing.T) {
 			for _, expected := range tt.want {
 				got, err := rs.Next()
 
-				if (err != nil) != expected.error {
-					t.Errorf("DataSource.Get() error is %v, want %v", err, expected.error)
-					continue
-				}
-				if err != nil {
+				if err != nil || (err != nil) != expected.error {
+					if (err != nil) != expected.error {
+						t.Errorf("DataSource.Get() error is %v, want %v", err, expected.error)
+					}
 					continue
 				}
 

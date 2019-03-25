@@ -46,8 +46,8 @@ func main() {
 	}
 
 	err = dataSourceRespository.Register("users",
-		postgres.NewDataSourceBuilderFactory("localhost", "postgres",
-			"", "mydb", "users", nil, 5432))
+		postgres.NewDataSourceBuilderFactory("localhost", "root",
+			"toor", "mydb", "users", nil, 5432))
 
 	if err != nil {
 		log.Fatal(err)
@@ -57,14 +57,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	physTyped := phys.(*physical.Filter)
-
-	aliases := postgres.NewAliases("u")
-
-	translated, err := postgres.FormulaToSQL(physTyped.Formula, aliases)
-
-	log.Println(translated)
 
 	phys = optimizer.Optimize(ctx, optimizer.DefaultScenarios, phys)
 
@@ -83,7 +75,8 @@ func main() {
 		var out []string
 		fields := rec.Fields()
 		for i := range fields {
-			out = append(out, fmt.Sprintf("%v: %v", fields[i].Name, rec.Value(fields[i].Name)))
+			v := rec.Value(fields[i].Name)
+			out = append(out, fmt.Sprintf("%v: %v", fields[i].Name, v))
 		}
 		fmt.Println(strings.Join(out, ", "))
 	}

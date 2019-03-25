@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/cube2222/octosql/storage/csv"
+	"github.com/cube2222/octosql/storage/json"
 	"log"
 	"os"
 	"strings"
@@ -12,7 +14,6 @@ import (
 	"github.com/cube2222/octosql/parser"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/optimizer"
-	"github.com/cube2222/octosql/storage/json"
 	"github.com/xwb1989/sqlparser"
 )
 
@@ -40,6 +41,14 @@ func main() {
 		log.Fatal(err)
 	}
 	err = dataSourceRespository.Register("cities", json.NewDataSourceBuilderFactory("cities.json"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = dataSourceRespository.Register("people2", csv.NewDataSourceBuilderFactory("people.csv"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = dataSourceRespository.Register("cities2", csv.NewDataSourceBuilderFactory("cities.csv"))
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -1,6 +1,7 @@
 package csv
 
-//only comma-separated now. Changing that means setting RecordStream.rdr.Coma
+// only comma-separated now. Changing that means setting RecordStream.rdr.Coma
+// .csv reader trims leading white space(s)
 
 import (
 	"bufio"
@@ -45,41 +46,42 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 		return nil, errors.Wrap(err, "couldn't open file")
 	}
 	rdr := csv.NewReader(bufio.NewReader(file))
+	rdr.TrimLeadingSpace = true
 
 	columns, err := rdr.Read()
 	if err != nil {
 		return nil, errors.Wrap(err, "problem parsing column names")
 	}
 
-	fields := make([]octosql.VariableName, 0)
+	aliasedFields := make([]octosql.VariableName, 0)
 	for _, c := range columns {
-		fields = append(fields, octosql.VariableName(c))
+		aliasedFields = append(aliasedFields, octosql.VariableName(fmt.Sprintf("%s.%s", ds.alias, c)))
 	}
-	rdr.FieldsPerRecord = len(fields)
+	rdr.FieldsPerRecord = len(aliasedFields)
 
-	var set map[octosql.VariableName]interface{}
-	for _, f := range fields {
+	set := make(map[octosql.VariableName]interface{})
+	for _, f := range aliasedFields {
 		if _, present := set[f]; present {
-			return nil, errors.New("column names not unique") //cannot use Wrap() :(
+			return nil, errors.New("column names not unique") // cannot use Wrap() :(
 		}
 		set[f] = nil // is it idiomatic?
 	}
 
 	return &RecordStream{
-		file:   file,
-		rdr:    rdr,
-		isDone: false,
-		alias:  ds.alias,
-		fields: fields,
+		file:          file,
+		rdr:           rdr,
+		isDone:        false,
+		alias:         ds.alias,
+		aliasedFields: aliasedFields,
 	}, nil
 }
 
 type RecordStream struct {
-	file   *os.File
-	rdr    *csv.Reader
-	isDone bool
-	alias  string
-	fields []octosql.VariableName
+	file          *os.File
+	rdr           *csv.Reader
+	isDone        bool
+	alias         string
+	aliasedFields []octosql.VariableName
 }
 
 func (rs *RecordStream) Next() (*execution.Record, error) {
@@ -98,15 +100,10 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 		return nil, errors.Wrap(err, "problem(s) reading record")
 	}
 
-	var record map[octosql.VariableName]interface{}
-	for i, v := range line {
-		record[rs.fields[i]] = execution.NormalizeType(execution.ParseType(v)) //is ParseType needed?
-	}
-
 	aliasedRecord := make(map[octosql.VariableName]interface{})
-	for k, v := range record {
-		aliasedRecord[octosql.VariableName(fmt.Sprintf("%s.%s", rs.alias, k))] = v
+	for i, v := range line {
+		aliasedRecord[rs.aliasedFields[i]] = execution.NormalizeType(execution.ParseType(v)) //is ParseType needed?
 	}
 
-	return execution.NewRecord(rs.fields, aliasedRecord), nil
+	return execution.NewRecord(rs.aliasedFields, aliasedRecord), nil
 }

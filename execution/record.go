@@ -7,23 +7,31 @@ import (
 
 type Field struct {
 	Name octosql.VariableName
-	Type octosql.Datatype
 }
 
 type Record struct {
 	fieldNames []octosql.VariableName
-	data       map[octosql.VariableName]interface{}
+	data       []interface{}
 }
 
 func NewRecord(fields []octosql.VariableName, data map[octosql.VariableName]interface{}) *Record {
+	dataInner := make([]interface{}, len(fields))
+	for i := range fields {
+		dataInner[i] = data[fields[i]]
+	}
 	return &Record{
 		fieldNames: fields,
-		data:       data,
+		data:       dataInner,
 	}
 }
 
 func (r *Record) Value(field octosql.VariableName) interface{} {
-	return r.data[field]
+	for i := range r.fieldNames {
+		if r.fieldNames[i] == field {
+			return r.data[i]
+		}
+	}
+	return nil
 }
 
 func (r *Record) Fields() []Field {
@@ -31,7 +39,6 @@ func (r *Record) Fields() []Field {
 	for _, fieldName := range r.fieldNames {
 		fields = append(fields, Field{
 			Name: fieldName,
-			Type: getType(r.data[fieldName]),
 		})
 	}
 
@@ -40,8 +47,8 @@ func (r *Record) Fields() []Field {
 
 func (r *Record) AsVariables() octosql.Variables {
 	out := make(octosql.Variables)
-	for k, v := range r.data {
-		out[k] = v
+	for i := range r.fieldNames {
+		out[r.fieldNames[i]] = r.data[i]
 	}
 
 	return out

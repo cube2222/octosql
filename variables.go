@@ -1,6 +1,10 @@
 package octosql
 
-import "github.com/pkg/errors"
+import (
+	"strings"
+
+	"github.com/pkg/errors"
+)
 
 type VariableName string
 
@@ -10,6 +14,23 @@ func NewVariableName(varname string) VariableName {
 
 func (vn *VariableName) String() string {
 	return string(*vn)
+}
+
+func (vn *VariableName) Source() string {
+	parts := strings.Split(vn.String(), ".")
+	if len(parts) == 1 {
+		return ""
+	} else {
+		return parts[0]
+	}
+}
+
+func (vn *VariableName) Name() string {
+	i := strings.Index(vn.String(), ".")
+	if i == -1 {
+		return vn.String()
+	}
+	return vn.String()[i+1:]
 }
 
 type Variables map[VariableName]interface{}

@@ -51,9 +51,9 @@ func NewDataSourceBuilderFactory(host, user, password, dbname, tablename string,
 				return nil, errors.Wrap(err, "couldn't open connection to postgres database")
 			}
 
-			aliases := NewAliases(alias)
+			aliases := newAliases(alias)
 
-			query := FormulaToSQL(filter, aliases)
+			query := formulaToSQL(filter, aliases)
 			query = fmt.Sprintf("SELECT * FROM %s %s WHERE %s", tablename, alias, query)
 
 			stmt, err := db.Prepare(query)

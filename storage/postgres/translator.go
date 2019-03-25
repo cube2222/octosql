@@ -14,7 +14,7 @@ type aliases struct {
 	Alias                   string
 }
 
-func NewAliases(alias string) *aliases {
+func newAliases(alias string) *aliases {
 	return &aliases{
 		PlaceholderToExpression: make(map[string]physical.Expression),
 		Counter:                 1,
@@ -22,7 +22,7 @@ func NewAliases(alias string) *aliases {
 	}
 }
 
-func RelationToSQL(rel physical.Relation) string {
+func relationToSQL(rel physical.Relation) string {
 	switch rel {
 	case physical.Equal:
 		return "="
@@ -47,7 +47,7 @@ func (aliases *aliases) newPlaceholder() string {
 	return str
 }
 
-func ExpressionToSQL(expression physical.Expression, aliases *aliases) string {
+func expressionToSQL(expression physical.Expression, aliases *aliases) string {
 	switch expression := expression.(type) {
 	case *physical.Variable:
 		if expression.Name.Source() == aliases.Alias {
@@ -67,24 +67,24 @@ func ExpressionToSQL(expression physical.Expression, aliases *aliases) string {
 	}
 }
 
-func FormulaToSQL(formula physical.Formula, aliases *aliases) string {
+func formulaToSQL(formula physical.Formula, aliases *aliases) string {
 	switch formula := formula.(type) {
 	case *physical.And:
-		left := FormulaToSQL(formula.Left, aliases)
+		left := formulaToSQL(formula.Left, aliases)
 
-		right := FormulaToSQL(formula.Right, aliases)
+		right := formulaToSQL(formula.Right, aliases)
 
 		return fmt.Sprintf("%s AND %s", parenthesize(left), parenthesize(right))
 
 	case *physical.Or:
-		left := FormulaToSQL(formula.Left, aliases)
+		left := formulaToSQL(formula.Left, aliases)
 
-		right := FormulaToSQL(formula.Right, aliases)
+		right := formulaToSQL(formula.Right, aliases)
 
 		return fmt.Sprintf("%s OR %s", parenthesize(left), parenthesize(right))
 
 	case *physical.Not:
-		child := FormulaToSQL(formula.Child, aliases)
+		child := formulaToSQL(formula.Child, aliases)
 
 		return fmt.Sprintf("NOT %s", parenthesize(child))
 	case *physical.Constant:
@@ -94,11 +94,11 @@ func FormulaToSQL(formula physical.Formula, aliases *aliases) string {
 			return "FALSE"
 		}
 	case *physical.Predicate:
-		left := ExpressionToSQL(formula.Left, aliases)
+		left := expressionToSQL(formula.Left, aliases)
 
-		right := ExpressionToSQL(formula.Right, aliases)
+		right := expressionToSQL(formula.Right, aliases)
 
-		relationString := RelationToSQL(formula.Relation)
+		relationString := relationToSQL(formula.Relation)
 
 		return fmt.Sprintf("%s %s %s", parenthesize(left), relationString, parenthesize(right))
 	default:

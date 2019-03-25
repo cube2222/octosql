@@ -26,7 +26,7 @@ func TestFormulaToSQL(t *testing.T) {
 					physical.MoreThan,
 					physical.NewVariable("const_0"),
 				),
-				aliases: NewAliases("u"),
+				aliases: newAliases("u"),
 			},
 			want: "(u.id) > ($1)",
 			wantAliases: &aliases{
@@ -48,7 +48,7 @@ func TestFormulaToSQL(t *testing.T) {
 						physical.NewVariable("table.age"),
 					),
 				),
-				aliases: NewAliases("table"),
+				aliases: newAliases("table"),
 			},
 			want: "(TRUE) AND (($1) = (table.age))",
 			wantAliases: &aliases{
@@ -72,7 +72,7 @@ func TestFormulaToSQL(t *testing.T) {
 						physical.NewConstant(false),
 					),
 				),
-				aliases: NewAliases("alias"),
+				aliases: newAliases("alias"),
 			},
 			want: "((alias.age) <> (alias.IQ)) OR (NOT (FALSE))",
 			wantAliases: &aliases{
@@ -89,7 +89,7 @@ func TestFormulaToSQL(t *testing.T) {
 					physical.MoreThan,
 					physical.NewVariable("c.age"),
 				),
-				aliases: NewAliases("a"),
+				aliases: newAliases("a"),
 			},
 			want: "($1) > ($2)",
 			wantAliases: &aliases{
@@ -128,7 +128,7 @@ func TestFormulaToSQL(t *testing.T) {
 					),
 				),
 
-				aliases: NewAliases("a"),
+				aliases: newAliases("a"),
 			},
 
 			want: "(((a.age) > ($1)) AND ((a.sex) = ($2))) OR (($3) < ($4))",
@@ -146,12 +146,12 @@ func TestFormulaToSQL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := FormulaToSQL(tt.args.formula, tt.args.aliases); got != tt.want {
-				t.Errorf("FormulaToSQL() = %v, want %v", got, tt.want)
+			if got := formulaToSQL(tt.args.formula, tt.args.aliases); got != tt.want {
+				t.Errorf("formulaToSQL() = %v, want %v", got, tt.want)
 			}
 
 			if !reflect.DeepEqual(tt.args.aliases, tt.wantAliases) {
-				t.Errorf("FormulaToSQL aliases = %v, want %v", tt.args.aliases, tt.wantAliases)
+				t.Errorf("formulaToSQL aliases = %v, want %v", tt.args.aliases, tt.wantAliases)
 			}
 		})
 	}

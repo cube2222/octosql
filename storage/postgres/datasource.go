@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strconv"
@@ -52,14 +53,8 @@ func NewDataSourceBuilderFactory(host, user, password, dbname, tablename string,
 			}
 
 			aliases := NewAliases(alias)
-			query, err := FormulaToSQL(filter, aliases)
-			if err != nil {
-				return nil, errors.Wrap(err, "couldn't get query from formula")
-			}
-
+			query := FormulaToSQL(filter, aliases)
 			query = fmt.Sprintf("SELECT * FROM %s %s WHERE %s", tablename, alias, query)
-
-			//query = "SELECT * FROM " + tablename + " " + alias + " WHERE " + query
 
 			stmt, err := db.Prepare(query)
 			if err != nil {
@@ -83,13 +78,20 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 
 	for i := 0; i < ds.aliases.Counter-1; i++ {
 		placeholder := "$" + strconv.Itoa(i+1)
-		originalName, ok := ds.aliases.PlaceholderToVariable[placeholder]
+		expression, ok := ds.aliases.PlaceholderToExpression[placeholder]
 
 		if !ok {
 			return nil, errors.Errorf("couldn't get variable name for placeholder %s", placeholder)
 		}
 
-		value, err := variables.Get(originalName)
+		ctx := context.Background()
+
+		exec, err := expression.Materialize(ctx)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't materialize expression")
+		}
+
+		value, err := exec.ExpressionValue(variables)
 
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't get actual value from variables")
@@ -160,5 +162,6 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 		fields = append(fields, k)
 	}
 
+	execution.NormalizeType(resultMap)
 	return execution.NewRecord(fields, resultMap), nil
 }

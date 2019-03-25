@@ -1,55 +1,22 @@
 package postgres
 
 import (
-	"strconv"
-	"strings"
-
-	"github.com/cube2222/octosql"
+	"fmt"
 	"github.com/cube2222/octosql/physical"
-	"github.com/pkg/errors"
 )
 
-func parenthesize(text string) string {
-	return "(" + text + ")"
-}
-
 type Aliases struct {
-	PlaceholderToVariable map[string]octosql.VariableName
-	Counter               int
-	TableAlias            string
+	PlaceholderToExpression map[string]physical.Expression
+	Counter                 int
+	Alias                   string
 }
 
-func NewAliases(tableAlias string) *Aliases {
+func NewAliases(alias string) *Aliases {
 	return &Aliases{
-		PlaceholderToVariable: make(map[string]octosql.VariableName),
-		Counter:               1,
-		TableAlias:            tableAlias,
+		PlaceholderToExpression: make(map[string]physical.Expression),
+		Counter:                 1,
+		Alias:                   alias,
 	}
-}
-
-func (aliases *Aliases) isAliasedForTable(variable octosql.VariableName) bool {
-	typed := variable.String()
-	if !strings.Contains(typed, ".") {
-		return false
-	}
-
-	splitString := strings.Split(typed, ".")
-	alias := splitString[0]
-	return alias == aliases.TableAlias
-}
-
-
-func (aliases* Aliases) alias (variable octosql.VariableName) string  {
-	if aliases.isAliasedForTable(variable) {
-		return variable.String()
-	}
-
-	placeholder := "$" + strconv.Itoa(aliases.Counter)
-	aliases.Counter++
-
-	aliases.PlaceholderToVariable[placeholder] = variable
-
-	return placeholder
 }
 
 func RelationToSQL(rel physical.Relation) string {
@@ -71,77 +38,71 @@ func RelationToSQL(rel physical.Relation) string {
 	}
 }
 
-func ExpressionToSQL(expression physical.Expression, aliases *Aliases) (string, error) {
-	switch expression := expression.(type) {
-	case *physical.AliasedExpression: //TODO: ?
-		panic("Implement aliased expr")
-	case *physical.NodeExpression:
-		panic("NodeExpression not supported in translation to SQL")
-	case *physical.Variable:
-		return aliases.alias(expression.Name), nil
+func (aliases *Aliases) newPlaceholder() string {
+	str := fmt.Sprintf("$%d", aliases.Counter)
+	aliases.Counter++
+	return str
+}
 
+func ExpressionToSQL(expression physical.Expression, aliases *Aliases) string {
+	switch expression := expression.(type) {
+	case *physical.Variable:
+		if expression.Name.Source() == aliases.Alias {
+			return expression.Name.String()
+		}
+
+		placeholder := aliases.newPlaceholder()
+		aliases.PlaceholderToExpression[placeholder] = expression
+
+		return placeholder
 
 	default:
-		panic("Unknown expression")
+		placeholder := aliases.newPlaceholder()
+		aliases.PlaceholderToExpression[placeholder] = expression
+
+		return placeholder
 	}
 }
 
-func FormulaToSQL(formula physical.Formula, aliases *Aliases) (string, error) {
+func FormulaToSQL(formula physical.Formula, aliases *Aliases) string {
 	switch formula := formula.(type) {
 	case *physical.And:
-		left, err := FormulaToSQL(formula.Left, aliases)
-		if err != nil {
-			return "", errors.Wrap(err, "couldn't transform left subformula to string")
-		}
+		left := FormulaToSQL(formula.Left, aliases)
 
-		right, err := FormulaToSQL(formula.Right, aliases)
-		if err != nil {
-			return "", errors.Wrap(err, "couldn't transform right subformula to string")
-		}
+		right := FormulaToSQL(formula.Right, aliases)
 
-		return parenthesize(left) + " AND " + parenthesize(right), nil
+		return fmt.Sprintf("%s AND %s", parenthesize(left), parenthesize(right))
 
 	case *physical.Or:
-		left, err := FormulaToSQL(formula.Left, aliases)
-		if err != nil {
-			return "", errors.Wrap(err, "couldn't transform left subformula to string in OR")
-		}
+		left := FormulaToSQL(formula.Left, aliases)
 
-		right, err := FormulaToSQL(formula.Right, aliases)
-		if err != nil {
-			return "", errors.Wrap(err, "couldn't transform right subformula to string in OR")
-		}
+		right := FormulaToSQL(formula.Right, aliases)
 
-		return parenthesize(left) + " OR " + parenthesize(right), nil
+		return fmt.Sprintf("%s OR %s", parenthesize(left), parenthesize(right))
 
 	case *physical.Not:
-		child, err := FormulaToSQL(formula.Child, aliases)
-		if err != nil {
-			return "", errors.Wrap(err, "couldn't transform child subformula to string")
-		}
+		child := FormulaToSQL(formula.Child, aliases)
 
-		return "NOT " + parenthesize(child), nil
+		return fmt.Sprintf("NOT %s", parenthesize(child))
 	case *physical.Constant:
 		if formula.Value {
-			return "TRUE", nil
+			return "TRUE"
 		} else {
-			return "FALSE", nil
+			return "FALSE"
 		}
 	case *physical.Predicate:
-		left, err := ExpressionToSQL(formula.Left, aliases)
-		if err != nil {
-			return "", errors.Wrap(err, "couldn't transform left expression to string")
-		}
+		left := ExpressionToSQL(formula.Left, aliases)
 
-		right, err := ExpressionToSQL(formula.Right, aliases)
-		if err != nil {
-			return "", errors.Wrap(err, "couldn't transform right expression to string")
-		}
+		right := ExpressionToSQL(formula.Right, aliases)
 
 		relationString := RelationToSQL(formula.Relation)
 
-		return parenthesize(left) + " " + relationString + " " + parenthesize(right), nil
+		return fmt.Sprintf("%s %s %s", parenthesize(left), relationString, parenthesize(right))
 	default:
 		panic("Unknown type of physical.Formula")
 	}
+}
+
+func parenthesize(str string) string {
+	return fmt.Sprintf("(%s)", str)
 }

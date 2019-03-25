@@ -8,6 +8,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+//A structure that stores the relation $n -> expression
+//that will be later used to put specific values into a SQL query
 type aliases struct {
 	PlaceholderToExpression map[string]physical.Expression
 	Counter                 int
@@ -49,11 +51,11 @@ func (aliases *aliases) newPlaceholder() string {
 
 func expressionToSQL(expression physical.Expression, aliases *aliases) string {
 	switch expression := expression.(type) {
-	case *physical.Variable:
+	case *physical.Variable: //if it's a variable, then check if it's a column name for alias
 		if expression.Name.Source() == aliases.Alias {
 			return expression.Name.String()
 		}
-
+		//if not, or we are not a variable, then create a new placeholder and assign the expression to it
 		placeholder := aliases.newPlaceholder()
 		aliases.PlaceholderToExpression[placeholder] = expression
 
@@ -110,6 +112,7 @@ func parenthesize(str string) string {
 	return fmt.Sprintf("(%s)", str)
 }
 
+//materializes the values in the map so that one can later call EvaluateExpression on them
 func (aliases *aliases) materializeAliases() (*executionAliases, error) {
 	result := newExecutionAliases()
 
@@ -118,7 +121,7 @@ func (aliases *aliases) materializeAliases() (*executionAliases, error) {
 	for placeholder, expression := range aliases.PlaceholderToExpression {
 		exec, err := expression.Materialize(ctx)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't materialize expression")
+			return nil, errors.Wrap(err, "couldn't materialize expression in materializeAliases")
 		}
 
 		result.PlaceholderToExpression[placeholder] = exec

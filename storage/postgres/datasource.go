@@ -53,6 +53,7 @@ func NewDataSourceBuilderFactory(host, user, password, dbname, tablename string,
 
 			aliases := newAliases(alias)
 
+			//create a query with placeholders to prepare a statement from a physical formula
 			query := formulaToSQL(filter, aliases)
 			query = fmt.Sprintf("SELECT * FROM %s %s WHERE %s", tablename, alias, query)
 
@@ -61,6 +62,7 @@ func NewDataSourceBuilderFactory(host, user, password, dbname, tablename string,
 				return nil, errors.Wrap(err, "couldn't prepare db for query")
 			}
 
+			//materialize the created aliases
 			execAliases, err := aliases.materializeAliases()
 
 			if err != nil {
@@ -90,6 +92,7 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 			return nil, errors.Errorf("couldn't get variable name for placeholder %s", placeholder)
 		}
 
+		//since we have an execution expression, then we can evaluate it given the variables
 		value, err := expression.ExpressionValue(variables)
 
 		if err != nil {

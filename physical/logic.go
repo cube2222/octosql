@@ -11,6 +11,8 @@ import (
 type Formula interface {
 	// Transform returns a new Formula after recursively calling Transform
 	Transform(ctx context.Context, transformers *Transformers) Formula
+	SplitByAnd() []Formula
+	ExtractPredicates() []*Predicate
 	Materialize(ctx context.Context) (execution.Formula, error)
 }
 
@@ -30,6 +32,14 @@ func (f *Constant) Transform(ctx context.Context, transformers *Transformers) Fo
 		formula = transformers.FormulaT(formula)
 	}
 	return formula
+}
+
+func (f *Constant) SplitByAnd() []Formula {
+	return []Formula{f}
+}
+
+func (f *Constant) ExtractPredicates() []*Predicate {
+	return []*Predicate{}
 }
 
 func (f *Constant) Materialize(ctx context.Context) (execution.Formula, error) {
@@ -53,6 +63,14 @@ func (f *And) Transform(ctx context.Context, transformers *Transformers) Formula
 		formula = transformers.FormulaT(formula)
 	}
 	return formula
+}
+
+func (f *And) SplitByAnd() []Formula {
+	return append(f.Left.SplitByAnd(), f.Right.SplitByAnd()...)
+}
+
+func (f *And) ExtractPredicates() []*Predicate {
+	return append(f.Left.ExtractPredicates(), f.Right.ExtractPredicates()...)
 }
 
 func (f *And) Materialize(ctx context.Context) (execution.Formula, error) {
@@ -86,6 +104,14 @@ func (f *Or) Transform(ctx context.Context, transformers *Transformers) Formula 
 	return formula
 }
 
+func (f *Or) SplitByAnd() []Formula {
+	return []Formula{f}
+}
+
+func (f *Or) ExtractPredicates() []*Predicate {
+	return append(f.Left.ExtractPredicates(), f.Right.ExtractPredicates()...)
+}
+
 func (f *Or) Materialize(ctx context.Context) (execution.Formula, error) {
 	materializedLeft, err := f.Left.Materialize(ctx)
 	if err != nil {
@@ -116,6 +142,14 @@ func (f *Not) Transform(ctx context.Context, transformers *Transformers) Formula
 	return formula
 }
 
+func (f *Not) SplitByAnd() []Formula {
+	return []Formula{f}
+}
+
+func (f *Not) ExtractPredicates() []*Predicate {
+	return f.Child.ExtractPredicates()
+}
+
 func (f *Not) Materialize(ctx context.Context) (execution.Formula, error) {
 	materialized, err := f.Child.Materialize(ctx)
 	if err != nil {
@@ -144,6 +178,14 @@ func (f *Predicate) Transform(ctx context.Context, transformers *Transformers) F
 		formula = transformers.FormulaT(formula)
 	}
 	return formula
+}
+
+func (f *Predicate) SplitByAnd() []Formula {
+	return []Formula{f}
+}
+
+func (f *Predicate) ExtractPredicates() []*Predicate {
+	return []*Predicate{f}
 }
 
 func (f *Predicate) Materialize(ctx context.Context) (execution.Formula, error) {

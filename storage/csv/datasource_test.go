@@ -31,9 +31,35 @@ var csvDbs = map[string]csvDsc{
 	},
 }
 
-/*func TestDataSource_Get(t *testing.T) {
-	;
-}*/
+func TestDataSource_Get(t *testing.T) {
+	tests := []struct {
+		name    string
+		csvName string
+		wantErr bool
+	}{
+		{
+			name:    "happy path",
+			csvName: "cities",
+			wantErr: false,
+		},
+		{
+			name:    "not unique columns",
+			csvName: "notUnique",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		ds := newDataSource(csvDbs[tt.csvName].path, csvDbs[tt.csvName].alias)
+
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ds.Get(octosql.NoVariables())
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DataSource.Get() error is %v, want %v", err, tt.wantErr)
+			}
+		})
+	}
+}
 
 func TestRecordStream_Next(t *testing.T) {
 	type wanted struct {

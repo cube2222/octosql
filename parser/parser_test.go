@@ -1,16 +1,16 @@
 package parser
 
 import (
+	"github.com/bradleyjkemp/memviz"
 	"log"
 	"os"
 	"testing"
 
-	memmap "github.com/bradleyjkemp/memviz"
 	"github.com/cube2222/octosql/logical"
 	"github.com/xwb1989/sqlparser"
 )
 
-func TestParseSelect(t *testing.T) {
+func TestParseNode(t *testing.T) {
 	type args struct {
 		statement string
 	}
@@ -20,6 +20,116 @@ func TestParseSelect(t *testing.T) {
 		want    logical.Node
 		wantErr bool
 	}{
+		{
+			name: "simple union all",
+			args: args{
+				"SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 3 " +
+					"UNION ALL " +
+					"SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 4",
+			},
+			want: logical.NewUnionAll(
+				logical.NewMap(
+					[]logical.NamedExpression{
+						logical.NewVariable("p2.name"),
+						logical.NewVariable("p2.age"),
+					},
+					logical.NewFilter(
+						logical.NewPredicate(
+							logical.NewVariable("p2.age"),
+							logical.MoreThan,
+							logical.NewConstant(3),
+						),
+						logical.NewDataSource("people", "p2"),
+					),
+				),
+				logical.NewMap(
+					[]logical.NamedExpression{
+						logical.NewVariable("p2.name"),
+						logical.NewVariable("p2.age"),
+					},
+					logical.NewFilter(
+						logical.NewPredicate(
+							logical.NewVariable("p2.age"),
+							logical.MoreThan,
+							logical.NewConstant(4),
+						),
+						logical.NewDataSource("people", "p2"),
+					),
+				),
+			),
+			wantErr: false,
+		},
+		{
+			name: "complex union all",
+			args: args{
+				"(SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 3 UNION ALL SELECT p2.name, p2.age FROM people p2 WHERE p2.age < 5) " +
+					"UNION ALL" +
+					" (SELECT p2.name, p2.age FROM people p2 WHERE p2.city > 'ciechanowo' UNION ALL SELECT p2.name, p2.age FROM people p2 WHERE p2.city < 'wwa')",
+			},
+			want: logical.NewUnionAll(
+				logical.NewUnionAll(
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewVariable("p2.name"),
+							logical.NewVariable("p2.age"),
+						},
+						logical.NewFilter(
+							logical.NewPredicate(
+								logical.NewVariable("p2.age"),
+								logical.MoreThan,
+								logical.NewConstant(3),
+							),
+							logical.NewDataSource("people", "p2"),
+						),
+					),
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewVariable("p2.name"),
+							logical.NewVariable("p2.age"),
+						},
+						logical.NewFilter(
+							logical.NewPredicate(
+								logical.NewVariable("p2.age"),
+								logical.LessThan,
+								logical.NewConstant(5),
+							),
+							logical.NewDataSource("people", "p2"),
+						),
+					),
+				),
+				logical.NewUnionAll(
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewVariable("p2.name"),
+							logical.NewVariable("p2.age"),
+						},
+						logical.NewFilter(
+							logical.NewPredicate(
+								logical.NewVariable("p2.city"),
+								logical.MoreThan,
+								logical.NewConstant("ciechanowo"),
+							),
+							logical.NewDataSource("people", "p2"),
+						),
+					),
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewVariable("p2.name"),
+							logical.NewVariable("p2.age"),
+						},
+						logical.NewFilter(
+							logical.NewPredicate(
+								logical.NewVariable("p2.city"),
+								logical.LessThan,
+								logical.NewConstant("wwa"),
+							),
+							logical.NewDataSource("people", "p2"),
+						),
+					),
+				),
+			),
+			wantErr: false,
+		},
 		{
 			name: "simple select",
 			args: args{
@@ -196,11 +306,11 @@ WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age`,
 				t.Fatal(err)
 			}
 
-			statement := stmt.(*sqlparser.Select)
+			statement := stmt.(sqlparser.SelectStatement)
 
-			got, err := ParseSelect(statement)
+			got, err := ParseNode(statement)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ParseSelect() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ParseNode() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if err := logical.EqualNodes(got, tt.want); err != nil {
@@ -217,7 +327,7 @@ WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age`,
 				}
 				memmap.Map(f, tt.want)
 				f.Close()
-				t.Errorf("ParseSelect() = %v, want %v: %v", got, tt.want, err)
+				t.Errorf("ParseNode() = %v, want %v: %v", got, tt.want, err)
 			}
 		})
 	}

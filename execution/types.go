@@ -154,7 +154,6 @@ func AreEqual(left, right interface{}) bool {
 		return true
 
 	case *Record:
-		// albo rekord, albo jesli
 		rightRecord, ok := right.(*Record)
 		if !ok {
 			temp, ok := right.(Record)

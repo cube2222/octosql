@@ -1,8 +1,6 @@
 package execution
 
 import (
-	"reflect"
-
 	"github.com/cube2222/octosql"
 	"github.com/mitchellh/hashstructure"
 	"github.com/pkg/errors"
@@ -79,8 +77,8 @@ func (rs *recordSet) Has(r *Record) (bool, error) {
 		return false, errors.Wrap(err, "couldn't get hash of record")
 	}
 
-	for rec := range rs.set[hash] {
-		if reflect.DeepEqual(rec, r) {
+	for i := range rs.set[hash] {
+		if AreEqual(r, rs.set[hash][i]) {
 			return true, nil
 		}
 	}

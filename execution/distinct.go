@@ -1,7 +1,10 @@
 package execution
 
 import (
+	"reflect"
+
 	"github.com/cube2222/octosql"
+	"github.com/mitchellh/hashstructure"
 	"github.com/pkg/errors"
 )
 
@@ -16,7 +19,7 @@ func NewDistinct(child Node) *Distinct {
 type DistinctStream struct {
 	stream    RecordStream
 	variables octosql.Variables
-	records   map[Record]bool
+	records   *recordSet
 }
 
 func (node *Distinct) Get(variables octosql.Variables) (RecordStream, error) {
@@ -28,7 +31,7 @@ func (node *Distinct) Get(variables octosql.Variables) (RecordStream, error) {
 	return DistinctStream{
 		stream:    stream,
 		variables: variables,
-		records:   make(map[Record]bool),
+		records:   newRecordSet(),
 	}, nil
 }
 
@@ -37,15 +40,68 @@ func (distinctStream DistinctStream) Next() (*Record, error) {
 		record, err := distinctStream.stream.Next()
 		if err != nil {
 			if err == ErrEndOfStream {
-				return nil, err
+				return nil, ErrEndOfStream
 			}
 			return nil, errors.Wrap(err, "couldn't get record from stream in DistinctStream")
 		}
 
-		_, alreadyFound := distinctStream.records[*record]
-		if !alreadyFound {
-			distinctStream.records[*record] = true
+		already, err := distinctStream.records.Has(record)
+
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't access the record set")
+		}
+
+		if !already {
+			_, err := distinctStream.records.Insert(record)
+
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't access the record set")
+			}
+
 			return record, nil
 		}
 	}
+}
+
+type recordSet struct {
+	set map[uint64][]*Record
+}
+
+func newRecordSet() *recordSet {
+	return &recordSet{
+		set: make(map[uint64][]*Record),
+	}
+}
+
+func (rs *recordSet) Has(r *Record) (bool, error) {
+	hash, err := hashstructure.Hash(r, nil)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't get hash of record")
+	}
+
+	for rec := range rs.set[hash] {
+		if reflect.DeepEqual(rec, r) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func (rs *recordSet) Insert(r *Record) (bool, error) {
+	hash, err := hashstructure.Hash(r, nil)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't get hash of record")
+	}
+
+	already, err := rs.Has(r)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't find out if record already in set")
+	}
+	if !already {
+		rs.set[hash] = append(rs.set[hash], r)
+		return true, nil
+	}
+
+	return false, nil
 }

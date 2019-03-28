@@ -1,6 +1,9 @@
 package optimizer
 
 import (
+	"context"
+
+	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/physical"
 	. "github.com/cube2222/octosql/physical/matcher" // Makes the scenarios more readable.
 )
@@ -9,6 +12,7 @@ var DefaultScenarios = []Scenario{
 	MergeRequalifiers,
 	MergeFilters,
 	MergeDataSourceBuilderWithRequalifier,
+	MergeDataSourceBuilderWithFilter,
 }
 
 var MergeRequalifiers = Scenario{
@@ -91,19 +95,150 @@ var MergeDataSourceBuilderWithFilter = Scenario{
 			Name: "data_source_builder",
 		},
 	},
-	CandidateApprover: func(match *Match) bool {
-		panic("implement me")
-		// return CheckIfContainsOnlyPrimaryKeys(match.Nodes["data_source_builder"], match.Formulas["parent_filter"])
+	CandidateApprover: func(match *Match) bool { // TODO: Pass context.
+		filters := match.Formulas["parent_filter"].SplitByAnd()
+		ds := match.Nodes["data_source_builder"].(*physical.DataSourceBuilder)
+
+	filterChecker:
+		for _, filter := range filters {
+			predicates := filter.ExtractPredicates()
+			foundAnyLocalVariables := false
+			for _, predicate := range predicates {
+				predicateMovable := false
+
+				varsLeft := GetVariables(context.Background(), predicate.Left)
+				varsRight := GetVariables(context.Background(), predicate.Right)
+				localVarsLeft := make([]octosql.VariableName, 0)
+				localVarsRight := make([]octosql.VariableName, 0)
+
+				for i := range varsLeft {
+					if varsLeft[i].Source() == ds.Alias {
+						localVarsLeft = append(localVarsLeft, varsLeft[i])
+					}
+				}
+				for i := range varsRight {
+					if varsRight[i].Source() == ds.Alias {
+						localVarsRight = append(localVarsRight, varsRight[i])
+					}
+				}
+
+				if len(localVarsLeft) > 0 || len(localVarsRight) > 0 {
+					foundAnyLocalVariables = true
+				}
+
+				if _, ok := ds.AvailableFilters[physical.Primary][predicate.Relation]; ok {
+					if subset(ds.PrimaryKeys, localVarsLeft) && subset(ds.PrimaryKeys, localVarsRight) {
+						predicateMovable = true
+					}
+				}
+
+				if _, ok := ds.AvailableFilters[physical.Secondary][predicate.Relation]; ok {
+					predicateMovable = true
+				}
+
+				if !predicateMovable {
+					continue filterChecker
+				}
+			}
+			if !foundAnyLocalVariables {
+				continue
+			}
+			return true
+		}
+		return false
 	},
 	Reassembler: func(match *Match) physical.Node {
-		dataSourceBuilder := match.Nodes["data_source_builder"].(*physical.DataSourceBuilder)
+		filters := match.Formulas["parent_filter"].SplitByAnd()
+		ds := match.Nodes["data_source_builder"].(*physical.DataSourceBuilder)
 
-		return &physical.DataSourceBuilder{
-			Executor:         dataSourceBuilder.Executor,
-			PrimaryKeys:      dataSourceBuilder.PrimaryKeys,
-			AvailableFilters: dataSourceBuilder.AvailableFilters,
-			Filter:           physical.NewAnd(dataSourceBuilder.Filter, match.Formulas["parent_filter"]),
-			Alias:            dataSourceBuilder.Alias,
+		extractable := -1
+
+	filterChecker:
+		for index, filter := range filters {
+			predicates := filter.ExtractPredicates()
+			foundAnyLocalVariables := false
+			for _, predicate := range predicates {
+				allPredicatesMovable := false
+
+				varsLeft := GetVariables(context.Background(), predicate.Left)
+				varsRight := GetVariables(context.Background(), predicate.Right)
+				localVarsLeft := make([]octosql.VariableName, 0)
+				localVarsRight := make([]octosql.VariableName, 0)
+
+				for i := range varsLeft {
+					if varsLeft[i].Source() == ds.Alias {
+						localVarsLeft = append(localVarsLeft, varsLeft[i])
+					}
+				}
+				for i := range varsRight {
+					if varsRight[i].Source() == ds.Alias {
+						localVarsRight = append(localVarsRight, varsRight[i])
+					}
+				}
+
+				if len(localVarsLeft) > 0 || len(localVarsRight) > 0 {
+					foundAnyLocalVariables = true
+				}
+
+				if _, ok := ds.AvailableFilters[physical.Primary][predicate.Relation]; ok {
+					if subset(ds.PrimaryKeys, localVarsLeft) && subset(ds.PrimaryKeys, localVarsRight) {
+						allPredicatesMovable = true
+					}
+				}
+
+				if _, ok := ds.AvailableFilters[physical.Secondary][predicate.Relation]; ok {
+					allPredicatesMovable = true
+				}
+
+				if !allPredicatesMovable {
+					continue filterChecker
+				}
+			}
+			if !foundAnyLocalVariables {
+				continue
+			}
+			extractable = index
+			break
 		}
+		dsFilter := physical.NewAnd(filters[extractable], ds.Filter)
+
+		filters[extractable] = filters[len(filters)-1]
+		filters = filters[:len(filters)-1]
+
+		var out physical.Node = &physical.DataSourceBuilder{
+			Executor:         ds.Executor,
+			PrimaryKeys:      ds.PrimaryKeys,
+			AvailableFilters: ds.AvailableFilters,
+			Filter:           dsFilter,
+			Alias:            ds.Alias,
+		}
+
+		if len(filters) > 0 {
+			for len(filters) > 1 {
+				filters[1] = physical.NewAnd(filters[0], filters[1])
+				filters = filters[1:]
+			}
+			out = physical.NewFilter(filters[0], out)
+		}
+
+		return out
 	},
+}
+
+func subset(set []octosql.VariableName, subset []octosql.VariableName) bool {
+	for i := range subset {
+		if !containsVariableName(set, subset[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func containsVariableName(vns []octosql.VariableName, vn octosql.VariableName) bool {
+	for i := range vns {
+		if vn == vns[i] {
+			return true
+		}
+	}
+	return false
 }

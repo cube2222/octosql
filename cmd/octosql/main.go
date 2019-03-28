@@ -3,10 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
-	"strings"
-
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/parser"
@@ -14,6 +10,9 @@ import (
 	"github.com/cube2222/octosql/physical/optimizer"
 	"github.com/cube2222/octosql/storage/json"
 	"github.com/xwb1989/sqlparser"
+	"log"
+	"os"
+	"strings"
 )
 
 func main() {

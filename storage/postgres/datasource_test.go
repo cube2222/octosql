@@ -9,8 +9,17 @@ import (
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	_ "github.com/lib/pq"
-	"github.com/pkg/errors"
 )
+
+/*
+	VERY IMPORTANT: READ BEFORE ADDING TEST CASES
+	SQL's column names are case insensitive which means you should
+	either create octosql.VariableNames via the constructor or make sure
+	they are lowercase, so that they match the column names returned by psql
+
+	When passing fieldNames to the InMemoryStream you should also make sure
+	that they are aliased using the argument alias
+*/
 
 func TestDataSource_Get(t *testing.T) {
 	type args struct {
@@ -24,13 +33,12 @@ func TestDataSource_Get(t *testing.T) {
 		alias      string
 		variables  octosql.Variables
 		formula    physical.Formula
-		columns    []string
 		queries    []string
 	}
 	tests := []struct {
 		name    string
 		args    args
-		want    *records
+		want    *execution.InMemoryStream
 		wantErr bool
 	}{
 		{
@@ -55,7 +63,6 @@ func TestDataSource_Get(t *testing.T) {
 				variables: octosql.Variables{
 					"const_0": 2,
 				},
-				columns: []string{"id", "sex", "points", "username"},
 				queries: []string{
 					"CREATE TABLE users(id INTEGER PRIMARY KEY, username VARCHAR(30), points INTEGER, sex VARCHAR(1));",
 					"INSERT INTO users VALUES(1, 'user1', 10, 'M');",
@@ -63,16 +70,17 @@ func TestDataSource_Get(t *testing.T) {
 					"INSERT INTO users VALUES(3, 'user3', 2, 'M');",
 				},
 			},
-			want: &records{
-				m: map[int]octosql.Variables{
-					0: {
+			want: execution.NewInMemoryStream(
+				[]octosql.VariableName{"u.id", "u.sex", "u.points", "u.username"},
+				[]map[octosql.VariableName]interface{}{
+					{
 						"u.id":       2,
-						"u.username": "user2",
-						"u.points":   300,
 						"u.sex":      "F",
+						"u.points":   300,
+						"u.username": "user2",
 					},
 				},
-			},
+			),
 			wantErr: false,
 		},
 
@@ -91,16 +99,15 @@ func TestDataSource_Get(t *testing.T) {
 				port:       5432,
 				alias:      "ani",
 				formula: physical.NewPredicate(
-					physical.NewVariable("ani.howMany"),
+					physical.NewVariable("ani.howmany"),
 					physical.LessThan,
 					physical.NewVariable("const_0"),
 				),
 				variables: octosql.Variables{
 					"const_0": 1000,
 				},
-				columns: []string{"name", "howMany"},
 				queries: []string{
-					"CREATE TABLE animals(name VARCHAR(25) PRIMARY KEY, howMany BIGINT);",
+					"CREATE TABLE animals(name VARCHAR(25) PRIMARY KEY, howmany BIGINT);",
 					"INSERT INTO animals VALUES('lion', 50000);",
 					"INSERT INTO animals VALUES('panda', 500);",
 					"INSERT INTO animals VALUES('mosquito', 100000000);",
@@ -108,18 +115,19 @@ func TestDataSource_Get(t *testing.T) {
 					"INSERT INTO animals VALUES('mammoth', 0);",
 				},
 			},
-			want: &records{
-				m: map[int]octosql.Variables{
-					0: {
+			want: execution.NewInMemoryStream(
+				[]octosql.VariableName{"ani.name", "ani.howmany"},
+				[]map[octosql.VariableName]interface{}{
+					{
 						"ani.name":    "panda",
-						"ani.howMany": 500,
+						"ani.howmany": 500,
 					},
-					1: {
+					{
 						"ani.name":    "mammoth",
-						"ani.howMany": 0,
+						"ani.howmany": 0,
 					},
 				},
-			},
+			),
 			wantErr: false,
 		},
 
@@ -139,13 +147,13 @@ func TestDataSource_Get(t *testing.T) {
 				alias:      "ani",
 				formula: physical.NewAnd(
 					physical.NewPredicate(
-						physical.NewVariable("ani.howMany"),
+						physical.NewVariable("ani.howmany"),
 						physical.LessThan,
 						physical.NewVariable("const_0"),
 					),
 
 					physical.NewPredicate(
-						physical.NewVariable("ani.howMany"),
+						physical.NewVariable("ani.howmany"),
 						physical.MoreThan,
 						physical.NewVariable("const_1"),
 					),
@@ -154,9 +162,8 @@ func TestDataSource_Get(t *testing.T) {
 					"const_0": 1000,
 					"const_1": 600,
 				},
-				columns: []string{"name", "howMany"},
 				queries: []string{
-					"CREATE TABLE animals(name VARCHAR(25) PRIMARY KEY, howMany BIGINT);",
+					"CREATE TABLE animals(name VARCHAR(25) PRIMARY KEY, howmany BIGINT);",
 					"INSERT INTO animals VALUES('lion', 50000);",
 					"INSERT INTO animals VALUES('panda', 500);",
 					"INSERT INTO animals VALUES('mosquito', 100000000);",
@@ -164,9 +171,10 @@ func TestDataSource_Get(t *testing.T) {
 					"INSERT INTO animals VALUES('mammoth', 0);",
 				},
 			},
-			want: &records{
-				m: map[int]octosql.Variables{},
-			},
+			want: execution.NewInMemoryStream(
+				[]octosql.VariableName{"ani.name", "ani.howmany"},
+				[]map[octosql.VariableName]interface{}{},
+			),
 			wantErr: false,
 		},
 
@@ -192,7 +200,6 @@ func TestDataSource_Get(t *testing.T) {
 				variables: octosql.Variables{
 					"const_0": "M",
 				},
-				columns: []string{"id", "sex"},
 				queries: []string{
 					"CREATE TABLE people(id INTEGER PRIMARY KEY, sex CHAR);",
 					"INSERT INTO people VALUES(1, 'M');",
@@ -202,22 +209,23 @@ func TestDataSource_Get(t *testing.T) {
 					"INSERT INTO people VALUES(5, 'F');",
 				},
 			},
-			want: &records{
-				m: map[int]octosql.Variables{
-					0: {
+			want: execution.NewInMemoryStream(
+				[]octosql.VariableName{"p.id", "p.sex"},
+				[]map[octosql.VariableName]interface{}{
+					{
 						"p.id":  2,
-						"p.sex": 'F',
+						"p.sex": "F",
 					},
-					1: {
+					{
 						"p.id":  3,
-						"p.sex": 'F',
+						"p.sex": "F",
 					},
-					2: {
+					{
 						"p.id":  5,
-						"p.sex": 'F',
+						"p.sex": "F",
 					},
 				},
-			},
+			),
 			wantErr: false,
 		},
 
@@ -234,7 +242,6 @@ func TestDataSource_Get(t *testing.T) {
 				alias:      "u",
 				formula:    physical.NewConstant(true),
 				variables:  octosql.Variables{},
-				columns:    []string{},
 				queries:    []string{},
 			},
 			want:    nil,
@@ -253,7 +260,6 @@ func TestDataSource_Get(t *testing.T) {
 				alias:      "u",
 				formula:    physical.NewConstant(true),
 				variables:  octosql.Variables{},
-				columns:    []string{},
 				queries:    []string{},
 			},
 			want:    nil,
@@ -272,7 +278,6 @@ func TestDataSource_Get(t *testing.T) {
 				alias:      "u",
 				formula:    physical.NewConstant(true),
 				variables:  octosql.Variables{},
-				columns:    []string{},
 				queries:    []string{},
 			},
 			want:    nil,
@@ -291,7 +296,6 @@ func TestDataSource_Get(t *testing.T) {
 				alias:      "u",
 				formula:    physical.NewConstant(true),
 				variables:  octosql.Variables{},
-				columns:    []string{},
 				queries:    []string{},
 			},
 			want:    nil,
@@ -308,8 +312,6 @@ func TestDataSource_Get(t *testing.T) {
 
 			db, err := sql.Open("postgres", psqlInfo)
 
-			defer db.Close()
-
 			if err != nil {
 				t.Errorf("Unsuspected error in open")
 				return
@@ -324,6 +326,21 @@ func TestDataSource_Get(t *testing.T) {
 				return
 			}
 
+			defer func() {
+				_, err := db.Exec(fmt.Sprintf("DROP TABLE %s;", args.tablename))
+
+				if err != nil {
+					t.Errorf("Couldn't drop table %s", args.tablename)
+					return
+				}
+
+				err = db.Close()
+
+				if err != nil {
+					t.Errorf("Couldn't close connection to db")
+					return
+				}
+			}()
 			_, err = db.Exec(args.queries[0]) //create relation
 
 			if err != nil {
@@ -358,93 +375,18 @@ func TestDataSource_Get(t *testing.T) {
 				return
 			}
 
-			records, err := insertStreamIntoMap(stream)
+			equal, err := execution.AreStreamsEqual(stream, tt.want)
 
 			if err != nil {
-				t.Errorf("Unwanted error in insertStreamIntoMap")
+				t.Errorf("AreStreamsEqual() error: %s", err)
 				return
 			}
 
-			if !areRecordsEqual(records, tt.want, args.columns) {
-				t.Errorf("ERROR: Streams don't match")
+			if !equal {
+				t.Errorf("ERROR: Streams are not equal")
 				return
 			}
 
-			_, err = db.Exec(fmt.Sprintf("DROP TABLE %s", args.tablename))
-
-			if err != nil {
-				t.Errorf("Couldn't drop table %s", args.tablename)
-				return
-			}
 		})
 	}
-}
-
-type records struct {
-	m map[int]octosql.Variables
-}
-
-func newRecords() *records {
-	return &records{
-		m: make(map[int]octosql.Variables),
-	}
-}
-
-func insertStreamIntoMap(stream execution.RecordStream) (*records, error) {
-	result := newRecords()
-
-	var i int = 0
-
-	for {
-		rec, err := stream.Next()
-		if err != nil {
-			if err == execution.ErrEndOfStream {
-				return result, nil
-			}
-			return nil, errors.Wrap(err, "couldn't get next element of record")
-		}
-
-		result.m[i] = rec.AsVariables()
-		i++
-	}
-}
-
-func areRecordsEqual(first, second *records, columns []string) bool {
-	if len(first.m) != len(second.m) {
-		return false
-	}
-
-	for i := 0; i < len(first.m); i++ {
-		firstRec := first.m[i]
-		secondRec := second.m[i]
-
-		if !areVariablesEqual(firstRec, secondRec, columns) {
-			return false
-		}
-	}
-
-	return true
-}
-
-func areVariablesEqual(first, second octosql.Variables, columns []string) bool {
-	if len(first) != len(second) {
-		return false
-	}
-
-	for i := range columns {
-		colName := columns[i]
-
-		firstValue, firstOk := first[octosql.VariableName(colName)]
-		secondValue, secondOk := second[octosql.VariableName(colName)]
-
-		if firstOk != secondOk {
-			return false
-		}
-
-		if !execution.AreEqual(firstValue, secondValue) {
-			return false
-		}
-	}
-
-	return true
 }

@@ -3,10 +3,11 @@ workflows:
   test-release:
     jobs:
       - test
-      #- test-postgres
+      - test-postgres
       - release:
           requires:
             - test
+            - test-postgres
           filters:
             branches:
               only: master

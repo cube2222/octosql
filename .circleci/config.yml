@@ -3,7 +3,7 @@ workflows:
   test-release:
     jobs:
       - test
-      - test-postgres
+      #- test-postgres
       - release:
           requires:
             - test
@@ -31,22 +31,22 @@ jobs:
       - run: go test -v physical/...
       - run: go test -v storage/json/...
 
-  test-postgres:
-    docker:
-      - image: circleci/golang:1.12
-        environment:
-          GO111MODULE: "on"
-      - image: circleci/postgres:latest
-        environment:
-          POSTGRES_USER: root
-          POSTGRES_PASSWORD: toor
-          POSTGRES_DB: mydb
-
-      working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
-        steps:
-          - checkout
-
-          - run: go test -v storage/postgres/...
+#  test-postgres:
+#    docker:
+#      - image: circleci/golang:1.12
+#        environment:
+#          GO111MODULE: "on"
+#      - image: circleci/postgres:latest
+#        environment:
+#          POSTGRES_USER: root
+#          POSTGRES_PASSWORD: toor
+#          POSTGRES_DB: mydb
+#
+#      working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
+#        steps:
+#          - checkout
+#
+#          - run: go test -v storage/postgres/...
 
   release:
     docker:

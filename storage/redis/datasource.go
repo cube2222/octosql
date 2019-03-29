@@ -17,12 +17,12 @@ var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 }
 
 type DataSource struct {
-	client  *redis.Client
-	allKeys map[octosql.VariableName]interface{}
-	alias   string
+	client *redis.Client
+	filter physical.Formula
+	alias  string
 }
 
-func NewDataSourceBuilderFactory(hostname, password string, port, dbIndex int, dbKey []octosql.VariableName) func(alias string) *physical.DataSourceBuilder {
+func NewDataSourceBuilderFactory(hostname, password string, port, dbIndex int) func(alias string) *physical.DataSourceBuilder {
 	return physical.NewDataSourceBuilderFactory(
 		func(filter physical.Formula, alias string) (execution.Node, error) {
 			client := redis.NewClient(
@@ -33,18 +33,13 @@ func NewDataSourceBuilderFactory(hostname, password string, port, dbIndex int, d
 				},
 			)
 
-			allKeys, err := GetAllKeys(filter, dbKey[0])
-			if err != nil {
-				return nil, errors.Wrap(err, "couldn't get all keys from filter")
-			}
-
 			return &DataSource{
-				client:  client,
-				allKeys: allKeys,
-				alias:   alias,
+				client: client,
+				filter: filter,
+				alias:  alias,
 			}, nil
 		},
-		dbKey,
+		[]octosql.VariableName{"key"}, // hard-coded key used for key identity in formula
 		availableFilters,
 	)
 }
@@ -52,7 +47,12 @@ func NewDataSourceBuilderFactory(hostname, password string, port, dbIndex int, d
 func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, error) {
 	var allKeys *redis.ScanCmd
 
-	if len(ds.allKeys) == 0 {
+	keysWanted, err := GetAllKeys(ds.filter, variables, "key", ds.alias)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get all keys from filter")
+	}
+
+	if len(keysWanted) == 0 {
 		allKeys = ds.client.Scan(0, "*", 0)
 
 		return &EntireBaseStream{
@@ -63,20 +63,12 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 		}, nil
 	}
 
-	sliceKeys := make([]string, len(ds.allKeys))
-	for k := range ds.allKeys {
-		value, err := variables.Get(k)
+	sliceKeys := make([]string, len(keysWanted))
+	for k := range keysWanted {
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't get value from variables map")
 		}
-
-		switch value := value.(type) {
-		case string:
-			sliceKeys = append(sliceKeys, value)
-
-		default:
-			return nil, errors.Errorf("wrong value type for key")
-		}
+		sliceKeys = append(sliceKeys, k.String())
 	}
 
 	return &KeySpecificStream{
@@ -88,7 +80,9 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 	}, nil
 }
 
-type RecordStream interface{}
+type RecordStream interface {
+	Next() (*execution.Record, error)
+}
 
 type KeySpecificStream struct {
 	client  *redis.Client
@@ -150,6 +144,11 @@ func GetNewRecord(client *redis.Client, key, alias string) (*execution.Record, e
 	fieldNames := make([]octosql.VariableName, len(recordValues))
 	for k := range aliasedRecord {
 		fieldNames = append(fieldNames, k)
+	}
+
+	aliasedRecord, err = execution.NormalizeType(aliasedRecord).(map[octosql.VariableName]interface{})
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't normalize aliased map to map[octosql.VariableName]interface{}")
 	}
 
 	return execution.NewRecord(fieldNames, aliasedRecord), nil

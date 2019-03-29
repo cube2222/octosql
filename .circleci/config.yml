@@ -47,7 +47,7 @@ jobs:
     steps:
       - checkout
 
-      - run: go test -v storage/postgres/...
+      - run: go test -v ./storage/postgres/...
 
   release:
     docker:

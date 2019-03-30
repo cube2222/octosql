@@ -68,15 +68,10 @@ func (vs Variables) MergeWith(other Variables) (Variables, error) {
 	return out, nil
 }
 
-func (vs Variables) Equal(vs1 Variables) bool {
-	if len(vs) == len(vs1) {
-		for k := range vs {
-			_, ok := vs1[k]
-			if !ok {
-				return false
-			}
-		}
-		return true
+func (vs Variables) MergeWithNoConflicts(other Variables) (Variables, error) {
+	out := vs
+	for k, v := range other {
+		out[k] = v
 	}
-	return false
+	return out, nil
 }

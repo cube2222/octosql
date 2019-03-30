@@ -2,91 +2,171 @@ package redis
 
 import (
 	"context"
-	"fmt"
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
 )
 
-func EvaluateExpression(expression physical.Expression, variables octosql.Variables) (octosql.VariableName, error) {
-	execExpression, err := expression.Materialize(context.Background())
+type KeyFormula interface {
+	GetAllKeys(variables octosql.Variables) (octosql.Variables, error)
+}
+
+type And struct {
+	left, right KeyFormula
+}
+
+func NewAnd(left, right KeyFormula) *And {
+	return &And{
+		left:  left,
+		right: right,
+	}
+}
+
+func (f *And) GetAllKeys(variables octosql.Variables) (octosql.Variables, error) {
+	leftKeys, err := f.left.GetAllKeys(variables)
 	if err != nil {
-		return "", errors.Wrap(err, "couldn't materialize expression")
+		return nil, errors.Wrap(err, "couldn't get all keys from left KeyFormula")
 	}
 
-	exprValue, err := execExpression.ExpressionValue(variables)
+	rightKeys, err := f.right.GetAllKeys(variables)
 	if err != nil {
-		return "", errors.Wrap(err, "couldn't get expression value")
+		return nil, errors.Wrap(err, "couldn't get all keys from right KeyFormula")
+	}
+
+	resultKeys := make(map[octosql.VariableName]interface{})
+	for k := range leftKeys {
+		if val, ok := rightKeys[k]; ok {
+			resultKeys[k] = val
+		}
+	}
+
+	return resultKeys, nil
+}
+
+type Or struct {
+	left, right KeyFormula
+}
+
+func NewOr(left, right KeyFormula) *Or {
+	return &Or{
+		left:  left,
+		right: right,
+	}
+}
+
+func (f *Or) GetAllKeys(variables octosql.Variables) (octosql.Variables, error) {
+	leftKeys, err := f.left.GetAllKeys(variables)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get all keys from left KeyFormula")
+	}
+
+	rightKeys, err := f.right.GetAllKeys(variables)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get all keys from right KeyFormula")
+	}
+
+	leftKeys, err = leftKeys.MergeWithNoConflicts(rightKeys)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't merge left and right keys")
+	}
+
+	return leftKeys, nil
+}
+
+type Equal struct {
+	child execution.Expression
+}
+
+func NewEqual(left execution.Expression) *Equal {
+	return &Equal{
+		child: left,
+	}
+}
+
+func (f *Equal) GetAllKeys(variables octosql.Variables) (octosql.Variables, error) {
+	exprValue, err := f.child.ExpressionValue(variables)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get child expression value")
 	}
 
 	switch exprValue := exprValue.(type) {
 	case string:
-		return octosql.NewVariableName(exprValue), nil
+		return octosql.NewVariables(
+			map[octosql.VariableName]interface{}{
+				octosql.NewVariableName(exprValue): nil,
+			},
+		), nil
 
 	default:
-		return "", errors.Errorf("wrong expression value for redis database")
+		return nil, errors.Errorf("wrong expression value for a key in redis database")
 	}
 }
 
-func GetAllKeys(filter physical.Formula, variables octosql.Variables, key octosql.VariableName, alias string) (octosql.Variables, error) {
-	switch formula := filter.(type) {
+func NewKeyFormula(formula physical.Formula, keyAlias octosql.VariableName) (KeyFormula, error) {
+	switch formula := formula.(type) {
 	case *physical.And:
-		leftKeys, err := GetAllKeys(formula.Left, variables, key, alias)
+		leftFormula, err := NewKeyFormula(formula.Left, keyAlias)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't get left keys")
-		}
-		rightKeys, err := GetAllKeys(formula.Right, variables, key, alias)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't get right keys")
+			return nil, errors.Wrap(err, "couldn't create KeyFormula from left formula")
 		}
 
-		if leftKeys.Equal(rightKeys) {
-			return leftKeys, nil
+		rightFormula, err := NewKeyFormula(formula.Right, keyAlias)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't create KeyFormula from left formula")
 		}
-		return nil, errors.Errorf("left and right keys are not equal")
+
+		return NewAnd(leftFormula, rightFormula), nil
 
 	case *physical.Or:
-		leftKeys, err := GetAllKeys(formula.Left, variables, key, alias)
+		leftFormula, err := NewKeyFormula(formula.Left, keyAlias)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't get left keys")
+			return nil, errors.Wrap(err, "couldn't create KeyFormula from left formula")
 		}
 
-		rightKeys, err := GetAllKeys(formula.Right, variables, key, alias)
+		rightFormula, err := NewKeyFormula(formula.Right, keyAlias)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't get right keys")
+			return nil, errors.Wrap(err, "couldn't create KeyFormula from left formula")
 		}
 
-		leftKeys, err = leftKeys.MergeWith(rightKeys)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't merge left and right keys")
-		}
-		return leftKeys, nil
+		return NewOr(leftFormula, rightFormula), nil
 
 	case *physical.Predicate:
-		leftKeyValue, err := EvaluateExpression(formula.Left, variables)
+		materializedLeft, err := formula.Left.Materialize(context.Background())
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't get value of left expression")
+			return nil, errors.Wrap(err, "couldn't materialize left expression")
 		}
-		rightKeyValue, err := EvaluateExpression(formula.Right, variables)
+		materializedRight, err := formula.Right.Materialize(context.Background())
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't get value of right expression")
+			return nil, errors.Wrap(err, "couldn't materialize right expression")
 		}
 
-		if leftKeyValue.String() != fmt.Sprintf("%s.%s", alias, key) {
-			if rightKeyValue.String() != fmt.Sprintf("%s.%s", alias, key) {
+		if !IsExpressionKeyAlias(materializedLeft, keyAlias) {
+			if !IsExpressionKeyAlias(materializedRight, keyAlias) {
 				return nil, errors.Errorf("neither of predicates expressions represents key identifier")
 			}
 
-			return octosql.NewVariables(map[octosql.VariableName]interface{}{
-				leftKeyValue: nil, // TODO - co ?
-			}), nil
+			return NewEqual(materializedLeft), nil
 		}
 
-		return octosql.NewVariables(map[octosql.VariableName]interface{}{
-			rightKeyValue: nil, // TODO - co ?
-		}), nil
+		return NewEqual(materializedRight), nil
 
 	default:
 		return nil, errors.Errorf("wrong formula type for redis database")
 	}
+}
+
+func IsExpressionKeyAlias(expression execution.Expression, keyAlias octosql.VariableName) bool {
+	// TODO - veeery ugly
+	switch expression := expression.(type) {
+	case execution.NamedExpression: // TODO - it should be case execution.Variable but for any reason it's not working :<
+		if expression.Name() == keyAlias {
+			return true
+		}
+
+	default:
+		return false
+	}
+
+	return false
 }

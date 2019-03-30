@@ -17,9 +17,10 @@ var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 }
 
 type DataSource struct {
-	client *redis.Client
-	filter physical.Formula
-	alias  string
+	client     *redis.Client
+	keyFormula KeyFormula
+	err        error
+	alias      string
 }
 
 func NewDataSourceBuilderFactory(hostname, password string, port, dbIndex int) func(alias string) *physical.DataSourceBuilder {
@@ -33,10 +34,14 @@ func NewDataSourceBuilderFactory(hostname, password string, port, dbIndex int) f
 				},
 			)
 
+			keyAlias := octosql.NewVariableName(fmt.Sprintf("%s.key", alias))
+			keyFormula, err := NewKeyFormula(filter, keyAlias)
+
 			return &DataSource{
-				client: client,
-				filter: filter,
-				alias:  alias,
+				client:     client,
+				keyFormula: keyFormula,
+				err:        err,
+				alias:      alias,
 			}, nil
 		},
 		[]octosql.VariableName{"key"}, // hard-coded key used for key identity in formula
@@ -47,7 +52,11 @@ func NewDataSourceBuilderFactory(hostname, password string, port, dbIndex int) f
 func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, error) {
 	var allKeys *redis.ScanCmd
 
-	keysWanted, err := GetAllKeys(ds.filter, variables, "key", ds.alias)
+	if ds.err != nil {
+		return nil, errors.Wrap(ds.err, "couldn't create KeyFormula")
+	}
+
+	keysWanted, err := ds.keyFormula.GetAllKeys(variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get all keys from filter")
 	}
@@ -146,9 +155,9 @@ func GetNewRecord(client *redis.Client, key, alias string) (*execution.Record, e
 		fieldNames = append(fieldNames, k)
 	}
 
-	aliasedRecord, err = execution.NormalizeType(aliasedRecord).(map[octosql.VariableName]interface{})
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't normalize aliased map to map[octosql.VariableName]interface{}")
+	aliasedRecord, ok := execution.NormalizeType(aliasedRecord).(map[octosql.VariableName]interface{})
+	if !ok {
+		return nil, errors.Errorf("couldn't normalize aliased map to map[octosql.VariableName]interface{}")
 	}
 
 	return execution.NewRecord(fieldNames, aliasedRecord), nil

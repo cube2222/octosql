@@ -7,7 +7,6 @@ import (
 	"github.com/cube2222/octosql/physical"
 	"github.com/go-redis/redis"
 	"github.com/pkg/errors"
-	"sort"
 )
 
 var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
@@ -77,10 +76,6 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 	for k := range keysWanted {
 		sliceKeys = append(sliceKeys, k.String())
 	}
-
-	sort.Slice(sliceKeys, func(i, j int) bool {
-		return sliceKeys[i] < sliceKeys[j]
-	})
 
 	return &KeySpecificStream{
 		client:  ds.client,

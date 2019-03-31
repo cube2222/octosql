@@ -78,9 +78,9 @@ type Equal struct {
 	child execution.Expression
 }
 
-func NewEqual(left execution.Expression) *Equal {
+func NewEqual(child execution.Expression) *Equal {
 	return &Equal{
-		child: left,
+		child: child,
 	}
 }
 
@@ -104,6 +104,10 @@ func (f *Equal) GetAllKeys(variables octosql.Variables) (octosql.Variables, erro
 }
 
 func NewKeyFormula(formula physical.Formula, keyAlias octosql.VariableName) (KeyFormula, error) {
+	if formula == nil { // there was no formula, so we want to scan whole redis database (no error returned)
+		return nil, nil
+	}
+
 	switch formula := formula.(type) {
 	case *physical.And:
 		leftFormula, err := NewKeyFormula(formula.Left, keyAlias)

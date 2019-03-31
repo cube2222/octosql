@@ -56,9 +56,15 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 		return nil, errors.Wrap(ds.err, "couldn't create KeyFormula")
 	}
 
-	keysWanted, err := ds.keyFormula.GetAllKeys(variables)
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get all keys from filter")
+	keysWanted := octosql.NoVariables()
+
+	if ds.keyFormula != nil { // there was filter
+		keysExtracted, err := ds.keyFormula.GetAllKeys(variables)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't get all keys from filter")
+		}
+
+		keysWanted = keysExtracted
 	}
 
 	if len(keysWanted) == 0 {
@@ -72,11 +78,8 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 		}, nil
 	}
 
-	sliceKeys := make([]string, len(keysWanted))
+	sliceKeys := make([]string, 0)
 	for k := range keysWanted {
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't get value from variables map")
-		}
 		sliceKeys = append(sliceKeys, k.String())
 	}
 
@@ -121,7 +124,7 @@ func (rs *KeySpecificStream) Next() (*execution.Record, error) {
 	key := rs.keys[rs.counter]
 	rs.counter++
 
-	return GetNewRecord(rs.client, rs.alias, key)
+	return GetNewRecord(rs.client, key, rs.alias)
 }
 
 func (rs *EntireBaseStream) Next() (*execution.Record, error) {
@@ -135,7 +138,7 @@ func (rs *EntireBaseStream) Next() (*execution.Record, error) {
 	}
 	key := rs.dbIterator.Val()
 
-	return GetNewRecord(rs.client, rs.alias, key)
+	return GetNewRecord(rs.client, key, rs.alias)
 }
 
 func GetNewRecord(client *redis.Client, key, alias string) (*execution.Record, error) {
@@ -150,7 +153,7 @@ func GetNewRecord(client *redis.Client, key, alias string) (*execution.Record, e
 		aliasedRecord[fieldName] = v
 	}
 
-	fieldNames := make([]octosql.VariableName, len(recordValues))
+	fieldNames := make([]octosql.VariableName, 0)
 	for k := range aliasedRecord {
 		fieldNames = append(fieldNames, k)
 	}

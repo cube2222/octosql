@@ -7,6 +7,7 @@ import (
 	"github.com/cube2222/octosql/physical"
 	"github.com/go-redis/redis"
 	"github.com/pkg/errors"
+	"sort"
 )
 
 var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
@@ -19,7 +20,6 @@ var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 type DataSource struct {
 	client     *redis.Client
 	keyFormula KeyFormula
-	err        error
 	alias      string
 }
 
@@ -34,13 +34,14 @@ func NewDataSourceBuilderFactory(hostname, password string, port, dbIndex int) f
 				},
 			)
 
-			keyAlias := octosql.NewVariableName(fmt.Sprintf("%s.key", alias))
-			keyFormula, err := NewKeyFormula(filter, keyAlias)
+			keyFormula, err := NewKeyFormula(filter, "key", alias)
+			if err != nil {
+				return nil, errors.Errorf("couldn't create KeyFormula")
+			}
 
 			return &DataSource{
 				client:     client,
 				keyFormula: keyFormula,
-				err:        err,
 				alias:      alias,
 			}, nil
 		},
@@ -50,16 +51,10 @@ func NewDataSourceBuilderFactory(hostname, password string, port, dbIndex int) f
 }
 
 func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, error) {
-	var allKeys *redis.ScanCmd
-
-	if ds.err != nil {
-		return nil, errors.Wrap(ds.err, "couldn't create KeyFormula")
-	}
-
 	keysWanted := octosql.NoVariables()
 
 	if ds.keyFormula != nil { // there was filter
-		keysExtracted, err := ds.keyFormula.GetAllKeys(variables)
+		keysExtracted, err := ds.keyFormula.getAllKeys(variables)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't get all keys from filter")
 		}
@@ -68,7 +63,7 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 	}
 
 	if len(keysWanted) == 0 {
-		allKeys = ds.client.Scan(0, "*", 0)
+		allKeys := ds.client.Scan(0, "*", 0)
 
 		return &EntireBaseStream{
 			client:     ds.client,
@@ -82,6 +77,10 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 	for k := range keysWanted {
 		sliceKeys = append(sliceKeys, k.String())
 	}
+
+	sort.Slice(sliceKeys, func(i, j int) bool {
+		return sliceKeys[i] < sliceKeys[j]
+	})
 
 	return &KeySpecificStream{
 		client:  ds.client,

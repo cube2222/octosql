@@ -68,8 +68,13 @@ func (vs Variables) MergeWith(other Variables) (Variables, error) {
 	return out, nil
 }
 
+// Similar to MergeWith, but we don't care about key repeats, because getAllKeys returns Variables map
+// in key: nil form (every value in these maps are nils)
 func (vs Variables) MergeWithNoConflicts(other Variables) (Variables, error) {
-	out := vs
+	out := make(Variables)
+	for k, v := range vs {
+		out[k] = v
+	}
 	for k, v := range other {
 		out[k] = v
 	}

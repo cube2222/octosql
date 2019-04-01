@@ -477,6 +477,214 @@ func TestMergeDataSourceWithRequalifier(t *testing.T) {
 	}
 }
 
+func TestMergeDataSourceWithFilter(t *testing.T) {
+	type args struct {
+		plan physical.Node
+	}
+	tests := []struct {
+		name string
+		args args
+		want physical.Node
+	}{
+		{
+			name: "simple single merge",
+			args: args{
+				plan: &physical.Filter{
+					Formula: physical.NewPredicate(
+						physical.NewVariable("a.name"),
+						physical.Equal,
+						physical.NewVariable("a.surname"),
+					),
+					Source: &physical.DataSourceBuilder{
+						Executor:    nil,
+						PrimaryKeys: []octosql.VariableName{},
+						AvailableFilters: map[physical.FieldType]map[physical.Relation]struct{}{
+							physical.Primary: {
+								physical.Equal:    struct{}{},
+								physical.NotEqual: struct{}{},
+								physical.MoreThan: struct{}{},
+								physical.LessThan: struct{}{},
+							},
+							physical.Secondary: {
+								physical.Equal: struct{}{},
+							},
+						},
+						Filter: physical.NewConstant(true),
+						Alias:  "a",
+					},
+				},
+			},
+			want: &physical.DataSourceBuilder{
+				Executor:    nil,
+				PrimaryKeys: []octosql.VariableName{},
+				AvailableFilters: map[physical.FieldType]map[physical.Relation]struct{}{
+					physical.Primary: {
+						physical.Equal:    struct{}{},
+						physical.NotEqual: struct{}{},
+						physical.MoreThan: struct{}{},
+						physical.LessThan: struct{}{},
+					},
+					physical.Secondary: {
+						physical.Equal: struct{}{},
+					},
+				},
+				Filter: physical.NewAnd(
+					physical.NewPredicate(
+						physical.NewVariable("a.name"),
+						physical.Equal,
+						physical.NewVariable("a.surname"),
+					),
+					physical.NewConstant(true),
+				),
+				Alias: "a",
+			},
+		},
+		{
+			name: "simple partial merge",
+			args: args{
+				plan: &physical.Filter{
+					Formula: physical.NewAnd(
+						physical.NewPredicate(
+							physical.NewVariable("a.name"),
+							physical.Equal,
+							physical.NewVariable("a.surname"),
+						),
+						physical.NewPredicate(
+							physical.NewVariable("b.test"),
+							physical.MoreThan,
+							physical.NewVariable("a.surname"),
+						),
+					),
+
+					Source: &physical.DataSourceBuilder{
+						Executor:    nil,
+						PrimaryKeys: []octosql.VariableName{"a.name"},
+						AvailableFilters: map[physical.FieldType]map[physical.Relation]struct{}{
+							physical.Primary: {
+								physical.Equal:    struct{}{},
+								physical.NotEqual: struct{}{},
+								physical.MoreThan: struct{}{},
+								physical.LessThan: struct{}{},
+							},
+							physical.Secondary: {
+								physical.Equal: struct{}{},
+							},
+						},
+						Filter: physical.NewConstant(true),
+						Alias:  "a",
+					},
+				},
+			},
+			want: &physical.Filter{
+				Formula: physical.NewPredicate(
+					physical.NewVariable("b.test"),
+					physical.MoreThan,
+					physical.NewVariable("a.surname"),
+				),
+				Source: &physical.DataSourceBuilder{
+					Executor:    nil,
+					PrimaryKeys: []octosql.VariableName{"a.name"},
+					AvailableFilters: map[physical.FieldType]map[physical.Relation]struct{}{
+						physical.Primary: {
+							physical.Equal:    struct{}{},
+							physical.NotEqual: struct{}{},
+							physical.MoreThan: struct{}{},
+							physical.LessThan: struct{}{},
+						},
+						physical.Secondary: {
+							physical.Equal: struct{}{},
+						},
+					},
+					Filter: physical.NewAnd(
+						physical.NewPredicate(
+							physical.NewVariable("a.name"),
+							physical.Equal,
+							physical.NewVariable("a.surname"),
+						),
+						physical.NewConstant(true),
+					),
+					Alias: "a",
+				},
+			},
+		},
+		{
+			name: "simple partial merge",
+			args: args{
+				plan: &physical.Filter{
+					Formula: physical.NewAnd(
+						physical.NewPredicate(
+							physical.NewVariable("a.name"),
+							physical.Equal,
+							physical.NewVariable("a.surname"),
+						),
+						physical.NewPredicate(
+							physical.NewVariable("b.test"),
+							physical.MoreThan,
+							physical.NewVariable("b.test2"),
+						),
+					),
+
+					Source: &physical.DataSourceBuilder{
+						Executor:    nil,
+						PrimaryKeys: []octosql.VariableName{"a.name"},
+						AvailableFilters: map[physical.FieldType]map[physical.Relation]struct{}{
+							physical.Primary: {
+								physical.Equal:    struct{}{},
+								physical.NotEqual: struct{}{},
+								physical.MoreThan: struct{}{},
+								physical.LessThan: struct{}{},
+							},
+							physical.Secondary: {
+								physical.Equal: struct{}{},
+							},
+						},
+						Filter: physical.NewConstant(true),
+						Alias:  "a",
+					},
+				},
+			},
+			want: &physical.Filter{
+				Formula: physical.NewPredicate(
+					physical.NewVariable("b.test"),
+					physical.MoreThan,
+					physical.NewVariable("b.test2"),
+				),
+				Source: &physical.DataSourceBuilder{
+					Executor:    nil,
+					PrimaryKeys: []octosql.VariableName{"a.name"},
+					AvailableFilters: map[physical.FieldType]map[physical.Relation]struct{}{
+						physical.Primary: {
+							physical.Equal:    struct{}{},
+							physical.NotEqual: struct{}{},
+							physical.MoreThan: struct{}{},
+							physical.LessThan: struct{}{},
+						},
+						physical.Secondary: {
+							physical.Equal: struct{}{},
+						},
+					},
+					Filter: physical.NewAnd(
+						physical.NewPredicate(
+							physical.NewVariable("a.name"),
+							physical.Equal,
+							physical.NewVariable("a.surname"),
+						),
+						physical.NewConstant(true),
+					),
+					Alias: "a",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Optimize(context.Background(), []Scenario{MergeDataSourceBuilderWithFilter}, tt.args.plan); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("MergeDataSourceWithFilter() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestMultiOptimization(t *testing.T) {
 	type args struct {
 		plan physical.Node

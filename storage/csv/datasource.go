@@ -1,6 +1,6 @@
 package csv
 
-// only comma-separated now. Changing that means setting RecordStream.rdr.Coma
+// only comma-separated now. Changing that means setting RecordStream.r.Coma
 // .csv reader trims leading white space(s)
 
 import (
@@ -21,7 +21,7 @@ var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 	physical.Secondary: make(map[physical.Relation]struct{}),
 }
 
-// for datasource_test.go usage only
+// for csv/datasource_test.go usage only
 func newDataSource(path, alias string) *DataSource {
 	return &DataSource{
 		path:  path,
@@ -52,31 +52,31 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't open file")
 	}
-	rdr := csv.NewReader(bufio.NewReader(file))
-	rdr.TrimLeadingSpace = true
+	r := csv.NewReader(bufio.NewReader(file))
+	r.TrimLeadingSpace = true
 
-	columns, err := rdr.Read()
+	columns, err := r.Read()
 	if err != nil {
-		return nil, errors.Wrap(err, "problem parsing column names")
+		return nil, errors.Wrap(err, "couldn't read column names")
 	}
 
 	aliasedFields := make([]octosql.VariableName, 0)
 	for _, c := range columns {
 		aliasedFields = append(aliasedFields, octosql.VariableName(fmt.Sprintf("%s.%s", ds.alias, c)))
 	}
-	rdr.FieldsPerRecord = len(aliasedFields)
+	r.FieldsPerRecord = len(aliasedFields)
 
-	set := make(map[octosql.VariableName]interface{})
+	set := make(map[octosql.VariableName]struct{})
 	for _, f := range aliasedFields {
 		if _, present := set[f]; present {
 			return nil, errors.New("column names not unique") // cannot use Wrap() :(
 		}
-		set[f] = nil // is it idiomatic?
+		set[f] = struct{}{}
 	}
 
 	return &RecordStream{
 		file:          file,
-		rdr:           rdr,
+		r:             r,
 		isDone:        false,
 		alias:         ds.alias,
 		aliasedFields: aliasedFields,
@@ -85,7 +85,7 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 
 type RecordStream struct {
 	file          *os.File
-	rdr           *csv.Reader
+	r             *csv.Reader
 	isDone        bool
 	alias         string
 	aliasedFields []octosql.VariableName
@@ -96,7 +96,7 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 		return nil, execution.ErrEndOfStream
 	}
 
-	line, err := rs.rdr.Read()
+	line, err := rs.r.Read()
 	if err == io.EOF {
 		rs.isDone = true
 		rs.file.Close()
@@ -104,12 +104,12 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 	}
 
 	if err != nil {
-		return nil, errors.Wrap(err, "problem(s) reading record")
+		return nil, errors.Wrap(err, "couldn't read record")
 	}
 
 	aliasedRecord := make(map[octosql.VariableName]interface{})
 	for i, v := range line {
-		aliasedRecord[rs.aliasedFields[i]] = execution.NormalizeType(execution.ParseType(v)) //is NormalizeType needed?
+		aliasedRecord[rs.aliasedFields[i]] = execution.ParseType(v)
 	}
 
 	return execution.NewRecord(rs.aliasedFields, aliasedRecord), nil

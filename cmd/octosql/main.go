@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/cube2222/octosql/storage/csv"
 	"log"
 	"os"
 	"strings"
@@ -12,10 +13,8 @@ import (
 	"github.com/cube2222/octosql/parser"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/optimizer"
-	"github.com/xwb1989/sqlparser"
-
-	"github.com/cube2222/octosql/storage/csv"
 	"github.com/cube2222/octosql/storage/json"
+	"github.com/xwb1989/sqlparser"
 )
 
 func main() {
@@ -37,19 +36,11 @@ func main() {
 	}
 
 	dataSourceRespository := physical.NewDataSourceRepository()
-	err = dataSourceRespository.Register("people", json.NewDataSourceBuilderFactory("people.json"))
+	err = dataSourceRespository.Register("people", json.NewDataSourceBuilderFactory("storage/json/fixtures/people.json"))
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = dataSourceRespository.Register("cities", json.NewDataSourceBuilderFactory("cities.json"))
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = dataSourceRespository.Register("people2", csv.NewDataSourceBuilderFactory("people.csv"))
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = dataSourceRespository.Register("cities2", csv.NewDataSourceBuilderFactory("cities.csv"))
+	err = dataSourceRespository.Register("cities", csv.NewDataSourceBuilderFactory("storage/csv/fixtures/cities.csv"))
 	if err != nil {
 		log.Fatal(err)
 	}

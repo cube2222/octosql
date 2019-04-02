@@ -34,7 +34,7 @@ var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 type DataSource struct {
 	db      *sql.DB
 	stmt    *sql.Stmt
-	aliases *executionAliases
+	aliases map[string]execution.Expression
 	alias   string
 }
 
@@ -84,17 +84,15 @@ func NewDataSourceBuilderFactory(host, user, password, dbname, tablename string,
 func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, error) {
 	values := make([]interface{}, 0)
 
-	for i := 0; i < len(ds.aliases.PlaceholderToExpression); i++ {
+	for i := 0; i < len(ds.aliases); i++ {
 		placeholder := "$" + strconv.Itoa(i+1)
-		expression, ok := ds.aliases.PlaceholderToExpression[placeholder]
-
+		expression, ok := ds.aliases[placeholder]
 		if !ok {
 			return nil, errors.Errorf("couldn't get variable name for placeholder %s", placeholder)
 		}
 
 		//since we have an execution expression, then we can evaluate it given the variables
 		value, err := expression.ExpressionValue(variables)
-
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't get actual value from variables")
 		}
@@ -103,13 +101,11 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 	}
 
 	rows, err := ds.stmt.Query(values...)
-
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't execute statement")
+		return nil, errors.Wrap(err, "couldn't query statement")
 	}
 
 	columns, err := rows.Columns()
-
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get columns from rows")
 	}
@@ -147,7 +143,7 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 	}
 
 	if err := rs.rows.Scan(colPointers...); err != nil {
-		return nil, errors.Wrap(err, "couldn't scan the row")
+		return nil, errors.Wrap(err, "couldn't scan row")
 	}
 
 	resultMap := make(map[octosql.VariableName]interface{})
@@ -165,20 +161,9 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 	}
 
 	resultMap, ok := execution.NormalizeType(resultMap).(map[octosql.VariableName]interface{})
-
 	if !ok {
 		return nil, errors.New("couldn't cast resultMap to map[octosql.VariableName]interface{}")
 	}
 
 	return execution.NewRecord(fields, resultMap), nil
-}
-
-type executionAliases struct {
-	PlaceholderToExpression map[string]execution.Expression
-}
-
-func newExecutionAliases() *executionAliases {
-	return &executionAliases{
-		PlaceholderToExpression: make(map[string]execution.Expression),
-	}
 }

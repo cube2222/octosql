@@ -3,38 +3,42 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	_ "github.com/lib/pq"
+	"github.com/pkg/errors"
 )
 
-/*
-	VERY IMPORTANT: READ BEFORE ADDING TEST CASES
-	SQL's column names are case insensitive which means you should
-	either create octosql.VariableNames via the constructor or make sure
-	they are lowercase, so that they match the column names returned by psql
-
-	When passing fieldNames to the InMemoryStream you should also make sure
-	that they are aliased using the argument alias
-*/
-
 func TestDataSource_Get(t *testing.T) {
-	type args struct {
-		host       string
-		user       string
-		password   string
-		dbname     string
-		tablename  string
-		primaryKey []octosql.VariableName
-		port       int
-		alias      string
-		variables  octosql.Variables
-		formula    physical.Formula
-		queries    []string
+	host := "localhost"
+	port := 5432
+	user := "root"
+	password := "toor"
+	dbname := "mydb"
+
+	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
+		"password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
+
+	db, err := sql.Open("postgres", psqlInfo)
+	if err != nil {
+		panic("Couldn't connect to a database")
 	}
+
+	type args struct {
+		tablename        string
+		alias            string
+		primaryKey       []octosql.VariableName
+		variables        octosql.Variables
+		formula          physical.Formula
+		rows             [][]interface{}
+		tableDescription string
+	}
+
 	tests := []struct {
 		name    string
 		args    args
@@ -42,351 +46,242 @@ func TestDataSource_Get(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			/*
-				query: "SELECT * FROM users u WHERE u.id = 2"
-			*/
-			name: "simple test1",
+			name: "SELECT * FROM animals",
 			args: args{
-				host:       "localhost",
-				user:       "root",
-				password:   "toor",
-				dbname:     "mydb",
-				tablename:  "users",
-				primaryKey: []octosql.VariableName{"id"},
-				port:       5432,
-				alias:      "u",
+				tablename:  "animals",
+				alias:      "a",
+				primaryKey: []octosql.VariableName{"name"},
+				variables:  map[octosql.VariableName]interface{}{},
+				formula:    physical.NewConstant(true),
+				rows: [][]interface{}{
+					{"panda", 500},
+					{"human", 7000000},
+					{"mammoth", 0},
+					{"zebra", 5000},
+				},
+				tableDescription: "CREATE TABLE animals(name VARCHAR(20) PRIMARY KEY, population INTEGER);",
+			},
+			want: execution.NewInMemoryStream([]*execution.Record{
+				execution.UtilNewRecord(
+					[]octosql.VariableName{"a.name", "a.population"},
+					[]interface{}{"panda", 500},
+				),
+				execution.UtilNewRecord(
+					[]octosql.VariableName{"a.name", "a.population"},
+					[]interface{}{"mammoth", 0},
+				),
+				execution.UtilNewRecord(
+					[]octosql.VariableName{"a.population", "a.name"},
+					[]interface{}{7000000, "human"},
+				),
+				execution.UtilNewRecord(
+					[]octosql.VariableName{"a.name", "a.population"},
+					[]interface{}{"zebra", 5000},
+				),
+			},
+			),
+			wantErr: false,
+		},
+
+		{
+			name: "SELECT * FROM animals a WHERE a.population > 20000 - empty answer",
+			args: args{
+				tablename:  "animals",
+				alias:      "a",
+				primaryKey: []octosql.VariableName{"name"},
+				variables: map[octosql.VariableName]interface{}{
+					"const_0": 20000,
+				},
 				formula: physical.NewPredicate(
-					physical.NewVariable("u.id"),
+					physical.NewVariable("a.population"),
+					physical.MoreThan,
+					physical.NewVariable("const_0"),
+				),
+				rows: [][]interface{}{
+					{"panda", 500},
+					{"zebra", 5000},
+				},
+				tableDescription: "CREATE TABLE animals(name VARCHAR(20) PRIMARY KEY, population INTEGER);",
+			},
+			want:    execution.NewInMemoryStream([]*execution.Record{}),
+			wantErr: false,
+		},
+
+		{
+			name: "SELECT * FROM animals a WHERE a.name = 'panda'",
+			args: args{
+				tablename:  "animals",
+				alias:      "a",
+				primaryKey: []octosql.VariableName{"name"},
+				variables: map[octosql.VariableName]interface{}{
+					"const_0": "panda",
+				},
+				formula: physical.NewPredicate(
+					physical.NewVariable("a.name"),
 					physical.Equal,
 					physical.NewVariable("const_0"),
 				),
-				variables: octosql.Variables{
-					"const_0": 2,
+				rows: [][]interface{}{
+					{"panda", 500},
+					{"zebra", 5000},
+					{"beaver", 5912930},
+					{"duck", 291230},
 				},
-				queries: []string{
-					"CREATE TABLE users(id INTEGER PRIMARY KEY, username VARCHAR(30), points INTEGER, sex VARCHAR(1));",
-					"INSERT INTO users VALUES(1, 'user1', 10, 'M');",
-					"INSERT INTO users VALUES(2, 'user2', 300, 'F');",
-					"INSERT INTO users VALUES(3, 'user3', 2, 'M');",
-				},
+				tableDescription: "CREATE TABLE animals(name VARCHAR(20) PRIMARY KEY, population INTEGER);",
 			},
-			want: execution.NewInMemoryStream(
-				[]octosql.VariableName{"u.id", "u.sex", "u.points", "u.username"},
-				[]map[octosql.VariableName]interface{}{
-					{
-						"u.id":       2,
-						"u.sex":      "F",
-						"u.points":   300,
-						"u.username": "user2",
-					},
-				},
-			),
-			wantErr: false,
-		},
-
-		{
-			/*
-				query: "SELECT * FROM animals ani WHERE ani.howMany < 1000"
-			*/
-			name: "simple test2",
-			args: args{
-				host:       "localhost",
-				user:       "root",
-				password:   "toor",
-				dbname:     "mydb",
-				tablename:  "animals",
-				primaryKey: []octosql.VariableName{"name"},
-				port:       5432,
-				alias:      "ani",
-				formula: physical.NewPredicate(
-					physical.NewVariable("ani.howmany"),
-					physical.LessThan,
-					physical.NewVariable("const_0"),
+			want: execution.NewInMemoryStream([]*execution.Record{
+				execution.UtilNewRecord(
+					[]octosql.VariableName{"a.population", "a.name"},
+					[]interface{}{500, "panda"},
 				),
-				variables: octosql.Variables{
-					"const_0": 1000,
-				},
-				queries: []string{
-					"CREATE TABLE animals(name VARCHAR(25) PRIMARY KEY, howmany BIGINT);",
-					"INSERT INTO animals VALUES('lion', 50000);",
-					"INSERT INTO animals VALUES('panda', 500);",
-					"INSERT INTO animals VALUES('mosquito', 100000000);",
-					"INSERT INTO animals VALUES('human', 7000000000);",
-					"INSERT INTO animals VALUES('mammoth', 0);",
-				},
-			},
-			want: execution.NewInMemoryStream(
-				[]octosql.VariableName{"ani.name", "ani.howmany"},
-				[]map[octosql.VariableName]interface{}{
-					{
-						"ani.name":    "panda",
-						"ani.howmany": 500,
-					},
-					{
-						"ani.name":    "mammoth",
-						"ani.howmany": 0,
-					},
-				},
-			),
+			}),
 			wantErr: false,
 		},
 
 		{
-			/*
-				query: "SELECT * FROM animals ani WHERE ani.howMany < 1000 AND ani.howMany > 600"
-			*/
-			name: "no answers query",
+			name: "SELECT * FROM people p WHERE 1 <> p.id",
 			args: args{
-				host:       "localhost",
-				user:       "root",
-				password:   "toor",
-				dbname:     "mydb",
-				tablename:  "animals",
-				primaryKey: []octosql.VariableName{"name"},
-				port:       5432,
-				alias:      "ani",
-				formula: physical.NewAnd(
-					physical.NewPredicate(
-						physical.NewVariable("ani.howmany"),
-						physical.LessThan,
-						physical.NewVariable("const_0"),
-					),
-
-					physical.NewPredicate(
-						physical.NewVariable("ani.howmany"),
-						physical.MoreThan,
-						physical.NewVariable("const_1"),
-					),
-				),
-				variables: octosql.Variables{
-					"const_0": 1000,
-					"const_1": 600,
-				},
-				queries: []string{
-					"CREATE TABLE animals(name VARCHAR(25) PRIMARY KEY, howmany BIGINT);",
-					"INSERT INTO animals VALUES('lion', 50000);",
-					"INSERT INTO animals VALUES('panda', 500);",
-					"INSERT INTO animals VALUES('mosquito', 100000000);",
-					"INSERT INTO animals VALUES('human', 7000000000);",
-					"INSERT INTO animals VALUES('mammoth', 0);",
-				},
-			},
-			want: execution.NewInMemoryStream(
-				[]octosql.VariableName{"ani.name", "ani.howmany"},
-				[]map[octosql.VariableName]interface{}{},
-			),
-			wantErr: false,
-		},
-
-		{
-			/*
-				query: "SELECT * FROM people p WHERE p.sex <> 'M'"
-			*/
-			name: "simple test unequal",
-			args: args{
-				host:       "localhost",
-				user:       "root",
-				password:   "toor",
-				dbname:     "mydb",
 				tablename:  "people",
-				primaryKey: []octosql.VariableName{"id"},
-				port:       5432,
 				alias:      "p",
+				primaryKey: []octosql.VariableName{"id"},
+				variables: map[octosql.VariableName]interface{}{
+					"const_0": 1,
+				},
 				formula: physical.NewPredicate(
 					physical.NewVariable("const_0"),
 					physical.NotEqual,
-					physical.NewVariable("p.sex"),
+					physical.NewVariable("p.id"),
 				),
-				variables: octosql.Variables{
-					"const_0": "M",
+				rows: [][]interface{}{
+					{1, "Janek"},
+					{2, "Kuba"},
+					{3, "Wojtek"},
+					{4, "Adam"},
 				},
-				queries: []string{
-					"CREATE TABLE people(id INTEGER PRIMARY KEY, sex CHAR);",
-					"INSERT INTO people VALUES(1, 'M');",
-					"INSERT INTO people VALUES(2, 'F');",
-					"INSERT INTO people VALUES(3, 'F');",
-					"INSERT INTO people VALUES(4, 'M');",
-					"INSERT INTO people VALUES(5, 'F');",
-				},
+				tableDescription: "CREATE TABLE people(id INTEGER PRIMARY KEY, name VARCHAR(20));",
 			},
-			want: execution.NewInMemoryStream(
-				[]octosql.VariableName{"p.id", "p.sex"},
-				[]map[octosql.VariableName]interface{}{
-					{
-						"p.id":  2,
-						"p.sex": "F",
-					},
-					{
-						"p.id":  3,
-						"p.sex": "F",
-					},
-					{
-						"p.id":  5,
-						"p.sex": "F",
-					},
-				},
-			),
+			want: execution.NewInMemoryStream([]*execution.Record{
+				execution.UtilNewRecord(
+					[]octosql.VariableName{"p.id", "p.name"},
+					[]interface{}{4, "Adam"},
+				),
+				execution.UtilNewRecord(
+					[]octosql.VariableName{"p.name", "p.id"},
+					[]interface{}{"Kuba", 2},
+				),
+				execution.UtilNewRecord(
+					[]octosql.VariableName{"p.name", "p.id"},
+					[]interface{}{"Wojtek", 3},
+				),
+			}),
 			wantErr: false,
-		},
-
-		{
-			name: "invalid port",
-			args: args{
-				host:       "localhost",
-				user:       "root",
-				password:   "toor",
-				dbname:     "mydb",
-				tablename:  "users",
-				primaryKey: []octosql.VariableName{"id"},
-				port:       2, //a port that surely won't connect us to a db
-				alias:      "u",
-				formula:    physical.NewConstant(true),
-				variables:  octosql.Variables{},
-				queries:    []string{},
-			},
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			name: "invalid host",
-			args: args{
-				host:       "nosuchhost",
-				user:       "root",
-				password:   "toor",
-				dbname:     "mydb",
-				tablename:  "users",
-				primaryKey: []octosql.VariableName{"id"},
-				port:       5432,
-				alias:      "u",
-				formula:    physical.NewConstant(true),
-				variables:  octosql.Variables{},
-				queries:    []string{},
-			},
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			name: "invalid password",
-			args: args{
-				host:       "localhost",
-				user:       "root",
-				password:   "nosuchpassword",
-				dbname:     "mydb",
-				tablename:  "users",
-				primaryKey: []octosql.VariableName{"id"},
-				port:       5432,
-				alias:      "u",
-				formula:    physical.NewConstant(true),
-				variables:  octosql.Variables{},
-				queries:    []string{},
-			},
-			want:    nil,
-			wantErr: true,
-		},
-		{
-			name: "invalid dbname",
-			args: args{
-				host:       "localhost",
-				user:       "root",
-				password:   "toor",
-				dbname:     "nosuchdb",
-				tablename:  "users",
-				primaryKey: []octosql.VariableName{"id"},
-				port:       5432,
-				alias:      "u",
-				formula:    physical.NewConstant(true),
-				variables:  octosql.Variables{},
-				queries:    []string{},
-			},
-			want:    nil,
-			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			args := tt.args
-
-			psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
-				"password=%s dbname=%s sslmode=disable", args.host, args.port, args.user, args.password, args.dbname)
-
-			db, err := sql.Open("postgres", psqlInfo)
-
+			err := createTable(db, args.tableDescription)
 			if err != nil {
-				t.Errorf("Unsuspected error in open")
+				t.Errorf("Couldn't create table")
 				return
 			}
 
-			err = db.Ping()
+			defer dropTable(db, args.tablename) //unhandled error
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Couldn't connect to database")
-				return
-			} else if err != nil {
-				return
-			}
-
-			defer func() {
-				_, err := db.Exec(fmt.Sprintf("DROP TABLE %s;", args.tablename))
-
-				if err != nil {
-					t.Errorf("Couldn't drop table %s", args.tablename)
-					return
-				}
-
-				err = db.Close()
-
-				if err != nil {
-					t.Errorf("Couldn't close connection to db")
-					return
-				}
-			}()
-			_, err = db.Exec(args.queries[0]) //create relation
-
+			err = insertValues(db, args.tablename, args.rows)
 			if err != nil {
-				t.Errorf("Couldnt create relation %s in database %s", args.tablename, args.dbname)
+				t.Errorf("Couldn't insert values into table")
 				return
 			}
 
-			for i := 1; i < len(args.queries); i++ {
-				query := args.queries[i]
-				_, err = db.Exec(query) //insert values
+			dsFactory := NewDataSourceBuilderFactory(host, user, password, dbname, args.tablename, args.primaryKey, port)
+			dsBuilder := dsFactory(args.alias)
 
-				if err != nil {
-					t.Errorf("Couldn't complete query: %s. %s", query, err)
-					return
-				}
-			}
-
-			dsFactory := NewDataSourceBuilderFactory(args.host, args.user, args.password, args.dbname, args.tablename, args.primaryKey, args.port)
-			dsbuilder := dsFactory(args.alias)
-
-			execNode, err := dsbuilder.Executor(args.formula, args.alias)
-
+			execNode, err := dsBuilder.Executor(args.formula, args.alias)
 			if err != nil {
-				t.Errorf("NotEqual.Apply() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Couldn't get ExecutionNode")
 				return
 			}
 
 			stream, err := execNode.Get(args.variables)
-
 			if err != nil {
-				t.Errorf("Unwanted error in Get")
+				t.Errorf("Couldn't get stream")
 				return
 			}
 
 			equal, err := execution.AreStreamsEqual(stream, tt.want)
-
 			if err != nil {
-				t.Errorf("AreStreamsEqual() error: %s", err)
+				t.Errorf("Error in AreStreamsEqual()")
 				return
 			}
 
-			if !equal {
-				t.Errorf("ERROR: Streams are not equal")
+			if !equal != tt.wantErr {
+				t.Errorf("Streams don't match")
+				return
+			} else {
 				return
 			}
-
 		})
 	}
+}
+
+func createTable(db *sql.DB, tableDescription string) error {
+	_, err := db.Exec(tableDescription)
+	if err != nil {
+		return errors.Wrap(err, "Couldn't create table")
+	}
+	return nil
+}
+
+func insertValues(db *sql.DB, tablename string, values [][]interface{}) error {
+	for i := range values {
+		row := values[i]
+		n := len(row)
+
+		if n == 0 {
+			continue
+		}
+
+		stringRow := spliceToString(row)
+
+		query := fmt.Sprintf("INSERT INTO %s VALUES (%s);", tablename, strings.Join(stringRow, ", "))
+
+		_, err := db.Exec(query)
+		if err != nil {
+			return errors.Wrap(err, "one of the inserts failed")
+		}
+	}
+
+	return nil
+}
+
+func dropTable(db *sql.DB, tablename string) error {
+	query := fmt.Sprintf("DROP TABLE %s;", tablename)
+	_, err := db.Exec(query)
+	if err != nil {
+		return errors.Wrap(err, "couldn't drop table")
+	}
+	return nil
+}
+
+func spliceToString(values []interface{}) []string {
+	var result []string
+	for i := range values {
+		value := values[i]
+		value = execution.NormalizeType(value)
+		var str string
+		switch value := value.(type) {
+		case string:
+			str = fmt.Sprintf("'%s'", value)
+		case time.Time:
+			str = fmt.Sprintf("'%s'", value)
+		default:
+			str = fmt.Sprintf("%v", value)
+		}
+
+		result = append(result, str)
+	}
+
+	return result
 }

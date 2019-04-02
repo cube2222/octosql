@@ -3,6 +3,7 @@ package execution
 import (
 	"sort"
 
+	"github.com/cube2222/octosql"
 	"github.com/pkg/errors"
 )
 
@@ -134,5 +135,12 @@ func lessInterface(a, b interface{}) bool {
 		return !a && b
 	default:
 		return false
+	}
+}
+
+func UtilNewRecord(fields []octosql.VariableName, data []interface{}) *Record {
+	return &Record{
+		fieldNames: fields,
+		data:       data,
 	}
 }

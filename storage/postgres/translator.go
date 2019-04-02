@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
 )
@@ -113,8 +114,8 @@ func parenthesize(str string) string {
 }
 
 //materializes the values in the map so that one can later call EvaluateExpression on them
-func (aliases *aliases) materializeAliases() (*executionAliases, error) {
-	result := newExecutionAliases()
+func (aliases *aliases) materializeAliases() (map[string]execution.Expression, error) {
+	result := make(map[string]execution.Expression)
 
 	ctx := context.Background()
 
@@ -124,7 +125,7 @@ func (aliases *aliases) materializeAliases() (*executionAliases, error) {
 			return nil, errors.Wrap(err, "couldn't materialize expression in materializeAliases")
 		}
 
-		result.PlaceholderToExpression[placeholder] = exec
+		result[placeholder] = exec
 	}
 
 	return result, nil

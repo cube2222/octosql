@@ -31,14 +31,14 @@ func TestAreStreamsEqual(t *testing.T) {
 			args: args{
 				first: NewInMemoryStream(
 					[]*Record{
-						newRecord([]octosql.VariableName{"age"}, []interface{}{7}),
-						newRecord([]octosql.VariableName{"age"}, []interface{}{10}),
+						UtilNewRecord([]octosql.VariableName{"age"}, []interface{}{7}),
+						UtilNewRecord([]octosql.VariableName{"age"}, []interface{}{10}),
 					},
 				),
 				second: NewInMemoryStream(
 					[]*Record{
-						newRecord([]octosql.VariableName{"age"}, []interface{}{7}),
-						newRecord([]octosql.VariableName{"age"}, []interface{}{10}),
+						UtilNewRecord([]octosql.VariableName{"age"}, []interface{}{7}),
+						UtilNewRecord([]octosql.VariableName{"age"}, []interface{}{10}),
 					},
 				),
 			},
@@ -50,12 +50,12 @@ func TestAreStreamsEqual(t *testing.T) {
 			args: args{
 				first: NewInMemoryStream(
 					[]*Record{
-						newRecord([]octosql.VariableName{"name", "age"}, []interface{}{"Janek", 4}),
+						UtilNewRecord([]octosql.VariableName{"name", "age"}, []interface{}{"Janek", 4}),
 					},
 				),
 				second: NewInMemoryStream(
 					[]*Record{
-						newRecord([]octosql.VariableName{"age", "name"}, []interface{}{4, "Janek"}),
+						UtilNewRecord([]octosql.VariableName{"age", "name"}, []interface{}{4, "Janek"}),
 					},
 				),
 			},
@@ -67,14 +67,14 @@ func TestAreStreamsEqual(t *testing.T) {
 			args: args{
 				first: NewInMemoryStream(
 					[]*Record{
-						newRecord([]octosql.VariableName{"age"}, []interface{}{10}),
-						newRecord([]octosql.VariableName{"age"}, []interface{}{7}),
+						UtilNewRecord([]octosql.VariableName{"age"}, []interface{}{10}),
+						UtilNewRecord([]octosql.VariableName{"age"}, []interface{}{7}),
 					},
 				),
 				second: NewInMemoryStream(
 					[]*Record{
-						newRecord([]octosql.VariableName{"age"}, []interface{}{7}),
-						newRecord([]octosql.VariableName{"age"}, []interface{}{10}),
+						UtilNewRecord([]octosql.VariableName{"age"}, []interface{}{7}),
+						UtilNewRecord([]octosql.VariableName{"age"}, []interface{}{10}),
 					},
 				),
 			},
@@ -86,14 +86,14 @@ func TestAreStreamsEqual(t *testing.T) {
 			args: args{
 				first: NewInMemoryStream(
 					[]*Record{
-						newRecord([]octosql.VariableName{"age", "name"}, []interface{}{10, "Janek"}),
-						newRecord([]octosql.VariableName{"name", "age"}, []interface{}{"Wojtek", 7}),
+						UtilNewRecord([]octosql.VariableName{"age", "name"}, []interface{}{10, "Janek"}),
+						UtilNewRecord([]octosql.VariableName{"name", "age"}, []interface{}{"Wojtek", 7}),
 					},
 				),
 				second: NewInMemoryStream(
 					[]*Record{
-						newRecord([]octosql.VariableName{"age", "name"}, []interface{}{7, "Wojtek"}),
-						newRecord([]octosql.VariableName{"name", "age"}, []interface{}{"Janek", 10}),
+						UtilNewRecord([]octosql.VariableName{"age", "name"}, []interface{}{7, "Wojtek"}),
+						UtilNewRecord([]octosql.VariableName{"name", "age"}, []interface{}{"Janek", 10}),
 					},
 				),
 			},
@@ -105,14 +105,14 @@ func TestAreStreamsEqual(t *testing.T) {
 			args: args{
 				first: NewInMemoryStream(
 					[]*Record{
-						newRecord([]octosql.VariableName{"age", "name"}, []interface{}{10, "Janek"}),
-						newRecord([]octosql.VariableName{"name", "age"}, []interface{}{"Wojtek", 7}),
+						UtilNewRecord([]octosql.VariableName{"age", "name"}, []interface{}{10, "Janek"}),
+						UtilNewRecord([]octosql.VariableName{"name", "age"}, []interface{}{"Wojtek", 7}),
 					},
 				),
 				second: NewInMemoryStream(
 					[]*Record{
-						newRecord([]octosql.VariableName{"age", "name"}, []interface{}{7, "Wojtek"}),
-						newRecord([]octosql.VariableName{"name", "age"}, []interface{}{"Janek", 12}),
+						UtilNewRecord([]octosql.VariableName{"age", "name"}, []interface{}{7, "Wojtek"}),
+						UtilNewRecord([]octosql.VariableName{"name", "age"}, []interface{}{"Janek", 12}),
 					},
 				),
 			},
@@ -124,14 +124,14 @@ func TestAreStreamsEqual(t *testing.T) {
 			args: args{
 				first: NewInMemoryStream(
 					[]*Record{
-						newRecord([]octosql.VariableName{"age"}, []interface{}{10}),
-						newRecord([]octosql.VariableName{"age"}, []interface{}{7}),
+						UtilNewRecord([]octosql.VariableName{"age"}, []interface{}{10}),
+						UtilNewRecord([]octosql.VariableName{"age"}, []interface{}{7}),
 					},
 				),
 				second: NewInMemoryStream(
 					[]*Record{
-						newRecord([]octosql.VariableName{"age"}, []interface{}{7}),
-						newRecord([]octosql.VariableName{"ageButBetter"}, []interface{}{10}),
+						UtilNewRecord([]octosql.VariableName{"age"}, []interface{}{7}),
+						UtilNewRecord([]octosql.VariableName{"ageButBetter"}, []interface{}{10}),
 					},
 				),
 			},
@@ -150,12 +150,5 @@ func TestAreStreamsEqual(t *testing.T) {
 				t.Errorf("AreStreamsEqual() = %v, want %v", got, tt.want)
 			}
 		})
-	}
-}
-
-func newRecord(fields []octosql.VariableName, data []interface{}) *Record {
-	return &Record{
-		fieldNames: fields,
-		data:       data,
 	}
 }

@@ -45,9 +45,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = dataSourceRespository.Register("users",
+	err = dataSourceRespository.Register("myusers",
 		postgres.NewDataSourceBuilderFactory("localhost", "root",
-			"toor", "mydb", "users", nil, 5432))
+			"toor", "mydb", "myusers", nil, 5432))
 
 	if err != nil {
 		log.Fatal(err)
@@ -56,6 +56,13 @@ func main() {
 	phys, variables, err := parsed.Physical(ctx, logical.NewPhysicalPlanCreator(dataSourceRespository))
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	switch phys.(type) {
+	case *physical.Filter:
+		fmt.Println("It's a filter")
+	default:
+		fmt.Println("It's not a filter")
 	}
 
 	phys = optimizer.Optimize(ctx, optimizer.DefaultScenarios, phys)

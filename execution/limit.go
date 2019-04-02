@@ -3,112 +3,118 @@ package execution
 import (
 	"github.com/cube2222/octosql"
 	"github.com/pkg/errors"
-	"os"
 )
-
-const limitAll int = -42
-const offsetNone int = 0
 
 type Limit struct {
 	data   Node
-	limit  Node
-	offset Node
+	limit  Expression
+	offset Expression
 }
 
-func NewLimit(data, limit, offset Node) *Limit {
+const offsetNone, limitAll = 0, -1
+
+func NewLimit(data Node, limit, offset Expression) *Limit {
 	return &Limit{data: data, limit: limit, offset: offset}
 }
 
+func extractSingleValue(e Expression, name string, variables octosql.Variables) (value interface{}, err error) {
+	expr, err := e.ExpressionValue(variables)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get "+name+" expression value")
+	}
+	switch exprType := expr.(type) {
+	case Variable:
+		val, err := exprType.ExpressionValue(variables)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't get " + name + " variable value")
+		}
+		return val, nil
+	case NodeExpression:
+		val, err := exprType.ExpressionValue(variables)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't get " + name + " nodeExpression value")
+		}
+		if val == nil {
+			return nil, errors.New(name + " nodeExpression empty")
+		}
+		switch valType := val.(type){
+		case []Record:
+			return nil, errors.New(name + " nodeExpression has multiple rows")
+		case Record:
+			return nil, errors.New(name + " nodeExpression has multiple columns")
+		default:
+			return val, nil
+		}
+	// start debug
+	case Node:
+		panic("Assert t.type != Node failed (execution/limit.go:extractSingleValue)")
+	case Constant:
+		panic("Assert t.type != Constant failed (execution/limit.go:extractSingleValue)")
+	// end debug*/
+	default:
+		return nil, errors.New(name + " expression value invalid")
+	}
+}
+
+// as it is taken out of good Expression, val's type should already be normalized
+
+
 func (node *Limit) Get(variables octosql.Variables) (RecordStream, error) {
-	var limitVal, offsetVal = limitAll, offsetNone
+	var limit, offset = limitAll, offsetNone
+	var limitVariables, offsetVariables = octosql.NoVariables(), octosql.NoVariables()
 
 	dataStream, err := node.data.Get(variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get data record stream")
 	}
 
-	if node.limit != nil {
-		limitStream, err := node.limit.Get(variables)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't get limit record stream")
-		}
-
-		record, err := limitStream.Next()
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't get limit expression value")
-		}
-		if len(record.fieldNames) != 1 {
-			return nil, errors.Wrap(err, "more than one column in limit expression query")
-		}
-
-		// some asserting that good type of variable ... (positive int or string "ALL" if I decide to support it)
-		limitVal = record.data[0]
-
-		_, err = limitStream.Next()
-		if err != ErrEndOfStream {
-			return nil, errors.Wrap(err, "limit expression query has more than one row")
-		}
+	limitVal, err := extractSingleValue(node.limit, "limit", variables)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't extract value from limit subexpression")
 	}
 
-	if node.offset != nil {
-		offsetStream, err := node.offset.Get(variables)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't get offset record stream")
-		}
+	val, err :=
 
-		record, err := offsetStream.Next()
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't get offset expression value")
-		}
-		if len(record.fieldNames) != 1 {
-			return nil, errors.Wrap(err, "more than one column in offset expression query")
-		}
-
-		// some asserting that good type of variable ...
-		offsetVal = record.data[0]
-
-		_, err = offsetStream.Next()
-		if err != ErrEndOfStream {
-			return nil, errors.Wrap(err, "offset expression query has more than one row")
-		}
-	}
-
-	ls := &LimitedStream{
+	ls := &limitedStream{
 		variables: variables,
 		rs:        dataStream,
-		limit:     limitVal,
-		finished:  false,
+		limit:     limit,
 	}
 
-	for ; offsetVal > 0; offsetVal-- {
-		_, err :=
+	for ; offset > 0; offset-- {
+		_, err := ls.Next()
+		if err != nil {
+			if err == ErrEndOfStream {
+				return ls, nil
+			}
+			return nil, errors.Wrap(err, "couldn't read record from limitedStream")
+		}
 	}
 
 	return ls, nil
 }
 
-type LimitedStream struct {
+type limitedStream struct {
 	rs        RecordStream
 	variables octosql.Variables
 	limit     int
-	finished  bool
 }
 
-func (node *LimitedStream) Next() (*Record, error) {
-	if (!node.finished) {
-		for node.limit != 0 {
-			record, err := node.rs.Next()
-			if err != nil {
-				if err == ErrEndOfStream {
-					node.finished = true
-					return nil, ErrEndOfStream
-				}
-				return nil, errors.Wrap(err, "couldn't get node record")
+func (node *limitedStream) Next() (*Record, error) {
+	for node.limit != 0 {
+		record, err := node.rs.Next()
+		if err != nil {
+			if err == ErrEndOfStream {
+				node.limit = 0
+				return nil, ErrEndOfStream
 			}
-			node.limit--
-			node.finished = (node.limit  0)
-			return record, nil
+			return nil, errors.Wrap(err, "couldn't get limitedStream's record")
 		}
+		if node.limit > 0 { // LIMIT ALL and such
+			node.limit--
+		}
+		return record, nil
 	}
+
 	return nil, ErrEndOfStream
 }

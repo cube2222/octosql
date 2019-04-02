@@ -18,286 +18,123 @@ func TestAreStreamsEqual(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "single column, equal streams",
+			name: "empty streams",
 			args: args{
-				NewInMemoryStream(
-					[]octosql.VariableName{"id"},
-					[]map[octosql.VariableName]interface{}{
-						{
-							"id": 1,
-						},
-						{
-							"id": 2,
-						},
-						{
-							"id": 3,
-						},
-					},
-				),
-
-				NewInMemoryStream(
-					[]octosql.VariableName{"id"},
-					[]map[octosql.VariableName]interface{}{
-						{
-							"id": 1,
-						},
-						{
-							"id": 2,
-						},
-						{
-							"id": 3,
-						},
-					},
-				),
+				first:  NewInMemoryStream([]*Record{}),
+				second: NewInMemoryStream([]*Record{}),
 			},
-
 			want:    true,
 			wantErr: false,
 		},
-
 		{
-			name: "two columns, different column order, equal streams",
+			name: "identical streams",
 			args: args{
-				NewInMemoryStream(
-					[]octosql.VariableName{"id", "age"},
-					[]map[octosql.VariableName]interface{}{
-						{
-							"id":  1,
-							"age": 7,
-						},
-						{
-							"id":  2,
-							"age": 13,
-						},
-						{
-							"id":  3,
-							"age": 19,
-						},
+				first: NewInMemoryStream(
+					[]*Record{
+						newRecord([]octosql.VariableName{"age"}, []interface{}{7}),
+						newRecord([]octosql.VariableName{"age"}, []interface{}{10}),
 					},
 				),
-
-				NewInMemoryStream(
-					[]octosql.VariableName{"age", "id"},
-					[]map[octosql.VariableName]interface{}{
-						{
-							"age": 7,
-							"id":  1,
-						},
-						{
-							"id":  2,
-							"age": 13,
-						},
-						{
-							"age": 19,
-							"id":  3,
-						},
+				second: NewInMemoryStream(
+					[]*Record{
+						newRecord([]octosql.VariableName{"age"}, []interface{}{7}),
+						newRecord([]octosql.VariableName{"age"}, []interface{}{10}),
 					},
 				),
 			},
-
 			want:    true,
 			wantErr: false,
 		},
-
 		{
-			name: "single column, first stream longer",
+			name: "indentical streams with different column order",
 			args: args{
-				NewInMemoryStream(
-					[]octosql.VariableName{"id"},
-					[]map[octosql.VariableName]interface{}{
-						{
-							"id": 1,
-						},
-						{
-							"id": 2,
-						},
-						{
-							"id": 3,
-						},
-						{
-							"id": 4,
-						},
+				first: NewInMemoryStream(
+					[]*Record{
+						newRecord([]octosql.VariableName{"name", "age"}, []interface{}{"Janek", 4}),
 					},
 				),
-
-				NewInMemoryStream(
-					[]octosql.VariableName{"id"},
-					[]map[octosql.VariableName]interface{}{
-						{
-							"id": 1,
-						},
-						{
-							"id": 2,
-						},
-						{
-							"id": 3,
-						},
+				second: NewInMemoryStream(
+					[]*Record{
+						newRecord([]octosql.VariableName{"age", "name"}, []interface{}{4, "Janek"}),
 					},
 				),
 			},
-
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "different order streams",
+			args: args{
+				first: NewInMemoryStream(
+					[]*Record{
+						newRecord([]octosql.VariableName{"age"}, []interface{}{10}),
+						newRecord([]octosql.VariableName{"age"}, []interface{}{7}),
+					},
+				),
+				second: NewInMemoryStream(
+					[]*Record{
+						newRecord([]octosql.VariableName{"age"}, []interface{}{7}),
+						newRecord([]octosql.VariableName{"age"}, []interface{}{10}),
+					},
+				),
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "very complex test",
+			args: args{
+				first: NewInMemoryStream(
+					[]*Record{
+						newRecord([]octosql.VariableName{"age", "name"}, []interface{}{10, "Janek"}),
+						newRecord([]octosql.VariableName{"name", "age"}, []interface{}{"Wojtek", 7}),
+					},
+				),
+				second: NewInMemoryStream(
+					[]*Record{
+						newRecord([]octosql.VariableName{"age", "name"}, []interface{}{7, "Wojtek"}),
+						newRecord([]octosql.VariableName{"name", "age"}, []interface{}{"Janek", 10}),
+					},
+				),
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "not equal streams - mismatched record",
+			args: args{
+				first: NewInMemoryStream(
+					[]*Record{
+						newRecord([]octosql.VariableName{"age", "name"}, []interface{}{10, "Janek"}),
+						newRecord([]octosql.VariableName{"name", "age"}, []interface{}{"Wojtek", 7}),
+					},
+				),
+				second: NewInMemoryStream(
+					[]*Record{
+						newRecord([]octosql.VariableName{"age", "name"}, []interface{}{7, "Wojtek"}),
+						newRecord([]octosql.VariableName{"name", "age"}, []interface{}{"Janek", 12}),
+					},
+				),
+			},
 			want:    false,
 			wantErr: false,
 		},
-
 		{
-			name: "single column, second stream longer",
+			name: "mismatched column name",
 			args: args{
-				NewInMemoryStream(
-					[]octosql.VariableName{"id"},
-					[]map[octosql.VariableName]interface{}{
-						{
-							"id": 1,
-						},
-						{
-							"id": 2,
-						},
-						{
-							"id": 3,
-						},
+				first: NewInMemoryStream(
+					[]*Record{
+						newRecord([]octosql.VariableName{"age"}, []interface{}{10}),
+						newRecord([]octosql.VariableName{"age"}, []interface{}{7}),
 					},
 				),
-
-				NewInMemoryStream(
-					[]octosql.VariableName{"id"},
-					[]map[octosql.VariableName]interface{}{
-						{
-							"id": 1,
-						},
-						{
-							"id": 2,
-						},
-						{
-							"id": 3,
-						},
-						{
-							"id": 4,
-						},
+				second: NewInMemoryStream(
+					[]*Record{
+						newRecord([]octosql.VariableName{"age"}, []interface{}{7}),
+						newRecord([]octosql.VariableName{"ageButBetter"}, []interface{}{10}),
 					},
 				),
 			},
-
-			want:    false,
-			wantErr: false,
-		},
-
-		{
-			name: "non-matching column names, equal values",
-			args: args{
-				NewInMemoryStream(
-					[]octosql.VariableName{"id", "name"},
-					[]map[octosql.VariableName]interface{}{
-						{
-							"id":   1,
-							"name": "a",
-						},
-						{
-							"id":   2,
-							"name": "b",
-						},
-					},
-				),
-
-				NewInMemoryStream(
-					[]octosql.VariableName{"id", "surname"},
-					[]map[octosql.VariableName]interface{}{
-						{
-							"id":      1,
-							"surname": "a",
-						},
-						{
-							"id":      2,
-							"surname": "b",
-						},
-						{
-							"id": 3,
-						},
-					},
-				),
-			},
-
-			want:    false,
-			wantErr: false,
-		},
-
-		{
-			name: "single column, non-matching values",
-			args: args{
-				NewInMemoryStream(
-					[]octosql.VariableName{"id"},
-					[]map[octosql.VariableName]interface{}{
-						{
-							"id": 1,
-						},
-						{
-							"id": 2,
-						},
-						{
-							"id": 3,
-						},
-					},
-				),
-
-				NewInMemoryStream(
-					[]octosql.VariableName{"id"},
-					[]map[octosql.VariableName]interface{}{
-						{
-							"id": 1,
-						},
-						{
-							"id": 2,
-						},
-						{
-							"id": 4,
-						},
-					},
-				),
-			},
-
-			want:    false,
-			wantErr: false,
-		},
-
-		{
-			name: "multiple columns, non-matching values",
-			args: args{
-				NewInMemoryStream(
-					[]octosql.VariableName{"id", "age"},
-					[]map[octosql.VariableName]interface{}{
-						{
-							"id":  1,
-							"age": 3,
-						},
-						{
-							"id":  2,
-							"age": 5,
-						},
-						{
-							"id":  3,
-							"age": 10,
-						},
-					},
-				),
-
-				NewInMemoryStream(
-					[]octosql.VariableName{"id", "age"},
-					[]map[octosql.VariableName]interface{}{
-						{
-							"id":  1,
-							"age": 3,
-						},
-						{
-							"id":  2,
-							"age": 6,
-						},
-						{
-							"id":  3,
-							"age": 10,
-						},
-					},
-				),
-			},
-
 			want:    false,
 			wantErr: false,
 		},
@@ -313,5 +150,12 @@ func TestAreStreamsEqual(t *testing.T) {
 				t.Errorf("AreStreamsEqual() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func newRecord(fields []octosql.VariableName, data []interface{}) *Record {
+	return &Record{
+		fieldNames: fields,
+		data:       data,
 	}
 }

@@ -176,6 +176,98 @@ func TestDataSource_Get(t *testing.T) {
 			}),
 			wantErr: false,
 		},
+
+		{
+			name: "SELECT * FROM people p WHERE 1 <> p.id AND p.name >= 'Kuba'",
+			args: args{
+				tablename:  "people",
+				alias:      "p",
+				primaryKey: []octosql.VariableName{"id"},
+				variables: map[octosql.VariableName]interface{}{
+					"const_0": 1,
+					"const_1": "Kuba",
+				},
+				formula: physical.NewAnd(
+					physical.NewPredicate(
+						physical.NewVariable("p.name"),
+						physical.GreaterEqual,
+						physical.NewVariable("const_1"),
+					),
+					physical.NewPredicate(
+						physical.NewVariable("const_0"),
+						physical.NotEqual,
+						physical.NewVariable("p.id"),
+					),
+				),
+
+				rows: [][]interface{}{
+					{1, "Janek"},
+					{2, "Kuba"},
+					{3, "Wojtek"},
+					{4, "Adam"},
+				},
+				tableDescription: "CREATE TABLE people(id INTEGER PRIMARY KEY, name VARCHAR(20));",
+			},
+			want: execution.NewInMemoryStream([]*execution.Record{
+				execution.UtilNewRecord(
+					[]octosql.VariableName{"p.name", "p.id"},
+					[]interface{}{"Wojtek", 3},
+				),
+				execution.UtilNewRecord(
+					[]octosql.VariableName{"p.id", "p.name"},
+					[]interface{}{2, "Kuba"},
+				),
+			}),
+			wantErr: false,
+		},
+
+		{
+			name: "SELECT * FROM people p WHERE p.name <= 'J' OR p.id = 3",
+			args: args{
+				tablename:  "people",
+				alias:      "p",
+				primaryKey: []octosql.VariableName{"id"},
+				variables: map[octosql.VariableName]interface{}{
+					"const_0": "K",
+					"const_1": 3,
+				},
+				formula: physical.NewOr(
+					physical.NewPredicate(
+						physical.NewVariable("p.name"),
+						physical.LessEqual,
+						physical.NewVariable("const_0"),
+					),
+					physical.NewPredicate(
+						physical.NewVariable("const_1"),
+						physical.Equal,
+						physical.NewVariable("p.id"),
+					),
+				),
+
+				rows: [][]interface{}{
+					{1, "Janek"},
+					{2, "Kuba"},
+					{3, "Wojtek"},
+					{4, "Adam"},
+				},
+				tableDescription: "CREATE TABLE people(id INTEGER PRIMARY KEY, name VARCHAR(20));",
+			},
+			want: execution.NewInMemoryStream([]*execution.Record{
+				execution.UtilNewRecord(
+					[]octosql.VariableName{"p.name", "p.id"},
+					[]interface{}{"Adam", 4},
+				),
+				execution.UtilNewRecord(
+					[]octosql.VariableName{"p.id", "p.name"},
+					[]interface{}{1, "Janek"},
+				),
+				execution.UtilNewRecord(
+					[]octosql.VariableName{"p.name", "p.id"},
+					[]interface{}{"Wojtek", 3},
+				),
+			}),
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {

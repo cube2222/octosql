@@ -39,6 +39,10 @@ func relationToSQL(rel physical.Relation) string {
 		return "IN"
 	case physical.Like:
 		return "LIKE"
+	case physical.GreaterEqual:
+		return ">="
+	case physical.LessEqual:
+		return "<="
 	default:
 		panic("Invalid physical relation")
 	}

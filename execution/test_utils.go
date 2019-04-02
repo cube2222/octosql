@@ -59,6 +59,10 @@ func AreStreamsEqual(first, second RecordStream) (bool, error) {
 		secondRec, secondErr := second.Next()
 		if firstErr == ErrEndOfStream && secondErr == ErrEndOfStream {
 			break
+		} else if firstErr == ErrEndOfStream && secondErr == nil {
+			return false, nil
+		} else if firstErr == nil && secondErr == ErrEndOfStream {
+			return false, nil
 		} else if firstErr != nil {
 			return false, errors.Wrap(firstErr, "couldn't get record")
 		} else if secondErr != nil {

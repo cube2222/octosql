@@ -11,12 +11,14 @@ import (
 type Relation string
 
 const (
-	Equal    Relation = "equal"
-	NotEqual Relation = "not_equal"
-	MoreThan Relation = "more_than"
-	LessThan Relation = "less_than"
-	Like     Relation = "like"
-	In       Relation = "in"
+	Equal        Relation = "equal"
+	NotEqual     Relation = "not_equal"
+	MoreThan     Relation = "more_than"
+	LessThan     Relation = "less_than"
+	Like         Relation = "like"
+	In           Relation = "in"
+	GreaterEqual Relation = "greater_equal"
+	LessEqual    Relation = "less_equal"
 )
 
 func NewRelation(relation string) Relation {
@@ -37,6 +39,10 @@ func (rel Relation) Materialize(ctx context.Context) execution.Relation {
 		return execution.NewLike()
 	case In:
 		return execution.NewIn()
+	case GreaterEqual:
+		return execution.NewGreaterEqual()
+	case LessEqual:
+		return execution.NewLessEqual()
 	default:
 		log.Fatalf("Invalid relation: %+v", rel) // This should be filtered at the logical plan level
 		return nil

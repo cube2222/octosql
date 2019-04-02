@@ -351,6 +351,258 @@ func TestLessThan_Apply(t *testing.T) {
 	}
 }
 
+func TestGreaterEqual_Apply(t *testing.T) {
+	type args struct {
+		variables octosql.Variables
+		left      Expression
+		right     Expression
+	}
+	tests := []struct {
+		name    string
+		rel     *LessThan
+		args    args
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "simple >= integer variable check (>)",
+			args: args{
+				variables: map[octosql.VariableName]interface{}{
+					"a": 5,
+					"b": 4,
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+
+		{
+			name: "simple >= integer variable check (==)",
+			args: args{
+				variables: map[octosql.VariableName]interface{}{
+					"a": 4,
+					"b": 4,
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+
+		{
+			name: "simple >= integer variable check (<)",
+			args: args{
+				variables: map[octosql.VariableName]interface{}{
+					"a": 4,
+					"b": 6,
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: false,
+		},
+
+		{
+			name: "simple >= string variable check (>)",
+			args: args{
+				variables: map[octosql.VariableName]interface{}{
+					"a": "baba",
+					"b": "baaa",
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+
+		{
+			name: "simple >= string variable check (==)",
+			args: args{
+				variables: map[octosql.VariableName]interface{}{
+					"a": "baba",
+					"b": "baba",
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+
+		{
+			name: "simple >= string variable check (<)",
+			args: args{
+				variables: map[octosql.VariableName]interface{}{
+					"a": "baba",
+					"b": "baca",
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: false,
+		},
+
+		{
+			name: "simple incompatible variables check",
+			args: args{
+				variables: map[octosql.VariableName]interface{}{
+					"a": 3.0,
+					"b": 3,
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rel := &GreaterEqual{}
+			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("LessThan.Apply() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("LessThan.Apply() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLessEqual_Apply(t *testing.T) {
+	type args struct {
+		variables octosql.Variables
+		left      Expression
+		right     Expression
+	}
+	tests := []struct {
+		name    string
+		rel     *LessThan
+		args    args
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "simple <= integer variable check (>)",
+			args: args{
+				variables: map[octosql.VariableName]interface{}{
+					"a": 5,
+					"b": 4,
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: false,
+		},
+
+		{
+			name: "simple <= integer variable check (==)",
+			args: args{
+				variables: map[octosql.VariableName]interface{}{
+					"a": 4,
+					"b": 4,
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+
+		{
+			name: "simple <= integer variable check (<)",
+			args: args{
+				variables: map[octosql.VariableName]interface{}{
+					"a": 4,
+					"b": 6,
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+
+		{
+			name: "simple <= string variable check (>)",
+			args: args{
+				variables: map[octosql.VariableName]interface{}{
+					"a": "baba",
+					"b": "baaa",
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: false,
+		},
+
+		{
+			name: "simple <= string variable check (==)",
+			args: args{
+				variables: map[octosql.VariableName]interface{}{
+					"a": "baba",
+					"b": "baba",
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+
+		{
+			name: "simple <= string variable check (<)",
+			args: args{
+				variables: map[octosql.VariableName]interface{}{
+					"a": "baba",
+					"b": "baca",
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+
+		{
+			name: "simple incompatible variables check",
+			args: args{
+				variables: map[octosql.VariableName]interface{}{
+					"a": 3.0,
+					"b": 3,
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rel := &LessEqual{}
+			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("LessThan.Apply() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("LessThan.Apply() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestLike_Apply(t *testing.T) {
 	type args struct {
 		variables octosql.Variables

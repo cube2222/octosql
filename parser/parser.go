@@ -19,8 +19,31 @@ func ParseUnionAll(statement *sqlparser.Union) (logical.Node, error) {
 		var err error
 
 		if statement.Limit != nil {
-			// could be done as in ParseSelect Limit's subsection (only swap parseSelect and parseUnionAll)
-			return nil, errors.Errorf("limit is currently unsupported, got %+v", statement)
+			// BTW parser doesn't allow neither (OFFSET without LIMIT) nor (LIMIT ALL)
+			var limitExpr, offsetExpr logical.Expression = logical.NewConstant(nil), logical.NewConstant(nil)
+
+			if statement.Limit.Rowcount != nil {
+				limitExpr, err = ParseExpression(statement.Limit.Rowcount)
+				if err != nil {
+					return nil, errors.Errorf("couldn't parse limit's Rowcount subexpression")
+				}
+			}
+
+			if statement.Limit.Offset != nil {
+				offsetExpr, err = ParseExpression(statement.Limit.Offset)
+				if err != nil {
+					return nil, errors.Errorf("couldn't parse limit's Offset subexpression")
+				}
+			}
+			// I am *NOT* sure whether I can set statement.Limit = nil and thus make it unusable for any further operations
+			// (always could back it up and restore before return, though)
+			statement.Limit = nil
+			node, err := ParseUnionAll(statement)
+			if err != nil {
+				return nil, errors.Errorf("couldn't parse limit's underlying node")
+			}
+
+			return logical.NewLimit(node, limitExpr, offsetExpr), nil
 		}
 		if statement.OrderBy != nil {
 			return nil, errors.Errorf("order by is currently unsupported, got %+v", statement)
@@ -52,14 +75,14 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		var limitExpr, offsetExpr logical.Expression = logical.NewConstant(nil), logical.NewConstant(nil)
 
 		if statement.Limit.Rowcount != nil {
-			limitExpr, err := ParseExpression(statement.Limit.Rowcount)
+			limitExpr, err = ParseExpression(statement.Limit.Rowcount)
 			if err != nil {
 				return nil, errors.Errorf("couldn't parse limit's Rowcount subexpression")
 			}
 		}
 
 		if statement.Limit.Offset != nil {
-			offsetExpr, err := ParseExpression(statement.Limit.Offset)
+			offsetExpr, err = ParseExpression(statement.Limit.Offset)
 			if err != nil {
 				return nil, errors.Errorf("couldn't parse limit's Offset subexpression")
 			}

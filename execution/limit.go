@@ -1,5 +1,8 @@
 package execution
 
+// *at the moment x interface{} is just casted to integer as "x.(int)"*
+// *has to* be checked if we want to treat it like that (rounding floats and so on)
+
 import (
 	"github.com/cube2222/octosql"
 	"github.com/pkg/errors"
@@ -18,26 +21,25 @@ func NewLimit(data Node, limit, offset Expression) *Limit {
 }
 
 func extractSingleValue(e Expression, name string, variables octosql.Variables) (value interface{}, err error) {
-	expr, err := e.ExpressionValue(variables)
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get "+name+" expression value")
-	}
-	switch exprType := expr.(type) {
-	case Variable:
+	switch exprType := e.(type) {
+	case *Variable:
 		val, err := exprType.ExpressionValue(variables)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't get " + name + " variable value")
+			return nil, errors.Wrap(err, "couldn't get "+name+" variable value")
 		}
 		return val, nil
-	case NodeExpression:
+	case *AliasedExpression:// <== I think it should be impossible (if I understand correctly, what AliasedExpression is)
+		// to be proven and removed or disproven and implemented
+		panic("unexpected AliasedExpression: execution/limit.go")
+	case *NodeExpression:
 		val, err := exprType.ExpressionValue(variables)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't get " + name + " nodeExpression value")
+			return nil, errors.Wrap(err, "couldn't get "+name+" nodeExpression value")
 		}
 		if val == nil {
 			return nil, errors.New(name + " nodeExpression empty")
 		}
-		switch valType := val.(type){
+		switch val.(type) {
 		case []Record:
 			return nil, errors.New(name + " nodeExpression has multiple rows")
 		case Record:
@@ -45,23 +47,15 @@ func extractSingleValue(e Expression, name string, variables octosql.Variables) 
 		default:
 			return val, nil
 		}
-	// start debug
-	case Node:
-		panic("Assert t.type != Node failed (execution/limit.go:extractSingleValue)")
-	case Constant:
-		panic("Assert t.type != Constant failed (execution/limit.go:extractSingleValue)")
-	// end debug*/
 	default:
-		return nil, errors.New(name + " expression value invalid")
+		// to be proven and removed or disproven and implemented
+		panic("unexpected expression type: execution/limit.go")
+		//return nil, errors.New("wrong " + name + " expression type")
 	}
 }
 
-// as it is taken out of good Expression, val's type should already be normalized
-
-
 func (node *Limit) Get(variables octosql.Variables) (RecordStream, error) {
 	var limit, offset = limitAll, offsetNone
-	var limitVariables, offsetVariables = octosql.NoVariables(), octosql.NoVariables()
 
 	dataStream, err := node.data.Get(variables)
 	if err != nil {
@@ -73,11 +67,36 @@ func (node *Limit) Get(variables octosql.Variables) (RecordStream, error) {
 		return nil, errors.Wrap(err, "couldn't extract value from limit subexpression")
 	}
 
-	val, err :=
+	if limitVal != nil {
+		val, ok := limitVal.(int)
+		if !ok {
+			return nil, errors.New("limit value not convertible to int")
+		}
+		if val < 0 {
+			return nil, errors.New("negative limit value")
+		}
+		limit = val
+	}
+
+	offsetVal, err := extractSingleValue(node.offset, "offset", variables)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't extract value from offset subexpression")
+	}
+
+	if offsetVal != nil {
+		val, ok := offsetVal.(int)
+		if !ok {
+			return nil, errors.New("offset value not convertible to int")
+		}
+		if val < 0 {
+			return nil, errors.New("negative offset value")
+		}
+		offset = val
+	}
 
 	ls := &limitedStream{
-		variables: variables,
 		rs:        dataStream,
+		variables: variables,
 		limit:     limit,
 	}
 

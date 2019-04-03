@@ -58,16 +58,18 @@ func TestDataSource_Get(t *testing.T) {
 					"const_0": "key0",
 				},
 			},
-			want: execution.NewInMemoryStream(
-				[]octosql.VariableName{"r.age", "r.city", "r.name", "r.surname"},
-				[]map[octosql.VariableName]interface{}{
-					{
+			want: execution.NewInMemoryStream([]*execution.Record{
+				execution.NewRecord(
+					[]octosql.VariableName{"r.age", "r.city", "r.name", "r.surname"},
+					map[octosql.VariableName]interface{}{
 						"r.age":     "3",
 						"r.city":    "warsaw",
 						"r.name":    "wojtek",
 						"r.surname": "k",
 					},
-				}),
+				),
+			},
+			),
 			wantErr: false,
 		},
 		{
@@ -97,16 +99,18 @@ func TestDataSource_Get(t *testing.T) {
 					"const_0": "key0",
 				},
 			},
-			want: execution.NewInMemoryStream(
-				[]octosql.VariableName{"r.age", "r.city", "r.name", "r.surname"},
-				[]map[octosql.VariableName]interface{}{
-					{
+			want: execution.NewInMemoryStream([]*execution.Record{
+				execution.NewRecord(
+					[]octosql.VariableName{"r.age", "r.city", "r.name", "r.surname"},
+					map[octosql.VariableName]interface{}{
 						"r.age":     "3",
 						"r.city":    "warsaw",
 						"r.name":    "wojtek",
 						"r.surname": "k",
 					},
-				}),
+				),
+			},
+			),
 			wantErr: false,
 		},
 		{
@@ -155,22 +159,27 @@ func TestDataSource_Get(t *testing.T) {
 					"const_1": "key1",
 				},
 			},
-			want: execution.NewInMemoryStream(
-				[]octosql.VariableName{"r.age", "r.city", "r.name", "r.surname"},
-				[]map[octosql.VariableName]interface{}{
-					{
+			want: execution.NewInMemoryStream([]*execution.Record{
+				execution.NewRecord(
+					[]octosql.VariableName{"r.age", "r.city", "r.name", "r.surname"},
+					map[octosql.VariableName]interface{}{
 						"r.age":     "3",
 						"r.city":    "warsaw",
 						"r.name":    "wojtek",
 						"r.surname": "k",
 					},
-					{
+				),
+				execution.NewRecord(
+					[]octosql.VariableName{"r.age", "r.city", "r.name", "r.surname"},
+					map[octosql.VariableName]interface{}{
 						"r.age":     "4",
 						"r.city":    "zacisze",
 						"r.name":    "janek",
 						"r.surname": "ch",
 					},
-				}),
+				),
+			},
+			),
 			wantErr: false,
 		},
 		{
@@ -207,16 +216,18 @@ func TestDataSource_Get(t *testing.T) {
 					"const_1": "key1",
 				},
 			},
-			want: execution.NewInMemoryStream(
-				[]octosql.VariableName{"r.age", "r.city", "r.name", "r.surname"},
-				[]map[octosql.VariableName]interface{}{
-					{
+			want: execution.NewInMemoryStream([]*execution.Record{
+				execution.NewRecord(
+					[]octosql.VariableName{"r.age", "r.city", "r.name", "r.surname"},
+					map[octosql.VariableName]interface{}{
 						"r.age":     "3",
 						"r.city":    "warsaw",
 						"r.name":    "wojtek",
 						"r.surname": "k",
 					},
-				}),
+				),
+			},
+			),
 			wantErr: false,
 		},
 		{
@@ -226,7 +237,7 @@ func TestDataSource_Get(t *testing.T) {
 				password: "",
 				port:     6379,
 				dbIndex:  0,
-				filter:   nil,
+				filter:   physical.NewConstant(true),
 				err:      nil,
 				alias:    "r",
 				queries: map[string]map[string]interface{}{
@@ -259,34 +270,45 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				variables: map[octosql.VariableName]interface{}{},
 			},
-			want: execution.NewInMemoryStream(
-				[]octosql.VariableName{"r.age", "r.city", "r.name", "r.surname"},
-				[]map[octosql.VariableName]interface{}{
-					{
-						"r.age":     "1",
-						"r.city":    "ciechanow",
-						"r.name":    "adam",
-						"r.surname": "cz",
-					},
-					{
-						"r.age":     "2",
-						"r.city":    "warsaw",
-						"r.name":    "kuba",
-						"r.surname": "m",
-					},
-					{
-						"r.age":     "4",
-						"r.city":    "zacisze",
-						"r.name":    "janek",
-						"r.surname": "ch",
-					},
-					{
+			want: execution.NewInMemoryStream([]*execution.Record{
+				execution.NewRecord(
+					[]octosql.VariableName{"r.age", "r.city", "r.name", "r.surname"},
+					map[octosql.VariableName]interface{}{
 						"r.age":     "3",
 						"r.city":    "warsaw",
 						"r.name":    "wojtek",
 						"r.surname": "k",
 					},
-				}),
+				),
+				execution.NewRecord(
+					[]octosql.VariableName{"r.age", "r.city", "r.name", "r.surname"},
+					map[octosql.VariableName]interface{}{
+						"r.age":     "4",
+						"r.city":    "zacisze",
+						"r.name":    "janek",
+						"r.surname": "ch",
+					},
+				),
+				execution.NewRecord(
+					[]octosql.VariableName{"r.age", "r.city", "r.name", "r.surname"},
+					map[octosql.VariableName]interface{}{
+						"r.age":     "1",
+						"r.city":    "ciechanow",
+						"r.name":    "adam",
+						"r.surname": "cz",
+					},
+				),
+				execution.NewRecord(
+					[]octosql.VariableName{"r.age", "r.city", "r.name", "r.surname"},
+					map[octosql.VariableName]interface{}{
+						"r.age":     "2",
+						"r.city":    "warsaw",
+						"r.name":    "kuba",
+						"r.surname": "m",
+					},
+				),
+			},
+			),
 			wantErr: false,
 		},
 		{
@@ -362,22 +384,27 @@ func TestDataSource_Get(t *testing.T) {
 					"const_3": "key3",
 				},
 			},
-			want: execution.NewInMemoryStream(
-				[]octosql.VariableName{"r.age", "r.city", "r.name", "r.surname"},
-				[]map[octosql.VariableName]interface{}{
-					{
+			want: execution.NewInMemoryStream([]*execution.Record{
+				execution.NewRecord(
+					[]octosql.VariableName{"r.age", "r.city", "r.name", "r.surname"},
+					map[octosql.VariableName]interface{}{
 						"r.age":     "3",
 						"r.city":    "warsaw",
 						"r.name":    "wojtek",
 						"r.surname": "k",
 					},
-					{
+				),
+				execution.NewRecord(
+					[]octosql.VariableName{"r.age", "r.city", "r.name", "r.surname"},
+					map[octosql.VariableName]interface{}{
 						"r.age":     "4",
 						"r.city":    "zacisze",
 						"r.name":    "janek",
 						"r.surname": "ch",
 					},
-				}),
+				),
+			},
+			),
 			wantErr: false,
 		},
 		{
@@ -446,16 +473,18 @@ func TestDataSource_Get(t *testing.T) {
 					"const_2": "key2",
 				},
 			},
-			want: execution.NewInMemoryStream(
-				[]octosql.VariableName{"r.age", "r.city", "r.name", "r.surname"},
-				[]map[octosql.VariableName]interface{}{
-					{
+			want: execution.NewInMemoryStream([]*execution.Record{
+				execution.NewRecord(
+					[]octosql.VariableName{"r.age", "r.city", "r.name", "r.surname"},
+					map[octosql.VariableName]interface{}{
 						"r.age":     "4",
 						"r.city":    "zacisze",
 						"r.name":    "janek",
 						"r.surname": "ch",
 					},
-				}),
+				),
+			},
+			),
 			wantErr: false,
 		},
 		{

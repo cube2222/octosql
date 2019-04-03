@@ -9,7 +9,7 @@ import (
 type VariableName string
 
 func NewVariableName(varname string) VariableName {
-	return VariableName(varname)
+	return VariableName(strings.ToLower(varname))
 }
 
 func (vn *VariableName) String() string {

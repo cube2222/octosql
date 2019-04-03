@@ -50,15 +50,9 @@ func NewDataSourceBuilderFactory(hostname, password string, port, dbIndex int) f
 }
 
 func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, error) {
-	keysWanted := octosql.NoVariables()
-
-	if ds.keyFormula != nil { // there was filter
-		keysExtracted, err := ds.keyFormula.getAllKeys(variables)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't get all keys from filter")
-		}
-
-		keysWanted = keysExtracted
+	keysWanted, err := ds.keyFormula.getAllKeys(variables)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get all keys from filter")
 	}
 
 	if len(keysWanted) == 0 {

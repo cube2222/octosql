@@ -147,10 +147,6 @@ func (f *Equal) getAllKeys(variables octosql.Variables) (octosql.Variables, erro
 }
 
 func NewKeyFormula(formula physical.Formula, key, alias string) (KeyFormula, error) {
-	if formula == nil { // there was no formula, so we want to scan whole redis database (no error returned)
-		return nil, nil
-	}
-
 	switch formula := formula.(type) {
 	case *physical.And:
 		leftFormula, err := NewKeyFormula(formula.Left, key, alias)

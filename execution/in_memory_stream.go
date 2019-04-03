@@ -1,18 +1,14 @@
 package execution
 
-import "github.com/cube2222/octosql"
-
 type InMemoryStream struct {
-	fields []octosql.VariableName
-	data   []map[octosql.VariableName]interface{}
-	index  int
+	data  []*Record
+	index int
 }
 
-func NewInMemoryStream(fields []octosql.VariableName, data []map[octosql.VariableName]interface{}) *InMemoryStream {
+func NewInMemoryStream(data []*Record) *InMemoryStream {
 	return &InMemoryStream{
-		fields: fields,
-		data:   data,
-		index:  0,
+		data:  data,
+		index: 0,
 	}
 }
 
@@ -21,8 +17,8 @@ func (ims *InMemoryStream) Next() (*Record, error) {
 		return nil, ErrEndOfStream
 	}
 
-	recData := ims.data[ims.index]
+	recordToReturn := ims.data[ims.index]
 	ims.index++
 
-	return NewRecord(ims.fields, recData), nil
+	return recordToReturn, nil
 }

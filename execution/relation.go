@@ -110,6 +110,38 @@ func (rel *LessThan) Apply(variables octosql.Variables, left, right Expression) 
 	return more, nil
 }
 
+type GreaterEqual struct {
+}
+
+func NewGreaterEqual() Relation {
+	return &GreaterEqual{}
+}
+
+func (rel *GreaterEqual) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
+	less, err := (*LessThan).Apply(nil, variables, left, right)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't get less for greater_equal")
+	}
+
+	return !less, nil
+}
+
+type LessEqual struct {
+}
+
+func NewLessEqual() Relation {
+	return &LessEqual{}
+}
+
+func (rel *LessEqual) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
+	more, err := (*MoreThan).Apply(nil, variables, left, right)
+	if err != nil {
+		return false, errors.Wrap(err, "coudln't get more for less_equal")
+	}
+
+	return !more, nil
+}
+
 type Like struct {
 }
 

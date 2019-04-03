@@ -14,6 +14,7 @@ import (
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/optimizer"
 	"github.com/cube2222/octosql/storage/json"
+	"github.com/cube2222/octosql/storage/postgres"
 	"github.com/xwb1989/sqlparser"
 )
 
@@ -45,9 +46,24 @@ func main() {
 		log.Fatal(err)
 	}
 
+	err = dataSourceRespository.Register("myusers",
+		postgres.NewDataSourceBuilderFactory("localhost", "root",
+			"toor", "mydb", "myusers", nil, 5432))
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	phys, variables, err := parsed.Physical(ctx, logical.NewPhysicalPlanCreator(dataSourceRespository))
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	switch phys.(type) {
+	case *physical.Filter:
+		fmt.Println("It's a filter")
+	default:
+		fmt.Println("It's not a filter")
 	}
 
 	phys = optimizer.Optimize(ctx, optimizer.DefaultScenarios, phys)
@@ -67,7 +83,8 @@ func main() {
 		var out []string
 		fields := rec.Fields()
 		for i := range fields {
-			out = append(out, fmt.Sprintf("%v: %v", fields[i].Name, rec.Value(fields[i].Name)))
+			v := rec.Value(fields[i].Name)
+			out = append(out, fmt.Sprintf("%v: %v", fields[i].Name, v))
 		}
 		fmt.Println(strings.Join(out, ", "))
 	}

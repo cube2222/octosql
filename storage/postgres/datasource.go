@@ -14,20 +14,22 @@ import (
 
 var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 	physical.Primary: {
-		physical.Equal:    {},
-		physical.NotEqual: {},
-		physical.MoreThan: {},
-		physical.LessThan: {},
-		physical.Like:     {},
-		physical.In:       {},
+		physical.Equal:        {},
+		physical.NotEqual:     {},
+		physical.MoreThan:     {},
+		physical.LessThan:     {},
+		physical.GreaterEqual: {},
+		physical.LessEqual:    {},
+		physical.Like:         {},
 	},
 	physical.Secondary: {
-		physical.Equal:    {},
-		physical.NotEqual: {},
-		physical.MoreThan: {},
-		physical.LessThan: {},
-		physical.Like:     {},
-		physical.In:       {},
+		physical.Equal:        {},
+		physical.NotEqual:     {},
+		physical.MoreThan:     {},
+		physical.LessThan:     {},
+		physical.Like:         {},
+		physical.GreaterEqual: {},
+		physical.LessEqual:    {},
 	},
 }
 

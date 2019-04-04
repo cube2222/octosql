@@ -55,7 +55,7 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 		return nil, errors.Wrap(err, "couldn't get all keys from filter")
 	}
 
-	if len(keysWanted) == 0 {
+	if len(keysWanted.keys) == 0 {
 		allKeys := ds.client.Scan(0, "*", 0)
 
 		return &EntireBaseStream{
@@ -67,7 +67,7 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 	}
 
 	sliceKeys := make([]string, 0)
-	for k := range keysWanted {
+	for k := range keysWanted.keys {
 		sliceKeys = append(sliceKeys, k.String())
 	}
 

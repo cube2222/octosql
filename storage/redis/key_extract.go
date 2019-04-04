@@ -8,10 +8,33 @@ import (
 	"github.com/pkg/errors"
 )
 
+// This ENUM says whether our KeyFormula returned just Variables (DefaultKeys) or True /Ł False (only constants)
+// It is used only when And structure decides what to return based on children results
+type resultType int
+
+const (
+	DefaultKeys resultType = iota
+	True
+	False
+)
+
+// keys are wrapped in struct with additional ENUM value (check comment above for more information)
+type redisKeys struct {
+	keys       octosql.Variables
+	resultType resultType
+}
+
+func newRedisKeys(keys octosql.Variables, resultType resultType) *redisKeys {
+	return &redisKeys{
+		keys:       keys,
+		resultType: resultType,
+	}
+}
+
 // Formula build from physical.Formula, so that it accepts formulas for redis database
 // Also, getAllKeys returns all keys, that will be subject of HGetAll
 type KeyFormula interface {
-	getAllKeys(variables octosql.Variables) (octosql.Variables, error)
+	getAllKeys(variables octosql.Variables) (*redisKeys, error)
 }
 
 // Just as with logical constant
@@ -27,8 +50,12 @@ func NewConstant(value bool) *Constant {
 	}
 }
 
-func (f *Constant) getAllKeys(variables octosql.Variables) (octosql.Variables, error) {
-	return octosql.NoVariables(), nil
+func (f *Constant) getAllKeys(variables octosql.Variables) (*redisKeys, error) {
+	if f.value {
+		return newRedisKeys(octosql.NoVariables(), True), nil
+	}
+
+	return newRedisKeys(octosql.NoVariables(), False), nil
 }
 
 // Just like logical operator, the form is like: (formula1 AND formula2)
@@ -44,7 +71,7 @@ func NewAnd(left, right KeyFormula) *And {
 	}
 }
 
-func (f *And) getAllKeys(variables octosql.Variables) (octosql.Variables, error) {
+func (f *And) getAllKeys(variables octosql.Variables) (*redisKeys, error) {
 	leftKeys, err := f.left.getAllKeys(variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get all keys from left KeyFormula")
@@ -55,32 +82,32 @@ func (f *And) getAllKeys(variables octosql.Variables) (octosql.Variables, error)
 		return nil, errors.Wrap(err, "couldn't get all keys from right KeyFormula")
 	}
 
-	switch leftType := f.left.(type) {
-	case *Constant:
-		if leftType.value {
-			return rightKeys, nil // left formula is TRUE
-		}
-		return leftKeys, nil // empty map otherwise
+	if leftKeys.resultType == False || rightKeys.resultType == False { // one of children is Constant(false) - return empty map
+		return newRedisKeys(
+			octosql.NoVariables(),
+			DefaultKeys), nil
+	}
 
-	default: // left formula is not constant, we need to check right formula
-		switch rightType := f.right.(type) {
-		case *Constant:
-			if rightType.value {
-				return leftKeys, nil // same as above
-			}
-			return rightKeys, nil
+	if leftKeys.resultType == True { // if one child is Constant(true) then we return map of other child
+		return newRedisKeys(
+			rightKeys.keys,
+			DefaultKeys), nil
+	}
 
-		default: // neither of children formulas are constant - we return their intersection
-			resultKeys := make(map[octosql.VariableName]interface{})
-			for k := range leftKeys {
-				if val, ok := rightKeys[k]; ok {
-					resultKeys[k] = val
-				}
-			}
+	if rightKeys.resultType == True {
+		return newRedisKeys(
+			leftKeys.keys,
+			DefaultKeys), nil
+	}
 
-			return resultKeys, nil
+	resultKeys := make(map[octosql.VariableName]interface{}) // if not, then both children returned keys map - return intersection of them
+	for k := range leftKeys.keys {
+		if val, ok := rightKeys.keys[k]; ok {
+			resultKeys[k] = val
 		}
 	}
+
+	return newRedisKeys(resultKeys, DefaultKeys), nil
 }
 
 // Just like logical operator, the form is like: (formula1 OR formula2)
@@ -96,7 +123,7 @@ func NewOr(left, right KeyFormula) *Or {
 	}
 }
 
-func (f *Or) getAllKeys(variables octosql.Variables) (octosql.Variables, error) {
+func (f *Or) getAllKeys(variables octosql.Variables) (*redisKeys, error) {
 	leftKeys, err := f.left.getAllKeys(variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get all keys from left KeyFormula")
@@ -107,12 +134,12 @@ func (f *Or) getAllKeys(variables octosql.Variables) (octosql.Variables, error) 
 		return nil, errors.Wrap(err, "couldn't get all keys from right KeyFormula")
 	}
 
-	leftKeys, err = leftKeys.MergeWithNoConflicts(rightKeys)
+	resultKeys, err := leftKeys.keys.MergeWithNoConflicts(rightKeys.keys)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't merge left and right keys")
 	}
 
-	return leftKeys, nil
+	return newRedisKeys(resultKeys, DefaultKeys), nil
 }
 
 // The equivalent form is: ("key" = child), where "key" is alias for extracted key from redis database
@@ -127,7 +154,7 @@ func NewEqual(child execution.Expression) *Equal {
 	}
 }
 
-func (f *Equal) getAllKeys(variables octosql.Variables) (octosql.Variables, error) {
+func (f *Equal) getAllKeys(variables octosql.Variables) (*redisKeys, error) {
 	exprValue, err := f.child.ExpressionValue(variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get child expression value")
@@ -135,11 +162,12 @@ func (f *Equal) getAllKeys(variables octosql.Variables) (octosql.Variables, erro
 
 	switch exprValue := exprValue.(type) {
 	case string:
-		return octosql.NewVariables(
-			map[octosql.VariableName]interface{}{
-				octosql.NewVariableName(exprValue): nil,
-			},
-		), nil
+		return newRedisKeys(
+			octosql.NewVariables(
+				map[octosql.VariableName]interface{}{
+					octosql.NewVariableName(exprValue): nil,
+				}),
+			DefaultKeys), nil
 
 	default:
 		return nil, errors.Errorf("wrong expression value for a key in redis database")

@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strconv"
 	"time"
+
+	"github.com/cube2222/octosql"
 )
 
 // ParseType tries to parse the given string into any type it succeeds to. Returns back the string on failure.
@@ -70,6 +72,17 @@ func NormalizeType(value interface{}) interface{} {
 			out[k] = NormalizeType(v)
 		}
 		return out
+	case map[octosql.VariableName]interface{}:
+		out := make(map[octosql.VariableName]interface{})
+		for k, v := range value {
+			out[k] = NormalizeType(v)
+		}
+		return out
+	case *interface{}:
+		if value != nil {
+			return NormalizeType(*value)
+		}
+		return nil
 	default:
 		return value
 	}
@@ -77,6 +90,9 @@ func NormalizeType(value interface{}) interface{} {
 
 // AreEqual checks the equality of the given values, returning false if the types don't match.
 func AreEqual(left, right interface{}) bool {
+	if left == nil && right == nil {
+		return true
+	}
 	switch left := left.(type) {
 	case int:
 		right, ok := right.(int)

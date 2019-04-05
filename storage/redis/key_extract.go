@@ -20,11 +20,11 @@ const (
 
 // keys are wrapped in struct with additional ENUM value (check comment above for more information)
 type redisKeys struct {
-	keys       octosql.Variables
+	keys       map[string]interface{}
 	resultType resultType
 }
 
-func newRedisKeys(keys octosql.Variables, resultType resultType) *redisKeys {
+func newRedisKeys(keys map[string]interface{}, resultType resultType) *redisKeys {
 	return &redisKeys{
 		keys:       keys,
 		resultType: resultType,
@@ -52,10 +52,10 @@ func NewConstant(value bool) *Constant {
 
 func (f *Constant) getAllKeys(variables octosql.Variables) (*redisKeys, error) {
 	if f.value {
-		return newRedisKeys(octosql.NoVariables(), True), nil
+		return newRedisKeys(make(map[string]interface{}), True), nil
 	}
 
-	return newRedisKeys(octosql.NoVariables(), False), nil
+	return newRedisKeys(make(map[string]interface{}), False), nil
 }
 
 // Just like logical operator, the form is like: (formula1 AND formula2)
@@ -82,30 +82,19 @@ func (f *And) getAllKeys(variables octosql.Variables) (*redisKeys, error) {
 		return nil, errors.Wrap(err, "couldn't get all keys from right KeyFormula")
 	}
 
-	if leftKeys.resultType == False || rightKeys.resultType == False { // one of children is Constant(false) - return empty map
-		return newRedisKeys(
-			octosql.NoVariables(),
-			DefaultKeys), nil
+	if leftKeys.resultType == False || rightKeys.resultType == False { // one of children is Constant(false) - return empty map and false type
+		return newRedisKeys(make(map[string]interface{}), False), nil
 	}
 
-	if leftKeys.resultType == True { // if one child is Constant(true) then we return map of other child
-		return newRedisKeys(
-			rightKeys.keys,
-			DefaultKeys), nil
+	if leftKeys.resultType == True { // if one child is Constant(true) then we return map and type of other child
+		return newRedisKeys(rightKeys.keys, rightKeys.resultType), nil
 	}
 
 	if rightKeys.resultType == True {
-		return newRedisKeys(
-			leftKeys.keys,
-			DefaultKeys), nil
+		return newRedisKeys(leftKeys.keys, leftKeys.resultType), nil
 	}
 
-	resultKeys := make(map[octosql.VariableName]interface{}) // if not, then both children returned keys map - return intersection of them
-	for k := range leftKeys.keys {
-		if val, ok := rightKeys.keys[k]; ok {
-			resultKeys[k] = val
-		}
-	}
+	resultKeys := createIntersection(leftKeys.keys, rightKeys.keys) // if not, then both children returned keys map - return intersection of them
 
 	return newRedisKeys(resultKeys, DefaultKeys), nil
 }
@@ -134,10 +123,15 @@ func (f *Or) getAllKeys(variables octosql.Variables) (*redisKeys, error) {
 		return nil, errors.Wrap(err, "couldn't get all keys from right KeyFormula")
 	}
 
-	resultKeys, err := leftKeys.keys.MergeWithNoConflicts(rightKeys.keys)
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't merge left and right keys")
+	if leftKeys.resultType == True || rightKeys.resultType == True { // if so, then we "accept everything" at this point
+		return newRedisKeys(make(map[string]interface{}), True), nil // returnType is True, because Or('sth', True) can be simplified to Constant(true)
 	}
+
+	if leftKeys.resultType == False && rightKeys.resultType == False { // if so, then we "accept nothing" at this point
+		return newRedisKeys(make(map[string]interface{}), False), nil // returnType is False, because Or(False, False) can be simplified to Constant(false)
+	}
+
+	resultKeys := createUnion(leftKeys.keys, rightKeys.keys)
 
 	return newRedisKeys(resultKeys, DefaultKeys), nil
 }
@@ -163,11 +157,9 @@ func (f *Equal) getAllKeys(variables octosql.Variables) (*redisKeys, error) {
 	switch exprValue := exprValue.(type) {
 	case string:
 		return newRedisKeys(
-			octosql.NewVariables(
-				map[octosql.VariableName]interface{}{
-					octosql.NewVariableName(exprValue): nil,
-				}),
-			DefaultKeys), nil
+			map[string]interface{}{
+				exprValue: nil,
+			}, DefaultKeys), nil
 
 	default:
 		return nil, errors.Errorf("wrong expression value for a key in redis database")
@@ -203,8 +195,8 @@ func NewKeyFormula(formula physical.Formula, key, alias string) (KeyFormula, err
 		return NewOr(leftFormula, rightFormula), nil
 
 	case *physical.Predicate:
-		if !IsExpressionKeyAlias(formula.Left, key, alias) {
-			if !IsExpressionKeyAlias(formula.Right, key, alias) {
+		if !isExpressionKeyAlias(formula.Left, key, alias) {
+			if !isExpressionKeyAlias(formula.Right, key, alias) {
 				return nil, errors.Errorf("neither of predicates expressions represents key identifier")
 			}
 
@@ -231,7 +223,7 @@ func NewKeyFormula(formula physical.Formula, key, alias string) (KeyFormula, err
 	}
 }
 
-func IsExpressionKeyAlias(expression physical.Expression, key, alias string) bool {
+func isExpressionKeyAlias(expression physical.Expression, key, alias string) bool {
 	switch expression := expression.(type) {
 	case *physical.Variable:
 		if expression.Name.Name() == key && expression.Name.Source() == alias {
@@ -243,4 +235,25 @@ func IsExpressionKeyAlias(expression physical.Expression, key, alias string) boo
 	}
 
 	return false
+}
+
+func createUnion(first, second map[string]interface{}) map[string]interface{} {
+	out := make(map[string]interface{})
+	for k, v := range first {
+		out[k] = v
+	}
+	for k, v := range second {
+		out[k] = v
+	}
+	return out
+}
+
+func createIntersection(first, second map[string]interface{}) map[string]interface{} {
+	out := make(map[string]interface{}) // if not, then both children returned keys map - return intersection of them
+	for k := range first {
+		if val, ok := second[k]; ok {
+			out[k] = val
+		}
+	}
+	return out
 }

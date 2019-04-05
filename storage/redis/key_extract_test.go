@@ -435,7 +435,7 @@ func TestAnd_GetAllKeys(t *testing.T) {
 				},
 			},
 			want: &redisKeys{
-				octosql.Variables{
+				map[string]interface{}{
 					"key0": nil,
 				},
 				DefaultKeys,
@@ -455,10 +455,42 @@ func TestAnd_GetAllKeys(t *testing.T) {
 				},
 			},
 			want: &redisKeys{
-				octosql.Variables{
+				map[string]interface{}{
 					"key0": nil,
 				},
 				DefaultKeys,
+			},
+			wantErr: false,
+		},
+		{
+			// TRUE and TRUE
+			name: "dumb true",
+			fields: fields{
+				left:  &Constant{true},
+				right: &Constant{true},
+			},
+			args: args{
+				map[octosql.VariableName]interface{}{},
+			},
+			want: &redisKeys{
+				map[string]interface{}{},
+				True,
+			},
+			wantErr: false,
+		},
+		{
+			// FALSE and FALSE
+			name: "dumb false",
+			fields: fields{
+				left:  &Constant{false},
+				right: &Constant{false},
+			},
+			args: args{
+				map[octosql.VariableName]interface{}{},
+			},
+			want: &redisKeys{
+				map[string]interface{}{},
+				False,
 			},
 			wantErr: false,
 		},
@@ -475,8 +507,8 @@ func TestAnd_GetAllKeys(t *testing.T) {
 				},
 			},
 			want: &redisKeys{
-				octosql.Variables{},
-				DefaultKeys,
+				map[string]interface{}{},
+				False,
 			},
 			wantErr: false,
 		},
@@ -494,7 +526,7 @@ func TestAnd_GetAllKeys(t *testing.T) {
 				},
 			},
 			want: &redisKeys{
-				octosql.Variables{},
+				map[string]interface{}{},
 				DefaultKeys,
 			},
 			wantErr: false,
@@ -515,6 +547,30 @@ func TestAnd_GetAllKeys(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			// ("const_0" or True) and "const_1"
+			name: "tricky and with constant",
+			fields: fields{
+				left: &Or{
+					&Equal{execution.NewVariable("const_0")},
+					&Constant{true},
+				},
+				right: &Equal{execution.NewVariable("const_1")},
+			},
+			args: args{
+				map[octosql.VariableName]interface{}{
+					"const_0": "key0",
+					"const_1": "key1",
+				},
+			},
+			want: &redisKeys{
+				map[string]interface{}{
+					"key1": nil,
+				},
+				DefaultKeys,
+			},
+			wantErr: false,
+		},
+		{
 			// ("const_0" and "const_0") and ("const_0" and "const_0")
 			name: "complex and dummy",
 			fields: fields{
@@ -533,7 +589,7 @@ func TestAnd_GetAllKeys(t *testing.T) {
 				},
 			},
 			want: &redisKeys{
-				octosql.Variables{
+				map[string]interface{}{
 					"key0": nil,
 				},
 				DefaultKeys,
@@ -560,7 +616,7 @@ func TestAnd_GetAllKeys(t *testing.T) {
 				},
 			},
 			want: &redisKeys{
-				octosql.Variables{},
+				map[string]interface{}{},
 				DefaultKeys,
 			},
 			wantErr: false,
@@ -585,7 +641,7 @@ func TestAnd_GetAllKeys(t *testing.T) {
 				},
 			},
 			want: &redisKeys{
-				octosql.Variables{
+				map[string]interface{}{
 					"key1": nil,
 				},
 				DefaultKeys,
@@ -616,7 +672,7 @@ func TestAnd_GetAllKeys(t *testing.T) {
 				},
 			},
 			want: &redisKeys{
-				octosql.Variables{
+				map[string]interface{}{
 					"key0": nil,
 					"key1": nil,
 				},
@@ -671,7 +727,7 @@ func TestOr_GetAllKeys(t *testing.T) {
 				},
 			},
 			want: &redisKeys{
-				octosql.Variables{
+				map[string]interface{}{
 					"key0": nil,
 				},
 				DefaultKeys,
@@ -692,7 +748,7 @@ func TestOr_GetAllKeys(t *testing.T) {
 				},
 			},
 			want: &redisKeys{
-				octosql.Variables{
+				map[string]interface{}{
 					"key0": nil,
 					"key1": nil,
 				},
@@ -713,10 +769,8 @@ func TestOr_GetAllKeys(t *testing.T) {
 				},
 			},
 			want: &redisKeys{
-				octosql.Variables{
-					"key1": nil,
-				},
-				DefaultKeys,
+				map[string]interface{}{},
+				True,
 			},
 			wantErr: false,
 		},
@@ -733,10 +787,42 @@ func TestOr_GetAllKeys(t *testing.T) {
 				},
 			},
 			want: &redisKeys{
-				octosql.Variables{
+				map[string]interface{}{
 					"key1": nil,
 				},
 				DefaultKeys,
+			},
+			wantErr: false,
+		},
+		{
+			// TRUE or TRUE
+			name: "dumb true",
+			fields: fields{
+				left:  &Constant{true},
+				right: &Constant{true},
+			},
+			args: args{
+				map[octosql.VariableName]interface{}{},
+			},
+			want: &redisKeys{
+				map[string]interface{}{},
+				True,
+			},
+			wantErr: false,
+		},
+		{
+			// FALSE or FALSE
+			name: "dumb false",
+			fields: fields{
+				left:  &Constant{false},
+				right: &Constant{false},
+			},
+			args: args{
+				map[octosql.VariableName]interface{}{},
+			},
+			want: &redisKeys{
+				map[string]interface{}{},
+				False,
 			},
 			wantErr: false,
 		},
@@ -773,7 +859,7 @@ func TestOr_GetAllKeys(t *testing.T) {
 				},
 			},
 			want: &redisKeys{
-				octosql.Variables{
+				map[string]interface{}{
 					"key0": nil,
 					"key1": nil,
 					"key3": nil,
@@ -804,10 +890,56 @@ func TestOr_GetAllKeys(t *testing.T) {
 				},
 			},
 			want: &redisKeys{
-				octosql.Variables{
+				map[string]interface{}{
 					"key0": nil,
 					"key1": nil,
 					"key2": nil,
+				},
+				DefaultKeys,
+			},
+			wantErr: false,
+		},
+		{
+			// (TRUE and TRUE) or "const_1"
+			name: "constant or and",
+			fields: fields{
+				left: &And{
+					&Constant{true},
+					&Constant{true},
+				},
+				right: &Equal{execution.NewVariable("const_1")},
+			},
+			args: args{
+				map[octosql.VariableName]interface{}{
+					"const_1": "key1",
+				},
+			},
+			want: &redisKeys{
+				map[string]interface{}{},
+				True,
+			},
+			wantErr: false,
+		},
+		{
+			// ("const_0" and TRUE) or "const_1"
+			name: "constant or and vol2",
+			fields: fields{
+				left: &And{
+					&Equal{execution.NewVariable("const_0")},
+					&Constant{true},
+				},
+				right: &Equal{execution.NewVariable("const_1")},
+			},
+			args: args{
+				map[octosql.VariableName]interface{}{
+					"const_0": "key0",
+					"const_1": "key1",
+				},
+			},
+			want: &redisKeys{
+				map[string]interface{}{
+					"key0": nil,
+					"key1": nil,
 				},
 				DefaultKeys,
 			},
@@ -834,7 +966,7 @@ func TestOr_GetAllKeys(t *testing.T) {
 				},
 			},
 			want: &redisKeys{
-				octosql.Variables{
+				map[string]interface{}{
 					"key1": nil,
 					"key2": nil,
 				},
@@ -844,7 +976,7 @@ func TestOr_GetAllKeys(t *testing.T) {
 		},
 		{
 			// ("const_0" and "const_1") or (("const_1" or "const_2") and "const_1"))
-			name: "very complex or vol2",
+			name: "very complex or",
 			fields: fields{
 				left: &And{
 					&Equal{execution.NewVariable("const_0")},
@@ -866,7 +998,7 @@ func TestOr_GetAllKeys(t *testing.T) {
 				},
 			},
 			want: &redisKeys{
-				octosql.Variables{
+				map[string]interface{}{
 					"key1": nil,
 				},
 				DefaultKeys,
@@ -917,7 +1049,7 @@ func TestEqual_GetAllKeys(t *testing.T) {
 				},
 			},
 			want: &redisKeys{
-				octosql.Variables{
+				map[string]interface{}{
 					"key0": nil,
 				},
 				DefaultKeys,
@@ -951,7 +1083,7 @@ func TestEqual_GetAllKeys(t *testing.T) {
 				},
 			},
 			want: &redisKeys{
-				octosql.Variables{
+				map[string]interface{}{
 					"key1": nil,
 				},
 				DefaultKeys,
@@ -999,7 +1131,7 @@ func TestConstant_getAllKeys(t *testing.T) {
 				map[octosql.VariableName]interface{}{},
 			},
 			want: &redisKeys{
-				octosql.Variables{},
+				map[string]interface{}{},
 				True,
 			},
 			wantErr: false,
@@ -1013,7 +1145,7 @@ func TestConstant_getAllKeys(t *testing.T) {
 				map[octosql.VariableName]interface{}{},
 			},
 			want: &redisKeys{
-				octosql.Variables{},
+				map[string]interface{}{},
 				False,
 			},
 			wantErr: false,

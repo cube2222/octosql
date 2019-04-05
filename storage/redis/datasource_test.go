@@ -16,6 +16,7 @@ func TestDataSource_Get(t *testing.T) {
 		password string
 		port     int
 		dbIndex  int
+		dbKey    string
 		filter   physical.Formula
 		err      error
 		alias    string
@@ -38,6 +39,7 @@ func TestDataSource_Get(t *testing.T) {
 				password: "",
 				port:     6379,
 				dbIndex:  0,
+				dbKey:    "key",
 				filter: physical.NewPredicate(
 					physical.NewVariable("r.key"),
 					physical.NewRelation("equal"),
@@ -79,8 +81,51 @@ func TestDataSource_Get(t *testing.T) {
 				password: "",
 				port:     6379,
 				dbIndex:  1,
+				dbKey:    "key",
 				filter: physical.NewPredicate(
 					physical.NewVariable("r.key"),
+					physical.NewRelation("equal"),
+					physical.NewVariable("const_0")),
+				err:   nil,
+				alias: "r",
+				queries: map[string]map[string]interface{}{
+					"key0": {
+						"name":    "wojtek",
+						"surname": "k",
+						"age":     "3",
+						"city":    "warsaw",
+					},
+				},
+			},
+			args: args{
+				variables: map[octosql.VariableName]interface{}{
+					"const_0": "key0",
+				},
+			},
+			want: execution.NewInMemoryStream([]*execution.Record{
+				execution.NewRecord(
+					[]octosql.VariableName{"r.age", "r.city", "r.name", "r.surname"},
+					map[octosql.VariableName]interface{}{
+						"r.age":     "3",
+						"r.city":    "warsaw",
+						"r.name":    "wojtek",
+						"r.surname": "k",
+					},
+				),
+			},
+			),
+			wantErr: false,
+		},
+		{
+			name: "different database key",
+			fields: fields{
+				hostname: "localhost",
+				password: "",
+				port:     6379,
+				dbIndex:  1,
+				dbKey:    "some_other_key_name",
+				filter: physical.NewPredicate(
+					physical.NewVariable("r.some_other_key_name"),
 					physical.NewRelation("equal"),
 					physical.NewVariable("const_0")),
 				err:   nil,
@@ -120,6 +165,7 @@ func TestDataSource_Get(t *testing.T) {
 				password: "",
 				port:     6379,
 				dbIndex:  0,
+				dbKey:    "key",
 				filter: physical.NewOr(
 					physical.NewPredicate(
 						physical.NewVariable("r.key"),
@@ -189,6 +235,7 @@ func TestDataSource_Get(t *testing.T) {
 				password: "",
 				port:     6379,
 				dbIndex:  0,
+				dbKey:    "key",
 				filter: physical.NewAnd(
 					physical.NewPredicate(
 						physical.NewVariable("r.key"),
@@ -237,6 +284,7 @@ func TestDataSource_Get(t *testing.T) {
 				password: "",
 				port:     6379,
 				dbIndex:  0,
+				dbKey:    "key",
 				filter:   physical.NewConstant(true),
 				err:      nil,
 				alias:    "r",
@@ -319,6 +367,7 @@ func TestDataSource_Get(t *testing.T) {
 				password: "",
 				port:     6379,
 				dbIndex:  0,
+				dbKey:    "key",
 				filter: physical.NewAnd(
 					physical.NewOr(
 						physical.NewPredicate(
@@ -415,6 +464,7 @@ func TestDataSource_Get(t *testing.T) {
 				password: "",
 				port:     6379,
 				dbIndex:  0,
+				dbKey:    "key",
 				filter: physical.NewOr(
 					physical.NewAnd(
 						physical.NewPredicate(
@@ -494,6 +544,7 @@ func TestDataSource_Get(t *testing.T) {
 				password: "",
 				port:     6379,
 				dbIndex:  0,
+				dbKey:    "key",
 				filter: physical.NewPredicate(
 					physical.NewVariable("r.key"),
 					physical.NewRelation("equal"),
@@ -522,6 +573,7 @@ func TestDataSource_Get(t *testing.T) {
 				password: "aaa",
 				port:     6379,
 				dbIndex:  0,
+				dbKey:    "key",
 				filter: physical.NewPredicate(
 					physical.NewVariable("r.key"),
 					physical.NewRelation("equal"),
@@ -568,6 +620,7 @@ func TestDataSource_Get(t *testing.T) {
 				password: "",
 				port:     1234,
 				dbIndex:  0,
+				dbKey:    "key",
 				filter: physical.NewPredicate(
 					physical.NewVariable("r.key"),
 					physical.NewRelation("equal"),
@@ -591,6 +644,7 @@ func TestDataSource_Get(t *testing.T) {
 				password: "",
 				port:     6379,
 				dbIndex:  20,
+				dbKey:    "key",
 				filter: physical.NewPredicate(
 					physical.NewVariable("r.key"),
 					physical.NewRelation("equal"),
@@ -648,7 +702,7 @@ func TestDataSource_Get(t *testing.T) {
 				}
 			}
 
-			dsFactory := NewDataSourceBuilderFactory(fields.hostname, fields.password, fields.port, fields.dbIndex)
+			dsFactory := NewDataSourceBuilderFactory(fields.hostname, fields.password, fields.port, fields.dbIndex, fields.dbKey)
 			dsBuilder := dsFactory(fields.alias)
 			execNode, err := dsBuilder.Executor(fields.filter, fields.alias)
 			if err != nil {

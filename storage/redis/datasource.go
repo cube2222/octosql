@@ -22,7 +22,8 @@ type DataSource struct {
 	alias      string
 }
 
-func NewDataSourceBuilderFactory(hostname, password string, port, dbIndex int) func(alias string) *physical.DataSourceBuilder {
+// dbKey is the name for hard-coded key alias used in future formulas for redis queries
+func NewDataSourceBuilderFactory(hostname, password string, port, dbIndex int, dbKey string) func(alias string) *physical.DataSourceBuilder {
 	return physical.NewDataSourceBuilderFactory(
 		func(filter physical.Formula, alias string) (execution.Node, error) {
 			client := redis.NewClient(
@@ -33,7 +34,7 @@ func NewDataSourceBuilderFactory(hostname, password string, port, dbIndex int) f
 				},
 			)
 
-			keyFormula, err := NewKeyFormula(filter, "key", alias)
+			keyFormula, err := NewKeyFormula(filter, dbKey, alias)
 			if err != nil {
 				return nil, errors.Errorf("couldn't create KeyFormula")
 			}
@@ -44,7 +45,9 @@ func NewDataSourceBuilderFactory(hostname, password string, port, dbIndex int) f
 				alias:      alias,
 			}, nil
 		},
-		[]octosql.VariableName{"key"}, // hard-coded key used for key identity in formula
+		[]octosql.VariableName{
+			octosql.NewVariableName(dbKey),
+		},
 		availableFilters,
 	)
 }
@@ -58,7 +61,7 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 	if len(keysWanted.keys) == 0 {
 		allKeys := ds.client.Scan(0, "*", 0)
 
-		return &EntireBaseStream{
+		return &EntireDatabaseStream{
 			client:     ds.client,
 			dbIterator: allKeys.Iterator(),
 			isDone:     false,
@@ -68,7 +71,7 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 
 	sliceKeys := make([]string, 0)
 	for k := range keysWanted.keys {
-		sliceKeys = append(sliceKeys, k.String())
+		sliceKeys = append(sliceKeys, k)
 	}
 
 	return &KeySpecificStream{
@@ -92,7 +95,7 @@ type KeySpecificStream struct {
 	alias   string
 }
 
-type EntireBaseStream struct {
+type EntireDatabaseStream struct {
 	client     *redis.Client
 	dbIterator *redis.ScanIterator
 	isDone     bool
@@ -115,7 +118,7 @@ func (rs *KeySpecificStream) Next() (*execution.Record, error) {
 	return GetNewRecord(rs.client, key, rs.alias)
 }
 
-func (rs *EntireBaseStream) Next() (*execution.Record, error) {
+func (rs *EntireDatabaseStream) Next() (*execution.Record, error) {
 	if rs.isDone {
 		return nil, execution.ErrEndOfStream
 	}

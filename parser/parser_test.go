@@ -21,6 +21,24 @@ func TestParseNode(t *testing.T) {
 		wantErr bool
 	}{
 		{
+			name: "simple limit + offset",
+			args: args{
+				"SELECT p.name, p.age FROM people p LIMIT 3 OFFSET 2",
+			},
+			want: logical.NewLimit(
+				logical.NewMap(
+					[]logical.NamedExpression{
+						logical.NewVariable("p.name"),
+						logical.NewVariable("p.age"),
+					},
+					logical.NewDataSource("people", "p"),
+				),
+				logical.NewConstant(3),
+				logical.NewConstant(2),
+			),
+			wantErr: false,
+		},
+		{
 			name: "simple union all",
 			args: args{
 				"SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 3 " +

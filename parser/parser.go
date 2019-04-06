@@ -19,23 +19,13 @@ func ParseUnionAll(statement *sqlparser.Union) (logical.Node, error) {
 		var err error
 
 		if statement.Limit != nil {
-			// handling identical to that in ParseSelect() - cannot abstract any nice small helper function, though
-			var limitExpr, offsetExpr logical.Expression = logical.NewConstant(nil), logical.NewConstant(nil)
-
-			if statement.Limit.Rowcount != nil {
-				limitExpr, err = ParseExpression(statement.Limit.Rowcount)
-				if err != nil {
-					return nil, errors.Errorf("couldn't parse limit's Rowcount subexpression")
-				}
+			limitExpr, offsetExpr, err := parseLimitSubexpressions(statement.Limit.Rowcount, statement.Limit.Offset)
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't parse limit's subexpression")
 			}
 
-			if statement.Limit.Offset != nil {
-				offsetExpr, err = ParseExpression(statement.Limit.Offset)
-				if err != nil {
-					return nil, errors.Errorf("couldn't parse limit's Offset subexpression")
-				}
-			}
-
+			// I am *NOT* sure whether I can set statement.Limit = nil and thus make it unusable for any further operations
+			// (always could back it up and restore before return, though)
 			statement.Limit = nil
 			node, err := ParseUnionAll(statement)
 			if err != nil {
@@ -70,21 +60,11 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 	var root logical.Node
 
 	if statement.Limit != nil {
-		var limitExpr, offsetExpr logical.Expression = logical.NewConstant(nil), logical.NewConstant(nil)
-
-		if statement.Limit.Rowcount != nil {
-			limitExpr, err = ParseExpression(statement.Limit.Rowcount)
-			if err != nil {
-				return nil, errors.Errorf("couldn't parse limit's Rowcount subexpression")
-			}
+		limitExpr, offsetExpr, err := parseLimitSubexpressions(statement.Limit.Rowcount, statement.Limit.Offset)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't parse limit's subexpression")
 		}
 
-		if statement.Limit.Offset != nil {
-			offsetExpr, err = ParseExpression(statement.Limit.Offset)
-			if err != nil {
-				return nil, errors.Errorf("couldn't parse limit's Offset subexpression")
-			}
-		}
 		// I am *NOT* sure whether I can set statement.Limit = nil and thus make it unusable for any further operations
 		// (always could back it up and restore before return, though)
 		statement.Limit = nil
@@ -291,4 +271,24 @@ func ParseInfixComparison(left, right sqlparser.Expr, operator string) (logical.
 		return nil, errors.Wrapf(err, "couldn't parse right hand side of %s comparator %+v", operator, right)
 	}
 	return logical.NewPredicate(leftParsed, logical.NewRelation(operator), rightParsed), nil
+}
+
+func parseLimitSubexpressions(limit, offset sqlparser.Expr) (logical.Expression, logical.Expression,  error){
+	var limitExpr, offsetExpr logical.Expression = logical.NewConstant(nil), logical.NewConstant(nil)
+
+	if limit != nil {
+		limitExpr, err := ParseExpression(limit)
+		if err != nil {
+			return nil, nil, errors.Errorf("couldn't parse limit's Rowcount subexpression")
+		}
+	}
+
+	if offset != nil {
+		offsetExpr, err := ParseExpression(offset)
+		if err != nil {
+			return nil, nil, errors.Errorf("couldn't parse limit's Offset subexpression")
+		}
+	}
+
+	return limitExpr, offsetExpr, nil
 }

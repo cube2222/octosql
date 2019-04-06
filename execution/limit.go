@@ -96,7 +96,6 @@ func (node *Limit) Get(variables octosql.Variables) (RecordStream, error) {
 
 	ls := &limitedStream{
 		rs:        dataStream,
-		variables: variables,
 		limit:     limit,
 	}
 
@@ -115,7 +114,6 @@ func (node *Limit) Get(variables octosql.Variables) (RecordStream, error) {
 
 type limitedStream struct {
 	rs        RecordStream
-	variables octosql.Variables
 	limit     int
 }
 

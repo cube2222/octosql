@@ -18,7 +18,10 @@ func NewLimit(data Node, limit, offset Expression) *Limit {
 }
 
 func (node *Limit) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
-	// assuming that SQL parser is good and didn't allow node.data to be nil
+	if node.data == nil || node.limit == nil || node.offset == nil {
+		return nil, nil, errors.New("Limit has a nil field")
+	}
+
 	dataNode, variables, err := node.data.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for data node")

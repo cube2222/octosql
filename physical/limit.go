@@ -30,25 +30,23 @@ func (node *Limit) Transform(ctx context.Context, transformers *Transformers) No
 }
 
 func (node *Limit) Materialize(ctx context.Context) (execution.Node, error) {
-	var limitExpr, offsetExpr execution.Expression = nil, nil
+	if node.data == nil || node.limit == nil || node.offset == nil {
+		return nil, errors.New("Limit has a nil field")
+	}
 
 	dataNode, err := node.data.Materialize(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize data node")
 	}
 
-	if node.limit != nil {
-		limitExpr, err = node.limit.Materialize(ctx)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't materialize limit expression")
-		}
+	limitExpr, err := node.limit.Materialize(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't materialize limit expression")
 	}
 
-	if node.offset != nil {
-		offsetExpr, err = node.offset.Materialize(ctx)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't materialize offset expression")
-		}
+	offsetExpr, err := node.offset.Materialize(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't materialize offset expression")
 	}
 
 	return execution.NewLimit(dataNode, limitExpr, offsetExpr), nil

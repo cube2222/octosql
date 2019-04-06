@@ -26,6 +26,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// todo: add UnionAll support
 	typed, ok := stmt.(*sqlparser.Select)
 	if !ok {
 		log.Fatal("invalid statement type")

@@ -1,8 +1,5 @@
 package execution
 
-// *at the moment x interface{} is just casted to integer as "x.(int)"*
-// *has to* be checked if we want to treat it like that (rounding floats and so on)
-
 import (
 	"github.com/cube2222/octosql"
 	"github.com/pkg/errors"
@@ -27,10 +24,7 @@ func extractSingleValue(e Expression, name string, variables octosql.Variables) 
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't get "+name+" variable value")
 		}
-		return val, nil
-	case *AliasedExpression:// <== I think it should be impossible (if I understand correctly, what AliasedExpression is)
-		// to be proven and removed or disproven and implemented
-		panic("unexpected AliasedExpression: execution/limit.go")
+		return val, nil // parser set Limit's limit|offset to NewConstant(nil) if there had been no limit|offset in original SQL qiuery
 	case *NodeExpression:
 		val, err := exprType.ExpressionValue(variables)
 		if err != nil {
@@ -48,9 +42,7 @@ func extractSingleValue(e Expression, name string, variables octosql.Variables) 
 			return val, nil
 		}
 	default:
-		// to be proven and removed or disproven and implemented
-		panic("unexpected expression type: execution/limit.go")
-		//return nil, errors.New("wrong " + name + " expression type")
+		return nil, errors.New("unexpected type in type-switch @ execution/limit.go")
 	}
 }
 
@@ -67,7 +59,7 @@ func (node *Limit) Get(variables octosql.Variables) (RecordStream, error) {
 		return nil, errors.Wrap(err, "couldn't extract value from limit subexpression")
 	}
 
-	if limitVal != nil {
+	if limitVal != nil { // means no "LIMIT" in original SQL query
 		val, ok := limitVal.(int)
 		if !ok {
 			return nil, errors.New("limit value not convertible to int")
@@ -83,7 +75,7 @@ func (node *Limit) Get(variables octosql.Variables) (RecordStream, error) {
 		return nil, errors.Wrap(err, "couldn't extract value from offset subexpression")
 	}
 
-	if offsetVal != nil {
+	if offsetVal != nil { // means no "OFFSET" in original SQL query
 		val, ok := offsetVal.(int)
 		if !ok {
 			return nil, errors.New("offset value not convertible to int")
@@ -95,8 +87,8 @@ func (node *Limit) Get(variables octosql.Variables) (RecordStream, error) {
 	}
 
 	ls := &limitedStream{
-		rs:        dataStream,
-		limit:     limit,
+		rs:    dataStream,
+		limit: limit,
 	}
 
 	for ; offset > 0; offset-- {
@@ -113,8 +105,8 @@ func (node *Limit) Get(variables octosql.Variables) (RecordStream, error) {
 }
 
 type limitedStream struct {
-	rs        RecordStream
-	limit     int
+	rs    RecordStream
+	limit int
 }
 
 func (node *limitedStream) Next() (*Record, error) {
@@ -127,7 +119,7 @@ func (node *limitedStream) Next() (*Record, error) {
 			}
 			return nil, errors.Wrap(err, "couldn't get limitedStream's record")
 		}
-		if node.limit > 0 { // LIMIT ALL and such
+		if node.limit > 0 { // LIMIT not set
 			node.limit--
 		}
 		return record, nil

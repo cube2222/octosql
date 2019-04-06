@@ -275,16 +275,17 @@ func ParseInfixComparison(left, right sqlparser.Expr, operator string) (logical.
 
 func parseLimitSubexpressions(limit, offset sqlparser.Expr) (logical.Expression, logical.Expression,  error){
 	var limitExpr, offsetExpr logical.Expression = logical.NewConstant(nil), logical.NewConstant(nil)
+	var err error
 
 	if limit != nil {
-		limitExpr, err := ParseExpression(limit)
+		limitExpr, err = ParseExpression(limit)
 		if err != nil {
 			return nil, nil, errors.Errorf("couldn't parse limit's Rowcount subexpression")
 		}
 	}
 
 	if offset != nil {
-		offsetExpr, err := ParseExpression(offset)
+		offsetExpr, err = ParseExpression(offset)
 		if err != nil {
 			return nil, nil, errors.Errorf("couldn't parse limit's Offset subexpression")
 		}

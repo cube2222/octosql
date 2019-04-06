@@ -274,6 +274,8 @@ func ParseInfixComparison(left, right sqlparser.Expr, operator string) (logical.
 }
 
 func parseLimitSubexpressions(limit, offset sqlparser.Expr) (logical.Expression, logical.Expression,  error){
+	// BTW parser doesn't recognize clause OFFSET without LIMIT and simultaneously doesn't recognize "LIMIT ALL"
+	// (though I checked it a few days ago and am not so sure right now)
 	var limitExpr, offsetExpr logical.Expression = logical.NewConstant(nil), logical.NewConstant(nil)
 	var err error
 

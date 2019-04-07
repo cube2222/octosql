@@ -21,6 +21,45 @@ func TestParseNode(t *testing.T) {
 		wantErr bool
 	}{
 		{
+			name: "simple union",
+			args: args{
+				"SELECT p.id, p.name, p.surname FROM people p WHERE p.surname = Kowalski " +
+					"UNION " +
+					"SELECT * FROM admins a WHERE a.exp < 2",
+			},
+			want: logical.NewDistinct(
+				logical.NewUnionAll(
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewVariable("p.id"),
+							logical.NewVariable("p.name"),
+							logical.NewVariable("p.surname"),
+						},
+						logical.NewFilter(
+							logical.NewPredicate(
+								logical.NewVariable("p.surname"),
+								logical.Equal,
+								logical.NewVariable("Kowalski"),
+							),
+							logical.NewDataSource("people", "p"),
+						),
+					),
+					logical.NewFilter(
+						logical.NewPredicate(
+							logical.NewVariable("a.exp"),
+							logical.LessThan,
+							logical.NewConstant(2),
+						),
+						logical.NewDataSource(
+							"admins",
+							"a",
+						),
+					),
+				),
+			),
+			wantErr: false,
+		},
+		{
 			name: "simple union all",
 			args: args{
 				"SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 3 " +

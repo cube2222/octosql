@@ -71,6 +71,13 @@ func EqualNodes(node1, node2 Node) error {
 			return nil
 		}
 
+	case *Distinct:
+		if node2, ok := node2.(*Distinct); ok{
+			if err := EqualNodes(node1.child, node2.child); err != nil {
+				return errors.Wrap(err, "distinct's children not equal")
+			}
+		}
+
 	default:
 		log.Fatalf("Unsupported equality comparison %v and %v", reflect.TypeOf(node1), reflect.TypeOf(node2))
 	}

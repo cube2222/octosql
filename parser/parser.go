@@ -13,32 +13,31 @@ import (
 
 // TODO: W sumie to jeszcze moze byc "boolean node expression" chociaz oczywiscie dziala przez (costam) = TRUE
 
-func ParseUnionAll(statement *sqlparser.Union) (logical.Node, error) {
-	switch statement.Type {
+func ParseUnion(statement *sqlparser.Union) (logical.Node, error) {
+	if statement.Limit != nil {
+		return nil, errors.Errorf("limit is currently unsupported, got %+v", statement)
+	}
+	if statement.OrderBy != nil {
+		return nil, errors.Errorf("order by is currently unsupported, got %+v", statement)
+	}
+
+	firstNode, err := ParseNode(statement.Left)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't parse first select expression")
+	}
+
+	secondNode, err := ParseNode(statement.Right)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't parse second select expression")
+	}
+
+	switch (statement.Type) {
 	case sqlparser.UnionAllStr:
-		var err error
-
-		if statement.Limit != nil {
-			return nil, errors.Errorf("limit is currently unsupported, got %+v", statement)
-		}
-		if statement.OrderBy != nil {
-			return nil, errors.Errorf("order by is currently unsupported, got %+v", statement)
-		}
-
-		firstNode, err := ParseNode(statement.Left)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't parse first select expression")
-		}
-
-		secondNode, err := ParseNode(statement.Right)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't parse second select expression")
-		}
-
 		return logical.NewUnionAll(firstNode, secondNode), nil
-
+	case sqlparser.UnionDistinctStr, sqlparser.UnionStr:
+		return logical.NewUnionDistinct(firstNode, secondNode), nil
 	default:
-		return nil, errors.Errorf("unsupported union %+v of type %v", statement, statement.Type)
+		return nil, errors.New("union with nonsense 'Type' field")
 	}
 }
 
@@ -102,13 +101,12 @@ func ParseNode(statement sqlparser.SelectStatement) (logical.Node, error) {
 		return ParseSelect(statement)
 
 	case *sqlparser.Union:
-		return ParseUnionAll(statement)
+		return ParseUnion(statement)
 
 	case *sqlparser.ParenSelect:
 		return ParseNode(statement.Select)
 
 	default:
-		// Union
 		return nil, errors.Errorf("unsupported select %+v of type %v", statement, reflect.TypeOf(statement))
 	}
 }

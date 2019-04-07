@@ -8,12 +8,18 @@ import (
 	"github.com/pkg/errors"
 )
 
+// (?)todo: rename union_all.go's to union.go's
+
 type UnionAll struct {
 	first, second Node
 }
 
 func NewUnionAll(first, second Node) *UnionAll {
 	return &UnionAll{first: first, second: second}
+}
+
+func NewUnionDistinct(first, second Node) *Distinct{
+	return NewDistinct(NewUnionAll(first, second))
 }
 
 func (node *UnionAll) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {

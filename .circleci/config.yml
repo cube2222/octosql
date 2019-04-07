@@ -8,6 +8,7 @@ workflows:
           requires:
             - test
             - test-postgres
+            - test-redis
           filters:
             branches:
               only: master
@@ -48,6 +49,19 @@ jobs:
       - checkout
 
       - run: go test -v ./storage/postgres/...
+
+  test-redis:
+    docker:
+      - image: circleci/golang:1.12
+        environment:
+          GO111MODULE: "on"
+      - image: circleci/redis:latest
+
+    working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
+    steps:
+      - checkout
+
+      - run: go test -v ./storage/redis/...
 
   release:
     docker:

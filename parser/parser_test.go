@@ -39,7 +39,7 @@ func TestParseNode(t *testing.T) {
 							logical.NewPredicate(
 								logical.NewVariable("p.surname"),
 								logical.Equal,
-								logical.NewVariable("Kowalski"),
+								logical.NewConstant("Kowalski"),
 							),
 							logical.NewDataSource("people", "p"),
 						),

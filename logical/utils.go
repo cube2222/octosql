@@ -76,6 +76,7 @@ func EqualNodes(node1, node2 Node) error {
 			if err := EqualNodes(node1.child, node2.child); err != nil {
 				return errors.Wrap(err, "distinct's children not equal")
 			}
+			return nil
 		}
 
 	default:

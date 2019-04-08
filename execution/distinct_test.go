@@ -160,6 +160,156 @@ func TestDistinct_Get(t *testing.T) {
 					[]interface{}{4, "Wojtek"}),
 			}),
 		},
+
+		{
+			name: "advanced data (slice) - no repetitions",
+			args: args{
+				NewInMemoryStream([]*Record{
+					UtilNewRecord(
+						[]octosql.VariableName{"numbers"},
+						[]interface{}{[]int{1, 2, 3}}),
+					UtilNewRecord(
+						[]octosql.VariableName{"numbers"},
+						[]interface{}{[]int{4, 5, 6, 7}}),
+					UtilNewRecord(
+						[]octosql.VariableName{"numbers"},
+						[]interface{}{[]int{7, 8}}),
+				}),
+			},
+			want: NewInMemoryStream([]*Record{
+				UtilNewRecord(
+					[]octosql.VariableName{"numbers"},
+					[]interface{}{[]int{4, 5, 6, 7}}),
+				UtilNewRecord(
+					[]octosql.VariableName{"numbers"},
+					[]interface{}{[]int{1, 2, 3}}),
+				UtilNewRecord(
+					[]octosql.VariableName{"numbers"},
+					[]interface{}{[]int{7, 8}}),
+			}),
+		},
+
+		{
+			name: "advanced data (slice) - repetitions",
+			args: args{
+				NewInMemoryStream([]*Record{
+					UtilNewRecord(
+						[]octosql.VariableName{"numbers"},
+						[]interface{}{[]int{1, 2, 3}}),
+					UtilNewRecord(
+						[]octosql.VariableName{"numbers"},
+						[]interface{}{[]int{1, 2, 3}}),
+					UtilNewRecord(
+						[]octosql.VariableName{"numbers"},
+						[]interface{}{[]int{7, 8}}),
+				}),
+			},
+			want: NewInMemoryStream([]*Record{
+				UtilNewRecord(
+					[]octosql.VariableName{"numbers"},
+					[]interface{}{[]int{1, 2, 3}}),
+				UtilNewRecord(
+					[]octosql.VariableName{"numbers"},
+					[]interface{}{[]int{7, 8}}),
+			}),
+		},
+
+		{
+			name: "advanced (map) - repetitions",
+			args: args{
+				NewInMemoryStream([]*Record{
+					UtilNewRecord(
+						[]octosql.VariableName{"map"},
+						[]interface{}{map[int]string{
+							0: "aaa",
+							1: "bbb",
+							2: "ccc",
+						}}),
+					UtilNewRecord(
+						[]octosql.VariableName{"map"},
+						[]interface{}{map[int]string{
+							1: "bbb",
+							0: "aaa",
+							2: "ccc",
+						}}),
+					UtilNewRecord(
+						[]octosql.VariableName{"map"},
+						[]interface{}{map[int]string{
+							0: "aaa",
+							1: "bbb",
+							2: "ccd",
+						}}),
+				}),
+			},
+			want: NewInMemoryStream([]*Record{
+				UtilNewRecord(
+					[]octosql.VariableName{"map"},
+					[]interface{}{map[int]string{
+						1: "bbb",
+						0: "aaa",
+						2: "ccc",
+					}}),
+				UtilNewRecord(
+					[]octosql.VariableName{"map"},
+					[]interface{}{map[int]string{
+						0: "aaa",
+						1: "bbb",
+						2: "ccd",
+					}}),
+			}),
+		},
+
+		{
+			name: "advanced (map + slice) - no repetitions",
+			args: args{
+				NewInMemoryStream([]*Record{
+					UtilNewRecord(
+						[]octosql.VariableName{"map", "numbers"},
+						[]interface{}{map[int]string{
+							0: "aaa",
+							1: "bbb",
+							2: "ccc",
+						}, []int{1, 2}}),
+					UtilNewRecord(
+						[]octosql.VariableName{"map"},
+						[]interface{}{map[int]string{
+							1: "bbb",
+							0: "aaa",
+							2: "ccc",
+						}, []int{1, 3}}),
+					UtilNewRecord(
+						[]octosql.VariableName{"map"},
+						[]interface{}{map[int]string{
+							0: "aaa",
+							1: "bbb",
+							2: "ccd",
+						}, []int{1, 2}}),
+				}),
+			},
+			want: NewInMemoryStream([]*Record{
+				UtilNewRecord(
+					[]octosql.VariableName{"map", "numbers"},
+					[]interface{}{map[int]string{
+						0: "aaa",
+						1: "bbb",
+						2: "ccc",
+					}, []int{1, 2}}),
+				UtilNewRecord(
+					[]octosql.VariableName{"map"},
+					[]interface{}{map[int]string{
+						1: "bbb",
+						0: "aaa",
+						2: "ccc",
+					}, []int{1, 3}}),
+				UtilNewRecord(
+					[]octosql.VariableName{"map"},
+					[]interface{}{map[int]string{
+						0: "aaa",
+						1: "bbb",
+						2: "ccd",
+					}, []int{1, 2}}),
+			}),
+		},
 	}
 
 	for _, tt := range tests {

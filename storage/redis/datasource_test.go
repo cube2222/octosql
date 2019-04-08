@@ -3,14 +3,20 @@ package redis
 import (
 	"fmt"
 	"github.com/cube2222/octosql/physical"
+	"github.com/go-redis/redis"
 	"testing"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
-	"github.com/go-redis/redis"
 )
 
 func TestDataSource_Get(t *testing.T) {
+	hostname := "localhost"
+	password := ""
+	port := 6379
+	dbIndex := 0
+	dbKey := "key"
+
 	type fields struct {
 		hostname string
 		password string
@@ -18,7 +24,6 @@ func TestDataSource_Get(t *testing.T) {
 		dbIndex  int
 		dbKey    string
 		filter   physical.Formula
-		err      error
 		alias    string
 		queries  map[string]map[string]interface{}
 	}
@@ -35,16 +40,15 @@ func TestDataSource_Get(t *testing.T) {
 		{
 			name: "simple test",
 			fields: fields{
-				hostname: "localhost",
-				password: "",
-				port:     6379,
-				dbIndex:  0,
-				dbKey:    "key",
+				hostname: hostname,
+				password: password,
+				port:     port,
+				dbIndex:  dbIndex,
+				dbKey:    dbKey,
 				filter: physical.NewPredicate(
 					physical.NewVariable("r.key"),
 					physical.NewRelation("equal"),
 					physical.NewVariable("const_0")),
-				err:   nil,
 				alias: "r",
 				queries: map[string]map[string]interface{}{
 					"key0": {
@@ -77,16 +81,15 @@ func TestDataSource_Get(t *testing.T) {
 		{
 			name: "different database index",
 			fields: fields{
-				hostname: "localhost",
-				password: "",
-				port:     6379,
+				hostname: hostname,
+				password: password,
+				port:     port,
 				dbIndex:  1,
-				dbKey:    "key",
+				dbKey:    dbKey,
 				filter: physical.NewPredicate(
 					physical.NewVariable("r.key"),
 					physical.NewRelation("equal"),
 					physical.NewVariable("const_0")),
-				err:   nil,
 				alias: "r",
 				queries: map[string]map[string]interface{}{
 					"key0": {
@@ -119,16 +122,15 @@ func TestDataSource_Get(t *testing.T) {
 		{
 			name: "different database key",
 			fields: fields{
-				hostname: "localhost",
-				password: "",
-				port:     6379,
-				dbIndex:  1,
+				hostname: hostname,
+				password: password,
+				port:     port,
+				dbIndex:  dbIndex,
 				dbKey:    "some_other_key_name",
 				filter: physical.NewPredicate(
 					physical.NewVariable("r.some_other_key_name"),
 					physical.NewRelation("equal"),
 					physical.NewVariable("const_0")),
-				err:   nil,
 				alias: "r",
 				queries: map[string]map[string]interface{}{
 					"key0": {
@@ -161,11 +163,11 @@ func TestDataSource_Get(t *testing.T) {
 		{
 			name: "simple test vol2 - or / additional queries",
 			fields: fields{
-				hostname: "localhost",
-				password: "",
-				port:     6379,
-				dbIndex:  0,
-				dbKey:    "key",
+				hostname: hostname,
+				password: password,
+				port:     port,
+				dbIndex:  dbIndex,
+				dbKey:    dbKey,
 				filter: physical.NewOr(
 					physical.NewPredicate(
 						physical.NewVariable("r.key"),
@@ -176,7 +178,6 @@ func TestDataSource_Get(t *testing.T) {
 						physical.NewRelation("equal"),
 						physical.NewVariable("const_1")),
 				),
-				err:   nil,
 				alias: "r",
 				queries: map[string]map[string]interface{}{
 					"key0": {
@@ -231,11 +232,11 @@ func TestDataSource_Get(t *testing.T) {
 		{
 			name: "simple redis test vol3 - and / additional variables",
 			fields: fields{
-				hostname: "localhost",
-				password: "",
-				port:     6379,
-				dbIndex:  0,
-				dbKey:    "key",
+				hostname: hostname,
+				password: password,
+				port:     port,
+				dbIndex:  dbIndex,
+				dbKey:    dbKey,
 				filter: physical.NewAnd(
 					physical.NewPredicate(
 						physical.NewVariable("r.key"),
@@ -246,7 +247,6 @@ func TestDataSource_Get(t *testing.T) {
 						physical.NewRelation("equal"),
 						physical.NewVariable("const_0")),
 				),
-				err:   nil,
 				alias: "r",
 				queries: map[string]map[string]interface{}{
 					"key0": {
@@ -280,13 +280,12 @@ func TestDataSource_Get(t *testing.T) {
 		{
 			name: "simple redis - no filter (whole scan)",
 			fields: fields{
-				hostname: "localhost",
-				password: "",
-				port:     6379,
-				dbIndex:  0,
-				dbKey:    "key",
+				hostname: hostname,
+				password: password,
+				port:     port,
+				dbIndex:  dbIndex,
+				dbKey:    dbKey,
 				filter:   physical.NewConstant(true),
-				err:      nil,
 				alias:    "r",
 				queries: map[string]map[string]interface{}{
 					"key0": {
@@ -363,11 +362,11 @@ func TestDataSource_Get(t *testing.T) {
 			// (("r.key" = "const_0") or ("r.key" = "const_1")) and ((("r.key" = "const_2") or ("r.key" = "const_1")) or ("r.key" = "const_0")))
 			name: "complex redis test",
 			fields: fields{
-				hostname: "localhost",
-				password: "",
-				port:     6379,
-				dbIndex:  0,
-				dbKey:    "key",
+				hostname: hostname,
+				password: password,
+				port:     port,
+				dbIndex:  dbIndex,
+				dbKey:    dbKey,
 				filter: physical.NewAnd(
 					physical.NewOr(
 						physical.NewPredicate(
@@ -396,7 +395,6 @@ func TestDataSource_Get(t *testing.T) {
 							physical.NewVariable("const_0")),
 					),
 				),
-				err:   nil,
 				alias: "r",
 				queries: map[string]map[string]interface{}{
 					"key0": {
@@ -460,11 +458,11 @@ func TestDataSource_Get(t *testing.T) {
 			// (("r.key" = "const_0") and ("const_1" = "r.key")) or ((("r.key" = "const_1") or ("r.key" = "const_2")) and ("r.key" = "const_1")))
 			name: "complex redis test vol2",
 			fields: fields{
-				hostname: "localhost",
-				password: "",
-				port:     6379,
-				dbIndex:  0,
-				dbKey:    "key",
+				hostname: hostname,
+				password: password,
+				port:     port,
+				dbIndex:  dbIndex,
+				dbKey:    dbKey,
 				filter: physical.NewOr(
 					physical.NewAnd(
 						physical.NewPredicate(
@@ -493,7 +491,6 @@ func TestDataSource_Get(t *testing.T) {
 							physical.NewVariable("const_1")),
 					),
 				),
-				err:   nil,
 				alias: "r",
 				queries: map[string]map[string]interface{}{
 					"key0": {
@@ -540,16 +537,15 @@ func TestDataSource_Get(t *testing.T) {
 		{
 			name: "wrong - no variables",
 			fields: fields{
-				hostname: "localhost",
-				password: "",
-				port:     6379,
-				dbIndex:  0,
-				dbKey:    "key",
+				hostname: hostname,
+				password: password,
+				port:     port,
+				dbIndex:  dbIndex,
+				dbKey:    dbKey,
 				filter: physical.NewPredicate(
 					physical.NewVariable("r.key"),
 					physical.NewRelation("equal"),
 					physical.NewVariable("const_0")),
-				err:   nil,
 				alias: "r",
 				queries: map[string]map[string]interface{}{
 					"key0": {
@@ -569,16 +565,15 @@ func TestDataSource_Get(t *testing.T) {
 		{
 			name: "wrong password",
 			fields: fields{
-				hostname: "localhost",
+				hostname: hostname,
 				password: "aaa",
-				port:     6379,
-				dbIndex:  0,
-				dbKey:    "key",
+				port:     port,
+				dbIndex:  dbIndex,
+				dbKey:    dbKey,
 				filter: physical.NewPredicate(
 					physical.NewVariable("r.key"),
 					physical.NewRelation("equal"),
 					physical.NewVariable("const_0")),
-				err:     nil,
 				alias:   "r",
 				queries: map[string]map[string]interface{}{},
 			},
@@ -594,14 +589,14 @@ func TestDataSource_Get(t *testing.T) {
 			name: "wrong hostname",
 			fields: fields{
 				hostname: "anyhost",
-				password: "",
-				port:     6379,
-				dbIndex:  0,
+				password: password,
+				port:     port,
+				dbIndex:  dbIndex,
+				dbKey:    dbKey,
 				filter: physical.NewPredicate(
 					physical.NewVariable("r.key"),
 					physical.NewRelation("equal"),
 					physical.NewVariable("const_0")),
-				err:     nil,
 				alias:   "r",
 				queries: map[string]map[string]interface{}{},
 			},
@@ -616,16 +611,15 @@ func TestDataSource_Get(t *testing.T) {
 		{
 			name: "wrong port",
 			fields: fields{
-				hostname: "localhost",
-				password: "",
+				hostname: hostname,
+				password: password,
 				port:     1234,
-				dbIndex:  0,
-				dbKey:    "key",
+				dbIndex:  dbIndex,
+				dbKey:    dbKey,
 				filter: physical.NewPredicate(
 					physical.NewVariable("r.key"),
 					physical.NewRelation("equal"),
 					physical.NewVariable("const_0")),
-				err:     nil,
 				alias:   "r",
 				queries: map[string]map[string]interface{}{},
 			},
@@ -640,16 +634,15 @@ func TestDataSource_Get(t *testing.T) {
 		{
 			name: "wrong dbIndex",
 			fields: fields{
-				hostname: "localhost",
-				password: "",
-				port:     6379,
+				hostname: hostname,
+				password: password,
+				port:     port,
 				dbIndex:  20,
-				dbKey:    "key",
+				dbKey:    dbKey,
 				filter: physical.NewPredicate(
 					physical.NewVariable("r.key"),
 					physical.NewRelation("equal"),
 					physical.NewVariable("const_0")),
-				err:     nil,
 				alias:   "r",
 				queries: map[string]map[string]interface{}{},
 			},
@@ -665,10 +658,6 @@ func TestDataSource_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fields := tt.fields
-
-			if fields.err != nil {
-				t.Errorf("error while creating KeyFormula")
-			}
 
 			client := redis.NewClient(
 				&redis.Options{

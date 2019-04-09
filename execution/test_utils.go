@@ -40,7 +40,7 @@ func (rms *recordMultiSet) Insert(rec *Record) error {
 	for k := range targetSlice {
 		element := targetSlice[k]
 		if AreEqual(element.rec, rec) {
-			element.count++
+			rms.set[hash][k].count++
 			return nil
 		}
 	}
@@ -125,12 +125,14 @@ func AreStreamsEqual(first, second RecordStream) (bool, error) {
 			return false, errors.Wrap(secondErr, "error in Next for second stream")
 		}
 
-		err := firstMultiSet.Insert(Normalize(firstRec))
+		firstNormalized := Normalize(firstRec)
+		err := firstMultiSet.Insert(firstNormalized)
 		if err != nil {
 			return false, errors.Wrap(err, "couldn't insert into the multiset")
 		}
 
-		err = secondMultiSet.Insert(Normalize(secondRec))
+		secondNormalized := Normalize(secondRec)
+		err = secondMultiSet.Insert(secondNormalized)
 		if err != nil {
 			return false, errors.Wrap(err, "couldn't insert into the multiset")
 		}

@@ -72,6 +72,7 @@ func newRecordSet() *recordSet {
 }
 
 func (rs *recordSet) Has(r *Record) (bool, error) {
+	r = Normalize(r)
 	hash, err := hashstructure.Hash(r, nil)
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get hash of record")
@@ -87,6 +88,7 @@ func (rs *recordSet) Has(r *Record) (bool, error) {
 }
 
 func (rs *recordSet) Insert(r *Record) (bool, error) {
+	r = Normalize(r)
 	hash, err := hashstructure.Hash(r, nil)
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get hash of record")

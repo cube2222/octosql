@@ -135,7 +135,7 @@ func TestAreStreamsEqual(t *testing.T) {
 					},
 				),
 			},
-			want:    false,
+			want:    true,
 			wantErr: false,
 		},
 	}

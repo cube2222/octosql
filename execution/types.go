@@ -183,6 +183,7 @@ func AreEqual(left, right interface{}) bool {
 		if len(leftFields) != len(rightFields) {
 			return false
 		}
+
 		for i := range leftFields {
 			if !AreEqual(left.Value(leftFields[i].Name), rightRecord.Value(rightFields[i].Name)) {
 				return false

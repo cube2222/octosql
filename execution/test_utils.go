@@ -4,7 +4,6 @@ import (
 	"sort"
 
 	"github.com/cube2222/octosql"
-	"github.com/mitchellh/hashstructure"
 	"github.com/pkg/errors"
 )
 
@@ -31,7 +30,7 @@ func newMultiSet() *recordMultiSet {
 }
 
 func (rms *recordMultiSet) Insert(rec *Record) error {
-	hash, err := hashstructure.Hash(rec, nil)
+	hash, err := HashRecord(rec)
 	if err != nil {
 		return errors.Wrap(err, "couldn't hash record")
 	}
@@ -51,7 +50,7 @@ func (rms *recordMultiSet) Insert(rec *Record) error {
 }
 
 func (rms *recordMultiSet) GetCount(rec *Record) (int, error) {
-	hash, err := hashstructure.Hash(rec, nil)
+	hash, err := HashRecord(rec)
 	if err != nil {
 		return 0, errors.Wrap(err, "couldn't hash record")
 	}

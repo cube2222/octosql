@@ -45,7 +45,7 @@ func (node *UnifiedStream) Next() (*Record, error) {
 		return firstRecord, nil
 	}
 	for {
-		secondRecord, err := node.first.Next()
+		secondRecord, err := node.second.Next()
 		if err != nil {
 			if err == ErrEndOfStream {
 				return nil, ErrEndOfStream

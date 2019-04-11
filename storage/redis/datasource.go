@@ -83,10 +83,6 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 	}, nil
 }
 
-type RecordStream interface {
-	Next() (*execution.Record, error)
-}
-
 type KeySpecificStream struct {
 	client  *redis.Client
 	keys    []string

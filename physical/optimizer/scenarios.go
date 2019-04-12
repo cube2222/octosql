@@ -236,7 +236,7 @@ func subset(set []octosql.VariableName, subset []octosql.VariableName) bool {
 
 func containsVariableName(vns []octosql.VariableName, vn octosql.VariableName) bool {
 	for i := range vns {
-		if vn == vns[i] {
+		if vn.Name() == vns[i].Name() {
 			return true
 		}
 	}

@@ -2,7 +2,7 @@ module github.com/cube2222/octosql
 
 require (
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible // indirect
-	github.com/bradleyjkemp/memmap v0.2.2 // indirect
+	github.com/bradleyjkemp/memmap v0.2.2
 	github.com/bradleyjkemp/memviz v0.2.2
 	github.com/cweill/gotests v1.5.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect

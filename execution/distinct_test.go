@@ -2,6 +2,7 @@ package execution
 
 import (
 	"testing"
+	"time"
 
 	"github.com/cube2222/octosql"
 )
@@ -431,6 +432,49 @@ func TestDistinct_Get(t *testing.T) {
 				UtilNewRecord( //unique - second row template; mixed columns same values
 					[]octosql.VariableName{"id", "scores", "age"},
 					[]interface{}{[]interface{}{9, 1, 11}, 1, 17}),
+			}),
+		},
+
+		{
+			name: "time.Time",
+			args: args{
+				NewInMemoryStream([]*Record{
+					UtilNewRecord(
+						[]octosql.VariableName{"date"},
+						[]interface{}{time.Date(2019, 11, 28, 0, 0, 0, 0, time.FixedZone("Poland", 0))}),
+					UtilNewRecord(
+						[]octosql.VariableName{"date"},
+						[]interface{}{time.Date(2019, 11, 28, 0, 0, 0, 0, time.FixedZone("Poland", 0))}),
+					UtilNewRecord(
+						[]octosql.VariableName{"date"},
+						[]interface{}{time.Date(2019, 11, 28, 0, 0, 2, 0, time.FixedZone("Poland", 0))}),
+					UtilNewRecord(
+						[]octosql.VariableName{"date"},
+						[]interface{}{time.Date(2018, 11, 28, 0, 0, 0, 0, time.FixedZone("Poland", 0))}),
+					UtilNewRecord(
+						[]octosql.VariableName{"date"},
+						[]interface{}{time.Date(2019, 12, 28, 0, 0, 0, 0, time.FixedZone("Poland", 0))}),
+					UtilNewRecord(
+						[]octosql.VariableName{"date"},
+						[]interface{}{time.Date(2019, 11, 27, 0, 0, 2, 0, time.FixedZone("Poland", 0))}),
+				}),
+			},
+			want: NewInMemoryStream([]*Record{
+				UtilNewRecord(
+					[]octosql.VariableName{"date"},
+					[]interface{}{time.Date(2018, 11, 28, 0, 0, 0, 0, time.FixedZone("Poland", 0))}),
+				UtilNewRecord(
+					[]octosql.VariableName{"date"},
+					[]interface{}{time.Date(2019, 12, 28, 0, 0, 0, 0, time.FixedZone("Poland", 0))}),
+				UtilNewRecord(
+					[]octosql.VariableName{"date"},
+					[]interface{}{time.Date(2019, 11, 27, 0, 0, 2, 0, time.FixedZone("Poland", 0))}),
+				UtilNewRecord(
+					[]octosql.VariableName{"date"},
+					[]interface{}{time.Date(2019, 11, 28, 0, 0, 0, 0, time.FixedZone("Poland", 0))}),
+				UtilNewRecord(
+					[]octosql.VariableName{"date"},
+					[]interface{}{time.Date(2019, 11, 28, 0, 0, 2, 0, time.FixedZone("Poland", 0))}),
 			}),
 		},
 	}

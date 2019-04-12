@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
@@ -82,6 +83,10 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 	for k := range aliasedRecord {
 		fields = append(fields, k)
 	}
+
+	sort.Slice(fields, func(i, j int) bool {
+		return fields[i] < fields[j]
+	})
 
 	return execution.NewRecord(fields, aliasedRecord), nil
 }

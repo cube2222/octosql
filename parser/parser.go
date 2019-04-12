@@ -69,27 +69,31 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		root = logical.NewFilter(filterFormula, root)
 	}
 
-	if len(statement.SelectExprs) == 1 {
-		if _, ok := statement.SelectExprs[0].(*sqlparser.StarExpr); ok {
-			return root, nil
+	if len(statement.SelectExprs) >= 1 {
+		if _, ok := statement.SelectExprs[0].(*sqlparser.StarExpr); !ok {
+			expressions := make([]logical.NamedExpression, len(statement.SelectExprs))
+			for i := range statement.SelectExprs {
+				aliasedExpression, ok := statement.SelectExprs[i].(*sqlparser.AliasedExpr)
+				if !ok {
+					return nil, errors.Errorf("expected aliased expression in select on index %v, got %v %v",
+						i, statement.SelectExprs[i], reflect.TypeOf(statement.SelectExprs[i]))
+				}
+
+				expressions[i], err = ParseAliasedExpression(aliasedExpression)
+				if err != nil {
+					return nil, errors.Wrapf(err, "couldn't parse aliased expression with index %d", i)
+				}
+			}
+
+			root = logical.NewMap(expressions, root)
 		}
 	}
 
-	expressions := make([]logical.NamedExpression, len(statement.SelectExprs))
-	for i := range statement.SelectExprs {
-		aliasedExpression, ok := statement.SelectExprs[i].(*sqlparser.AliasedExpr)
-		if !ok {
-			return nil, errors.Errorf("expected aliased expression in select on index %v, got %v %v",
-				i, statement.SelectExprs[i], reflect.TypeOf(statement.SelectExprs[i]))
-		}
-
-		expressions[i], err = ParseAliasedExpression(aliasedExpression)
-		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't parse aliased expression with index %d", i)
-		}
+	if len(statement.Distinct) > 0 {
+		root = logical.NewDistinct(root)
 	}
 
-	return logical.NewMap(expressions, root), nil
+	return root, nil
 }
 
 func ParseNode(statement sqlparser.SelectStatement) (logical.Node, error) {

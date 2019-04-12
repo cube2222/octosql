@@ -14,12 +14,6 @@ func NewDistinct(child Node) *Distinct {
 	return &Distinct{child: child}
 }
 
-type DistinctStream struct {
-	stream    RecordStream
-	variables octosql.Variables
-	records   *recordSet
-}
-
 func (node *Distinct) Get(variables octosql.Variables) (RecordStream, error) {
 	stream, err := node.child.Get(variables)
 	if err != nil {
@@ -31,6 +25,12 @@ func (node *Distinct) Get(variables octosql.Variables) (RecordStream, error) {
 		variables: variables,
 		records:   newRecordSet(),
 	}, nil
+}
+
+type DistinctStream struct {
+	stream    RecordStream
+	variables octosql.Variables
+	records   *recordSet
 }
 
 func (distinctStream DistinctStream) Next() (*Record, error) {

@@ -16,129 +16,6 @@ func TestDistinct_Get(t *testing.T) {
 		want RecordStream
 	}{
 		{
-			name: "the ultimate test",
-			args: args{
-				NewInMemoryStream([]*Record{
-					UtilNewRecord( //unique
-						[]octosql.VariableName{"map", "numbers", "number", "name"},
-						[]interface{}{map[int]string{
-							0: "aaa",
-							1: "bbb",
-							2: "ccc",
-						}, []int{1, 2}, 7, "nazwa"}),
-					UtilNewRecord( //unique - different column order
-						[]octosql.VariableName{"map", "name", "number", "numbers"},
-						[]interface{}{map[int]string{
-							0: "aaa",
-							1: "bbb",
-							2: "ccc",
-						}, "nazwa", 7, []int{1, 2}}),
-					UtilNewRecord( //unique - diff in numbers
-						[]octosql.VariableName{"map", "numbers", "number", "name"},
-						[]interface{}{map[int]string{
-							0: "aaa",
-							1: "bbb",
-							2: "ccc",
-						}, []int{1, 3}, 7, "nazwa"}),
-					UtilNewRecord( //unique diff in number
-						[]octosql.VariableName{"map", "numbers", "number", "name"},
-						[]interface{}{map[int]string{
-							0: "aaa",
-							1: "bbb",
-							2: "ccc",
-						}, []int{1, 3}, 8, "nazwa"}),
-					UtilNewRecord( //unique - diff in name
-						[]octosql.VariableName{"map", "numbers", "number", "name"},
-						[]interface{}{map[int]string{
-							0: "aaa",
-							1: "bbb",
-							2: "ccc",
-						}, []int{1, 3}, 7, "nazwa0"}),
-					UtilNewRecord( //unique - diff in map
-						[]octosql.VariableName{"map", "numbers", "number", "name"},
-						[]interface{}{map[int]string{
-							0: "aaa",
-							1: "bbb",
-							2: "cccc",
-						}, []int{1, 3}, 7, "nazwa"}),
-					UtilNewRecord( //repetition of diff in number
-						[]octosql.VariableName{"map", "numbers", "number", "name"},
-						[]interface{}{map[int]string{
-							0: "aaa",
-							1: "bbb",
-							2: "ccc",
-						}, []int{1, 3}, 8, "nazwa"}),
-					UtilNewRecord( //unique - second row template
-						[]octosql.VariableName{"id", "age", "scores"},
-						[]interface{}{1, 17, []interface{}{1, 9, 11}}),
-					UtilNewRecord( //unique - second row template; diff in scores
-						[]octosql.VariableName{"id", "age", "scores"},
-						[]interface{}{1, 17, []interface{}{9, 1, 11}}),
-					UtilNewRecord( //repetition - second row template;
-						[]octosql.VariableName{"id", "age", "scores"},
-						[]interface{}{1, 17, []interface{}{1, 9, 11}}),
-					UtilNewRecord( //unique - second row template; mixed columns same values
-						[]octosql.VariableName{"id", "scores", "age"},
-						[]interface{}{[]interface{}{9, 1, 11}, 1, 17}),
-				}),
-			},
-
-			want: NewInMemoryStream([]*Record{
-				UtilNewRecord( //unique
-					[]octosql.VariableName{"map", "numbers", "number", "name"},
-					[]interface{}{map[int]string{
-						0: "aaa",
-						1: "bbb",
-						2: "ccc",
-					}, []int{1, 2}, 7, "nazwa"}),
-				UtilNewRecord( //unique - different column order
-					[]octosql.VariableName{"map", "name", "number", "numbers"},
-					[]interface{}{map[int]string{
-						0: "aaa",
-						1: "bbb",
-						2: "ccc",
-					}, "nazwa", 7, []int{1, 2}}),
-				UtilNewRecord( //unique - diff in numbers
-					[]octosql.VariableName{"map", "numbers", "number", "name"},
-					[]interface{}{map[int]string{
-						0: "aaa",
-						1: "bbb",
-						2: "ccc",
-					}, []int{1, 3}, 7, "nazwa"}),
-				UtilNewRecord( //unique diff in number
-					[]octosql.VariableName{"map", "numbers", "number", "name"},
-					[]interface{}{map[int]string{
-						0: "aaa",
-						1: "bbb",
-						2: "ccc",
-					}, []int{1, 3}, 8, "nazwa"}),
-				UtilNewRecord( //unique - diff in name
-					[]octosql.VariableName{"map", "numbers", "number", "name"},
-					[]interface{}{map[int]string{
-						0: "aaa",
-						1: "bbb",
-						2: "ccc",
-					}, []int{1, 3}, 7, "nazwa0"}),
-				UtilNewRecord( //unique - diff in map
-					[]octosql.VariableName{"map", "numbers", "number", "name"},
-					[]interface{}{map[int]string{
-						0: "aaa",
-						1: "bbb",
-						2: "cccc",
-					}, []int{1, 3}, 7, "nazwa"}),
-				UtilNewRecord( //unique - second row template
-					[]octosql.VariableName{"id", "age", "scores"},
-					[]interface{}{1, 17, []interface{}{1, 9, 11}}),
-				UtilNewRecord( //unique - second row template; diff in scores
-					[]octosql.VariableName{"id", "age", "scores"},
-					[]interface{}{1, 17, []interface{}{9, 1, 11}}),
-				UtilNewRecord( //unique - second row template; mixed columns same values
-					[]octosql.VariableName{"id", "scores", "age"},
-					[]interface{}{[]interface{}{9, 1, 11}, 1, 17}),
-			}),
-		},
-
-		{
 			name: "simple test - all distinct",
 			args: args{
 				NewInMemoryStream([]*Record{
@@ -431,6 +308,129 @@ func TestDistinct_Get(t *testing.T) {
 						1: "bbb",
 						2: "ccd",
 					}, []int{1, 2}}),
+			}),
+		},
+
+		{
+			name: "the ultimate test",
+			args: args{
+				NewInMemoryStream([]*Record{
+					UtilNewRecord( //unique
+						[]octosql.VariableName{"map", "numbers", "number", "name"},
+						[]interface{}{map[int]string{
+							0: "aaa",
+							1: "bbb",
+							2: "ccc",
+						}, []int{1, 2}, 7, "nazwa"}),
+					UtilNewRecord( //unique - different column order
+						[]octosql.VariableName{"map", "name", "number", "numbers"},
+						[]interface{}{map[int]string{
+							0: "aaa",
+							1: "bbb",
+							2: "ccc",
+						}, "nazwa", 7, []int{1, 2}}),
+					UtilNewRecord( //unique - diff in numbers
+						[]octosql.VariableName{"map", "numbers", "number", "name"},
+						[]interface{}{map[int]string{
+							0: "aaa",
+							1: "bbb",
+							2: "ccc",
+						}, []int{1, 3}, 7, "nazwa"}),
+					UtilNewRecord( //unique diff in number
+						[]octosql.VariableName{"map", "numbers", "number", "name"},
+						[]interface{}{map[int]string{
+							0: "aaa",
+							1: "bbb",
+							2: "ccc",
+						}, []int{1, 3}, 8, "nazwa"}),
+					UtilNewRecord( //unique - diff in name
+						[]octosql.VariableName{"map", "numbers", "number", "name"},
+						[]interface{}{map[int]string{
+							0: "aaa",
+							1: "bbb",
+							2: "ccc",
+						}, []int{1, 3}, 7, "nazwa0"}),
+					UtilNewRecord( //unique - diff in map
+						[]octosql.VariableName{"map", "numbers", "number", "name"},
+						[]interface{}{map[int]string{
+							0: "aaa",
+							1: "bbb",
+							2: "cccc",
+						}, []int{1, 3}, 7, "nazwa"}),
+					UtilNewRecord( //repetition of diff in number
+						[]octosql.VariableName{"map", "numbers", "number", "name"},
+						[]interface{}{map[int]string{
+							0: "aaa",
+							1: "bbb",
+							2: "ccc",
+						}, []int{1, 3}, 8, "nazwa"}),
+					UtilNewRecord( //unique - second row template
+						[]octosql.VariableName{"id", "age", "scores"},
+						[]interface{}{1, 17, []interface{}{1, 9, 11}}),
+					UtilNewRecord( //unique - second row template; diff in scores
+						[]octosql.VariableName{"id", "age", "scores"},
+						[]interface{}{1, 17, []interface{}{9, 1, 11}}),
+					UtilNewRecord( //repetition - second row template;
+						[]octosql.VariableName{"id", "age", "scores"},
+						[]interface{}{1, 17, []interface{}{1, 9, 11}}),
+					UtilNewRecord( //unique - second row template; mixed columns same values
+						[]octosql.VariableName{"id", "scores", "age"},
+						[]interface{}{[]interface{}{9, 1, 11}, 1, 17}),
+				}),
+			},
+
+			want: NewInMemoryStream([]*Record{
+				UtilNewRecord( //unique
+					[]octosql.VariableName{"map", "numbers", "number", "name"},
+					[]interface{}{map[int]string{
+						0: "aaa",
+						1: "bbb",
+						2: "ccc",
+					}, []int{1, 2}, 7, "nazwa"}),
+				UtilNewRecord( //unique - different column order
+					[]octosql.VariableName{"map", "name", "number", "numbers"},
+					[]interface{}{map[int]string{
+						0: "aaa",
+						1: "bbb",
+						2: "ccc",
+					}, "nazwa", 7, []int{1, 2}}),
+				UtilNewRecord( //unique - diff in numbers
+					[]octosql.VariableName{"map", "numbers", "number", "name"},
+					[]interface{}{map[int]string{
+						0: "aaa",
+						1: "bbb",
+						2: "ccc",
+					}, []int{1, 3}, 7, "nazwa"}),
+				UtilNewRecord( //unique diff in number
+					[]octosql.VariableName{"map", "numbers", "number", "name"},
+					[]interface{}{map[int]string{
+						0: "aaa",
+						1: "bbb",
+						2: "ccc",
+					}, []int{1, 3}, 8, "nazwa"}),
+				UtilNewRecord( //unique - diff in name
+					[]octosql.VariableName{"map", "numbers", "number", "name"},
+					[]interface{}{map[int]string{
+						0: "aaa",
+						1: "bbb",
+						2: "ccc",
+					}, []int{1, 3}, 7, "nazwa0"}),
+				UtilNewRecord( //unique - diff in map
+					[]octosql.VariableName{"map", "numbers", "number", "name"},
+					[]interface{}{map[int]string{
+						0: "aaa",
+						1: "bbb",
+						2: "cccc",
+					}, []int{1, 3}, 7, "nazwa"}),
+				UtilNewRecord( //unique - second row template
+					[]octosql.VariableName{"id", "age", "scores"},
+					[]interface{}{1, 17, []interface{}{1, 9, 11}}),
+				UtilNewRecord( //unique - second row template; diff in scores
+					[]octosql.VariableName{"id", "age", "scores"},
+					[]interface{}{1, 17, []interface{}{9, 1, 11}}),
+				UtilNewRecord( //unique - second row template; mixed columns same values
+					[]octosql.VariableName{"id", "scores", "age"},
+					[]interface{}{[]interface{}{9, 1, 11}, 1, 17}),
 			}),
 		},
 	}

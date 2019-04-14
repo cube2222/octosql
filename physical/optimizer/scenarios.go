@@ -2,6 +2,7 @@ package optimizer
 
 import (
 	"context"
+	"strings"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/physical"
@@ -13,6 +14,7 @@ var DefaultScenarios = []Scenario{
 	MergeFilters,
 	MergeDataSourceBuilderWithRequalifier,
 	MergeDataSourceBuilderWithFilter,
+	PushFilterBelowMap,
 }
 
 var MergeRequalifiers = Scenario{
@@ -241,4 +243,95 @@ func containsVariableName(vns []octosql.VariableName, vn octosql.VariableName) b
 		}
 	}
 	return false
+}
+
+var PushFilterBelowMap = Scenario{
+	Name:        "push filter below map",
+	Description: "Creates a new filter under the map containing predicates which can be checked before mapping.",
+	CandidateMatcher: &FilterMatcher{
+		Formula: &AnyFormulaMatcher{
+			Name: "parent_filter",
+		},
+		Source: &MapMatcher{
+			Expressions: &AnyNamedExpressionListMatcher{
+				Name: "child_expressions",
+			},
+			Keep: &AnyPrimitiveMatcher{
+				Name: "child_keep",
+			},
+			Source: &AnyNodeMatcher{
+				Name: "child_source",
+			},
+		},
+	},
+	CandidateApprover: func(match *Match) bool { // TODO: Pass context.
+		filters := match.Formulas["parent_filter"].SplitByAnd()
+
+		for _, filter := range filters {
+			predicates := filter.ExtractPredicates()
+			foundNoLocalVariables := true
+			for _, predicate := range predicates {
+				varsLeft := GetVariables(context.Background(), predicate.Left)
+				varsRight := GetVariables(context.Background(), predicate.Right)
+				vars := append(varsLeft, varsRight...)
+
+				for _, varname := range vars {
+					if varname.Source() == "" && !strings.HasPrefix(varname.Name(), "const_") { //TODO: hax, fixme, physical plan should contain constants. (why get rid of useful information)
+						foundNoLocalVariables = false
+					}
+				}
+			}
+			if foundNoLocalVariables {
+				return true
+			}
+		}
+		return false
+	},
+	Reassembler: func(match *Match) physical.Node {
+		filters := match.Formulas["parent_filter"].SplitByAnd()
+
+		extractable := -1
+
+		for index, filter := range filters {
+			predicates := filter.ExtractPredicates()
+			foundNoLocalVariables := true
+			for _, predicate := range predicates {
+				varsLeft := GetVariables(context.Background(), predicate.Left)
+				varsRight := GetVariables(context.Background(), predicate.Right)
+				vars := append(varsLeft, varsRight...)
+
+				for _, varname := range vars {
+					if varname.Source() == "" && !strings.HasPrefix(varname.Name(), "const_") { //TODO: hax, fixme, physical plan should contain constants. (why get rid of useful information)
+						foundNoLocalVariables = false
+					}
+				}
+			}
+			if foundNoLocalVariables {
+				extractable = index
+				break
+			}
+		}
+		extractableFilter := filters[extractable]
+		filters[extractable] = filters[len(filters)-1]
+		filters = filters[:len(filters)-1]
+
+		var out physical.Node = &physical.Map{
+			Expressions: match.NamedExpressionLists["child_expressions"],
+			Keep:        match.Primitives["child_keep"].(bool),
+			Source: &physical.Filter{
+				Formula: extractableFilter,
+				Source:  match.Nodes["child_source"],
+			},
+		}
+
+		if len(filters) > 0 {
+			for len(filters) > 1 {
+				filters[1] = physical.NewAnd(filters[0], filters[1])
+				filters = filters[1:]
+			}
+			out = physical.NewFilter(filters[0], out)
+		}
+
+		return out
+	},
 }

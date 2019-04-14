@@ -61,17 +61,9 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		return nil, errors.Wrap(err, "couldn't parse from expression")
 	}
 
-	if statement.Where != nil {
-		filterFormula, err := ParseLogic(statement.Where.Expr)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't parse where expression")
-		}
-		root = logical.NewFilter(filterFormula, root)
-	}
-
+	var expressions = make([]logical.NamedExpression, len(statement.SelectExprs))
 	if len(statement.SelectExprs) >= 1 {
 		if _, ok := statement.SelectExprs[0].(*sqlparser.StarExpr); !ok {
-			expressions := make([]logical.NamedExpression, len(statement.SelectExprs))
 			for i := range statement.SelectExprs {
 				aliasedExpression, ok := statement.SelectExprs[i].(*sqlparser.AliasedExpr)
 				if !ok {
@@ -85,7 +77,26 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 				}
 			}
 
-			root = logical.NewMap(expressions, root)
+			root = logical.NewMap(expressions, root, true)
+		}
+	}
+
+	if statement.Where != nil {
+		filterFormula, err := ParseLogic(statement.Where.Expr)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't parse where expression")
+		}
+		root = logical.NewFilter(filterFormula, root)
+	}
+
+	if len(statement.SelectExprs) >= 1 {
+		if _, ok := statement.SelectExprs[0].(*sqlparser.StarExpr); !ok {
+			nameExpressions := make([]logical.NamedExpression, len(statement.SelectExprs))
+			for i := range expressions {
+				nameExpressions[i] = logical.NewVariable(expressions[i].Name())
+			}
+
+			root = logical.NewMap(nameExpressions, root, false)
 		}
 	}
 

@@ -54,6 +54,7 @@ type Expression interface {
 
 type NamedExpression interface {
 	Expression
+	Name() octosql.VariableName
 	PhysicalNamed(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.NamedExpression, octosql.Variables, error)
 }
 
@@ -63,6 +64,10 @@ type Variable struct {
 
 func NewVariable(name octosql.VariableName) *Variable {
 	return &Variable{name: name}
+}
+
+func (v *Variable) Name() octosql.VariableName {
+	return v.name
 }
 
 func (v *Variable) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
@@ -111,6 +116,10 @@ type AliasedExpression struct {
 
 func NewAliasedExpression(name octosql.VariableName, expr Expression) NamedExpression {
 	return &AliasedExpression{name: name, expr: expr}
+}
+
+func (v *AliasedExpression) Name() octosql.VariableName {
+	return v.name
 }
 
 func (alExpr *AliasedExpression) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {

@@ -11,10 +11,11 @@ import (
 type Map struct {
 	expressions []NamedExpression
 	source      Node
+	keep        bool
 }
 
-func NewMap(expressions []NamedExpression, child Node) *Map {
-	return &Map{expressions: expressions, source: child}
+func NewMap(expressions []NamedExpression, child Node, keep bool) *Map {
+	return &Map{expressions: expressions, source: child, keep: keep}
 }
 
 func (node *Map) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
@@ -49,5 +50,5 @@ func (node *Map) Physical(ctx context.Context, physicalCreator *PhysicalPlanCrea
 		return nil, nil, errors.Wrap(err, "couldn't merge variables for map source")
 	}
 
-	return physical.NewMap(physicalExprs, child), variables, nil
+	return physical.NewMap(physicalExprs, child, node.keep), variables, nil
 }

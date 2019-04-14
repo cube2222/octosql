@@ -115,25 +115,27 @@ func (rs *KeySpecificStream) Next() (*execution.Record, error) {
 }
 
 func (rs *EntireDatabaseStream) Next() (*execution.Record, error) {
-	if rs.isDone {
-		return nil, execution.ErrEndOfStream
-	}
-
-	if !rs.dbIterator.Next() {
-		rs.isDone = true
-		return nil, execution.ErrEndOfStream
-	}
-	key := rs.dbIterator.Val()
-
-	record, err := GetNewRecord(rs.client, key, rs.alias)
-	if err != nil {
-		if err == execution.ErrNotFound { // key was not in redis database so we skip it
-			return rs.Next()
+	for {
+		if rs.isDone {
+			return nil, execution.ErrEndOfStream
 		}
-		return nil, err
-	}
 
-	return record, nil
+		if !rs.dbIterator.Next() {
+			rs.isDone = true
+			return nil, execution.ErrEndOfStream
+		}
+		key := rs.dbIterator.Val()
+
+		record, err := GetNewRecord(rs.client, key, rs.alias)
+		if err != nil {
+			if err == execution.ErrNotFound { // key was not in redis database so we skip it
+				continue
+			}
+			return nil, err
+		}
+
+		return record, nil
+	}
 }
 
 func GetNewRecord(client *redis.Client, key, alias string) (*execution.Record, error) {

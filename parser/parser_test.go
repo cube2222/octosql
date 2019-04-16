@@ -27,33 +27,31 @@ func TestParseNode(t *testing.T) {
 					"UNION " +
 					"SELECT * FROM admins a WHERE a.exp < 2",
 			},
-			want: logical.NewDistinct(
-				logical.NewUnionAll(
-					logical.NewMap(
-						[]logical.NamedExpression{
-							logical.NewVariable("p.id"),
-							logical.NewVariable("p.name"),
-							logical.NewVariable("p.surname"),
-						},
-						logical.NewFilter(
-							logical.NewPredicate(
-								logical.NewVariable("p.surname"),
-								logical.Equal,
-								logical.NewConstant("Kowalski"),
-							),
-							logical.NewDataSource("people", "p"),
-						),
-					),
+			want: logical.NewUnionDistinct(
+				logical.NewMap(
+					[]logical.NamedExpression{
+						logical.NewVariable("p.id"),
+						logical.NewVariable("p.name"),
+						logical.NewVariable("p.surname"),
+					},
 					logical.NewFilter(
 						logical.NewPredicate(
-							logical.NewVariable("a.exp"),
-							logical.LessThan,
-							logical.NewConstant(2),
+							logical.NewVariable("p.surname"),
+							logical.Equal,
+							logical.NewConstant("Kowalski"),
 						),
-						logical.NewDataSource(
-							"admins",
-							"a",
-						),
+						logical.NewDataSource("people", "p"),
+					),
+				),
+				logical.NewFilter(
+					logical.NewPredicate(
+						logical.NewVariable("a.exp"),
+						logical.LessThan,
+						logical.NewConstant(2),
+					),
+					logical.NewDataSource(
+						"admins",
+						"a",
 					),
 				),
 			),

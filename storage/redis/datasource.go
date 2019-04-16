@@ -128,7 +128,7 @@ func (rs *EntireDatabaseStream) Next() (*execution.Record, error) {
 
 		record, err := GetNewRecord(rs.client, key, rs.alias)
 		if err != nil {
-			if err == execution.ErrNotFound { // key was not in redis database so we skip it
+			if err == ErrNotFound { // key was not in redis database so we skip it
 				continue
 			}
 			return nil, err
@@ -146,7 +146,7 @@ func GetNewRecord(client *redis.Client, key, alias string) (*execution.Record, e
 
 	// We skip this record
 	if len(recordValues) == 0 {
-		return nil, execution.ErrNotFound
+		return nil, ErrNotFound
 	}
 
 	recordValues["key"] = key
@@ -169,3 +169,5 @@ func GetNewRecord(client *redis.Client, key, alias string) (*execution.Record, e
 
 	return execution.NewRecord(fieldNames, aliasedRecord), nil
 }
+
+var ErrNotFound = errors.New("redis key not found")

@@ -115,17 +115,27 @@ func (rs *KeySpecificStream) Next() (*execution.Record, error) {
 }
 
 func (rs *EntireDatabaseStream) Next() (*execution.Record, error) {
-	if rs.isDone {
-		return nil, execution.ErrEndOfStream
-	}
+	for {
+		if rs.isDone {
+			return nil, execution.ErrEndOfStream
+		}
 
-	if !rs.dbIterator.Next() {
-		rs.isDone = true
-		return nil, execution.ErrEndOfStream
-	}
-	key := rs.dbIterator.Val()
+		if !rs.dbIterator.Next() {
+			rs.isDone = true
+			return nil, execution.ErrEndOfStream
+		}
+		key := rs.dbIterator.Val()
 
-	return GetNewRecord(rs.client, key, rs.alias)
+		record, err := GetNewRecord(rs.client, key, rs.alias)
+		if err != nil {
+			if err == ErrNotFound { // key was not in redis database so we skip it
+				continue
+			}
+			return nil, err
+		}
+
+		return record, nil
+	}
 }
 
 func GetNewRecord(client *redis.Client, key, alias string) (*execution.Record, error) {
@@ -133,6 +143,13 @@ func GetNewRecord(client *redis.Client, key, alias string) (*execution.Record, e
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("could't get hash for key %s", key))
 	}
+
+	// We skip this record
+	if len(recordValues) == 0 {
+		return nil, ErrNotFound
+	}
+
+	recordValues["key"] = key
 
 	aliasedRecord := make(map[octosql.VariableName]interface{})
 	for k, v := range recordValues {
@@ -152,3 +169,5 @@ func GetNewRecord(client *redis.Client, key, alias string) (*execution.Record, e
 
 	return execution.NewRecord(fieldNames, aliasedRecord), nil
 }
+
+var ErrNotFound = errors.New("redis key not found")

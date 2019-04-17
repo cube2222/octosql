@@ -21,46 +21,47 @@ func TestParseNode(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "simple union all + NO limit + offset",
+			name: "simple union all + limit + NO offset",
 			args: args{
 				"SELECT c.name, c.age FROM cities c WHERE c.age > 100 " +
 					"UNION ALL " +
-					"SELECT p.name, p.age FROM people p WHERE p.age > 4 " + " LIMIT 5",
+					"SELECT p.name, p.age FROM people p WHERE p.age > 4 " +
+					"LIMIT 5",
 			},
-			want: logical.NewLimit(
-				logical.NewUnionAll(
-					logical.NewMap(
-						[]logical.NamedExpression{
-							logical.NewVariable("c.name"),
-							logical.NewVariable("c.age"),
-						},
-						logical.NewFilter(
-							logical.NewPredicate(
+			want: logical.NewOffset(
+				logical.NewLimit(
+					logical.NewUnionAll(
+						logical.NewMap(
+							[]logical.NamedExpression{
+								logical.NewVariable("c.name"),
 								logical.NewVariable("c.age"),
-								logical.MoreThan,
-								logical.NewConstant(100),
+							},
+							logical.NewFilter(
+								logical.NewPredicate(
+									logical.NewVariable("c.age"),
+									logical.MoreThan,
+									logical.NewConstant(100),
+								),
+								logical.NewDataSource("cities", "c"),
 							),
-							logical.NewDataSource("cities", ""),
 						),
-					),
-					logical.NewMap(
-						[]logical.NamedExpression{
-							logical.NewVariable("p.name"),
-							logical.NewVariable("p.age"),
-						},
-						logical.NewFilter(
-							logical.NewPredicate(
+						logical.NewMap(
+							[]logical.NamedExpression{
+								logical.NewVariable("p.name"),
 								logical.NewVariable("p.age"),
-								logical.MoreThan,
-								logical.NewConstant(4),
+							},
+							logical.NewFilter(
+								logical.NewPredicate(
+									logical.NewVariable("p.age"),
+									logical.MoreThan,
+									logical.NewConstant(4),
+								),
+								logical.NewDataSource("people", "p"),
 							),
-							logical.NewDataSource("people", "p"),
 						),
 					),
-				),
-				logical.NewConstant(5),
-				logical.NewConstant(nil),
-			),
+					logical.NewConstant(5),
+				), nil),
 			wantErr: false,
 		},
 
@@ -69,15 +70,18 @@ func TestParseNode(t *testing.T) {
 			args: args{
 				"SELECT p.name, p.age FROM people p LIMIT 3 OFFSET 2",
 			},
-			want: logical.NewLimit(
-				logical.NewMap(
-					[]logical.NamedExpression{
-						logical.NewVariable("p.name"),
-						logical.NewVariable("p.age"),
-					},
-					logical.NewDataSource("people", "p"),
+			want: logical.NewOffset(
+				logical.NewLimit(
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewVariable("p.name"),
+							logical.NewVariable("p.age"),
+						},
+						logical.NewDataSource("people", "p"),
+					),
+					logical.NewConstant(3),
+
 				),
-				logical.NewConstant(3),
 				logical.NewConstant(2),
 			),
 			wantErr: false,

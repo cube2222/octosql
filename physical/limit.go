@@ -8,20 +8,18 @@ import (
 )
 
 type Limit struct {
-	data   Node
-	limit  Expression
-	offset Expression
+	data      Node
+	limitExpr Expression
 }
 
-func NewLimit(data Node, limit, offset Expression) *Limit {
-	return &Limit{data: data, limit: limit, offset: offset}
+func NewLimit(data Node, expr Expression) *Limit {
+	return &Limit{data: data, limitExpr: expr}
 }
 
 func (node *Limit) Transform(ctx context.Context, transformers *Transformers) Node {
 	var transformed Node = &Limit{
-		data:   node.data.Transform(ctx, transformers),
-		limit:  node.limit.Transform(ctx, transformers),
-		offset: node.offset.Transform(ctx, transformers),
+		data:      node.data.Transform(ctx, transformers),
+		limitExpr: node.limitExpr.Transform(ctx, transformers),
 	}
 	if transformers.NodeT != nil {
 		transformed = transformers.NodeT(transformed)
@@ -30,8 +28,8 @@ func (node *Limit) Transform(ctx context.Context, transformers *Transformers) No
 }
 
 func (node *Limit) Materialize(ctx context.Context) (execution.Node, error) {
-	if node.data == nil || node.limit == nil || node.offset == nil {
-		return nil, errors.New("Limit has a nil field")
+	if node.data == nil || node.limitExpr == nil {
+		return nil, errors.New("Limit has an incorrect nil field")
 	}
 
 	dataNode, err := node.data.Materialize(ctx)
@@ -39,15 +37,10 @@ func (node *Limit) Materialize(ctx context.Context) (execution.Node, error) {
 		return nil, errors.Wrap(err, "couldn't materialize data node")
 	}
 
-	limitExpr, err := node.limit.Materialize(ctx)
+	limitExpr, err := node.limitExpr.Materialize(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize limit expression")
 	}
 
-	offsetExpr, err := node.offset.Materialize(ctx)
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't materialize offset expression")
-	}
-
-	return execution.NewLimit(dataNode, limitExpr, offsetExpr), nil
+	return execution.NewLimit(dataNode, limitExpr), nil
 }

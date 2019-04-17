@@ -8,18 +8,17 @@ import (
 )
 
 type Limit struct {
-	data   Node
-	limit  Expression
-	offset Expression
+	data      Node
+	limitExpr Expression
 }
 
-func NewLimit(data Node, limit, offset Expression) *Limit {
-	return &Limit{data: data, limit: limit, offset: offset}
+func NewLimit(data Node, expr Expression) Node {
+	return &Limit{data: data, limitExpr: expr}
 }
 
 func (node *Limit) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
-	if node.data == nil || node.limit == nil || node.offset == nil {
-		return nil, nil, errors.New("Limit has a nil field")
+	if node.data == nil {
+		return nil, nil, errors.New("Limit has a nil node underneath")
 	}
 
 	dataNode, variables, err := node.data.Physical(ctx, physicalCreator)
@@ -27,7 +26,11 @@ func (node *Limit) Physical(ctx context.Context, physicalCreator *PhysicalPlanCr
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for data node")
 	}
 
-	limitExpr, limitVariables, err := node.limit.Physical(ctx, physicalCreator)
+	if node.limitExpr == nil {
+		return dataNode, variables, nil
+	}
+
+	limitExpr, limitVariables, err := node.limitExpr.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for limit expression")
 	}
@@ -36,14 +39,5 @@ func (node *Limit) Physical(ctx context.Context, physicalCreator *PhysicalPlanCr
 		return nil, nil, errors.Wrap(err, "couldn't get limit node variables")
 	}
 
-	offsetExpr, offsetVariables, err := node.offset.Physical(ctx, physicalCreator)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get physical plan for offset expression")
-	}
-	variables, err = variables.MergeWith(offsetVariables)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get offset node variables")
-	}
-
-	return physical.NewLimit(dataNode, limitExpr, offsetExpr), variables, nil
+	return physical.NewLimit(dataNode, limitExpr), variables, nil
 }

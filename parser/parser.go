@@ -18,21 +18,21 @@ func ParseUnionAll(statement *sqlparser.Union) (logical.Node, error) {
 	case sqlparser.UnionAllStr:
 		var err error
 
+		// after merge (with Union pull request) make sure that it is inside ParseUnion
 		if statement.Limit != nil {
 			limitExpr, offsetExpr, err := parseLimitSubexpressions(statement.Limit.Rowcount, statement.Limit.Offset)
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't parse limit's subexpression")
 			}
 
-			// I am *NOT* sure whether I can set statement.Limit = nil and thus make it unusable for any further operations
-			// (always could back it up and restore before return, though)
 			statement.Limit = nil
 			node, err := ParseUnionAll(statement)
 			if err != nil {
 				return nil, errors.Errorf("couldn't parse limit's underlying node")
 			}
 
-			return logical.NewLimit(node, limitExpr, offsetExpr), nil
+			// alternatively: if offsetExpr == nil {return NewLimit} else {return NewOffset}
+			return logical.NewOffset(logical.NewLimit(node, limitExpr), offsetExpr), nil
 		}
 		if statement.OrderBy != nil {
 			return nil, errors.Errorf("order by is currently unsupported, got %+v", statement)
@@ -65,15 +65,14 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 			return nil, errors.Wrap(err, "couldn't parse limit's subexpression")
 		}
 
-		// I am *NOT* sure whether I can set statement.Limit = nil and thus make it unusable for any further operations
-		// (always could back it up and restore before return, though)
 		statement.Limit = nil
 		node, err := ParseSelect(statement)
 		if err != nil {
 			return nil, errors.Errorf("couldn't parse limit's underlying node")
 		}
 
-		return logical.NewLimit(node, limitExpr, offsetExpr), nil
+		// alternatively: if offsetExpr == nil {return NewLimit} else {return NewOffset}
+		return logical.NewOffset(logical.NewLimit(node, limitExpr), offsetExpr), nil
 	}
 
 	if len(statement.From) != 1 {
@@ -273,10 +272,10 @@ func ParseInfixComparison(left, right sqlparser.Expr, operator string) (logical.
 	return logical.NewPredicate(leftParsed, logical.NewRelation(operator), rightParsed), nil
 }
 
-func parseLimitSubexpressions(limit, offset sqlparser.Expr) (logical.Expression, logical.Expression,  error){
+func parseLimitSubexpressions(limit, offset sqlparser.Expr) (logical.Expression, logical.Expression, error) {
 	// BTW parser doesn't recognize clause OFFSET without LIMIT and simultaneously doesn't recognize "LIMIT ALL"
 	// (though I checked it a few days ago and am not so sure right now)
-	var limitExpr, offsetExpr logical.Expression = logical.NewConstant(nil), logical.NewConstant(nil)
+	var limitExpr, offsetExpr logical.Expression = nil, nil
 	var err error
 
 	if limit != nil {

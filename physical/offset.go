@@ -28,10 +28,6 @@ func (node *Offset) Transform(ctx context.Context, transformers *Transformers) N
 }
 
 func (node *Offset) Materialize(ctx context.Context) (execution.Node, error) {
-	if node.data == nil || node.offsetExpr == nil {
-		return nil, errors.New("offset has an incorrect nil field")
-	}
-
 	dataNode, err := node.data.Materialize(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize data node")

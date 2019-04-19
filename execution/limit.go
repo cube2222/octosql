@@ -10,25 +10,19 @@ type Limit struct {
 	limitExpr Expression
 }
 
-const limitAll = -2137
-
 func NewLimit(data Node, limit Expression) *Limit {
 	return &Limit{data: data, limitExpr: limit}
 }
 
-func extractSingleValue(e Expression, variables octosql.Variables) (value interface{}, err error) {
-	switch exprType := e.(type) {
+func extractSingleValue(expr Expression, variables octosql.Variables) (value interface{}, err error) {
+	val, err := expr.ExpressionValue(variables)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get expression value")
+	}
+	switch expr.(type) {
 	case *Variable:
-		val, err := exprType.ExpressionValue(variables)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't get variable value")
-		}
-		return val, nil // parser set Limit's limit|offset to NewConstant(nil) if there had been no limit|offset in original SQL qiuery
+		return val, nil // parser set Limit's limit|offset to nil if there had been no limit|offset in original SQL qiuery
 	case *NodeExpression:
-		val, err := exprType.ExpressionValue(variables)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't get nodeExpression value")
-		}
 		if val == nil {
 			return nil, errors.New("nodeExpression empty")
 		}
@@ -41,16 +35,14 @@ func extractSingleValue(e Expression, variables octosql.Variables) (value interf
 			return val, nil
 		}
 	default:
-		return nil, errors.New("unexpected type in type-switch @ execution/limit.go")
+		return nil, errors.New("execution/limit.go: unexpected type in type-switch in extractSingleValue()")
 	}
 }
 
 func (node *Limit) Get(variables octosql.Variables) (RecordStream, error) {
-	var limitVal = limitAll
-
 	dataStream, err := node.data.Get(variables)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get data record stream")
+		return nil, errors.Wrap(err, "couldn't get data RecordStream")
 	}
 
 	exprVal, err := extractSingleValue(node.limitExpr, variables)
@@ -58,15 +50,12 @@ func (node *Limit) Get(variables octosql.Variables) (RecordStream, error) {
 		return nil, errors.Wrap(err, "couldn't extract value from limit subexpression")
 	}
 
-	if exprVal != nil { // otherwise no "LIMIT" in original SQL query
-		val, ok := exprVal.(int)
-		if !ok {
-			return nil, errors.New("limit value not convertible to int")
-		}
-		if val < 0 {
-			return nil, errors.New("negative limit value")
-		}
-		limitVal = val
+	limitVal, ok := exprVal.(int)
+	if !ok {
+		return nil, errors.New("limit value not int")
+	}
+	if limitVal < 0 {
+		return nil, errors.New("negative limit value")
 	}
 
 	return &limitedStream{
@@ -88,7 +77,7 @@ func (node *limitedStream) Next() (*Record, error) {
 				node.limit = 0
 				return nil, ErrEndOfStream
 			}
-			return nil, errors.Wrap(err, "couldn't get limitedStream's record")
+			return nil, errors.Wrap(err, "limitedStream: couldn't get record")
 		}
 		if node.limit > 0 { // LIMIT not set
 			node.limit--

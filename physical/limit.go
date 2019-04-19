@@ -28,10 +28,6 @@ func (node *Limit) Transform(ctx context.Context, transformers *Transformers) No
 }
 
 func (node *Limit) Materialize(ctx context.Context) (execution.Node, error) {
-	if node.data == nil || node.limitExpr == nil {
-		return nil, errors.New("Limit has an incorrect nil field")
-	}
-
 	dataNode, err := node.data.Materialize(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize data node")

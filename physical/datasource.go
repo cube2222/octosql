@@ -16,15 +16,18 @@ const (
 	Secondary FieldType = "secondary"
 )
 
+// DataSourceBuilderFactory is a function used to create a new aliased data source builder.
+type DataSourceBuilderFactory func(alias string) *DataSourceBuilder
+
 // DataSourceRepository is used to register factories for builders for any data source.
 // It can also later create a builder for any of those data source.
 type DataSourceRepository struct {
-	factories map[string]func(alias string) *DataSourceBuilder
+	factories map[string]DataSourceBuilderFactory
 }
 
 func NewDataSourceRepository() *DataSourceRepository {
 	return &DataSourceRepository{
-		factories: make(map[string]func(alias string) *DataSourceBuilder),
+		factories: make(map[string]DataSourceBuilderFactory),
 	}
 }
 
@@ -43,7 +46,7 @@ func (repo *DataSourceRepository) Get(dataSourceName, alias string) (*DataSource
 }
 
 // Register registers a builder factory for the given data source Name.
-func (repo *DataSourceRepository) Register(dataSourceName string, factory func(alias string) *DataSourceBuilder) error {
+func (repo *DataSourceRepository) Register(dataSourceName string, factory DataSourceBuilderFactory) error {
 	_, ok := repo.factories[dataSourceName]
 	if ok {
 		return errors.Errorf("data Source with Name %s already registered", dataSourceName)
@@ -62,7 +65,7 @@ type DataSourceBuilder struct {
 	Alias            string
 }
 
-func NewDataSourceBuilderFactory(executor func(filter Formula, alias string) (execution.Node, error), primaryKeys []octosql.VariableName, availableFilters map[FieldType]map[Relation]struct{}) func(alias string) *DataSourceBuilder {
+func NewDataSourceBuilderFactory(executor func(filter Formula, alias string) (execution.Node, error), primaryKeys []octosql.VariableName, availableFilters map[FieldType]map[Relation]struct{}) DataSourceBuilderFactory {
 	return func(alias string) *DataSourceBuilder {
 		return &DataSourceBuilder{
 			Executor:         executor,

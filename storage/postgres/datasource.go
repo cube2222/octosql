@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	_ "github.com/lib/pq"
@@ -40,11 +41,11 @@ type DataSource struct {
 	alias   string
 }
 
-func NewDataSourceBuilderFactory(host, user, password, dbname, tablename string,
-	pkey []octosql.VariableName, port int) func(alias string) *physical.DataSourceBuilder {
+func NewDataSourceBuilderFactory(host string, port int, user, password, databaseName, tableName string,
+	primaryKeys []octosql.VariableName) physical.DataSourceBuilderFactory {
 
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
-		"password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
+		"password=%s dbname=%s sslmode=disable", host, port, user, password, databaseName)
 
 	return physical.NewDataSourceBuilderFactory(
 		func(filter physical.Formula, alias string) (execution.Node, error) {
@@ -57,7 +58,7 @@ func NewDataSourceBuilderFactory(host, user, password, dbname, tablename string,
 
 			//create a query with placeholders to prepare a statement from a physical formula
 			query := formulaToSQL(filter, aliases)
-			query = fmt.Sprintf("SELECT * FROM %s %s WHERE %s", tablename, alias, query)
+			query = fmt.Sprintf("SELECT * FROM %s %s WHERE %s", tableName, alias, query)
 
 			stmt, err := db.Prepare(query)
 			if err != nil {
@@ -78,9 +79,45 @@ func NewDataSourceBuilderFactory(host, user, password, dbname, tablename string,
 				db:      db,
 			}, nil
 		},
-		pkey,
+		primaryKeys,
 		availableFilters,
 	)
+}
+
+// NewDataSourceBuilderFactoryFromConfig creates a data source builder factory using the configuration.
+func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (physical.DataSourceBuilderFactory, error) {
+	host, port, err := config.GetAddress(dbConfig, "address")
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get address")
+	}
+	user, err := config.GetString(dbConfig, "user")
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get user")
+	}
+	databaseName, err := config.GetString(dbConfig, "databaseName")
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get databaseName")
+	}
+	tableName, err := config.GetString(dbConfig, "tableName")
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get tableName")
+	}
+
+	primaryKeysStrings, err := config.GetStringList(dbConfig, "primaryKeys")
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get primaryKeys")
+	}
+	var primaryKeys []octosql.VariableName
+	for _, str := range primaryKeysStrings {
+		primaryKeys = append(primaryKeys, octosql.NewVariableName(str))
+	}
+
+	password, err := config.GetString(dbConfig, "password") // TODO: Change to environment.
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get password")
+	}
+
+	return NewDataSourceBuilderFactory(host, port, user, password, databaseName, tableName, primaryKeys), nil
 }
 
 func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, error) {

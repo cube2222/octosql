@@ -11,6 +11,7 @@ import (
 	"os"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
@@ -34,7 +35,7 @@ type DataSource struct {
 	alias string
 }
 
-func NewDataSourceBuilderFactory(path string) func(alias string) *physical.DataSourceBuilder {
+func NewDataSourceBuilderFactory(path string) physical.DataSourceBuilderFactory {
 	return physical.NewDataSourceBuilderFactory(
 		func(filter physical.Formula, alias string) (execution.Node, error) {
 			return &DataSource{
@@ -45,6 +46,16 @@ func NewDataSourceBuilderFactory(path string) func(alias string) *physical.DataS
 		nil,
 		availableFilters,
 	)
+}
+
+// NewDataSourceBuilderFactoryFromConfig creates a data source builder factory using the configuration.
+func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (physical.DataSourceBuilderFactory, error) {
+	path, err := config.GetString(dbConfig, "path")
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get path")
+	}
+
+	return NewDataSourceBuilderFactory(path), nil
 }
 
 func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, error) {

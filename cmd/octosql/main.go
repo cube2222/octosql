@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/bradleyjkemp/memmap"
+	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/parser"
-	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/optimizer"
 	"github.com/cube2222/octosql/storage/csv"
 	"github.com/cube2222/octosql/storage/json"
@@ -38,25 +38,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	dataSourceRespository := physical.NewDataSourceRepository()
-	err = dataSourceRespository.Register("people", json.NewDataSourceBuilderFactory("storage/json/fixtures/people.json"))
+	cfg, err := config.ReadConfig(os.Getenv("OCTOSQL_CONFIG"))
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = dataSourceRespository.Register("cities", csv.NewDataSourceBuilderFactory("storage/csv/fixtures/cities.csv"))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = dataSourceRespository.Register("users_ids",
-		postgres.NewDataSourceBuilderFactory("localhost", "root",
-			"toor", "mydb", "users_ids", nil, 5432))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = dataSourceRespository.Register("users",
-		redis.NewDataSourceBuilderFactory("localhost", "", 6379, 0, "key"))
+	dataSourceRespository, err := config.CreateDataSourceRepositoryFromConfig(
+		map[string]config.Factory{
+			"csv":      csv.NewDataSourceBuilderFactoryFromConfig,
+			"json":     json.NewDataSourceBuilderFactoryFromConfig,
+			"postgres": postgres.NewDataSourceBuilderFactoryFromConfig,
+			"redis":    redis.NewDataSourceBuilderFactoryFromConfig,
+		},
+		cfg,
+	)
 	if err != nil {
 		log.Fatal(err)
 	}

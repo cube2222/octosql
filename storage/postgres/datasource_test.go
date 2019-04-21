@@ -287,7 +287,7 @@ func TestDataSource_Get(t *testing.T) {
 				return
 			}
 
-			dsFactory := NewDataSourceBuilderFactory(host, user, password, dbname, args.tablename, args.primaryKey, port)
+			dsFactory := NewDataSourceBuilderFactory(host, port, user, password, dbname, args.tablename, args.primaryKey)
 			dsBuilder := dsFactory(args.alias)
 
 			execNode, err := dsBuilder.Executor(args.formula, args.alias)

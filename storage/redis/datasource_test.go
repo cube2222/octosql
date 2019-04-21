@@ -704,7 +704,7 @@ func TestDataSource_Get(t *testing.T) {
 				}
 			}
 
-			dsFactory := NewDataSourceBuilderFactory(fields.hostname, fields.password, fields.port, fields.dbIndex, fields.dbKey)
+			dsFactory := NewDataSourceBuilderFactory(fields.hostname, fields.port, fields.password, fields.dbIndex, fields.dbKey)
 			dsBuilder := dsFactory(fields.alias)
 			execNode, err := dsBuilder.Executor(fields.filter, fields.alias)
 			if err != nil {

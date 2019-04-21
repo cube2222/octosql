@@ -29,6 +29,12 @@ func (rel *Equal) Apply(variables octosql.Variables, left, right Expression) (bo
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get value of right operator in more than")
 	}
+	if leftValue == nil || rightValue == nil {
+		if leftValue == nil && rightValue == nil {
+			return true, nil
+		}
+		return false, nil
+	}
 	if reflect.TypeOf(leftValue).Kind() != reflect.TypeOf(rightValue).Kind() {
 		return false, errors.Errorf(
 			"invalid operands to equal %v and %v with types %v and %v",
@@ -68,6 +74,9 @@ func (rel *MoreThan) Apply(variables octosql.Variables, left, right Expression) 
 	rightValue, err := right.ExpressionValue(variables)
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get value of right operator in more than")
+	}
+	if leftValue == nil || rightValue == nil {
+		return false, errors.Errorf("invalid null operand to more_than %v and %v", leftValue, rightValue)
 	}
 	if reflect.TypeOf(leftValue).Kind() != reflect.TypeOf(rightValue).Kind() {
 		return false, errors.Errorf(

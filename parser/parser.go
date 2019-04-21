@@ -61,6 +61,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		return nil, errors.Wrap(err, "couldn't parse from expression")
 	}
 
+	// A WHERE clause needs to have access to those variables, so this map comes first, keeping the old variables.
 	var expressions = make([]logical.NamedExpression, len(statement.SelectExprs))
 	if len(statement.SelectExprs) >= 1 {
 		if _, ok := statement.SelectExprs[0].(*sqlparser.StarExpr); !ok {
@@ -89,6 +90,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		root = logical.NewFilter(filterFormula, root)
 	}
 
+	// Now we only keep the selected variables.
 	if len(statement.SelectExprs) >= 1 {
 		if _, ok := statement.SelectExprs[0].(*sqlparser.StarExpr); !ok {
 			nameExpressions := make([]logical.NamedExpression, len(statement.SelectExprs))

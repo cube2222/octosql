@@ -15,27 +15,26 @@ func NewLimit(data Node, limit Expression) *Limit {
 }
 
 func extractSingleValue(expr Expression, variables octosql.Variables) (value interface{}, err error) {
-	val, err := expr.ExpressionValue(variables)
+	nodeExpr, ok := expr.(*NodeExpression)
+	if !ok {
+		return nil, errors.New("unexpected type of expression")
+	}
+
+	val, err := nodeExpr.ExpressionValue(variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get expression value")
 	}
-	switch expr.(type) {
-	case *Variable:
-		return val, nil // parser set Limit's limit|offset to nil if there had been no limit|offset in original SQL qiuery
-	case *NodeExpression:
-		if val == nil {
-			return nil, errors.New("nodeExpression empty")
-		}
-		switch val.(type) {
-		case []Record:
-			return nil, errors.New("nodeExpression has multiple rows")
-		case Record:
-			return nil, errors.New("nodeExpression has multiple columns")
-		default:
-			return val, nil
-		}
+
+	if val == nil {
+		return nil, errors.New("nodeExpression empty")
+	}
+	switch val.(type) {
+	case []Record:
+		return nil, errors.New("nodeExpression has multiple rows")
+	case Record:
+		return nil, errors.New("nodeExpression has multiple columns")
 	default:
-		return nil, errors.New("execution/limit.go: unexpected type in type-switch in extractSingleValue()")
+		return val, nil
 	}
 }
 
@@ -70,7 +69,8 @@ type limitedStream struct {
 }
 
 func (node *limitedStream) Next() (*Record, error) {
-	for node.limit != 0 {
+	for node.limit > 0 {
+		node.limit--
 		record, err := node.rs.Next()
 		if err != nil {
 			if err == ErrEndOfStream {
@@ -78,9 +78,6 @@ func (node *limitedStream) Next() (*Record, error) {
 				return nil, ErrEndOfStream
 			}
 			return nil, errors.Wrap(err, "limitedStream: couldn't get record")
-		}
-		if node.limit > 0 { // LIMIT not set
-			node.limit--
 		}
 		return record, nil
 	}

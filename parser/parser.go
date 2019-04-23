@@ -32,14 +32,14 @@ func ParseUnionAll(statement *sqlparser.Union) (logical.Node, error) {
 			return nil, errors.Wrap(err, "couldn't parse second select expression")
 		}
 
-		// after merge (with Union pull request) make sure that it is inside ParseUnion
+		// TODO: after merge (with Union pull request) make sure that it is inside ParseUnion
 		if statement.Limit != nil {
 			limitExpr, offsetExpr, err := parseLimitSubexpressions(statement.Limit.Rowcount, statement.Limit.Offset)
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't parse limit/offset clause subexpression")
 			}
 
-			if (offsetExpr != nil) {
+			if offsetExpr != nil {
 				return logical.NewOffset(logical.NewLimit(logical.NewUnionAll(firstNode, secondNode), limitExpr), offsetExpr), nil
 			} else {
 				return logical.NewLimit(logical.NewUnionAll(firstNode, secondNode), limitExpr), nil
@@ -106,7 +106,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 			return nil, errors.Wrap(err, "couldn't parse limit/offset clause subexpression")
 		}
 
-		if (offsetExpr != nil) {
+		if offsetExpr != nil {
 			root = logical.NewOffset(logical.NewLimit(root, limitExpr), offsetExpr)
 		} else {
 			root = logical.NewLimit(root, limitExpr)
@@ -268,8 +268,15 @@ func ParseInfixComparison(left, right sqlparser.Expr, operator string) (logical.
 }
 
 func parseLimitSubexpressions(limit, offset sqlparser.Expr) (logical.Expression, logical.Expression, error) {
-	// BTW parser doesn't recognize clause OFFSET without LIMIT and simultaneously doesn't recognize "LIMIT ALL"
-	// (though I checked it a few days ago and am not so sure right now)
+	/* 	to be strict neither LIMIT nor OFFSET is in SQL standard...
+		parser doesn't support OFFSET clause without LIMIT clause - Google BigQuery syntax
+		TODO (?): add support of OFFSET clause without LIMIT clause to parser:
+		just append to limit_opt in sqlparser/sql.y clause:
+			| OFFSET expression
+			  {
+				$$ = &Limit{Offset: $2}
+			  }
+	*/
 	var limitExpr, offsetExpr logical.Expression = nil, nil
 	var err error
 

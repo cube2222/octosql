@@ -33,10 +33,14 @@ func (node *Limit) Get(variables octosql.Variables) (RecordStream, error) {
 		return nil, errors.New("negative limit value")
 	}
 
+	return newLimitedStream(dataStream, limitVal), nil
+}
+
+func newLimitedStream(rs RecordStream, limit int) *limitedStream {
 	return &limitedStream{
-		rs:    dataStream,
-		limit: limitVal,
-	}, nil
+		rs:    rs,
+		limit: limit,
+	}
 }
 
 type limitedStream struct {

@@ -17,6 +17,7 @@ func ParseUnionAll(statement *sqlparser.Union) (logical.Node, error) {
 	switch statement.Type {
 	case sqlparser.UnionAllStr:
 		var err error
+		var root logical.Node
 
 		if statement.OrderBy != nil {
 			return nil, errors.Errorf("order by is currently unsupported, got %+v", statement)
@@ -32,6 +33,8 @@ func ParseUnionAll(statement *sqlparser.Union) (logical.Node, error) {
 			return nil, errors.Wrap(err, "couldn't parse second select expression")
 		}
 
+		root = logical.NewUnionAll(firstNode, secondNode)
+
 		// TODO: after merge (with Union pull request) make sure that it is inside ParseUnion
 		if statement.Limit != nil {
 			limitExpr, offsetExpr, err := parseLimitSubexpressions(statement.Limit.Rowcount, statement.Limit.Offset)
@@ -40,13 +43,14 @@ func ParseUnionAll(statement *sqlparser.Union) (logical.Node, error) {
 			}
 
 			if offsetExpr != nil {
-				return logical.NewOffset(logical.NewLimit(logical.NewUnionAll(firstNode, secondNode), limitExpr), offsetExpr), nil
-			} else {
-				return logical.NewLimit(logical.NewUnionAll(firstNode, secondNode), limitExpr), nil
+				root = logical.NewOffset(root, offsetExpr)
+			}
+			if limitExpr != nil {
+				root = logical.NewLimit(root, limitExpr)
 			}
 		}
 
-		return logical.NewUnionAll(firstNode, secondNode), nil
+		return root, nil
 
 	default:
 		return nil, errors.Errorf("unsupported union %+v of type %v", statement, statement.Type)
@@ -109,7 +113,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		if offsetExpr != nil {
 			root = logical.NewOffset(root, offsetExpr)
 		}
-		if limitExpr != nil{
+		if limitExpr != nil {
 			root = logical.NewLimit(root, limitExpr)
 		}
 	}

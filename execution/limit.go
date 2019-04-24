@@ -14,30 +14,6 @@ func NewLimit(data Node, limit Expression) *Limit {
 	return &Limit{data: data, limitExpr: limit}
 }
 
-func extractSingleValue(expr Expression, variables octosql.Variables) (value interface{}, err error) {
-	nodeExpr, ok := expr.(*NodeExpression)
-	if !ok {
-		return nil, errors.New("unexpected type of expression")
-	}
-
-	val, err := nodeExpr.ExpressionValue(variables)
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get expression value")
-	}
-
-	if val == nil {
-		return nil, errors.New("nodeExpression empty")
-	}
-	switch val.(type) {
-	case []Record:
-		return nil, errors.New("nodeExpression has multiple rows")
-	case Record:
-		return nil, errors.New("nodeExpression has multiple columns")
-	default:
-		return val, nil
-	}
-}
-
 func (node *Limit) Get(variables octosql.Variables) (RecordStream, error) {
 	dataStream, err := node.data.Get(variables)
 	if err != nil {

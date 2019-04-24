@@ -269,14 +269,14 @@ func ParseInfixComparison(left, right sqlparser.Expr, operator string) (logical.
 
 func parseLimitSubexpressions(limit, offset sqlparser.Expr) (logical.Expression, logical.Expression, error) {
 	/* 	to be strict neither LIMIT nor OFFSET is in SQL standard...
-		parser doesn't support OFFSET clause without LIMIT clause - Google BigQuery syntax
-		TODO (?): add support of OFFSET clause without LIMIT clause to parser:
-		just append to limit_opt in sqlparser/sql.y clause:
-			| OFFSET expression
-			  {
-				$$ = &Limit{Offset: $2}
-			  }
-	*/
+	*	parser doesn't support OFFSET clause without LIMIT clause - Google BigQuery syntax
+	*	TODO (?): add support of OFFSET clause without LIMIT clause to parser:
+	*	just append to limit_opt in sqlparser/sql.y clause:
+	*		| OFFSET expression
+	*		  {
+	*			$$ = &Limit{Offset: $2}
+	*		  }
+	 */
 	var limitExpr, offsetExpr logical.Expression = nil, nil
 	var err error
 

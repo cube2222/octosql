@@ -10,10 +10,11 @@ import (
 type Map struct {
 	Expressions []NamedExpression
 	Source      Node
+	Keep        bool
 }
 
-func NewMap(expressions []NamedExpression, child Node) *Map {
-	return &Map{Expressions: expressions, Source: child}
+func NewMap(expressions []NamedExpression, child Node, keep bool) *Map {
+	return &Map{Expressions: expressions, Source: child, Keep: keep}
 }
 
 func (node *Map) Transform(ctx context.Context, transformers *Transformers) Node {
@@ -24,6 +25,7 @@ func (node *Map) Transform(ctx context.Context, transformers *Transformers) Node
 	var transformed Node = &Map{
 		Expressions: exprs,
 		Source:      node.Source.Transform(ctx, transformers),
+		Keep:        node.Keep,
 	}
 	if transformers.NodeT != nil {
 		transformed = transformers.NodeT(transformed)
@@ -45,5 +47,5 @@ func (node *Map) Materialize(ctx context.Context) (execution.Node, error) {
 		return nil, errors.Wrap(err, "couldn't materialize Source node")
 	}
 
-	return execution.NewMap(matExprs, materialized), nil
+	return execution.NewMap(matExprs, materialized, node.Keep), nil
 }

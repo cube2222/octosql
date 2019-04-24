@@ -24,15 +24,13 @@ func (node *UnionAll) Get(variables octosql.Variables) (RecordStream, error) {
 	}
 
 	return &UnifiedStream{
-		first:     firstRecordStream,
-		second:    secondRecordStream,
-		variables: variables,
+		first:  firstRecordStream,
+		second: secondRecordStream,
 	}, nil
 }
 
 type UnifiedStream struct {
 	first, second RecordStream
-	variables     octosql.Variables
 }
 
 func (node *UnifiedStream) Next() (*Record, error) {
@@ -47,7 +45,7 @@ func (node *UnifiedStream) Next() (*Record, error) {
 		return firstRecord, nil
 	}
 	for {
-		secondRecord, err := node.first.Next()
+		secondRecord, err := node.second.Next()
 		if err != nil {
 			if err == ErrEndOfStream {
 				return nil, ErrEndOfStream

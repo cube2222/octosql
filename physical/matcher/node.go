@@ -4,7 +4,7 @@ import (
 	"github.com/cube2222/octosql/physical"
 )
 
-// NodeMatcher is used to match formulas on different predicates.
+// NodeMatcher is used to match nodes on various predicates.
 type NodeMatcher interface {
 	// Match tries to match a node filling the match. Returns true on success.
 	Match(match *Match, node physical.Node) bool
@@ -16,6 +16,42 @@ type AnyNodeMatcher struct {
 }
 
 func (m *AnyNodeMatcher) Match(match *Match, node physical.Node) bool {
+	if len(m.Name) > 0 {
+		match.Nodes[m.Name] = node
+	}
+	return true
+}
+
+type MapMatcher struct {
+	Name        string
+	Expressions NamedExpressionListMatcher
+	Keep        PrimitiveMatcher
+	Source      NodeMatcher
+}
+
+func (m *MapMatcher) Match(match *Match, node physical.Node) bool {
+	mapNode, ok := node.(*physical.Map)
+	if !ok {
+		return false
+	}
+	if m.Expressions != nil {
+		matched := m.Expressions.Match(match, mapNode.Expressions)
+		if !matched {
+			return false
+		}
+	}
+	if m.Keep != nil {
+		matched := m.Keep.Match(match, mapNode.Keep)
+		if !matched {
+			return false
+		}
+	}
+	if m.Source != nil {
+		matched := m.Source.Match(match, mapNode.Source)
+		if !matched {
+			return false
+		}
+	}
 	if len(m.Name) > 0 {
 		match.Nodes[m.Name] = node
 	}

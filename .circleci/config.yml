@@ -3,9 +3,13 @@ workflows:
   test-release:
     jobs:
       - test
+      - test-postgres
+      - test-redis
       - release:
           requires:
             - test
+            - test-postgres
+            - test-redis
           filters:
             branches:
               only: master
@@ -22,7 +26,43 @@ jobs:
     steps:
       - checkout
 
-      - run: go test -v ./...
+      - run: go test -v
+      - run: go test -v ./cmd/...
+      - run: go test -v ./execution/...
+      - run: go test -v ./logical/...
+      - run: go test -v ./parser/...
+      - run: go test -v ./physical/...
+      - run: go test -v ./storage/json/...
+
+  test-postgres:
+    docker:
+      - image: circleci/golang:1.12
+        environment:
+          GO111MODULE: "on"
+      - image: circleci/postgres:latest
+        environment:
+          POSTGRES_USER: root
+          POSTGRES_PASSWORD: toor
+          POSTGRES_DB: mydb
+
+    working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
+    steps:
+      - checkout
+
+      - run: go test -v ./storage/postgres/...
+
+  test-redis:
+    docker:
+      - image: circleci/golang:1.12
+        environment:
+          GO111MODULE: "on"
+      - image: circleci/redis:latest
+
+    working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
+    steps:
+      - checkout
+
+      - run: go test -v ./storage/redis/...
 
   release:
     docker:

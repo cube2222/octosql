@@ -38,7 +38,7 @@ type NamedExpression interface {
 	MaterializeNamed(ctx context.Context) (execution.NamedExpression, error)
 }
 
-// Variables describes a variable name.
+// Variables describes a variable Name.
 type Variable struct {
 	Name octosql.VariableName
 }

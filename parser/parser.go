@@ -76,6 +76,27 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		return nil, errors.Wrap(err, "couldn't parse from expression")
 	}
 
+	// A WHERE clause needs to have access to those variables, so this map comes first, keeping the old variables.
+	var expressions = make([]logical.NamedExpression, len(statement.SelectExprs))
+	if len(statement.SelectExprs) >= 1 {
+		if _, ok := statement.SelectExprs[0].(*sqlparser.StarExpr); !ok {
+			for i := range statement.SelectExprs {
+				aliasedExpression, ok := statement.SelectExprs[i].(*sqlparser.AliasedExpr)
+				if !ok {
+					return nil, errors.Errorf("expected aliased expression in select on index %v, got %v %v",
+						i, statement.SelectExprs[i], reflect.TypeOf(statement.SelectExprs[i]))
+				}
+
+				expressions[i], err = ParseAliasedExpression(aliasedExpression)
+				if err != nil {
+					return nil, errors.Wrapf(err, "couldn't parse aliased expression with index %d", i)
+				}
+			}
+
+			root = logical.NewMap(expressions, root, true)
+		}
+	}
+
 	if statement.Where != nil {
 		filterFormula, err := ParseLogic(statement.Where.Expr)
 		if err != nil {
@@ -84,24 +105,20 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		root = logical.NewFilter(filterFormula, root)
 	}
 
-	if len(statement.SelectExprs) == 1 {
-		if _, ok := statement.SelectExprs[0].(*sqlparser.StarExpr); ok {
-			return root, nil
+	// Now we only keep the selected variables.
+	if len(statement.SelectExprs) >= 1 {
+		if _, ok := statement.SelectExprs[0].(*sqlparser.StarExpr); !ok {
+			nameExpressions := make([]logical.NamedExpression, len(statement.SelectExprs))
+			for i := range expressions {
+				nameExpressions[i] = logical.NewVariable(expressions[i].Name())
+			}
+
+			root = logical.NewMap(nameExpressions, root, false)
 		}
 	}
 
-	expressions := make([]logical.NamedExpression, len(statement.SelectExprs))
-	for i := range statement.SelectExprs {
-		aliasedExpression, ok := statement.SelectExprs[i].(*sqlparser.AliasedExpr)
-		if !ok {
-			return nil, errors.Errorf("expected aliased expression in select on index %v, got %v %v",
-				i, statement.SelectExprs[i], reflect.TypeOf(statement.SelectExprs[i]))
-		}
-
-		expressions[i], err = ParseAliasedExpression(aliasedExpression)
-		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't parse aliased expression with index %d", i)
-		}
+	if len(statement.Distinct) > 0 {
+		root = logical.NewDistinct(root)
 	}
 	root = logical.NewMap(expressions, root)
 

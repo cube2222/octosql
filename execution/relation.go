@@ -29,6 +29,12 @@ func (rel *Equal) Apply(variables octosql.Variables, left, right Expression) (bo
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get value of right operator in more than")
 	}
+	if leftValue == nil || rightValue == nil {
+		if leftValue == nil && rightValue == nil {
+			return true, nil
+		}
+		return false, nil
+	}
 	if reflect.TypeOf(leftValue).Kind() != reflect.TypeOf(rightValue).Kind() {
 		return false, errors.Errorf(
 			"invalid operands to equal %v and %v with types %v and %v",
@@ -69,6 +75,9 @@ func (rel *MoreThan) Apply(variables octosql.Variables, left, right Expression) 
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get value of right operator in more than")
 	}
+	if leftValue == nil || rightValue == nil {
+		return false, errors.Errorf("invalid null operand to more_than %v and %v", leftValue, rightValue)
+	}
 	if reflect.TypeOf(leftValue).Kind() != reflect.TypeOf(rightValue).Kind() {
 		return false, errors.Errorf(
 			"invalid operands to more_than %v and %v with types %v and %v",
@@ -108,6 +117,38 @@ func (rel *LessThan) Apply(variables octosql.Variables, left, right Expression) 
 		return false, errors.Wrap(err, "couldn't check reverse more_than")
 	}
 	return more, nil
+}
+
+type GreaterEqual struct {
+}
+
+func NewGreaterEqual() Relation {
+	return &GreaterEqual{}
+}
+
+func (rel *GreaterEqual) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
+	less, err := (*LessThan).Apply(nil, variables, left, right)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't get less for greater_equal")
+	}
+
+	return !less, nil
+}
+
+type LessEqual struct {
+}
+
+func NewLessEqual() Relation {
+	return &LessEqual{}
+}
+
+func (rel *LessEqual) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
+	more, err := (*MoreThan).Apply(nil, variables, left, right)
+	if err != nil {
+		return false, errors.Wrap(err, "coudln't get more for less_equal")
+	}
+
+	return !more, nil
 }
 
 type Like struct {

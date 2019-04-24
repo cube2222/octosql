@@ -11,12 +11,14 @@ import (
 type Relation string
 
 const (
-	Equal    Relation = "="
-	NotEqual Relation = "!="
-	MoreThan Relation = ">"
-	LessThan Relation = "<"
-	Like     Relation = "like"
-	In       Relation = "in"
+	Equal        Relation = "="
+	NotEqual     Relation = "!="
+	MoreThan     Relation = ">"
+	LessThan     Relation = "<"
+	Like         Relation = "like"
+	In           Relation = "in"
+	GreaterEqual Relation = ">="
+	LessEqual    Relation = "<="
 )
 
 func NewRelation(relation string) Relation {
@@ -37,6 +39,10 @@ func (rel Relation) Physical(ctx context.Context) (physical.Relation, error) {
 		return physical.Like, nil
 	case In:
 		return physical.In, nil
+	case GreaterEqual:
+		return physical.GreaterEqual, nil
+	case LessEqual:
+		return physical.LessEqual, nil
 	default:
 		return "", errors.Errorf("invalid relation %s", rel)
 	}

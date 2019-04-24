@@ -8,10 +8,11 @@ import (
 type Map struct {
 	expressions []NamedExpression
 	source      Node
+	keep        bool
 }
 
-func NewMap(expressions []NamedExpression, child Node) *Map {
-	return &Map{expressions: expressions, source: child}
+func NewMap(expressions []NamedExpression, child Node, keep bool) *Map {
+	return &Map{expressions: expressions, source: child, keep: keep}
 }
 
 func (node *Map) Get(variables octosql.Variables) (RecordStream, error) {
@@ -24,6 +25,7 @@ func (node *Map) Get(variables octosql.Variables) (RecordStream, error) {
 		expressions: node.expressions,
 		variables:   variables,
 		source:      recordStream,
+		keep:        node.keep,
 	}, nil
 }
 
@@ -31,6 +33,7 @@ type MappedStream struct {
 	expressions []NamedExpression
 	variables   octosql.Variables
 	source      RecordStream
+	keep        bool
 }
 
 func (stream *MappedStream) Next() (*Record, error) {
@@ -57,6 +60,15 @@ func (stream *MappedStream) Next() (*Record, error) {
 			return nil, errors.Wrapf(err, "couldn't get expression %v", expr.Name())
 		}
 		outValues[expr.Name()] = value
+	}
+
+	if stream.keep {
+		for _, name := range srcRecord.fieldNames {
+			if _, ok := outValues[name]; !ok {
+				fieldNames = append(fieldNames, name)
+				outValues[name] = srcRecord.Value(name)
+			}
+		}
 	}
 
 	return NewRecord(fieldNames, outValues), nil

@@ -107,8 +107,9 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		}
 
 		if offsetExpr != nil {
-			root = logical.NewOffset(logical.NewLimit(root, limitExpr), offsetExpr)
-		} else {
+			root = logical.NewOffset(root, offsetExpr)
+		}
+		if limitExpr != nil{
 			root = logical.NewLimit(root, limitExpr)
 		}
 	}

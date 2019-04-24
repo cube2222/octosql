@@ -54,7 +54,7 @@ func (stream *MappedStream) Next() (*Record, error) {
 
 		value, err := extractSingleValue(expr, variables)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't extract single value")
+			return nil, errors.Wrapf(err, "couldn't get expression %v", expr.Name())
 		}
 		outValues[expr.Name()] = value
 	}

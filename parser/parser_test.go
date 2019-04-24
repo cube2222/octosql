@@ -73,12 +73,12 @@ func TestParseNode(t *testing.T) {
 					logical.NewVariable("p.name"),
 					logical.NewVariable("p.age"),
 				},
-				logical.NewOffset(
-					logical.NewLimit(
+				logical.NewLimit(
+					logical.NewOffset(
 						logical.NewDataSource("people", "p"),
-						logical.NewConstant(3),
+						logical.NewConstant(2),
 					),
-					logical.NewConstant(2),
+					logical.NewConstant(3),
 				),
 			),
 			wantErr: false,

@@ -68,18 +68,18 @@ func TestParseNode(t *testing.T) {
 			args: args{
 				"SELECT p.name, p.age FROM people p LIMIT 3 OFFSET 2",
 			},
-			want: logical.NewMap(
-				[]logical.NamedExpression{
-					logical.NewVariable("p.name"),
-					logical.NewVariable("p.age"),
-				},
-				logical.NewLimit(
-					logical.NewOffset(
+			want: logical.NewLimit(
+				logical.NewOffset(
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewVariable("p.name"),
+							logical.NewVariable("p.age"),
+						},
 						logical.NewDataSource("people", "p"),
-						logical.NewConstant(2),
 					),
-					logical.NewConstant(3),
+					logical.NewConstant(2),
 				),
+				logical.NewConstant(3),
 			),
 			wantErr: false,
 		},

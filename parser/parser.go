@@ -103,6 +103,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 			return nil, errors.Wrapf(err, "couldn't parse aliased expression with index %d", i)
 		}
 	}
+	root = logical.NewMap(expressions, root)
 
 	if statement.Limit != nil {
 		limitExpr, offsetExpr, err := parseLimitSubexpressions(statement.Limit.Rowcount, statement.Limit.Offset)
@@ -118,7 +119,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		}
 	}
 
-	return logical.NewMap(expressions, root), nil
+	return root, nil
 }
 
 func ParseNode(statement sqlparser.SelectStatement) (logical.Node, error) {

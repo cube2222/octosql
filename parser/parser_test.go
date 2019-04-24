@@ -42,8 +42,16 @@ func TestParseNode(t *testing.T) {
 								logical.MoreThan,
 								logical.NewConstant(100),
 							),
-							logical.NewDataSource("cities", "c"),
+							logical.NewMap(
+								[]logical.NamedExpression{
+									logical.NewVariable("c.name"),
+									logical.NewVariable("c.age"),
+								},
+								logical.NewDataSource("cities", "c"),
+								true,
+							),
 						),
+						false,
 					),
 					logical.NewMap(
 						[]logical.NamedExpression{
@@ -56,8 +64,16 @@ func TestParseNode(t *testing.T) {
 								logical.MoreThan,
 								logical.NewConstant(4),
 							),
-							logical.NewDataSource("people", "p"),
+							logical.NewMap(
+								[]logical.NamedExpression{
+									logical.NewVariable("p.name"),
+									logical.NewVariable("p.age"),
+								},
+								logical.NewDataSource("people", "p"),
+								true,
+							),
 						),
+						false,
 					),
 				),
 				logical.NewConstant(5),
@@ -76,7 +92,15 @@ func TestParseNode(t *testing.T) {
 							logical.NewVariable("p.name"),
 							logical.NewVariable("p.age"),
 						},
-						logical.NewDataSource("people", "p"),
+						logical.NewMap(
+							[]logical.NamedExpression{
+								logical.NewVariable("p.name"),
+								logical.NewVariable("p.age"),
+							},
+							logical.NewDataSource("people", "p"),
+							true,
+						),
+						false,
 					),
 					logical.NewConstant(2),
 				),

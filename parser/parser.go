@@ -51,7 +51,6 @@ func ParseUnionAll(statement *sqlparser.Union) (logical.Node, error) {
 		}
 
 		return root, nil
-
 	default:
 		return nil, errors.Errorf("unsupported union %+v of type %v", statement, statement.Type)
 	}
@@ -120,7 +119,6 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 	if len(statement.Distinct) > 0 {
 		root = logical.NewDistinct(root)
 	}
-	root = logical.NewMap(expressions, root)
 
 	if statement.Limit != nil {
 		limitExpr, offsetExpr, err := parseLimitSubexpressions(statement.Limit.Rowcount, statement.Limit.Offset)

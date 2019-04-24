@@ -99,15 +99,17 @@ func (alExpr *AliasedExpression) Name() octosql.VariableName {
 	return alExpr.name
 }
 
-// should there be a pointer argument?
 func extractSingleValue(expr Expression, variables octosql.Variables) (interface{}, error) {
 	value, err := expr.ExpressionValue(variables)
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't get expression's value")
 	}
 
-	if _, ok := value.([]Record); ok {
-		return nil, errors.Errorf("multiple records ended up in one select field %+v", value)
+	if records, ok := value.([]Record); ok {
+		if len(records) != 1{
+			return nil, errors.Errorf("number of records different than 1: %+v", value)
+		}
+		value = records[0]
 	}
 
 	if record, ok := value.(Record); ok {

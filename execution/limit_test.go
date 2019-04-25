@@ -89,6 +89,24 @@ func TestLimit_Get(t *testing.T) {
 			}),
 			wantError: NO_ERROR,
 		},
+		{
+			name: "zero limit get",
+			vars: octosql.NoVariables(),
+			node: NewLimit(&DummyNode{
+				[]*Record{
+					UtilNewRecord(
+						[]octosql.VariableName{
+							"num",
+						},
+						[]interface{}{
+							1,
+						}),
+				},
+			}, &DummyValue{0}),
+			wantStream: NewInMemoryStream([]*Record{
+			}),
+			wantError: NO_ERROR,
+		},
 	}
 
 	for _, tt := range tests {

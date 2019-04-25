@@ -180,3 +180,35 @@ func UtilNewRecord(fields []octosql.VariableName, data []interface{}) *Record {
 		data:       data,
 	}
 }
+
+func UtilNewDummyNode(data []*Record) *DummyNode {
+	return &DummyNode{
+		data,
+	}
+}
+
+type DummyNode struct {
+	data []*Record
+}
+
+func (dn *DummyNode) Get(variables octosql.Variables) (RecordStream, error) {
+	if dn.data == nil {
+		return NewInMemoryStream([]*Record{}), nil
+	}
+
+	return NewInMemoryStream(dn.data), nil
+}
+
+func UtilNewDummyValue(value interface{}) *DummyValue {
+	return &DummyValue{
+		value,
+	}
+}
+
+type DummyValue struct {
+	value interface{}
+}
+
+func (dv *DummyValue) ExpressionValue(variables octosql.Variables) (interface{}, error) {
+	return dv.value, nil
+}

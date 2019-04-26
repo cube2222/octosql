@@ -10,7 +10,7 @@ type UnionDistinct struct {
 	first, second Node
 }
 
-func NewUnionDistinct(first, second Node) *UnionDistinct{
+func NewUnionDistinct(first, second Node) *UnionDistinct {
 	return &UnionDistinct{first: first, second: second}
 }
 

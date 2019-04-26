@@ -1,10 +1,11 @@
 package parser
 
 import (
-	"github.com/bradleyjkemp/memviz"
 	"log"
 	"os"
 	"testing"
+
+	"github.com/bradleyjkemp/memviz"
 
 	"github.com/cube2222/octosql/logical"
 	"github.com/xwb1989/sqlparser"
@@ -40,8 +41,16 @@ func TestParseNode(t *testing.T) {
 							logical.Equal,
 							logical.NewConstant("Kowalski"),
 						),
-						logical.NewDataSource("people", "p"),
+						logical.NewMap(
+							[]logical.NamedExpression{
+								logical.NewVariable("p.id"),
+								logical.NewVariable("p.name"),
+								logical.NewVariable("p.surname"),
+							},
+							logical.NewDataSource("people", "p"),
+							false),
 					),
+					false,
 				),
 				logical.NewFilter(
 					logical.NewPredicate(
@@ -54,6 +63,93 @@ func TestParseNode(t *testing.T) {
 						"a",
 					),
 				),
+			),
+			wantErr: false,
+		},
+		{
+			name: "simple union all + limit + NO offset",
+			args: args{
+				"SELECT c.name, c.age FROM cities c WHERE c.age > 100 " +
+					"UNION ALL " +
+					"SELECT p.name, p.age FROM people p WHERE p.age > 4 " +
+					"LIMIT 5",
+			},
+			want: logical.NewLimit(
+				logical.NewUnionAll(
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewVariable("c.name"),
+							logical.NewVariable("c.age"),
+						},
+						logical.NewFilter(
+							logical.NewPredicate(
+								logical.NewVariable("c.age"),
+								logical.MoreThan,
+								logical.NewConstant(100),
+							),
+							logical.NewMap(
+								[]logical.NamedExpression{
+									logical.NewVariable("c.name"),
+									logical.NewVariable("c.age"),
+								},
+								logical.NewDataSource("cities", "c"),
+								true,
+							),
+						),
+						false,
+					),
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewVariable("p.name"),
+							logical.NewVariable("p.age"),
+						},
+						logical.NewFilter(
+							logical.NewPredicate(
+								logical.NewVariable("p.age"),
+								logical.MoreThan,
+								logical.NewConstant(4),
+							),
+							logical.NewMap(
+								[]logical.NamedExpression{
+									logical.NewVariable("p.name"),
+									logical.NewVariable("p.age"),
+								},
+								logical.NewDataSource("people", "p"),
+								true,
+							),
+						),
+						false,
+					),
+				),
+				logical.NewConstant(5),
+			),
+			wantErr: false,
+		},
+		{
+			name: "simple limit + offset",
+			args: args{
+				"SELECT p.name, p.age FROM people p LIMIT 3 OFFSET 2",
+			},
+			want: logical.NewLimit(
+				logical.NewOffset(
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewVariable("p.name"),
+							logical.NewVariable("p.age"),
+						},
+						logical.NewMap(
+							[]logical.NamedExpression{
+								logical.NewVariable("p.name"),
+								logical.NewVariable("p.age"),
+							},
+							logical.NewDataSource("people", "p"),
+							true,
+						),
+						false,
+					),
+					logical.NewConstant(2),
+				),
+				logical.NewConstant(3),
 			),
 			wantErr: false,
 		},
@@ -76,8 +172,16 @@ func TestParseNode(t *testing.T) {
 							logical.MoreThan,
 							logical.NewConstant(3),
 						),
-						logical.NewDataSource("people", "p2"),
+						logical.NewMap(
+							[]logical.NamedExpression{
+								logical.NewVariable("p2.name"),
+								logical.NewVariable("p2.age"),
+							},
+							logical.NewDataSource("people", "p2"),
+							true,
+						),
 					),
+					false,
 				),
 				logical.NewMap(
 					[]logical.NamedExpression{
@@ -90,8 +194,16 @@ func TestParseNode(t *testing.T) {
 							logical.MoreThan,
 							logical.NewConstant(4),
 						),
-						logical.NewDataSource("people", "p2"),
+						logical.NewMap(
+							[]logical.NamedExpression{
+								logical.NewVariable("p2.name"),
+								logical.NewVariable("p2.age"),
+							},
+							logical.NewDataSource("people", "p2"),
+							true,
+						),
 					),
+					false,
 				),
 			),
 			wantErr: false,
@@ -116,8 +228,16 @@ func TestParseNode(t *testing.T) {
 								logical.MoreThan,
 								logical.NewConstant(3),
 							),
-							logical.NewDataSource("people", "p2"),
+							logical.NewMap(
+								[]logical.NamedExpression{
+									logical.NewVariable("p2.name"),
+									logical.NewVariable("p2.age"),
+								},
+								logical.NewDataSource("people", "p2"),
+								true,
+							),
 						),
+						false,
 					),
 					logical.NewMap(
 						[]logical.NamedExpression{
@@ -130,8 +250,16 @@ func TestParseNode(t *testing.T) {
 								logical.LessThan,
 								logical.NewConstant(5),
 							),
-							logical.NewDataSource("people", "p2"),
+							logical.NewMap(
+								[]logical.NamedExpression{
+									logical.NewVariable("p2.name"),
+									logical.NewVariable("p2.age"),
+								},
+								logical.NewDataSource("people", "p2"),
+								true,
+							),
 						),
+						false,
 					),
 				),
 				logical.NewUnionAll(
@@ -146,8 +274,16 @@ func TestParseNode(t *testing.T) {
 								logical.MoreThan,
 								logical.NewConstant("ciechanowo"),
 							),
-							logical.NewDataSource("people", "p2"),
+							logical.NewMap(
+								[]logical.NamedExpression{
+									logical.NewVariable("p2.name"),
+									logical.NewVariable("p2.age"),
+								},
+								logical.NewDataSource("people", "p2"),
+								true,
+							),
 						),
+						false,
 					),
 					logical.NewMap(
 						[]logical.NamedExpression{
@@ -160,8 +296,16 @@ func TestParseNode(t *testing.T) {
 								logical.LessThan,
 								logical.NewConstant("wwa"),
 							),
-							logical.NewDataSource("people", "p2"),
+							logical.NewMap(
+								[]logical.NamedExpression{
+									logical.NewVariable("p2.name"),
+									logical.NewVariable("p2.age"),
+								},
+								logical.NewDataSource("people", "p2"),
+								true,
+							),
 						),
+						false,
 					),
 				),
 			),
@@ -183,8 +327,16 @@ func TestParseNode(t *testing.T) {
 						logical.MoreThan,
 						logical.NewConstant(3),
 					),
-					logical.NewDataSource("people", "p2"),
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewVariable("p2.name"),
+							logical.NewVariable("p2.age"),
+						},
+						logical.NewDataSource("people", "p2"),
+						true,
+					),
 				),
+				false,
 			),
 			wantErr: false,
 		},
@@ -280,32 +432,7 @@ WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age`,
 			want: logical.NewMap(
 				[]logical.NamedExpression{
 					logical.NewVariable("p3.name"),
-					logical.NewAliasedExpression(
-						"city",
-						logical.NewNodeExpression(
-							logical.NewMap(
-								[]logical.NamedExpression{
-									logical.NewVariable("p1.city"),
-								},
-								logical.NewFilter(
-									logical.NewInfixOperator(
-										logical.NewPredicate(
-											logical.NewVariable("p3.name"),
-											logical.Equal,
-											logical.NewConstant("Kuba"),
-										),
-										logical.NewPredicate(
-											logical.NewVariable("p1.name"),
-											logical.Equal,
-											logical.NewConstant("adam"),
-										),
-										"AND",
-									),
-									logical.NewDataSource("people", "p1"),
-								),
-							),
-						),
-					),
+					logical.NewVariable("city"),
 				},
 				logical.NewFilter(
 					logical.NewPredicate(
@@ -320,18 +447,65 @@ WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age`,
 										logical.Equal,
 										logical.NewConstant("wojtek"),
 									),
-									logical.NewDataSource("people", "p2"),
+									logical.NewMap(
+										[]logical.NamedExpression{
+											logical.NewVariable("p2.age"),
+										},
+										logical.NewDataSource("people", "p2"),
+										true,
+									),
 								),
+								false,
 							),
 						),
 						logical.MoreThan,
 						logical.NewVariable("p3.age"),
 					),
-					logical.NewRequalifier(
-						"p3",
-						logical.NewDataSource("people", "p4"),
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewVariable("p3.name"),
+							logical.NewAliasedExpression(
+								"city",
+								logical.NewNodeExpression(
+									logical.NewMap(
+										[]logical.NamedExpression{
+											logical.NewVariable("p1.city"),
+										},
+										logical.NewFilter(
+											logical.NewInfixOperator(
+												logical.NewPredicate(
+													logical.NewVariable("p3.name"),
+													logical.Equal,
+													logical.NewConstant("Kuba"),
+												),
+												logical.NewPredicate(
+													logical.NewVariable("p1.name"),
+													logical.Equal,
+													logical.NewConstant("adam"),
+												),
+												"AND",
+											),
+											logical.NewMap(
+												[]logical.NamedExpression{
+													logical.NewVariable("p1.city"),
+												},
+												logical.NewDataSource("people", "p1"),
+												true,
+											),
+										),
+										false,
+									),
+								),
+							),
+						},
+						logical.NewRequalifier(
+							"p3",
+							logical.NewDataSource("people", "p4"),
+						),
+						true,
 					),
 				),
+				false,
 			),
 			wantErr: false,
 		},

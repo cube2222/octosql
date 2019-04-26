@@ -14,12 +14,6 @@ func NewDistinct(child Node) *Distinct {
 	return &Distinct{child: child}
 }
 
-type DistinctStream struct {
-	stream    RecordStream
-	variables octosql.Variables
-	records   *recordSet
-}
-
 func (node *Distinct) Get(variables octosql.Variables) (RecordStream, error) {
 	stream, err := node.child.Get(variables)
 	if err != nil {
@@ -31,6 +25,12 @@ func (node *Distinct) Get(variables octosql.Variables) (RecordStream, error) {
 		variables: variables,
 		records:   newRecordSet(),
 	}, nil
+}
+
+type DistinctStream struct {
+	stream    RecordStream
+	variables octosql.Variables
+	records   *recordSet
 }
 
 func (distinctStream DistinctStream) Next() (*Record, error) {
@@ -72,7 +72,7 @@ func newRecordSet() *recordSet {
 }
 
 func (rs *recordSet) Has(r *Record) (bool, error) {
-	hash, err := hashstructure.Hash(r, nil)
+	hash, err := HashRecord(r)
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get hash of record")
 	}
@@ -87,7 +87,7 @@ func (rs *recordSet) Has(r *Record) (bool, error) {
 }
 
 func (rs *recordSet) Insert(r *Record) (bool, error) {
-	hash, err := hashstructure.Hash(r, nil)
+	hash, err := HashRecord(r)
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get hash of record")
 	}
@@ -102,4 +102,8 @@ func (rs *recordSet) Insert(r *Record) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func HashRecord(rec *Record) (uint64, error) {
+	return hashstructure.Hash(rec.data, nil)
 }

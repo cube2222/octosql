@@ -71,8 +71,8 @@ func TestDataSource_Get(t *testing.T) {
 					[]interface{}{"mammoth", 0},
 				),
 				execution.UtilNewRecord(
-					[]octosql.VariableName{"a.population", "a.name"},
-					[]interface{}{7000000, "human"},
+					[]octosql.VariableName{"a.name", "a.population"},
+					[]interface{}{"human", 7000000},
 				),
 				execution.UtilNewRecord(
 					[]octosql.VariableName{"a.name", "a.population"},

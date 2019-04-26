@@ -3,18 +3,20 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/cube2222/octosql/storage/csv"
 	"log"
 	"os"
 	"strings"
 
+	"github.com/bradleyjkemp/memmap"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/parser"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/optimizer"
+	"github.com/cube2222/octosql/storage/csv"
 	"github.com/cube2222/octosql/storage/json"
 	"github.com/cube2222/octosql/storage/postgres"
+	"github.com/cube2222/octosql/storage/redis"
 	"github.com/xwb1989/sqlparser"
 )
 
@@ -27,7 +29,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	typed, ok := stmt.(*sqlparser.Select)
+	typed, ok := stmt.(sqlparser.SelectStatement)
 	if !ok {
 		log.Fatal("invalid statement type")
 	}
@@ -46,10 +48,15 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = dataSourceRespository.Register("myusers",
+	err = dataSourceRespository.Register("users_ids",
 		postgres.NewDataSourceBuilderFactory("localhost", "root",
-			"toor", "mydb", "myusers", nil, 5432))
+			"toor", "mydb", "users_ids", nil, 5432))
+	if err != nil {
+		log.Fatal(err)
+	}
 
+	err = dataSourceRespository.Register("users",
+		redis.NewDataSourceBuilderFactory("localhost", "", 6379, 0, "key"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -60,6 +67,13 @@ func main() {
 	}
 
 	phys = optimizer.Optimize(ctx, optimizer.DefaultScenarios, phys)
+
+	f, err := os.Create("diag_got")
+	if err != nil {
+		log.Fatal(err)
+	}
+	memmap.Map(f, phys)
+	f.Close()
 
 	exec, err := phys.Materialize(ctx)
 	if err != nil {

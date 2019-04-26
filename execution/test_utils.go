@@ -7,139 +7,171 @@ import (
 	"github.com/pkg/errors"
 )
 
+type multiSetElement struct {
+	rec   *Record
+	count int
+}
+
+type recordMultiSet struct {
+	set map[uint64][]multiSetElement
+}
+
+func newMultiSetElement(rec *Record) multiSetElement {
+	return multiSetElement{
+		rec:   rec,
+		count: 1,
+	}
+}
+
+func newMultiSet() *recordMultiSet {
+	return &recordMultiSet{
+		set: make(map[uint64][]multiSetElement),
+	}
+}
+
+func (rms *recordMultiSet) Insert(rec *Record) error {
+	hash, err := HashRecord(rec)
+	if err != nil {
+		return errors.Wrap(err, "couldn't hash record")
+	}
+
+	targetSlice := rms.set[hash]
+	for k := range targetSlice {
+		element := targetSlice[k]
+		if AreEqual(element.rec, rec) {
+			rms.set[hash][k].count++
+			return nil
+		}
+	}
+
+	rms.set[hash] = append(rms.set[hash], newMultiSetElement(rec))
+
+	return nil
+}
+
+func (rms *recordMultiSet) GetCount(rec *Record) (int, error) {
+	hash, err := HashRecord(rec)
+	if err != nil {
+		return 0, errors.Wrap(err, "couldn't hash record")
+	}
+
+	targetSlice := rms.set[hash]
+	for k := range targetSlice {
+		element := targetSlice[k]
+		if AreEqual(element.rec, rec) {
+			return element.count, nil
+		}
+	}
+
+	return 0, nil
+}
+
 type entity struct {
-	fieldName string
+	fieldName octosql.VariableName
 	value     interface{}
 }
 
-//creates a entity slice from a record, sorts it by column name
-//and normalizes types
-func normalizeColumns(rec *Record) []entity {
-	merged := make([]entity, 0)
-	for k := range rec.fieldNames {
-		newEntity := entity{
-			fieldName: rec.fieldNames[k].String(),
-			value:     NormalizeType(rec.data[k]),
-		}
-		merged = append(merged, newEntity)
+type row []entity
+
+func newEntity(name octosql.VariableName, value interface{}) entity {
+	return entity{
+		fieldName: name,
+		value:     value,
 	}
-
-	sort.Slice(merged, func(i, j int) bool {
-		return merged[i].fieldName < merged[j].fieldName
-	})
-
-	return merged
 }
 
-//entities are considered equal iff after sorting len(first) == len(second)
-//and for every 0 <= i < len(first) first[i].value == second[i].value
-//								and first[i].fieldName == second[i].fieldName
-func areEntitiesEqual(first, second []entity) bool {
-	if len(first) != len(second) {
-		return false
+func Normalize(rec *Record) *Record {
+	row := make(row, 0)
+	for k := range rec.fieldNames {
+		fieldName := rec.fieldNames[k]
+		value := rec.data[k]
+		row = append(row, newEntity(fieldName, value))
 	}
 
-	for k := range first {
-		firstVal := first[k].value
-		secondVal := second[k].value
+	sort.Slice(row, func(i, j int) bool {
+		return row[i].fieldName < row[j].fieldName
+	})
 
-		if !AreEqual(firstVal, secondVal) || first[k].fieldName != second[k].fieldName {
-			return false
-		}
+	sortedFieldNames := make([]octosql.VariableName, len(rec.fieldNames))
+	values := make([]interface{}, len(rec.fieldNames))
+
+	for k := range row {
+		ent := row[k]
+		sortedFieldNames[k] = ent.fieldName
+		values[k] = ent.value
 	}
-	return true
+
+	return UtilNewRecord(sortedFieldNames, values)
 }
 
 func AreStreamsEqual(first, second RecordStream) (bool, error) {
-	firstTable := make([][]entity, 0)
-	secondTable := make([][]entity, 0)
+	firstMultiSet := newMultiSet()
+	secondMultiSet := newMultiSet()
 
 	for {
 		firstRec, firstErr := first.Next()
 		secondRec, secondErr := second.Next()
-		if firstErr == ErrEndOfStream && secondErr == ErrEndOfStream {
+
+		if firstErr == secondErr && firstErr == ErrEndOfStream {
 			break
 		} else if firstErr == ErrEndOfStream && secondErr == nil {
 			return false, nil
 		} else if firstErr == nil && secondErr == ErrEndOfStream {
 			return false, nil
 		} else if firstErr != nil {
-			return false, errors.Wrap(firstErr, "couldn't get record")
+			return false, errors.Wrap(firstErr, "error in Next for first stream")
 		} else if secondErr != nil {
-			return false, errors.Wrap(secondErr, "couldn't get record")
+			return false, errors.Wrap(secondErr, "error in Next for second stream")
 		}
 
-		firstTable = append(firstTable, normalizeColumns(firstRec))
-		secondTable = append(secondTable, normalizeColumns(secondRec))
+		firstNormalized := Normalize(firstRec)
+		err := firstMultiSet.Insert(firstNormalized)
+		if err != nil {
+			return false, errors.Wrap(err, "couldn't insert into the multiset")
+		}
+
+		secondNormalized := Normalize(secondRec)
+		err = secondMultiSet.Insert(secondNormalized)
+		if err != nil {
+			return false, errors.Wrap(err, "couldn't insert into the multiset")
+		}
 	}
 
-	sort.Slice(firstTable, func(i, j int) bool {
-		return lessEntity(firstTable[i], firstTable[j])
-	})
+	firstContained, err := firstMultiSet.isContained(secondMultiSet)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't check whether first contained in second")
+	}
 
-	sort.Slice(secondTable, func(i, j int) bool {
-		return lessEntity(secondTable[i], secondTable[j])
-	})
+	secondContained, err := secondMultiSet.isContained(firstMultiSet)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't check whether second contained in first")
+	}
 
-	for k := range firstTable {
-		if !areEntitiesEqual(firstTable[k], secondTable[k]) {
-			return false, nil
-		}
+	if !(firstContained && secondContained) {
+		return false, nil
 	}
 
 	return true, nil
 }
 
-func lessEntity(first, second []entity) bool {
-	if len(first) != len(second) {
-		return len(first) < len(second)
-	}
+func (rms *recordMultiSet) isContained(other *recordMultiSet) (bool, error) {
+	for key := range rms.set {
+		hashSlice := rms.set[key]
+		for k := range hashSlice {
+			setElem := hashSlice[k]
 
-	for k := range first {
-		f := first[k].value
-		s := second[k].value
+			otherCount, err := other.GetCount(setElem.rec)
+			if err != nil {
+				return false, errors.Wrap(err, "couldn't get count of elem in second set")
+			}
 
-		if !AreEqual(f, s) {
-			return lessInterface(f, s)
+			if otherCount < setElem.count {
+				return false, nil
+			}
 		}
 	}
 
-	return false
-}
-
-func lessInterface(a, b interface{}) bool {
-	switch a := a.(type) {
-	case int:
-		b, ok := b.(int)
-		if !ok {
-			return false
-		}
-
-		return a < b
-	case string:
-		b, ok := b.(string)
-		if !ok {
-			return false
-		}
-
-		return a < b
-	case float64:
-		b, ok := b.(float64)
-		if !ok {
-			return false
-		}
-
-		return a < b
-	case bool:
-		b, ok := b.(bool)
-		if !ok {
-			return false
-		}
-
-		return !a && b
-	default:
-		return false
-	}
+	return true, nil
 }
 
 func UtilNewRecord(fields []octosql.VariableName, data []interface{}) *Record {
@@ -147,4 +179,36 @@ func UtilNewRecord(fields []octosql.VariableName, data []interface{}) *Record {
 		fieldNames: fields,
 		data:       data,
 	}
+}
+
+func UtilNewDummyNode(data []*Record) *DummyNode {
+	return &DummyNode{
+		data,
+	}
+}
+
+type DummyNode struct {
+	data []*Record
+}
+
+func (dn *DummyNode) Get(variables octosql.Variables) (RecordStream, error) {
+	if dn.data == nil {
+		return NewInMemoryStream([]*Record{}), nil
+	}
+
+	return NewInMemoryStream(dn.data), nil
+}
+
+func UtilNewDummyValue(value interface{}) *DummyValue {
+	return &DummyValue{
+		value,
+	}
+}
+
+type DummyValue struct {
+	value interface{}
+}
+
+func (dv *DummyValue) ExpressionValue(variables octosql.Variables) (interface{}, error) {
+	return dv.value, nil
 }

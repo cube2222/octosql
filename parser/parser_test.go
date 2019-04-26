@@ -22,6 +22,93 @@ func TestParseNode(t *testing.T) {
 		wantErr bool
 	}{
 		{
+			name: "simple union all + limit + NO offset",
+			args: args{
+				"SELECT c.name, c.age FROM cities c WHERE c.age > 100 " +
+					"UNION ALL " +
+					"SELECT p.name, p.age FROM people p WHERE p.age > 4 " +
+					"LIMIT 5",
+			},
+			want: logical.NewLimit(
+				logical.NewUnionAll(
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewVariable("c.name"),
+							logical.NewVariable("c.age"),
+						},
+						logical.NewFilter(
+							logical.NewPredicate(
+								logical.NewVariable("c.age"),
+								logical.MoreThan,
+								logical.NewConstant(100),
+							),
+							logical.NewMap(
+								[]logical.NamedExpression{
+									logical.NewVariable("c.name"),
+									logical.NewVariable("c.age"),
+								},
+								logical.NewDataSource("cities", "c"),
+								true,
+							),
+						),
+						false,
+					),
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewVariable("p.name"),
+							logical.NewVariable("p.age"),
+						},
+						logical.NewFilter(
+							logical.NewPredicate(
+								logical.NewVariable("p.age"),
+								logical.MoreThan,
+								logical.NewConstant(4),
+							),
+							logical.NewMap(
+								[]logical.NamedExpression{
+									logical.NewVariable("p.name"),
+									logical.NewVariable("p.age"),
+								},
+								logical.NewDataSource("people", "p"),
+								true,
+							),
+						),
+						false,
+					),
+				),
+				logical.NewConstant(5),
+			),
+			wantErr: false,
+		},
+		{
+			name: "simple limit + offset",
+			args: args{
+				"SELECT p.name, p.age FROM people p LIMIT 3 OFFSET 2",
+			},
+			want: logical.NewLimit(
+				logical.NewOffset(
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewVariable("p.name"),
+							logical.NewVariable("p.age"),
+						},
+						logical.NewMap(
+							[]logical.NamedExpression{
+								logical.NewVariable("p.name"),
+								logical.NewVariable("p.age"),
+							},
+							logical.NewDataSource("people", "p"),
+							true,
+						),
+						false,
+					),
+					logical.NewConstant(2),
+				),
+				logical.NewConstant(3),
+			),
+			wantErr: false,
+		},
+		{
 			name: "simple union all",
 			args: args{
 				"SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 3 " +

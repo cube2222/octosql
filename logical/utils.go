@@ -71,6 +71,28 @@ func EqualNodes(node1, node2 Node) error {
 			return nil
 		}
 
+	case *Limit:
+		if node2, ok := node2.(*Limit); ok {
+			if err := EqualExpressions(node1.limitExpr, node2.limitExpr); err != nil {
+				return errors.Wrap(err, "limit subexpressions not equal")
+			}
+			if err := EqualNodes(node1.data, node2.data); err != nil {
+				return errors.Wrap(err, "data nodes underneath not equal")
+			}
+			return nil
+		}
+
+	case *Offset:
+		if node2, ok := node2.(*Offset); ok {
+			if err := EqualExpressions(node1.offsetExpr, node2.offsetExpr); err != nil {
+				return errors.Wrap(err, "offset subexpressions not equal")
+			}
+			if err := EqualNodes(node1.data, node2.data); err != nil {
+				return errors.Wrap(err, "data nodes underneath not equal")
+			}
+			return nil
+		}
+
 	default:
 		log.Fatalf("Unsupported equality comparison %v and %v", reflect.TypeOf(node1), reflect.TypeOf(node2))
 	}

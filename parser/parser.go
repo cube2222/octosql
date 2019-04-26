@@ -17,10 +17,8 @@ func ParseUnionAll(statement *sqlparser.Union) (logical.Node, error) {
 	switch statement.Type {
 	case sqlparser.UnionAllStr:
 		var err error
+		var root logical.Node
 
-		if statement.Limit != nil {
-			return nil, errors.Errorf("limit is currently unsupported, got %+v", statement)
-		}
 		if statement.OrderBy != nil {
 			return nil, errors.Errorf("order by is currently unsupported, got %+v", statement)
 		}
@@ -35,8 +33,24 @@ func ParseUnionAll(statement *sqlparser.Union) (logical.Node, error) {
 			return nil, errors.Wrap(err, "couldn't parse second select expression")
 		}
 
-		return logical.NewUnionAll(firstNode, secondNode), nil
+		root = logical.NewUnionAll(firstNode, secondNode)
 
+		// TODO: after merge (with Union pull request) make sure that it is inside ParseUnion
+		if statement.Limit != nil {
+			limitExpr, offsetExpr, err := parseTwoSubexpressions(statement.Limit.Rowcount, statement.Limit.Offset)
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't parse limit/offset clause subexpression")
+			}
+
+			if offsetExpr != nil {
+				root = logical.NewOffset(root, offsetExpr)
+			}
+			if limitExpr != nil {
+				root = logical.NewLimit(root, limitExpr)
+			}
+		}
+
+		return root, nil
 	default:
 		return nil, errors.Errorf("unsupported union %+v of type %v", statement, statement.Type)
 	}
@@ -104,6 +118,20 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 
 	if len(statement.Distinct) > 0 {
 		root = logical.NewDistinct(root)
+	}
+
+	if statement.Limit != nil {
+		limitExpr, offsetExpr, err := parseTwoSubexpressions(statement.Limit.Rowcount, statement.Limit.Offset)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't parse limit/offset clause subexpression")
+		}
+
+		if offsetExpr != nil {
+			root = logical.NewOffset(root, offsetExpr)
+		}
+		if limitExpr != nil {
+			root = logical.NewLimit(root, limitExpr)
+		}
 	}
 
 	return root, nil
@@ -258,4 +286,34 @@ func ParseInfixComparison(left, right sqlparser.Expr, operator string) (logical.
 		return nil, errors.Wrapf(err, "couldn't parse right hand side of %s comparator %+v", operator, right)
 	}
 	return logical.NewPredicate(leftParsed, logical.NewRelation(operator), rightParsed), nil
+}
+
+func parseTwoSubexpressions(limit, offset sqlparser.Expr) (logical.Expression, logical.Expression, error) {
+	/* 	to be strict neither LIMIT nor OFFSET is in SQL standard...
+	*	parser doesn't support OFFSET clause without LIMIT clause - Google BigQuery syntax
+	*	TODO (?): add support of OFFSET clause without LIMIT clause to parser:
+	*	just append to limit_opt in sqlparser/sql.y clause:
+	*		| OFFSET expression
+	*		  {
+	*			$$ = &Limit{Offset: $2}
+	*		  }
+	 */
+	var limitExpr, offsetExpr logical.Expression = nil, nil
+	var err error
+
+	if limit != nil {
+		limitExpr, err = ParseExpression(limit)
+		if err != nil {
+			return nil, nil, errors.Errorf("couldn't parse limit's Rowcount subexpression")
+		}
+	}
+
+	if offset != nil {
+		offsetExpr, err = ParseExpression(offset)
+		if err != nil {
+			return nil, nil, errors.Errorf("couldn't parse limit's Offset subexpression")
+		}
+	}
+
+	return limitExpr, offsetExpr, nil
 }

@@ -37,7 +37,7 @@ func ParseUnionAll(statement *sqlparser.Union) (logical.Node, error) {
 
 		// TODO: after merge (with Union pull request) make sure that it is inside ParseUnion
 		if statement.Limit != nil {
-			limitExpr, offsetExpr, err := parseLimitSubexpressions(statement.Limit.Rowcount, statement.Limit.Offset)
+			limitExpr, offsetExpr, err := parseTwoSubexpressions(statement.Limit.Rowcount, statement.Limit.Offset)
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't parse limit/offset clause subexpression")
 			}
@@ -121,7 +121,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 	}
 
 	if statement.Limit != nil {
-		limitExpr, offsetExpr, err := parseLimitSubexpressions(statement.Limit.Rowcount, statement.Limit.Offset)
+		limitExpr, offsetExpr, err := parseTwoSubexpressions(statement.Limit.Rowcount, statement.Limit.Offset)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't parse limit/offset clause subexpression")
 		}
@@ -288,7 +288,7 @@ func ParseInfixComparison(left, right sqlparser.Expr, operator string) (logical.
 	return logical.NewPredicate(leftParsed, logical.NewRelation(operator), rightParsed), nil
 }
 
-func parseLimitSubexpressions(limit, offset sqlparser.Expr) (logical.Expression, logical.Expression, error) {
+func parseTwoSubexpressions(limit, offset sqlparser.Expr) (logical.Expression, logical.Expression, error) {
 	/* 	to be strict neither LIMIT nor OFFSET is in SQL standard...
 	*	parser doesn't support OFFSET clause without LIMIT clause - Google BigQuery syntax
 	*	TODO (?): add support of OFFSET clause without LIMIT clause to parser:

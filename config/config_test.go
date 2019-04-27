@@ -45,6 +45,9 @@ func TestReadConfig(t *testing.T) {
 							"password":     "toor",
 							"databaseName": "mydb",
 							"tableName":    "users_ids",
+							"primaryKeys": []interface{}{
+								"name",
+							},
 						},
 					},
 					{

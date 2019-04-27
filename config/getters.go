@@ -8,6 +8,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+// GetInterface get's the given potentially nested field irrelevant of it's type.
+// This will recursively descend into submaps.
 func GetInterface(config map[string]interface{}, field string) (interface{}, error) {
 	i := strings.Index(field, ".")
 	if i == -1 {
@@ -32,6 +34,7 @@ func GetInterface(config map[string]interface{}, field string) (interface{}, err
 	return out, nil
 }
 
+// GetInterfaceList gets a list from the given field.
 func GetInterfaceList(config map[string]interface{}, field string) ([]interface{}, error) {
 	out, err := GetInterface(config, field)
 	if err != nil {
@@ -46,6 +49,7 @@ func GetInterfaceList(config map[string]interface{}, field string) ([]interface{
 	return outTable, nil
 }
 
+// GetMap gets a sub-map from the given field.
 func GetMap(config map[string]interface{}, field string) (map[string]interface{}, error) {
 	out, err := GetInterface(config, field)
 	if err != nil {
@@ -60,6 +64,7 @@ func GetMap(config map[string]interface{}, field string) (map[string]interface{}
 	return outMap, nil
 }
 
+// GetString gets a string from the given field.
 func GetString(config map[string]interface{}, field string) (string, error) {
 	out, err := GetInterface(config, field)
 	if err != nil {
@@ -74,6 +79,7 @@ func GetString(config map[string]interface{}, field string) (string, error) {
 	return outString, nil
 }
 
+// GetInt gets an int from the given field.
 func GetInt(config map[string]interface{}, field string) (int, error) {
 	out, err := GetInterface(config, field)
 	if err != nil {
@@ -88,6 +94,7 @@ func GetInt(config map[string]interface{}, field string) (int, error) {
 	return outInt, nil
 }
 
+// GetFloat64 gets a float64 from the given field.
 func GetFloat64(config map[string]interface{}, field string) (float64, error) {
 	out, err := GetInterface(config, field)
 	if err != nil {
@@ -102,7 +109,8 @@ func GetFloat64(config map[string]interface{}, field string) (float64, error) {
 	return outFloat, nil
 }
 
-func GetAddress(config map[string]interface{}, field string) (string, int, error) {
+// GetIPAddress gets an ip address from the given field.
+func GetIPAddress(config map[string]interface{}, field string) (string, int, error) {
 	value, err := GetString(config, field)
 	if err != nil {
 		return "", 0, errors.Wrapf(err, "couldn't get string")
@@ -121,6 +129,7 @@ func GetAddress(config map[string]interface{}, field string) (string, int, error
 	return parts[0], int(port), nil
 }
 
+// GetStringList gets a string list from the given field.
 func GetStringList(config map[string]interface{}, field string) ([]string, error) {
 	out, err := GetInterfaceList(config, field)
 	if err != nil {

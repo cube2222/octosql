@@ -15,6 +15,7 @@ import (
 	"github.com/cube2222/octosql/physical/optimizer"
 	"github.com/cube2222/octosql/storage/csv"
 	"github.com/cube2222/octosql/storage/json"
+	"github.com/cube2222/octosql/storage/mysql"
 	"github.com/cube2222/octosql/storage/postgres"
 	"github.com/cube2222/octosql/storage/redis"
 	"github.com/xwb1989/sqlparser"
@@ -46,6 +47,7 @@ func main() {
 		map[string]config.Factory{
 			"csv":      csv.NewDataSourceBuilderFactoryFromConfig,
 			"json":     json.NewDataSourceBuilderFactoryFromConfig,
+			"mysql":    mysql.NewDataSourceBuilderFactoryFromConfig,
 			"postgres": postgres.NewDataSourceBuilderFactoryFromConfig,
 			"redis":    redis.NewDataSourceBuilderFactoryFromConfig,
 		},

@@ -18,14 +18,14 @@ func TestLimit_Get(t *testing.T) {
 		{
 			name:       "negative limit value",
 			vars:       octosql.NoVariables(),
-			node:       NewLimit(UtilNewDummyNode(nil), UtilNewDummyValue(-42)),
+			node:       NewLimit(NewDummyNode(nil), NewDummyValue(-42)),
 			wantStream: nil,
 			wantError:  "negative limit value",
 		},
 		{
 			name:       "limit value not int",
 			vars:       octosql.NoVariables(),
-			node:       NewLimit(UtilNewDummyNode(nil), UtilNewDummyValue(2.0)),
+			node:       NewLimit(NewDummyNode(nil), NewDummyValue(2.0)),
 			wantStream: nil,
 			wantError:  "limit value not int",
 		},
@@ -34,28 +34,28 @@ func TestLimit_Get(t *testing.T) {
 			vars: octosql.NoVariables(),
 			node: NewLimit(&DummyNode{
 				[]*Record{
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{
 							"num",
 						},
 						[]interface{}{
 							1e10,
 						}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{
 							"num",
 						},
 						[]interface{}{
 							3.21,
 						}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{
 							"flag",
 						},
 						[]interface{}{
 							false,
 						}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{
 							"num",
 						},
@@ -65,21 +65,21 @@ func TestLimit_Get(t *testing.T) {
 				},
 			}, &DummyValue{3}),
 			wantStream: NewInMemoryStream([]*Record{
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{
 						"num",
 					},
 					[]interface{}{
 						1e10,
 					}),
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{
 						"num",
 					},
 					[]interface{}{
 						3.21,
 					}),
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{
 						"flag",
 					},
@@ -94,7 +94,7 @@ func TestLimit_Get(t *testing.T) {
 			vars: octosql.NoVariables(),
 			node: NewLimit(&DummyNode{
 				[]*Record{
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{
 							"num",
 						},
@@ -103,9 +103,8 @@ func TestLimit_Get(t *testing.T) {
 						}),
 				},
 			}, &DummyValue{0}),
-			wantStream: NewInMemoryStream([]*Record{
-			}),
-			wantError: NO_ERROR,
+			wantStream: NewInMemoryStream([]*Record{}),
+			wantError:  NO_ERROR,
 		},
 	}
 
@@ -146,14 +145,14 @@ func TestLimitedStream_Next(t *testing.T) {
 			name: "Simplest limitedStream possible",
 			stream: newLimitedStream(
 				NewInMemoryStream([]*Record{
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{
 							"num",
 						},
 						[]interface{}{
 							1,
 						}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{
 							"num",
 						},
@@ -164,7 +163,7 @@ func TestLimitedStream_Next(t *testing.T) {
 				1,
 			),
 			wantStream: NewInMemoryStream([]*Record{
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{
 						"num",
 					},

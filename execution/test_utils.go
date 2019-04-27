@@ -101,7 +101,7 @@ func Normalize(rec *Record) *Record {
 		values[k] = ent.value
 	}
 
-	return UtilNewRecord(sortedFieldNames, values)
+	return NewRecordFromSlice(sortedFieldNames, values)
 }
 
 func AreStreamsEqual(first, second RecordStream) (bool, error) {
@@ -174,14 +174,14 @@ func (rms *recordMultiSet) isContained(other *recordMultiSet) (bool, error) {
 	return true, nil
 }
 
-func UtilNewRecord(fields []octosql.VariableName, data []interface{}) *Record {
+func NewRecordFromSlice(fields []octosql.VariableName, data []interface{}) *Record {
 	return &Record{
 		fieldNames: fields,
 		data:       data,
 	}
 }
 
-func UtilNewDummyNode(data []*Record) *DummyNode {
+func NewDummyNode(data []*Record) *DummyNode {
 	return &DummyNode{
 		data,
 	}
@@ -199,7 +199,7 @@ func (dn *DummyNode) Get(variables octosql.Variables) (RecordStream, error) {
 	return NewInMemoryStream(dn.data), nil
 }
 
-func UtilNewDummyValue(value interface{}) *DummyValue {
+func NewDummyValue(value interface{}) *DummyValue {
 	return &DummyValue{
 		value,
 	}

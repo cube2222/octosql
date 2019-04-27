@@ -20,25 +20,25 @@ func TestDistinct_Get(t *testing.T) {
 			name: "simple test - all distinct",
 			args: args{
 				NewInMemoryStream([]*Record{
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"id", "age"},
 						[]interface{}{1, 7}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"id", "age"},
 						[]interface{}{2, 10}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"id", "age"},
 						[]interface{}{3, 2}),
 				}),
 			},
 			want: NewInMemoryStream([]*Record{
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"id", "age"},
 					[]interface{}{1, 7}),
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"id", "age"},
 					[]interface{}{3, 2}),
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"id", "age"},
 					[]interface{}{2, 10}),
 			}),
@@ -48,19 +48,19 @@ func TestDistinct_Get(t *testing.T) {
 			name: "same record every time",
 			args: args{
 				NewInMemoryStream([]*Record{
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"id", "age"},
 						[]interface{}{1, 7}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"id", "age"},
 						[]interface{}{1, 7}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"id", "age"},
 						[]interface{}{1, 7}),
 				}),
 			},
 			want: NewInMemoryStream([]*Record{
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"id", "age"},
 					[]interface{}{1, 7}),
 			}),
@@ -70,25 +70,25 @@ func TestDistinct_Get(t *testing.T) {
 			name: "similar records - int",
 			args: args{
 				NewInMemoryStream([]*Record{
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"id"},
 						[]interface{}{1}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"id"},
 						[]interface{}{2}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"id"},
 						[]interface{}{3}),
 				}),
 			},
 			want: NewInMemoryStream([]*Record{
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"id"},
 					[]interface{}{1}),
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"id"},
 					[]interface{}{2}),
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"id"},
 					[]interface{}{3}),
 			}),
@@ -98,28 +98,28 @@ func TestDistinct_Get(t *testing.T) {
 			name: "reduction - multiple records",
 			args: args{
 				NewInMemoryStream([]*Record{
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"continent", "name"},
 						[]interface{}{"Africa", "lion"}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"continent", "name"},
 						[]interface{}{"Europe", "pigeon"}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"continent", "name"},
 						[]interface{}{"Europe", "pigeon"}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"continent", "name"},
 						[]interface{}{"Africa", "lion"}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"continent", "name"},
 						[]interface{}{"Africa", "lion"}),
 				}),
 			},
 			want: NewInMemoryStream([]*Record{
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"continent", "name"},
 					[]interface{}{"Africa", "lion"}),
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"continent", "name"},
 					[]interface{}{"Europe", "pigeon"}),
 			}),
@@ -129,34 +129,34 @@ func TestDistinct_Get(t *testing.T) {
 			name: "a bit of reduction - one record",
 			args: args{
 				NewInMemoryStream([]*Record{
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"id", "name"},
 						[]interface{}{1, "Janek"}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"id", "name"},
 						[]interface{}{2, "Kuba"}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"id", "name"},
 						[]interface{}{3, "Wojtek"}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"id", "name"},
 						[]interface{}{1, "Janek"}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"id", "name"},
 						[]interface{}{4, "Wojtek"}),
 				}),
 			},
 			want: NewInMemoryStream([]*Record{
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"id", "name"},
 					[]interface{}{1, "Janek"}),
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"id", "name"},
 					[]interface{}{2, "Kuba"}),
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"id", "name"},
 					[]interface{}{3, "Wojtek"}),
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"id", "name"},
 					[]interface{}{4, "Wojtek"}),
 			}),
@@ -166,25 +166,25 @@ func TestDistinct_Get(t *testing.T) {
 			name: "advanced data (slice) - no repetitions",
 			args: args{
 				NewInMemoryStream([]*Record{
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"numbers"},
 						[]interface{}{[]int{1, 2, 3}}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"numbers"},
 						[]interface{}{[]int{4, 5, 6, 7}}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"numbers"},
 						[]interface{}{[]int{7, 8}}),
 				}),
 			},
 			want: NewInMemoryStream([]*Record{
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"numbers"},
 					[]interface{}{[]int{4, 5, 6, 7}}),
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"numbers"},
 					[]interface{}{[]int{1, 2, 3}}),
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"numbers"},
 					[]interface{}{[]int{7, 8}}),
 			}),
@@ -194,22 +194,22 @@ func TestDistinct_Get(t *testing.T) {
 			name: "advanced data (slice) - repetitions",
 			args: args{
 				NewInMemoryStream([]*Record{
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"numbers"},
 						[]interface{}{[]int{1, 2, 3}}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"numbers"},
 						[]interface{}{[]int{1, 2, 3}}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"numbers"},
 						[]interface{}{[]int{7, 8}}),
 				}),
 			},
 			want: NewInMemoryStream([]*Record{
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"numbers"},
 					[]interface{}{[]int{1, 2, 3}}),
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"numbers"},
 					[]interface{}{[]int{7, 8}}),
 			}),
@@ -219,21 +219,21 @@ func TestDistinct_Get(t *testing.T) {
 			name: "advanced (map) - repetitions",
 			args: args{
 				NewInMemoryStream([]*Record{
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"map"},
 						[]interface{}{map[int]string{
 							0: "aaa",
 							1: "bbb",
 							2: "ccc",
 						}}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"map"},
 						[]interface{}{map[int]string{
 							1: "bbb",
 							0: "aaa",
 							2: "ccc",
 						}}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"map"},
 						[]interface{}{map[int]string{
 							0: "aaa",
@@ -243,14 +243,14 @@ func TestDistinct_Get(t *testing.T) {
 				}),
 			},
 			want: NewInMemoryStream([]*Record{
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"map"},
 					[]interface{}{map[int]string{
 						1: "bbb",
 						0: "aaa",
 						2: "ccc",
 					}}),
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"map"},
 					[]interface{}{map[int]string{
 						0: "aaa",
@@ -264,21 +264,21 @@ func TestDistinct_Get(t *testing.T) {
 			name: "advanced (map + slice) - no repetitions",
 			args: args{
 				NewInMemoryStream([]*Record{
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"map", "numbers"},
 						[]interface{}{map[int]string{
 							0: "aaa",
 							1: "bbb",
 							2: "ccc",
 						}, []int{1, 2}}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"map", "numbers"},
 						[]interface{}{map[int]string{
 							1: "bbb",
 							0: "aaa",
 							2: "ccc",
 						}, []int{1, 3}}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"map", "numbers"},
 						[]interface{}{map[int]string{
 							0: "aaa",
@@ -288,21 +288,21 @@ func TestDistinct_Get(t *testing.T) {
 				}),
 			},
 			want: NewInMemoryStream([]*Record{
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"map", "numbers"},
 					[]interface{}{map[int]string{
 						0: "aaa",
 						1: "bbb",
 						2: "ccc",
 					}, []int{1, 2}}),
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"map", "numbers"},
 					[]interface{}{map[int]string{
 						1: "bbb",
 						0: "aaa",
 						2: "ccc",
 					}, []int{1, 3}}),
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"map", "numbers"},
 					[]interface{}{map[int]string{
 						0: "aaa",
@@ -316,120 +316,120 @@ func TestDistinct_Get(t *testing.T) {
 			name: "the ultimate test",
 			args: args{
 				NewInMemoryStream([]*Record{
-					UtilNewRecord( //unique
+					NewRecordFromSlice( //unique
 						[]octosql.VariableName{"map", "numbers", "number", "name"},
 						[]interface{}{map[int]string{
 							0: "aaa",
 							1: "bbb",
 							2: "ccc",
 						}, []int{1, 2}, 7, "nazwa"}),
-					UtilNewRecord( //unique - different column order
+					NewRecordFromSlice( //unique - different column order
 						[]octosql.VariableName{"map", "name", "number", "numbers"},
 						[]interface{}{map[int]string{
 							0: "aaa",
 							1: "bbb",
 							2: "ccc",
 						}, "nazwa", 7, []int{1, 2}}),
-					UtilNewRecord( //unique - diff in numbers
+					NewRecordFromSlice( //unique - diff in numbers
 						[]octosql.VariableName{"map", "numbers", "number", "name"},
 						[]interface{}{map[int]string{
 							0: "aaa",
 							1: "bbb",
 							2: "ccc",
 						}, []int{1, 3}, 7, "nazwa"}),
-					UtilNewRecord( //unique diff in number
+					NewRecordFromSlice( //unique diff in number
 						[]octosql.VariableName{"map", "numbers", "number", "name"},
 						[]interface{}{map[int]string{
 							0: "aaa",
 							1: "bbb",
 							2: "ccc",
 						}, []int{1, 3}, 8, "nazwa"}),
-					UtilNewRecord( //unique - diff in name
+					NewRecordFromSlice( //unique - diff in name
 						[]octosql.VariableName{"map", "numbers", "number", "name"},
 						[]interface{}{map[int]string{
 							0: "aaa",
 							1: "bbb",
 							2: "ccc",
 						}, []int{1, 3}, 7, "nazwa0"}),
-					UtilNewRecord( //unique - diff in map
+					NewRecordFromSlice( //unique - diff in map
 						[]octosql.VariableName{"map", "numbers", "number", "name"},
 						[]interface{}{map[int]string{
 							0: "aaa",
 							1: "bbb",
 							2: "cccc",
 						}, []int{1, 3}, 7, "nazwa"}),
-					UtilNewRecord( //repetition of diff in number
+					NewRecordFromSlice( //repetition of diff in number
 						[]octosql.VariableName{"map", "numbers", "number", "name"},
 						[]interface{}{map[int]string{
 							0: "aaa",
 							1: "bbb",
 							2: "ccc",
 						}, []int{1, 3}, 8, "nazwa"}),
-					UtilNewRecord( //unique - second row template
+					NewRecordFromSlice( //unique - second row template
 						[]octosql.VariableName{"id", "age", "scores"},
 						[]interface{}{1, 17, []interface{}{1, 9, 11}}),
-					UtilNewRecord( //unique - second row template; diff in scores
+					NewRecordFromSlice( //unique - second row template; diff in scores
 						[]octosql.VariableName{"id", "age", "scores"},
 						[]interface{}{1, 17, []interface{}{9, 1, 11}}),
-					UtilNewRecord( //repetition - second row template;
+					NewRecordFromSlice( //repetition - second row template;
 						[]octosql.VariableName{"id", "age", "scores"},
 						[]interface{}{1, 17, []interface{}{1, 9, 11}}),
-					UtilNewRecord( //unique - second row template; mixed columns same values
+					NewRecordFromSlice( //unique - second row template; mixed columns same values
 						[]octosql.VariableName{"id", "scores", "age"},
 						[]interface{}{[]interface{}{9, 1, 11}, 1, 17}),
 				}),
 			},
 
 			want: NewInMemoryStream([]*Record{
-				UtilNewRecord( //unique
+				NewRecordFromSlice( //unique
 					[]octosql.VariableName{"map", "numbers", "number", "name"},
 					[]interface{}{map[int]string{
 						0: "aaa",
 						1: "bbb",
 						2: "ccc",
 					}, []int{1, 2}, 7, "nazwa"}),
-				UtilNewRecord( //unique - different column order
+				NewRecordFromSlice( //unique - different column order
 					[]octosql.VariableName{"map", "name", "number", "numbers"},
 					[]interface{}{map[int]string{
 						0: "aaa",
 						1: "bbb",
 						2: "ccc",
 					}, "nazwa", 7, []int{1, 2}}),
-				UtilNewRecord( //unique - diff in numbers
+				NewRecordFromSlice( //unique - diff in numbers
 					[]octosql.VariableName{"map", "numbers", "number", "name"},
 					[]interface{}{map[int]string{
 						0: "aaa",
 						1: "bbb",
 						2: "ccc",
 					}, []int{1, 3}, 7, "nazwa"}),
-				UtilNewRecord( //unique diff in number
+				NewRecordFromSlice( //unique diff in number
 					[]octosql.VariableName{"map", "numbers", "number", "name"},
 					[]interface{}{map[int]string{
 						0: "aaa",
 						1: "bbb",
 						2: "ccc",
 					}, []int{1, 3}, 8, "nazwa"}),
-				UtilNewRecord( //unique - diff in name
+				NewRecordFromSlice( //unique - diff in name
 					[]octosql.VariableName{"map", "numbers", "number", "name"},
 					[]interface{}{map[int]string{
 						0: "aaa",
 						1: "bbb",
 						2: "ccc",
 					}, []int{1, 3}, 7, "nazwa0"}),
-				UtilNewRecord( //unique - diff in map
+				NewRecordFromSlice( //unique - diff in map
 					[]octosql.VariableName{"map", "numbers", "number", "name"},
 					[]interface{}{map[int]string{
 						0: "aaa",
 						1: "bbb",
 						2: "cccc",
 					}, []int{1, 3}, 7, "nazwa"}),
-				UtilNewRecord( //unique - second row template
+				NewRecordFromSlice( //unique - second row template
 					[]octosql.VariableName{"id", "age", "scores"},
 					[]interface{}{1, 17, []interface{}{1, 9, 11}}),
-				UtilNewRecord( //unique - second row template; diff in scores
+				NewRecordFromSlice( //unique - second row template; diff in scores
 					[]octosql.VariableName{"id", "age", "scores"},
 					[]interface{}{1, 17, []interface{}{9, 1, 11}}),
-				UtilNewRecord( //unique - second row template; mixed columns same values
+				NewRecordFromSlice( //unique - second row template; mixed columns same values
 					[]octosql.VariableName{"id", "scores", "age"},
 					[]interface{}{[]interface{}{9, 1, 11}, 1, 17}),
 			}),
@@ -439,40 +439,40 @@ func TestDistinct_Get(t *testing.T) {
 			name: "time.Time",
 			args: args{
 				NewInMemoryStream([]*Record{
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"date"},
 						[]interface{}{time.Date(2019, 11, 28, 0, 0, 0, 0, time.FixedZone("Poland", 0))}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"date"},
 						[]interface{}{time.Date(2019, 11, 28, 0, 0, 0, 0, time.FixedZone("Poland", 0))}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"date"},
 						[]interface{}{time.Date(2019, 11, 28, 0, 0, 2, 0, time.FixedZone("Poland", 0))}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"date"},
 						[]interface{}{time.Date(2018, 11, 28, 0, 0, 0, 0, time.FixedZone("Poland", 0))}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"date"},
 						[]interface{}{time.Date(2019, 12, 28, 0, 0, 0, 0, time.FixedZone("Poland", 0))}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{"date"},
 						[]interface{}{time.Date(2019, 11, 27, 0, 0, 2, 0, time.FixedZone("Poland", 0))}),
 				}),
 			},
 			want: NewInMemoryStream([]*Record{
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"date"},
 					[]interface{}{time.Date(2018, 11, 28, 0, 0, 0, 0, time.FixedZone("Poland", 0))}),
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"date"},
 					[]interface{}{time.Date(2019, 12, 28, 0, 0, 0, 0, time.FixedZone("Poland", 0))}),
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"date"},
 					[]interface{}{time.Date(2019, 11, 27, 0, 0, 2, 0, time.FixedZone("Poland", 0))}),
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"date"},
 					[]interface{}{time.Date(2019, 11, 28, 0, 0, 0, 0, time.FixedZone("Poland", 0))}),
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{"date"},
 					[]interface{}{time.Date(2019, 11, 28, 0, 0, 2, 0, time.FixedZone("Poland", 0))}),
 			}),

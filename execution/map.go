@@ -52,26 +52,14 @@ func (stream *MappedStream) Next() (*Record, error) {
 
 	fieldNames := make([]octosql.VariableName, 0)
 	outValues := make(map[octosql.VariableName]interface{})
-	for i := range stream.expressions {
-		fieldNames = append(fieldNames, stream.expressions[i].Name())
+	for _, expr := range stream.expressions {
+		fieldNames = append(fieldNames, expr.Name())
 
-		value, err := stream.expressions[i].ExpressionValue(variables)
+		value, err := extractSingleValue(expr, variables)
 		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't get expression %v", stream.expressions[i].Name())
+			return nil, errors.Wrapf(err, "couldn't get expression %v", expr.Name())
 		}
-
-		if _, ok := value.([]Record); ok {
-			return nil, errors.Errorf("multiple records ended up in one select field %+v", value)
-		}
-
-		if record, ok := value.(Record); ok {
-			if len(record.Fields()) > 1 {
-				return nil, errors.Errorf("multi field record ended up in one select field %+v", value)
-			}
-			outValues[stream.expressions[i].Name()] = record.Value(record.Fields()[0].Name)
-			continue
-		}
-		outValues[stream.expressions[i].Name()] = value
+		outValues[expr.Name()] = value
 	}
 
 	if stream.keep {

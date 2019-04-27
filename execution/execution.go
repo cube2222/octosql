@@ -98,3 +98,25 @@ func (alExpr *AliasedExpression) ExpressionValue(variables octosql.Variables) (i
 func (alExpr *AliasedExpression) Name() octosql.VariableName {
 	return alExpr.name
 }
+
+func extractSingleValue(expr Expression, variables octosql.Variables) (interface{}, error) {
+	value, err := expr.ExpressionValue(variables)
+	if err != nil {
+		return nil, errors.Wrapf(err, "couldn't get expression's value")
+	}
+
+	if records, ok := value.([]Record); ok {
+		if len(records) != 1{
+			return nil, errors.Errorf("number of records different than 1: %+v", value)
+		}
+		value = records[0]
+	}
+
+	if record, ok := value.(Record); ok {
+		if len(record.Fields()) > 1 {
+			return nil, errors.Errorf("multi field record ended up in one select field %+v", value)
+		}
+		return record.Value(record.Fields()[0].Name), nil
+	}
+	return value, nil
+}

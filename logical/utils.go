@@ -22,7 +22,6 @@ func EqualNodes(node1, node2 Node) error {
 			return nil
 		}
 
-	// cannot it be done in one case with UnionAll? (to be removed after review)
 	case *UnionDistinct:
 		if node2, ok := node2.(*UnionDistinct); ok {
 			if err := EqualNodes(node1.first, node2.first); err != nil {

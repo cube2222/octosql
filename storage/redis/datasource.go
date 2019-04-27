@@ -2,7 +2,9 @@ package redis
 
 import (
 	"fmt"
+
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	"github.com/go-redis/redis"
@@ -22,8 +24,9 @@ type DataSource struct {
 	alias      string
 }
 
+// NewDataSourceBuilderFactory creates a new datasource builder factory for a redis database.
 // dbKey is the name for hard-coded key alias used in future formulas for redis queries
-func NewDataSourceBuilderFactory(hostname, password string, port, dbIndex int, dbKey string) func(alias string) *physical.DataSourceBuilder {
+func NewDataSourceBuilderFactory(hostname string, port int, password string, dbIndex int, dbKey string) physical.DataSourceBuilderFactory {
 	return physical.NewDataSourceBuilderFactory(
 		func(filter physical.Formula, alias string) (execution.Node, error) {
 			client := redis.NewClient(
@@ -50,6 +53,28 @@ func NewDataSourceBuilderFactory(hostname, password string, port, dbIndex int, d
 		},
 		availableFilters,
 	)
+}
+
+// NewDataSourceBuilderFactoryFromConfig creates a data source builder factory using the configuration.
+func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (physical.DataSourceBuilderFactory, error) {
+	host, port, err := config.GetIPAddress(dbConfig, "address")
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get address")
+	}
+	dbIndex, err := config.GetInt(dbConfig, "databaseIndex")
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get database index")
+	}
+	dbKey, err := config.GetString(dbConfig, "databaseKeyName")
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get database key name")
+	}
+	password, err := config.GetString(dbConfig, "password") // TODO: Change to environment.
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get password")
+	}
+
+	return NewDataSourceBuilderFactory(host, port, password, dbIndex, dbKey), nil
 }
 
 func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, error) {

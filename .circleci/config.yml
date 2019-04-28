@@ -3,6 +3,7 @@ workflows:
   test-release:
     jobs:
       - test
+      - test-mysql
       - test-postgres
       - test-redis
       - release:
@@ -34,6 +35,22 @@ jobs:
       - run: go test -v ./parser/...
       - run: go test -v ./physical/...
       - run: go test -v ./storage/json/...
+
+  test-mysql:
+    docker:
+      - image: circleci/golang:1.12
+        environment:
+          GO111MODULE: "on"
+      - image: circleci/mysql:latest
+        environment:
+          MYSQL_ROOT_PASSWORD: toor
+          MYSQL_DATABASE: mydb
+
+    working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
+    steps:
+      - checkout
+
+      - run: go test -v ./storage/mysql/...
 
   test-postgres:
     docker:

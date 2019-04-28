@@ -106,13 +106,13 @@ func extractSingleValue(expr Expression, variables octosql.Variables) (interface
 	}
 
 	if records, ok := value.([]Record); ok {
-		if len(records) != 1{
+		if len(records) != 1 {
 			return nil, errors.Errorf("number of records different than 1: %+v", value)
 		}
 		value = records[0]
 	}
 
-	if record, ok := value.(Record); ok {
+	if record, ok := value.(*Record); ok {
 		if len(record.Fields()) > 1 {
 			return nil, errors.Errorf("multi field record ended up in one select field %+v", value)
 		}

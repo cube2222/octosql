@@ -18,14 +18,14 @@ func TestOffset_Get(t *testing.T) {
 		{
 			name:       "negative offset value",
 			vars:       octosql.NoVariables(),
-			node:       NewOffset(UtilNewDummyNode(nil), UtilNewDummyValue(-42)),
+			node:       NewOffset(NewDummyNode(nil), NewDummyValue(-42)),
 			wantStream: nil,
 			wantError:  "negative offset value",
 		},
 		{
 			name:       "offset value not int",
 			vars:       octosql.NoVariables(),
-			node:       NewOffset(UtilNewDummyNode(nil), UtilNewDummyValue(2.0)),
+			node:       NewOffset(NewDummyNode(nil), NewDummyValue(2.0)),
 			wantStream: nil,
 			wantError:  "offset value not int",
 		},
@@ -34,28 +34,28 @@ func TestOffset_Get(t *testing.T) {
 			vars: octosql.NoVariables(),
 			node: NewOffset(&DummyNode{
 				[]*Record{
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{
 							"num",
 						},
 						[]interface{}{
 							1e10,
 						}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{
 							"num",
 						},
 						[]interface{}{
 							3.21,
 						}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{
 							"flag",
 						},
 						[]interface{}{
 							false,
 						}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{
 							"num",
 						},
@@ -65,14 +65,14 @@ func TestOffset_Get(t *testing.T) {
 				},
 			}, &DummyValue{2}),
 			wantStream: NewInMemoryStream([]*Record{
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{
 						"flag",
 					},
 					[]interface{}{
 						false,
 					}),
-				UtilNewRecord(
+				NewRecordFromSlice(
 					[]octosql.VariableName{
 						"num",
 					},
@@ -87,14 +87,14 @@ func TestOffset_Get(t *testing.T) {
 			vars: octosql.NoVariables(),
 			node: NewOffset(&DummyNode{
 				[]*Record{
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{
 							"num",
 						},
 						[]interface{}{
 							1,
 						}),
-					UtilNewRecord(
+					NewRecordFromSlice(
 						[]octosql.VariableName{
 							"num",
 						},
@@ -103,9 +103,8 @@ func TestOffset_Get(t *testing.T) {
 						}),
 				},
 			}, &DummyValue{4}),
-			wantStream: NewInMemoryStream([]*Record{
-			}),
-			wantError: NO_ERROR,
+			wantStream: NewInMemoryStream([]*Record{}),
+			wantError:  NO_ERROR,
 		},
 	}
 

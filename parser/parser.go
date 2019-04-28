@@ -182,7 +182,7 @@ func ParseAliasedExpression(expr *sqlparser.AliasedExpr) (logical.NamedExpressio
 		if named, ok := subExpr.(logical.NamedExpression); ok {
 			return named, nil
 		}
-		return nil, errors.Wrap(err, "expressions in select statement must be named")
+		return nil, errors.Errorf("expressions in select statement must be named")
 	}
 	return logical.NewAliasedExpression(octosql.VariableName(expr.As.String()), subExpr), nil
 }

@@ -159,6 +159,9 @@ func ParseNode(statement sqlparser.SelectStatement) (logical.Node, error) {
 func ParseTableExpression(expr *sqlparser.AliasedTableExpr) (logical.Node, error) {
 	switch subExpr := expr.Expr.(type) {
 	case sqlparser.TableName:
+		if expr.As.IsEmpty() {
+			return nil, errors.Errorf("table \"%v\" must have unique alias", subExpr.Name)
+		}
 		return logical.NewDataSource(subExpr.Name.String(), expr.As.String()), nil
 
 	case *sqlparser.Subquery:

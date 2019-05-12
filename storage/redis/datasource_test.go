@@ -668,24 +668,19 @@ func TestDataSource_Get(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "wrong db",
+			name: "wrong db address",
 			fields: fields{
 				hostname: hostname,
 				password: password,
 				port:     1111,
 				dbIndex:  20,
 				dbKey:    dbKey,
-				filter: physical.NewPredicate(
-					physical.NewVariable("r.key"),
-					physical.NewRelation("equal"),
-					physical.NewVariable("const_0")),
-				alias:   "r",
-				queries: map[string]map[string]interface{}{},
+				filter:   physical.NewConstant(true),
+				alias:    "r",
+				queries:  map[string]map[string]interface{}{},
 			},
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": "key0",
-				},
+				variables: map[octosql.VariableName]interface{}{},
 			},
 			want:    nil,
 			wantErr: true,

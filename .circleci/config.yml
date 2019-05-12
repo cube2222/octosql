@@ -41,7 +41,7 @@ jobs:
       - image: circleci/golang:1.12
         environment:
           GO111MODULE: "on"
-      - image: mysql:latest
+      - image: circleci/mysql:latest
         environment:
           MYSQL_ROOT_PASSWORD: toor
           MYSQL_DATABASE: mydb

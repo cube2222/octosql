@@ -50,6 +50,7 @@ jobs:
     steps:
       - checkout
 
+      - run: sleep 4
       - run: go test -v ./storage/mysql/...
 
   test-postgres:

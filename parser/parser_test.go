@@ -509,6 +509,45 @@ WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age`,
 			),
 			wantErr: false,
 		},
+		{
+			name: "left join",
+			args: args{
+				statement: `
+SELECT p.name FROM people p LEFT JOIN cities c ON p.city = c.name AND p.favorite_city = c.name`,
+			},
+			want: logical.NewMap(
+				[]logical.NamedExpression{
+					logical.NewVariable("p.name"),
+				},
+				logical.NewMap(
+					[]logical.NamedExpression{
+						logical.NewVariable("p.name"),
+					},
+					logical.NewLeftJoin(
+						logical.NewDataSource("people", "p"),
+						logical.NewFilter(
+							logical.NewInfixOperator(
+								logical.NewPredicate(
+									logical.NewVariable("p.city"),
+									logical.Equal,
+									logical.NewVariable("c.name"),
+								),
+								logical.NewPredicate(
+									logical.NewVariable("p.favorite_city"),
+									logical.Equal,
+									logical.NewVariable("c.name"),
+								),
+								"AND",
+							),
+							logical.NewDataSource("cities", "c"),
+						),
+					),
+					true,
+				),
+				false,
+			),
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

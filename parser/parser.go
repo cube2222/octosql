@@ -66,13 +66,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		return nil, errors.Errorf("currently only one expression in from supported, got %v", len(statement.From))
 	}
 
-	aliasedTableFrom, ok := statement.From[0].(*sqlparser.AliasedTableExpr)
-	if !ok {
-		return nil, errors.Errorf("expected aliased table expression in from, got %v %v",
-			statement.From[0], reflect.TypeOf(statement.From[0]))
-	}
-
-	root, err = ParseTableExpression(aliasedTableFrom)
+	root, err = ParseTableExpression(statement.From[0])
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't parse from expression")
 	}
@@ -156,7 +150,20 @@ func ParseNode(statement sqlparser.SelectStatement) (logical.Node, error) {
 	}
 }
 
-func ParseTableExpression(expr *sqlparser.AliasedTableExpr) (logical.Node, error) {
+func ParseTableExpression(expr sqlparser.TableExpr) (logical.Node, error) {
+	switch expr := expr.(type) {
+	case *sqlparser.AliasedTableExpr:
+		return ParseAliasedTableExpression(expr)
+	case *sqlparser.JoinTableExpr:
+		return ParseJoinTableExpression(expr)
+	case *sqlparser.ParenTableExpr:
+		return ParseTableExpression(expr.Exprs[0])
+	default:
+		return nil, errors.Errorf("invalid table expression %+v of type %v", expr, reflect.TypeOf(expr))
+	}
+}
+
+func ParseAliasedTableExpression(expr *sqlparser.AliasedTableExpr) (logical.Node, error) {
 	switch subExpr := expr.Expr.(type) {
 	case sqlparser.TableName:
 		if expr.As.IsEmpty() {
@@ -172,8 +179,42 @@ func ParseTableExpression(expr *sqlparser.AliasedTableExpr) (logical.Node, error
 		return logical.NewRequalifier(expr.As.String(), subQuery), nil
 
 	default:
-		return nil, errors.Errorf("invalid table expression %+v of type %v", expr.Expr, reflect.TypeOf(expr.Expr))
+		return nil, errors.Errorf("invalid aliased table expression %+v of type %v", expr.Expr, reflect.TypeOf(expr.Expr))
 	}
+}
+
+func ParseJoinTableExpression(expr *sqlparser.JoinTableExpr) (logical.Node, error) {
+	leftTable, err := ParseTableExpression(expr.LeftExpr)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't parse join left table expression")
+	}
+	rightTable, err := ParseTableExpression(expr.RightExpr)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't parse join right table expression")
+	}
+
+	var source, joined logical.Node
+	switch expr.Join {
+	case sqlparser.LeftJoinStr:
+		source = leftTable
+		joined = rightTable
+	case sqlparser.RightJoinStr:
+		source = rightTable
+		joined = leftTable
+	default:
+		return nil, errors.Errorf("invalid join expression: %v", expr.Join)
+	}
+
+	if expr.Condition.On != nil {
+		condition, err := ParseLogic(expr.Condition.On)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't parse ON condition in join")
+		}
+
+		joined = logical.NewFilter(condition, joined)
+	}
+
+	return logical.NewLeftJoin(source, joined), nil
 }
 
 func ParseAliasedExpression(expr *sqlparser.AliasedExpr) (logical.NamedExpression, error) {

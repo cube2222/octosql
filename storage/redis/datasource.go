@@ -146,6 +146,9 @@ func (rs *EntireDatabaseStream) Next() (*execution.Record, error) {
 		}
 
 		if !rs.dbIterator.Next() {
+			if rs.dbIterator.Err() != nil {
+				return nil, rs.dbIterator.Err()
+			}
 			rs.isDone = true
 			return nil, execution.ErrEndOfStream
 		}

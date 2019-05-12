@@ -667,6 +667,29 @@ func TestDataSource_Get(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 		},
+		{
+			name: "wrong db",
+			fields: fields{
+				hostname: hostname,
+				password: password,
+				port:     1111,
+				dbIndex:  20,
+				dbKey:    dbKey,
+				filter: physical.NewPredicate(
+					physical.NewVariable("r.key"),
+					physical.NewRelation("equal"),
+					physical.NewVariable("const_0")),
+				alias:   "r",
+				queries: map[string]map[string]interface{}{},
+			},
+			args: args{
+				variables: map[octosql.VariableName]interface{}{
+					"const_0": "key0",
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

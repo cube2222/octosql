@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/bradleyjkemp/memmap"
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"

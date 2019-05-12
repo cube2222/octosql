@@ -548,6 +548,45 @@ SELECT p.name FROM people p LEFT JOIN cities c ON p.city = c.name AND p.favorite
 			),
 			wantErr: false,
 		},
+		{
+			name: "right join",
+			args: args{
+				statement: `
+SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorite_city = c.name`,
+			},
+			want: logical.NewMap(
+				[]logical.NamedExpression{
+					logical.NewVariable("p.name"),
+				},
+				logical.NewMap(
+					[]logical.NamedExpression{
+						logical.NewVariable("p.name"),
+					},
+					logical.NewLeftJoin(
+						logical.NewDataSource("people", "p"),
+						logical.NewFilter(
+							logical.NewInfixOperator(
+								logical.NewPredicate(
+									logical.NewVariable("p.city"),
+									logical.Equal,
+									logical.NewVariable("c.name"),
+								),
+								logical.NewPredicate(
+									logical.NewVariable("p.favorite_city"),
+									logical.Equal,
+									logical.NewVariable("c.name"),
+								),
+								"AND",
+							),
+							logical.NewDataSource("cities", "c"),
+						),
+					),
+					true,
+				),
+				false,
+			),
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

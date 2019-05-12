@@ -8,7 +8,9 @@ require (
 	github.com/go-redis/redis v6.15.2+incompatible
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/lib/pq v1.0.0
+	github.com/mattn/go-runewidth v0.0.4 // indirect
 	github.com/mitchellh/hashstructure v1.0.0
+	github.com/olekukonko/tablewriter v0.0.1
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0 // indirect
 	github.com/pkg/errors v0.8.1

@@ -36,6 +36,7 @@ type LeftJoinedStream struct {
 	joined          Node
 	curRecord       *Record
 	curJoinedStream RecordStream
+	joinedAnyRecord bool
 }
 
 func (stream *LeftJoinedStream) Next() (*Record, error) {
@@ -60,18 +61,26 @@ func (stream *LeftJoinedStream) Next() (*Record, error) {
 			}
 
 			stream.curRecord = srcRecord
+			stream.joinedAnyRecord = false
 		}
 
 		joinedRecord, err := stream.curJoinedStream.Next()
 		if err != nil {
 			// TODO: If there's nothing, then we have to put one record with a null right side
 			if err == ErrEndOfStream {
+				if !stream.joinedAnyRecord {
+					toReturn := stream.curRecord
+					stream.curRecord = nil
+					stream.curJoinedStream = nil
+					return toReturn, nil
+				}
 				stream.curRecord = nil
 				stream.curJoinedStream = nil
 				continue
 			}
 			return nil, errors.Wrap(err, "couldn't get joined record")
 		}
+		stream.joinedAnyRecord = true
 
 		fields := stream.curRecord.fieldNames
 		for _, field := range joinedRecord.Fields() {

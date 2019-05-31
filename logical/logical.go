@@ -118,8 +118,8 @@ func NewAliasedExpression(name octosql.VariableName, expr Expression) NamedExpre
 	return &AliasedExpression{name: name, expr: expr}
 }
 
-func (v *AliasedExpression) Name() octosql.VariableName {
-	return v.name
+func (alExpr *AliasedExpression) Name() octosql.VariableName {
+	return alExpr.name
 }
 
 func (alExpr *AliasedExpression) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/logical"
@@ -233,6 +234,26 @@ func ParseAliasedExpression(expr *sqlparser.AliasedExpr) (logical.NamedExpressio
 
 func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 	switch expr := expr.(type) {
+	case *sqlparser.FuncExpr:
+		functionName := strings.ToLower(expr.Name.String())
+
+		if len(expr.Exprs) != 1 {
+			return nil, errors.Errorf("expected single select in select exprs, go %v %v",
+				expr.Exprs[0], reflect.TypeOf(expr.Exprs[0]))
+		}
+
+		subexpr, ok := expr.Exprs[0].(*sqlparser.AliasedExpr)
+		if !ok {
+			return nil, errors.Errorf("expected aliased expression")
+		}
+
+		parsed, err := ParseAliasedExpression(subexpr)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't parse aliased expression")
+		}
+
+		return logical.NewFunctionExpression(functionName, parsed), nil
+
 	case *sqlparser.ColName:
 		name := expr.Name.String()
 		if !expr.Qualifier.Name.IsEmpty() {

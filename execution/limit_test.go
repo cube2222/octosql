@@ -126,10 +126,10 @@ func TestLimit_Get(t *testing.T) {
 
 			equal, err := AreStreamsEqual(rs, tt.wantStream)
 			if !equal {
-				t.Errorf("limitedStream doesn't work as expected")
+				t.Errorf("LimitedStream doesn't work as expected")
 			}
 			if err != nil {
-				t.Errorf("limitedStream comparison error: %v", err)
+				t.Errorf("LimitedStream comparison error: %v", err)
 			}
 		})
 	}
@@ -138,11 +138,11 @@ func TestLimit_Get(t *testing.T) {
 func TestLimitedStream_Next(t *testing.T) {
 	tests := []struct {
 		name       string
-		stream     *limitedStream
+		stream     *LimitedStream
 		wantStream *InMemoryStream
 	}{
 		{
-			name: "Simplest limitedStream possible",
+			name: "Simplest LimitedStream possible",
 			stream: newLimitedStream(
 				NewInMemoryStream([]*Record{
 					NewRecordFromSlice(
@@ -178,10 +178,10 @@ func TestLimitedStream_Next(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			equal, err := AreStreamsEqual(tt.stream, tt.wantStream)
 			if !equal {
-				t.Errorf("limitedStream doesn't work as intended")
+				t.Errorf("LimitedStream doesn't work as intended")
 			}
 			if err != nil {
-				t.Errorf("limitedStream comparison error: %v", err)
+				t.Errorf("LimitedStream comparison error: %v", err)
 			}
 		})
 	}

@@ -123,6 +123,15 @@ type EntireDatabaseStream struct {
 	alias      string
 }
 
+func (rs *KeySpecificStream) Close() error {
+	err := rs.client.Close()
+	if err != nil {
+		return errors.Wrap(err, "Couldn't close underlying client")
+	}
+
+	return nil
+}
+
 func (rs *KeySpecificStream) Next() (*execution.Record, error) {
 	if rs.isDone {
 		return nil, execution.ErrEndOfStream
@@ -137,6 +146,15 @@ func (rs *KeySpecificStream) Next() (*execution.Record, error) {
 	rs.counter++
 
 	return GetNewRecord(rs.client, key, rs.alias)
+}
+
+func (rs *EntireDatabaseStream) Close() error {
+	err := rs.client.Close()
+	if err != nil {
+		return errors.Wrap(err, "Couldn't close underlying client")
+	}
+
+	return nil
 }
 
 func (rs *EntireDatabaseStream) Next() (*execution.Record, error) {

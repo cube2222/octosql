@@ -72,6 +72,7 @@ func getType(i interface{}) octosql.Datatype {
 
 type RecordStream interface {
 	Next() (*Record, error)
+	Close() error
 }
 
 var ErrEndOfStream = errors.New("end of stream")

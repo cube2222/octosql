@@ -22,6 +22,8 @@ var functionTable = map[string]execution.FunctionType{
 	"upper": execution.FuncUpper,
 	"neg":   execution.FuncNegative,
 	"abs":   execution.FuncAbs,
+	"cap":   execution.FuncCapitalize,
+	"sqrt":  execution.FuncSqrt,
 }
 
 type FunctionExpression struct {

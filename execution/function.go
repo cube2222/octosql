@@ -93,3 +93,25 @@ func FuncAbs(x interface{}) (interface{}, error) {
 		return 0, errors.New("Variable of given typed doesn't have absolute value")
 	}
 }
+
+func FuncCapitalize(x interface{}) (interface{}, error) {
+	x = NormalizeType(x)
+	switch x := x.(type) {
+	case string:
+		return strings.Title(x), nil
+	default:
+		return "", errors.New("Variable of given type can't be capitalized")
+	}
+}
+
+func FuncSqrt(x interface{}) (interface{}, error) {
+	x = NormalizeType(x)
+	switch x := x.(type) {
+	case int:
+		return math.Sqrt(float64(x)), nil
+	case float64:
+		return math.Sqrt(x), nil
+	default:
+		return 0, errors.New("Variable of given name doesn't have a square root")
+	}
+}

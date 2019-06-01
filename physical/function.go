@@ -24,25 +24,30 @@ var functionTable = map[string]execution.FunctionType{
 	"abs":   execution.FuncAbs,
 	"cap":   execution.FuncCapitalize,
 	"sqrt":  execution.FuncSqrt,
+	"max":   execution.FuncMax,
 }
 
 type FunctionExpression struct {
-	Name  string
-	Child Expression
+	name      string
+	arguments []Expression
 }
 
-func NewFunctionExpression(name string, child Expression) *FunctionExpression {
+func NewFunctionExpression(name string, args []Expression) *FunctionExpression {
 	return &FunctionExpression{
-		Name:  name,
-		Child: child,
+		name:      name,
+		arguments: args,
 	}
 }
 
 func (fe *FunctionExpression) Transform(ctx context.Context, transformers *Transformers) Expression {
-	var expr Expression = &FunctionExpression{
-		Name:  fe.Name,
-		Child: fe.Child.Transform(ctx, transformers),
+	transformed := make([]Expression, 0)
+	for i := range fe.arguments {
+		transformedArg := fe.arguments[i].Transform(ctx, transformers)
+		transformed = append(transformed, transformedArg)
 	}
+
+	var expr Expression = NewFunctionExpression(fe.name, transformed)
+
 	if transformers.ExprT != nil {
 		expr = transformers.ExprT(expr)
 	}
@@ -50,14 +55,19 @@ func (fe *FunctionExpression) Transform(ctx context.Context, transformers *Trans
 }
 
 func (fe *FunctionExpression) Materialize(ctx context.Context) (execution.Expression, error) {
-	materialized, err := fe.Child.Materialize(ctx)
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't materialize child")
+	function, ok := functionTable[fe.name]
+	if !ok {
+		return nil, errors.Errorf("No function %v found", fe.name)
 	}
 
-	function, ok := functionTable[fe.Name]
-	if !ok {
-		return nil, errors.Errorf("No function %v found", fe.Name)
+	materialized := make([]execution.Expression, 0)
+	for i := range fe.arguments {
+		materializedArg, err := fe.arguments[i].Materialize(ctx)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't materialize argument")
+		}
+
+		materialized = append(materialized, materializedArg)
 	}
 
 	return execution.NewFunctionExpression(function, materialized), nil

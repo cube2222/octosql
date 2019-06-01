@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
-	"github.com/cube2222/octosql"
+	"github.com/bradleyjkemp/memmap"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/logical"
@@ -17,7 +18,6 @@ import (
 	"github.com/cube2222/octosql/storage/mysql"
 	"github.com/cube2222/octosql/storage/postgres"
 	"github.com/cube2222/octosql/storage/redis"
-	"github.com/olekukonko/tablewriter"
 	"github.com/xwb1989/sqlparser"
 )
 
@@ -64,6 +64,13 @@ func main() {
 
 	phys = optimizer.Optimize(ctx, optimizer.DefaultScenarios, phys)
 
+	f, err := os.Create("diag_got")
+	if err != nil {
+		log.Fatal(err)
+	}
+	memmap.Map(f, phys)
+	f.Close()
+
 	exec, err := phys.Materialize(ctx)
 	if err != nil {
 		log.Fatal(err)
@@ -75,40 +82,16 @@ func main() {
 	}
 
 	var rec *execution.Record
-	var records []*execution.Record
 	for rec, err = stream.Next(); err == nil; rec, err = stream.Next() {
-		records = append(records, rec)
+		var out []string
+		fields := rec.Fields()
+		for i := range fields {
+			v := rec.Value(fields[i].Name)
+			out = append(out, fmt.Sprintf("%v: %v", fields[i].Name, v))
+		}
+		fmt.Println(strings.Join(out, ", "))
 	}
 	if err != execution.ErrEndOfStream {
 		log.Fatal(err)
 	}
-
-	var fields []string
-	for _, record := range records {
-		for _, field := range record.Fields() {
-			found := false
-			for i := range fields {
-				if fields[i] == field.Name.String() {
-					found = true
-				}
-			}
-			if !found {
-				fields = append(fields, field.Name.String())
-			}
-		}
-	}
-
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader(fields)
-
-	for _, record := range records {
-		var out []string
-		for _, field := range fields {
-			value := record.Value(octosql.NewVariableName(field))
-			out = append(out, fmt.Sprint(value))
-		}
-		table.Append(out)
-	}
-
-	table.Render()
 }

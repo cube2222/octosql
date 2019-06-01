@@ -53,15 +53,12 @@ func FuncInt(args []interface{}) (interface{}, error) {
 	}
 
 	arg := args[0]
-	arg = NormalizeType(arg)
-	switch x := arg.(type) {
-	case int:
-		return x, nil
-	case float64:
-		return int(x), nil
-	default:
-		return 0, errors.Errorf("Can't cast variable %v of type %v to int", arg, reflect.TypeOf(arg))
+	fArg, err := floatify(arg)
+	if err != nil {
+		return nil, errors.Errorf("Can't cast variable %v of type %v to int", arg, reflect.TypeOf(arg))
 	}
+
+	return int(fArg), nil
 }
 
 func FuncLower(args []interface{}) (interface{}, error) {
@@ -69,14 +66,12 @@ func FuncLower(args []interface{}) (interface{}, error) {
 		return nil, errors.Errorf("lower: expected 1 argument, got %v", len(args))
 	}
 
-	arg := args[0]
-	arg = NormalizeType(arg)
-	switch x := arg.(type) {
-	case string:
-		return strings.ToLower(x), nil
-	default:
-		return "", errors.Errorf("Can't lowercase variable %v of type %v", arg, reflect.TypeOf(arg))
+	arg := NormalizeType(args[0])
+	if arg, ok := arg.(string); ok {
+		return strings.ToLower(arg), nil
 	}
+
+	return nil, errors.Errorf("Couldn't lowercase variable %v of type %v", arg, reflect.TypeOf(arg))
 }
 
 func FuncUpper(args []interface{}) (interface{}, error) {
@@ -84,14 +79,12 @@ func FuncUpper(args []interface{}) (interface{}, error) {
 		return nil, errors.Errorf("upper: expected 1 argument, got %v", len(args))
 	}
 
-	arg := args[0]
-	arg = NormalizeType(arg)
-	switch x := arg.(type) {
-	case string:
-		return strings.ToUpper(x), nil
-	default:
-		return "", errors.Errorf("Can't uppercase variable %v of type %v", arg, reflect.TypeOf(arg))
+	arg := NormalizeType(args[0])
+	if arg, ok := arg.(string); ok {
+		return strings.ToUpper(arg), nil
 	}
+
+	return nil, errors.Errorf("Couldn't uppercase variable %v of type %v", arg, reflect.TypeOf(arg))
 }
 
 func FuncNegative(args []interface{}) (interface{}, error) {
@@ -100,15 +93,12 @@ func FuncNegative(args []interface{}) (interface{}, error) {
 	}
 
 	arg := args[0]
-	arg = NormalizeType(arg)
-	switch x := arg.(type) {
-	case int:
-		return -x, nil
-	case float64:
-		return -x, nil
-	default:
-		return 0, errors.Errorf("Can't negate variable %v of type %v", arg, reflect.TypeOf(arg))
+	fArg, err := floatify(arg)
+	if err != nil {
+		return nil, errors.Errorf("Can't negate variable %v of type %v", arg, reflect.TypeOf(arg))
 	}
+
+	return -1 * fArg, nil
 }
 
 func FuncAbs(args []interface{}) (interface{}, error) {
@@ -117,15 +107,12 @@ func FuncAbs(args []interface{}) (interface{}, error) {
 	}
 
 	arg := args[0]
-	arg = NormalizeType(arg)
-	switch x := arg.(type) {
-	case int:
-		return int(math.Abs(float64(x))), nil
-	case float64:
-		return math.Abs(x), nil
-	default:
-		return 0, errors.Errorf("Can't take absolute value of variable %v of type %v", arg, reflect.TypeOf(arg))
+	fArg, err := floatify(arg)
+	if err != nil {
+		return nil, errors.Errorf("Can't take absolute value of variable %v of type %v", arg, reflect.TypeOf(arg))
 	}
+
+	return math.Abs(fArg), nil
 }
 
 func FuncCapitalize(args []interface{}) (interface{}, error) {
@@ -133,14 +120,12 @@ func FuncCapitalize(args []interface{}) (interface{}, error) {
 		return nil, errors.Errorf("int: expected 1 argument, got %v", len(args))
 	}
 
-	arg := args[0]
-	arg = NormalizeType(arg)
-	switch x := arg.(type) {
-	case string:
-		return strings.Title(x), nil
-	default:
-		return "", errors.Errorf("Can't capitalize variable %v of type %v", arg, reflect.TypeOf(arg))
+	arg := NormalizeType(args[0])
+	if arg, ok := arg.(string); ok {
+		return strings.ToTitle(arg), nil
 	}
+
+	return nil, errors.Errorf("Can't capitalize variable %v of type %v", arg, reflect.TypeOf(arg))
 }
 
 func FuncSqrt(args []interface{}) (interface{}, error) {
@@ -149,15 +134,12 @@ func FuncSqrt(args []interface{}) (interface{}, error) {
 	}
 
 	arg := args[0]
-	arg = NormalizeType(arg)
-	switch x := arg.(type) {
-	case int:
-		return math.Sqrt(float64(x)), nil
-	case float64:
-		return math.Sqrt(x), nil
-	default:
-		return 0, errors.Errorf("Can't take sqrt of variable %v of type %v", arg, reflect.TypeOf(arg))
+	fArg, err := floatify(arg)
+	if err != nil {
+		return nil, errors.Errorf("Couldn't take sqrt of variable %v of type %v", arg, reflect.TypeOf(arg))
 	}
+
+	return math.Sqrt(fArg), nil
 }
 
 func FuncMax(args []interface{}) (interface{}, error) {
@@ -168,16 +150,12 @@ func FuncMax(args []interface{}) (interface{}, error) {
 	max := math.Inf(-1) /* negative infinity */
 	for i := range args {
 		arg := args[i]
-		arg = NormalizeType(arg)
-
-		switch arg := arg.(type) {
-		case int:
-			max = math.Max(float64(arg), max)
-		case float64:
-			max = math.Max(arg, max)
-		default:
-			return nil, errors.Errorf("Can't take maximum of variable %v of type %v", arg, reflect.TypeOf(arg))
+		fArg, err := floatify(arg)
+		if err != nil {
+			return nil, errors.Errorf("Can't include variable %v of type %v in maximum", arg, reflect.TypeOf(arg))
 		}
+
+		max = math.Max(max, fArg)
 	}
 
 	return max, nil
@@ -191,16 +169,12 @@ func FuncMin(args []interface{}) (interface{}, error) {
 	min := math.Inf(1) /* positive infinity */
 	for i := range args {
 		arg := args[i]
-		arg = NormalizeType(arg)
-
-		switch arg := arg.(type) {
-		case int:
-			min = math.Min(float64(arg), min)
-		case float64:
-			min = math.Min(arg, min)
-		default:
-			return nil, errors.Errorf("Can't take minimum of variable %v of type %v", arg, reflect.TypeOf(arg))
+		fArg, err := floatify(arg)
+		if err != nil {
+			return nil, errors.Errorf("Can't include variable %v of type %v in minimum", arg, reflect.TypeOf(arg))
 		}
+
+		min = math.Min(min, fArg)
 	}
 
 	return min, nil
@@ -247,15 +221,13 @@ func FuncFloor(args []interface{}) (interface{}, error) {
 		return nil, errors.Errorf("floor: expected 1 argument, got %v", len(args))
 	}
 
-	arg := NormalizeType(args[0])
-	switch arg := arg.(type) {
-	case int:
-		return int(math.Floor(float64(arg))), nil
-	case float64:
-		return int(math.Floor(arg)), nil
-	default:
+	arg := args[0]
+	fArg, err := floatify(arg)
+	if err != nil {
 		return nil, errors.Errorf("Can't take floor of variable %v of type %v", arg, reflect.TypeOf(arg))
 	}
+
+	return int(math.Floor(fArg)), nil
 }
 
 func FuncCeil(args []interface{}) (interface{}, error) {
@@ -263,15 +235,62 @@ func FuncCeil(args []interface{}) (interface{}, error) {
 		return nil, errors.Errorf("ceil: expected 1 argument, got %v", len(args))
 	}
 
-	arg := NormalizeType(args[0])
-	switch arg := arg.(type) {
-	case int:
-		return int(math.Ceil(float64(arg))), nil
-	case float64:
-		return int(math.Ceil(arg)), nil
-	default:
+	arg := args[0]
+	fArg, err := floatify(arg)
+	if err != nil {
 		return nil, errors.Errorf("Can't take ceiling of variable %v of type %v", arg, reflect.TypeOf(arg))
 	}
+
+	return int(math.Ceil(fArg)), nil
+}
+
+func FuncLog(args []interface{}) (interface{}, error) {
+	if len(args) != 1 {
+		return nil, errors.Errorf("log: expected 1 argument, got %v", len(args))
+	}
+
+	arg := args[0]
+	fArg, err := floatify(arg)
+	if err != nil {
+		return nil, errors.Errorf("Can't take log of variable %v of type %v", arg, reflect.TypeOf(arg))
+	}
+
+	return math.Log2(fArg), nil
+}
+
+func FuncLn(args []interface{}) (interface{}, error) {
+	if len(args) != 1 {
+		return nil, errors.Errorf("ln: expected 1 argument, got %v", len(args))
+	}
+
+	arg := args[0]
+	fArg, err := floatify(arg)
+	if err != nil {
+		return nil, errors.Errorf("Can't take ln of variable %v of type %v", arg, reflect.TypeOf(arg))
+	}
+
+	return math.Log1p(fArg) - 1, nil
+}
+
+func FuncPower(args []interface{}) (interface{}, error) {
+	if len(args) != 2 {
+		return nil, errors.Errorf("pow: Expected 2 arguments, got %v", len(args))
+	}
+
+	base := args[0]
+	exp := args[1]
+
+	fBase, err := floatify(base)
+	if err != nil {
+		return nil, errors.Errorf("Base of power can't be variable %v of type %v", base, reflect.TypeOf(base))
+	}
+
+	fExp, err := floatify(exp)
+	if err != nil {
+		return nil, errors.Errorf("Exponent of power can't be variable %v of type %v", exp, reflect.TypeOf(exp))
+	}
+
+	return math.Pow(fBase, fExp), nil
 }
 
 /* Auxiliary functions */

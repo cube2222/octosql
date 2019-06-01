@@ -29,6 +29,9 @@ var functionTable = map[string]execution.FunctionType{
 	"rand":  execution.FuncRand,
 	"ceil":  execution.FuncCeil,
 	"floor": execution.FuncFloor,
+	"log":   execution.FuncLog,
+	"ln":    execution.FuncLn,
+	"pow":   execution.FuncPower,
 }
 
 type FunctionExpression struct {

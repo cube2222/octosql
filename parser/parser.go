@@ -223,6 +223,13 @@ func ParseAliasedExpression(expr *sqlparser.AliasedExpr) (logical.NamedExpressio
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't parse aliased expression: %+v", expr.Expr)
 	}
+
+	/* If it's a function without alias then the name of the functions becomes the alias */
+	fun, ok := expr.Expr.(*sqlparser.FuncExpr)
+	if ok && expr.As.String() == "" {
+		expr.As = fun.Name
+	}
+
 	if expr.As.String() == "" {
 		if named, ok := subExpr.(logical.NamedExpression); ok {
 			return named, nil

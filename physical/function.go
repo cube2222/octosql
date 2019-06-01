@@ -25,6 +25,10 @@ var functionTable = map[string]execution.FunctionType{
 	"cap":   execution.FuncCapitalize,
 	"sqrt":  execution.FuncSqrt,
 	"max":   execution.FuncMax,
+	"min":   execution.FuncMin,
+	"rand":  execution.FuncRand,
+	"ceil":  execution.FuncCeil,
+	"floor": execution.FuncFloor,
 }
 
 type FunctionExpression struct {

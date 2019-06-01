@@ -2,6 +2,7 @@ package execution
 
 import (
 	"math"
+	"math/rand"
 	"reflect"
 	"strings"
 
@@ -180,4 +181,109 @@ func FuncMax(args []interface{}) (interface{}, error) {
 	}
 
 	return max, nil
+}
+
+func FuncMin(args []interface{}) (interface{}, error) {
+	if len(args) == 0 {
+		return nil, errors.New("min: expected any arguments, got 0")
+	}
+
+	min := math.Inf(1) /* positive infinity */
+	for i := range args {
+		arg := args[i]
+		arg = NormalizeType(arg)
+
+		switch arg := arg.(type) {
+		case int:
+			min = math.Min(float64(arg), min)
+		case float64:
+			min = math.Min(arg, min)
+		default:
+			return nil, errors.Errorf("Can't take minimum of variable %v of type %v", arg, reflect.TypeOf(arg))
+		}
+	}
+
+	return min, nil
+}
+
+/* 	No arguments means a random real number between [0, 1]
+   	One argument is the upper bound.
+	Two arguments is the lower and upper bound.
+*/
+func FuncRand(args []interface{}) (interface{}, error) {
+	argCount := len(args)
+
+	if argCount > 2 {
+		return nil, errors.Errorf("rand: expected at most 2 arguments, got %v", argCount)
+	}
+
+	if argCount == 0 { /* [0, 1] */
+		return rand.Float64(), nil
+	} else if argCount == 1 { /* only upper bound */
+		upper, err := floatify(args[0])
+		if err != nil {
+			return nil, err
+		}
+
+		return upper * rand.Float64(), nil
+
+	} else { /* lower and upper bound */
+		lower, err := floatify(args[0])
+		if err != nil {
+			return nil, err
+		}
+
+		upper, err := floatify(args[1])
+		if err != nil {
+			return nil, err
+		}
+
+		return lower + rand.Float64()*(upper-lower), nil
+	}
+}
+
+func FuncFloor(args []interface{}) (interface{}, error) {
+	if len(args) != 1 {
+		return nil, errors.Errorf("floor: expected 1 argument, got %v", len(args))
+	}
+
+	arg := NormalizeType(args[0])
+	switch arg := arg.(type) {
+	case int:
+		return int(math.Floor(float64(arg))), nil
+	case float64:
+		return int(math.Floor(arg)), nil
+	default:
+		return nil, errors.Errorf("Can't take floor of variable %v of type %v", arg, reflect.TypeOf(arg))
+	}
+}
+
+func FuncCeil(args []interface{}) (interface{}, error) {
+	if len(args) != 1 {
+		return nil, errors.Errorf("ceil: expected 1 argument, got %v", len(args))
+	}
+
+	arg := NormalizeType(args[0])
+	switch arg := arg.(type) {
+	case int:
+		return int(math.Ceil(float64(arg))), nil
+	case float64:
+		return int(math.Ceil(arg)), nil
+	default:
+		return nil, errors.Errorf("Can't take ceiling of variable %v of type %v", arg, reflect.TypeOf(arg))
+	}
+}
+
+/* Auxiliary functions */
+func floatify(x interface{}) (float64, error) {
+	x = NormalizeType(x)
+	switch x := x.(type) {
+	case int:
+		return float64(x), nil
+	case float64:
+		return x, nil
+	default:
+		return 0.0, errors.Errorf("Value %v of type %v can't be cast to float",
+			x, reflect.TypeOf(x))
+	}
 }

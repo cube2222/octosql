@@ -23,11 +23,11 @@ func NewEqual() Relation {
 func (rel *Equal) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
 	leftValue, err := left.ExpressionValue(variables)
 	if err != nil {
-		return false, errors.Wrap(err, "couldn't get value of left operator in more than")
+		return false, errors.Wrap(err, "couldn't get value of left operator in equal")
 	}
 	rightValue, err := right.ExpressionValue(variables)
 	if err != nil {
-		return false, errors.Wrap(err, "couldn't get value of right operator in more than")
+		return false, errors.Wrap(err, "couldn't get value of right operator in equal")
 	}
 	if leftValue == nil || rightValue == nil {
 		if leftValue == nil && rightValue == nil {
@@ -161,11 +161,11 @@ func NewLike() Relation {
 func (rel *Like) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
 	leftValue, err := left.ExpressionValue(variables)
 	if err != nil {
-		return false, errors.Wrap(err, "couldn't get value of left operator in more than")
+		return false, errors.Wrap(err, "couldn't get value of left operator in LIKE")
 	}
 	rightValue, err := right.ExpressionValue(variables)
 	if err != nil {
-		return false, errors.Wrap(err, "couldn't get value of right operator in more than")
+		return false, errors.Wrap(err, "couldn't get value of right operator in LIKE")
 	}
 	leftString, ok := leftValue.(string)
 	if !ok {
@@ -197,11 +197,11 @@ func NewIn() Relation {
 func (rel *In) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
 	leftValue, err := left.ExpressionValue(variables)
 	if err != nil {
-		return false, errors.Wrap(err, "couldn't get value of left operator in more than")
+		return false, errors.Wrap(err, "couldn't get value of left operator in IN")
 	}
 	rightValue, err := right.ExpressionValue(variables)
 	if err != nil {
-		return false, errors.Wrap(err, "couldn't get value of right operator in more than")
+		return false, errors.Wrap(err, "couldn't get value of right operator in IN")
 	}
 
 	switch set := rightValue.(type) {

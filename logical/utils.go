@@ -83,7 +83,7 @@ func EqualNodes(node1, node2 Node) error {
 		}
 
 	case *Distinct:
-		if node2, ok := node2.(*Distinct); ok{
+		if node2, ok := node2.(*Distinct); ok {
 			if err := EqualNodes(node1.child, node2.child); err != nil {
 				return errors.Wrap(err, "distinct's children not equal")
 			}
@@ -97,6 +97,17 @@ func EqualNodes(node1, node2 Node) error {
 			}
 			if err := EqualNodes(node1.data, node2.data); err != nil {
 				return errors.Wrap(err, "data nodes underneath not equal")
+			}
+			return nil
+		}
+
+	case *LeftJoin:
+		if node2, ok := node2.(*LeftJoin); ok {
+			if err := EqualNodes(node1.source, node2.source); err != nil {
+				return errors.Wrap(err, "source nodes underneath not equal")
+			}
+			if err := EqualNodes(node1.joined, node2.joined); err != nil {
+				return errors.Wrap(err, "joined nodes underneath not equal")
 			}
 			return nil
 		}

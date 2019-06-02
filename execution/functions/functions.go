@@ -15,6 +15,15 @@ import (
 	All of the functions in the funcTable must appear here.
 */
 
+func execute(fun execution.Function, args ...interface{}) (interface{}, error) {
+	err := fun.Validator(args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return fun.Logic(args...)
+}
+
 /* Single number arguments functions */
 
 var FuncInt = execution.Function{

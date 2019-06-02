@@ -26,7 +26,7 @@ func exactlyNArgs(n int, args ...interface{}) error {
 }
 
 func oneArg(args ...interface{}) error { /* this is a popular validator */
-	return exactlyNArgs(0, args...)
+	return exactlyNArgs(1, args...)
 }
 
 func atLeastOneArg(args ...interface{}) error {

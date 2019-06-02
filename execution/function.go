@@ -7,7 +7,7 @@ import (
 
 type Function struct {
 	Validator func(...interface{}) error
-	Logic     func(...interface{}) interface{}
+	Logic     func(...interface{}) (interface{}, error)
 }
 
 type FunctionExpression struct {
@@ -38,5 +38,5 @@ func (fe *FunctionExpression) ExpressionValue(variables octosql.Variables) (inte
 		return nil, err
 	}
 
-	return fe.function.Logic(values...), nil
+	return fe.function.Logic(values...) /* return value and possible error */
 }

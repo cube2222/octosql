@@ -2,6 +2,7 @@ package physical
 
 import (
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/execution/functions"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
@@ -16,22 +17,24 @@ to make the functions more versatile.
 table. Otherwise the function will be considered undefined
 and will throw an error on physical -> execution conversion.
 */
-var functionTable = map[string]execution.FunctionType{
-	"int":   execution.FuncInt,
-	"lower": execution.FuncLower,
-	"upper": execution.FuncUpper,
-	"neg":   execution.FuncNegative,
-	"abs":   execution.FuncAbs,
-	"cap":   execution.FuncCapitalize,
-	"sqrt":  execution.FuncSqrt,
-	"max":   execution.FuncMax,
-	"min":   execution.FuncMin,
-	"rand":  execution.FuncRand,
-	"ceil":  execution.FuncCeil,
-	"floor": execution.FuncFloor,
-	"log":   execution.FuncLog,
-	"ln":    execution.FuncLn,
-	"pow":   execution.FuncPower,
+var functionTable = map[string]execution.Function{
+	"int":   functions.FuncInt,
+	"lower": functions.FuncLower,
+	"upper": functions.FuncUpper,
+	"neg":   functions.FuncNegate,
+	"abs":   functions.FuncAbs,
+	"cap":   functions.FuncCapitalize,
+	"sqrt":  functions.FuncSqrt,
+	"max":   functions.FuncMax,
+	"min":   functions.FuncMin,
+	"rand":  functions.FuncRand,
+	"ceil":  functions.FuncCeil,
+	"floor": functions.FuncFloor,
+	"log":   functions.FuncLog,
+	"ln":    functions.FuncLn,
+	"pow":   functions.FuncPower,
+	"rev":   functions.FuncReverse,
+	"sub":   functions.FuncSubstring,
 }
 
 type FunctionExpression struct {

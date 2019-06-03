@@ -29,6 +29,10 @@ func oneArg(args ...interface{}) error { /* this is a popular validator */
 	return exactlyNArgs(1, args...)
 }
 
+func twoArgs(args ...interface{}) error {
+	return exactlyNArgs(2, args...)
+}
+
 func atLeastOneArg(args ...interface{}) error {
 	if len(args) == 0 {
 		return errors.Errorf("Expected at least one argument, but got zero")
@@ -112,6 +116,17 @@ func allFloats(args ...interface{}) error {
 func allNumbers(args ...interface{}) error {
 	for _, arg := range args {
 		err := wantNumber(arg)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func allStrings(args ...interface{}) error {
+	for _, arg := range args {
+		err := wantString(arg)
 		if err != nil {
 			return err
 		}

@@ -16,25 +16,29 @@ to make the functions more versatile.
 /* The only legal functions are the ones that appear in this
 table. Otherwise the function will be considered undefined
 and will throw an error on physical -> execution conversion.
+IMPORTANT: As of now the lookup is case sensitive, so the functions must
+be stored in lowercase, and the user must input them as lowercase as well.
 */
 var functionTable = map[string]execution.Function{
-	"int":   functions.FuncInt,
-	"lower": functions.FuncLower,
-	"upper": functions.FuncUpper,
-	"neg":   functions.FuncNegate,
-	"abs":   functions.FuncAbs,
-	"cap":   functions.FuncCapitalize,
-	"sqrt":  functions.FuncSqrt,
-	"max":   functions.FuncMax,
-	"min":   functions.FuncMin,
-	"rand":  functions.FuncRand,
-	"ceil":  functions.FuncCeil,
-	"floor": functions.FuncFloor,
-	"log":   functions.FuncLog,
-	"ln":    functions.FuncLn,
-	"pow":   functions.FuncPower,
-	"rev":   functions.FuncReverse,
-	"sub":   functions.FuncSubstring,
+	"int":          functions.FuncInt,
+	"lowercase":    functions.FuncLower,
+	"uppercase":    functions.FuncUpper,
+	"negate":       functions.FuncNegate,
+	"abs":          functions.FuncAbs,
+	"capitalize":   functions.FuncCapitalize,
+	"sqrt":         functions.FuncSqrt,
+	"max":          functions.FuncMax,
+	"min":          functions.FuncMin,
+	"randint":      functions.FuncRandInt,
+	"randfloat":    functions.FuncRandFloat,
+	"ceiling":      functions.FuncCeil,
+	"floor":        functions.FuncFloor,
+	"log":          functions.FuncLog,
+	"ln":           functions.FuncLn,
+	"power":        functions.FuncPower,
+	"reverse":      functions.FuncReverse,
+	"sub":          functions.FuncSubstring, //TODO: fix parsing so that you can name this function substring
+	"matchregular": functions.FuncRegexp,
 }
 
 type FunctionExpression struct {

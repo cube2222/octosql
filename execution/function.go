@@ -38,5 +38,10 @@ func (fe *FunctionExpression) ExpressionValue(variables octosql.Variables) (inte
 		return nil, err
 	}
 
-	return fe.function.Logic(values...) /* return value and possible error */
+	finalValue, err := fe.function.Logic(values...)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get function's value")
+	}
+
+	return finalValue, nil
 }

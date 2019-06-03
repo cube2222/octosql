@@ -4,6 +4,7 @@ import (
 	"math"
 	"math/rand"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -76,9 +77,15 @@ var FuncAbs = execution.Function{
 	Logic: func(args ...interface{}) (interface{}, error) {
 		switch arg := args[0].(type) {
 		case int:
-			return int(math.Abs(float64(arg))), nil
+			if arg < 0 {
+				return -1 * arg, nil
+			}
+			return arg, nil
 		case float64:
-			return math.Abs(arg), nil
+			if arg < 0 {
+				return -1 * arg, nil
+			}
+			return arg, nil
 		default:
 			return nil, errors.Errorf("Can't take absolute value of type %v", reflect.TypeOf(arg))
 		}
@@ -247,7 +254,7 @@ var FuncMax = execution.Function{
 }
 
 /* Other number functions */
-var FuncRand = execution.Function{
+var FuncRandFloat = execution.Function{
 	Validator: func(args ...interface{}) error {
 		err := allInts(args...)
 		if err != nil {
@@ -275,6 +282,42 @@ var FuncRand = execution.Function{
 	},
 }
 
+var FuncRandInt = execution.Function{
+	Validator: func(args ...interface{}) error {
+		err := allInts(args...)
+		if err != nil {
+			return err
+		}
+
+		if len(args) > 2 {
+			return errors.Errorf("Expected at most two arguments, got %v", len(args))
+		}
+		return nil
+	},
+	Logic: func(args ...interface{}) (interface{}, error) {
+		argCount := len(args)
+		if argCount == 0 {
+			return rand.Int(), nil
+		} else if argCount == 1 {
+			upper := args[0].(int)
+			if upper <= 0 {
+				return nil, errors.Errorf("Upper boundary for random integer must be greater than zero")
+			}
+
+			return rand.Intn(upper), nil
+		} else {
+			lower := args[0].(int)
+			upper := args[1].(int)
+
+			if upper <= lower {
+				return nil, errors.Errorf("Upper bound for random integers must be greater than the lower bound")
+			}
+
+			return lower + rand.Intn(upper-lower), nil
+		}
+	},
+}
+
 var FuncPower = execution.Function{
 	Validator: func(args ...interface{}) error {
 		err := allFloats(args...)
@@ -296,7 +339,7 @@ var FuncPower = execution.Function{
 
 var FuncLower = execution.Function{
 	Validator: func(args ...interface{}) error {
-		return wantString(args...)
+		return combine(oneArg, wantString)(args...)
 	},
 	Logic: func(args ...interface{}) (interface{}, error) {
 		return strings.ToLower(args[0].(string)), nil
@@ -305,7 +348,7 @@ var FuncLower = execution.Function{
 
 var FuncUpper = execution.Function{
 	Validator: func(args ...interface{}) error {
-		return wantString(args...)
+		return combine(oneArg, wantString)(args...)
 	},
 	Logic: func(args ...interface{}) (interface{}, error) {
 		return strings.ToUpper(args[0].(string)), nil
@@ -314,16 +357,18 @@ var FuncUpper = execution.Function{
 
 var FuncCapitalize = execution.Function{
 	Validator: func(args ...interface{}) error {
-		return wantString(args...)
+		return combine(oneArg, wantString)(args...)
 	},
 	Logic: func(args ...interface{}) (interface{}, error) {
-		return strings.ToTitle(args[0].(string)), nil
+		arg := args[0].(string)
+		arg = strings.ToLower(arg)
+		return strings.Title(arg), nil
 	},
 }
 
 var FuncReverse = execution.Function{
 	Validator: func(args ...interface{}) error {
-		return wantString(args...)
+		return combine(oneArg, wantString)(args...)
 	},
 	Logic: func(args ...interface{}) (interface{}, error) {
 		arg := args[0].(string)
@@ -376,6 +421,25 @@ var FuncSubstring = execution.Function{
 		}
 
 		return str[start:end], nil
+	},
+}
+
+var FuncRegexp = execution.Function{
+	Validator: func(args ...interface{}) error {
+		return combine(twoArgs, allStrings)(args...)
+	},
+	Logic: func(args ...interface{}) (interface{}, error) {
+		re, err := regexp.Compile(args[0].(string))
+		if err != nil {
+			return nil, errors.Errorf("Couldn't compile regular expression")
+		}
+
+		match := re.FindString(args[1].(string))
+		if match == "" {
+			return nil, nil
+		}
+
+		return match, nil
 	},
 }
 

@@ -127,11 +127,7 @@ func compare(x, y interface{}) (int, error) {
 	}
 }
 
-func (ob *OrderBy) Get(variables octosql.Variables) (RecordStream, error) {
-	sourceStream, err := ob.Source.Get(variables)
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get underlying stream in order by")
-	}
+func createOrderedStream(ob []OrderField, sourceStream RecordStream) (RecordStream, error) {
 
 	records := make([]*Record, 0)
 
@@ -146,7 +142,7 @@ func (ob *OrderBy) Get(variables octosql.Variables) (RecordStream, error) {
 		records = append(records, rec)
 	}
 
-	err = validateRecords(records, ob.Fields)
+	err := validateRecords(records, ob)
 	if err != nil {
 		return nil, errors.Wrap(err, "records can't be sorted according to given columns")
 	}
@@ -157,7 +153,7 @@ func (ob *OrderBy) Get(variables octosql.Variables) (RecordStream, error) {
 		iRec := records[i]
 		jRec := records[j]
 
-		for _, column := range ob.Fields {
+		for _, column := range ob {
 			x := iRec.Value(column.ColumnName)
 			y := jRec.Value(column.ColumnName)
 
@@ -200,4 +196,18 @@ func (ob *OrderBy) Get(variables octosql.Variables) (RecordStream, error) {
 	}
 
 	return NewInMemoryStream(records), nil
+}
+
+func (ob *OrderBy) Get(variables octosql.Variables) (RecordStream, error) {
+	sourceStream, err := ob.Source.Get(variables)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get underlying stream in order by")
+	}
+
+	orderedStream, err := createOrderedStream(ob.Fields, sourceStream)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't create ordered stream from source stream")
+	}
+
+	return orderedStream, nil
 }

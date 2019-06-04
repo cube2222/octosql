@@ -181,6 +181,27 @@ func TestOrderBy_Get(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 		},
+		{
+			name: "failed - non sortable boolean",
+			args: args{
+				stream: NewInMemoryStream([]*Record{
+					NewRecordFromSlice(
+						[]octosql.VariableName{"is_nice"},
+						[]interface{}{false}),
+					NewRecordFromSlice(
+						[]octosql.VariableName{"is_nice"},
+						[]interface{}{true}),
+				}),
+				fields: []OrderField{
+					{
+						ColumnName: "is_nice",
+						Direction:  Descending,
+					},
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {

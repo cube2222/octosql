@@ -1,6 +1,7 @@
 package functions
 
 import (
+	"math"
 	"reflect"
 	"testing"
 
@@ -216,6 +217,53 @@ func Test_stringFunctions(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 		},
+
+		/* regexp matching tests */
+		{
+			name: "simple match - 1",
+			args: args{
+				fun:  FuncRegexp,
+				args: []interface{}{"t[a+b]e", "tcetdetaetbe"},
+			},
+			want:    "tae",
+			wantErr: false,
+		},
+		{
+			name: "simple match - 2",
+			args: args{
+				fun:  FuncRegexp,
+				args: []interface{}{"a..d", "axdaxxdaxdxa"},
+			},
+			want:    "axxd",
+			wantErr: false,
+		},
+		{
+			name: "simple match - 3",
+			args: args{
+				fun:  FuncRegexp,
+				args: []interface{}{".[0-9].", "this is a bit longer but 4 the matcher it's no problem"},
+			},
+			want:    " 4 ", /* matches the spaces with . */
+			wantErr: false,
+		},
+		{
+			name: "simple match - 4",
+			args: args{
+				fun:  FuncRegexp,
+				args: []interface{}{"[1-9][0-9]{3}", "The year was 2312 and the aliens began their invasion"},
+			},
+			want:    "2312",
+			wantErr: false,
+		},
+		{
+			name: "invalid regexp - 1",
+			args: args{
+				fun:  FuncRegexp,
+				args: []interface{}{"[1-9][0-9]{3", "The year was 2312 and the aliens began their invasion"},
+			},
+			want:    "",
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -226,6 +274,101 @@ func Test_stringFunctions(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("execute() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_numerical(t *testing.T) {
+	type args struct {
+		fun  execution.Function
+		args []interface{}
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    interface{}
+		wantErr bool
+	}{
+
+		/* sqrt() */
+		{
+			name: "sqrt(4)",
+			args: args{
+				args: []interface{}{4},
+				fun:  FuncSqrt,
+			},
+			want:    2.0, /* type is important */
+			wantErr: false,
+		},
+		{
+			name: "sqrt(7)",
+			args: args{
+				args: []interface{}{7},
+				fun:  FuncSqrt,
+			},
+			want:    math.Sqrt(7.0), /* type is important */
+			wantErr: false,
+		},
+		{
+			name: "sqrt(-1)",
+			args: args{
+				args: []interface{}{-1},
+				fun:  FuncSqrt,
+			},
+			want:    nil,
+			wantErr: true,
+		},
+
+		/* log */
+		{
+			name: "log(8)",
+			args: args{
+				args: []interface{}{8},
+				fun:  FuncLog,
+			},
+			want:    3.0,
+			wantErr: false,
+		},
+		{
+			name: "log(15.5)",
+			args: args{
+				args: []interface{}{15.5},
+				fun:  FuncLog,
+			},
+			want:    math.Log2(15.5),
+			wantErr: false,
+		},
+		{
+			name: "log(0)",
+			args: args{
+				args: []interface{}{0},
+				fun:  FuncLog,
+			},
+			want:    nil,
+			wantErr: true,
+		},
+
+		/* x^y */
+		{
+			name: "3^4",
+			args: args{
+				args: []interface{}{3.0, 4.0},
+				fun:  FuncPower,
+			},
+			want:    81.0,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := execute(tt.args.fun, tt.args.args...)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Func error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Func = %v, want %v", got, tt.want)
 			}
 		})
 	}

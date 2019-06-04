@@ -156,12 +156,12 @@ var FuncLog = execution.Function{
 			if arg <= 0 {
 				return nil, errors.Errorf("Can't take log of value %v", arg)
 			}
-			return math.Log(float64(arg)), nil
+			return math.Log2(float64(arg)), nil
 		case float64:
 			if arg <= 0 {
 				return nil, errors.Errorf("Can't take log of value %v", arg)
 			}
-			return math.Log(arg), nil
+			return math.Log2(arg), nil
 		default:
 			return nil, errors.Errorf("Can't take log of type %v", reflect.TypeOf(arg))
 		}

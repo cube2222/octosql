@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/logical"
@@ -222,6 +223,7 @@ func ParseAliasedExpression(expr *sqlparser.AliasedExpr) (logical.NamedExpressio
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't parse aliased expression: %+v", expr.Expr)
 	}
+
 	if expr.As.String() == "" {
 		if named, ok := subExpr.(logical.NamedExpression); ok {
 			return named, nil
@@ -231,8 +233,42 @@ func ParseAliasedExpression(expr *sqlparser.AliasedExpr) (logical.NamedExpressio
 	return logical.NewAliasedExpression(octosql.VariableName(expr.As.String()), subExpr), nil
 }
 
+func ParseFunctionArgument(expr *sqlparser.AliasedExpr) (logical.Expression, error) {
+	subExpr, err := ParseExpression(expr.Expr)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't parse argument")
+	}
+
+	return subExpr, nil
+}
+
 func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 	switch expr := expr.(type) {
+	case *sqlparser.FuncExpr:
+		functionName := strings.ToLower(expr.Name.String())
+
+		arguments := make([]logical.Expression, 0)
+		var logicArg logical.Expression
+		var err error
+
+		for i := range expr.Exprs {
+			arg := expr.Exprs[i]
+
+			switch arg := arg.(type) {
+			case *sqlparser.AliasedExpr:
+				logicArg, err = ParseFunctionArgument(arg)
+				if err != nil {
+					return nil, errors.Wrap(err, "couldn't parse an aliased expression argument")
+				}
+			default:
+				return nil, errors.Errorf("Unsupported argument %v of type %v", arg, reflect.TypeOf(arg))
+			}
+
+			arguments = append(arguments, logicArg)
+		}
+
+		return logical.NewFunctionExpression(functionName, arguments), nil
+
 	case *sqlparser.ColName:
 		name := expr.Name.String()
 		if !expr.Qualifier.Name.IsEmpty() {

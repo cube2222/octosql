@@ -20,7 +20,7 @@ func (node *Distinct) Get(variables octosql.Variables) (RecordStream, error) {
 		return nil, errors.Wrap(err, "couldn't get stream for child node in distinct")
 	}
 
-	return DistinctStream{
+	return &DistinctStream{
 		stream:    stream,
 		variables: variables,
 		records:   newRecordSet(),
@@ -33,9 +33,18 @@ type DistinctStream struct {
 	records   *recordSet
 }
 
-func (distinctStream DistinctStream) Next() (*Record, error) {
+func (ds *DistinctStream) Close() error {
+	err := ds.stream.Close()
+	if err != nil {
+		return errors.Wrap(err, "Couldn't close underlying stream")
+	}
+
+	return nil
+}
+
+func (ds *DistinctStream) Next() (*Record, error) {
 	for {
-		record, err := distinctStream.stream.Next()
+		record, err := ds.stream.Next()
 		if err != nil {
 			if err == ErrEndOfStream {
 				return nil, ErrEndOfStream
@@ -43,14 +52,14 @@ func (distinctStream DistinctStream) Next() (*Record, error) {
 			return nil, errors.Wrap(err, "couldn't get record from stream in DistinctStream")
 		}
 
-		already, err := distinctStream.records.Has(record)
+		already, err := ds.records.Has(record)
 
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't access the record set")
 		}
 
 		if !already {
-			_, err := distinctStream.records.Insert(record)
+			_, err := ds.records.Insert(record)
 
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't access the record set")

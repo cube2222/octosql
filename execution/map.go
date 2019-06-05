@@ -36,6 +36,15 @@ type MappedStream struct {
 	keep        bool
 }
 
+func (stream *MappedStream) Close() error {
+	err := stream.source.Close()
+	if err != nil {
+		return errors.Wrap(err, "Couldn't close underlying stream")
+	}
+
+	return nil
+}
+
 func (stream *MappedStream) Next() (*Record, error) {
 	srcRecord, err := stream.source.Next()
 	if err != nil {

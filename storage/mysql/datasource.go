@@ -159,6 +159,15 @@ type RecordStream struct {
 	alias   string
 }
 
+func (rs *RecordStream) Close() error {
+	err := rs.rows.Close()
+	if err != nil {
+		return errors.Wrap(err, "Couldn't close underlying SQL rows")
+	}
+
+	return nil
+}
+
 func (rs *RecordStream) Next() (*execution.Record, error) {
 	if rs.isDone {
 		return nil, execution.ErrEndOfStream

@@ -1,6 +1,8 @@
 package execution
 
 import (
+	"io"
+
 	"github.com/cube2222/octosql"
 	"github.com/pkg/errors"
 )
@@ -72,6 +74,7 @@ func getType(i interface{}) octosql.Datatype {
 
 type RecordStream interface {
 	Next() (*Record, error)
+	io.Closer
 }
 
 var ErrEndOfStream = errors.New("end of stream")

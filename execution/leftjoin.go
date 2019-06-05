@@ -39,6 +39,20 @@ type LeftJoinedStream struct {
 	joinedAnyRecord bool
 }
 
+func (stream *LeftJoinedStream) Close() error {
+	err := stream.source.Close()
+	if err != nil {
+		return errors.Wrap(err, "Couldn't close source stream")
+	}
+
+	err = stream.curJoinedStream.Close()
+	if err != nil {
+		return errors.Wrap(err, "Couldn't close joined stream")
+	}
+
+	return nil
+}
+
 func (stream *LeftJoinedStream) Next() (*Record, error) {
 	for {
 		if stream.curRecord == nil {

@@ -126,10 +126,10 @@ func TestOffset_Get(t *testing.T) {
 
 			equal, err := AreStreamsEqual(rs, tt.wantStream)
 			if !equal {
-				t.Errorf("limitedStream doesn't work as expected")
+				t.Errorf("LimitedStream doesn't work as expected")
 			}
 			if err != nil {
-				t.Errorf("limitedStream comparison error: %v", err)
+				t.Errorf("LimitedStream comparison error: %v", err)
 			}
 		})
 	}

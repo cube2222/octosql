@@ -256,13 +256,31 @@ func Test_stringFunctions(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "invalid regexp - 1",
+			name: "star regexp match - 1",
 			args: args{
 				fun:  FuncRegexp,
-				args: []interface{}{"[1-9][0-9]{3", "The year was 2312 and the aliens began their invasion"},
+				args: []interface{}{"AB*A", "My favourite band is not ABA, it's ABBA."},
 			},
-			want:    "",
-			wantErr: true,
+			want:    "ABA",
+			wantErr: false,
+		},
+		{
+			name: "star regexp match - 2",
+			args: args{
+				fun:  FuncRegexp,
+				args: []interface{}{"a*ba*", "What is a bbba?"},
+			},
+			want:    "b", /* matches the shortest */
+			wantErr: false,
+		},
+		{
+			name: "complex regexp",
+			args: args{
+				fun:  FuncRegexp,
+				args: []interface{}{`[a + b]{2}c*d{3}`, "abcddaaacdddbacccdddabcda"},
+			},
+			want:    "aacddd",
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {

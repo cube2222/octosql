@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/logical"
 	"github.com/pkg/errors"
 	"github.com/xwb1989/sqlparser"
@@ -115,6 +116,15 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 
 	if len(statement.Distinct) > 0 {
 		root = logical.NewDistinct(root)
+	}
+
+	if statement.OrderBy != nil {
+		fields, err := parseOrderByFields(statement.OrderBy)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't parse arguments of order by")
+		}
+
+		root = logical.NewOrderBy(fields, root)
 	}
 
 	if statement.Limit != nil {
@@ -368,6 +378,31 @@ func ParseInfixComparison(left, right sqlparser.Expr, operator string) (logical.
 		return nil, errors.Wrapf(err, "couldn't parse right hand side of %s comparator %+v", operator, right)
 	}
 	return logical.NewPredicate(leftParsed, logical.NewRelation(operator), rightParsed), nil
+}
+
+func parseOrderByFields(order sqlparser.OrderBy) ([]execution.OrderField, error) {
+	columns := make([]execution.OrderField, 0)
+
+	for _, field := range order {
+		typed, ok := field.Expr.(*sqlparser.ColName)
+		if !ok {
+			return nil, errors.Errorf("Expected a column name as argument of order by clause")
+		}
+
+		name := typed.Name.String()
+		if !typed.Qualifier.Name.IsEmpty() {
+			name = fmt.Sprintf("%s.%s", typed.Qualifier.Name.String(), name)
+		}
+
+		order := execution.OrderField{
+			ColumnName: octosql.VariableName(name),
+			Direction:  field.Direction,
+		}
+
+		columns = append(columns, order)
+	}
+
+	return columns, nil
 }
 
 func parseTwoSubexpressions(limit, offset sqlparser.Expr) (logical.Expression, logical.Expression, error) {

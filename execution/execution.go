@@ -62,6 +62,8 @@ func (ne *NodeExpression) ExpressionValue(variables octosql.Variables) (interfac
 		return nil, errors.Wrap(err, "couldn't get records from stream")
 	}
 
+	records.Close()
+
 	if len(outRecords) > 1 {
 		return outRecords, nil
 	}

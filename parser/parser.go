@@ -106,6 +106,8 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		root = logical.NewFilter(filterFormula, root)
 	}
 
+	// TODO - chyba tutaj zrobic group by, zeby mial pod sobą mapę ze wszzystkimi polami przepuszczoną przez filtr
+
 	// Now we only keep the selected variables.
 	if len(statement.SelectExprs) >= 1 {
 		if _, ok := statement.SelectExprs[0].(*sqlparser.StarExpr); !ok {

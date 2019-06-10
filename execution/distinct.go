@@ -104,6 +104,16 @@ func (rs *recordSet) Insert(r *Record) (bool, error) {
 	return false, nil
 }
 
+func (rs *recordSet) InsertAll(r *Record) error {
+	hash, err := HashRecord(r)
+	if err != nil {
+		return errors.Wrap(err, "couldn't get hash of record")
+	}
+
+	rs.set[hash] = append(rs.set[hash], r)
+	return nil
+}
+
 func HashRecord(rec *Record) (uint64, error) {
 	return hashstructure.Hash(rec.data, nil)
 }

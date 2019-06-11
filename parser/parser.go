@@ -102,6 +102,15 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		root = logical.NewFilter(filterFormula, root)
 	}
 
+	if statement.OrderBy != nil {
+		fields, err := parseOrderByFields(statement.OrderBy)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't parse arguments of order by")
+		}
+
+		root = logical.NewOrderBy(fields, root)
+	}
+
 	// Now we only keep the selected variables.
 	if len(statement.SelectExprs) >= 1 {
 		if _, ok := statement.SelectExprs[0].(*sqlparser.StarExpr); !ok {
@@ -116,15 +125,6 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 
 	if len(statement.Distinct) > 0 {
 		root = logical.NewDistinct(root)
-	}
-
-	if statement.OrderBy != nil {
-		fields, err := parseOrderByFields(statement.OrderBy)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't parse arguments of order by")
-		}
-
-		root = logical.NewOrderBy(fields, root)
 	}
 
 	if statement.Limit != nil {

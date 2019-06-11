@@ -212,6 +212,10 @@ func ParseJoinTableExpression(expr *sqlparser.JoinTableExpr) (logical.Node, erro
 	case sqlparser.RightJoinStr:
 		source = rightTable
 		joined = leftTable
+	case sqlparser.JoinStr:
+		// TODO: Add cardinality based heuristics
+		source = leftTable
+		joined = rightTable
 	default:
 		return nil, errors.Errorf("invalid join expression: %v", expr.Join)
 	}

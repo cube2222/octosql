@@ -5,23 +5,23 @@ import (
 	"github.com/pkg/errors"
 )
 
-// LeftJoin currently only supports lookup joins.
-type LeftJoin struct {
+// InnerJoin currently only supports lookup joins.
+type InnerJoin struct {
 	source Node
 	joined Node
 }
 
-func NewLeftJoin(source Node, joined Node) *LeftJoin {
-	return &LeftJoin{source: source, joined: joined}
+func NewInnerJoin(source Node, joined Node) *InnerJoin {
+	return &InnerJoin{source: source, joined: joined}
 }
 
-func (node *LeftJoin) Get(variables octosql.Variables) (RecordStream, error) {
+func (node *InnerJoin) Get(variables octosql.Variables) (RecordStream, error) {
 	recordStream, err := node.source.Get(variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get record stream")
 	}
 
-	return &LeftJoinedStream{
+	return &InnerJoinedStream{
 		variables:       variables,
 		source:          recordStream,
 		joined:          node.joined,
@@ -30,16 +30,15 @@ func (node *LeftJoin) Get(variables octosql.Variables) (RecordStream, error) {
 	}, nil
 }
 
-type LeftJoinedStream struct {
+type InnerJoinedStream struct {
 	variables       octosql.Variables
 	source          RecordStream
 	joined          Node
 	curRecord       *Record
 	curJoinedStream RecordStream
-	joinedAnyRecord bool
 }
 
-func (stream *LeftJoinedStream) Close() error {
+func (stream *InnerJoinedStream) Close() error {
 	err := stream.source.Close()
 	if err != nil {
 		return errors.Wrap(err, "Couldn't close source stream")
@@ -53,7 +52,7 @@ func (stream *LeftJoinedStream) Close() error {
 	return nil
 }
 
-func (stream *LeftJoinedStream) Next() (*Record, error) {
+func (stream *InnerJoinedStream) Next() (*Record, error) {
 	for {
 		if stream.curRecord == nil {
 			srcRecord, err := stream.source.Next()
@@ -75,25 +74,17 @@ func (stream *LeftJoinedStream) Next() (*Record, error) {
 			}
 
 			stream.curRecord = srcRecord
-			stream.joinedAnyRecord = false
 		}
 
 		joinedRecord, err := stream.curJoinedStream.Next()
 		if err != nil {
 			if err == ErrEndOfStream {
-				if !stream.joinedAnyRecord {
-					toReturn := stream.curRecord
-					stream.curRecord = nil
-					stream.curJoinedStream = nil
-					return toReturn, nil
-				}
 				stream.curRecord = nil
 				stream.curJoinedStream = nil
 				continue
 			}
 			return nil, errors.Wrap(err, "couldn't get joined record")
 		}
-		stream.joinedAnyRecord = true
 
 		fields := stream.curRecord.fieldNames
 		for _, field := range joinedRecord.Fields() {

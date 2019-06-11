@@ -1,4 +1,4 @@
-package octosql
+package main
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"github.com/cube2222/octosql/app"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/output"
+	jsonoutput "github.com/cube2222/octosql/output/json"
 	"github.com/cube2222/octosql/output/table"
 	"github.com/cube2222/octosql/parser"
 	"github.com/cube2222/octosql/storage/csv"
@@ -56,6 +57,8 @@ var rootCmd = &cobra.Command{
 		switch outputFormat {
 		case "table":
 			out = table.NewOutput(os.Stdout)
+		case "json":
+			out = jsonoutput.NewOutput(os.Stdout)
 		default:
 			log.Fatal("invalid output type")
 		}

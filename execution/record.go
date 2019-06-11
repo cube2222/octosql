@@ -56,22 +56,6 @@ func (r *Record) AsVariables() octosql.Variables {
 	return out
 }
 
-func getType(i interface{}) octosql.Datatype {
-	if _, ok := i.(int); ok {
-		return octosql.DatatypeInt
-	}
-	if _, ok := i.(float32); ok {
-		return octosql.DatatypeFloat32
-	}
-	if _, ok := i.(float64); ok {
-		return octosql.DatatypeFloat64
-	}
-	if _, ok := i.(string); ok {
-		return octosql.DatatypeString
-	}
-	return octosql.DatatypeString // TODO: Unknown
-}
-
 type RecordStream interface {
 	Next() (*Record, error)
 	io.Closer

@@ -511,6 +511,22 @@ var FuncMul = execution.Function{
 	},
 }
 
+var FuncDiv = execution.Function{
+	Validator: func(args ...interface{}) error {
+		return combine(twoArgs, allNumbers)(args...)
+	},
+	Logic: func(args ...interface{}) (interface{}, error) {
+		firstFloat, _ := floatify(args[0])
+		secondFloat, _ := floatify(args[1])
+
+		if secondFloat == 0.0 {
+			return nil, errors.Errorf("division by zero")
+		}
+
+		return firstFloat / secondFloat, nil
+	},
+}
+
 /* Auxiliary functions */
 func intMin(x, y int) int {
 	if x <= y {

@@ -43,6 +43,7 @@ var functionTable = map[string]execution.Function{
 	"+":            functions.FuncAdd,
 	"*":            functions.FuncMul,
 	"-":            functions.FuncSub,
+	"/":            functions.FuncDiv,
 }
 
 type FunctionExpression struct {

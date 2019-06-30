@@ -258,6 +258,26 @@ func ParseFunctionArgument(expr *sqlparser.AliasedExpr) (logical.Expression, err
 
 func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 	switch expr := expr.(type) {
+	case *sqlparser.ParenExpr:
+		child, err := ParseExpression(expr.Expr)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't parse expression in ParenExpr")
+		}
+
+		return child, nil
+	case *sqlparser.BinaryExpr:
+		left, err := ParseExpression(expr.Left)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't parse left child expression")
+		}
+
+		right, err := ParseExpression(expr.Right)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't parse right child expression")
+		}
+
+		return logical.NewFunctionExpression(expr.Operator, []logical.Expression{left, right}), nil
+
 	case *sqlparser.FuncExpr:
 		functionName := strings.ToLower(expr.Name.String())
 

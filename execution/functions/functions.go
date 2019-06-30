@@ -443,6 +443,74 @@ var FuncRegexp = execution.Function{
 	},
 }
 
+/* Operators */
+
+var FuncAdd = execution.Function{
+	Validator: func(args ...interface{}) error {
+		return combine(twoArgs, allNumbers)(args...)
+	},
+	Logic: func(args ...interface{}) (interface{}, error) {
+		first := args[0]
+		second := args[1]
+
+		firstInt, firstOk := first.(int)
+		secondInt, secondOk := second.(int)
+
+		if firstOk && secondOk {
+			return firstInt + secondInt, nil
+		} else {
+			firstFloat, _ := floatify(first)
+			secondFloat, _ := floatify(second)
+
+			return firstFloat + secondFloat, nil
+		}
+	},
+}
+
+var FuncSub = execution.Function{
+	Validator: func(args ...interface{}) error {
+		return combine(twoArgs, allNumbers)(args...)
+	},
+	Logic: func(args ...interface{}) (interface{}, error) {
+		first := args[0]
+		second := args[1]
+
+		firstInt, firstOk := first.(int)
+		secondInt, secondOk := second.(int)
+
+		if firstOk && secondOk {
+			return firstInt - secondInt, nil
+		} else {
+			firstFloat, _ := floatify(first)
+			secondFloat, _ := floatify(second)
+
+			return firstFloat - secondFloat, nil
+		}
+	},
+}
+
+var FuncMul = execution.Function{
+	Validator: func(args ...interface{}) error {
+		return combine(twoArgs, allNumbers)(args...)
+	},
+	Logic: func(args ...interface{}) (interface{}, error) {
+		first := args[0]
+		second := args[1]
+
+		firstInt, firstOk := first.(int)
+		secondInt, secondOk := second.(int)
+
+		if firstOk && secondOk {
+			return firstInt * secondInt, nil
+		} else {
+			firstFloat, _ := floatify(first)
+			secondFloat, _ := floatify(second)
+
+			return firstFloat * secondFloat, nil
+		}
+	},
+}
+
 /* Auxiliary functions */
 func intMin(x, y int) int {
 	if x <= y {
@@ -456,4 +524,21 @@ func intMax(x, y int) int {
 		return y
 	}
 	return x
+}
+
+func floatify(x interface{}) (float64, error) {
+	switch x := x.(type) {
+	case int:
+		return float64(x), nil
+	case float64:
+		return x, nil
+	case bool:
+		if x {
+			return 1.0, nil
+		}
+
+		return 0.0, nil
+	default:
+		return 0.0, errors.Errorf("couldn't convert value %v of type %v to float", x, reflect.TypeOf(x))
+	}
 }

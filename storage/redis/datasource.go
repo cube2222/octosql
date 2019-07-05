@@ -22,6 +22,7 @@ type DataSource struct {
 	client     *redis.Client
 	keyFormula KeyFormula
 	alias      string
+	dbKey      string
 }
 
 // NewDataSourceBuilderFactory creates a new datasource builder factory for a redis database.
@@ -46,6 +47,7 @@ func NewDataSourceBuilderFactory(hostname string, port int, password string, dbI
 				client:     client,
 				keyFormula: keyFormula,
 				alias:      alias,
+				dbKey:      dbKey,
 			}, nil
 		},
 		[]octosql.VariableName{
@@ -91,6 +93,7 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 			dbIterator: allKeys.Iterator(),
 			isDone:     false,
 			alias:      ds.alias,
+			keyName:    ds.dbKey,
 		}, nil
 	}
 
@@ -105,6 +108,7 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 		counter: 0,
 		isDone:  false,
 		alias:   ds.alias,
+		keyName: ds.dbKey,
 	}, nil
 }
 
@@ -114,6 +118,7 @@ type KeySpecificStream struct {
 	counter int
 	isDone  bool
 	alias   string
+	keyName string
 }
 
 type EntireDatabaseStream struct {
@@ -121,6 +126,7 @@ type EntireDatabaseStream struct {
 	dbIterator *redis.ScanIterator
 	isDone     bool
 	alias      string
+	keyName    string
 }
 
 func (rs *KeySpecificStream) Close() error {
@@ -145,7 +151,7 @@ func (rs *KeySpecificStream) Next() (*execution.Record, error) {
 	key := rs.keys[rs.counter]
 	rs.counter++
 
-	return GetNewRecord(rs.client, key, rs.alias)
+	return GetNewRecord(rs.client, rs.keyName, key, rs.alias)
 }
 
 func (rs *EntireDatabaseStream) Close() error {
@@ -172,7 +178,7 @@ func (rs *EntireDatabaseStream) Next() (*execution.Record, error) {
 		}
 		key := rs.dbIterator.Val()
 
-		record, err := GetNewRecord(rs.client, key, rs.alias)
+		record, err := GetNewRecord(rs.client, rs.keyName, key, rs.alias)
 		if err != nil {
 			if err == ErrNotFound { // key was not in redis database so we skip it
 				continue
@@ -184,7 +190,7 @@ func (rs *EntireDatabaseStream) Next() (*execution.Record, error) {
 	}
 }
 
-func GetNewRecord(client *redis.Client, key, alias string) (*execution.Record, error) {
+func GetNewRecord(client *redis.Client, keyName, key, alias string) (*execution.Record, error) {
 	recordValues, err := client.HGetAll(key).Result()
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("could't get hash for key %s", key))
@@ -195,7 +201,7 @@ func GetNewRecord(client *redis.Client, key, alias string) (*execution.Record, e
 		return nil, ErrNotFound
 	}
 
-	recordValues["key"] = key
+	recordValues[keyName] = key
 
 	aliasedRecord := make(map[octosql.VariableName]interface{})
 	for k, v := range recordValues {

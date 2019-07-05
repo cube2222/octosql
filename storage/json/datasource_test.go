@@ -8,7 +8,7 @@ import (
 	"github.com/cube2222/octosql/execution"
 )
 
-func TestJSONRecordStream_Next(t *testing.T) {
+func TestJSONRecordStream_Get(t *testing.T) {
 	tests := []struct {
 		name        string
 		path        string

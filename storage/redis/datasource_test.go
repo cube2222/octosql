@@ -530,32 +530,32 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				variables: map[octosql.VariableName]interface{}{},
 			},
-			want:    nil,
+			want:    execution.NewInMemoryStream(nil),
 			wantErr: true,
 		},
-		//{
-		//	name: "wrong password",
-		//	fields: fields{
-		//		hostname: hostname,
-		//		password: "aaa",
-		//		port:     port,
-		//		dbIndex:  dbIndex,
-		//		dbKey:    dbKey,
-		//		filter: physical.NewPredicate(
-		//			physical.NewVariable("r.key"),
-		//			physical.NewRelation("equal"),
-		//			physical.NewVariable("const_0")),
-		//		alias:   "r",
-		//		queries: map[string]map[string]interface{}{},
-		//	},
-		//	args: args{
-		//		variables: map[octosql.VariableName]interface{}{
-		//			"const_0": "key0",
-		//		},
-		//	},
-		//	want:    nil,
-		//	wantErr: true,
-		//},
+		{
+			name: "wrong password",
+			fields: fields{
+				hostname: hostname,
+				password: "aaa",
+				port:     port,
+				dbIndex:  dbIndex,
+				dbKey:    dbKey,
+				filter: physical.NewPredicate(
+					physical.NewVariable("r.key"),
+					physical.NewRelation("equal"),
+					physical.NewVariable("const_0")),
+				alias:   "r",
+				queries: map[string]map[string]interface{}{},
+			},
+			args: args{
+				variables: map[octosql.VariableName]interface{}{
+					"const_0": "key0",
+				},
+			},
+			want:    execution.NewInMemoryStream(nil),
+			wantErr: true,
+		},
 		{
 			name: "wrong hostname",
 			fields: fields{
@@ -576,7 +576,7 @@ func TestDataSource_Get(t *testing.T) {
 					"const_0": "key0",
 				},
 			},
-			want:    nil,
+			want:    execution.NewInMemoryStream(nil),
 			wantErr: true,
 		},
 		{
@@ -599,7 +599,7 @@ func TestDataSource_Get(t *testing.T) {
 					"const_0": "key0",
 				},
 			},
-			want:    nil,
+			want:    execution.NewInMemoryStream(nil),
 			wantErr: true,
 		},
 		{
@@ -622,7 +622,7 @@ func TestDataSource_Get(t *testing.T) {
 					"const_0": "key0",
 				},
 			},
-			want:    nil,
+			want:    execution.NewInMemoryStream(nil),
 			wantErr: true,
 		},
 		{
@@ -640,7 +640,7 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				variables: map[octosql.VariableName]interface{}{},
 			},
-			want:    nil,
+			want:    execution.NewInMemoryStream(nil),
 			wantErr: true,
 		},
 	}

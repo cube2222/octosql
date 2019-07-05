@@ -84,7 +84,7 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get path")
 	}
-	arrayFormat, err := config.GetBool(dbConfig, "array_format")
+	arrayFormat, err := config.GetBool(dbConfig, "arrayFormat", config.WithDefault(false))
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get if json in array form")
 	}

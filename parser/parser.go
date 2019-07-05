@@ -229,7 +229,14 @@ func ParseJoinTableExpression(expr *sqlparser.JoinTableExpr) (logical.Node, erro
 		joined = logical.NewFilter(condition, joined)
 	}
 
-	return logical.NewLeftJoin(source, joined), nil
+	switch expr.Join {
+	case sqlparser.LeftJoinStr, sqlparser.RightJoinStr:
+		return logical.NewLeftJoin(source, joined), nil
+	case sqlparser.JoinStr:
+		return logical.NewInnerJoin(source, joined), nil
+	default:
+		return nil, errors.Errorf("invalid join expression: %v", expr.Join)
+	}
 }
 
 func ParseAliasedExpression(expr *sqlparser.AliasedExpr) (logical.NamedExpression, error) {

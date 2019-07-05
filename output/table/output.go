@@ -45,6 +45,7 @@ func (o *Output) Close() error {
 
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader(fields)
+	table.SetAutoFormatHeaders(false)
 
 	for _, record := range o.records {
 		var out []string

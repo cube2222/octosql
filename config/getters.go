@@ -153,6 +153,25 @@ func GetInt(config map[string]interface{}, field string, opts ...Option) (int, e
 	return outInt, nil
 }
 
+// GetInt gets an int from the given field.
+func GetBool(config map[string]interface{}, field string, opts ...Option) (bool, error) {
+	options := getOptions(opts...)
+	out, err := GetInterface(config, field)
+	if err != nil {
+		if options.withDefault && errors.Cause(err) == ErrNotFound {
+			return options.defaultValue.(bool), nil
+		}
+		return false, errors.Wrapf(err, "couldn't get interface{}")
+	}
+
+	outBool, ok := out.(bool)
+	if !ok {
+		return false, errors.Errorf("expected bool, got %v", reflect.TypeOf(out))
+	}
+
+	return outBool, nil
+}
+
 // GetFloat64 gets a float64 from the given field.
 func GetFloat64(config map[string]interface{}, field string, opts ...Option) (float64, error) {
 	options := getOptions(opts...)

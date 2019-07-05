@@ -20,16 +20,57 @@ var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 }
 
 type DataSource struct {
-	path  string
-	alias string
+	path                string
+	alias               string
+	arrayFormat         bool
+	arrayFormatInMemory []*execution.Record
 }
 
-func NewDataSourceBuilderFactory(path string) physical.DataSourceBuilderFactory {
+func NewDataSourceBuilderFactory(path string, arrayFormat bool) physical.DataSourceBuilderFactory {
 	return physical.NewDataSourceBuilderFactory(
 		func(filter physical.Formula, alias string) (execution.Node, error) {
+			if arrayFormat {
+				f, err := os.Open(path)
+				if err != nil {
+					return nil, errors.Wrap(err, "couldn't open json file")
+				}
+				defer f.Close()
+
+				var content []map[string]interface{}
+				err = json.NewDecoder(f).Decode(&content)
+				if err != nil {
+					return nil, errors.Wrap(err, "couldn't decode json file")
+				}
+
+				var records []*execution.Record
+				for _, entry := range content {
+					fields := make([]octosql.VariableName, 0)
+					values := make(map[octosql.VariableName]interface{})
+					for k := range entry {
+						varName := octosql.NewVariableName(fmt.Sprintf("%v.%v", alias, k))
+						fields = append(fields, varName)
+						values[varName] = execution.NormalizeType(entry[k])
+					}
+
+					sort.Slice(fields, func(i, j int) bool {
+						return fields[i] < fields[j]
+					})
+
+					records = append(records, execution.NewRecord(fields, values))
+				}
+
+				return &DataSource{
+					path:                path,
+					arrayFormat:         arrayFormat,
+					arrayFormatInMemory: records,
+					alias:               alias,
+				}, nil
+			}
+
 			return &DataSource{
-				path:  path,
-				alias: alias,
+				path:        path,
+				arrayFormat: arrayFormat,
+				alias:       alias,
 			}, nil
 		},
 		nil,
@@ -43,11 +84,19 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get path")
 	}
+	arrayFormat, err := config.GetBool(dbConfig, "arrayFormat", config.WithDefault(false))
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get if json in array form")
+	}
 
-	return NewDataSourceBuilderFactory(path), nil
+	return NewDataSourceBuilderFactory(path, arrayFormat), nil
 }
 
 func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, error) {
+	if ds.arrayFormat {
+		return execution.NewInMemoryStream(ds.arrayFormatInMemory), nil
+	}
+
 	file, err := os.Open(ds.path)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't open file")
@@ -96,7 +145,7 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 
 	aliasedRecord := make(map[octosql.VariableName]interface{})
 	for k, v := range record {
-		aliasedRecord[octosql.VariableName(fmt.Sprintf("%s.%s", rs.alias, k))] = v
+		aliasedRecord[octosql.VariableName(fmt.Sprintf("%s.%s", rs.alias, k))] = execution.NormalizeType(v)
 	}
 
 	fields := make([]octosql.VariableName, 0)

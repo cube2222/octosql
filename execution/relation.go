@@ -23,11 +23,11 @@ func NewEqual() Relation {
 func (rel *Equal) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
 	leftValue, err := left.ExpressionValue(variables)
 	if err != nil {
-		return false, errors.Wrap(err, "couldn't get value of left operator in more than")
+		return false, errors.Wrap(err, "couldn't get value of left operator in equal")
 	}
 	rightValue, err := right.ExpressionValue(variables)
 	if err != nil {
-		return false, errors.Wrap(err, "couldn't get value of right operator in more than")
+		return false, errors.Wrap(err, "couldn't get value of right operator in equal")
 	}
 	if leftValue == nil || rightValue == nil {
 		if leftValue == nil && rightValue == nil {
@@ -161,11 +161,11 @@ func NewLike() Relation {
 func (rel *Like) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
 	leftValue, err := left.ExpressionValue(variables)
 	if err != nil {
-		return false, errors.Wrap(err, "couldn't get value of left operator in more than")
+		return false, errors.Wrap(err, "couldn't get value of left operator in LIKE")
 	}
 	rightValue, err := right.ExpressionValue(variables)
 	if err != nil {
-		return false, errors.Wrap(err, "couldn't get value of right operator in more than")
+		return false, errors.Wrap(err, "couldn't get value of right operator in LIKE")
 	}
 	leftString, ok := leftValue.(string)
 	if !ok {
@@ -197,11 +197,11 @@ func NewIn() Relation {
 func (rel *In) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
 	leftValue, err := left.ExpressionValue(variables)
 	if err != nil {
-		return false, errors.Wrap(err, "couldn't get value of left operator in more than")
+		return false, errors.Wrap(err, "couldn't get value of left operator in IN")
 	}
 	rightValue, err := right.ExpressionValue(variables)
 	if err != nil {
-		return false, errors.Wrap(err, "couldn't get value of right operator in more than")
+		return false, errors.Wrap(err, "couldn't get value of right operator in IN")
 	}
 
 	switch set := rightValue.(type) {
@@ -214,12 +214,41 @@ func (rel *In) Apply(variables octosql.Variables, left, right Expression) (bool,
 				}
 				continue
 			}
+			switch leftValue.(type) {
+			case *Record:
+				return AreEqual(leftValue, &set[i]), nil
+			case []interface{}:
+				fields := set[i].Fields()
+				values := make([]interface{}, len(fields))
+				for i, field := range fields {
+					values[i] = set[i].Value(field.Name)
+				}
+				return AreEqual(leftValue, values), nil
+			}
+
+		}
+		return false, nil
+
+	case *Record:
+		switch leftValue.(type) {
+		case *Record:
+			return AreEqual(leftValue, rightValue), nil
+		case []interface{}:
+			fields := set.Fields()
+			values := make([]interface{}, len(fields))
+			for i, field := range fields {
+				values[i] = set.Value(field.Name)
+			}
+			return AreEqual(leftValue, values), nil
+		}
+
+	case []interface{}:
+		for i := range set {
 			if AreEqual(leftValue, set[i]) {
 				return true, nil
 			}
 		}
 		return false, nil
-	default:
-		return AreEqual(leftValue, rightValue), nil
 	}
+	return AreEqual(leftValue, rightValue), nil
 }

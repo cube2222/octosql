@@ -9,6 +9,39 @@ import (
 	"github.com/cube2222/octosql"
 )
 
+type Datatype string
+
+const (
+	DatatypeBoolean Datatype = "boolean"
+	DatatypeInt     Datatype = "int"
+	DatatypeFloat32 Datatype = "float32"
+	DatatypeFloat64 Datatype = "float64"
+	DatatypeString  Datatype = "string"
+	DatatypeTuple   Datatype = "[]interface{}"
+)
+
+func getType(i interface{}) Datatype {
+	if _, ok := i.(bool); ok {
+		return DatatypeBoolean
+	}
+	if _, ok := i.(int); ok {
+		return DatatypeInt
+	}
+	if _, ok := i.(float32); ok {
+		return DatatypeFloat32
+	}
+	if _, ok := i.(float64); ok {
+		return DatatypeFloat64
+	}
+	if _, ok := i.(string); ok {
+		return DatatypeString
+	}
+	if _, ok := i.([]interface{}); ok {
+		return DatatypeTuple
+	}
+	return DatatypeString // TODO: Unknown
+}
+
 // ParseType tries to parse the given string into any type it succeeds to. Returns back the string on failure.
 func ParseType(str string) interface{} {
 	integer, err := strconv.ParseInt(str, 10, 64)

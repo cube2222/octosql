@@ -33,6 +33,20 @@ type UnifiedStream struct {
 	first, second RecordStream
 }
 
+func (node *UnifiedStream) Close() error {
+	err := node.first.Close()
+	if err != nil {
+		return errors.Wrap(err, "Couldn't close first underlying stream")
+	}
+
+	err = node.second.Close()
+	if err != nil {
+		return errors.Wrap(err, "Couldn't close second underlying stream")
+	}
+
+	return nil
+}
+
 func (node *UnifiedStream) Next() (*Record, error) {
 	for {
 		firstRecord, err := node.first.Next()

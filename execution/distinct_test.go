@@ -487,7 +487,7 @@ func TestDistinct_Get(t *testing.T) {
 				records:   newRecordSet(),
 			}
 
-			equal, err := AreStreamsEqual(tt.want, distinct)
+			equal, err := AreStreamsEqual(tt.want, &distinct)
 			if err != nil {
 				t.Errorf("Error in AreStreamsEqual()")
 				return

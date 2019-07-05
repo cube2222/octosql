@@ -102,6 +102,15 @@ type RecordStream struct {
 	aliasedFields []octosql.VariableName
 }
 
+func (rs *RecordStream) Close() error {
+	err := rs.file.Close()
+	if err != nil {
+		return errors.Wrap(err, "Couldn't close underlying file")
+	}
+
+	return nil
+}
+
 func (rs *RecordStream) Next() (*execution.Record, error) {
 	if rs.isDone {
 		return nil, execution.ErrEndOfStream

@@ -24,9 +24,9 @@ func TestParseNode(t *testing.T) {
 		{
 			name: "simple union",
 			args: args{
-				"SELECT p.id, p.name, p.surname FROM people p WHERE p.surname = Kowalski " +
-					"UNION " +
-					"SELECT * FROM admins a WHERE a.exp < 2",
+				`SELECT p.id, p.name, p.surname FROM people p WHERE p.surname = 'Kowalski'
+					UNION
+					SELECT * FROM admins a WHERE a.exp < 2`,
 			},
 			want: logical.NewUnionDistinct(
 				logical.NewMap(
@@ -69,10 +69,10 @@ func TestParseNode(t *testing.T) {
 		{
 			name: "simple union all + limit + NO offset",
 			args: args{
-				"SELECT c.name, c.age FROM cities c WHERE c.age > 100 " +
-					"UNION ALL " +
-					"SELECT p.name, p.age FROM people p WHERE p.age > 4 " +
-					"LIMIT 5",
+				`SELECT c.name, c.age FROM cities c WHERE c.age > 100
+					UNION ALL
+					SELECT p.name, p.age FROM people p WHERE p.age > 4
+					LIMIT 5`,
 			},
 			want: logical.NewLimit(
 				logical.NewUnionAll(
@@ -156,9 +156,9 @@ func TestParseNode(t *testing.T) {
 		{
 			name: "simple union all",
 			args: args{
-				"SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 3 " +
-					"UNION ALL " +
-					"SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 4",
+				`SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 3
+					UNION ALL
+					SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 4`,
 			},
 			want: logical.NewUnionAll(
 				logical.NewMap(
@@ -211,9 +211,9 @@ func TestParseNode(t *testing.T) {
 		{
 			name: "complex union all",
 			args: args{
-				"(SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 3 UNION ALL SELECT p2.name, p2.age FROM people p2 WHERE p2.age < 5) " +
-					"UNION ALL" +
-					" (SELECT p2.name, p2.age FROM people p2 WHERE p2.city > 'ciechanowo' UNION ALL SELECT p2.name, p2.age FROM people p2 WHERE p2.city < 'wwa')",
+				`(SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 3 UNION ALL SELECT p2.name, p2.age FROM people p2 WHERE p2.age < 5)
+					UNION ALL
+					(SELECT p2.name, p2.age FROM people p2 WHERE p2.city > 'ciechanowo' UNION ALL SELECT p2.name, p2.age FROM people p2 WHERE p2.city < 'wwa')`,
 			},
 			want: logical.NewUnionAll(
 				logical.NewUnionAll(
@@ -509,6 +509,116 @@ WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age`,
 			),
 			wantErr: false,
 		},
+		{
+			name: "left join",
+			args: args{
+				statement: `
+SELECT p.name FROM people p LEFT JOIN cities c ON p.city = c.name AND p.favorite_city = c.name`,
+			},
+			want: logical.NewMap(
+				[]logical.NamedExpression{
+					logical.NewVariable("p.name"),
+				},
+				logical.NewMap(
+					[]logical.NamedExpression{
+						logical.NewVariable("p.name"),
+					},
+					logical.NewLeftJoin(
+						logical.NewDataSource("people", "p"),
+						logical.NewFilter(
+							logical.NewInfixOperator(
+								logical.NewPredicate(
+									logical.NewVariable("p.city"),
+									logical.Equal,
+									logical.NewVariable("c.name"),
+								),
+								logical.NewPredicate(
+									logical.NewVariable("p.favorite_city"),
+									logical.Equal,
+									logical.NewVariable("c.name"),
+								),
+								"AND",
+							),
+							logical.NewDataSource("cities", "c"),
+						),
+					),
+					true,
+				),
+				false,
+			),
+			wantErr: false,
+		},
+		{
+			name: "right join",
+			args: args{
+				statement: `
+SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorite_city = c.name`,
+			},
+			want: logical.NewMap(
+				[]logical.NamedExpression{
+					logical.NewVariable("p.name"),
+				},
+				logical.NewMap(
+					[]logical.NamedExpression{
+						logical.NewVariable("p.name"),
+					},
+					logical.NewLeftJoin(
+						logical.NewDataSource("people", "p"),
+						logical.NewFilter(
+							logical.NewInfixOperator(
+								logical.NewPredicate(
+									logical.NewVariable("p.city"),
+									logical.Equal,
+									logical.NewVariable("c.name"),
+								),
+								logical.NewPredicate(
+									logical.NewVariable("p.favorite_city"),
+									logical.Equal,
+									logical.NewVariable("c.name"),
+								),
+								"AND",
+							),
+							logical.NewDataSource("cities", "c"),
+						),
+					),
+					true,
+				),
+				false,
+			),
+			wantErr: false,
+		},
+		{
+			name: "right join",
+			args: args{
+				statement: `SELECT * FROM people p WHERE p.age IN (1, 2, 3, 4) AND ('Jacob', 3) IN (SELECT * FROM people p)`,
+			},
+			want: logical.NewFilter(
+				logical.NewInfixOperator(
+					logical.NewPredicate(
+						logical.NewVariable("p.age"),
+						logical.In,
+						logical.NewTuple([]logical.Expression{
+							logical.NewConstant(1),
+							logical.NewConstant(2),
+							logical.NewConstant(3),
+							logical.NewConstant(4),
+						}),
+					),
+					logical.NewPredicate(
+						logical.NewTuple([]logical.Expression{
+							logical.NewConstant("Jacob"),
+							logical.NewConstant(3),
+						}),
+						logical.In,
+						logical.NewNodeExpression(
+							logical.NewDataSource("people", "p"),
+						),
+					),
+					"AND"),
+				logical.NewDataSource("people", "p"),
+			),
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -525,6 +635,8 @@ WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age`,
 				return
 			}
 			if err := logical.EqualNodes(got, tt.want); err != nil {
+				t.Errorf("ParseNode() = %v, want %v: %v", got, tt.want, err)
+
 				f, err := os.Create("diag_got")
 				if err != nil {
 					log.Fatal(err)
@@ -538,7 +650,6 @@ WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age`,
 				}
 				memmap.Map(f, tt.want)
 				f.Close()
-				t.Errorf("ParseNode() = %v, want %v: %v", got, tt.want, err)
 			}
 		})
 	}

@@ -36,19 +36,28 @@ func (node *Limit) Get(variables octosql.Variables) (RecordStream, error) {
 	return newLimitedStream(dataStream, limitVal), nil
 }
 
-func newLimitedStream(rs RecordStream, limit int) *limitedStream {
-	return &limitedStream{
+func newLimitedStream(rs RecordStream, limit int) *LimitedStream {
+	return &LimitedStream{
 		rs:    rs,
 		limit: limit,
 	}
 }
 
-type limitedStream struct {
+type LimitedStream struct {
 	rs    RecordStream
 	limit int
 }
 
-func (node *limitedStream) Next() (*Record, error) {
+func (node *LimitedStream) Close() error {
+	err := node.rs.Close()
+	if err != nil {
+		return errors.Wrap(err, "Couldn't close underlying stream")
+	}
+
+	return nil
+}
+
+func (node *LimitedStream) Next() (*Record, error) {
 	for node.limit > 0 {
 		node.limit--
 		record, err := node.rs.Next()
@@ -57,7 +66,7 @@ func (node *limitedStream) Next() (*Record, error) {
 				node.limit = 0
 				return nil, ErrEndOfStream
 			}
-			return nil, errors.Wrap(err, "limitedStream: couldn't get record")
+			return nil, errors.Wrap(err, "LimitedStream: couldn't get record")
 		}
 		return record, nil
 	}

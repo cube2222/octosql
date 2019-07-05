@@ -45,11 +45,11 @@ func (repo *DataSourceRepository) Get(dataSourceName, alias string) (*DataSource
 	return ds(alias), nil
 }
 
-// Register registers a builder factory for the given data source Name.
+// Register registers a builder factory for the given data source ColumnName.
 func (repo *DataSourceRepository) Register(dataSourceName string, factory DataSourceBuilderFactory) error {
 	_, ok := repo.factories[dataSourceName]
 	if ok {
-		return errors.Errorf("data Source with Name %s already registered", dataSourceName)
+		return errors.Errorf("data Source with ColumnName %s already registered", dataSourceName)
 	}
 	repo.factories[dataSourceName] = factory
 	return nil

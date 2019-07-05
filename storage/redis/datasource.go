@@ -59,19 +59,19 @@ func NewDataSourceBuilderFactory(hostname string, port int, password string, dbI
 
 // NewDataSourceBuilderFactoryFromConfig creates a data source builder factory using the configuration.
 func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (physical.DataSourceBuilderFactory, error) {
-	host, port, err := config.GetIPAddress(dbConfig, "address")
+	host, port, err := config.GetIPAddress(dbConfig, "address", config.WithDefault([]interface{}{"localhost", 6379}))
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get address")
 	}
-	dbIndex, err := config.GetInt(dbConfig, "databaseIndex")
+	dbIndex, err := config.GetInt(dbConfig, "databaseIndex", config.WithDefault(0))
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get database index")
 	}
-	dbKey, err := config.GetString(dbConfig, "databaseKeyName")
+	dbKey, err := config.GetString(dbConfig, "databaseKeyName", config.WithDefault("key"))
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get database key name")
 	}
-	password, err := config.GetString(dbConfig, "password") // TODO: Change to environment.
+	password, err := config.GetString(dbConfig, "password", config.WithDefault("")) // TODO: Change to environment.
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get password")
 	}

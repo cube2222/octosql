@@ -688,11 +688,15 @@ func TestDataSource_Get(t *testing.T) {
 			if err != nil && !tt.wantErr {
 				t.Errorf("%v : while executing datasource builder", err)
 				return
+			} else if err != nil {
+				return
 			}
 
 			stream, err := execNode.Get(tt.args.variables)
 			if err != nil && !tt.wantErr {
 				t.Errorf("Error in Get: %v", err)
+				return
+			} else if err != nil {
 				return
 			}
 
@@ -700,6 +704,12 @@ func TestDataSource_Get(t *testing.T) {
 			if err != nil && !tt.wantErr {
 				t.Errorf("AreStreamsEqual() error: %s", err)
 				return
+			} else if err != nil {
+				return
+			}
+
+			if tt.wantErr {
+				t.Errorf("wanted error, but none received")
 			}
 
 			if !equal {

@@ -1,7 +1,6 @@
 package json
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -20,52 +19,14 @@ var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 }
 
 type DataSource struct {
-	path                string
-	alias               string
-	arrayFormat         bool
-	arrayFormatInMemory []*execution.Record
+	path        string
+	alias       string
+	arrayFormat bool
 }
 
 func NewDataSourceBuilderFactory(path string, arrayFormat bool) physical.DataSourceBuilderFactory {
 	return physical.NewDataSourceBuilderFactory(
 		func(filter physical.Formula, alias string) (execution.Node, error) {
-			if arrayFormat {
-				f, err := os.Open(path)
-				if err != nil {
-					return nil, errors.Wrap(err, "couldn't open json file")
-				}
-				defer f.Close()
-
-				var content []map[string]interface{}
-				err = json.NewDecoder(f).Decode(&content)
-				if err != nil {
-					return nil, errors.Wrap(err, "couldn't decode json file")
-				}
-
-				var records []*execution.Record
-				for _, entry := range content {
-					fields := make([]octosql.VariableName, 0)
-					values := make(map[octosql.VariableName]interface{})
-					for k := range entry {
-						varName := octosql.NewVariableName(fmt.Sprintf("%v.%v", alias, k))
-						fields = append(fields, varName)
-						values[varName] = execution.NormalizeType(entry[k])
-					}
-
-					sort.Slice(fields, func(i, j int) bool {
-						return fields[i] < fields[j]
-					})
-
-					records = append(records, execution.NewRecord(fields, values))
-				}
-
-				return &DataSource{
-					path:                path,
-					arrayFormat:         arrayFormat,
-					arrayFormatInMemory: records,
-					alias:               alias,
-				}, nil
-			}
 
 			return &DataSource{
 				path:        path,
@@ -93,28 +54,28 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 }
 
 func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, error) {
-	if ds.arrayFormat {
-		return execution.NewInMemoryStream(ds.arrayFormatInMemory), nil
-	}
-
 	file, err := os.Open(ds.path)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't open file")
 	}
-	sc := bufio.NewScanner(file)
+
 	return &RecordStream{
-		file:   file,
-		sc:     sc,
-		isDone: false,
-		alias:  ds.alias,
+		arrayFormat:                   ds.arrayFormat,
+		arrayFormatOpeningBracketRead: false,
+		file:                          file,
+		decoder:                       json.NewDecoder(file),
+		isDone:                        false,
+		alias:                         ds.alias,
 	}, nil
 }
 
 type RecordStream struct {
-	file   *os.File
-	sc     *bufio.Scanner
-	isDone bool
-	alias  string
+	arrayFormat                   bool
+	arrayFormatOpeningBracketRead bool
+	file                          *os.File
+	decoder                       *json.Decoder
+	isDone                        bool
+	alias                         string
 }
 
 func (rs *RecordStream) Close() error {
@@ -131,16 +92,27 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 		return nil, execution.ErrEndOfStream
 	}
 
-	if !rs.sc.Scan() {
+	if rs.arrayFormat && !rs.arrayFormatOpeningBracketRead {
+		tok, err := rs.decoder.Token() // Read opening [
+		if tok != json.Delim('[') {
+			return nil, errors.Errorf("expected [ as first json token, got %v", tok)
+		}
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't read json opening bracket")
+		}
+		rs.arrayFormatOpeningBracketRead = true
+	}
+
+	if !rs.decoder.More() {
 		rs.isDone = true
 		rs.file.Close()
 		return nil, execution.ErrEndOfStream
 	}
 
 	var record map[octosql.VariableName]interface{}
-	err := json.Unmarshal(rs.sc.Bytes(), &record)
+	err := rs.decoder.Decode(&record)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't unmarshal json record")
+		return nil, errors.Wrap(err, "couldn't decode json record")
 	}
 
 	aliasedRecord := make(map[octosql.VariableName]interface{})

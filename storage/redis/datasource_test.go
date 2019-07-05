@@ -656,10 +656,12 @@ func TestDataSource_Get(t *testing.T) {
 				},
 			)
 
-			_, err := client.Ping().Result()
-			if err != nil {
-				t.Errorf("Couldn't connect to database: %v", err)
-				return
+			if tt.wantErr == false {
+				_, err := client.Ping().Result()
+				if err != nil {
+					t.Errorf("Couldn't connect to database: %v", err)
+					return
+				}
 			}
 
 			defer func() {
@@ -683,19 +685,19 @@ func TestDataSource_Get(t *testing.T) {
 			dsFactory := NewDataSourceBuilderFactory(fields.hostname, fields.port, fields.password, fields.dbIndex, fields.dbKey)
 			dsBuilder := dsFactory(fields.alias)
 			execNode, err := dsBuilder.Executor(fields.filter, fields.alias)
-			if err != nil {
+			if (err != nil) != tt.wantErr {
 				t.Errorf("%v : while executing datasource builder", err)
 				return
 			}
 
 			stream, err := execNode.Get(tt.args.variables)
-			if err != nil {
+			if (err != nil) != tt.wantErr {
 				t.Errorf("Error in Get: %v", err)
 				return
 			}
 
 			equal, err := execution.AreStreamsEqual(stream, tt.want)
-			if err != nil {
+			if (err != nil) != tt.wantErr {
 				t.Errorf("AreStreamsEqual() error: %s", err)
 				return
 			}

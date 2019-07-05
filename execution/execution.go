@@ -38,6 +38,27 @@ func (v *Variable) Name() octosql.VariableName {
 	return v.name
 }
 
+type Tuple struct {
+	expressions []Expression
+}
+
+func NewTuple(expressions []Expression) *Tuple {
+	return &Tuple{expressions: expressions}
+}
+
+func (tup *Tuple) ExpressionValue(variables octosql.Variables) (interface{}, error) {
+	outValues := make([]interface{}, len(tup.expressions))
+	for i, expr := range tup.expressions {
+		value, err := extractSingleValue(expr, variables)
+		if err != nil {
+			return nil, errors.Wrapf(err, "couldn't get tuple subexpression with index %v", i)
+		}
+		outValues[i] = value
+	}
+
+	return outValues, nil
+}
+
 type NodeExpression struct {
 	node Node
 }
@@ -114,7 +135,7 @@ func extractSingleValue(expr Expression, variables octosql.Variables) (interface
 
 	if record, ok := value.(*Record); ok {
 		if len(record.Fields()) > 1 {
-			return nil, errors.Errorf("multi field record ended up in one select field %+v", value)
+			return nil, errors.Errorf("multi field record ended up in single expression field %+v", value)
 		}
 		return record.Value(record.Fields()[0].Name), nil
 	}

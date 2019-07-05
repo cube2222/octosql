@@ -214,12 +214,41 @@ func (rel *In) Apply(variables octosql.Variables, left, right Expression) (bool,
 				}
 				continue
 			}
+			switch leftValue.(type) {
+			case *Record:
+				return AreEqual(leftValue, &set[i]), nil
+			case []interface{}:
+				fields := set[i].Fields()
+				values := make([]interface{}, len(fields))
+				for i, field := range fields {
+					values[i] = set[i].Value(field.Name)
+				}
+				return AreEqual(leftValue, values), nil
+			}
+
+		}
+		return false, nil
+
+	case *Record:
+		switch leftValue.(type) {
+		case *Record:
+			return AreEqual(leftValue, rightValue), nil
+		case []interface{}:
+			fields := set.Fields()
+			values := make([]interface{}, len(fields))
+			for i, field := range fields {
+				values[i] = set.Value(field.Name)
+			}
+			return AreEqual(leftValue, values), nil
+		}
+
+	case []interface{}:
+		for i := range set {
 			if AreEqual(leftValue, set[i]) {
 				return true, nil
 			}
 		}
 		return false, nil
-	default:
-		return AreEqual(leftValue, rightValue), nil
 	}
+	return AreEqual(leftValue, rightValue), nil
 }

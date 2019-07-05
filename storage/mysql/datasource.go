@@ -84,7 +84,7 @@ func NewDataSourceBuilderFactory(host string, port int, user, password, database
 
 // NewDataSourceBuilderFactoryFromConfig creates a data source builder factory using the configuration.
 func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (physical.DataSourceBuilderFactory, error) {
-	host, port, err := config.GetIPAddress(dbConfig, "address")
+	host, port, err := config.GetIPAddress(dbConfig, "address", config.WithDefault([]interface{}{"localhost", 3306}))
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get address")
 	}
@@ -101,7 +101,7 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 		return nil, errors.Wrap(err, "couldn't get tableName")
 	}
 
-	primaryKeysStrings, err := config.GetStringList(dbConfig, "primaryKeys")
+	primaryKeysStrings, err := config.GetStringList(dbConfig, "primaryKeys", config.WithDefault([]string{}))
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get primaryKeys")
 	}

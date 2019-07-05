@@ -685,19 +685,19 @@ func TestDataSource_Get(t *testing.T) {
 			dsFactory := NewDataSourceBuilderFactory(fields.hostname, fields.port, fields.password, fields.dbIndex, fields.dbKey)
 			dsBuilder := dsFactory(fields.alias)
 			execNode, err := dsBuilder.Executor(fields.filter, fields.alias)
-			if (err != nil) != tt.wantErr {
+			if err != nil && !tt.wantErr {
 				t.Errorf("%v : while executing datasource builder", err)
 				return
 			}
 
 			stream, err := execNode.Get(tt.args.variables)
-			if (err != nil) != tt.wantErr {
+			if err != nil && !tt.wantErr {
 				t.Errorf("Error in Get: %v", err)
 				return
 			}
 
 			equal, err := execution.AreStreamsEqual(stream, tt.want)
-			if (err != nil) != tt.wantErr {
+			if err != nil && !tt.wantErr {
 				t.Errorf("AreStreamsEqual() error: %s", err)
 				return
 			}

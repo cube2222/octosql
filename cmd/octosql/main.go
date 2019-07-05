@@ -10,6 +10,7 @@ import (
 	"github.com/cube2222/octosql/app"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/output"
+	csvoutput "github.com/cube2222/octosql/output/csv"
 	jsonoutput "github.com/cube2222/octosql/output/json"
 	"github.com/cube2222/octosql/output/table"
 	"github.com/cube2222/octosql/parser"
@@ -59,6 +60,10 @@ var rootCmd = &cobra.Command{
 			out = table.NewOutput(os.Stdout)
 		case "json":
 			out = jsonoutput.NewOutput(os.Stdout)
+		case "csv":
+			out = csvoutput.NewOutput(',', os.Stdout)
+		case "tabbed":
+			out = csvoutput.NewOutput('\t', os.Stdout)
 		default:
 			log.Fatal("invalid output type")
 		}
@@ -89,7 +94,7 @@ var rootCmd = &cobra.Command{
 
 func main() {
 	rootCmd.Flags().StringVarP(&configPath, "config", "c", os.Getenv("OCTOSQL_CONFIG"), "data source configuration path, defaults to $OCTOSQL_CONFIG")
-	rootCmd.Flags().StringVarP(&outputFormat, "output", "o", "table", "output format, one of [table json csv]")
+	rootCmd.Flags().StringVarP(&outputFormat, "output", "o", "table", "output format, one of [table json csv tabbed]")
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

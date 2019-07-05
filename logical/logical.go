@@ -93,6 +93,38 @@ func (v *Constant) Physical(ctx context.Context, physicalCreator *PhysicalPlanCr
 	}), nil
 }
 
+type Tuple struct {
+	expressions []Expression
+}
+
+func NewTuple(expressions []Expression) *Tuple {
+	return &Tuple{expressions: expressions}
+}
+
+func (tup *Tuple) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
+	physicalExprs := make([]physical.Expression, len(tup.expressions))
+	variables := octosql.NoVariables()
+	for i := range tup.expressions {
+		physicalExpr, exprVariables, err := tup.expressions[i].Physical(ctx, physicalCreator)
+		if err != nil {
+			return nil, nil, errors.Wrapf(
+				err,
+				"couldn't get physical plan for tuple subexpression with index %d", i,
+			)
+		}
+		variables, err = variables.MergeWith(exprVariables)
+		if err != nil {
+			return nil, nil, errors.Wrapf(
+				err,
+				"couldn't merge variables with those of tuple subexpression with index %d", i,
+			)
+		}
+
+		physicalExprs[i] = physicalExpr
+	}
+	return physical.NewTuple(physicalExprs), variables, nil
+}
+
 type NodeExpression struct {
 	node Node
 }

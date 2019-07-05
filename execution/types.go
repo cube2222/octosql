@@ -17,6 +17,7 @@ const (
 	DatatypeFloat32 Datatype = "float32"
 	DatatypeFloat64 Datatype = "float64"
 	DatatypeString  Datatype = "string"
+	DatatypeTuple   Datatype = "[]interface{}"
 )
 
 func getType(i interface{}) Datatype {
@@ -34,6 +35,9 @@ func getType(i interface{}) Datatype {
 	}
 	if _, ok := i.(string); ok {
 		return DatatypeString
+	}
+	if _, ok := i.([]interface{}); ok {
+		return DatatypeTuple
 	}
 	return DatatypeString // TODO: Unknown
 }

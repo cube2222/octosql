@@ -328,6 +328,21 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 	case sqlparser.BoolVal:
 		return logical.NewConstant(expr), nil
 
+	case sqlparser.ValTuple:
+		if len(expr) == 1 {
+			return ParseExpression(expr[0])
+		}
+		expressions := make([]logical.Expression, len(expr))
+		for i := range expr {
+			subExpr, err := ParseExpression(expr[i])
+			if err != nil {
+				return nil, errors.Wrapf(err, "couldn't parse tuple subexpression with index %v", i)
+			}
+
+			expressions[i] = subExpr
+		}
+		return logical.NewTuple(expressions), nil
+
 	default:
 		return nil, errors.Errorf("unsupported expression %+v of type %v", expr, reflect.TypeOf(expr))
 	}

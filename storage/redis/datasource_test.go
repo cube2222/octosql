@@ -80,48 +80,6 @@ func TestDataSource_Get(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "different database index and different key",
-			fields: fields{
-				hostname: hostname,
-				password: password,
-				port:     port,
-				dbIndex:  1,
-				dbKey:    "id",
-				filter: physical.NewPredicate(
-					physical.NewVariable("r.id"),
-					physical.NewRelation("equal"),
-					physical.NewVariable("const_0")),
-				alias: "r",
-				queries: map[string]map[string]interface{}{
-					"id": {
-						"name":    "wojtek",
-						"surname": "k",
-						"age":     "3",
-						"city":    "warsaw",
-					},
-				},
-			},
-			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": "key0",
-				},
-			},
-			want: execution.NewInMemoryStream([]*execution.Record{
-				execution.NewRecord(
-					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]interface{}{
-						"r.id":      "key0",
-						"r.age":     "3",
-						"r.city":    "warsaw",
-						"r.name":    "wojtek",
-						"r.surname": "k",
-					},
-				),
-			},
-			),
-			wantErr: false,
-		},
-		{
 			name: "different database key",
 			fields: fields{
 				hostname: hostname,
@@ -150,13 +108,13 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecord(
-					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
+					[]octosql.VariableName{"r.some_other_key_name", "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]interface{}{
-						"r.key":     "key0",
-						"r.age":     "3",
-						"r.city":    "warsaw",
-						"r.name":    "wojtek",
-						"r.surname": "k",
+						"r.some_other_key_name": "key0",
+						"r.age":                 "3",
+						"r.city":                "warsaw",
+						"r.name":                "wojtek",
+						"r.surname":             "k",
 					},
 				),
 			},
@@ -700,7 +658,7 @@ func TestDataSource_Get(t *testing.T) {
 
 			_, err := client.Ping().Result()
 			if err != nil {
-				//t.Errorf("Couldn't connect to database")
+				t.Errorf("Couldn't connect to database: %v", err)
 				return
 			}
 
@@ -732,7 +690,7 @@ func TestDataSource_Get(t *testing.T) {
 
 			stream, err := execNode.Get(tt.args.variables)
 			if err != nil {
-				//t.Errorf("Error in Get")
+				t.Errorf("Error in Get: %v", err)
 				return
 			}
 

@@ -80,20 +80,20 @@ func TestDataSource_Get(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "different database index",
+			name: "different database index and different key",
 			fields: fields{
 				hostname: hostname,
 				password: password,
 				port:     port,
 				dbIndex:  1,
-				dbKey:    dbKey,
+				dbKey:    "id",
 				filter: physical.NewPredicate(
-					physical.NewVariable("r.key"),
+					physical.NewVariable("r.id"),
 					physical.NewRelation("equal"),
 					physical.NewVariable("const_0")),
 				alias: "r",
 				queries: map[string]map[string]interface{}{
-					"key0": {
+					"id": {
 						"name":    "wojtek",
 						"surname": "k",
 						"age":     "3",
@@ -110,7 +110,7 @@ func TestDataSource_Get(t *testing.T) {
 				execution.NewRecord(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]interface{}{
-						"r.key":     "key0",
+						"r.id":      "key0",
 						"r.age":     "3",
 						"r.city":    "warsaw",
 						"r.name":    "wojtek",

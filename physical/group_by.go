@@ -2,60 +2,57 @@ package physical
 
 import (
 	"context"
-	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/logical"
-	"github.com/pkg/errors"
 	"strings"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/execution"
+	"github.com/pkg/errors"
 )
 
 type Aggregate string
 
 const (
+	Avg   Aggregate = "avg"
 	Count Aggregate = "count"
+	First Aggregate = "first"
+	Last  Aggregate = "last"
 	Max   Aggregate = "max"
 	Min   Aggregate = "min"
-	Avg   Aggregate = "avg"
+	Sum   Aggregate = "sum"
 )
 
-func NewAggregate(aggr logical.Aggregate) Aggregate {
-	return Aggregate(aggr)
+var aggregateTable = map[Aggregate]execution.AggregatePrototype{ // TODO: fillme
+}
+
+func NewAggregate(aggregate string) Aggregate {
+	return Aggregate(strings.ToLower(aggregate))
 }
 
 type GroupBy struct {
-	SelectExpr []NamedExpression
-	Source     Node
-	Group      []NamedExpression             // po czym grupujemy
-	Aggregates map[NamedExpression]Aggregate // zbior agregatow: agregat -> co agreguje
+	Source Node
+	Key    []Expression
+
+	Fields     []octosql.VariableName
+	Aggregates []Aggregate
 }
 
-func NewGroupBy(selectExpr []NamedExpression, source Node, group []NamedExpression, aggregates map[NamedExpression]Aggregate) *GroupBy {
-	return &GroupBy{SelectExpr: selectExpr, Source: source, Group: group, Aggregates: aggregates}
+func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, aggregates []Aggregate) *GroupBy {
+	return &GroupBy{Source: source, Key: key, Fields: fields, Aggregates: aggregates}
 }
 
 func (node *GroupBy) Transform(ctx context.Context, transformers *Transformers) Node {
-	// selectExpr transformation
-	executionSelect := make([]NamedExpression, len(node.SelectExpr))
-	for i := range node.SelectExpr {
-		executionSelect[i] = node.SelectExpr[i].TransformNamed(ctx, transformers)
+	key := make([]Expression, len(node.Key))
+	for i := range node.Key {
+		key[i] = node.Key[i].Transform(ctx, transformers)
 	}
 
-	// group transformation
-	executionGroup := make([]NamedExpression, len(node.Group))
-	for i := range node.Group {
-		executionGroup[i] = node.Group[i].TransformNamed(ctx, transformers)
-	}
-
-	// aggregates transformation
-	executionAggregates := make(map[NamedExpression]Aggregate)
-	for key, value := range node.Aggregates {
-		executionAggregates[key.TransformNamed(ctx, transformers)] = value
-	}
+	source := node.Source.Transform(ctx, transformers)
 
 	var transformed Node = &GroupBy{
-		SelectExpr: executionSelect,
-		Source:     node.Source.Transform(ctx, transformers),
-		Group:      executionGroup,
-		Aggregates: executionAggregates,
+		Source:     source,
+		Key:        key,
+		Fields:     node.Fields,
+		Aggregates: node.Aggregates,
 	}
 
 	if transformers.NodeT != nil {
@@ -66,55 +63,25 @@ func (node *GroupBy) Transform(ctx context.Context, transformers *Transformers) 
 }
 
 func (node *GroupBy) Materialize(ctx context.Context) (execution.Node, error) {
-	// select materialization
-	executionSelect := make([]execution.NamedExpression, len(node.SelectExpr))
-	for i := range node.SelectExpr {
-		materialized, err := node.SelectExpr[i].MaterializeNamed(ctx)
-		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't materialize expression with index %v", i)
-		}
-
-		executionSelect[i] = materialized
-	}
-
-	// source materialization
-	executionSource, err := node.Source.Materialize(ctx)
+	source, err := node.Source.Materialize(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize Source node")
 	}
 
-	// group materialization
-	executionGroup := make([]execution.NamedExpression, len(node.Group))
-	for i := range node.Group {
-		materialized, err := node.Group[i].MaterializeNamed(ctx)
+	key := make([]execution.Expression, len(node.Key))
+	for i := range node.Key {
+		keyPart, err := node.Key[i].Materialize(ctx)
 		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't materialize expression with index %v", i)
+			return nil, errors.Wrapf(err, "couldn't materialize group key expression with index %v", i)
 		}
 
-		executionGroup[i] = materialized
+		key[i] = keyPart
 	}
 
-	// aggregates materialization
-	executionAggregates := make(map[execution.NamedExpression]execution.Aggregate)
-	for key, value := range node.Aggregates {
-		executionExpr, err := key.MaterializeNamed(ctx)
-		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't get execution plan for aggregates map with key %s", key)
-		}
-
-		switch Aggregate(strings.ToLower(string(value))) {
-		case Count:
-			executionAggregates[executionExpr] = execution.NewCount()
-		case Max:
-			executionAggregates[executionExpr] = execution.NewMax()
-		case Min:
-			executionAggregates[executionExpr] = execution.NewMin()
-		case Avg:
-			executionAggregates[executionExpr] = execution.NewAvg()
-		default:
-			return nil, errors.Errorf("invalid aggregate %s", key)
-		}
+	aggregatePrototypes := make([]execution.AggregatePrototype, len(node.Aggregates))
+	for i := range node.Aggregates {
+		aggregatePrototypes[i] = aggregateTable[node.Aggregates[i]]
 	}
 
-	return execution.NewGroupBy(executionSelect, executionSource, executionGroup, executionAggregates), nil
+	return execution.NewGroupBy(source, key, node.Fields, aggregatePrototypes), nil
 }

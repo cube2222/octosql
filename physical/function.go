@@ -27,7 +27,7 @@ var functionTable = map[string]execution.Function{
 	"abs":          functions.FuncAbs,
 	"capitalize":   functions.FuncCapitalize,
 	"sqrt":         functions.FuncSqrt,
-	"max":          functions.FuncMax,
+	"max":          functions.FuncMax, //TODO: fixme same as aggregate
 	"min":          functions.FuncMin,
 	"randint":      functions.FuncRandInt,
 	"randfloat":    functions.FuncRandFloat,

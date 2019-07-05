@@ -2,6 +2,8 @@ package logical
 
 import (
 	"context"
+	"strings"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
@@ -10,43 +12,31 @@ import (
 type Aggregate string
 
 const (
+	Avg   Aggregate = "avg"
 	Count Aggregate = "count"
+	First Aggregate = "first"
+	Last  Aggregate = "last"
 	Max   Aggregate = "max"
 	Min   Aggregate = "min"
-	Avg   Aggregate = "avg"
+	Sum   Aggregate = "sum"
 )
 
 type GroupBy struct {
-	selectExpr []NamedExpression
-	source     Node
-	group      []NamedExpression             // po czym grupujemy
-	aggregates map[NamedExpression]Aggregate // zbior agregatow: agregat -> co agreguje
+	source Node
+	key    []Expression
+
+	fields     []octosql.VariableName
+	aggregates []Aggregate
 }
 
-func NewGroupBy(selectExpr []NamedExpression, source Node, group []NamedExpression, aggregates map[NamedExpression]Aggregate) *GroupBy {
-	return &GroupBy{selectExpr: selectExpr, source: source, group: group, aggregates: aggregates}
+func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, aggregates []Aggregate) *GroupBy {
+	return &GroupBy{source: source, key: key, fields: fields, aggregates: aggregates}
 }
 
 func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
 	variables := octosql.NoVariables()
 
-	// selectexpr convertion
-	physicalSelect := make([]physical.NamedExpression, len(node.selectExpr))
-	for i := range node.selectExpr {
-		physicalExpr, exprVariables, err := node.selectExpr[i].PhysicalNamed(ctx, physicalCreator)
-		if err != nil {
-			return nil, nil, errors.Wrapf(err, "couldn't get physical plan for group expression with index %d", i)
-		}
-		variables, err = variables.MergeWith(exprVariables)
-		if err != nil {
-			return nil, nil, errors.Wrapf(err, "couldn't merge variables with those of group expression with index %d", i)
-		}
-
-		physicalSelect[i] = physicalExpr
-	}
-
-	// source convertion
-	physicalSource, sourceVariables, err := node.source.Physical(ctx, physicalCreator)
+	source, sourceVariables, err := node.source.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for group by source")
 	}
@@ -55,35 +45,41 @@ func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlan
 		return nil, nil, errors.Wrap(err, "couldn't merge variables with those of source")
 	}
 
-	// group convertion
-	physicalGroup := make([]physical.NamedExpression, len(node.group))
-	for i := range node.group {
-		physicalExpr, exprVariables, err := node.group[i].PhysicalNamed(ctx, physicalCreator)
+	key := make([]physical.Expression, len(node.key))
+	for i := range node.key {
+		expr, exprVariables, err := node.key[i].Physical(ctx, physicalCreator)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "couldn't get physical plan for group expression with index %d", i)
+			return nil, nil, errors.Wrapf(err, "couldn't get physical plan for group key expression with index %d", i)
 		}
 		variables, err = variables.MergeWith(exprVariables)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "couldn't merge variables with those of group expression with index %d", i)
+			return nil, nil, errors.Wrapf(err, "couldn't merge variables with those of group key expression with index %d", i)
 		}
 
-		physicalGroup[i] = physicalExpr
+		key[i] = expr
 	}
 
-	// aggregates convertion
-	physicalAggregates := make(map[physical.NamedExpression]physical.Aggregate)
-	for key, value := range node.aggregates {
-		physicalExpr, exprVariables, err := key.PhysicalNamed(ctx, physicalCreator)
-		if err != nil {
-			return nil, nil, errors.Wrapf(err, "couldn't get physical plan for aggregates map with key %s", key)
+	aggregates := make([]physical.Aggregate, len(node.aggregates))
+	for i := range node.aggregates {
+		switch Aggregate(strings.ToLower(string(node.aggregates[i]))) {
+		case Avg:
+			aggregates[i] = physical.Avg
+		case Count:
+			aggregates[i] = physical.Count
+		case First:
+			aggregates[i] = physical.First
+		case Last:
+			aggregates[i] = physical.Last
+		case Max:
+			aggregates[i] = physical.Max
+		case Min:
+			aggregates[i] = physical.Min
+		case Sum:
+			aggregates[i] = physical.Sum
+		default:
+			return nil, nil, errors.Errorf("invalid aggregate: %s", node.aggregates[i])
 		}
-		variables, err = variables.MergeWith(exprVariables)
-		if err != nil {
-			return nil, nil, errors.Wrapf(err, "couldn't merge variables with those of aggregates expression with key %s", key)
-		}
-
-		physicalAggregates[physicalExpr] = physical.NewAggregate(value)
 	}
 
-	return physical.NewGroupBy(physicalSelect, physicalSource, physicalGroup, physicalAggregates), variables, nil
+	return physical.NewGroupBy(source, key, node.fields, aggregates), variables, nil
 }

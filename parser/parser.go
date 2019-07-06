@@ -85,7 +85,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 						i, statement.SelectExprs[i], reflect.TypeOf(statement.SelectExprs[i]))
 				}
 
-				if statement.GroupBy == nil {
+				if len(statement.GroupBy) != 0 {
 					expressions[i], err = ParseAliasedExpression(aliasedExpression)
 					if err != nil {
 						return nil, errors.Wrapf(err, "couldn't parse aliased expression with index %d", i)
@@ -141,7 +141,11 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		if _, ok := statement.SelectExprs[0].(*sqlparser.StarExpr); !ok {
 			nameExpressions := make([]logical.NamedExpression, len(statement.SelectExprs))
 			for i := range expressions {
-				nameExpressions[i] = logical.NewVariable(octosql.NewVariableName(fmt.Sprintf("%v_%v", expressions[i].Name(), aggregates[i])))
+				if len(statement.GroupBy) == 0 {
+					nameExpressions[i] = logical.NewVariable(expressions[i].Name())
+				} else {
+					nameExpressions[i] = logical.NewVariable(octosql.NewVariableName(fmt.Sprintf("%v_%v", expressions[i].Name(), aggregates[i])))
+				}
 			}
 
 			root = logical.NewMap(nameExpressions, root, false)

@@ -21,8 +21,9 @@ const (
 	Sum   Aggregate = "sum"
 )
 
-var aggregateFunctions = []Aggregate{
+var AggregateFunctions = []Aggregate{
 	Count,
+	First,
 }
 
 type GroupBy struct {

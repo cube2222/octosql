@@ -39,9 +39,12 @@ func (node *GroupBy) Get(variables octosql.Variables) (RecordStream, error) {
 	}
 
 	return &GroupByStream{
-		source:     source,
-		variables:  variables,
-		key:        node.key,
+		source:    source,
+		variables: variables,
+
+		key:    node.key,
+		groups: NewHashMap(),
+
 		fields:     node.fields,
 		aggregates: aggregates,
 	}, nil
@@ -129,7 +132,7 @@ func (stream *GroupByStream) Next() (*Record, error) {
 		}
 	}
 
-	return NewRecordFromSlice(stream.fieldNames, values), ErrEndOfStream
+	return NewRecordFromSlice(stream.fieldNames, values), nil
 }
 
 func (stream *GroupByStream) Close() error {

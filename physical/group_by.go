@@ -24,6 +24,7 @@ const (
 
 var aggregateTable = map[Aggregate]execution.AggregatePrototype{ // TODO: fillme
 	Count: func() execution.Aggregate { return aggregates.NewCount() },
+	First: func() execution.Aggregate { return aggregates.NewFirst() },
 }
 
 func NewAggregate(aggregate string) Aggregate {

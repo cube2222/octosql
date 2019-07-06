@@ -57,7 +57,7 @@ func (g *HashMap) Get(key interface{}) (interface{}, bool, error) {
 }
 
 func (g *HashMap) GetIterator() *Iterator {
-	hashes := make([]uint64, len(g.container))
+	hashes := make([]uint64, 0, len(g.container))
 	for k := range g.container {
 		hashes = append(hashes, k)
 	}
@@ -88,7 +88,7 @@ func (iter *Iterator) Next() (interface{}, interface{}, bool) {
 	outListPos := iter.listPosition
 
 	// Advance iterator to next item
-	if iter.listPosition == len(iter.hm.container[iter.hashes[iter.hashesPosition]]) {
+	if iter.listPosition+1 == len(iter.hm.container[iter.hashes[iter.hashesPosition]]) {
 		iter.hashesPosition++
 		iter.listPosition = 0
 	} else {
@@ -96,5 +96,5 @@ func (iter *Iterator) Next() (interface{}, interface{}, bool) {
 	}
 
 	outEntry := iter.hm.container[iter.hashes[outHashPos]][outListPos]
-	return outEntry.key, outEntry.value, false
+	return outEntry.key, outEntry.value, true
 }

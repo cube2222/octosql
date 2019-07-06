@@ -75,6 +75,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 
 	// A WHERE clause needs to have access to those variables, so this map comes first, keeping the old variables.
 	var expressions = make([]logical.NamedExpression, len(statement.SelectExprs))
+	var aggregates = make([]logical.Aggregate, len(statement.SelectExprs))
 	if len(statement.SelectExprs) >= 1 {
 		if _, ok := statement.SelectExprs[0].(*sqlparser.StarExpr); !ok {
 			for i := range statement.SelectExprs {
@@ -84,9 +85,16 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 						i, statement.SelectExprs[i], reflect.TypeOf(statement.SelectExprs[i]))
 				}
 
-				expressions[i], err = ParseAliasedExpression(aliasedExpression)
-				if err != nil {
-					return nil, errors.Wrapf(err, "couldn't parse aliased expression with index %d", i)
+				if statement.GroupBy == nil {
+					expressions[i], err = ParseAliasedExpression(aliasedExpression)
+					if err != nil {
+						return nil, errors.Wrapf(err, "couldn't parse aliased expression with index %d", i)
+					}
+				} else {
+					aggregates[i], expressions[i], err = ParseAggregate(aliasedExpression.Expr)
+					if err != nil {
+						return nil, errors.Wrapf(err, "couldn't parse aggregate with index %d", i)
+					}
 				}
 			}
 
@@ -100,6 +108,23 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 			return nil, errors.Wrap(err, "couldn't parse where expression")
 		}
 		root = logical.NewFilter(filterFormula, root)
+	}
+
+	if statement.GroupBy != nil {
+		key := make([]logical.Expression, len(statement.GroupBy))
+		for i := range statement.GroupBy {
+			key[i], err = ParseExpression(statement.GroupBy[i])
+			if err != nil {
+				return nil, errors.Wrapf(err, "couldn't parse group key expression with index %v", i)
+			}
+		}
+
+		fields := make([]octosql.VariableName, len(expressions))
+		for i := range expressions {
+			fields[i] = expressions[i].Name()
+		}
+
+		root = logical.NewGroupBy(root, key, fields, aggregates)
 	}
 
 	if statement.OrderBy != nil {
@@ -116,7 +141,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		if _, ok := statement.SelectExprs[0].(*sqlparser.StarExpr); !ok {
 			nameExpressions := make([]logical.NamedExpression, len(statement.SelectExprs))
 			for i := range expressions {
-				nameExpressions[i] = logical.NewVariable(expressions[i].Name())
+				nameExpressions[i] = logical.NewVariable(octosql.NewVariableName(fmt.Sprintf("%v_%v", expressions[i].Name(), aggregates[i])))
 			}
 
 			root = logical.NewMap(nameExpressions, root, false)
@@ -237,6 +262,40 @@ func ParseJoinTableExpression(expr *sqlparser.JoinTableExpr) (logical.Node, erro
 	default:
 		return nil, errors.Errorf("invalid join expression: %v", expr.Join)
 	}
+}
+
+func ParseAggregate(expr sqlparser.Expr) (logical.Aggregate, logical.NamedExpression, error) {
+	switch expr := expr.(type) {
+	case *sqlparser.FuncExpr:
+		found := false
+		curAggregate := logical.Aggregate(strings.ToLower(expr.Name.String()))
+		for _, aggregate := range logical.AggregateFunctions {
+			if curAggregate == aggregate {
+				found = true
+			}
+		}
+		if !found {
+			return "", nil, errors.Errorf("aggregate not found: %v", expr.Name)
+		}
+
+		arg, err := ParseAliasedExpression(expr.Exprs[0].(*sqlparser.AliasedExpr))
+		if err != nil {
+			return "", nil, errors.Wrap(err, "couldn't parse aggregate argument")
+		}
+
+		return curAggregate, arg, nil
+		/*case *sqlparser.AliasedExpr:
+		curAggregate := logical.First
+
+		arg, err := ParseAliasedExpression(expr)
+		if err != nil {
+			return "", nil, errors.Wrap(err, "couldn't parse aggregate argument")
+		}
+
+		return curAggregate, arg, nil*/
+	}
+
+	return "", nil, errors.Errorf("invalid expression type")
 }
 
 func ParseAliasedExpression(expr *sqlparser.AliasedExpr) (logical.NamedExpression, error) {

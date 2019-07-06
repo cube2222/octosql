@@ -85,7 +85,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 						i, statement.SelectExprs[i], reflect.TypeOf(statement.SelectExprs[i]))
 				}
 
-				if len(statement.GroupBy) != 0 {
+				if len(statement.GroupBy) == 0 {
 					expressions[i], err = ParseAliasedExpression(aliasedExpression)
 					if err != nil {
 						return nil, errors.Wrapf(err, "couldn't parse aliased expression with index %d", i)

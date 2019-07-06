@@ -6,6 +6,7 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/execution/aggregates"
 	"github.com/pkg/errors"
 )
 
@@ -22,6 +23,7 @@ const (
 )
 
 var aggregateTable = map[Aggregate]execution.AggregatePrototype{ // TODO: fillme
+	Count: func() execution.Aggregate { return aggregates.NewCount() },
 }
 
 func NewAggregate(aggregate string) Aggregate {

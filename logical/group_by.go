@@ -21,6 +21,10 @@ const (
 	Sum   Aggregate = "sum"
 )
 
+var aggregateFunctions = []Aggregate{
+	Count,
+}
+
 type GroupBy struct {
 	source Node
 	key    []Expression

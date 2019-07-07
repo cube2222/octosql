@@ -2,6 +2,7 @@ OctoSQL
 =======
 OctoSQL is a data query tool, allowing you to join, analyze and transform data from multiple data sources and file formats using SQL.
 
+## Table of Contents
 - [What is OctoSQL?](#what-is-octosql)
 - [Quickstart](#quickstart)
 - [Installation](#installation)

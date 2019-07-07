@@ -87,6 +87,8 @@ func (agg *Max) AddRecord(key []interface{}, value interface{}) error {
 		if !ok || value.After(max.(time.Time)) {
 			max = value
 		}
+	default:
+		return errors.Errorf("invalid type in max: %v with value %v", execution.GetType(value), value)
 	}
 
 	err = agg.maxes.Set(key, max)

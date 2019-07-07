@@ -22,11 +22,13 @@ const (
 	Sum   Aggregate = "sum"
 )
 
-var aggregateTable = map[Aggregate]execution.AggregatePrototype{ // TODO: fillme
+var aggregateTable = map[Aggregate]execution.AggregatePrototype{
 	Avg:   func() execution.Aggregate { return aggregates.NewAverage() },
 	Count: func() execution.Aggregate { return aggregates.NewCount() },
 	First: func() execution.Aggregate { return aggregates.NewFirst() },
 	Last:  func() execution.Aggregate { return aggregates.NewLast() },
+	Max:   func() execution.Aggregate { return aggregates.NewMax() },
+	Min:   func() execution.Aggregate { return aggregates.NewMin() },
 	Sum:   func() execution.Aggregate { return aggregates.NewSum() },
 }
 

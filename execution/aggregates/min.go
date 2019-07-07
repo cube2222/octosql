@@ -87,6 +87,9 @@ func (agg *Min) AddRecord(key []interface{}, value interface{}) error {
 		if !ok || value.Before(min.(time.Time)) {
 			min = value
 		}
+
+	default:
+		return errors.Errorf("invalid type in min: %v with value %v", execution.GetType(value), value)
 	}
 
 	err = agg.mins.Set(key, min)

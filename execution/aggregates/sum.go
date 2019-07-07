@@ -53,6 +53,9 @@ func (agg *Sum) AddRecord(key []interface{}, value interface{}) error {
 		} else {
 			sum = value
 		}
+
+	default:
+		return errors.Errorf("invalid type in sum: %v with value %v", execution.GetType(value), value)
 	}
 
 	err = agg.sums.Set(key, sum)

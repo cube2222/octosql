@@ -25,7 +25,7 @@ func (agg *Average) AddRecord(key []interface{}, value interface{}) error {
 	case int:
 		floatValue = float64(value)
 	default:
-		return errors.Errorf("invalid value to average: %v with type %v", value, execution.GetType(value))
+		return errors.Errorf("invalid type in average: %v with value %v", execution.GetType(value), value)
 	}
 
 	count, ok, err := agg.counts.Get(key)

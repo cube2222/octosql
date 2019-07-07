@@ -26,6 +26,8 @@ var AggregateFunctions = []Aggregate{
 	Count,
 	First,
 	Last,
+	Max,
+	Min,
 	Sum,
 }
 

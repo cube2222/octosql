@@ -74,9 +74,10 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 	}
 
 	// A WHERE clause needs to have access to those variables, so this map comes first, keeping the old variables.
-	var expressions = make([]logical.NamedExpression, len(statement.SelectExprs))
-	var aggregates = make([]logical.Aggregate, len(statement.SelectExprs))
-	var aggregatesAs = make([]octosql.VariableName, len(statement.SelectExprs))
+	expressions := make([]logical.NamedExpression, len(statement.SelectExprs))
+	aggregates := make([]logical.Aggregate, len(statement.SelectExprs))
+	aggregatesAs := make([]octosql.VariableName, len(statement.SelectExprs))
+	aggregating := false
 	if len(statement.SelectExprs) >= 1 {
 		if _, ok := statement.SelectExprs[0].(*sqlparser.StarExpr); !ok {
 			for i := range statement.SelectExprs {
@@ -86,31 +87,23 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 						i, statement.SelectExprs[i], reflect.TypeOf(statement.SelectExprs[i]))
 				}
 
-				if len(statement.GroupBy) > 0 {
-					aggregates[i], expressions[i], err = ParseAggregate(aliasedExpression.Expr)
-					if err == nil {
-						aggregatesAs[i] = octosql.NewVariableName(aliasedExpression.As.String())
-						continue
-					}
-
-					if errors.Cause(err) != ErrNotAggregate {
-						return nil, errors.Wrapf(err, "couldn't parse aggregate with index %d", i)
-					}
-
-					// If this isn't an aggregate expression,
-					// then we just throw a "first" aggregate at it.
-					aggregates[i] = logical.First
+				// Try to parse this as an aggregate expression.
+				aggregates[i], expressions[i], err = ParseAggregate(aliasedExpression.Expr)
+				if err == nil {
+					aggregating = true
+					aggregatesAs[i] = octosql.NewVariableName(aliasedExpression.As.String())
+					continue
 				}
+				if errors.Cause(err) != ErrNotAggregate {
+					return nil, errors.Wrapf(err, "couldn't parse aggregate with index %d", i)
+				}
+
+				// If this isn't an aggregate expression,
+				// then we parse it as a normal select expression.
 
 				expressions[i], err = ParseAliasedExpression(aliasedExpression)
 				if err != nil {
 					return nil, errors.Wrapf(err, "couldn't parse aliased expression with index %d", i)
-				}
-
-				if len(statement.GroupBy) > 0 {
-					// Ergonomically, the user probably expects the name not to change
-					// because of the "first" addition behind the scenes.
-					aggregatesAs[i] = expressions[i].Name()
 				}
 			}
 
@@ -126,7 +119,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		root = logical.NewFilter(filterFormula, root)
 	}
 
-	if statement.GroupBy != nil {
+	if aggregating {
 		key := make([]logical.Expression, len(statement.GroupBy))
 		for i := range statement.GroupBy {
 			key[i], err = ParseExpression(statement.GroupBy[i])
@@ -134,10 +127,22 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 				return nil, errors.Wrapf(err, "couldn't parse group key expression with index %v", i)
 			}
 		}
+		if len(key) == 0 {
+			key = []logical.Expression{logical.NewConstant(true)}
+		}
 
 		fields := make([]octosql.VariableName, len(expressions))
 		for i := range expressions {
 			fields[i] = expressions[i].Name()
+		}
+
+		// If the user doesn't specify an aggregate, we default to the first element in the group.
+		// However, we don't want to change the name of that field.
+		for i := range aggregates {
+			if len(aggregates[i]) == 0 {
+				aggregates[i] = logical.First
+				aggregatesAs[i] = expressions[i].Name()
+			}
 		}
 
 		root = logical.NewGroupBy(root, key, fields, aggregates, aggregatesAs)
@@ -157,7 +162,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		if _, ok := statement.SelectExprs[0].(*sqlparser.StarExpr); !ok {
 			nameExpressions := make([]logical.NamedExpression, len(statement.SelectExprs))
 			for i := range expressions {
-				if len(statement.GroupBy) == 0 {
+				if !aggregating {
 					nameExpressions[i] = logical.NewVariable(expressions[i].Name())
 				} else {
 					if len(aggregatesAs[i]) > 0 {

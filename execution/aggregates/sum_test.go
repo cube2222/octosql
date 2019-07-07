@@ -248,7 +248,7 @@ func TestSum(t *testing.T) {
 			want: 6.0 + 7.0 + 8.0 + 9.0,
 		},
 		{
-			name: "many groups",
+			name: "type error",
 			args: []kv{
 				{
 					key:   []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},
@@ -275,7 +275,7 @@ func TestSum(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "many groups",
+			name: "type error",
 			args: []kv{
 				{
 					key:   []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},
@@ -302,7 +302,7 @@ func TestSum(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "many groups",
+			name: "type error",
 			args: []kv{
 				{
 					key:   []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},

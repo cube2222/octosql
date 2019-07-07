@@ -232,7 +232,7 @@ func TestAverage(t *testing.T) {
 			want: 7.5,
 		},
 		{
-			name: "many groups",
+			name: "type error",
 			args: []kv{
 				{
 					key:   []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},
@@ -259,7 +259,7 @@ func TestAverage(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "many groups",
+			name: "type error",
 			args: []kv{
 				{
 					key:   []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},
@@ -286,7 +286,7 @@ func TestAverage(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "many groups",
+			name: "type error",
 			args: []kv{
 				{
 					key:   []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},

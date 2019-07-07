@@ -57,7 +57,9 @@ var rootCmd = &cobra.Command{
 		var out output.Output
 		switch outputFormat {
 		case "table":
-			out = table.NewOutput(os.Stdout)
+			out = table.NewOutput(os.Stdout, false)
+		case "table_row_separated":
+			out = table.NewOutput(os.Stdout, true)
 		case "json":
 			out = jsonoutput.NewOutput(os.Stdout)
 		case "csv":
@@ -94,7 +96,7 @@ var rootCmd = &cobra.Command{
 
 func main() {
 	rootCmd.Flags().StringVarP(&configPath, "config", "c", os.Getenv("OCTOSQL_CONFIG"), "data source configuration path, defaults to $OCTOSQL_CONFIG")
-	rootCmd.Flags().StringVarP(&outputFormat, "output", "o", "table", "output format, one of [table json csv tabbed]")
+	rootCmd.Flags().StringVarP(&outputFormat, "output", "o", "table", "output format, one of [table json csv tabbed table_row_separated]")
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

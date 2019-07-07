@@ -119,7 +119,18 @@ func (stream *GroupByStream) Next() (*Record, error) {
 			}
 
 			for i := range stream.aggregates {
-				err := stream.aggregates[i].AddRecord(key, record.Value(stream.fields[i]))
+				var value interface{}
+				if stream.fields[i] == "*star*" {
+					mapping := make(map[octosql.VariableName]interface{}, len(record.Fields()))
+					for _, field := range record.Fields() {
+						mapping[field.Name] = record.Value(field.Name)
+					}
+					value = mapping
+
+				} else {
+					value = record.Value(stream.fields[i])
+				}
+				err := stream.aggregates[i].AddRecord(key, value)
 				if err != nil {
 					return nil, errors.Wrapf(err, "couldn't add record value to aggregate with index %v", i)
 				}

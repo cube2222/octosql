@@ -132,7 +132,12 @@ func (stream *GroupByStream) Next() (*Record, error) {
 				}
 				err := stream.aggregates[i].AddRecord(key, value)
 				if err != nil {
-					return nil, errors.Wrapf(err, "couldn't add record value to aggregate with index %v", i)
+					return nil, errors.Wrapf(
+						err,
+						"couldn't add record value to aggregate %s with index %v",
+						stream.aggregates[i].String(),
+						i,
+					)
 				}
 			}
 		}

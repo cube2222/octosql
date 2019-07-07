@@ -312,6 +312,12 @@ func TestAverage(t *testing.T) {
 			key:     []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},
 			wantErr: true,
 		},
+		{
+			name:    "average of zero elements",
+			args:    []kv{},
+			key:     []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

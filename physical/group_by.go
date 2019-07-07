@@ -23,8 +23,11 @@ const (
 )
 
 var aggregateTable = map[Aggregate]execution.AggregatePrototype{ // TODO: fillme
+	Avg:   func() execution.Aggregate { return aggregates.NewAverage() },
 	Count: func() execution.Aggregate { return aggregates.NewCount() },
 	First: func() execution.Aggregate { return aggregates.NewFirst() },
+	Last:  func() execution.Aggregate { return aggregates.NewLast() },
+	Sum:   func() execution.Aggregate { return aggregates.NewSum() },
 }
 
 func NewAggregate(aggregate string) Aggregate {
@@ -37,10 +40,12 @@ type GroupBy struct {
 
 	Fields     []octosql.VariableName
 	Aggregates []Aggregate
+
+	As []octosql.VariableName
 }
 
-func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, aggregates []Aggregate) *GroupBy {
-	return &GroupBy{Source: source, Key: key, Fields: fields, Aggregates: aggregates}
+func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, aggregates []Aggregate, as []octosql.VariableName) *GroupBy {
+	return &GroupBy{Source: source, Key: key, Fields: fields, Aggregates: aggregates, As: as}
 }
 
 func (node *GroupBy) Transform(ctx context.Context, transformers *Transformers) Node {
@@ -56,6 +61,7 @@ func (node *GroupBy) Transform(ctx context.Context, transformers *Transformers) 
 		Key:        key,
 		Fields:     node.Fields,
 		Aggregates: node.Aggregates,
+		As:         node.As,
 	}
 
 	if transformers.NodeT != nil {
@@ -86,5 +92,5 @@ func (node *GroupBy) Materialize(ctx context.Context) (execution.Node, error) {
 		aggregatePrototypes[i] = aggregateTable[node.Aggregates[i]]
 	}
 
-	return execution.NewGroupBy(source, key, node.Fields, aggregatePrototypes), nil
+	return execution.NewGroupBy(source, key, node.Fields, aggregatePrototypes, node.As), nil
 }

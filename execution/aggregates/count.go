@@ -15,8 +15,8 @@ func NewCount() *Count {
 	}
 }
 
-func (c *Count) AddRecord(key []interface{}, value interface{}) error {
-	count, ok, err := c.counts.Get(key)
+func (agg *Count) AddRecord(key []interface{}, value interface{}) error {
+	count, ok, err := agg.counts.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current count out of hashmap")
 	}
@@ -28,7 +28,7 @@ func (c *Count) AddRecord(key []interface{}, value interface{}) error {
 		newCount = 1
 	}
 
-	err = c.counts.Set(key, newCount)
+	err = agg.counts.Set(key, newCount)
 	if err != nil {
 		return errors.Wrap(err, "couldn't put new count into hashmap")
 	}
@@ -36,8 +36,8 @@ func (c *Count) AddRecord(key []interface{}, value interface{}) error {
 	return nil
 }
 
-func (c *Count) GetAggregated(key []interface{}) (interface{}, error) {
-	count, ok, err := c.counts.Get(key)
+func (agg *Count) GetAggregated(key []interface{}) (interface{}, error) {
+	count, ok, err := agg.counts.Get(key)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get count out of hashmap")
 	}
@@ -46,9 +46,9 @@ func (c *Count) GetAggregated(key []interface{}) (interface{}, error) {
 		return nil, errors.Errorf("count for key not found")
 	}
 
-	return count.(int), nil
+	return count, nil
 }
 
-func (c *Count) String() string {
+func (agg *Count) String() string {
 	return "count"
 }

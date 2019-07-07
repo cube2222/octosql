@@ -15,8 +15,8 @@ func NewFirst() *First {
 	}
 }
 
-func (c *First) AddRecord(key []interface{}, value interface{}) error {
-	_, ok, err := c.firsts.Get(key)
+func (agg *First) AddRecord(key []interface{}, value interface{}) error {
+	_, ok, err := agg.firsts.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current first out of hashmap")
 	}
@@ -25,7 +25,7 @@ func (c *First) AddRecord(key []interface{}, value interface{}) error {
 		return nil
 	}
 
-	err = c.firsts.Set(key, value)
+	err = agg.firsts.Set(key, value)
 	if err != nil {
 		return errors.Wrap(err, "couldn't put new first into hashmap")
 	}
@@ -33,19 +33,19 @@ func (c *First) AddRecord(key []interface{}, value interface{}) error {
 	return nil
 }
 
-func (c *First) GetAggregated(key []interface{}) (interface{}, error) {
-	first, ok, err := c.firsts.Get(key)
+func (agg *First) GetAggregated(key []interface{}) (interface{}, error) {
+	first, ok, err := agg.firsts.Get(key)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get count out of hashmap")
+		return nil, errors.Wrap(err, "couldn't get first out of hashmap")
 	}
 
 	if !ok {
-		return nil, errors.Errorf("count for key not found")
+		return nil, errors.Errorf("first for key not found")
 	}
 
 	return first, nil
 }
 
-func (c *First) String() string {
+func (agg *First) String() string {
 	return "first"
 }

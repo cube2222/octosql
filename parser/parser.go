@@ -76,6 +76,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 	// A WHERE clause needs to have access to those variables, so this map comes first, keeping the old variables.
 	var expressions = make([]logical.NamedExpression, len(statement.SelectExprs))
 	var aggregates = make([]logical.Aggregate, len(statement.SelectExprs))
+	var aggregatesAs = make([]octosql.VariableName, len(statement.SelectExprs))
 	if len(statement.SelectExprs) >= 1 {
 		if _, ok := statement.SelectExprs[0].(*sqlparser.StarExpr); !ok {
 			for i := range statement.SelectExprs {
@@ -85,16 +86,31 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 						i, statement.SelectExprs[i], reflect.TypeOf(statement.SelectExprs[i]))
 				}
 
-				if len(statement.GroupBy) == 0 {
-					expressions[i], err = ParseAliasedExpression(aliasedExpression)
-					if err != nil {
-						return nil, errors.Wrapf(err, "couldn't parse aliased expression with index %d", i)
-					}
-				} else {
+				if len(statement.GroupBy) > 0 {
 					aggregates[i], expressions[i], err = ParseAggregate(aliasedExpression.Expr)
-					if err != nil {
+					if err == nil {
+						aggregatesAs[i] = octosql.NewVariableName(aliasedExpression.As.String())
+						continue
+					}
+
+					if errors.Cause(err) != ErrNotAggregate {
 						return nil, errors.Wrapf(err, "couldn't parse aggregate with index %d", i)
 					}
+
+					// If this isn't an aggregate expression,
+					// then we just throw a "first" aggregate at it.
+					aggregates[i] = logical.First
+				}
+
+				expressions[i], err = ParseAliasedExpression(aliasedExpression)
+				if err != nil {
+					return nil, errors.Wrapf(err, "couldn't parse aliased expression with index %d", i)
+				}
+
+				if len(statement.GroupBy) > 0 {
+					// Ergonomically, the user probably expects the name not to change
+					// because of the "first" addition behind the scenes.
+					aggregatesAs[i] = expressions[i].Name()
 				}
 			}
 
@@ -124,7 +140,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 			fields[i] = expressions[i].Name()
 		}
 
-		root = logical.NewGroupBy(root, key, fields, aggregates)
+		root = logical.NewGroupBy(root, key, fields, aggregates, aggregatesAs)
 	}
 
 	if statement.OrderBy != nil {
@@ -144,7 +160,11 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 				if len(statement.GroupBy) == 0 {
 					nameExpressions[i] = logical.NewVariable(expressions[i].Name())
 				} else {
-					nameExpressions[i] = logical.NewVariable(octosql.NewVariableName(fmt.Sprintf("%v_%v", expressions[i].Name(), aggregates[i])))
+					if len(aggregatesAs[i]) > 0 {
+						nameExpressions[i] = logical.NewVariable(aggregatesAs[i])
+					} else {
+						nameExpressions[i] = logical.NewVariable(octosql.NewVariableName(fmt.Sprintf("%v_%v", expressions[i].Name(), aggregates[i])))
+					}
 				}
 			}
 
@@ -279,7 +299,7 @@ func ParseAggregate(expr sqlparser.Expr) (logical.Aggregate, logical.NamedExpres
 			}
 		}
 		if !found {
-			return "", nil, errors.Errorf("aggregate not found: %v", expr.Name)
+			return "", nil, errors.Wrapf(ErrNotAggregate, "aggregate not found: %v", expr.Name)
 		}
 
 		arg, err := ParseAliasedExpression(expr.Exprs[0].(*sqlparser.AliasedExpr))
@@ -288,19 +308,12 @@ func ParseAggregate(expr sqlparser.Expr) (logical.Aggregate, logical.NamedExpres
 		}
 
 		return curAggregate, arg, nil
-		/*case *sqlparser.AliasedExpr:
-		curAggregate := logical.First
-
-		arg, err := ParseAliasedExpression(expr)
-		if err != nil {
-			return "", nil, errors.Wrap(err, "couldn't parse aggregate argument")
-		}
-
-		return curAggregate, arg, nil*/
 	}
 
-	return "", nil, errors.Errorf("invalid expression type")
+	return "", nil, errors.Wrapf(ErrNotAggregate, "invalid group by select expression type")
 }
+
+var ErrNotAggregate = errors.New("expression is not aggregate")
 
 func ParseAliasedExpression(expr *sqlparser.AliasedExpr) (logical.NamedExpression, error) {
 	subExpr, err := ParseExpression(expr.Expr)
@@ -312,7 +325,7 @@ func ParseAliasedExpression(expr *sqlparser.AliasedExpr) (logical.NamedExpressio
 		if named, ok := subExpr.(logical.NamedExpression); ok {
 			return named, nil
 		}
-		return nil, errors.Errorf("expressions in select statement must be named")
+		return nil, errors.Errorf("expressions in select statement and aggregate expressions must be named")
 	}
 	return logical.NewAliasedExpression(octosql.VariableName(expr.As.String()), subExpr), nil
 }

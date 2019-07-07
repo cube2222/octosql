@@ -22,8 +22,11 @@ const (
 )
 
 var AggregateFunctions = []Aggregate{
+	Avg,
 	Count,
 	First,
+	Last,
+	Sum,
 }
 
 type GroupBy struct {
@@ -32,10 +35,12 @@ type GroupBy struct {
 
 	fields     []octosql.VariableName
 	aggregates []Aggregate
+
+	as []octosql.VariableName
 }
 
-func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, aggregates []Aggregate) *GroupBy {
-	return &GroupBy{source: source, key: key, fields: fields, aggregates: aggregates}
+func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, aggregates []Aggregate, as []octosql.VariableName) *GroupBy {
+	return &GroupBy{source: source, key: key, fields: fields, aggregates: aggregates, as: as}
 }
 
 func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
@@ -86,5 +91,5 @@ func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlan
 		}
 	}
 
-	return physical.NewGroupBy(source, key, node.fields, aggregates), variables, nil
+	return physical.NewGroupBy(source, key, node.fields, aggregates, node.as), variables, nil
 }

@@ -21,10 +21,12 @@ type GroupBy struct {
 
 	fields              []octosql.VariableName
 	aggregatePrototypes []AggregatePrototype
+
+	as []octosql.VariableName
 }
 
-func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, aggregatePrototypes []AggregatePrototype) *GroupBy {
-	return &GroupBy{source: source, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes}
+func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, aggregatePrototypes []AggregatePrototype, as []octosql.VariableName) *GroupBy {
+	return &GroupBy{source: source, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, as: as}
 }
 
 func (node *GroupBy) Get(variables octosql.Variables) (RecordStream, error) {
@@ -47,6 +49,8 @@ func (node *GroupBy) Get(variables octosql.Variables) (RecordStream, error) {
 
 		fields:     node.fields,
 		aggregates: aggregates,
+
+		as: node.as,
 	}, nil
 }
 
@@ -60,6 +64,8 @@ type GroupByStream struct {
 	fields     []octosql.VariableName
 	aggregates []Aggregate
 
+	as []octosql.VariableName
+
 	fieldNames []octosql.VariableName
 	iterator   *Iterator
 }
@@ -72,13 +78,17 @@ func (stream *GroupByStream) Next() (*Record, error) {
 				if err == ErrEndOfStream {
 					stream.fieldNames = make([]octosql.VariableName, len(stream.fields))
 					for i := range stream.fields {
-						stream.fieldNames[i] = octosql.NewVariableName(
-							fmt.Sprintf(
-								"%s_%s",
-								stream.fields[i].String(),
-								stream.aggregates[i].String(),
-							),
-						)
+						if len(stream.as[i]) > 0 {
+							stream.fieldNames[i] = stream.as[i]
+						} else {
+							stream.fieldNames[i] = octosql.NewVariableName(
+								fmt.Sprintf(
+									"%s_%s",
+									stream.fields[i].String(),
+									stream.aggregates[i].String(),
+								),
+							)
+						}
 					}
 					stream.iterator = stream.groups.GetIterator()
 					break

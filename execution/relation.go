@@ -38,7 +38,7 @@ func (rel *Equal) Apply(variables octosql.Variables, left, right Expression) (bo
 	if reflect.TypeOf(leftValue).Kind() != reflect.TypeOf(rightValue).Kind() {
 		return false, errors.Errorf(
 			"invalid operands to equal %v and %v with types %v and %v",
-			leftValue, rightValue, getType(leftValue), getType(rightValue))
+			leftValue, rightValue, GetType(leftValue), GetType(rightValue))
 	}
 
 	return AreEqual(leftValue, rightValue), nil
@@ -81,7 +81,7 @@ func (rel *MoreThan) Apply(variables octosql.Variables, left, right Expression) 
 	if reflect.TypeOf(leftValue).Kind() != reflect.TypeOf(rightValue).Kind() {
 		return false, errors.Errorf(
 			"invalid operands to more_than %v and %v with types %v and %v",
-			leftValue, rightValue, getType(leftValue), getType(rightValue))
+			leftValue, rightValue, GetType(leftValue), GetType(rightValue))
 	}
 
 	switch leftValue := leftValue.(type) {
@@ -101,7 +101,7 @@ func (rel *MoreThan) Apply(variables octosql.Variables, left, right Expression) 
 
 	return false, errors.Errorf(
 		"invalid operands to more_than %v and %v with types %v and %v, only int, float, string and time allowed",
-		leftValue, rightValue, getType(leftValue), getType(rightValue))
+		leftValue, rightValue, GetType(leftValue), GetType(rightValue))
 }
 
 type LessThan struct {
@@ -171,13 +171,13 @@ func (rel *Like) Apply(variables octosql.Variables, left, right Expression) (boo
 	if !ok {
 		return false, errors.Errorf(
 			"invalid operands to like %v and %v with types %v and %v, only string allowed",
-			leftValue, rightValue, getType(leftValue), getType(rightValue))
+			leftValue, rightValue, GetType(leftValue), GetType(rightValue))
 	}
 	rightString, ok := rightValue.(string)
 	if !ok {
 		return false, errors.Errorf(
 			"invalid operands to like %v and %v with types %v and %v, only string allowed",
-			leftValue, rightValue, getType(leftValue), getType(rightValue))
+			leftValue, rightValue, GetType(leftValue), GetType(rightValue))
 	}
 
 	match, err := regexp.MatchString(rightString, leftString)

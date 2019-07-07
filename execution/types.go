@@ -20,7 +20,7 @@ const (
 	DatatypeTuple   Datatype = "[]interface{}"
 )
 
-func getType(i interface{}) Datatype {
+func GetType(i interface{}) Datatype {
 	if _, ok := i.(bool); ok {
 		return DatatypeBoolean
 	}

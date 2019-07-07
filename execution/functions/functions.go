@@ -54,6 +54,33 @@ var FuncInt = execution.Function{
 	},
 }
 
+var FuncFloat = execution.Function{
+	Validator: func(args ...interface{}) error {
+		return combine(oneArg, basicType)(args...)
+	},
+	Logic: func(args ...interface{}) (interface{}, error) {
+		switch arg := args[0].(type) {
+		case int:
+			return float64(arg), nil
+		case float64:
+			return arg, nil
+		case bool:
+			if arg {
+				return 1.0, nil
+			}
+			return 0.0, nil
+		case string:
+			number, err := strconv.ParseFloat(arg, 64)
+			if err != nil {
+				return nil, err
+			}
+			return number, nil
+		default:
+			return nil, errors.Errorf("Type %v can't be parsed to float64", reflect.TypeOf(arg))
+		}
+	},
+}
+
 var FuncNegate = execution.Function{
 	Validator: func(args ...interface{}) error {
 		return combine(oneArg, wantNumber)(args...)
@@ -191,7 +218,7 @@ var FuncLn = execution.Function{
 }
 
 /* Multiple numbers functions */
-var FuncMin = execution.Function{
+var FuncLeast = execution.Function{
 	Validator: func(args ...interface{}) error {
 		return atLeastOneArg(args...)
 	},
@@ -204,14 +231,14 @@ var FuncMin = execution.Function{
 		}
 
 		if errInts == nil { /* ints */
-			min := math.MinInt64
+			min := math.MaxInt64
 			for _, arg := range args {
 				min = intMin(min, arg.(int))
 			}
 
 			return min, nil
 		} else { /* floats */
-			min := math.Inf(-1)
+			min := math.Inf(1)
 			for _, arg := range args {
 				min = math.Min(min, arg.(float64))
 			}
@@ -222,7 +249,7 @@ var FuncMin = execution.Function{
 	},
 }
 
-var FuncMax = execution.Function{
+var FuncGreatest = execution.Function{
 	Validator: func(args ...interface{}) error {
 		return atLeastOneArg(args...)
 	},
@@ -235,14 +262,14 @@ var FuncMax = execution.Function{
 		}
 
 		if errInts == nil { /* ints */
-			max := math.MaxInt64
+			max := math.MinInt64
 			for _, arg := range args {
 				max = intMax(max, arg.(int))
 			}
 
 			return max, nil
 		} else { /* floats */
-			max := math.Inf(1)
+			max := math.Inf(-1)
 			for _, arg := range args {
 				max = math.Max(max, arg.(float64))
 			}

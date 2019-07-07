@@ -14,7 +14,7 @@ OctoSQL is a data query tool, allowing you to join, analyze and transform data f
 - [Roadmap](#roadmap)
 
 ## What is OctoSQL?
-OctoSQL is a SQL query engine which allows you to write standard SQL queries on data in multiple SQL databases, NoSQL databases and files in various formats trying to push down as much of the work as possible to the source databases, not transferring unnecessary data. 
+OctoSQL is a SQL query engine which allows you to write standard SQL queries on data stored in multiple SQL databases, NoSQL databases and files in various formats trying to push down as much of the work as possible to the source databases, not transferring unnecessary data. 
 
 OctoSQL does that by creating an internal representation of your query and later translating parts of it into the query languages or APIs of the source databases. Whenever a datasource doesn't support a given operation, OctoSQL will execute it in memory, so you don't have to worry about the specifics of the underlying datasources. 
 
@@ -103,7 +103,7 @@ JSON file in one of the following forms:
 
 ---
 #### CSV
-CSV file seperated using commas.
+CSV file seperated using commas. The first row should contain column names.
 ##### options:
 - path - path to file containing the data, required
 
@@ -116,7 +116,6 @@ Single PostgreSQL database table.
 - password - required
 - databaseName - required
 - tableName - required
-
 ---
 #### MySQL
 Single MySQL database table.
@@ -126,7 +125,6 @@ Single MySQL database table.
 - password - required
 - databaseName - required
 - tableName - required
-
 ---
 #### Redis
 Redis database with the given index. Currently only hashes are supported.

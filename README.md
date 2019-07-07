@@ -141,16 +141,6 @@ The SQL dialect documentation:
 
 Function documentation:
 
-## Roadmap
-- Add arithmetic operators.
-- Write custom sql parser, so we can use sane function names.
-- Push down functions to supported databases.
-- Implement an in-memory index to save values of subqueries, so as not to recalculate them each time.
-- MapReduce style distributed execution mode.
-- Function Tables (RANGE(1, 10) for example)
-- Better nested JSON support.
-- HAVING clause.
-
 ## Architecture
 An OctoSQL invocation gets work done in multiple stages.
 
@@ -182,3 +172,13 @@ TODO: diagram
 Starting the execution plan creates a stream, which underneath may hold more streams, or parts of the execution plan to create streams in the future. This stream works in a pull based model.
 
 TODO: diagram
+
+## Roadmap
+- Add arithmetic operators.
+- Write custom sql parser, so we can use sane function names.
+- Push down functions to supported databases.
+- Implement an in-memory index to save values of subqueries, so as not to recalculate them each time.
+- MapReduce style distributed execution mode.
+- Function Tables (RANGE(1, 10) for example)
+- Better nested JSON support.
+- HAVING clause.

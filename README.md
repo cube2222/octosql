@@ -142,7 +142,7 @@ The SQL dialect documentation:
 Function documentation:
 
 ## Architecture
-An OctoSQL invocation gets work done in multiple stages.
+An OctoSQL invocation gets processed in multiple stages.
 
 ### SQL AST
 First, the SQL query gets parsed into an abstract syntax tree. This stage only rules out syntax errors.

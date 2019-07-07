@@ -6,8 +6,9 @@ import (
 )
 
 type Average struct {
-	averages *execution.HashMap
-	counts   *execution.HashMap
+	averages   *execution.HashMap
+	counts     *execution.HashMap
+	typedValue interface{}
 }
 
 func NewAverage() *Average {
@@ -18,11 +19,27 @@ func NewAverage() *Average {
 }
 
 func (agg *Average) AddRecord(key []interface{}, value interface{}) error {
+	if agg.typedValue == nil {
+		agg.typedValue = value
+	}
+
 	var floatValue float64
 	switch value := value.(type) {
 	case float64:
+		_, typeOk := agg.typedValue.(float64)
+		if !typeOk {
+			return errors.Errorf("mixed types in avg: %v and %v with values %v and %v",
+				execution.GetType(value), execution.GetType(agg.typedValue),
+				value, agg.typedValue)
+		}
 		floatValue = value
 	case int:
+		_, typeOk := agg.typedValue.(int)
+		if !typeOk {
+			return errors.Errorf("mixed types in avg: %v and %v with values %v and %v",
+				execution.GetType(value), execution.GetType(agg.typedValue),
+				value, agg.typedValue)
+		}
 		floatValue = float64(value)
 	default:
 		return errors.Errorf("invalid type in average: %v with value %v", execution.GetType(value), value)

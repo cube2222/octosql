@@ -316,15 +316,18 @@ func ParseJoinTableExpression(expr *sqlparser.JoinTableExpr) (logical.Node, erro
 func ParseAggregate(expr sqlparser.Expr) (logical.Aggregate, logical.NamedExpression, error) {
 	switch expr := expr.(type) {
 	case *sqlparser.FuncExpr:
-		found := false
 		curAggregate := logical.Aggregate(strings.ToLower(expr.Name.String()))
-		for _, aggregate := range logical.AggregateFunctions {
-			if curAggregate == aggregate {
-				found = true
-			}
-		}
-		if !found {
+		_, ok := logical.AggregateFunctions[curAggregate]
+		if !ok {
 			return "", nil, errors.Wrapf(ErrNotAggregate, "aggregate not found: %v", expr.Name)
+		}
+
+		if expr.Distinct {
+			curAggregate = logical.Aggregate(fmt.Sprintf("%v_distinct", curAggregate))
+			_, ok := logical.AggregateFunctions[curAggregate]
+			if !ok {
+				return "", nil, errors.Errorf("aggregate %v can't be used with distinct", expr.Name)
+			}
 		}
 
 		var parsedArg logical.NamedExpression

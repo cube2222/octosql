@@ -13,23 +13,29 @@ import (
 type Aggregate string
 
 const (
-	Avg   Aggregate = "avg"
-	Count Aggregate = "count"
-	First Aggregate = "first"
-	Last  Aggregate = "last"
-	Max   Aggregate = "max"
-	Min   Aggregate = "min"
-	Sum   Aggregate = "sum"
+	Avg           Aggregate = "avg"
+	AvgDistinct   Aggregate = "avg_distinct"
+	Count         Aggregate = "count"
+	CountDistinct Aggregate = "count_distinct"
+	First         Aggregate = "first"
+	Last          Aggregate = "last"
+	Max           Aggregate = "max"
+	Min           Aggregate = "min"
+	Sum           Aggregate = "sum"
+	SumDistinct   Aggregate = "sum_distinct"
 )
 
 var aggregateTable = map[Aggregate]execution.AggregatePrototype{
-	Avg:   func() execution.Aggregate { return aggregates.NewAverage() },
-	Count: func() execution.Aggregate { return aggregates.NewCount() },
-	First: func() execution.Aggregate { return aggregates.NewFirst() },
-	Last:  func() execution.Aggregate { return aggregates.NewLast() },
-	Max:   func() execution.Aggregate { return aggregates.NewMax() },
-	Min:   func() execution.Aggregate { return aggregates.NewMin() },
-	Sum:   func() execution.Aggregate { return aggregates.NewSum() },
+	Avg:           func() execution.Aggregate { return aggregates.NewAverage() },
+	AvgDistinct:   func() execution.Aggregate { return aggregates.NewDistinct(aggregates.NewAverage()) },
+	Count:         func() execution.Aggregate { return aggregates.NewCount() },
+	CountDistinct: func() execution.Aggregate { return aggregates.NewDistinct(aggregates.NewCount()) },
+	First:         func() execution.Aggregate { return aggregates.NewFirst() },
+	Last:          func() execution.Aggregate { return aggregates.NewLast() },
+	Max:           func() execution.Aggregate { return aggregates.NewMax() },
+	Min:           func() execution.Aggregate { return aggregates.NewMin() },
+	Sum:           func() execution.Aggregate { return aggregates.NewSum() },
+	SumDistinct:   func() execution.Aggregate { return aggregates.NewDistinct(aggregates.NewSum()) },
 }
 
 func NewAggregate(aggregate string) Aggregate {

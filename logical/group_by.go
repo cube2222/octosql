@@ -12,23 +12,29 @@ import (
 type Aggregate string
 
 const (
-	Avg   Aggregate = "avg"
-	Count Aggregate = "count"
-	First Aggregate = "first"
-	Last  Aggregate = "last"
-	Max   Aggregate = "max"
-	Min   Aggregate = "min"
-	Sum   Aggregate = "sum"
+	Avg           Aggregate = "avg"
+	AvgDistinct   Aggregate = "avg_distinct"
+	Count         Aggregate = "count"
+	CountDistinct Aggregate = "count_distinct"
+	First         Aggregate = "first"
+	Last          Aggregate = "last"
+	Max           Aggregate = "max"
+	Min           Aggregate = "min"
+	Sum           Aggregate = "sum"
+	SumDistinct   Aggregate = "sum_distinct"
 )
 
-var AggregateFunctions = []Aggregate{
-	Avg,
-	Count,
-	First,
-	Last,
-	Max,
-	Min,
-	Sum,
+var AggregateFunctions = map[Aggregate]struct{}{
+	Avg:           struct{}{},
+	AvgDistinct:   struct{}{},
+	Count:         struct{}{},
+	CountDistinct: struct{}{},
+	First:         struct{}{},
+	Last:          struct{}{},
+	Max:           struct{}{},
+	Min:           struct{}{},
+	Sum:           struct{}{},
+	SumDistinct:   struct{}{},
 }
 
 type GroupBy struct {
@@ -76,8 +82,12 @@ func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlan
 		switch Aggregate(strings.ToLower(string(node.aggregates[i]))) {
 		case Avg:
 			aggregates[i] = physical.Avg
+		case AvgDistinct:
+			aggregates[i] = physical.AvgDistinct
 		case Count:
 			aggregates[i] = physical.Count
+		case CountDistinct:
+			aggregates[i] = physical.CountDistinct
 		case First:
 			aggregates[i] = physical.First
 		case Last:
@@ -88,6 +98,8 @@ func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlan
 			aggregates[i] = physical.Min
 		case Sum:
 			aggregates[i] = physical.Sum
+		case SumDistinct:
+			aggregates[i] = physical.SumDistinct
 		default:
 			return nil, nil, errors.Errorf("invalid aggregate: %s", node.aggregates[i])
 		}

@@ -19,7 +19,7 @@ type AggregateMock struct {
 	t *testing.T
 }
 
-func (mock *AggregateMock) AddRecord(key []interface{}, value interface{}) error {
+func (mock *AggregateMock) AddRecord(key octosql.Tuple, value octosql.Value) error {
 	if !reflect.DeepEqual(mock.addKeys[mock.addI], key) {
 		mock.t.Errorf("invalid %v call key: got %v wanted %v", mock.addI, key, mock.addKeys[mock.addI])
 	}
@@ -30,7 +30,7 @@ func (mock *AggregateMock) AddRecord(key []interface{}, value interface{}) error
 	return nil
 }
 
-func (mock *AggregateMock) GetAggregated(key []interface{}) (interface{}, error) {
+func (mock *AggregateMock) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
 	_, ok := mock.getKeySet[key[0]]
 	if !ok {
 		mock.t.Errorf("invalid %v call key: got %v wanted one of %v", mock.getI, key, mock.getKeySet)

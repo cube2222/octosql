@@ -6,8 +6,8 @@ import (
 )
 
 type Function struct {
-	Validator func(...interface{}) error
-	Logic     func(...interface{}) (interface{}, error)
+	Validator func(...octosql.Value) error
+	Logic     func(...octosql.Value) (octosql.Value, error)
 }
 
 type FunctionExpression struct {
@@ -22,8 +22,8 @@ func NewFunctionExpression(fun Function, args []Expression) *FunctionExpression 
 	}
 }
 
-func (fe *FunctionExpression) ExpressionValue(variables octosql.Variables) (interface{}, error) {
-	values := make([]interface{}, 0)
+func (fe *FunctionExpression) ExpressionValue(variables octosql.Variables) (octosql.Value, error) {
+	values := make([]octosql.Value, 0)
 	for i := range fe.arguments {
 		value, err := fe.arguments[i].ExpressionValue(variables)
 		if err != nil {

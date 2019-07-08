@@ -3,6 +3,7 @@ package aggregates
 import (
 	"time"
 
+	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 )
@@ -18,7 +19,7 @@ func NewMin() *Min {
 	}
 }
 
-func (agg *Min) AddRecord(key []interface{}, value interface{}) error {
+func (agg *Min) AddRecord(key octosql.Tuple, value octosql.Value) error {
 	min, ok, err := agg.mins.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current min out of hashmap")
@@ -100,7 +101,7 @@ func (agg *Min) AddRecord(key []interface{}, value interface{}) error {
 	return nil
 }
 
-func (agg *Min) GetAggregated(key []interface{}) (interface{}, error) {
+func (agg *Min) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
 	min, ok, err := agg.mins.Get(key)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get min out of hashmap")

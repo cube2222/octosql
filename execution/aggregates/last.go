@@ -1,6 +1,7 @@
 package aggregates
 
 import (
+	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 )
@@ -15,7 +16,7 @@ func NewLast() *Last {
 	}
 }
 
-func (agg *Last) AddRecord(key []interface{}, value interface{}) error {
+func (agg *Last) AddRecord(key octosql.Tuple, value octosql.Value) error {
 	err := agg.lasts.Set(key, value)
 	if err != nil {
 		return errors.Wrap(err, "couldn't put new last into hashmap")
@@ -24,7 +25,7 @@ func (agg *Last) AddRecord(key []interface{}, value interface{}) error {
 	return nil
 }
 
-func (agg *Last) GetAggregated(key []interface{}) (interface{}, error) {
+func (agg *Last) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
 	last, ok, err := agg.lasts.Get(key)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get last out of hashmap")

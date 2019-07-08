@@ -1,6 +1,7 @@
 package aggregates
 
 import (
+	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 )
@@ -15,7 +16,7 @@ func NewFirst() *First {
 	}
 }
 
-func (agg *First) AddRecord(key []interface{}, value interface{}) error {
+func (agg *First) AddRecord(key octosql.Tuple, value octosql.Value) error {
 	_, ok, err := agg.firsts.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current first out of hashmap")
@@ -33,7 +34,7 @@ func (agg *First) AddRecord(key []interface{}, value interface{}) error {
 	return nil
 }
 
-func (agg *First) GetAggregated(key []interface{}) (interface{}, error) {
+func (agg *First) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
 	first, ok, err := agg.firsts.Get(key)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get first out of hashmap")

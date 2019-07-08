@@ -1,6 +1,7 @@
 package aggregates
 
 import (
+	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 )
@@ -16,7 +17,7 @@ func NewSum() *Sum {
 	}
 }
 
-func (agg *Sum) AddRecord(key []interface{}, value interface{}) error {
+func (agg *Sum) AddRecord(key octosql.Tuple, value octosql.Value) error {
 	sum, ok, err := agg.sums.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current sum out of hashmap")
@@ -66,7 +67,7 @@ func (agg *Sum) AddRecord(key []interface{}, value interface{}) error {
 	return nil
 }
 
-func (agg *Sum) GetAggregated(key []interface{}) (interface{}, error) {
+func (agg *Sum) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
 	sum, ok, err := agg.sums.Get(key)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get sum out of hashmap")

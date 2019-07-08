@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 )
 
@@ -15,7 +16,7 @@ type AddRecordMock struct {
 	t *testing.T
 }
 
-func (mock *AddRecordMock) AddRecord(key []interface{}, value interface{}) error {
+func (mock *AddRecordMock) AddRecord(key octosql.Tuple, value octosql.Value) error {
 	if !reflect.DeepEqual(mock.keys[mock.i], key) {
 		mock.t.Errorf("invalid %v call key: got %v wanted %v", mock.i, key, mock.keys[mock.i])
 	}
@@ -26,7 +27,7 @@ func (mock *AddRecordMock) AddRecord(key []interface{}, value interface{}) error
 	return nil
 }
 
-func (*AddRecordMock) GetAggregated(key []interface{}) (interface{}, error) {
+func (*AddRecordMock) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
 	panic("implement me")
 }
 

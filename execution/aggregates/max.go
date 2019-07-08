@@ -3,6 +3,7 @@ package aggregates
 import (
 	"time"
 
+	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 )
@@ -18,7 +19,7 @@ func NewMax() *Max {
 	}
 }
 
-func (agg *Max) AddRecord(key []interface{}, value interface{}) error {
+func (agg *Max) AddRecord(key octosql.Tuple, value octosql.Value) error {
 	max, ok, err := agg.maxes.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current max out of hashmap")
@@ -99,7 +100,7 @@ func (agg *Max) AddRecord(key []interface{}, value interface{}) error {
 	return nil
 }
 
-func (agg *Max) GetAggregated(key []interface{}) (interface{}, error) {
+func (agg *Max) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
 	max, ok, err := agg.maxes.Get(key)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get max out of hashmap")

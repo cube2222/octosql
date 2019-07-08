@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"github.com/cube2222/octosql"
 	"github.com/mitchellh/hashstructure"
 	"github.com/pkg/errors"
 )
@@ -16,11 +17,11 @@ func NewHashMap() *HashMap {
 }
 
 type entry struct {
-	key   interface{}
+	key   octosql.Value
 	value interface{}
 }
 
-func (g *HashMap) Set(key interface{}, value interface{}) error {
+func (g *HashMap) Set(key octosql.Value, value interface{}) error {
 	hash, err := hashstructure.Hash(key, nil)
 	if err != nil {
 		return errors.Wrapf(err, "couldn't hash %+v", key)
@@ -41,7 +42,7 @@ func (g *HashMap) Set(key interface{}, value interface{}) error {
 	return nil
 }
 
-func (g *HashMap) Get(key interface{}) (interface{}, bool, error) {
+func (g *HashMap) Get(key octosql.Value) (interface{}, bool, error) {
 	hash, err := hashstructure.Hash(key, nil)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "couldn't hash %+v", key)
@@ -78,7 +79,7 @@ type Iterator struct {
 }
 
 // Next returns next key, value, exists
-func (iter *Iterator) Next() (interface{}, interface{}, bool) {
+func (iter *Iterator) Next() (octosql.Value, interface{}, bool) {
 	if iter.hashesPosition == len(iter.hashes) {
 		return nil, nil, false
 	}

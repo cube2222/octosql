@@ -5,12 +5,19 @@ import (
 	"github.com/pkg/errors"
 )
 
+// TODO: Temporary. Delete me.
+func (*Record) OctoValue() {}
+
+type RecordSliceValue []Record
+
+func (RecordSliceValue) OctoValue() {}
+
 type Node interface {
 	Get(variables octosql.Variables) (RecordStream, error)
 }
 
 type Expression interface {
-	ExpressionValue(variables octosql.Variables) (interface{}, error)
+	ExpressionValue(variables octosql.Variables) (octosql.Value, error)
 }
 
 type NamedExpression interface {
@@ -26,7 +33,7 @@ func NewVariable(name octosql.VariableName) *Variable {
 	return &Variable{name: name}
 }
 
-func (v *Variable) ExpressionValue(variables octosql.Variables) (interface{}, error) {
+func (v *Variable) ExpressionValue(variables octosql.Variables) (octosql.Value, error) {
 	val, err := variables.Get(v.name)
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't get variable %+v, available variables %+v", v.name, variables)
@@ -38,16 +45,16 @@ func (v *Variable) Name() octosql.VariableName {
 	return v.name
 }
 
-type Tuple struct {
+type TupleExpression struct {
 	expressions []Expression
 }
 
-func NewTuple(expressions []Expression) *Tuple {
-	return &Tuple{expressions: expressions}
+func NewTuple(expressions []Expression) *TupleExpression {
+	return &TupleExpression{expressions: expressions}
 }
 
-func (tup *Tuple) ExpressionValue(variables octosql.Variables) (interface{}, error) {
-	outValues := make([]interface{}, len(tup.expressions))
+func (tup *TupleExpression) ExpressionValue(variables octosql.Variables) (octosql.Value, error) {
+	outValues := make(octosql.Tuple, len(tup.expressions))
 	for i, expr := range tup.expressions {
 		value, err := extractSingleValue(expr, variables)
 		if err != nil {
@@ -67,13 +74,13 @@ func NewNodeExpression(node Node) *NodeExpression {
 	return &NodeExpression{node: node}
 }
 
-func (ne *NodeExpression) ExpressionValue(variables octosql.Variables) (interface{}, error) {
+func (ne *NodeExpression) ExpressionValue(variables octosql.Variables) (octosql.Value, error) {
 	records, err := ne.node.Get(variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get record stream")
 	}
 
-	outRecords := make([]Record, 0)
+	outRecords := make(RecordSliceValue, 0)
 
 	var curRecord *Record
 	for curRecord, err = records.Next(); err == nil; curRecord, err = records.Next() {
@@ -112,7 +119,7 @@ func NewAliasedExpression(name octosql.VariableName, expr Expression) *AliasedEx
 	return &AliasedExpression{name: name, expr: expr}
 }
 
-func (alExpr *AliasedExpression) ExpressionValue(variables octosql.Variables) (interface{}, error) {
+func (alExpr *AliasedExpression) ExpressionValue(variables octosql.Variables) (octosql.Value, error) {
 	return alExpr.expr.ExpressionValue(variables)
 }
 
@@ -120,17 +127,17 @@ func (alExpr *AliasedExpression) Name() octosql.VariableName {
 	return alExpr.name
 }
 
-func extractSingleValue(expr Expression, variables octosql.Variables) (interface{}, error) {
+func extractSingleValue(expr Expression, variables octosql.Variables) (octosql.Value, error) {
 	value, err := expr.ExpressionValue(variables)
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't get expression's value")
 	}
 
-	if records, ok := value.([]Record); ok {
+	if records, ok := value.(RecordSliceValue); ok {
 		if len(records) != 1 {
 			return nil, errors.Errorf("number of records different than 1: %+v", value)
 		}
-		value = records[0]
+		value = &records[0]
 	}
 
 	if record, ok := value.(*Record); ok {

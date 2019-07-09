@@ -38,28 +38,28 @@ func TestLimit_Get(t *testing.T) {
 						[]octosql.VariableName{
 							"num",
 						},
-						[]interface{}{
+						octosql.Tuple{
 							1e10,
 						}),
 					NewRecordFromSlice(
 						[]octosql.VariableName{
 							"num",
 						},
-						[]interface{}{
+						octosql.Tuple{
 							3.21,
 						}),
 					NewRecordFromSlice(
 						[]octosql.VariableName{
 							"flag",
 						},
-						[]interface{}{
+						octosql.Tuple{
 							false,
 						}),
 					NewRecordFromSlice(
 						[]octosql.VariableName{
 							"num",
 						},
-						[]interface{}{
+						octosql.Tuple{
 							2.23e7,
 						}),
 				},
@@ -69,21 +69,21 @@ func TestLimit_Get(t *testing.T) {
 					[]octosql.VariableName{
 						"num",
 					},
-					[]interface{}{
+					octosql.Tuple{
 						1e10,
 					}),
 				NewRecordFromSlice(
 					[]octosql.VariableName{
 						"num",
 					},
-					[]interface{}{
+					octosql.Tuple{
 						3.21,
 					}),
 				NewRecordFromSlice(
 					[]octosql.VariableName{
 						"flag",
 					},
-					[]interface{}{
+					octosql.Tuple{
 						false,
 					}),
 			}),
@@ -98,7 +98,7 @@ func TestLimit_Get(t *testing.T) {
 						[]octosql.VariableName{
 							"num",
 						},
-						[]interface{}{
+						octosql.Tuple{
 							1,
 						}),
 				},
@@ -149,14 +149,14 @@ func TestLimitedStream_Next(t *testing.T) {
 						[]octosql.VariableName{
 							"num",
 						},
-						[]interface{}{
+						octosql.Tuple{
 							1,
 						}),
 					NewRecordFromSlice(
 						[]octosql.VariableName{
 							"num",
 						},
-						[]interface{}{
+						octosql.Tuple{
 							2,
 						}),
 				}),
@@ -167,7 +167,7 @@ func TestLimitedStream_Next(t *testing.T) {
 					[]octosql.VariableName{
 						"num",
 					},
-					[]interface{}{
+					octosql.Tuple{
 						1,
 					}),
 			}),

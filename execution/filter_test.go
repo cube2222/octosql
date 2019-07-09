@@ -38,23 +38,23 @@ func TestFilteredStream_Next(t *testing.T) {
 					[]*Record{
 						NewRecordFromSlice(
 							fieldNames,
-							[]interface{}{5, "test"},
+							octosql.Tuple{5, "test"},
 						),
 						NewRecordFromSlice(
 							fieldNames,
-							[]interface{}{4, "test2"},
+							octosql.Tuple{4, "test2"},
 						),
 						NewRecordFromSlice(
 							fieldNames,
-							[]interface{}{3, "test3"},
+							octosql.Tuple{3, "test3"},
 						),
 						NewRecordFromSlice(
 							fieldNames,
-							[]interface{}{3, "test33"},
+							octosql.Tuple{3, "test33"},
 						),
 						NewRecordFromSlice(
 							fieldNames,
-							[]interface{}{2, "test2"},
+							octosql.Tuple{2, "test2"},
 						),
 					},
 				),
@@ -63,15 +63,15 @@ func TestFilteredStream_Next(t *testing.T) {
 				[]*Record{
 					NewRecordFromSlice(
 						fieldNames,
-						[]interface{}{5, "test"},
+						octosql.Tuple{5, "test"},
 					),
 					NewRecordFromSlice(
 						fieldNames,
-						[]interface{}{4, "test2"},
+						octosql.Tuple{4, "test2"},
 					),
 					NewRecordFromSlice(
 						fieldNames,
-						[]interface{}{2, "test2"},
+						octosql.Tuple{2, "test2"},
 					),
 				},
 			),
@@ -92,31 +92,31 @@ func TestFilteredStream_Next(t *testing.T) {
 					[]*Record{
 						NewRecordFromSlice(
 							fieldNames,
-							[]interface{}{5, "test"},
+							octosql.Tuple{5, "test"},
 						),
 						NewRecordFromSlice(
 							fieldNames,
-							[]interface{}{5, "test"},
+							octosql.Tuple{5, "test"},
 						),
 						NewRecordFromSlice(
 							fieldNames,
-							[]interface{}{4, "test2"},
+							octosql.Tuple{4, "test2"},
 						),
 						NewRecordFromSlice(
 							fieldNames,
-							[]interface{}{3, "test3"},
+							octosql.Tuple{3, "test3"},
 						),
 						NewRecordFromSlice(
 							fieldNames,
-							[]interface{}{3, "test33"},
+							octosql.Tuple{3, "test33"},
 						),
 						NewRecordFromSlice(
 							fieldNames,
-							[]interface{}{2, "test2"},
+							octosql.Tuple{2, "test2"},
 						),
 						NewRecordFromSlice(
 							fieldNames,
-							[]interface{}{2, "test2"},
+							octosql.Tuple{2, "test2"},
 						),
 					},
 				),
@@ -125,23 +125,23 @@ func TestFilteredStream_Next(t *testing.T) {
 				[]*Record{
 					NewRecordFromSlice(
 						fieldNames,
-						[]interface{}{5, "test"},
+						octosql.Tuple{5, "test"},
 					),
 					NewRecordFromSlice(
 						fieldNames,
-						[]interface{}{5, "test"},
+						octosql.Tuple{5, "test"},
 					),
 					NewRecordFromSlice(
 						fieldNames,
-						[]interface{}{4, "test2"},
+						octosql.Tuple{4, "test2"},
 					),
 					NewRecordFromSlice(
 						fieldNames,
-						[]interface{}{2, "test2"},
+						octosql.Tuple{2, "test2"},
 					),
 					NewRecordFromSlice(
 						fieldNames,
-						[]interface{}{2, "test2"},
+						octosql.Tuple{2, "test2"},
 					),
 				},
 			),

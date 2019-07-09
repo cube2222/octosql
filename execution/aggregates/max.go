@@ -1,8 +1,6 @@
 package aggregates
 
 import (
-	"time"
-
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
@@ -29,44 +27,44 @@ func (agg *Max) AddRecord(key octosql.Tuple, value octosql.Value) error {
 		agg.typedValue = value
 	}
 	switch value := value.(type) {
-	case int:
-		_, typeOk := agg.typedValue.(int)
+	case octosql.Int:
+		_, typeOk := agg.typedValue.(octosql.Int)
 		if !typeOk {
 			return errors.Errorf("mixed types in max: %v and %v with values %v and %v",
 				execution.GetType(value), execution.GetType(agg.typedValue),
 				value, agg.typedValue)
 		}
 
-		if !ok || value > max.(int) {
+		if !ok || value > max.(octosql.Int) {
 			max = value
 		}
 
-	case float64:
-		_, typeOk := agg.typedValue.(float64)
+	case octosql.Float:
+		_, typeOk := agg.typedValue.(octosql.Float)
 		if !typeOk {
 			return errors.Errorf("mixed types in max: %v and %v with values %v and %v",
 				execution.GetType(value), execution.GetType(agg.typedValue),
 				value, agg.typedValue)
 		}
 
-		if !ok || value > max.(float64) {
+		if !ok || value > max.(octosql.Float) {
 			max = value
 		}
 
-	case string:
-		_, typeOk := agg.typedValue.(string)
+	case octosql.String:
+		_, typeOk := agg.typedValue.(octosql.String)
 		if !typeOk {
 			return errors.Errorf("mixed types in max: %v and %v with values %v and %v",
 				execution.GetType(value), execution.GetType(agg.typedValue),
 				value, agg.typedValue)
 		}
 
-		if !ok || value > max.(string) {
+		if !ok || value > max.(octosql.String) {
 			max = value
 		}
 
-	case bool:
-		_, typeOk := agg.typedValue.(bool)
+	case octosql.Bool:
+		_, typeOk := agg.typedValue.(octosql.Bool)
 		if !typeOk {
 			return errors.Errorf("mixed types in max: %v and %v with values %v and %v",
 				execution.GetType(value), execution.GetType(agg.typedValue),
@@ -77,15 +75,15 @@ func (agg *Max) AddRecord(key octosql.Tuple, value octosql.Value) error {
 			max = value
 		}
 
-	case time.Time:
-		_, typeOk := agg.typedValue.(time.Time)
+	case octosql.Time:
+		_, typeOk := agg.typedValue.(octosql.Time)
 		if !typeOk {
 			return errors.Errorf("mixed types in max: %v and %v with values %v and %v",
 				execution.GetType(value), execution.GetType(agg.typedValue),
 				value, agg.typedValue)
 		}
 
-		if !ok || value.After(max.(time.Time)) {
+		if !ok || value.Time().After(max.(octosql.Time).Time()) {
 			max = value
 		}
 	default:
@@ -110,7 +108,7 @@ func (agg *Max) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
 		return nil, errors.Errorf("max for key not found")
 	}
 
-	return max, nil
+	return max.(octosql.Value), nil
 }
 
 func (agg *Max) String() string {

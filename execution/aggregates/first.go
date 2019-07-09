@@ -44,7 +44,7 @@ func (agg *First) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
 		return nil, errors.Errorf("first for key not found")
 	}
 
-	return first, nil
+	return first.(octosql.Value), nil
 }
 
 func (agg *First) String() string {

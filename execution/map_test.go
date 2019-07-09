@@ -52,15 +52,15 @@ func TestMappedStream_Next(t *testing.T) {
 					[]*Record{
 						NewRecordFromSlice(
 							fieldNames,
-							[]interface{}{3, "test1", "test2"},
+							octosql.Tuple{3, "test1", "test2"},
 						),
 						NewRecordFromSlice(
 							fieldNames,
-							[]interface{}{5, "test2", "test0"},
+							octosql.Tuple{5, "test2", "test0"},
 						),
 						NewRecordFromSlice(
 							fieldNames,
-							[]interface{}{4, "test4", "test5"},
+							octosql.Tuple{4, "test4", "test5"},
 						),
 					},
 				),
@@ -69,13 +69,13 @@ func TestMappedStream_Next(t *testing.T) {
 			want: NewInMemoryStream(
 				[]*Record{
 					NewRecordFromSlice(fieldNamesNew,
-						[]interface{}{3, "yeah"},
+						octosql.Tuple{3, "yeah"},
 					),
 					NewRecordFromSlice(fieldNamesNew,
-						[]interface{}{5, "yeah"},
+						octosql.Tuple{5, "yeah"},
 					),
 					NewRecordFromSlice(fieldNamesNew,
-						[]interface{}{4, "yeah"},
+						octosql.Tuple{4, "yeah"},
 					),
 				},
 			),
@@ -101,15 +101,15 @@ func TestMappedStream_Next(t *testing.T) {
 					[]*Record{
 						NewRecordFromSlice(
 							fieldNames,
-							[]interface{}{3, "test1", "test2"},
+							octosql.Tuple{3, "test1", "test2"},
 						),
 						NewRecordFromSlice(
 							fieldNames,
-							[]interface{}{5, "test2", "test0"},
+							octosql.Tuple{5, "test2", "test0"},
 						),
 						NewRecordFromSlice(
 							fieldNames,
-							[]interface{}{4, "test4", "test5"},
+							octosql.Tuple{4, "test4", "test5"},
 						),
 					},
 				),
@@ -119,15 +119,15 @@ func TestMappedStream_Next(t *testing.T) {
 				[]*Record{
 					NewRecordFromSlice(
 						fieldNamesAll,
-						[]interface{}{3, "yeah", 3, "test1", "test2"},
+						octosql.Tuple{3, "yeah", 3, "test1", "test2"},
 					),
 					NewRecordFromSlice(
 						fieldNamesAll,
-						[]interface{}{5, "yeah", 5, "test2", "test0"},
+						octosql.Tuple{5, "yeah", 5, "test2", "test0"},
 					),
 					NewRecordFromSlice(
 						fieldNamesAll,
-						[]interface{}{4, "yeah", 4, "test4", "test5"},
+						octosql.Tuple{4, "yeah", 4, "test4", "test5"},
 					),
 				},
 			),
@@ -144,7 +144,7 @@ func TestMappedStream_Next(t *testing.T) {
 								[]*Record{
 									NewRecordFromSlice(
 										[]octosql.VariableName{octosql.NewVariableName("test")},
-										[]interface{}{5},
+										octosql.Tuple{5},
 									),
 								},
 							),
@@ -156,7 +156,7 @@ func TestMappedStream_Next(t *testing.T) {
 					[]*Record{
 						NewRecordFromSlice(
 							[]octosql.VariableName{},
-							[]interface{}{},
+							octosql.Tuple{},
 						),
 					},
 				),
@@ -166,7 +166,7 @@ func TestMappedStream_Next(t *testing.T) {
 				[]*Record{
 					NewRecordFromSlice(
 						[]octosql.VariableName{octosql.NewVariableName("awesome")},
-						[]interface{}{5},
+						octosql.Tuple{5},
 					),
 				},
 			),
@@ -186,7 +186,7 @@ func TestMappedStream_Next(t *testing.T) {
 											octosql.NewVariableName("test"),
 											octosql.NewVariableName("test"),
 										},
-										[]interface{}{
+										octosql.Tuple{
 											5,
 											3,
 										},
@@ -201,7 +201,7 @@ func TestMappedStream_Next(t *testing.T) {
 					[]*Record{
 						NewRecordFromSlice(
 							[]octosql.VariableName{},
-							[]interface{}{},
+							octosql.Tuple{},
 						),
 					},
 				),
@@ -211,7 +211,7 @@ func TestMappedStream_Next(t *testing.T) {
 				[]*Record{
 					NewRecordFromSlice(
 						[]octosql.VariableName{},
-						[]interface{}{},
+						octosql.Tuple{},
 					),
 				},
 			),

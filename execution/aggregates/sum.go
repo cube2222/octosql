@@ -27,8 +27,8 @@ func (agg *Sum) AddRecord(key octosql.Tuple, value octosql.Value) error {
 		agg.typedValue = value
 	}
 	switch value := value.(type) {
-	case int:
-		_, typeOk := agg.typedValue.(int)
+	case octosql.Int:
+		_, typeOk := agg.typedValue.(octosql.Int)
 		if !typeOk {
 			return errors.Errorf("mixed types in sum: %v and %v with values %v and %v",
 				execution.GetType(value), execution.GetType(agg.typedValue),
@@ -36,13 +36,13 @@ func (agg *Sum) AddRecord(key octosql.Tuple, value octosql.Value) error {
 		}
 
 		if ok {
-			sum = sum.(int) + value
+			sum = sum.(octosql.Int) + value
 		} else {
 			sum = value
 		}
 
-	case float64:
-		_, typeOk := agg.typedValue.(float64)
+	case octosql.Float:
+		_, typeOk := agg.typedValue.(octosql.Float)
 		if !typeOk {
 			return errors.Errorf("mixed types in sum: %v and %v with values %v and %v",
 				execution.GetType(value), execution.GetType(agg.typedValue),
@@ -50,7 +50,7 @@ func (agg *Sum) AddRecord(key octosql.Tuple, value octosql.Value) error {
 		}
 
 		if ok {
-			sum = sum.(float64) + value
+			sum = sum.(octosql.Float) + value
 		} else {
 			sum = value
 		}
@@ -77,7 +77,7 @@ func (agg *Sum) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
 		return nil, errors.Errorf("sum for key not found")
 	}
 
-	return sum, nil
+	return sum.(octosql.Value), nil
 }
 
 func (agg *Sum) String() string {

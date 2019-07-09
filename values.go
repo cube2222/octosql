@@ -10,8 +10,8 @@ type Phantom struct{}
 
 func (Phantom) OctoValue()         {}
 func (v Phantom) Struct() struct{} { return struct{}(v) }
-func MakePhantom(v struct{}) Phantom {
-	return Phantom(v)
+func MakePhantom() Phantom {
+	return Phantom(struct{}{})
 }
 
 type Int int

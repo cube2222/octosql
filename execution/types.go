@@ -2,6 +2,7 @@ package execution
 
 import (
 	"encoding/json"
+	"log"
 	"reflect"
 	"strconv"
 	"time"
@@ -14,49 +15,45 @@ type Datatype string
 const (
 	DatatypeBoolean Datatype = "boolean"
 	DatatypeInt     Datatype = "int"
-	DatatypeFloat32 Datatype = "float32"
 	DatatypeFloat64 Datatype = "float64"
 	DatatypeString  Datatype = "string"
-	DatatypeTuple   Datatype = "[]interface{}"
+	DatatypeTuple   Datatype = "octosql.Tuple"
 )
 
-func GetType(i interface{}) Datatype {
-	if _, ok := i.(bool); ok {
+func GetType(i octosql.Value) Datatype {
+	if _, ok := i.(octosql.Bool); ok {
 		return DatatypeBoolean
 	}
-	if _, ok := i.(int); ok {
+	if _, ok := i.(octosql.Int); ok {
 		return DatatypeInt
 	}
-	if _, ok := i.(float32); ok {
-		return DatatypeFloat32
-	}
-	if _, ok := i.(float64); ok {
+	if _, ok := i.(octosql.Float); ok {
 		return DatatypeFloat64
 	}
-	if _, ok := i.(string); ok {
+	if _, ok := i.(octosql.String); ok {
 		return DatatypeString
 	}
-	if _, ok := i.([]interface{}); ok {
+	if _, ok := i.(octosql.Tuple); ok {
 		return DatatypeTuple
 	}
 	return DatatypeString // TODO: Unknown
 }
 
 // ParseType tries to parse the given string into any type it succeeds to. Returns back the string on failure.
-func ParseType(str string) interface{} {
+func ParseType(str string) octosql.Value {
 	integer, err := strconv.ParseInt(str, 10, 64)
 	if err == nil {
-		return int(integer)
+		return octosql.MakeInt(int(integer))
 	}
 
 	float, err := strconv.ParseFloat(str, 64)
 	if err == nil {
-		return float
+		return octosql.MakeFloat(float)
 	}
 
 	boolean, err := strconv.ParseBool(str)
 	if err == nil {
-		return boolean
+		return octosql.MakeBool(boolean)
 	}
 
 	var jsonObject map[string]interface{}
@@ -67,46 +64,48 @@ func ParseType(str string) interface{} {
 
 	t, err := time.Parse(time.RFC3339, str)
 	if err == nil {
-		return t
+		return octosql.MakeTime(t)
 	}
 
-	return str
+	return octosql.MakeString(str)
 }
 
 // NormalizeType brings various primitive types into the type we want them to be.
 // All types coming out of data sources should be already normalized this way.
-func NormalizeType(value interface{}) interface{} {
+func NormalizeType(value interface{}) octosql.Value {
 	switch value := value.(type) {
+	case bool:
+		return octosql.MakeBool(value)
+	case int:
+		return octosql.MakeInt(value)
 	case int8:
-		return int(value)
+		return octosql.MakeInt(int(value))
 	case int32:
-		return int(value)
+		return octosql.MakeInt(int(value))
 	case int64:
-		return int(value)
+		return octosql.MakeInt(int(value))
 	case uint8:
-		return int(value)
+		return octosql.MakeInt(int(value))
 	case uint32:
-		return int(value)
+		return octosql.MakeInt(int(value))
 	case uint64:
-		return int(value)
+		return octosql.MakeInt(int(value))
 	case float32:
-		return float64(value)
+		return octosql.MakeFloat(float64(value))
+	case float64:
+		return octosql.MakeFloat(value)
 	case []byte:
-		return string(value)
-	case []interface{}:
-		out := make([]interface{}, len(value))
+		return octosql.MakeString(string(value))
+	case string:
+		return octosql.MakeString(value)
+	case octosql.Tuple:
+		out := make(octosql.Tuple, len(value))
 		for i := range value {
 			out[i] = NormalizeType(value[i])
 		}
 		return out
 	case map[string]interface{}:
-		out := make(map[string]interface{})
-		for k, v := range value {
-			out[k] = NormalizeType(v)
-		}
-		return out
-	case map[octosql.VariableName]interface{}:
-		out := make(map[octosql.VariableName]interface{})
+		out := make(octosql.Object)
 		for k, v := range value {
 			out[k] = NormalizeType(v)
 		}
@@ -116,54 +115,60 @@ func NormalizeType(value interface{}) interface{} {
 			return NormalizeType(*value)
 		}
 		return nil
-	default:
+	case time.Time:
+		return octosql.MakeTime(value)
+	case struct{}:
+		return octosql.MakePhantom()
+	case octosql.Value:
 		return value
 	}
+	log.Fatalf("invalid type to normalize: %s", reflect.TypeOf(value).String())
+	panic("unreachable")
 }
 
 // AreEqual checks the equality of the given values, returning false if the types don't match.
-func AreEqual(left, right interface{}) bool {
+func AreEqual(left, right octosql.Value) bool {
 	if left == nil && right == nil {
 		return true
 	}
 	switch left := left.(type) {
-	case int:
-		right, ok := right.(int)
+	case octosql.Int:
+		right, ok := right.(octosql.Int)
 		if !ok {
 			return false
 		}
 		return left == right
 
-	case float64:
-		right, ok := right.(float64)
+	case octosql.Float:
+		right, ok := right.(octosql.Float)
 		if !ok {
 			return false
 		}
 		return left == right
 
-	case bool:
-		right, ok := right.(bool)
+	case octosql.Bool:
+		right, ok := right.(octosql.Bool)
 		if !ok {
 			return false
 		}
 		return left == right
 
-	case string:
-		right, ok := right.(string)
+	case octosql.String:
+		right, ok := right.(octosql.String)
 		if !ok {
 			return false
 		}
 		return left == right
 
-	case time.Time:
-		right, ok := right.(time.Time)
+	case octosql.Time:
+		right, ok := right.(octosql.Time)
 		if !ok {
 			return false
 		}
-		return left.Equal(right)
+		return left.Time().Equal(right.Time())
 
-	case []interface{}:
-		right, ok := right.([]interface{})
+	case octosql.Tuple:
+		right, ok := right.(octosql.Tuple)
 		if !ok {
 			return false
 		}
@@ -177,39 +182,10 @@ func AreEqual(left, right interface{}) bool {
 		}
 		return true
 
-	case map[string]interface{}:
-		right, ok := right.(map[string]interface{})
-		if !ok {
-			return false
-		}
-		if len(left) != len(right) {
-			return false
-		}
-		for k := range left {
-			if _, ok := right[k]; !ok {
-				return false
-			}
-		}
-		for k := range right {
-			if _, ok := left[k]; !ok {
-				return false
-			}
-		}
-		for k := range left {
-			if !AreEqual(left[k], right[k]) {
-				return false
-			}
-		}
-		return true
-
 	case *Record:
 		rightRecord, ok := right.(*Record)
 		if !ok {
-			temp, ok := right.(Record)
-			if !ok {
-				return false
-			}
-			rightRecord = &temp
+			return false
 		}
 		leftFields := left.Fields()
 		rightFields := rightRecord.Fields()

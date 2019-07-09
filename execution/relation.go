@@ -218,7 +218,7 @@ func (rel *In) Apply(variables octosql.Variables, left, right Expression) (bool,
 				return AreEqual(leftValue, &set[i]), nil
 			case octosql.Tuple:
 				fields := set[i].Fields()
-				values := make([]interface{}, len(fields))
+				values := make(octosql.Tuple, len(fields))
 				for i, field := range fields {
 					values[i] = set[i].Value(field.Name)
 				}
@@ -234,7 +234,7 @@ func (rel *In) Apply(variables octosql.Variables, left, right Expression) (bool,
 			return AreEqual(leftValue, rightValue), nil
 		case octosql.Tuple:
 			fields := set.Fields()
-			values := make([]interface{}, len(fields))
+			values := make(octosql.Tuple, len(fields))
 			for i, field := range fields {
 				values[i] = set.Value(field.Name)
 			}

@@ -1,8 +1,6 @@
 package aggregates
 
 import (
-	"time"
-
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
@@ -29,44 +27,44 @@ func (agg *Min) AddRecord(key octosql.Tuple, value octosql.Value) error {
 		agg.typedValue = value
 	}
 	switch value := value.(type) {
-	case int:
-		_, typeOk := agg.typedValue.(int)
+	case octosql.Int:
+		_, typeOk := agg.typedValue.(octosql.Int)
 		if !typeOk {
 			return errors.Errorf("mixed types in min: %v and %v with values %v and %v",
 				execution.GetType(value), execution.GetType(agg.typedValue),
 				value, agg.typedValue)
 		}
 
-		if !ok || value < min.(int) {
+		if !ok || value < min.(octosql.Int) {
 			min = value
 		}
 
-	case float64:
-		_, typeOk := agg.typedValue.(float64)
+	case octosql.Float:
+		_, typeOk := agg.typedValue.(octosql.Float)
 		if !typeOk {
 			return errors.Errorf("mixed types in min: %v and %v with values %v and %v",
 				execution.GetType(value), execution.GetType(agg.typedValue),
 				value, agg.typedValue)
 		}
 
-		if !ok || value < min.(float64) {
+		if !ok || value < min.(octosql.Float) {
 			min = value
 		}
 
-	case string:
-		_, typeOk := agg.typedValue.(string)
+	case octosql.String:
+		_, typeOk := agg.typedValue.(octosql.String)
 		if !typeOk {
 			return errors.Errorf("mixed types in min: %v and %v with values %v and %v",
 				execution.GetType(value), execution.GetType(agg.typedValue),
 				value, agg.typedValue)
 		}
 
-		if !ok || value < min.(string) {
+		if !ok || value < min.(octosql.String) {
 			min = value
 		}
 
-	case bool:
-		_, typeOk := agg.typedValue.(bool)
+	case octosql.Bool:
+		_, typeOk := agg.typedValue.(octosql.Bool)
 		if !typeOk {
 			return errors.Errorf("mixed types in min: %v and %v with values %v and %v",
 				execution.GetType(value), execution.GetType(agg.typedValue),
@@ -77,15 +75,15 @@ func (agg *Min) AddRecord(key octosql.Tuple, value octosql.Value) error {
 			min = value
 		}
 
-	case time.Time:
-		_, typeOk := agg.typedValue.(time.Time)
+	case octosql.Time:
+		_, typeOk := agg.typedValue.(octosql.Time)
 		if !typeOk {
 			return errors.Errorf("mixed types in min: %v and %v with values %v and %v",
 				execution.GetType(value), execution.GetType(agg.typedValue),
 				value, agg.typedValue)
 		}
 
-		if !ok || value.Before(min.(time.Time)) {
+		if !ok || value.Time().Before(min.(octosql.Time).Time()) {
 			min = value
 		}
 
@@ -111,7 +109,7 @@ func (agg *Min) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
 		return nil, errors.Errorf("min for key not found")
 	}
 
-	return min, nil
+	return min.(octosql.Value), nil
 }
 
 func (agg *Min) String() string {

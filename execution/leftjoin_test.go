@@ -37,15 +37,15 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 					[]*Record{
 						NewRecordFromSlice(
 							fieldNames,
-							[]interface{}{"red", "test"},
+							octosql.Tuple{"red", "test"},
 						),
 						NewRecordFromSlice(
 							fieldNames,
-							[]interface{}{"blue", "test2"},
+							octosql.Tuple{"blue", "test2"},
 						),
 						NewRecordFromSlice(
 							fieldNames,
-							[]interface{}{"green", "test3"},
+							octosql.Tuple{"green", "test3"},
 						),
 					},
 				),
@@ -65,19 +65,19 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 					NewDummyNode([]*Record{
 						NewRecordFromSlice(
 							fieldNames2,
-							[]interface{}{"green", 7},
+							octosql.Tuple{"green", 7},
 						),
 						NewRecordFromSlice(
 							fieldNames2,
-							[]interface{}{"red", 5},
+							octosql.Tuple{"red", 5},
 						),
 						NewRecordFromSlice(
 							fieldNames2,
-							[]interface{}{"green", 4},
+							octosql.Tuple{"green", 4},
 						),
 						NewRecordFromSlice(
 							fieldNames2,
-							[]interface{}{"green", 2},
+							octosql.Tuple{"green", 2},
 						),
 					})),
 			},
@@ -85,19 +85,19 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 				[]*Record{
 					NewRecordFromSlice(
 						[]octosql.VariableName{"bike", "name", "color", "score"},
-						[]interface{}{"red", "test", "red", 5},
+						octosql.Tuple{"red", "test", "red", 5},
 					),
 					NewRecordFromSlice(
 						fieldNames,
-						[]interface{}{"blue", "test2"},
+						octosql.Tuple{"blue", "test2"},
 					),
 					NewRecordFromSlice(
 						[]octosql.VariableName{"bike", "name", "color", "score"},
-						[]interface{}{"green", "test3", "green", 7},
+						octosql.Tuple{"green", "test3", "green", 7},
 					),
 					NewRecordFromSlice(
 						[]octosql.VariableName{"bike", "name", "color", "score"},
-						[]interface{}{"green", "test3", "green", 4},
+						octosql.Tuple{"green", "test3", "green", 4},
 					),
 				},
 			),

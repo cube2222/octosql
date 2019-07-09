@@ -3,11 +3,12 @@ package functions
 import (
 	"reflect"
 
+	"github.com/cube2222/octosql"
 	"github.com/pkg/errors"
 )
 
-func combine(validators ...func(...interface{}) error) func(...interface{}) error {
-	return func(args ...interface{}) error {
+func combine(validators ...func(...octosql.Value) error) func(...octosql.Value) error {
+	return func(args ...octosql.Value) error {
 		for _, validator := range validators {
 			err := validator(args...)
 			if err != nil {
@@ -18,71 +19,71 @@ func combine(validators ...func(...interface{}) error) func(...interface{}) erro
 	}
 }
 
-func exactlyNArgs(n int, args ...interface{}) error {
+func exactlyNArgs(n int, args ...octosql.Value) error {
 	if len(args) != n {
 		return errors.Errorf("Expected exactly %v arguments, but got %v", n, len(args))
 	}
 	return nil
 }
 
-func oneArg(args ...interface{}) error { /* this is a popular validator */
+func oneArg(args ...octosql.Value) error { /* this is a popular validator */
 	return exactlyNArgs(1, args...)
 }
 
-func twoArgs(args ...interface{}) error {
+func twoArgs(args ...octosql.Value) error {
 	return exactlyNArgs(2, args...)
 }
 
-func atLeastOneArg(args ...interface{}) error {
+func atLeastOneArg(args ...octosql.Value) error {
 	if len(args) == 0 {
 		return errors.Errorf("Expected at least one argument, but got zero")
 	}
 	return nil
 }
 
-func basicType(args ...interface{}) error {
+func basicType(args ...octosql.Value) error {
 	switch arg := args[0].(type) {
-	case int:
+	case octosql.Int:
 		return nil
-	case float64:
+	case octosql.Float:
 		return nil
-	case bool:
+	case octosql.Bool:
 		return nil
-	case string:
+	case octosql.String:
 		return nil
 	default:
 		return errors.Errorf("Expected a basic type, but got %v of type %v", arg, reflect.TypeOf(arg))
 	}
 }
 
-func wantInt(args ...interface{}) error {
-	_, ok := args[0].(int)
+func wantInt(args ...octosql.Value) error {
+	_, ok := args[0].(octosql.Int)
 	if !ok {
 		return errors.Errorf("Expected an int, but got %v of type %v", args[0], reflect.TypeOf(args[0]))
 	}
 	return nil
 }
 
-func wantFloat(args ...interface{}) error {
-	_, ok := args[0].(float64)
+func wantFloat(args ...octosql.Value) error {
+	_, ok := args[0].(octosql.Float)
 	if !ok {
 		return errors.Errorf("Expected a float, but got %v of type %v", args[0], reflect.TypeOf(args[0]))
 	}
 	return nil
 }
 
-func wantString(args ...interface{}) error {
-	_, ok := args[0].(string)
+func wantString(args ...octosql.Value) error {
+	_, ok := args[0].(octosql.String)
 	if !ok {
 		return errors.Errorf("Expected a string, but got %v of type %v", args[0], reflect.TypeOf(args[0]))
 	}
 	return nil
 }
 
-func wantNumber(args ...interface{}) error {
-	_, ok := args[0].(int)
+func wantNumber(args ...octosql.Value) error {
+	_, ok := args[0].(octosql.Int)
 	if !ok {
-		_, ok := args[0].(float64)
+		_, ok := args[0].(octosql.Float)
 		if !ok {
 			return errors.Errorf("Expected a number, but got %v of type %v", args[0], reflect.TypeOf(args[0]))
 		}
@@ -91,7 +92,7 @@ func wantNumber(args ...interface{}) error {
 	return nil
 }
 
-func allInts(args ...interface{}) error {
+func allInts(args ...octosql.Value) error {
 	for _, arg := range args {
 		err := wantInt(arg)
 		if err != nil {
@@ -102,7 +103,7 @@ func allInts(args ...interface{}) error {
 	return nil
 }
 
-func allFloats(args ...interface{}) error {
+func allFloats(args ...octosql.Value) error {
 	for _, arg := range args {
 		err := wantFloat(arg)
 		if err != nil {
@@ -113,7 +114,7 @@ func allFloats(args ...interface{}) error {
 	return nil
 }
 
-func allNumbers(args ...interface{}) error {
+func allNumbers(args ...octosql.Value) error {
 	for _, arg := range args {
 		err := wantNumber(arg)
 		if err != nil {
@@ -124,7 +125,7 @@ func allNumbers(args ...interface{}) error {
 	return nil
 }
 
-func allStrings(args ...interface{}) error {
+func allStrings(args ...octosql.Value) error {
 	for _, arg := range args {
 		err := wantString(arg)
 		if err != nil {

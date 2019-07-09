@@ -188,23 +188,17 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 		return nil, errors.Wrap(err, "couldn't scan row")
 	}
 
-	resultMap := make(map[octosql.VariableName]interface{})
+	resultMap := make(map[octosql.VariableName]octosql.Value)
 
 	for i, columnName := range rs.columns {
-		val := colPointers[i].(*interface{})
 		newName := octosql.VariableName(fmt.Sprintf("%s.%s", rs.alias, columnName))
-		resultMap[newName] = val
+		resultMap[newName] = execution.NormalizeType(cols[i])
 	}
 
 	fields := make([]octosql.VariableName, 0)
 
 	for k := range resultMap {
 		fields = append(fields, k)
-	}
-
-	resultMap, ok := execution.NormalizeType(resultMap).(map[octosql.VariableName]interface{})
-	if !ok {
-		return nil, errors.New("couldn't cast resultMap to map[octosql.VariableName]interface{}")
 	}
 
 	return execution.NewRecord(fields, resultMap), nil

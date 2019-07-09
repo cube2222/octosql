@@ -89,7 +89,7 @@ func (agg *Average) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
 		return nil, errors.Errorf("average for key not found")
 	}
 
-	return average, nil
+	return average.(octosql.Float), nil
 }
 
 func (agg *Average) String() string {

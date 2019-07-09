@@ -74,7 +74,7 @@ func TestParseType(t *testing.T) {
 					"name":       "warsaw",
 					"population": 1700000.0,
 				},
-				"array": []interface{}{"value1", "value2"},
+				"array": octosql.Tuple{"value1", "value2"},
 			},
 		},
 		{
@@ -118,7 +118,7 @@ func TestNormalizeType(t *testing.T) {
 					"name":       "warsaw",
 					"population": float32(1700000),
 				},
-				"array": []interface{}{[]interface{}{float32(1), uint8(2), int64(3)}, true},
+				"array": octosql.Tuple{octosql.Tuple{float32(1), uint8(2), int64(3)}, true},
 			},
 			want: map[string]interface{}{
 				"name": "Jakub",
@@ -127,7 +127,7 @@ func TestNormalizeType(t *testing.T) {
 					"name":       "warsaw",
 					"population": float64(1700000.0),
 				},
-				"array": []interface{}{[]interface{}{float64(1), int(2), int(3)}, true},
+				"array": octosql.Tuple{octosql.Tuple{float64(1), int(2), int(3)}, true},
 			},
 		},
 	}
@@ -186,7 +186,7 @@ func TestAreEqual(t *testing.T) {
 					map[octosql.VariableName]interface{}{
 						octosql.NewVariableName("a"): 15,
 						octosql.NewVariableName("b"): "something",
-						octosql.NewVariableName("c"): []interface{}{1, 2, 3},
+						octosql.NewVariableName("c"): octosql.Tuple{1, 2, 3},
 					},
 				),
 				right: NewRecord(
@@ -198,7 +198,7 @@ func TestAreEqual(t *testing.T) {
 					map[octosql.VariableName]interface{}{
 						octosql.NewVariableName("a"): 15,
 						octosql.NewVariableName("b"): "something",
-						octosql.NewVariableName("c"): []interface{}{1, 2, 3},
+						octosql.NewVariableName("c"): octosql.Tuple{1, 2, 3},
 					},
 				),
 			},

@@ -12,75 +12,78 @@ func TestParseType(t *testing.T) {
 	tests := []struct {
 		name string
 		str  string
-		want interface{}
+		want octosql.Value
 	}{
 		{
 			name: "parse int",
 			str:  "123",
-			want: 123,
+			want: octosql.MakeInt(123),
 		},
 		{
 			name: "parse int",
 			str:  "-123",
-			want: -123,
+			want: octosql.MakeInt(-123),
 		},
 		{
 			name: "parse boolean",
 			str:  "true",
-			want: true,
+			want: octosql.MakeBool(true),
 		},
 		{
 			name: "parse boolean",
 			str:  "TRUE",
-			want: true,
+			want: octosql.MakeBool(true),
 		},
 		{
 			name: "parse boolean",
 			str:  "True",
-			want: true,
+			want: octosql.MakeBool(true),
 		},
 		{
 			name: "parse float",
 			str:  "123.0",
-			want: 123.0,
+			want: octosql.MakeFloat(123.0),
 		},
 		{
 			name: "parse float",
-			str:  "123.0",
-			want: 123.0,
+			str:  "-123.0",
+			want: octosql.MakeFloat(-123.0),
 		},
 		{
 			name: "parse float",
 			str:  "123.123",
-			want: 123.123,
+			want: octosql.MakeFloat(123.123),
 		},
 		{
 			name: "parse date",
 			str:  "2019-03-17T15:44:16+00:00",
-			want: time.Date(2019, 03, 17, 15, 44, 16, 0, time.UTC),
+			want: octosql.MakeTime(time.Date(2019, 03, 17, 15, 44, 16, 0, time.UTC)),
 		},
 		{
 			name: "parse date",
 			str:  "2019-03-17T15:44:16+01:00",
-			want: time.Date(2019, 03, 17, 14, 44, 16, 0, time.UTC),
+			want: octosql.MakeTime(time.Date(2019, 03, 17, 14, 44, 16, 0, time.UTC)),
 		},
 		{
 			name: "parse json",
 			str:  `{"name": "Jakub", "age": 3, "city": {"name": "warsaw", "population": 1700000}, "array": ["value1", "value2"]}`,
-			want: map[string]interface{}{
-				"name": "Jakub",
-				"age":  3.0,
-				"city": map[string]interface{}{
-					"name":       "warsaw",
-					"population": 1700000.0,
+			want: octosql.MakeObject(map[string]octosql.Value{
+				"name": octosql.MakeString("Jakub"),
+				"age":  octosql.MakeFloat(3.0),
+				"city": octosql.MakeObject(map[string]octosql.Value{
+					"name":       octosql.MakeString("warsaw"),
+					"population": octosql.MakeFloat(1700000.0),
+				}),
+				"array": octosql.Tuple{
+					octosql.MakeString("value1"),
+					octosql.MakeString("value2"),
 				},
-				"array": octosql.Tuple{"value1", "value2"},
-			},
+			}),
 		},
 		{
 			name: "unparsable",
 			str:  "Lorem ipsum.",
-			want: "Lorem ipsum.",
+			want: octosql.MakeString("Lorem ipsum."),
 		},
 	}
 	for _, tt := range tests {
@@ -90,8 +93,8 @@ func TestParseType(t *testing.T) {
 				t.Fatalf("ParseType() = type %v, want type %v",
 					reflect.TypeOf(got), reflect.TypeOf(tt.want))
 			}
-			if wantTime, ok := tt.want.(time.Time); ok {
-				if !wantTime.Equal(got.(time.Time)) {
+			if wantTime, ok := tt.want.(octosql.Time); ok {
+				if !wantTime.Time().Equal(got.(octosql.Time).Time()) {
 					t.Fatalf("ParseType() = %+v, want %+v", got, tt.want)
 				}
 				return
@@ -107,7 +110,7 @@ func TestNormalizeType(t *testing.T) {
 	tests := []struct {
 		name  string
 		value interface{}
-		want  interface{}
+		want  octosql.Value
 	}{
 		{
 			name: "normalize something complex",
@@ -118,17 +121,24 @@ func TestNormalizeType(t *testing.T) {
 					"name":       "warsaw",
 					"population": float32(1700000),
 				},
-				"array": octosql.Tuple{octosql.Tuple{float32(1), uint8(2), int64(3)}, true},
+				"array": []interface{}{[]interface{}{float32(1), uint8(2), int64(3)}, true},
 			},
-			want: map[string]interface{}{
-				"name": "Jakub",
-				"age":  int(3),
-				"city": map[string]interface{}{
-					"name":       "warsaw",
-					"population": float64(1700000.0),
+			want: octosql.MakeObject(map[string]octosql.Value{
+				"name": octosql.MakeString("Jakub"),
+				"age":  octosql.MakeInt(3),
+				"city": octosql.MakeObject(map[string]octosql.Value{
+					"name":       octosql.MakeString("warsaw"),
+					"population": octosql.MakeFloat(1700000.0),
+				}),
+				"array": octosql.Tuple{
+					octosql.Tuple{
+						octosql.MakeFloat(1),
+						octosql.MakeInt(2),
+						octosql.MakeInt(3),
+					},
+					octosql.MakeBool(true),
 				},
-				"array": octosql.Tuple{octosql.Tuple{float64(1), int(2), int(3)}, true},
-			},
+			}),
 		},
 	}
 	for _, tt := range tests {
@@ -142,8 +152,8 @@ func TestNormalizeType(t *testing.T) {
 
 func TestAreEqual(t *testing.T) {
 	type args struct {
-		left  interface{}
-		right interface{}
+		left  octosql.Value
+		right octosql.Value
 	}
 	tests := []struct {
 		name string
@@ -153,52 +163,52 @@ func TestAreEqual(t *testing.T) {
 		{
 			name: "compare ints",
 			args: args{
-				left:  1,
-				right: 1,
+				left:  octosql.MakeInt(1),
+				right: octosql.MakeInt(1),
 			},
 			want: true,
 		},
 		{
 			name: "compare ints",
 			args: args{
-				left:  1,
-				right: 2,
+				left:  octosql.MakeInt(1),
+				right: octosql.MakeInt(2),
 			},
 			want: false,
 		},
 		{
 			name: "compare times",
 			args: args{
-				left:  time.Date(2019, 03, 17, 15, 44, 16, 0, time.UTC),
-				right: time.Date(2019, 03, 17, 20, 44, 16, 0, time.FixedZone("anything", 3600*5)),
+				left:  octosql.MakeTime(time.Date(2019, 03, 17, 15, 44, 16, 0, time.UTC)),
+				right: octosql.MakeTime(time.Date(2019, 03, 17, 20, 44, 16, 0, time.FixedZone("anything", 3600*5))),
 			},
 			want: true,
 		},
 		{
 			name: "compare records",
 			args: args{
-				left: NewRecord(
+				left: NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{
 						octosql.NewVariableName("a"),
 						octosql.NewVariableName("b"),
 						octosql.NewVariableName("c"),
 					},
-					map[octosql.VariableName]interface{}{
-						octosql.NewVariableName("a"): 15,
-						octosql.NewVariableName("b"): "something",
-						octosql.NewVariableName("c"): octosql.Tuple{1, 2, 3},
+					[]interface{}{
+						15,
+						"something",
+						[]interface{}{1, 2, 3},
 					},
 				),
-				right: NewRecord(
+				right: NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{
 						octosql.NewVariableName("a"),
 						octosql.NewVariableName("b"),
 						octosql.NewVariableName("c"),
 					},
-					map[octosql.VariableName]interface{}{
-						octosql.NewVariableName("a"): 15,
-						octosql.NewVariableName("b"): "something",
-						octosql.NewVariableName("c"): octosql.Tuple{1, 2, 3},
+					[]interface{}{
+						15,
+						"something",
+						[]interface{}{1, 2, 3},
 					},
 				),
 			},
@@ -207,24 +217,24 @@ func TestAreEqual(t *testing.T) {
 		{
 			name: "records compare positionally",
 			args: args{
-				left: NewRecord(
+				left: NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{
 						octosql.NewVariableName("a"),
 						octosql.NewVariableName("b"),
 					},
-					map[octosql.VariableName]interface{}{
-						octosql.NewVariableName("a"): 15,
-						octosql.NewVariableName("b"): "something",
+					[]interface{}{
+						15,
+						"something",
 					},
 				),
-				right: NewRecord(
+				right: NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{
 						octosql.NewVariableName("b"),
 						octosql.NewVariableName("c"),
 					},
-					map[octosql.VariableName]interface{}{
-						octosql.NewVariableName("b"): 15,
-						octosql.NewVariableName("c"): "something",
+					[]interface{}{
+						15,
+						"something",
 					},
 				),
 			},
@@ -233,24 +243,24 @@ func TestAreEqual(t *testing.T) {
 		{
 			name: "unequal records",
 			args: args{
-				left: NewRecord(
+				left: NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{
 						octosql.NewVariableName("a"),
 						octosql.NewVariableName("b"),
 					},
-					map[octosql.VariableName]interface{}{
-						octosql.NewVariableName("a"): 15,
-						octosql.NewVariableName("b"): "something",
+					[]interface{}{
+						15,
+						"something",
 					},
 				),
-				right: NewRecord(
+				right: NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{
 						octosql.NewVariableName("b"),
 						octosql.NewVariableName("c"),
 					},
-					map[octosql.VariableName]interface{}{
-						octosql.NewVariableName("b"): 12,
-						octosql.NewVariableName("c"): "something_else",
+					[]interface{}{
+						12,
+						"something_else",
 					},
 				),
 			},
@@ -259,22 +269,22 @@ func TestAreEqual(t *testing.T) {
 		{
 			name: "unequal records",
 			args: args{
-				left: NewRecord(
+				left: NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{
 						octosql.NewVariableName("a"),
 					},
-					map[octosql.VariableName]interface{}{
-						octosql.NewVariableName("a"): 15,
+					[]interface{}{
+						15,
 					},
 				),
-				right: NewRecord(
+				right: NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{
 						octosql.NewVariableName("a"),
 						octosql.NewVariableName("b"),
 					},
-					map[octosql.VariableName]interface{}{
-						octosql.NewVariableName("a"): 15,
-						octosql.NewVariableName("b"): "something",
+					[]interface{}{
+						15,
+						"something",
 					},
 				),
 			},

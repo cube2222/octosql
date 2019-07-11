@@ -93,7 +93,7 @@ func Normalize(rec *Record) *Record {
 	})
 
 	sortedFieldNames := make([]octosql.VariableName, len(rec.fieldNames))
-	values := make([]octosql.Value, len(rec.fieldNames))
+	values := make([]interface{}, len(rec.fieldNames))
 
 	for k := range row {
 		ent := row[k]
@@ -101,7 +101,7 @@ func Normalize(rec *Record) *Record {
 		values[k] = ent.value
 	}
 
-	return NewRecordFromSlice(sortedFieldNames, values)
+	return NewRecordFromSliceWithNormalize(sortedFieldNames, values)
 }
 
 func AreStreamsEqual(first, second RecordStream) (bool, error) {
@@ -178,6 +178,17 @@ func NewRecordFromSlice(fields []octosql.VariableName, data []octosql.Value) *Re
 	return &Record{
 		fieldNames: fields,
 		data:       data,
+	}
+}
+
+func NewRecordFromSliceWithNormalize(fields []octosql.VariableName, data []interface{}) *Record {
+	normalized := make([]octosql.Value, len(data))
+	for i := range data {
+		normalized[i] = NormalizeType(data[i])
+	}
+	return &Record{
+		fieldNames: fields,
+		data:       normalized,
 	}
 }
 

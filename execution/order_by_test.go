@@ -21,15 +21,15 @@ func TestOrderBy_Get(t *testing.T) {
 			name: "simple order - one column int ascending",
 			args: args{
 				stream: NewInMemoryStream([]*Record{
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"id", "age"},
-						octosql.Tuple{1, 7}),
-					NewRecordFromSlice(
+						[]interface{}{1, 7}),
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"id", "age"},
-						octosql.Tuple{2, 10}),
-					NewRecordFromSlice(
+						[]interface{}{2, 10}),
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"id", "age"},
-						octosql.Tuple{3, 2}),
+						[]interface{}{3, 2}),
 				}),
 				fields: []OrderField{
 					{
@@ -39,15 +39,15 @@ func TestOrderBy_Get(t *testing.T) {
 				},
 			},
 			want: NewInMemoryStream([]*Record{
-				NewRecordFromSlice(
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "age"},
-					octosql.Tuple{3, 2}),
-				NewRecordFromSlice(
+					[]interface{}{3, 2}),
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "age"},
-					octosql.Tuple{1, 7}),
-				NewRecordFromSlice(
+					[]interface{}{1, 7}),
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "age"},
-					octosql.Tuple{2, 10}),
+					[]interface{}{2, 10}),
 			}),
 			wantErr: false,
 		},
@@ -56,15 +56,15 @@ func TestOrderBy_Get(t *testing.T) {
 			name: "simple order - one column string descending",
 			args: args{
 				stream: NewInMemoryStream([]*Record{
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
-						octosql.Tuple{"b", 7}),
-					NewRecordFromSlice(
+						[]interface{}{"b", 7}),
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
-						octosql.Tuple{"c", 10}),
-					NewRecordFromSlice(
+						[]interface{}{"c", 10}),
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
-						octosql.Tuple{"a", 2}),
+						[]interface{}{"a", 2}),
 				}),
 				fields: []OrderField{
 					{
@@ -74,15 +74,15 @@ func TestOrderBy_Get(t *testing.T) {
 				},
 			},
 			want: NewInMemoryStream([]*Record{
-				NewRecordFromSlice(
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
-					octosql.Tuple{"c", 10}),
-				NewRecordFromSlice(
+					[]interface{}{"c", 10}),
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
-					octosql.Tuple{"b", 7}),
-				NewRecordFromSlice(
+					[]interface{}{"b", 7}),
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
-					octosql.Tuple{"a", 2}),
+					[]interface{}{"a", 2}),
 			}),
 			wantErr: false,
 		},
@@ -91,21 +91,21 @@ func TestOrderBy_Get(t *testing.T) {
 			name: "complex order - string ascending then int descending",
 			args: args{
 				stream: NewInMemoryStream([]*Record{
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
-						octosql.Tuple{"a", 7}),
-					NewRecordFromSlice(
+						[]interface{}{"a", 7}),
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
-						octosql.Tuple{"d", 19}),
-					NewRecordFromSlice(
+						[]interface{}{"d", 19}),
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
-						octosql.Tuple{"a", -2}),
-					NewRecordFromSlice(
+						[]interface{}{"a", -2}),
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
-						octosql.Tuple{"c", 1}),
-					NewRecordFromSlice(
+						[]interface{}{"c", 1}),
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
-						octosql.Tuple{"d", 17}),
+						[]interface{}{"d", 17}),
 				}),
 				fields: []OrderField{
 					{
@@ -119,21 +119,21 @@ func TestOrderBy_Get(t *testing.T) {
 				},
 			},
 			want: NewInMemoryStream([]*Record{
-				NewRecordFromSlice(
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
-					octosql.Tuple{"a", 7}),
-				NewRecordFromSlice(
+					[]interface{}{"a", 7}),
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
-					octosql.Tuple{"a", -2}),
-				NewRecordFromSlice(
+					[]interface{}{"a", -2}),
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
-					octosql.Tuple{"c", 1}),
-				NewRecordFromSlice(
+					[]interface{}{"c", 1}),
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
-					octosql.Tuple{"d", 19}),
-				NewRecordFromSlice(
+					[]interface{}{"d", 19}),
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
-					octosql.Tuple{"d", 17}),
+					[]interface{}{"d", 17}),
 			}),
 			wantErr: false,
 		},
@@ -142,12 +142,12 @@ func TestOrderBy_Get(t *testing.T) {
 			name: "failed - missing field",
 			args: args{
 				stream: NewInMemoryStream([]*Record{
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
-						octosql.Tuple{"a", 7}),
-					NewRecordFromSlice(
+						[]interface{}{"a", 7}),
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age?"},
-						octosql.Tuple{"d", 19}),
+						[]interface{}{"d", 19}),
 				}),
 				fields: []OrderField{
 					{
@@ -164,12 +164,12 @@ func TestOrderBy_Get(t *testing.T) {
 			name: "failed - type mismatch",
 			args: args{
 				stream: NewInMemoryStream([]*Record{
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
-						octosql.Tuple{"a", 7}),
-					NewRecordFromSlice(
+						[]interface{}{"a", 7}),
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
-						octosql.Tuple{"d", 19.5}),
+						[]interface{}{"d", 19.5}),
 				}),
 				fields: []OrderField{
 					{
@@ -185,12 +185,12 @@ func TestOrderBy_Get(t *testing.T) {
 			name: "failed - non sortable boolean",
 			args: args{
 				stream: NewInMemoryStream([]*Record{
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"is_nice"},
-						octosql.Tuple{false}),
-					NewRecordFromSlice(
+						[]interface{}{false}),
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"is_nice"},
-						octosql.Tuple{true}),
+						[]interface{}{true}),
 				}),
 				fields: []OrderField{
 					{

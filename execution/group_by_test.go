@@ -10,11 +10,11 @@ import (
 type AggregateMock struct {
 	addI      int
 	addKeys   []octosql.Tuple
-	addValues octosql.Tuple
+	addValues []octosql.Value
 
 	getI      int
-	getKeySet map[interface{}]struct{}
-	getValues octosql.Tuple
+	getKeySet map[octosql.Value]struct{}
+	getValues []octosql.Value
 
 	t *testing.T
 }
@@ -49,58 +49,58 @@ func TestGroupBy_AggregateCalling(t *testing.T) {
 
 	firstAggregate := &AggregateMock{
 		addKeys: []octosql.Tuple{
-			{5},
-			{4},
-			{3},
-			{3},
-			{3},
+			{octosql.MakeInt(5)},
+			{octosql.MakeInt(4)},
+			{octosql.MakeInt(3)},
+			{octosql.MakeInt(3)},
+			{octosql.MakeInt(3)},
 		},
-		addValues: octosql.Tuple{
-			"Buster",
-			"Precious",
-			"Nala",
-			"Tiger",
-			"Lucy",
+		addValues: []octosql.Value{
+			octosql.MakeString("Buster"),
+			octosql.MakeString("Precious"),
+			octosql.MakeString("Nala"),
+			octosql.MakeString("Tiger"),
+			octosql.MakeString("Lucy"),
 		},
 
-		getKeySet: map[interface{}]struct{}{
-			5: {},
-			4: {},
-			3: {},
+		getKeySet: map[octosql.Value]struct{}{
+			octosql.MakeInt(5): {},
+			octosql.MakeInt(4): {},
+			octosql.MakeInt(3): {},
 		},
-		getValues: octosql.Tuple{
-			"Buster",
-			"Precious",
-			"Nala",
+		getValues: []octosql.Value{
+			octosql.MakeString("Buster"),
+			octosql.MakeString("Precious"),
+			octosql.MakeString("Nala"),
 		},
 
 		t: t,
 	}
 	secondAggregate := &AggregateMock{
 		addKeys: []octosql.Tuple{
-			{5},
-			{4},
-			{3},
-			{3},
-			{3},
+			{octosql.MakeInt(5)},
+			{octosql.MakeInt(4)},
+			{octosql.MakeInt(3)},
+			{octosql.MakeInt(3)},
+			{octosql.MakeInt(3)},
 		},
-		addValues: octosql.Tuple{
-			9,
-			6,
-			5,
-			4,
-			3,
+		addValues: []octosql.Value{
+			octosql.MakeInt(9),
+			octosql.MakeInt(6),
+			octosql.MakeInt(5),
+			octosql.MakeInt(4),
+			octosql.MakeInt(3),
 		},
 
-		getKeySet: map[interface{}]struct{}{
-			5: {},
-			4: {},
-			3: {},
+		getKeySet: map[octosql.Value]struct{}{
+			octosql.MakeInt(5): {},
+			octosql.MakeInt(4): {},
+			octosql.MakeInt(3): {},
 		},
-		getValues: octosql.Tuple{
-			9,
-			6,
-			4,
+		getValues: []octosql.Value{
+			octosql.MakeInt(9),
+			octosql.MakeInt(6),
+			octosql.MakeInt(4),
 		},
 
 		t: t,
@@ -108,11 +108,11 @@ func TestGroupBy_AggregateCalling(t *testing.T) {
 
 	groupby := &GroupByStream{
 		source: NewInMemoryStream([]*Record{
-			NewRecordFromSlice(fields, octosql.Tuple{"Buster", 9, 5}),
-			NewRecordFromSlice(fields, octosql.Tuple{"Precious", 6, 4}),
-			NewRecordFromSlice(fields, octosql.Tuple{"Nala", 5, 3}),
-			NewRecordFromSlice(fields, octosql.Tuple{"Tiger", 4, 3}),
-			NewRecordFromSlice(fields, octosql.Tuple{"Lucy", 3, 3}),
+			NewRecordFromSliceWithNormalize(fields, []interface{}{"Buster", 9, 5}),
+			NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 6, 4}),
+			NewRecordFromSliceWithNormalize(fields, []interface{}{"Nala", 5, 3}),
+			NewRecordFromSliceWithNormalize(fields, []interface{}{"Tiger", 4, 3}),
+			NewRecordFromSliceWithNormalize(fields, []interface{}{"Lucy", 3, 3}),
 		}),
 		variables:  octosql.NoVariables(),
 		key:        []Expression{NewVariable("ownerid")},
@@ -124,9 +124,9 @@ func TestGroupBy_AggregateCalling(t *testing.T) {
 
 	outFields := []octosql.VariableName{"cat_mock", "lives_left"}
 	expectedOutput := []*Record{
-		NewRecordFromSlice(outFields, octosql.Tuple{"Buster", 9}),
-		NewRecordFromSlice(outFields, octosql.Tuple{"Precious", 6}),
-		NewRecordFromSlice(outFields, octosql.Tuple{"Nala", 4}),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{"Buster", 9}),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{"Precious", 6}),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{"Nala", 4}),
 	}
 
 	var rec *Record

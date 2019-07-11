@@ -31,47 +31,47 @@ func TestFilteredStream_Next(t *testing.T) {
 					NewNotEqual(),
 					NewVariable("const"),
 				),
-				variables: map[octosql.VariableName]interface{}{
-					octosql.NewVariableName("const"): 3,
+				variables: map[octosql.VariableName]octosql.Value{
+					octosql.NewVariableName("const"): octosql.MakeInt(3),
 				},
 				source: NewInMemoryStream(
 					[]*Record{
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames,
-							octosql.Tuple{5, "test"},
+							[]interface{}{5, "test"},
 						),
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames,
-							octosql.Tuple{4, "test2"},
+							[]interface{}{4, "test2"},
 						),
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames,
-							octosql.Tuple{3, "test3"},
+							[]interface{}{3, "test3"},
 						),
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames,
-							octosql.Tuple{3, "test33"},
+							[]interface{}{3, "test33"},
 						),
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames,
-							octosql.Tuple{2, "test2"},
+							[]interface{}{2, "test2"},
 						),
 					},
 				),
 			},
 			want: NewInMemoryStream(
 				[]*Record{
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						fieldNames,
-						octosql.Tuple{5, "test"},
+						[]interface{}{5, "test"},
 					),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						fieldNames,
-						octosql.Tuple{4, "test2"},
+						[]interface{}{4, "test2"},
 					),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						fieldNames,
-						octosql.Tuple{2, "test2"},
+						[]interface{}{2, "test2"},
 					),
 				},
 			),
@@ -85,63 +85,63 @@ func TestFilteredStream_Next(t *testing.T) {
 					NewNotEqual(),
 					NewVariable("const"),
 				),
-				variables: map[octosql.VariableName]interface{}{
-					octosql.NewVariableName("const"): 3,
+				variables: map[octosql.VariableName]octosql.Value{
+					octosql.NewVariableName("const"): octosql.MakeInt(3),
 				},
 				source: NewInMemoryStream(
 					[]*Record{
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames,
-							octosql.Tuple{5, "test"},
+							[]interface{}{5, "test"},
 						),
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames,
-							octosql.Tuple{5, "test"},
+							[]interface{}{5, "test"},
 						),
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames,
-							octosql.Tuple{4, "test2"},
+							[]interface{}{4, "test2"},
 						),
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames,
-							octosql.Tuple{3, "test3"},
+							[]interface{}{3, "test3"},
 						),
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames,
-							octosql.Tuple{3, "test33"},
+							[]interface{}{3, "test33"},
 						),
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames,
-							octosql.Tuple{2, "test2"},
+							[]interface{}{2, "test2"},
 						),
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames,
-							octosql.Tuple{2, "test2"},
+							[]interface{}{2, "test2"},
 						),
 					},
 				),
 			},
 			want: NewInMemoryStream(
 				[]*Record{
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						fieldNames,
-						octosql.Tuple{5, "test"},
+						[]interface{}{5, "test"},
 					),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						fieldNames,
-						octosql.Tuple{5, "test"},
+						[]interface{}{5, "test"},
 					),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						fieldNames,
-						octosql.Tuple{4, "test2"},
+						[]interface{}{4, "test2"},
 					),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						fieldNames,
-						octosql.Tuple{2, "test2"},
+						[]interface{}{2, "test2"},
 					),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						fieldNames,
-						octosql.Tuple{2, "test2"},
+						[]interface{}{2, "test2"},
 					),
 				},
 			),
@@ -155,8 +155,8 @@ func TestFilteredStream_Next(t *testing.T) {
 					NewNotEqual(),
 					NewVariable("const"),
 				),
-				variables: map[octosql.VariableName]interface{}{
-					octosql.NewVariableName("const"): 3,
+				variables: map[octosql.VariableName]octosql.Value{
+					octosql.NewVariableName("const"): octosql.MakeInt(3),
 				},
 				source: NewInMemoryStream(nil),
 			},

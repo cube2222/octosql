@@ -98,7 +98,7 @@ func NormalizeType(value interface{}) octosql.Value {
 		return octosql.MakeString(string(value))
 	case string:
 		return octosql.MakeString(value)
-	case octosql.Tuple:
+	case []interface{}:
 		out := make(octosql.Tuple, len(value))
 		for i := range value {
 			out[i] = NormalizeType(value[i])

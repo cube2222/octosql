@@ -45,22 +45,22 @@ func TestMappedStream_Next(t *testing.T) {
 						NewVariable(octosql.NewVariableName("something_from_above")),
 					),
 				},
-				variables: map[octosql.VariableName]interface{}{
-					octosql.NewVariableName("something_from_above"): "yeah",
+				variables: map[octosql.VariableName]octosql.Value{
+					octosql.NewVariableName("something_from_above"): octosql.MakeString("yeah"),
 				},
 				source: NewInMemoryStream(
 					[]*Record{
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames,
-							octosql.Tuple{3, "test1", "test2"},
+							[]interface{}{3, "test1", "test2"},
 						),
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames,
-							octosql.Tuple{5, "test2", "test0"},
+							[]interface{}{5, "test2", "test0"},
 						),
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames,
-							octosql.Tuple{4, "test4", "test5"},
+							[]interface{}{4, "test4", "test5"},
 						),
 					},
 				),
@@ -68,14 +68,14 @@ func TestMappedStream_Next(t *testing.T) {
 			},
 			want: NewInMemoryStream(
 				[]*Record{
-					NewRecordFromSlice(fieldNamesNew,
-						octosql.Tuple{3, "yeah"},
+					NewRecordFromSliceWithNormalize(fieldNamesNew,
+						[]interface{}{3, "yeah"},
 					),
-					NewRecordFromSlice(fieldNamesNew,
-						octosql.Tuple{5, "yeah"},
+					NewRecordFromSliceWithNormalize(fieldNamesNew,
+						[]interface{}{5, "yeah"},
 					),
-					NewRecordFromSlice(fieldNamesNew,
-						octosql.Tuple{4, "yeah"},
+					NewRecordFromSliceWithNormalize(fieldNamesNew,
+						[]interface{}{4, "yeah"},
 					),
 				},
 			),
@@ -94,22 +94,22 @@ func TestMappedStream_Next(t *testing.T) {
 						NewVariable(octosql.NewVariableName("something_from_above")),
 					),
 				},
-				variables: map[octosql.VariableName]interface{}{
-					octosql.NewVariableName("something_from_above"): "yeah",
+				variables: map[octosql.VariableName]octosql.Value{
+					octosql.NewVariableName("something_from_above"): octosql.MakeString("yeah"),
 				},
 				source: NewInMemoryStream(
 					[]*Record{
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames,
-							octosql.Tuple{3, "test1", "test2"},
+							[]interface{}{3, "test1", "test2"},
 						),
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames,
-							octosql.Tuple{5, "test2", "test0"},
+							[]interface{}{5, "test2", "test0"},
 						),
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames,
-							octosql.Tuple{4, "test4", "test5"},
+							[]interface{}{4, "test4", "test5"},
 						),
 					},
 				),
@@ -117,17 +117,17 @@ func TestMappedStream_Next(t *testing.T) {
 			},
 			want: NewInMemoryStream(
 				[]*Record{
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						fieldNamesAll,
-						octosql.Tuple{3, "yeah", 3, "test1", "test2"},
+						[]interface{}{3, "yeah", 3, "test1", "test2"},
 					),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						fieldNamesAll,
-						octosql.Tuple{5, "yeah", 5, "test2", "test0"},
+						[]interface{}{5, "yeah", 5, "test2", "test0"},
 					),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						fieldNamesAll,
-						octosql.Tuple{4, "yeah", 4, "test4", "test5"},
+						[]interface{}{4, "yeah", 4, "test4", "test5"},
 					),
 				},
 			),
@@ -142,21 +142,21 @@ func TestMappedStream_Next(t *testing.T) {
 						NewNodeExpression(
 							NewDummyNode(
 								[]*Record{
-									NewRecordFromSlice(
+									NewRecordFromSliceWithNormalize(
 										[]octosql.VariableName{octosql.NewVariableName("test")},
-										octosql.Tuple{5},
+										[]interface{}{5},
 									),
 								},
 							),
 						),
 					),
 				},
-				variables: map[octosql.VariableName]interface{}{},
+				variables: map[octosql.VariableName]octosql.Value{},
 				source: NewInMemoryStream(
 					[]*Record{
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							[]octosql.VariableName{},
-							octosql.Tuple{},
+							[]interface{}{},
 						),
 					},
 				),
@@ -164,9 +164,9 @@ func TestMappedStream_Next(t *testing.T) {
 			},
 			want: NewInMemoryStream(
 				[]*Record{
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{octosql.NewVariableName("awesome")},
-						octosql.Tuple{5},
+						[]interface{}{5},
 					),
 				},
 			),
@@ -181,12 +181,12 @@ func TestMappedStream_Next(t *testing.T) {
 						NewNodeExpression(
 							NewDummyNode(
 								[]*Record{
-									NewRecordFromSlice(
+									NewRecordFromSliceWithNormalize(
 										[]octosql.VariableName{
 											octosql.NewVariableName("test"),
 											octosql.NewVariableName("test"),
 										},
-										octosql.Tuple{
+										[]interface{}{
 											5,
 											3,
 										},
@@ -196,12 +196,12 @@ func TestMappedStream_Next(t *testing.T) {
 						),
 					),
 				},
-				variables: map[octosql.VariableName]interface{}{},
+				variables: map[octosql.VariableName]octosql.Value{},
 				source: NewInMemoryStream(
 					[]*Record{
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							[]octosql.VariableName{},
-							octosql.Tuple{},
+							[]interface{}{},
 						),
 					},
 				),
@@ -209,9 +209,9 @@ func TestMappedStream_Next(t *testing.T) {
 			},
 			want: NewInMemoryStream(
 				[]*Record{
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{},
-						octosql.Tuple{},
+						[]interface{}{},
 					),
 				},
 			),

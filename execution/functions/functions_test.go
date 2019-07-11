@@ -5,11 +5,12 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 )
 
 func Test_parseInt(t *testing.T) {
-	type args []interface{}
+	type args []octosql.Value
 	tests := []struct {
 		name    string
 		args    args
@@ -18,37 +19,37 @@ func Test_parseInt(t *testing.T) {
 	}{
 		{
 			name:    "FuncInt - parse float",
-			args:    []interface{}{7.0},
-			want:    7,
+			args:    []octosql.Value{octosql.MakeFloat(7.0)},
+			want:    octosql.MakeInt(7),
 			wantErr: false,
 		},
 		{
 			name:    "FuncInt - parse string",
-			args:    []interface{}{"192"},
-			want:    192,
+			args:    []octosql.Value{octosql.MakeString("192")},
+			want:    octosql.MakeInt(192),
 			wantErr: false,
 		},
 		{
 			name:    "FuncInt - parse bool",
-			args:    []interface{}{true},
-			want:    1,
+			args:    []octosql.Value{octosql.MakeBool(true)},
+			want:    octosql.MakeInt(1),
 			wantErr: false,
 		},
 		{
 			name:    "FuncInt - invalid string",
-			args:    []interface{}{"17a"},
+			args:    []octosql.Value{octosql.MakeString("17a")},
 			want:    nil,
 			wantErr: true,
 		},
 		{
 			name:    "FuncInt - no args",
-			args:    []interface{}{},
+			args:    []octosql.Value{},
 			want:    nil,
 			wantErr: true,
 		},
 		{
 			name:    "FuncInt - too many args",
-			args:    []interface{}{7.0, "1"},
+			args:    []octosql.Value{octosql.MakeFloat(7.0), octosql.MakeString("1")},
 			want:    nil,
 			wantErr: true,
 		},
@@ -70,7 +71,7 @@ func Test_parseInt(t *testing.T) {
 func Test_stringFunctions(t *testing.T) {
 	type args struct {
 		fun  execution.Function
-		args []interface{}
+		args []octosql.Value
 	}
 	tests := []struct {
 		name    string
@@ -83,16 +84,16 @@ func Test_stringFunctions(t *testing.T) {
 			name: "uppercase - pass",
 			args: args{
 				fun:  FuncUpper,
-				args: []interface{}{"aLa MA kotA i PSA"},
+				args: []octosql.Value{octosql.MakeString("aLa MA kotA i PSA")},
 			},
-			want:    "ALA MA KOTA I PSA",
+			want:    octosql.MakeString("ALA MA KOTA I PSA"),
 			wantErr: false,
 		},
 		{
 			name: "uppercase too many args - fail",
 			args: args{
 				fun:  FuncUpper,
-				args: []interface{}{"aLa MA kotA i PSA", "a co to jest?"},
+				args: []octosql.Value{octosql.MakeString("aLa MA kotA i PSA"), octosql.MakeString("a co to jest?")},
 			},
 			want:    nil,
 			wantErr: true,
@@ -101,7 +102,7 @@ func Test_stringFunctions(t *testing.T) {
 			name: "uppercase int - fail",
 			args: args{
 				fun:  FuncUpper,
-				args: []interface{}{17},
+				args: []octosql.Value{octosql.MakeInt(17)},
 			},
 			want:    nil,
 			wantErr: true,
@@ -111,16 +112,16 @@ func Test_stringFunctions(t *testing.T) {
 			name: "lowercase - pass",
 			args: args{
 				fun:  FuncLower,
-				args: []interface{}{"aLa MA kotA i PSA"},
+				args: []octosql.Value{octosql.MakeString("aLa MA kotA i PSA")},
 			},
-			want:    "ala ma kota i psa",
+			want:    octosql.MakeString("ala ma kota i psa"),
 			wantErr: false,
 		},
 		{
 			name: "lowercase no args - fail",
 			args: args{
 				fun:  FuncLower,
-				args: []interface{}{},
+				args: []octosql.Value{},
 			},
 			want:    nil,
 			wantErr: true,
@@ -129,7 +130,7 @@ func Test_stringFunctions(t *testing.T) {
 			name: "lowercase float - fail",
 			args: args{
 				fun:  FuncLower,
-				args: []interface{}{17.16},
+				args: []octosql.Value{octosql.MakeFloat(17.16)},
 			},
 			want:    nil,
 			wantErr: true,
@@ -139,25 +140,25 @@ func Test_stringFunctions(t *testing.T) {
 			name: "capitalize - pass",
 			args: args{
 				fun:  FuncCapitalize,
-				args: []interface{}{"pawełjumperLEGENDApolskiegoYT"},
+				args: []octosql.Value{octosql.MakeString("pawełjumperLEGENDApolskiegoYT")},
 			},
-			want:    "Pawełjumperlegendapolskiegoyt",
+			want:    octosql.MakeString("Pawełjumperlegendapolskiegoyt"),
 			wantErr: false,
 		},
 		{
 			name: "capitalize - pass2",
 			args: args{
 				fun:  FuncCapitalize,
-				args: []interface{}{"there Are Several Words here"},
+				args: []octosql.Value{octosql.MakeString("there Are Several Words here")},
 			},
-			want:    "There Are Several Words Here",
+			want:    octosql.MakeString("There Are Several Words Here"),
 			wantErr: false,
 		},
 		{
 			name: "capitalize no args - fail",
 			args: args{
 				fun:  FuncCapitalize,
-				args: []interface{}{},
+				args: []octosql.Value{},
 			},
 			want:    nil,
 			wantErr: true,
@@ -166,7 +167,7 @@ func Test_stringFunctions(t *testing.T) {
 			name: "capitalize float - fail",
 			args: args{
 				fun:  FuncCapitalize,
-				args: []interface{}{17.16},
+				args: []octosql.Value{octosql.MakeFloat(17.16)},
 			},
 			want:    nil,
 			wantErr: true,
@@ -176,25 +177,25 @@ func Test_stringFunctions(t *testing.T) {
 			name: "reverse - pass",
 			args: args{
 				fun:  FuncReverse,
-				args: []interface{}{"ala ma kota"},
+				args: []octosql.Value{octosql.MakeString("ala ma kota")},
 			},
-			want:    "atok am ala",
+			want:    octosql.MakeString("atok am ala"),
 			wantErr: false,
 		},
 		{
 			name: "reverse - pass2",
 			args: args{
 				fun:  FuncReverse,
-				args: []interface{}{"aBcD123-"},
+				args: []octosql.Value{octosql.MakeString("aBcD123-")},
 			},
-			want:    "-321DcBa",
+			want:    octosql.MakeString("-321DcBa"),
 			wantErr: false,
 		},
 		{
 			name: "reverse no args - fail",
 			args: args{
 				fun:  FuncReverse,
-				args: []interface{}{},
+				args: []octosql.Value{},
 			},
 			want:    nil,
 			wantErr: true,
@@ -203,7 +204,7 @@ func Test_stringFunctions(t *testing.T) {
 			name: "reverse bool - fail",
 			args: args{
 				fun:  FuncReverse,
-				args: []interface{}{true},
+				args: []octosql.Value{octosql.MakeBool(true)},
 			},
 			want:    nil,
 			wantErr: true,
@@ -212,7 +213,7 @@ func Test_stringFunctions(t *testing.T) {
 			name: "reverse too many args - fail",
 			args: args{
 				fun:  FuncReverse,
-				args: []interface{}{"aa", "bb"},
+				args: []octosql.Value{octosql.MakeString("aa"), octosql.MakeString("bb")},
 			},
 			want:    nil,
 			wantErr: true,
@@ -223,63 +224,63 @@ func Test_stringFunctions(t *testing.T) {
 			name: "simple match - 1",
 			args: args{
 				fun:  FuncRegexp,
-				args: []interface{}{"t[a+b]e", "tcetdetaetbe"},
+				args: []octosql.Value{octosql.MakeString("t[a+b]e"), octosql.MakeString("tcetdetaetbe")},
 			},
-			want:    "tae",
+			want:    octosql.MakeString("tae"),
 			wantErr: false,
 		},
 		{
 			name: "simple match - 2",
 			args: args{
 				fun:  FuncRegexp,
-				args: []interface{}{"a..d", "axdaxxdaxdxa"},
+				args: []octosql.Value{octosql.MakeString("a..d"), octosql.MakeString("axdaxxdaxdxa")},
 			},
-			want:    "axxd",
+			want:    octosql.MakeString("axxd"),
 			wantErr: false,
 		},
 		{
 			name: "simple match - 3",
 			args: args{
 				fun:  FuncRegexp,
-				args: []interface{}{".[0-9].", "this is a bit longer but 4 the matcher it's no problem"},
+				args: []octosql.Value{octosql.MakeString(".[0-9]."), octosql.MakeString("this is a bit longer but 4 the matcher it's no problem")},
 			},
-			want:    " 4 ", /* matches the spaces with . */
+			want:    octosql.MakeString(" 4 "), /* matches the spaces with . */
 			wantErr: false,
 		},
 		{
 			name: "simple match - 4",
 			args: args{
 				fun:  FuncRegexp,
-				args: []interface{}{"[1-9][0-9]{3}", "The year was 2312 and the aliens began their invasion"},
+				args: []octosql.Value{octosql.MakeString("[1-9][0-9]{3}"), octosql.MakeString("The year was 2312 and the aliens began their invasion")},
 			},
-			want:    "2312",
+			want:    octosql.MakeString("2312"),
 			wantErr: false,
 		},
 		{
 			name: "star regexp match - 1",
 			args: args{
 				fun:  FuncRegexp,
-				args: []interface{}{"AB*A", "My favourite band is not ABA, it's ABBA."},
+				args: []octosql.Value{octosql.MakeString("AB*A"), octosql.MakeString("My favourite band is not ABA, it's ABBA.")},
 			},
-			want:    "ABA",
+			want:    octosql.MakeString("ABA"),
 			wantErr: false,
 		},
 		{
 			name: "star regexp match - 2",
 			args: args{
 				fun:  FuncRegexp,
-				args: []interface{}{"a*ba*", "What is a bbba?"},
+				args: []octosql.Value{octosql.MakeString("a*ba*"), octosql.MakeString("What is a bbba?")},
 			},
-			want:    "b", /* matches the shortest */
+			want:    octosql.MakeString("b"), /* matches the shortest */
 			wantErr: false,
 		},
 		{
 			name: "complex regexp",
 			args: args{
 				fun:  FuncRegexp,
-				args: []interface{}{`[a + b]{2}c*d{3}`, "abcddaaacdddbacccdddabcda"},
+				args: []octosql.Value{octosql.MakeString(`[a + b]{2}c*d{3}`), octosql.MakeString("abcddaaacdddbacccdddabcda")},
 			},
-			want:    "aacddd",
+			want:    octosql.MakeString("aacddd"),
 			wantErr: false,
 		},
 	}
@@ -300,7 +301,7 @@ func Test_stringFunctions(t *testing.T) {
 func Test_numerical(t *testing.T) {
 	type args struct {
 		fun  execution.Function
-		args []interface{}
+		args []octosql.Value
 	}
 	tests := []struct {
 		name    string
@@ -308,30 +309,29 @@ func Test_numerical(t *testing.T) {
 		want    octosql.Value
 		wantErr bool
 	}{
-
 		/* sqrt() */
 		{
 			name: "sqrt(4)",
 			args: args{
-				args: []interface{}{4},
+				args: []octosql.Value{octosql.MakeInt(4)},
 				fun:  FuncSqrt,
 			},
-			want:    2.0, /* type is important */
+			want:    octosql.MakeFloat(2.0), /* type is important */
 			wantErr: false,
 		},
 		{
 			name: "sqrt(7)",
 			args: args{
-				args: []interface{}{7},
+				args: []octosql.Value{octosql.MakeInt(7)},
 				fun:  FuncSqrt,
 			},
-			want:    math.Sqrt(7.0), /* type is important */
+			want:    octosql.MakeFloat(math.Sqrt(7.0)), /* type is important */
 			wantErr: false,
 		},
 		{
 			name: "sqrt(-1)",
 			args: args{
-				args: []interface{}{-1},
+				args: []octosql.Value{octosql.MakeInt(-1)},
 				fun:  FuncSqrt,
 			},
 			want:    nil,
@@ -342,25 +342,25 @@ func Test_numerical(t *testing.T) {
 		{
 			name: "log(8)",
 			args: args{
-				args: []interface{}{8},
+				args: []octosql.Value{octosql.MakeInt(8)},
 				fun:  FuncLog,
 			},
-			want:    3.0,
+			want:    octosql.MakeFloat(3.0),
 			wantErr: false,
 		},
 		{
 			name: "log(15.5)",
 			args: args{
-				args: []interface{}{15.5},
+				args: []octosql.Value{octosql.MakeFloat(15.5)},
 				fun:  FuncLog,
 			},
-			want:    math.Log2(15.5),
+			want:    octosql.MakeFloat(math.Log2(15.5)),
 			wantErr: false,
 		},
 		{
 			name: "log(0)",
 			args: args{
-				args: []interface{}{0},
+				args: []octosql.Value{octosql.MakeInt(0)},
 				fun:  FuncLog,
 			},
 			want:    nil,
@@ -371,10 +371,10 @@ func Test_numerical(t *testing.T) {
 		{
 			name: "3^4",
 			args: args{
-				args: []interface{}{3.0, 4.0},
+				args: []octosql.Value{octosql.MakeFloat(3.0), octosql.MakeFloat(4.0)},
 				fun:  FuncPower,
 			},
-			want:    81.0,
+			want:    octosql.MakeFloat(81.0),
 			wantErr: false,
 		},
 	}

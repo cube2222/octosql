@@ -360,7 +360,6 @@ func spliceToString(values []interface{}) []string {
 	var result []string
 	for i := range values {
 		value := values[i]
-		value = execution.NormalizeType(value)
 		var str string
 		switch value := value.(type) {
 		case string:

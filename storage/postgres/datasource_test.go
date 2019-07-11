@@ -3,7 +3,6 @@ package postgres
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"strings"
 	"testing"
 	"time"
@@ -339,7 +338,6 @@ func insertValues(db *sql.DB, tablename string, values [][]interface{}) error {
 		stringRow := spliceToString(row)
 
 		query := fmt.Sprintf("INSERT INTO %s VALUES (%s);", tablename, strings.Join(stringRow, ", "))
-		log.Println(query)
 
 		_, err := db.Exec(query)
 		if err != nil {
@@ -363,7 +361,6 @@ func spliceToString(values []interface{}) []string {
 	var result []string
 	for i := range values {
 		value := values[i]
-		value = execution.NormalizeType(value)
 		var str string
 		switch value := value.(type) {
 		case string:

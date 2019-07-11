@@ -275,7 +275,7 @@ func TestDataSource_Get(t *testing.T) {
 			args := tt.args
 			err := createTable(db, args.tableDescription)
 			if err != nil {
-				t.Errorf("Couldn't create table")
+				t.Errorf("Couldn't create table: %v", err)
 				return
 			}
 
@@ -283,7 +283,7 @@ func TestDataSource_Get(t *testing.T) {
 
 			err = insertValues(db, args.tablename, args.rows)
 			if err != nil {
-				t.Errorf("Couldn't insert values into table")
+				t.Errorf("Couldn't insert values into table: %v", err)
 				return
 			}
 
@@ -292,19 +292,19 @@ func TestDataSource_Get(t *testing.T) {
 
 			execNode, err := dsBuilder.Executor(args.formula, args.alias)
 			if err != nil {
-				t.Errorf("Couldn't get ExecutionNode")
+				t.Errorf("Couldn't get ExecutionNode: %v", err)
 				return
 			}
 
 			stream, err := execNode.Get(args.variables)
 			if err != nil {
-				t.Errorf("Couldn't get stream")
+				t.Errorf("Couldn't get stream: %v", err)
 				return
 			}
 
 			equal, err := execution.AreStreamsEqual(stream, tt.want)
 			if err != nil {
-				t.Errorf("Error in AreStreamsEqual()")
+				t.Errorf("Error in AreStreamsEqual(): %v", err)
 				return
 			}
 

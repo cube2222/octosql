@@ -4,148 +4,149 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 )
 
 func TestLast(t *testing.T) {
 	type kv struct {
-		key   []interface{}
-		value interface{}
+		key   octosql.Tuple
+		value octosql.Value
 	}
 	tests := []struct {
 		name    string
 		args    []kv
-		key     []interface{}
-		want    interface{}
+		key     octosql.Tuple
+		want    octosql.Value
 		wantErr bool
 	}{
 		{
 			name: "one element",
 			args: []kv{
 				{
-					key:   []interface{}{"key"},
-					value: 5,
+					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key")}),
+					value: octosql.MakeInt(5),
 				},
 			},
-			key:  []interface{}{"key"},
-			want: 5,
+			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key")}),
+			want: octosql.MakeInt(5),
 		},
 		{
 			name: "one element",
 			args: []kv{
 				{
-					key:   []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},
-					value: 6,
+					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
+					value: octosql.MakeInt(6),
 				},
 			},
-			key:  []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},
-			want: 6,
+			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
+			want: octosql.MakeInt(6),
 		},
 		{
 			name: "many single-element groups",
 			args: []kv{
 				{
-					key:   []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},
-					value: 6,
+					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
+					value: octosql.MakeInt(6),
 				},
 				{
-					key:   []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key1": 1}},
-					value: 4,
+					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
+					value: octosql.MakeInt(4),
 				},
 			},
-			key:  []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key1": 1}},
-			want: 4,
+			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
+			want: octosql.MakeInt(4),
 		},
 		{
 			name: "many single-element groups",
 			args: []kv{
 				{
-					key:   []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},
-					value: 6,
+					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
+					value: octosql.MakeInt(6),
 				},
 				{
-					key:   []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key1": 1}},
-					value: 4,
+					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
+					value: octosql.MakeInt(4),
 				},
 			},
-			key:  []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},
-			want: 6,
+			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
+			want: octosql.MakeInt(6),
 		},
 		{
 			name: "many groups",
 			args: []kv{
 				{
-					key:   []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},
-					value: 6,
+					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
+					value: octosql.MakeInt(6),
 				},
 				{
-					key:   []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key1": 1}},
-					value: 4,
+					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
+					value: octosql.MakeInt(4),
 				},
 				{
-					key:   []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},
-					value: 7,
+					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
+					value: octosql.MakeInt(7),
 				},
 				{
-					key:   []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},
-					value: 8,
+					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
+					value: octosql.MakeInt(8),
 				},
 				{
-					key:   []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},
-					value: 9,
+					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
+					value: octosql.MakeInt(9),
 				},
 			},
-			key:  []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key1": 1}},
-			want: 4,
+			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
+			want: octosql.MakeInt(4),
 		},
 		{
 			name: "many groups",
 			args: []kv{
 				{
-					key:   []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},
-					value: 6,
+					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
+					value: octosql.MakeInt(6),
 				},
 				{
-					key:   []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key1": 1}},
-					value: 4,
+					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
+					value: octosql.MakeInt(4),
 				},
 				{
-					key:   []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},
-					value: 7,
+					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
+					value: octosql.MakeInt(7),
 				},
 				{
-					key:   []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},
-					value: 8,
+					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
+					value: octosql.MakeInt(8),
 				},
 				{
-					key:   []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},
-					value: 9,
+					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
+					value: octosql.MakeInt(9),
 				},
 			},
-			key:  []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},
-			want: 9,
+			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
+			want: octosql.MakeInt(9),
 		},
 		{
 			name: "one element",
 			args: []kv{
 				{
-					key:   []interface{}{"key"},
-					value: map[string]interface{}{"test": 1},
+					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key")}),
+					value: octosql.MakeObject(map[string]octosql.Value{"test": octosql.MakeInt(1)}),
 				},
 			},
-			key:  []interface{}{"key"},
-			want: map[string]interface{}{"test": 1},
+			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key")}),
+			want: octosql.MakeObject(map[string]octosql.Value{"test": octosql.MakeInt(1)}),
 		},
 		{
 			name: "one element",
 			args: []kv{
 				{
-					key:   []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},
-					value: []interface{}{1, 2, []interface{}{"test", 5.0}},
+					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
+					value: octosql.MakeTuple([]octosql.Value{octosql.MakeInt(1), octosql.MakeInt(2), octosql.MakeTuple([]octosql.Value{octosql.MakeString("test"), octosql.MakeFloat(5.0)})}),
 				},
 			},
-			key:  []interface{}{"key", 1, []interface{}{"key", 1}, map[string]interface{}{"key": 1}},
-			want: []interface{}{1, 2, []interface{}{"test", 5.0}},
+			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
+			want: octosql.MakeTuple([]octosql.Value{octosql.MakeInt(1), octosql.MakeInt(2), octosql.MakeTuple([]octosql.Value{octosql.MakeString("test"), octosql.MakeFloat(5.0)})}),
 		},
 	}
 	for _, tt := range tests {

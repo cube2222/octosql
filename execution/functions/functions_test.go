@@ -13,7 +13,7 @@ func Test_parseInt(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    interface{}
+		want    octosql.Value
 		wantErr bool
 	}{
 		{
@@ -75,7 +75,7 @@ func Test_stringFunctions(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    interface{}
+		want    octosql.Value
 		wantErr bool
 	}{
 		/* uppercase tests */
@@ -305,7 +305,7 @@ func Test_numerical(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    interface{}
+		want    octosql.Value
 		wantErr bool
 	}{
 

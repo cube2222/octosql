@@ -8,7 +8,7 @@ import (
 
 type Min struct {
 	mins       *execution.HashMap
-	typedValue interface{}
+	typedValue octosql.Value
 }
 
 func NewMin() *Min {

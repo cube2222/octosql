@@ -430,8 +430,8 @@ func TestAnd_GetAllKeys(t *testing.T) {
 				right: &Equal{execution.NewVariable("const_0")},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_0": "key0",
+				map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
 				},
 			},
 			want: &redisKeys{
@@ -450,8 +450,8 @@ func TestAnd_GetAllKeys(t *testing.T) {
 				right: &Constant{true},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_0": "key0",
+				map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
 				},
 			},
 			want: &redisKeys{
@@ -470,7 +470,7 @@ func TestAnd_GetAllKeys(t *testing.T) {
 				right: &Constant{true},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{},
+				map[octosql.VariableName]octosql.Value{},
 			},
 			want: &redisKeys{
 				map[string]interface{}{},
@@ -486,7 +486,7 @@ func TestAnd_GetAllKeys(t *testing.T) {
 				right: &Constant{false},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{},
+				map[octosql.VariableName]octosql.Value{},
 			},
 			want: &redisKeys{
 				map[string]interface{}{},
@@ -502,8 +502,8 @@ func TestAnd_GetAllKeys(t *testing.T) {
 				right: &Constant{false},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_0": "key0",
+				map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
 				},
 			},
 			want: &redisKeys{
@@ -520,9 +520,9 @@ func TestAnd_GetAllKeys(t *testing.T) {
 				right: &Equal{execution.NewVariable("const_1")},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_0": "key0",
-					"const_1": "key1",
+				map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
+					"const_1": octosql.MakeString("key1"),
 				},
 			},
 			want: &redisKeys{
@@ -539,8 +539,8 @@ func TestAnd_GetAllKeys(t *testing.T) {
 				right: &Equal{execution.NewVariable("const_0")},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_1": "key1",
+				map[octosql.VariableName]octosql.Value{
+					"const_1": octosql.MakeString("key1"),
 				},
 			},
 			want:    nil,
@@ -557,9 +557,9 @@ func TestAnd_GetAllKeys(t *testing.T) {
 				right: &Equal{execution.NewVariable("const_1")},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_0": "key0",
-					"const_1": "key1",
+				map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
+					"const_1": octosql.MakeString("key1"),
 				},
 			},
 			want: &redisKeys{
@@ -584,8 +584,8 @@ func TestAnd_GetAllKeys(t *testing.T) {
 				},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_0": "key0",
+				map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
 				},
 			},
 			want: &redisKeys{
@@ -610,9 +610,9 @@ func TestAnd_GetAllKeys(t *testing.T) {
 				},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_0": "key0",
-					"const_1": "key1",
+				map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
+					"const_1": octosql.MakeString("key1"),
 				},
 			},
 			want: &redisKeys{
@@ -635,9 +635,9 @@ func TestAnd_GetAllKeys(t *testing.T) {
 				},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_0": "key0",
-					"const_1": "key1",
+				map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
+					"const_1": octosql.MakeString("key1"),
 				},
 			},
 			want: &redisKeys{
@@ -665,10 +665,10 @@ func TestAnd_GetAllKeys(t *testing.T) {
 				},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_0": "key0",
-					"const_1": "key1",
-					"const_2": "key2",
+				map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
+					"const_1": octosql.MakeString("key1"),
+					"const_2": octosql.MakeString("key2"),
 				},
 			},
 			want: &redisKeys{
@@ -722,8 +722,8 @@ func TestOr_GetAllKeys(t *testing.T) {
 				right: &Equal{execution.NewVariable("const_0")},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_0": "key0",
+				map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
 				},
 			},
 			want: &redisKeys{
@@ -742,9 +742,9 @@ func TestOr_GetAllKeys(t *testing.T) {
 				right: &Equal{execution.NewVariable("const_1")},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_0": "key0",
-					"const_1": "key1",
+				map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
+					"const_1": octosql.MakeString("key1"),
 				},
 			},
 			want: &redisKeys{
@@ -764,8 +764,8 @@ func TestOr_GetAllKeys(t *testing.T) {
 				right: &Equal{execution.NewVariable("const_1")},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_1": "key1",
+				map[octosql.VariableName]octosql.Value{
+					"const_1": octosql.MakeString("key1"),
 				},
 			},
 			want: &redisKeys{
@@ -782,8 +782,8 @@ func TestOr_GetAllKeys(t *testing.T) {
 				right: &Equal{execution.NewVariable("const_1")},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_1": "key1",
+				map[octosql.VariableName]octosql.Value{
+					"const_1": octosql.MakeString("key1"),
 				},
 			},
 			want: &redisKeys{
@@ -802,7 +802,7 @@ func TestOr_GetAllKeys(t *testing.T) {
 				right: &Constant{true},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{},
+				map[octosql.VariableName]octosql.Value{},
 			},
 			want: &redisKeys{
 				map[string]interface{}{},
@@ -818,7 +818,7 @@ func TestOr_GetAllKeys(t *testing.T) {
 				right: &Constant{false},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{},
+				map[octosql.VariableName]octosql.Value{},
 			},
 			want: &redisKeys{
 				map[string]interface{}{},
@@ -834,8 +834,8 @@ func TestOr_GetAllKeys(t *testing.T) {
 				right: &Equal{execution.NewVariable("const_1")},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_0": "key0",
+				map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
 				},
 			},
 			want:    nil,
@@ -852,10 +852,10 @@ func TestOr_GetAllKeys(t *testing.T) {
 				right: &Equal{execution.NewVariable("const_3")},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_0": "key0",
-					"const_1": "key1",
-					"const_3": "key3",
+				map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
+					"const_1": octosql.MakeString("key1"),
+					"const_3": octosql.MakeString("key3"),
 				},
 			},
 			want: &redisKeys{
@@ -882,11 +882,11 @@ func TestOr_GetAllKeys(t *testing.T) {
 				},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_0": "key0",
-					"const_1": "key1",
-					"const_2": "key2",
-					"const_3": "key3",
+				map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
+					"const_1": octosql.MakeString("key1"),
+					"const_2": octosql.MakeString("key2"),
+					"const_3": octosql.MakeString("key3"),
 				},
 			},
 			want: &redisKeys{
@@ -910,8 +910,8 @@ func TestOr_GetAllKeys(t *testing.T) {
 				right: &Equal{execution.NewVariable("const_1")},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_1": "key1",
+				map[octosql.VariableName]octosql.Value{
+					"const_1": octosql.MakeString("key1"),
 				},
 			},
 			want: &redisKeys{
@@ -931,9 +931,9 @@ func TestOr_GetAllKeys(t *testing.T) {
 				right: &Equal{execution.NewVariable("const_1")},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_0": "key0",
-					"const_1": "key1",
+				map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
+					"const_1": octosql.MakeString("key1"),
 				},
 			},
 			want: &redisKeys{
@@ -959,10 +959,10 @@ func TestOr_GetAllKeys(t *testing.T) {
 				},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_0": "key0",
-					"const_1": "key1",
-					"const_2": "key2",
+				map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
+					"const_1": octosql.MakeString("key1"),
+					"const_2": octosql.MakeString("key2"),
 				},
 			},
 			want: &redisKeys{
@@ -991,10 +991,10 @@ func TestOr_GetAllKeys(t *testing.T) {
 				},
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_0": "key0",
-					"const_1": "key1",
-					"const_2": "key2",
+				map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
+					"const_1": octosql.MakeString("key1"),
+					"const_2": octosql.MakeString("key2"),
 				},
 			},
 			want: &redisKeys{
@@ -1044,8 +1044,8 @@ func TestEqual_GetAllKeys(t *testing.T) {
 				child: execution.NewVariable("const_0"),
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_0": "key0",
+				map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
 				},
 			},
 			want: &redisKeys{
@@ -1062,8 +1062,8 @@ func TestEqual_GetAllKeys(t *testing.T) {
 				child: execution.NewVariable("const_0"),
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_1": "key1",
+				map[octosql.VariableName]octosql.Value{
+					"const_1": octosql.MakeString("key1"),
 				},
 			},
 			want:    nil,
@@ -1078,8 +1078,8 @@ func TestEqual_GetAllKeys(t *testing.T) {
 				),
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{
-					"const_1": "key1",
+				map[octosql.VariableName]octosql.Value{
+					"const_1": octosql.MakeString("key1"),
 				},
 			},
 			want: &redisKeys{
@@ -1128,7 +1128,7 @@ func TestConstant_getAllKeys(t *testing.T) {
 				value: true,
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{},
+				map[octosql.VariableName]octosql.Value{},
 			},
 			want: &redisKeys{
 				map[string]interface{}{},
@@ -1142,7 +1142,7 @@ func TestConstant_getAllKeys(t *testing.T) {
 				value: false,
 			},
 			args: args{
-				map[octosql.VariableName]interface{}{},
+				map[octosql.VariableName]octosql.Value{},
 			},
 			want: &redisKeys{
 				map[string]interface{}{},

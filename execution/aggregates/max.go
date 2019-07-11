@@ -8,7 +8,7 @@ import (
 
 type Max struct {
 	maxes      *execution.HashMap
-	typedValue interface{}
+	typedValue octosql.Value
 }
 
 func NewMax() *Max {

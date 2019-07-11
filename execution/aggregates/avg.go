@@ -9,7 +9,7 @@ import (
 type Average struct {
 	averages   *execution.HashMap
 	counts     *execution.HashMap
-	typedValue interface{}
+	typedValue octosql.Value
 }
 
 func NewAverage() *Average {

@@ -8,7 +8,7 @@ import (
 
 type Sum struct {
 	sums       *execution.HashMap
-	typedValue interface{}
+	typedValue octosql.Value
 }
 
 func NewSum() *Sum {

@@ -67,7 +67,7 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get database index")
 	}
-	dbKey, err := config.GetString(dbConfig, "databaseKeyName", config.WithDefault("key"))
+	dbKey, err := config.GetString(dbConfig, "databaseKeyName", config.WithDefault(octosql.MakeString("key")))
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get database key name")
 	}

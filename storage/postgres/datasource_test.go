@@ -51,7 +51,7 @@ func TestDataSource_Get(t *testing.T) {
 				tablename:  "animals",
 				alias:      "a",
 				primaryKey: []octosql.VariableName{"name"},
-				variables:  map[octosql.VariableName]interface{}{},
+				variables:  map[octosql.VariableName]octosql.Value{},
 				formula:    physical.NewConstant(true),
 				rows: [][]interface{}{
 					{"panda", 500},
@@ -89,8 +89,8 @@ func TestDataSource_Get(t *testing.T) {
 				tablename:  "animals",
 				alias:      "a",
 				primaryKey: []octosql.VariableName{"name"},
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": 20000,
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeInt(20000),
 				},
 				formula: physical.NewPredicate(
 					physical.NewVariable("a.population"),
@@ -113,8 +113,8 @@ func TestDataSource_Get(t *testing.T) {
 				tablename:  "animals",
 				alias:      "a",
 				primaryKey: []octosql.VariableName{"name"},
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": "panda",
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("panda"),
 				},
 				formula: physical.NewPredicate(
 					physical.NewVariable("a.name"),
@@ -144,8 +144,8 @@ func TestDataSource_Get(t *testing.T) {
 				tablename:  "people",
 				alias:      "p",
 				primaryKey: []octosql.VariableName{"id"},
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": 1,
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeInt(1),
 				},
 				formula: physical.NewPredicate(
 					physical.NewVariable("const_0"),
@@ -183,9 +183,9 @@ func TestDataSource_Get(t *testing.T) {
 				tablename:  "people",
 				alias:      "p",
 				primaryKey: []octosql.VariableName{"id"},
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": 1,
-					"const_1": "Kuba",
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeInt(1),
+					"const_1": octosql.MakeString("Kuba"),
 				},
 				formula: physical.NewAnd(
 					physical.NewPredicate(
@@ -227,9 +227,9 @@ func TestDataSource_Get(t *testing.T) {
 				tablename:  "people",
 				alias:      "p",
 				primaryKey: []octosql.VariableName{"id"},
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": "K",
-					"const_1": 3,
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("K"),
+					"const_1": octosql.MakeInt(3),
 				},
 				formula: physical.NewOr(
 					physical.NewPredicate(

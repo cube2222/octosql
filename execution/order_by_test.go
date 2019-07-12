@@ -2,11 +2,14 @@ package execution
 
 import (
 	"testing"
+	"time"
 
 	"github.com/cube2222/octosql"
 )
 
 func TestOrderBy_Get(t *testing.T) {
+	now := time.Now()
+
 	type args struct {
 		stream RecordStream
 		fields []OrderField
@@ -51,7 +54,6 @@ func TestOrderBy_Get(t *testing.T) {
 			}),
 			wantErr: false,
 		},
-
 		{
 			name: "simple order - one column string descending",
 			args: args{
@@ -86,7 +88,40 @@ func TestOrderBy_Get(t *testing.T) {
 			}),
 			wantErr: false,
 		},
-
+		{
+			name: "simple order - one column time descending",
+			args: args{
+				stream: NewInMemoryStream([]*Record{
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"name", "birth"},
+						[]interface{}{"b", now}),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"name", "birth"},
+						[]interface{}{"c", now.Add(time.Hour)}),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"name", "birth"},
+						[]interface{}{"a", now.Add(-1 * time.Hour)}),
+				}),
+				fields: []OrderField{
+					{
+						ColumnName: "birth",
+						Direction:  Descending,
+					},
+				},
+			},
+			want: NewInMemoryStream([]*Record{
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"name", "birth"},
+					[]interface{}{"c", now.Add(time.Hour)}),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"name", "birth"},
+					[]interface{}{"b", now}),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"name", "birth"},
+					[]interface{}{"a", now.Add(-1 * time.Hour)}),
+			}),
+			wantErr: false,
+		},
 		{
 			name: "complex order - string ascending then int descending",
 			args: args{
@@ -181,34 +216,13 @@ func TestOrderBy_Get(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 		},
-		{
-			name: "failed - non sortable boolean",
-			args: args{
-				stream: NewInMemoryStream([]*Record{
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"is_nice"},
-						[]interface{}{false}),
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"is_nice"},
-						[]interface{}{true}),
-				}),
-				fields: []OrderField{
-					{
-						ColumnName: "is_nice",
-						Direction:  Descending,
-					},
-				},
-			},
-			want:    nil,
-			wantErr: true,
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ordered, err := createOrderedStream(tt.args.fields, tt.args.stream)
 			if err != nil && !tt.wantErr {
-				t.Errorf("Error in create stream")
+				t.Errorf("Error in create stream: %v", err)
 				return
 			} else if err != nil {
 				return
@@ -216,7 +230,7 @@ func TestOrderBy_Get(t *testing.T) {
 
 			equal, err := AreStreamsEqual(tt.want, ordered)
 			if err != nil {
-				t.Errorf("Error in AreStreamsEqual()")
+				t.Errorf("Error in AreStreamsEqual(): %v", err)
 				return
 			}
 

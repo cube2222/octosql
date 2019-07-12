@@ -471,6 +471,24 @@ var FuncRegexp = execution.Function{
 	},
 }
 
+var FuncNth = execution.Function{
+	Validator: func(args ...octosql.Value) error {
+		if err := twoArgs(args...); err != nil {
+			return err
+		}
+		if _, ok := args[0].(octosql.Int); !ok {
+			return errors.Errorf("first argument to nth should be an integer, is %v", args[0])
+		}
+		if _, ok := args[1].(octosql.Tuple); !ok {
+			return errors.Errorf("second argument to nth should be a tuple, is %v", args[1])
+		}
+		return nil
+	},
+	Logic: func(args ...octosql.Value) (octosql.Value, error) {
+		return args[1].(octosql.Tuple).Slice()[args[0].(octosql.Int).Int()], nil
+	},
+}
+
 /* Auxiliary functions */
 func intMin(x, y octosql.Int) octosql.Int {
 	if x <= y {

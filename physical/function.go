@@ -40,6 +40,7 @@ var functionTable = map[string]execution.Function{
 	"reverse":      functions.FuncReverse,
 	"sub":          functions.FuncSubstring, //TODO: fix parsing so that you can name this function substring
 	"matchregular": functions.FuncRegexp,
+	"nth":          functions.FuncNth,
 }
 
 type FunctionExpression struct {

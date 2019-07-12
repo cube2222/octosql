@@ -56,6 +56,28 @@ func (r *Record) AsVariables() octosql.Variables {
 	return out
 }
 
+func (r *Record) AsTuple() octosql.Tuple {
+	return octosql.MakeTuple(r.data)
+}
+
+func (r *Record) Equal(other *Record) bool {
+	myFields := r.Fields()
+	otherFields := other.Fields()
+	if len(myFields) != len(otherFields) {
+		return false
+	}
+
+	for i := range myFields {
+		if myFields[i] != otherFields[i] {
+			return false
+		}
+		if !octosql.AreEqual(r.data[i], other.data[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 type RecordStream interface {
 	Next() (*Record, error)
 	io.Closer

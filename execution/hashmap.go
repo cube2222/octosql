@@ -29,7 +29,7 @@ func (g *HashMap) Set(key octosql.Value, value interface{}) error {
 
 	list := g.container[hash]
 	for i := range list {
-		if AreEqual(list[i].key, key) {
+		if octosql.AreEqual(list[i].key, key) {
 			list[i].value = value
 			return nil
 		}
@@ -50,7 +50,7 @@ func (g *HashMap) Get(key octosql.Value) (interface{}, bool, error) {
 
 	list := g.container[hash]
 	for i := range list {
-		if AreEqual(list[i].key, key) {
+		if octosql.AreEqual(list[i].key, key) {
 			return list[i].value, true, nil
 		}
 	}

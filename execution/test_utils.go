@@ -38,7 +38,7 @@ func (rms *recordMultiSet) Insert(rec *Record) error {
 	targetSlice := rms.set[hash]
 	for k := range targetSlice {
 		element := targetSlice[k]
-		if AreEqual(element.rec, rec) {
+		if element.rec.Equal(rec) {
 			rms.set[hash][k].count++
 			return nil
 		}
@@ -58,7 +58,7 @@ func (rms *recordMultiSet) GetCount(rec *Record) (int, error) {
 	targetSlice := rms.set[hash]
 	for k := range targetSlice {
 		element := targetSlice[k]
-		if AreEqual(element.rec, rec) {
+		if element.rec.Equal(rec) {
 			return element.count, nil
 		}
 	}
@@ -184,7 +184,7 @@ func NewRecordFromSlice(fields []octosql.VariableName, data []octosql.Value) *Re
 func NewRecordFromSliceWithNormalize(fields []octosql.VariableName, data []interface{}) *Record {
 	normalized := make([]octosql.Value, len(data))
 	for i := range data {
-		normalized[i] = NormalizeType(data[i])
+		normalized[i] = octosql.NormalizeType(data[i])
 	}
 	return &Record{
 		fieldNames: fields,

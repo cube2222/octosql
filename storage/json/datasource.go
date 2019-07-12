@@ -117,7 +117,7 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 
 	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
 	for k, v := range record {
-		aliasedRecord[octosql.VariableName(fmt.Sprintf("%s.%s", rs.alias, k))] = execution.NormalizeType(v)
+		aliasedRecord[octosql.VariableName(fmt.Sprintf("%s.%s", rs.alias, k))] = octosql.NormalizeType(v)
 	}
 
 	fields := make([]octosql.VariableName, 0)

@@ -123,6 +123,77 @@ func TestDataSource_Get(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "simple test vol2 - or / additional queries",
+			fields: fields{
+				hostname: hostname,
+				password: password,
+				port:     port,
+				dbIndex:  dbIndex,
+				dbKey:    dbKey,
+				filter: physical.NewOr(
+					physical.NewPredicate(
+						physical.NewVariable("r.key"),
+						physical.NewRelation("equal"),
+						physical.NewVariable("const_0")),
+					physical.NewPredicate(
+						physical.NewVariable("r.key"),
+						physical.NewRelation("equal"),
+						physical.NewVariable("const_1")),
+				),
+				alias: "r",
+				queries: map[string]map[string]interface{}{
+					"key0": {
+						"name":    "wojtek",
+						"surname": "k",
+						"age":     "3",
+						"city":    "warsaw",
+					},
+					"key1": {
+						"name":    "janek",
+						"surname": "ch",
+						"age":     "4",
+						"city":    "zacisze",
+					},
+					"key2": {
+						"name":    "kuba",
+						"surname": "m",
+						"age":     "2",
+						"city":    "warsaw",
+					},
+				},
+			},
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
+					"const_1": octosql.MakeString("key1"),
+				},
+			},
+			want: execution.NewInMemoryStream([]*execution.Record{
+				execution.NewRecord(
+					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
+					map[octosql.VariableName]octosql.Value{
+						"r.key":     octosql.MakeString("key0"),
+						"r.age":     octosql.MakeString("3"),
+						"r.city":    octosql.MakeString("warsaw"),
+						"r.name":    octosql.MakeString("wojtek"),
+						"r.surname": octosql.MakeString("k"),
+					},
+				),
+				execution.NewRecord(
+					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
+					map[octosql.VariableName]octosql.Value{
+						"r.key":     octosql.MakeString("key1"),
+						"r.age":     octosql.MakeString("4"),
+						"r.city":    octosql.MakeString("zacisze"),
+						"r.name":    octosql.MakeString("janek"),
+						"r.surname": octosql.MakeString("ch"),
+					},
+				),
+			},
+			),
+			wantErr: false,
+		},
+		{
 			name: "simple redis test vol3 - and / additional variables",
 			fields: fields{
 				hostname: hostname,

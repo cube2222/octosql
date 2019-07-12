@@ -52,22 +52,27 @@ export OCTOSQL_CONFIG=~/octosql.yaml
 
 Finally, query to your hearts desire:
 ```bash
-octosql "SELECT c.name, c.livesleft, p.city
-FROM cats c JOIN people p ON c.ownerid = p.id"
+octosql "SELECT p.city, FIRST(c.name), COUNT(DISTINCT c.name) cats, SUM(c.livesleft) catlives
+FROM cats c JOIN people p ON c.ownerid = p.id
+GROUP BY p.city
+ORDER BY catlives DESC
+LIMIT 9"
 ```
 Example output:
 ```
-+----------+-------------+----------------+
-|  c.name  | c.livesleft |     p.city     |
-+----------+-------------+----------------+
-| Buster   |           6 | Ivanhoe        |
-| Tiger    |           4 | Brambleton     |
-| Lucy     |           1 | Dunlo          |
-| Pepper   |           3 | Alleghenyville |
-| Tiger    |           2 | Katonah        |
-| Molly    |           6 | Babb           |
-| Precious |           8 | Holcombe       |
-+----------+-------------+----------------+
++---------+--------------+------+----------+
+| p.city  | c.name_first | cats | catlives |
++---------+--------------+------+----------+
+| Warren  | Zoey         |   68 |      570 |
+| Gadsden | Snickers     |   52 |      388 |
+| Staples | Harley       |   54 |      383 |
+| Buxton  | Lucky        |   45 |      373 |
+| Bethany | Princess     |   46 |      366 |
+| Noxen   | Sheba        |   49 |      361 |
+| Yorklyn | Scooter      |   45 |      359 |
+| Tuttle  | Toby         |   57 |      356 |
+| Ada     | Jasmine      |   49 |      351 |
++---------+--------------+------+----------+
 ```
 You can choose between table, tabbed, json and csv output formats.
 
@@ -174,6 +179,7 @@ Starting the execution plan creates a stream, which underneath may hold more str
 TODO: diagram
 
 ## Roadmap
+- Parallelize expression evaluation.
 - Add arithmetic operators.
 - Write custom sql parser, so we can use sane function names.
 - Push down functions to supported databases.

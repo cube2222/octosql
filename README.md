@@ -20,8 +20,10 @@ OctoSQL does that by creating an internal representation of your query and later
 
 With OctoSQL you don't need O(n) client tools or a large data analysis system deployment. Everything's contained in a single binary.
 
-**Why the name?**
-TODO
+### Why the name?
+OctoSQL stems from Octopus SQL.
+
+Octopus, because octopi have many arms, so they can grasp an manipulate many objects, like OctoSQL is able to handle multiple databases simultaneously.
 
 ## Quickstart
 Let's say we have a csv file with cats, and a redis database with people (potential cat owners). Now we want to get a list of cats with the cities their owners live in.

@@ -186,6 +186,21 @@ func AreEqual(left, right Value) bool {
 		}
 		return true
 
+	case Object:
+		right, ok := right.(Object)
+		if !ok {
+			return false
+		}
+		if len(left) != len(right) {
+			return false
+		}
+		for k := range left {
+			if !AreEqual(left[k], right[k]) {
+				return false
+			}
+		}
+		return true
+
 	}
 	log.Fatalf("unhandled type of octosql.Value: %v", reflect.TypeOf(left).String())
 	panic("unreachable")

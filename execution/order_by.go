@@ -34,11 +34,15 @@ func NewOrderBy(fields []OrderField, source Node) *OrderBy {
 
 func isSorteable(x octosql.Value) bool {
 	switch x.(type) {
+	case octosql.Bool:
+		return true
 	case octosql.Int:
 		return true
 	case octosql.Float:
 		return true
 	case octosql.String:
+		return true
+	case octosql.Time:
 		return true
 	default:
 		return false

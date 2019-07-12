@@ -1,8 +1,10 @@
 package octosql
 
 import (
+	"fmt"
 	"log"
 	"reflect"
+	"strings"
 	"time"
 )
 
@@ -62,6 +64,13 @@ type Tuple []Value
 
 func (Tuple) octoValue()       {}
 func (v Tuple) Slice() []Value { return []Value(v) }
+func (v Tuple) String() string {
+	valueStrings := make([]string, len(v.Slice()))
+	for i, value := range v.Slice() {
+		valueStrings[i] = fmt.Sprint(value)
+	}
+	return fmt.Sprintf("(%s)", strings.Join(valueStrings, ", "))
+}
 func MakeTuple(v []Value) Tuple {
 	return Tuple(v)
 }

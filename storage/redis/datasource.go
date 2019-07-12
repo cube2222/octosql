@@ -13,6 +13,7 @@ import (
 
 var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 	physical.Primary: {
+		physical.In:    {},
 		physical.Equal: {},
 	},
 	physical.Secondary: make(map[physical.Relation]struct{}),

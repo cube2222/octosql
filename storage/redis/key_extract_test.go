@@ -1108,6 +1108,82 @@ func TestEqual_GetAllKeys(t *testing.T) {
 	}
 }
 
+func TestIn_GetAllKeys(t *testing.T) {
+	type fields struct {
+		child execution.Expression
+	}
+	type args struct {
+		variables octosql.Variables
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *redisKeys
+		wantErr bool
+	}{
+		{
+			name: "simple in string",
+			fields: fields{
+				child: execution.NewVariable("const_0"),
+			},
+			args: args{
+				map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
+				},
+			},
+			want: &redisKeys{
+				map[string]interface{}{
+					"key0": nil,
+				},
+				DefaultKeys,
+			},
+			wantErr: false,
+		},
+		{
+			name: "simple in tuple",
+			fields: fields{
+				child: execution.NewTuple([]execution.Expression{
+					execution.NewVariable("const_0"),
+					execution.NewVariable("const_1"),
+					execution.NewVariable("const_2"),
+				}),
+			},
+			args: args{
+				map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key1"),
+					"const_1": octosql.MakeString("key2"),
+					"const_2": octosql.MakeString("key3"),
+				},
+			},
+			want: &redisKeys{
+				map[string]interface{}{
+					"key1": nil,
+					"key2": nil,
+					"key3": nil,
+				},
+				DefaultKeys,
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := &In{
+				child: tt.fields.child,
+			}
+			got, err := f.getAllKeys(tt.args.variables)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("In.getAllKeys() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("In.getAllKeys() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestConstant_getAllKeys(t *testing.T) {
 	type fields struct {
 		value bool

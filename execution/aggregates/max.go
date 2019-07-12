@@ -83,7 +83,7 @@ func (agg *Max) AddRecord(key octosql.Tuple, value octosql.Value) error {
 				value, agg.typedValue)
 		}
 
-		if !ok || value.Time().After(max.(octosql.Time).Time()) {
+		if !ok || value.AsTime().After(max.(octosql.Time).AsTime()) {
 			max = value
 		}
 	default:

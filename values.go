@@ -1,6 +1,7 @@
 package octosql
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"reflect"
@@ -10,63 +11,82 @@ import (
 
 type Value interface {
 	octoValue()
+	fmt.Stringer
 }
 
 type Phantom struct{}
 
-func (Phantom) octoValue()         {}
-func (v Phantom) Struct() struct{} { return struct{}(v) }
+func (Phantom) octoValue()           {}
+func (v Phantom) AsStruct() struct{} { return struct{}(v) }
+func (v Phantom) String() string {
+	return "<phantom>"
+}
 func MakePhantom() Phantom {
 	return Phantom(struct{}{})
 }
 
 type Int int
 
-func (Int) octoValue() {}
-func (v Int) Int() int { return int(v) }
+func (Int) octoValue()   {}
+func (v Int) AsInt() int { return int(v) }
+func (v Int) String() string {
+	return fmt.Sprint(v.AsInt())
+}
 func MakeInt(v int) Int {
 	return Int(v)
 }
 
 type Float float64
 
-func (Float) octoValue()       {}
-func (v Float) Float() float64 { return float64(v) }
+func (Float) octoValue()         {}
+func (v Float) AsFloat() float64 { return float64(v) }
+func (v Float) String() string {
+	return fmt.Sprint(v.AsFloat())
+}
 func MakeFloat(v float64) Float {
 	return Float(v)
 }
 
 type Bool bool
 
-func (Bool) octoValue()   {}
-func (v Bool) Bool() bool { return bool(v) }
+func (Bool) octoValue()     {}
+func (v Bool) AsBool() bool { return bool(v) }
+func (v Bool) String() string {
+	return fmt.Sprint(v.AsBool())
+}
 func MakeBool(v bool) Bool {
 	return Bool(v)
 }
 
 type String string
 
-func (String) octoValue()       {}
-func (v String) String() string { return string(v) }
+func (String) octoValue()         {}
+func (v String) AsString() string { return string(v) }
+func (v String) String() string {
+	return fmt.Sprintf("'%s'", v.AsString())
+}
 func MakeString(v string) String {
 	return String(v)
 }
 
 type Time time.Time
 
-func (Time) octoValue()        {}
-func (v Time) Time() time.Time { return time.Time(v) }
+func (Time) octoValue()          {}
+func (v Time) AsTime() time.Time { return time.Time(v) }
+func (v Time) String() string {
+	return v.AsTime().Format(time.RFC3339Nano)
+}
 func MakeTime(v time.Time) Time {
 	return Time(v)
 }
 
 type Tuple []Value
 
-func (Tuple) octoValue()       {}
-func (v Tuple) Slice() []Value { return []Value(v) }
+func (Tuple) octoValue()         {}
+func (v Tuple) AsSlice() []Value { return []Value(v) }
 func (v Tuple) String() string {
-	valueStrings := make([]string, len(v.Slice()))
-	for i, value := range v.Slice() {
+	valueStrings := make([]string, len(v.AsSlice()))
+	for i, value := range v.AsSlice() {
 		valueStrings[i] = fmt.Sprint(value)
 	}
 	return fmt.Sprintf("(%s)", strings.Join(valueStrings, ", "))
@@ -77,8 +97,15 @@ func MakeTuple(v []Value) Tuple {
 
 type Object map[string]Value
 
-func (Object) octoValue()                 {}
-func (v Object) Object() map[string]Value { return map[string]Value(v) }
+func (Object) octoValue()                {}
+func (v Object) AsMap() map[string]Value { return map[string]Value(v) }
+func (v Object) String() string {
+	text, err := json.Marshal(v.AsMap())
+	if err != nil {
+		return fmt.Sprint(v.AsMap())
+	}
+	return string(text)
+}
 func MakeObject(v map[string]Value) Object {
 	return Object(v)
 }
@@ -178,7 +205,7 @@ func AreEqual(left, right Value) bool {
 		if !ok {
 			return false
 		}
-		return left.Time().Equal(right.Time())
+		return left.AsTime().Equal(right.AsTime())
 
 	case Tuple:
 		right, ok := right.(Tuple)

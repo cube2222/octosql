@@ -83,7 +83,7 @@ func (agg *Min) AddRecord(key octosql.Tuple, value octosql.Value) error {
 				value, agg.typedValue)
 		}
 
-		if !ok || value.Time().Before(min.(octosql.Time).Time()) {
+		if !ok || value.AsTime().Before(min.(octosql.Time).AsTime()) {
 			min = value
 		}
 

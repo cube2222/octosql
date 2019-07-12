@@ -95,15 +95,15 @@ func (ne *NodeExpression) ExpressionValue(variables octosql.Variables) (octosql.
 	}
 
 	// There is exactly one record
-	if len(firstRecord.Slice()) > 1 {
+	if len(firstRecord.AsSlice()) > 1 {
 		return firstRecord, nil
 	}
-	if len(firstRecord.Slice()) == 0 {
+	if len(firstRecord.AsSlice()) == 0 {
 		return nil, nil
 	}
 
 	// There is exactly one field
-	return firstRecord.Slice()[0], nil
+	return firstRecord.AsSlice()[0], nil
 }
 
 type AliasedExpression struct {

@@ -94,7 +94,7 @@ func TestParseType(t *testing.T) {
 					reflect.TypeOf(got), reflect.TypeOf(tt.want))
 			}
 			if wantTime, ok := tt.want.(octosql.Time); ok {
-				if !wantTime.Time().Equal(got.(octosql.Time).Time()) {
+				if !wantTime.AsTime().Equal(got.(octosql.Time).AsTime()) {
 					t.Fatalf("ParseType() = %+v, want %+v", got, tt.want)
 				}
 				return

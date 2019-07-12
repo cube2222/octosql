@@ -95,7 +95,7 @@ func (rel *MoreThan) Apply(variables octosql.Variables, left, right Expression) 
 		return leftValue > rightValue, nil
 	case octosql.Time:
 		rightValue := rightValue.(octosql.Time)
-		return leftValue.Time().After(rightValue.Time()), nil
+		return leftValue.AsTime().After(rightValue.AsTime()), nil
 	}
 
 	return false, errors.Errorf(
@@ -179,7 +179,7 @@ func (rel *Like) Apply(variables octosql.Variables, left, right Expression) (boo
 			leftValue, rightValue, GetType(leftValue), GetType(rightValue))
 	}
 
-	match, err := regexp.MatchString(rightString.String(), leftString.String())
+	match, err := regexp.MatchString(rightString.AsString(), leftString.AsString())
 	if err != nil {
 		return false, errors.Wrapf(err, "couldn't match string in like relation with pattern %v", rightString)
 	}

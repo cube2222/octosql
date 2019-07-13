@@ -18,7 +18,7 @@ func NewMin() *Min {
 }
 
 func (agg *Min) AddRecord(key octosql.Tuple, value octosql.Value) error {
-	min, ok, err := agg.mins.Get(key)
+	min, previousValueExists, err := agg.mins.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current min out of hashmap")
 	}
@@ -35,7 +35,7 @@ func (agg *Min) AddRecord(key octosql.Tuple, value octosql.Value) error {
 				value, agg.typedValue)
 		}
 
-		if !ok || value < min.(octosql.Int) {
+		if !previousValueExists || value < min.(octosql.Int) {
 			min = value
 		}
 
@@ -47,7 +47,7 @@ func (agg *Min) AddRecord(key octosql.Tuple, value octosql.Value) error {
 				value, agg.typedValue)
 		}
 
-		if !ok || value < min.(octosql.Float) {
+		if !previousValueExists || value < min.(octosql.Float) {
 			min = value
 		}
 
@@ -59,7 +59,7 @@ func (agg *Min) AddRecord(key octosql.Tuple, value octosql.Value) error {
 				value, agg.typedValue)
 		}
 
-		if !ok || value < min.(octosql.String) {
+		if !previousValueExists || value < min.(octosql.String) {
 			min = value
 		}
 
@@ -71,7 +71,7 @@ func (agg *Min) AddRecord(key octosql.Tuple, value octosql.Value) error {
 				value, agg.typedValue)
 		}
 
-		if !ok || value == false {
+		if !previousValueExists || value == false {
 			min = value
 		}
 
@@ -83,7 +83,7 @@ func (agg *Min) AddRecord(key octosql.Tuple, value octosql.Value) error {
 				value, agg.typedValue)
 		}
 
-		if !ok || value.Time().Before(min.(octosql.Time).Time()) {
+		if !previousValueExists || value.Time().Before(min.(octosql.Time).Time()) {
 			min = value
 		}
 

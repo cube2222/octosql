@@ -21,24 +21,24 @@ func NewDistinct(underlying execution.Aggregate) *Distinct {
 }
 
 func (agg *Distinct) AddRecord(key octosql.Tuple, value octosql.Value) error {
-	groupSet, ok, err := agg.groupSets.Get(key)
+	groupSet, previousValueExists, err := agg.groupSets.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get distinct value set for group key")
 	}
 
 	var newGroupSet *execution.HashMap
-	if !ok {
+	if !previousValueExists {
 		newGroupSet = execution.NewHashMap()
 	} else {
 		newGroupSet = groupSet.(*execution.HashMap)
 	}
 
-	_, ok, err = newGroupSet.Get(value)
+	_, previousValueExists, err = newGroupSet.Get(value)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get value out of distinct value set for given key")
 	}
 
-	if ok {
+	if previousValueExists {
 		// This value has been here already
 		return nil
 	}

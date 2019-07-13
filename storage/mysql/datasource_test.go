@@ -19,7 +19,7 @@ func TestDataSource_Get(t *testing.T) {
 	port := 3306
 	user := "root"
 	password := "toor"
-	dbname := "mydb"
+	dbname := "app"
 
 	mysqlInfo := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true", user, password, host, port, dbname)
 
@@ -63,7 +63,7 @@ func TestDataSource_Get(t *testing.T) {
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"a.name", "a.population"},
-					[]interface{}{"panda", 500},
+					[]interface{}{"human", 7000000},
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"a.name", "a.population"},
@@ -71,7 +71,7 @@ func TestDataSource_Get(t *testing.T) {
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"a.name", "a.population"},
-					[]interface{}{"human", 7000000},
+					[]interface{}{"panda", 500},
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"a.name", "a.population"},
@@ -130,8 +130,8 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"a.population", "a.name"},
-					[]interface{}{500, "panda"},
+					[]octosql.VariableName{"a.name", "a.population"},
+					[]interface{}{"panda", 500},
 				),
 			}),
 			wantErr: false,
@@ -162,15 +162,15 @@ func TestDataSource_Get(t *testing.T) {
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
+					[]interface{}{2, "Kuba"},
+				),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"p.id", "p.name"},
+					[]interface{}{3, "Wojtek"},
+				),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{4, "Adam"},
-				),
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.name", "p.id"},
-					[]interface{}{"Kuba", 2},
-				),
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.name", "p.id"},
-					[]interface{}{"Wojtek", 3},
 				),
 			}),
 			wantErr: false,
@@ -209,12 +209,12 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.name", "p.id"},
-					[]interface{}{"Wojtek", 3},
+					[]octosql.VariableName{"p.id", "p.name"},
+					[]interface{}{2, "Kuba"},
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
-					[]interface{}{2, "Kuba"},
+					[]interface{}{3, "Wojtek"},
 				),
 			}),
 			wantErr: false,
@@ -253,16 +253,16 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.name", "p.id"},
-					[]interface{}{"Adam", 4},
-				),
-				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{1, "Janek"},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.name", "p.id"},
-					[]interface{}{"Wojtek", 3},
+					[]octosql.VariableName{"p.id", "p.name"},
+					[]interface{}{3, "Wojtek"},
+				),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"p.id", "p.name"},
+					[]interface{}{4, "Adam"},
 				),
 			}),
 			wantErr: false,

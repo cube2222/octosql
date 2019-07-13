@@ -136,7 +136,7 @@ func (f *Or) getAllKeys(variables octosql.Variables) (*redisKeys, error) {
 	return newRedisKeys(resultKeys, DefaultKeys), nil
 }
 
-// The equivalent form is: ("key" = child), where "key" is alias for extracted key from redis database
+// The equivalent form is: (octosql.MakeString("key") = child), where octosql.MakeString("key") is alias for extracted key from redis database
 // getAllKeys returns expression value of 'child' (only if it's of string type - the only acceptable in redis)
 type Equal struct {
 	child execution.Expression
@@ -155,10 +155,10 @@ func (f *Equal) getAllKeys(variables octosql.Variables) (*redisKeys, error) {
 	}
 
 	switch exprValue := exprValue.(type) {
-	case string:
+	case octosql.String:
 		return newRedisKeys(
 			map[string]interface{}{
-				exprValue: nil,
+				exprValue.String(): nil,
 			}, DefaultKeys), nil
 
 	default:

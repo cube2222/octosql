@@ -69,7 +69,7 @@ func (v *Variable) MaterializeNamed(ctx context.Context) (execution.NamedExpress
 	return execution.NewVariable(v.Name), nil
 }
 
-// Tuple describes an expression which is a tuple of subexpressions.
+// TupleExpression describes an expression which is a tuple of subexpressions.
 type Tuple struct {
 	Expressions []Expression
 }

@@ -18,14 +18,14 @@ func TestLimit_Get(t *testing.T) {
 		{
 			name:       "negative limit value",
 			vars:       octosql.NoVariables(),
-			node:       NewLimit(NewDummyNode(nil), NewDummyValue(-42)),
+			node:       NewLimit(NewDummyNode(nil), NewDummyValue(octosql.MakeInt(-42))),
 			wantStream: nil,
 			wantError:  "negative limit value",
 		},
 		{
 			name:       "limit value not int",
 			vars:       octosql.NoVariables(),
-			node:       NewLimit(NewDummyNode(nil), NewDummyValue(2.0)),
+			node:       NewLimit(NewDummyNode(nil), NewDummyValue(octosql.MakeFloat(2.0))),
 			wantStream: nil,
 			wantError:  "limit value not int",
 		},
@@ -34,28 +34,28 @@ func TestLimit_Get(t *testing.T) {
 			vars: octosql.NoVariables(),
 			node: NewLimit(&DummyNode{
 				[]*Record{
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{
 							"num",
 						},
 						[]interface{}{
 							1e10,
 						}),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{
 							"num",
 						},
 						[]interface{}{
 							3.21,
 						}),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{
 							"flag",
 						},
 						[]interface{}{
 							false,
 						}),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{
 							"num",
 						},
@@ -63,23 +63,23 @@ func TestLimit_Get(t *testing.T) {
 							2.23e7,
 						}),
 				},
-			}, &DummyValue{3}),
+			}, NewDummyValue(octosql.MakeInt(3))),
 			wantStream: NewInMemoryStream([]*Record{
-				NewRecordFromSlice(
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{
 						"num",
 					},
 					[]interface{}{
 						1e10,
 					}),
-				NewRecordFromSlice(
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{
 						"num",
 					},
 					[]interface{}{
 						3.21,
 					}),
-				NewRecordFromSlice(
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{
 						"flag",
 					},
@@ -94,7 +94,7 @@ func TestLimit_Get(t *testing.T) {
 			vars: octosql.NoVariables(),
 			node: NewLimit(&DummyNode{
 				[]*Record{
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{
 							"num",
 						},
@@ -102,7 +102,7 @@ func TestLimit_Get(t *testing.T) {
 							1,
 						}),
 				},
-			}, &DummyValue{0}),
+			}, NewDummyValue(octosql.MakeInt(0))),
 			wantStream: NewInMemoryStream([]*Record{}),
 			wantError:  NO_ERROR,
 		},
@@ -126,10 +126,10 @@ func TestLimit_Get(t *testing.T) {
 
 			equal, err := AreStreamsEqual(rs, tt.wantStream)
 			if !equal {
-				t.Errorf("LimitedStream doesn't work as expected")
+				t.Errorf("limitedStream doesn't work as expected")
 			}
 			if err != nil {
-				t.Errorf("LimitedStream comparison error: %v", err)
+				t.Errorf("limitedStream comparison error: %v", err)
 			}
 		})
 	}
@@ -142,17 +142,17 @@ func TestLimitedStream_Next(t *testing.T) {
 		wantStream *InMemoryStream
 	}{
 		{
-			name: "Simplest LimitedStream possible",
+			name: "Simplest limitedStream possible",
 			stream: newLimitedStream(
 				NewInMemoryStream([]*Record{
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{
 							"num",
 						},
 						[]interface{}{
 							1,
 						}),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{
 							"num",
 						},
@@ -163,7 +163,7 @@ func TestLimitedStream_Next(t *testing.T) {
 				1,
 			),
 			wantStream: NewInMemoryStream([]*Record{
-				NewRecordFromSlice(
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{
 						"num",
 					},
@@ -178,10 +178,10 @@ func TestLimitedStream_Next(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			equal, err := AreStreamsEqual(tt.stream, tt.wantStream)
 			if !equal {
-				t.Errorf("LimitedStream doesn't work as intended")
+				t.Errorf("limitedStream doesn't work as intended")
 			}
 			if err != nil {
-				t.Errorf("LimitedStream comparison error: %v", err)
+				t.Errorf("limitedStream comparison error: %v", err)
 			}
 		})
 	}

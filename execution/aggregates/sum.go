@@ -1,13 +1,14 @@
 package aggregates
 
 import (
+	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 )
 
 type Sum struct {
 	sums       *execution.HashMap
-	typedValue interface{}
+	typedValue octosql.Value
 }
 
 func NewSum() *Sum {
@@ -16,8 +17,8 @@ func NewSum() *Sum {
 	}
 }
 
-func (agg *Sum) AddRecord(key []interface{}, value interface{}) error {
-	sum, ok, err := agg.sums.Get(key)
+func (agg *Sum) AddRecord(key octosql.Tuple, value octosql.Value) error {
+	sum, previousValueExists, err := agg.sums.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current sum out of hashmap")
 	}
@@ -26,30 +27,30 @@ func (agg *Sum) AddRecord(key []interface{}, value interface{}) error {
 		agg.typedValue = value
 	}
 	switch value := value.(type) {
-	case int:
-		_, typeOk := agg.typedValue.(int)
+	case octosql.Int:
+		_, typeOk := agg.typedValue.(octosql.Int)
 		if !typeOk {
 			return errors.Errorf("mixed types in sum: %v and %v with values %v and %v",
 				execution.GetType(value), execution.GetType(agg.typedValue),
 				value, agg.typedValue)
 		}
 
-		if ok {
-			sum = sum.(int) + value
+		if previousValueExists {
+			sum = sum.(octosql.Int) + value
 		} else {
 			sum = value
 		}
 
-	case float64:
-		_, typeOk := agg.typedValue.(float64)
+	case octosql.Float:
+		_, typeOk := agg.typedValue.(octosql.Float)
 		if !typeOk {
 			return errors.Errorf("mixed types in sum: %v and %v with values %v and %v",
 				execution.GetType(value), execution.GetType(agg.typedValue),
 				value, agg.typedValue)
 		}
 
-		if ok {
-			sum = sum.(float64) + value
+		if previousValueExists {
+			sum = sum.(octosql.Float) + value
 		} else {
 			sum = value
 		}
@@ -66,7 +67,7 @@ func (agg *Sum) AddRecord(key []interface{}, value interface{}) error {
 	return nil
 }
 
-func (agg *Sum) GetAggregated(key []interface{}) (interface{}, error) {
+func (agg *Sum) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
 	sum, ok, err := agg.sums.Get(key)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get sum out of hashmap")
@@ -76,7 +77,7 @@ func (agg *Sum) GetAggregated(key []interface{}) (interface{}, error) {
 		return nil, errors.Errorf("sum for key not found")
 	}
 
-	return sum, nil
+	return sum.(octosql.Value), nil
 }
 
 func (agg *Sum) String() string {

@@ -1,15 +1,14 @@
 package aggregates
 
 import (
-	"time"
-
+	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 )
 
 type Min struct {
 	mins       *execution.HashMap
-	typedValue interface{}
+	typedValue octosql.Value
 }
 
 func NewMin() *Min {
@@ -18,8 +17,8 @@ func NewMin() *Min {
 	}
 }
 
-func (agg *Min) AddRecord(key []interface{}, value interface{}) error {
-	min, ok, err := agg.mins.Get(key)
+func (agg *Min) AddRecord(key octosql.Tuple, value octosql.Value) error {
+	min, previousValueExists, err := agg.mins.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current min out of hashmap")
 	}
@@ -28,63 +27,63 @@ func (agg *Min) AddRecord(key []interface{}, value interface{}) error {
 		agg.typedValue = value
 	}
 	switch value := value.(type) {
-	case int:
-		_, typeOk := agg.typedValue.(int)
+	case octosql.Int:
+		_, typeOk := agg.typedValue.(octosql.Int)
 		if !typeOk {
 			return errors.Errorf("mixed types in min: %v and %v with values %v and %v",
 				execution.GetType(value), execution.GetType(agg.typedValue),
 				value, agg.typedValue)
 		}
 
-		if !ok || value < min.(int) {
+		if !previousValueExists || value < min.(octosql.Int) {
 			min = value
 		}
 
-	case float64:
-		_, typeOk := agg.typedValue.(float64)
+	case octosql.Float:
+		_, typeOk := agg.typedValue.(octosql.Float)
 		if !typeOk {
 			return errors.Errorf("mixed types in min: %v and %v with values %v and %v",
 				execution.GetType(value), execution.GetType(agg.typedValue),
 				value, agg.typedValue)
 		}
 
-		if !ok || value < min.(float64) {
+		if !previousValueExists || value < min.(octosql.Float) {
 			min = value
 		}
 
-	case string:
-		_, typeOk := agg.typedValue.(string)
+	case octosql.String:
+		_, typeOk := agg.typedValue.(octosql.String)
 		if !typeOk {
 			return errors.Errorf("mixed types in min: %v and %v with values %v and %v",
 				execution.GetType(value), execution.GetType(agg.typedValue),
 				value, agg.typedValue)
 		}
 
-		if !ok || value < min.(string) {
+		if !previousValueExists || value < min.(octosql.String) {
 			min = value
 		}
 
-	case bool:
-		_, typeOk := agg.typedValue.(bool)
+	case octosql.Bool:
+		_, typeOk := agg.typedValue.(octosql.Bool)
 		if !typeOk {
 			return errors.Errorf("mixed types in min: %v and %v with values %v and %v",
 				execution.GetType(value), execution.GetType(agg.typedValue),
 				value, agg.typedValue)
 		}
 
-		if !ok || value == false {
+		if !previousValueExists || value == false {
 			min = value
 		}
 
-	case time.Time:
-		_, typeOk := agg.typedValue.(time.Time)
+	case octosql.Time:
+		_, typeOk := agg.typedValue.(octosql.Time)
 		if !typeOk {
 			return errors.Errorf("mixed types in min: %v and %v with values %v and %v",
 				execution.GetType(value), execution.GetType(agg.typedValue),
 				value, agg.typedValue)
 		}
 
-		if !ok || value.Before(min.(time.Time)) {
+		if !previousValueExists || value.Time().Before(min.(octosql.Time).Time()) {
 			min = value
 		}
 
@@ -100,7 +99,7 @@ func (agg *Min) AddRecord(key []interface{}, value interface{}) error {
 	return nil
 }
 
-func (agg *Min) GetAggregated(key []interface{}) (interface{}, error) {
+func (agg *Min) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
 	min, ok, err := agg.mins.Get(key)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get min out of hashmap")
@@ -110,7 +109,7 @@ func (agg *Min) GetAggregated(key []interface{}) (interface{}, error) {
 		return nil, errors.Errorf("min for key not found")
 	}
 
-	return min, nil
+	return min.(octosql.Value), nil
 }
 
 func (agg *Min) String() string {

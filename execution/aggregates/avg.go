@@ -1,6 +1,7 @@
 package aggregates
 
 import (
+	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 )
@@ -8,7 +9,7 @@ import (
 type Average struct {
 	averages   *execution.HashMap
 	counts     *execution.HashMap
-	typedValue interface{}
+	typedValue octosql.Value
 }
 
 func NewAverage() *Average {
@@ -18,48 +19,48 @@ func NewAverage() *Average {
 	}
 }
 
-func (agg *Average) AddRecord(key []interface{}, value interface{}) error {
+func (agg *Average) AddRecord(key octosql.Tuple, value octosql.Value) error {
 	if agg.typedValue == nil {
 		agg.typedValue = value
 	}
 
-	var floatValue float64
+	var floatValue octosql.Float
 	switch value := value.(type) {
-	case float64:
-		_, typeOk := agg.typedValue.(float64)
+	case octosql.Float:
+		_, typeOk := agg.typedValue.(octosql.Float)
 		if !typeOk {
 			return errors.Errorf("mixed types in avg: %v and %v with values %v and %v",
 				execution.GetType(value), execution.GetType(agg.typedValue),
 				value, agg.typedValue)
 		}
 		floatValue = value
-	case int:
-		_, typeOk := agg.typedValue.(int)
+	case octosql.Int:
+		_, typeOk := agg.typedValue.(octosql.Int)
 		if !typeOk {
 			return errors.Errorf("mixed types in avg: %v and %v with values %v and %v",
 				execution.GetType(value), execution.GetType(agg.typedValue),
 				value, agg.typedValue)
 		}
-		floatValue = float64(value)
+		floatValue = octosql.MakeFloat(float64(value.Int()))
 	default:
 		return errors.Errorf("invalid type in average: %v with value %v", execution.GetType(value), value)
 	}
 
-	count, ok, err := agg.counts.Get(key)
+	count, previousValueExists, err := agg.counts.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current element count out of hashmap")
 	}
 
-	average, ok, err := agg.averages.Get(key)
+	average, previousValueExists, err := agg.averages.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current average out of hashmap")
 	}
 
-	var newAverage float64
+	var newAverage octosql.Float
 	var newCount int
-	if ok {
+	if previousValueExists {
 		newCount = count.(int) + 1
-		newAverage = (average.(float64)*float64(newCount-1) + floatValue) / float64(newCount)
+		newAverage = (average.(octosql.Float)*octosql.MakeFloat(float64(newCount-1)) + floatValue) / octosql.MakeFloat(float64(newCount))
 	} else {
 		newCount = 1
 		newAverage = floatValue
@@ -78,7 +79,7 @@ func (agg *Average) AddRecord(key []interface{}, value interface{}) error {
 	return nil
 }
 
-func (agg *Average) GetAggregated(key []interface{}) (interface{}, error) {
+func (agg *Average) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
 	average, ok, err := agg.averages.Get(key)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get average out of hashmap")
@@ -88,7 +89,7 @@ func (agg *Average) GetAggregated(key []interface{}) (interface{}, error) {
 		return nil, errors.Errorf("average for key not found")
 	}
 
-	return average, nil
+	return average.(octosql.Float), nil
 }
 
 func (agg *Average) String() string {

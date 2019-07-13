@@ -68,12 +68,12 @@ func (rms *recordMultiSet) GetCount(rec *Record) (int, error) {
 
 type entity struct {
 	fieldName octosql.VariableName
-	value     interface{}
+	value     octosql.Value
 }
 
 type row []entity
 
-func newEntity(name octosql.VariableName, value interface{}) entity {
+func newEntity(name octosql.VariableName, value octosql.Value) entity {
 	return entity{
 		fieldName: name,
 		value:     value,
@@ -101,7 +101,7 @@ func Normalize(rec *Record) *Record {
 		values[k] = ent.value
 	}
 
-	return NewRecordFromSlice(sortedFieldNames, values)
+	return NewRecordFromSliceWithNormalize(sortedFieldNames, values)
 }
 
 func AreStreamsEqual(first, second RecordStream) (bool, error) {
@@ -174,10 +174,21 @@ func (rms *recordMultiSet) isContained(other *recordMultiSet) (bool, error) {
 	return true, nil
 }
 
-func NewRecordFromSlice(fields []octosql.VariableName, data []interface{}) *Record {
+func NewRecordFromSlice(fields []octosql.VariableName, data []octosql.Value) *Record {
 	return &Record{
 		fieldNames: fields,
 		data:       data,
+	}
+}
+
+func NewRecordFromSliceWithNormalize(fields []octosql.VariableName, data []interface{}) *Record {
+	normalized := make([]octosql.Value, len(data))
+	for i := range data {
+		normalized[i] = NormalizeType(data[i])
+	}
+	return &Record{
+		fieldNames: fields,
+		data:       normalized,
 	}
 }
 
@@ -199,16 +210,16 @@ func (dn *DummyNode) Get(variables octosql.Variables) (RecordStream, error) {
 	return NewInMemoryStream(dn.data), nil
 }
 
-func NewDummyValue(value interface{}) *DummyValue {
+func NewDummyValue(value octosql.Value) *DummyValue {
 	return &DummyValue{
 		value,
 	}
 }
 
 type DummyValue struct {
-	value interface{}
+	value octosql.Value
 }
 
-func (dv *DummyValue) ExpressionValue(variables octosql.Variables) (interface{}, error) {
+func (dv *DummyValue) ExpressionValue(variables octosql.Variables) (octosql.Value, error) {
 	return dv.value, nil
 }

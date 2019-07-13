@@ -10,8 +10,8 @@ import (
 type AggregatePrototype func() Aggregate
 
 type Aggregate interface {
-	AddRecord(key []interface{}, value interface{}) error
-	GetAggregated(key []interface{}) (interface{}, error)
+	AddRecord(key octosql.Tuple, value octosql.Value) error
+	GetAggregated(key octosql.Tuple) (octosql.Value, error)
 	String() string
 }
 
@@ -101,7 +101,7 @@ func (stream *GroupByStream) Next() (*Record, error) {
 				return nil, errors.Wrap(err, "couldn't merge stream variables with record")
 			}
 
-			key := make([]interface{}, len(stream.key))
+			key := make(octosql.Tuple, len(stream.key))
 			for i := range stream.key {
 				key[i], err = stream.key[i].ExpressionValue(variables)
 				if err != nil {
@@ -110,20 +110,20 @@ func (stream *GroupByStream) Next() (*Record, error) {
 			}
 
 			if len(key) == 0 {
-				key = append(key, struct{}{})
+				key = append(key, octosql.Phantom{})
 			}
 
-			err = stream.groups.Set(key, struct{}{})
+			err = stream.groups.Set(key, octosql.Phantom{})
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't put group key into hashmap")
 			}
 
 			for i := range stream.aggregates {
-				var value interface{}
+				var value octosql.Value
 				if stream.fields[i] == "*star*" {
-					mapping := make(map[octosql.VariableName]interface{}, len(record.Fields()))
+					mapping := make(octosql.Object, len(record.Fields()))
 					for _, field := range record.Fields() {
-						mapping[field.Name] = record.Value(field.Name)
+						mapping[field.Name.String()] = record.Value(field.Name)
 					}
 					value = mapping
 
@@ -147,9 +147,9 @@ func (stream *GroupByStream) Next() (*Record, error) {
 	if !ok {
 		return nil, ErrEndOfStream
 	}
-	typedKey := key.([]interface{})
+	typedKey := key.(octosql.Tuple)
 
-	values := make([]interface{}, len(stream.aggregates))
+	values := make([]octosql.Value, len(stream.aggregates))
 	for i := range stream.aggregates {
 		var err error
 		values[i], err = stream.aggregates[i].GetAggregated(typedKey)

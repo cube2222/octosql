@@ -3,7 +3,6 @@ package execution
 import (
 	"reflect"
 	"regexp"
-	"time"
 
 	"github.com/cube2222/octosql"
 	"github.com/pkg/errors"
@@ -85,18 +84,18 @@ func (rel *MoreThan) Apply(variables octosql.Variables, left, right Expression) 
 	}
 
 	switch leftValue := leftValue.(type) {
-	case int:
-		rightValue := rightValue.(int)
+	case octosql.Int:
+		rightValue := rightValue.(octosql.Int)
 		return leftValue > rightValue, nil
-	case float64:
-		rightValue := rightValue.(float64)
+	case octosql.Float:
+		rightValue := rightValue.(octosql.Float)
 		return leftValue > rightValue, nil
-	case string:
-		rightValue := rightValue.(string)
+	case octosql.String:
+		rightValue := rightValue.(octosql.String)
 		return leftValue > rightValue, nil
-	case time.Time:
-		rightValue := rightValue.(time.Time)
-		return leftValue.After(rightValue), nil
+	case octosql.Time:
+		rightValue := rightValue.(octosql.Time)
+		return leftValue.Time().After(rightValue.Time()), nil
 	}
 
 	return false, errors.Errorf(
@@ -167,20 +166,20 @@ func (rel *Like) Apply(variables octosql.Variables, left, right Expression) (boo
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get value of right operator in LIKE")
 	}
-	leftString, ok := leftValue.(string)
+	leftString, ok := leftValue.(octosql.String)
 	if !ok {
 		return false, errors.Errorf(
 			"invalid operands to like %v and %v with types %v and %v, only string allowed",
 			leftValue, rightValue, GetType(leftValue), GetType(rightValue))
 	}
-	rightString, ok := rightValue.(string)
+	rightString, ok := rightValue.(octosql.String)
 	if !ok {
 		return false, errors.Errorf(
 			"invalid operands to like %v and %v with types %v and %v, only string allowed",
 			leftValue, rightValue, GetType(leftValue), GetType(rightValue))
 	}
 
-	match, err := regexp.MatchString(rightString, leftString)
+	match, err := regexp.MatchString(rightString.String(), leftString.String())
 	if err != nil {
 		return false, errors.Wrapf(err, "couldn't match string in like relation with pattern %v", rightString)
 	}
@@ -205,7 +204,7 @@ func (rel *In) Apply(variables octosql.Variables, left, right Expression) (bool,
 	}
 
 	switch set := rightValue.(type) {
-	case []Record:
+	case RecordSliceValue:
 		for i := range set {
 			if len(set[i].Fields()) == 1 {
 				right := set[i].Value(set[i].Fields()[0].Name)
@@ -217,9 +216,9 @@ func (rel *In) Apply(variables octosql.Variables, left, right Expression) (bool,
 			switch leftValue.(type) {
 			case *Record:
 				return AreEqual(leftValue, &set[i]), nil
-			case []interface{}:
+			case octosql.Tuple:
 				fields := set[i].Fields()
-				values := make([]interface{}, len(fields))
+				values := make(octosql.Tuple, len(fields))
 				for i, field := range fields {
 					values[i] = set[i].Value(field.Name)
 				}
@@ -233,16 +232,16 @@ func (rel *In) Apply(variables octosql.Variables, left, right Expression) (bool,
 		switch leftValue.(type) {
 		case *Record:
 			return AreEqual(leftValue, rightValue), nil
-		case []interface{}:
+		case octosql.Tuple:
 			fields := set.Fields()
-			values := make([]interface{}, len(fields))
+			values := make(octosql.Tuple, len(fields))
 			for i, field := range fields {
 				values[i] = set.Value(field.Name)
 			}
 			return AreEqual(leftValue, values), nil
 		}
 
-	case []interface{}:
+	case octosql.Tuple:
 		for i := range set {
 			if AreEqual(leftValue, set[i]) {
 				return true, nil

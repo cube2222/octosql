@@ -2,12 +2,14 @@ package functions
 
 import (
 	"testing"
+
+	"github.com/cube2222/octosql"
 )
 
 func Test_exactlyNArgs(t *testing.T) {
 	type args struct {
 		n    int
-		args []interface{}
+		args []octosql.Value
 	}
 	tests := []struct {
 		name    string
@@ -18,7 +20,7 @@ func Test_exactlyNArgs(t *testing.T) {
 			name: "matching number",
 			args: args{
 				n:    2,
-				args: []interface{}{7, "a"},
+				args: []octosql.Value{octosql.MakeInt(7), octosql.MakeString("a")},
 			},
 			wantErr: false,
 		},
@@ -26,7 +28,7 @@ func Test_exactlyNArgs(t *testing.T) {
 			name: "non-matching number - too long",
 			args: args{
 				n:    2,
-				args: []interface{}{7, "a", true},
+				args: []octosql.Value{octosql.MakeInt(7), octosql.MakeString("a"), octosql.MakeBool(true)},
 			},
 			wantErr: true,
 		},
@@ -34,7 +36,7 @@ func Test_exactlyNArgs(t *testing.T) {
 			name: "non-matching number - too short",
 			args: args{
 				n:    4,
-				args: []interface{}{7, "a", true},
+				args: []octosql.Value{octosql.MakeInt(7), octosql.MakeString("a"), octosql.MakeBool(true)},
 			},
 			wantErr: true,
 		},
@@ -50,7 +52,7 @@ func Test_exactlyNArgs(t *testing.T) {
 
 func Test_atLeastOneArg(t *testing.T) {
 	type args struct {
-		args []interface{}
+		args []octosql.Value
 	}
 	tests := []struct {
 		name    string
@@ -60,21 +62,21 @@ func Test_atLeastOneArg(t *testing.T) {
 		{
 			name: "one arg - pass",
 			args: args{
-				[]interface{}{1},
+				[]octosql.Value{octosql.MakeInt(1)},
 			},
 			wantErr: false,
 		},
 		{
 			name: "two args - pass",
 			args: args{
-				[]interface{}{1, "hello"},
+				[]octosql.Value{octosql.MakeInt(1), octosql.MakeString("hello")},
 			},
 			wantErr: false,
 		},
 		{
 			name: "zero args - fail",
 			args: args{
-				[]interface{}{},
+				[]octosql.Value{},
 			},
 			wantErr: true,
 		},
@@ -90,7 +92,7 @@ func Test_atLeastOneArg(t *testing.T) {
 
 func Test_basicType(t *testing.T) {
 	type args struct {
-		args []interface{}
+		args []octosql.Value
 	}
 	tests := []struct {
 		name    string
@@ -100,42 +102,42 @@ func Test_basicType(t *testing.T) {
 		{
 			name: "int - pass",
 			args: args{
-				[]interface{}{7},
+				[]octosql.Value{octosql.MakeInt(7)},
 			},
 			wantErr: false,
 		},
 		{
 			name: "float - pass",
 			args: args{
-				[]interface{}{7.0},
+				[]octosql.Value{octosql.MakeFloat(7.0)},
 			},
 			wantErr: false,
 		},
 		{
 			name: "bool - pass",
 			args: args{
-				[]interface{}{false},
+				[]octosql.Value{octosql.MakeBool(false)},
 			},
 			wantErr: false,
 		},
 		{
 			name: "string - pass",
 			args: args{
-				[]interface{}{"nice"},
+				[]octosql.Value{octosql.MakeString("nice")},
 			},
 			wantErr: false,
 		},
 		{
 			name: "slice - fail",
 			args: args{
-				[]interface{}{[]interface{}{1, 2, 3}},
+				[]octosql.Value{octosql.MakeTuple(octosql.Tuple{octosql.MakeInt(1), octosql.MakeInt(2), octosql.MakeInt(3)})},
 			},
 			wantErr: true,
 		},
 		{
 			name: "map - fail",
 			args: args{
-				[]interface{}{map[string]string{}},
+				[]octosql.Value{octosql.MakeObject(map[string]octosql.Value{})},
 			},
 			wantErr: true,
 		},
@@ -151,7 +153,7 @@ func Test_basicType(t *testing.T) {
 
 func Test_wantInt(t *testing.T) {
 	type args struct {
-		args []interface{}
+		args []octosql.Value
 	}
 	tests := []struct {
 		name    string
@@ -161,21 +163,21 @@ func Test_wantInt(t *testing.T) {
 		{
 			name: "int - pass",
 			args: args{
-				[]interface{}{7},
+				[]octosql.Value{octosql.MakeInt(7)},
 			},
 			wantErr: false,
 		},
 		{
 			name: "float - fail",
 			args: args{
-				[]interface{}{7.0},
+				[]octosql.Value{octosql.MakeFloat(7.0)},
 			},
 			wantErr: true,
 		},
 		{
 			name: "string - fail",
 			args: args{
-				[]interface{}{"aaa"},
+				[]octosql.Value{octosql.MakeString("aaa")},
 			},
 			wantErr: true,
 		},
@@ -191,7 +193,7 @@ func Test_wantInt(t *testing.T) {
 
 func Test_wantFloat(t *testing.T) {
 	type args struct {
-		args []interface{}
+		args []octosql.Value
 	}
 	tests := []struct {
 		name    string
@@ -201,21 +203,21 @@ func Test_wantFloat(t *testing.T) {
 		{
 			name: "int - fail",
 			args: args{
-				[]interface{}{7},
+				[]octosql.Value{octosql.MakeInt(7)},
 			},
 			wantErr: true,
 		},
 		{
 			name: "float - pass",
 			args: args{
-				[]interface{}{7.0},
+				[]octosql.Value{octosql.MakeFloat(7.0)},
 			},
 			wantErr: false,
 		},
 		{
 			name: "string - fail",
 			args: args{
-				[]interface{}{"aaa"},
+				[]octosql.Value{octosql.MakeString("aaa")},
 			},
 			wantErr: true,
 		},
@@ -231,7 +233,7 @@ func Test_wantFloat(t *testing.T) {
 
 func Test_wantString(t *testing.T) {
 	type args struct {
-		args []interface{}
+		args []octosql.Value
 	}
 	tests := []struct {
 		name    string
@@ -241,21 +243,21 @@ func Test_wantString(t *testing.T) {
 		{
 			name: "int - fail",
 			args: args{
-				[]interface{}{7},
+				[]octosql.Value{octosql.MakeInt(7)},
 			},
 			wantErr: true,
 		},
 		{
 			name: "float - fail",
 			args: args{
-				[]interface{}{7.0},
+				[]octosql.Value{octosql.MakeFloat(7.0)},
 			},
 			wantErr: true,
 		},
 		{
 			name: "string - fail",
 			args: args{
-				[]interface{}{"aaa"},
+				[]octosql.Value{octosql.MakeString("aaa")},
 			},
 			wantErr: false,
 		},
@@ -271,7 +273,7 @@ func Test_wantString(t *testing.T) {
 
 func Test_wantNumber(t *testing.T) {
 	type args struct {
-		args []interface{}
+		args []octosql.Value
 	}
 	tests := []struct {
 		name    string
@@ -281,28 +283,28 @@ func Test_wantNumber(t *testing.T) {
 		{
 			name: "int - pass",
 			args: args{
-				[]interface{}{7},
+				[]octosql.Value{octosql.MakeInt(7)},
 			},
 			wantErr: false,
 		},
 		{
 			name: "float - pass",
 			args: args{
-				[]interface{}{7.0},
+				[]octosql.Value{octosql.MakeFloat(7.0)},
 			},
 			wantErr: false,
 		},
 		{
 			name: "string - fail",
 			args: args{
-				[]interface{}{"aaa"},
+				[]octosql.Value{octosql.MakeString("aaa")},
 			},
 			wantErr: true,
 		},
 		{
 			name: "bool - fail",
 			args: args{
-				[]interface{}{true},
+				[]octosql.Value{octosql.MakeBool(true)},
 			},
 			wantErr: true,
 		},
@@ -318,7 +320,7 @@ func Test_wantNumber(t *testing.T) {
 
 func Test_allInts(t *testing.T) {
 	type args struct {
-		args []interface{}
+		args []octosql.Value
 	}
 	tests := []struct {
 		name    string
@@ -328,28 +330,28 @@ func Test_allInts(t *testing.T) {
 		{
 			name: "all ints - pass",
 			args: args{
-				[]interface{}{1, 2, 3, 4},
+				[]octosql.Value{octosql.MakeInt(1), octosql.MakeInt(2), octosql.MakeInt(3), octosql.MakeInt(4)},
 			},
 			wantErr: false,
 		},
 		{
 			name: "empty - pass",
 			args: args{
-				[]interface{}{},
+				[]octosql.Value{},
 			},
 			wantErr: false,
 		},
 		{
 			name: "mixed1 - fail",
 			args: args{
-				[]interface{}{1, 2, 2.0, 3, 4},
+				[]octosql.Value{octosql.MakeInt(1), octosql.MakeInt(2), octosql.MakeFloat(2.0), octosql.MakeInt(3), octosql.MakeInt(4)},
 			},
 			wantErr: true,
 		},
 		{
 			name: "mixed2 - fail",
 			args: args{
-				[]interface{}{1, 2, "2", 3, 4},
+				[]octosql.Value{octosql.MakeInt(1), octosql.MakeInt(2), octosql.MakeString("2"), octosql.MakeInt(3), octosql.MakeInt(4)},
 			},
 			wantErr: true,
 		},
@@ -365,7 +367,7 @@ func Test_allInts(t *testing.T) {
 
 func Test_allFloats(t *testing.T) {
 	type args struct {
-		args []interface{}
+		args []octosql.Value
 	}
 	tests := []struct {
 		name    string
@@ -375,28 +377,28 @@ func Test_allFloats(t *testing.T) {
 		{
 			name: "all floats - pass",
 			args: args{
-				[]interface{}{1.0, 2.0, 3.0, 4.0},
+				[]octosql.Value{octosql.MakeFloat(1.0), octosql.MakeFloat(2.0), octosql.MakeFloat(3.0), octosql.MakeFloat(4.0)},
 			},
 			wantErr: false,
 		},
 		{
 			name: "empty - pass",
 			args: args{
-				[]interface{}{},
+				[]octosql.Value{},
 			},
 			wantErr: false,
 		},
 		{
 			name: "mixed1 - fail",
 			args: args{
-				[]interface{}{1.0, 2, 2.0, 3.0, 4},
+				[]octosql.Value{octosql.MakeFloat(1.0), octosql.MakeInt(2), octosql.MakeFloat(2.0), octosql.MakeFloat(3.0), octosql.MakeInt(4)},
 			},
 			wantErr: true,
 		},
 		{
 			name: "mixed2 - fail",
 			args: args{
-				[]interface{}{1.0, 2.0, "2", 3.0, 4.0},
+				[]octosql.Value{octosql.MakeFloat(1.0), octosql.MakeFloat(2.0), octosql.MakeString("2"), octosql.MakeFloat(3.0), octosql.MakeFloat(4.0)},
 			},
 			wantErr: true,
 		},
@@ -412,7 +414,7 @@ func Test_allFloats(t *testing.T) {
 
 func Test_allNumbers(t *testing.T) {
 	type args struct {
-		args []interface{}
+		args []octosql.Value
 	}
 	tests := []struct {
 		name    string
@@ -422,28 +424,28 @@ func Test_allNumbers(t *testing.T) {
 		{
 			name: "all ints - pass",
 			args: args{
-				[]interface{}{1, 2, 3, 4},
+				[]octosql.Value{octosql.MakeInt(1), octosql.MakeInt(2), octosql.MakeInt(3), octosql.MakeInt(4)},
 			},
 			wantErr: false,
 		},
 		{
 			name: "empty - pass",
 			args: args{
-				[]interface{}{},
+				[]octosql.Value{},
 			},
 			wantErr: false,
 		},
 		{
 			name: "mixed1 - pass",
 			args: args{
-				[]interface{}{1, 2, 2.0, 3, 4},
+				[]octosql.Value{octosql.MakeInt(1), octosql.MakeInt(2), octosql.MakeFloat(2.0), octosql.MakeInt(3), octosql.MakeInt(4)},
 			},
 			wantErr: false,
 		},
 		{
 			name: "mixed2 - fail",
 			args: args{
-				[]interface{}{1, 2, "2", 3, 4},
+				[]octosql.Value{octosql.MakeInt(1), octosql.MakeInt(2), octosql.MakeString("2"), octosql.MakeInt(3), octosql.MakeInt(4)},
 			},
 			wantErr: true,
 		},

@@ -203,20 +203,15 @@ func GetNewRecord(client *redis.Client, keyName, key, alias string) (*execution.
 
 	recordValues[keyName] = key
 
-	aliasedRecord := make(map[octosql.VariableName]interface{})
+	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
 	for k, v := range recordValues {
 		fieldName := octosql.NewVariableName(fmt.Sprintf("%s.%s", alias, k))
-		aliasedRecord[fieldName] = v
+		aliasedRecord[fieldName] = execution.NormalizeType(v)
 	}
 
 	fieldNames := make([]octosql.VariableName, 0)
 	for k := range aliasedRecord {
 		fieldNames = append(fieldNames, k)
-	}
-
-	aliasedRecord, ok := execution.NormalizeType(aliasedRecord).(map[octosql.VariableName]interface{})
-	if !ok {
-		return nil, errors.Errorf("couldn't normalize aliased map to map[octosql.VariableName]interface{}")
 	}
 
 	return execution.NewRecord(fieldNames, aliasedRecord), nil

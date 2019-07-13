@@ -1,6 +1,7 @@
 package aggregates
 
 import (
+	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 )
@@ -15,15 +16,15 @@ func NewCount() *Count {
 	}
 }
 
-func (agg *Count) AddRecord(key []interface{}, value interface{}) error {
-	count, ok, err := agg.counts.Get(key)
+func (agg *Count) AddRecord(key octosql.Tuple, value octosql.Value) error {
+	count, previousValueExists, err := agg.counts.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current count out of hashmap")
 	}
 
-	var newCount int
-	if ok {
-		newCount = count.(int) + 1
+	var newCount octosql.Int
+	if previousValueExists {
+		newCount = count.(octosql.Int) + 1
 	} else {
 		newCount = 1
 	}
@@ -36,7 +37,7 @@ func (agg *Count) AddRecord(key []interface{}, value interface{}) error {
 	return nil
 }
 
-func (agg *Count) GetAggregated(key []interface{}) (interface{}, error) {
+func (agg *Count) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
 	count, ok, err := agg.counts.Get(key)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get count out of hashmap")
@@ -46,7 +47,7 @@ func (agg *Count) GetAggregated(key []interface{}) (interface{}, error) {
 		return nil, errors.Errorf("count for key not found")
 	}
 
-	return count, nil
+	return count.(octosql.Int), nil
 }
 
 func (agg *Count) String() string {

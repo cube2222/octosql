@@ -3,6 +3,7 @@ package aggregates
 import (
 	"fmt"
 
+	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 )
@@ -19,25 +20,25 @@ func NewDistinct(underlying execution.Aggregate) *Distinct {
 	}
 }
 
-func (agg *Distinct) AddRecord(key []interface{}, value interface{}) error {
-	groupSet, ok, err := agg.groupSets.Get(key)
+func (agg *Distinct) AddRecord(key octosql.Tuple, value octosql.Value) error {
+	groupSet, previousValueExists, err := agg.groupSets.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get distinct value set for group key")
 	}
 
 	var newGroupSet *execution.HashMap
-	if !ok {
+	if !previousValueExists {
 		newGroupSet = execution.NewHashMap()
 	} else {
 		newGroupSet = groupSet.(*execution.HashMap)
 	}
 
-	_, ok, err = newGroupSet.Get(value)
+	_, previousValueExists, err = newGroupSet.Get(value)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get value out of distinct value set for given key")
 	}
 
-	if ok {
+	if previousValueExists {
 		// This value has been here already
 		return nil
 	}
@@ -60,7 +61,7 @@ func (agg *Distinct) AddRecord(key []interface{}, value interface{}) error {
 	return nil
 }
 
-func (agg *Distinct) GetAggregated(key []interface{}) (interface{}, error) {
+func (agg *Distinct) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
 	return agg.underlying.GetAggregated(key)
 }
 

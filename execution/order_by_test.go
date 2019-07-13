@@ -11,8 +11,9 @@ func TestOrderBy_Get(t *testing.T) {
 	now := time.Now()
 
 	type args struct {
-		stream RecordStream
-		fields []OrderField
+		stream      RecordStream
+		expressions []Expression
+		directions  []OrderDirection
 	}
 	tests := []struct {
 		name    string
@@ -34,12 +35,8 @@ func TestOrderBy_Get(t *testing.T) {
 						[]octosql.VariableName{"id", "age"},
 						[]interface{}{3, 2}),
 				}),
-				fields: []OrderField{
-					{
-						ColumnName: "age",
-						Direction:  Ascending,
-					},
-				},
+				expressions: []Expression{NewVariable(octosql.NewVariableName("age"))},
+				directions:  []OrderDirection{Ascending},
 			},
 			want: NewInMemoryStream([]*Record{
 				NewRecordFromSliceWithNormalize(
@@ -60,28 +57,24 @@ func TestOrderBy_Get(t *testing.T) {
 				stream: NewInMemoryStream([]*Record{
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
-						[]interface{}{"b", 7}),
+						[]interface{}{"b", 10}),
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
-						[]interface{}{"c", 10}),
+						[]interface{}{"c", 7}),
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
 						[]interface{}{"a", 2}),
 				}),
-				fields: []OrderField{
-					{
-						ColumnName: "name",
-						Direction:  Descending,
-					},
-				},
+				expressions: []Expression{NewVariable(octosql.NewVariableName("name"))},
+				directions:  []OrderDirection{Descending},
 			},
 			want: NewInMemoryStream([]*Record{
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
-					[]interface{}{"c", 10}),
+					[]interface{}{"c", 7}),
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
-					[]interface{}{"b", 7}),
+					[]interface{}{"b", 10}),
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
 					[]interface{}{"a", 2}),
@@ -102,12 +95,8 @@ func TestOrderBy_Get(t *testing.T) {
 						[]octosql.VariableName{"name", "birth"},
 						[]interface{}{"a", now.Add(-1 * time.Hour)}),
 				}),
-				fields: []OrderField{
-					{
-						ColumnName: "birth",
-						Direction:  Descending,
-					},
-				},
+				expressions: []Expression{NewVariable(octosql.NewVariableName("birth"))},
+				directions:  []OrderDirection{Descending},
 			},
 			want: NewInMemoryStream([]*Record{
 				NewRecordFromSliceWithNormalize(
@@ -142,15 +131,13 @@ func TestOrderBy_Get(t *testing.T) {
 						[]octosql.VariableName{"name", "age"},
 						[]interface{}{"d", 17}),
 				}),
-				fields: []OrderField{
-					{
-						ColumnName: "name",
-						Direction:  Ascending,
-					},
-					{
-						ColumnName: "age",
-						Direction:  Descending,
-					},
+				expressions: []Expression{
+					NewVariable(octosql.NewVariableName("name")),
+					NewVariable(octosql.NewVariableName("age")),
+				},
+				directions: []OrderDirection{
+					Ascending,
+					Descending,
 				},
 			},
 			want: NewInMemoryStream([]*Record{
@@ -184,12 +171,8 @@ func TestOrderBy_Get(t *testing.T) {
 						[]octosql.VariableName{"name", "age?"},
 						[]interface{}{"d", 19}),
 				}),
-				fields: []OrderField{
-					{
-						ColumnName: "age",
-						Direction:  Descending,
-					},
-				},
+				expressions: []Expression{NewVariable(octosql.NewVariableName("age"))},
+				directions:  []OrderDirection{Descending},
 			},
 			want:    nil,
 			wantErr: true,
@@ -206,12 +189,8 @@ func TestOrderBy_Get(t *testing.T) {
 						[]octosql.VariableName{"name", "age"},
 						[]interface{}{"d", 19.5}),
 				}),
-				fields: []OrderField{
-					{
-						ColumnName: "age",
-						Direction:  Descending,
-					},
-				},
+				expressions: []Expression{NewVariable(octosql.NewVariableName("age"))},
+				directions:  []OrderDirection{Descending},
 			},
 			want:    nil,
 			wantErr: true,
@@ -220,7 +199,7 @@ func TestOrderBy_Get(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ordered, err := createOrderedStream(tt.args.fields, tt.args.stream)
+			ordered, err := createOrderedStream(tt.args.expressions, tt.args.directions, octosql.NoVariables(), tt.args.stream)
 			if err != nil && !tt.wantErr {
 				t.Errorf("Error in create stream: %v", err)
 				return

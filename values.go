@@ -24,6 +24,9 @@ func (v Phantom) String() string {
 func MakePhantom() Phantom {
 	return Phantom(struct{}{})
 }
+func ZeroPhantom() Phantom {
+	return struct{}{}
+}
 
 type Int int
 
@@ -34,6 +37,9 @@ func (v Int) String() string {
 }
 func MakeInt(v int) Int {
 	return Int(v)
+}
+func ZeroInt() Int {
+	return 0
 }
 
 type Float float64
@@ -46,6 +52,9 @@ func (v Float) String() string {
 func MakeFloat(v float64) Float {
 	return Float(v)
 }
+func ZeroFloat() Float {
+	return 0
+}
 
 type Bool bool
 
@@ -56,6 +65,9 @@ func (v Bool) String() string {
 }
 func MakeBool(v bool) Bool {
 	return Bool(v)
+}
+func ZeroBool() Bool {
+	return false
 }
 
 type String string
@@ -68,6 +80,9 @@ func (v String) String() string {
 func MakeString(v string) String {
 	return String(v)
 }
+func ZeroString() String {
+	return ""
+}
 
 type Time time.Time
 
@@ -78,6 +93,9 @@ func (v Time) String() string {
 }
 func MakeTime(v time.Time) Time {
 	return Time(v)
+}
+func ZeroTime() Time {
+	return Time(time.Time{})
 }
 
 type Tuple []Value
@@ -94,6 +112,9 @@ func (v Tuple) String() string {
 func MakeTuple(v []Value) Tuple {
 	return Tuple(v)
 }
+func ZeroTuple() Tuple {
+	return nil
+}
 
 type Object map[string]Value
 
@@ -108,6 +129,9 @@ func (v Object) String() string {
 }
 func MakeObject(v map[string]Value) Object {
 	return Object(v)
+}
+func ZeroObject() Object {
+	return nil
 }
 
 // NormalizeType brings various primitive types into the type we want them to be.

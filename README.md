@@ -144,7 +144,7 @@ Redis database with the given index. Currently only hashes are supported.
 ## Documentation
 The SQL dialect documentation:
 
-Function documentation:
+Documentation for the available functions: https://github.com/cube2222/octosql/wiki/Function-Documentation
 
 ## Architecture
 An OctoSQL invocation gets processed in multiple stages.

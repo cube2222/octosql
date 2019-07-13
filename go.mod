@@ -6,18 +6,23 @@ require (
 	github.com/bradleyjkemp/memviz v0.2.2
 	github.com/go-redis/redis v6.15.2+incompatible
 	github.com/go-sql-driver/mysql v1.4.1
+	github.com/golang/protobuf v1.3.1 // indirect
+	github.com/kr/pretty v0.1.0 // indirect
 	github.com/lib/pq v1.0.0
 	github.com/mattn/go-runewidth v0.0.4 // indirect
-	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/hashstructure v1.0.0
 	github.com/olekukonko/tablewriter v0.0.1
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0 // indirect
 	github.com/pkg/errors v0.8.1
+	github.com/russross/blackfriday v2.0.0+incompatible
+	github.com/shurcooL/go v0.0.0-20190704215121-7189cc372560 // indirect
+	github.com/shurcooL/markdownfmt v0.0.0-20190409060426-3438a10682f5
+	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 	github.com/spf13/cobra v0.0.5
-	github.com/spf13/viper v1.4.0
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2
 	golang.org/x/net v0.0.0-20190522155817-f3200d17e092
 	google.golang.org/appengine v1.5.0 // indirect
+	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 	gopkg.in/yaml.v2 v2.2.2
 )

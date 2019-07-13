@@ -13,36 +13,6 @@ lowercase an int). This may be expanded in the future
 to make the functions more versatile.
 */
 
-/* The only legal functions are the ones that appear in this
-table. Otherwise the function will be considered undefined
-and will throw an error on physical -> execution conversion.
-IMPORTANT: As of now the lookup is case sensitive, so the functions must
-be stored in lowercase, and the user must input them as lowercase as well.
-*/
-var functionTable = map[string]execution.Function{
-	"int":          functions.FuncInt,
-	"float":        functions.FuncFloat,
-	"lowercase":    functions.FuncLower,
-	"uppercase":    functions.FuncUpper,
-	"negate":       functions.FuncNegate,
-	"abs":          functions.FuncAbs,
-	"capitalize":   functions.FuncCapitalize,
-	"sqrt":         functions.FuncSqrt,
-	"greatest":     functions.FuncGreatest,
-	"least":        functions.FuncLeast,
-	"randint":      functions.FuncRandInt,
-	"randfloat":    functions.FuncRandFloat,
-	"ceiling":      functions.FuncCeil,
-	"floor":        functions.FuncFloor,
-	"log":          functions.FuncLog,
-	"ln":           functions.FuncLn,
-	"power":        functions.FuncPower,
-	"reverse":      functions.FuncReverse,
-	"sub":          functions.FuncSubstring, //TODO: fix parsing so that you can name this function substring
-	"matchregular": functions.FuncRegexp,
-	"nth":          functions.FuncNth,
-}
-
 type FunctionExpression struct {
 	name      string
 	arguments []Expression

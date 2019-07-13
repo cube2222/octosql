@@ -7,9 +7,12 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/cube2222/octosql/docs"
 )
 
 type Value interface {
+	docs.Documented
 	octoValue()
 	fmt.Stringer
 }
@@ -20,6 +23,9 @@ func (Phantom) octoValue()           {}
 func (v Phantom) AsStruct() struct{} { return struct{}(v) }
 func (v Phantom) String() string {
 	return "<phantom>"
+}
+func (v Phantom) Document() docs.Documentation {
+	return docs.Text("Phantom")
 }
 func MakePhantom() Phantom {
 	return Phantom(struct{}{})
@@ -35,6 +41,9 @@ func (v Int) AsInt() int { return int(v) }
 func (v Int) String() string {
 	return fmt.Sprint(v.AsInt())
 }
+func (v Int) Document() docs.Documentation {
+	return docs.Text("Int")
+}
 func MakeInt(v int) Int {
 	return Int(v)
 }
@@ -48,6 +57,9 @@ func (Float) octoValue()         {}
 func (v Float) AsFloat() float64 { return float64(v) }
 func (v Float) String() string {
 	return fmt.Sprint(v.AsFloat())
+}
+func (v Float) Document() docs.Documentation {
+	return docs.Text("Float")
 }
 func MakeFloat(v float64) Float {
 	return Float(v)
@@ -63,6 +75,9 @@ func (v Bool) AsBool() bool { return bool(v) }
 func (v Bool) String() string {
 	return fmt.Sprint(v.AsBool())
 }
+func (v Bool) Document() docs.Documentation {
+	return docs.Text("Bool")
+}
 func MakeBool(v bool) Bool {
 	return Bool(v)
 }
@@ -77,6 +92,9 @@ func (v String) AsString() string { return string(v) }
 func (v String) String() string {
 	return fmt.Sprintf("'%s'", v.AsString())
 }
+func (v String) Document() docs.Documentation {
+	return docs.Text("String")
+}
 func MakeString(v string) String {
 	return String(v)
 }
@@ -90,6 +108,9 @@ func (Time) octoValue()          {}
 func (v Time) AsTime() time.Time { return time.Time(v) }
 func (v Time) String() string {
 	return v.AsTime().Format(time.RFC3339Nano)
+}
+func (v Time) Document() docs.Documentation {
+	return docs.Text("Time")
 }
 func MakeTime(v time.Time) Time {
 	return Time(v)
@@ -109,6 +130,9 @@ func (v Tuple) String() string {
 	}
 	return fmt.Sprintf("(%s)", strings.Join(valueStrings, ", "))
 }
+func (v Tuple) Document() docs.Documentation {
+	return docs.Text("Tuple")
+}
 func MakeTuple(v []Value) Tuple {
 	return Tuple(v)
 }
@@ -126,6 +150,9 @@ func (v Object) String() string {
 		return fmt.Sprint(v.AsMap())
 	}
 	return string(text)
+}
+func (v Object) Document() docs.Documentation {
+	return docs.Text("Object")
 }
 func MakeObject(v map[string]Value) Object {
 	return Object(v)

@@ -223,7 +223,7 @@ func Test_stringFunctions(t *testing.T) {
 		{
 			name: "simple match - 1",
 			args: args{
-				fun:  FuncRegexp,
+				fun:  FuncMatchRegexp,
 				args: []octosql.Value{octosql.MakeString("t[a+b]e"), octosql.MakeString("tcetdetaetbe")},
 			},
 			want:    octosql.MakeString("tae"),
@@ -232,7 +232,7 @@ func Test_stringFunctions(t *testing.T) {
 		{
 			name: "simple match - 2",
 			args: args{
-				fun:  FuncRegexp,
+				fun:  FuncMatchRegexp,
 				args: []octosql.Value{octosql.MakeString("a..d"), octosql.MakeString("axdaxxdaxdxa")},
 			},
 			want:    octosql.MakeString("axxd"),
@@ -241,7 +241,7 @@ func Test_stringFunctions(t *testing.T) {
 		{
 			name: "simple match - 3",
 			args: args{
-				fun:  FuncRegexp,
+				fun:  FuncMatchRegexp,
 				args: []octosql.Value{octosql.MakeString(".[0-9]."), octosql.MakeString("this is a bit longer but 4 the matcher it's no problem")},
 			},
 			want:    octosql.MakeString(" 4 "), /* matches the spaces with . */
@@ -250,7 +250,7 @@ func Test_stringFunctions(t *testing.T) {
 		{
 			name: "simple match - 4",
 			args: args{
-				fun:  FuncRegexp,
+				fun:  FuncMatchRegexp,
 				args: []octosql.Value{octosql.MakeString("[1-9][0-9]{3}"), octosql.MakeString("The year was 2312 and the aliens began their invasion")},
 			},
 			want:    octosql.MakeString("2312"),
@@ -259,7 +259,7 @@ func Test_stringFunctions(t *testing.T) {
 		{
 			name: "star regexp match - 1",
 			args: args{
-				fun:  FuncRegexp,
+				fun:  FuncMatchRegexp,
 				args: []octosql.Value{octosql.MakeString("AB*A"), octosql.MakeString("My favourite band is not ABA, it's ABBA.")},
 			},
 			want:    octosql.MakeString("ABA"),
@@ -268,7 +268,7 @@ func Test_stringFunctions(t *testing.T) {
 		{
 			name: "star regexp match - 2",
 			args: args{
-				fun:  FuncRegexp,
+				fun:  FuncMatchRegexp,
 				args: []octosql.Value{octosql.MakeString("a*ba*"), octosql.MakeString("What is a bbba?")},
 			},
 			want:    octosql.MakeString("b"), /* matches the shortest */
@@ -277,7 +277,7 @@ func Test_stringFunctions(t *testing.T) {
 		{
 			name: "complex regexp",
 			args: args{
-				fun:  FuncRegexp,
+				fun:  FuncMatchRegexp,
 				args: []octosql.Value{octosql.MakeString(`[a + b]{2}c*d{3}`), octosql.MakeString("abcddaaacdddbacccdddabcda")},
 			},
 			want:    octosql.MakeString("aacddd"),
@@ -343,7 +343,7 @@ func Test_numerical(t *testing.T) {
 			name: "log(8)",
 			args: args{
 				args: []octosql.Value{octosql.MakeInt(8)},
-				fun:  FuncLog,
+				fun:  FuncLog2,
 			},
 			want:    octosql.MakeFloat(3.0),
 			wantErr: false,
@@ -352,7 +352,7 @@ func Test_numerical(t *testing.T) {
 			name: "log(15.5)",
 			args: args{
 				args: []octosql.Value{octosql.MakeFloat(15.5)},
-				fun:  FuncLog,
+				fun:  FuncLog2,
 			},
 			want:    octosql.MakeFloat(math.Log2(15.5)),
 			wantErr: false,
@@ -361,7 +361,7 @@ func Test_numerical(t *testing.T) {
 			name: "log(0)",
 			args: args{
 				args: []octosql.Value{octosql.MakeInt(0)},
-				fun:  FuncLog,
+				fun:  FuncLog2,
 			},
 			want:    nil,
 			wantErr: true,

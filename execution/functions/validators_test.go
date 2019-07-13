@@ -43,8 +43,8 @@ func Test_exactlyNArgs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := exactlyNArgs(tt.args.n)(tt.args.args...); (err != nil) != tt.wantErr {
-				t.Errorf("exactlyNArgs() error = %v, wantErr %v", err, tt.wantErr)
+			if err := ExactlyNArgs(tt.args.n).Validate(tt.args.args...); (err != nil) != tt.wantErr {
+				t.Errorf("ExactlyNArgs() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -111,7 +111,7 @@ func Test_atLeastNArgs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := atLeastNArgs(tt.args.n)(tt.args.args...); (err != nil) != tt.wantErr {
+			if err := AtLeastNArgs(tt.args.n).Validate(tt.args.args...); (err != nil) != tt.wantErr {
 				t.Errorf("atLeastOneArg() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -179,7 +179,7 @@ func Test_atMostNArgs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := atMostNArgs(tt.args.n)(tt.args.args...); (err != nil) != tt.wantErr {
+			if err := AtMostNArgs(tt.args.n).Validate(tt.args.args...); (err != nil) != tt.wantErr {
 				t.Errorf("atMostOneArg() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -319,7 +319,7 @@ func Test_wantedType(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := typeOf(tt.args.wantedType)(tt.args.arg); (err != nil) != tt.wantErr {
+			if err := TypeOf(tt.args.wantedType).Validate(tt.args.arg); (err != nil) != tt.wantErr {
 				t.Errorf("basicType() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

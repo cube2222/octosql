@@ -38,11 +38,11 @@ type Validator interface {
 }
 
 type FunctionExpression struct {
-	function  Function
+	function  *Function
 	arguments []Expression
 }
 
-func NewFunctionExpression(fun Function, args []Expression) *FunctionExpression {
+func NewFunctionExpression(fun *Function, args []Expression) *FunctionExpression {
 	return &FunctionExpression{
 		function:  fun,
 		arguments: args,

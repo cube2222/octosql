@@ -41,7 +41,7 @@ func (fe *FunctionExpression) Transform(ctx context.Context, transformers *Trans
 }
 
 func (fe *FunctionExpression) Materialize(ctx context.Context) (execution.Expression, error) {
-	function, ok := functionTable[fe.name]
+	function, ok := functions.FunctionTable[fe.name]
 	if !ok {
 		return nil, errors.Errorf("No function %v found", fe.name)
 	}

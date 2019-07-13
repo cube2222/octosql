@@ -157,8 +157,6 @@ The SQL AST gets converted into a logical query plan. This plan is still mostly 
 
 If you wanted to add a new query language to OctoSQL, the only problem you'd have to solve is translating it to this logical plan.
 
-TODO: diagram
-
 ### Physical Plan
 The logical plan gets converted into a physical plan. This conversion finds any logical errors in the query. If this stage is reached, then the input is correct and OctoSQL can execute it.
 
@@ -172,12 +170,8 @@ Here is an example diagram of an optimized physical plan:
 ### Execution Plan
 The physical plan gets materialized into an execution plan. This stage has to be able to connect to the actual datasources. It may initialize connections, open files, etc.
 
-TODO: diagram
-
 ### Stream
 Starting the execution plan creates a stream, which underneath may hold more streams, or parts of the execution plan to create streams in the future. This stream works in a pull based model.
-
-TODO: diagram
 
 ## Roadmap
 - Parallelize expression evaluation.

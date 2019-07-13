@@ -31,6 +31,14 @@ var usableFunctions = []execution.Function{
 	FuncSubstring,
 	FuncMatchRegexp,
 	FuncNth,
+	FuncReplace,
+	FuncHasPrefix,
+	FuncHasSuffix,
+	FuncContains,
+	FuncIndex,
+	FuncLength,
+	FuncNow,
+	FuncStringJoin,
 }
 
 func init() {

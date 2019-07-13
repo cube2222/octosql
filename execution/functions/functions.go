@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	. "github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/docs"
@@ -632,6 +633,147 @@ var FuncMatchRegexp = execution.Function{
 	},
 }
 
+var FuncReplace = execution.Function{
+	Name: "replace",
+	ArgumentNames: [][]string{
+		{"old", "new", "text"},
+	},
+	Description: docs.Text("Returns the text with all the instances of old replaced with new."),
+	Validator: All(
+		ExactlyNArgs(3),
+		AllArgs(TypeOf(ZeroString())),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		return MakeString(
+			strings.Replace(
+				args[2].(String).AsString(),
+				args[0].(String).AsString(),
+				args[1].(String).AsString(),
+				-1),
+		), nil
+	},
+}
+
+var FuncHasPrefix = execution.Function{
+	Name: "hasprefix",
+	ArgumentNames: [][]string{
+		{"prefix", "text"},
+	},
+	Description: docs.Text("Returns whether the text begins with prefix."),
+	Validator: All(
+		ExactlyNArgs(2),
+		AllArgs(TypeOf(ZeroString())),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		return MakeBool(
+			strings.HasPrefix(
+				args[1].(String).AsString(),
+				args[0].(String).AsString(),
+			),
+		), nil
+	},
+}
+
+var FuncHasSuffix = execution.Function{
+	Name: "hassuffix",
+	ArgumentNames: [][]string{
+		{"suffix", "text"},
+	},
+	Description: docs.Text("Returns whether the text ends with suffix."),
+	Validator: All(
+		ExactlyNArgs(2),
+		AllArgs(TypeOf(ZeroString())),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		return MakeBool(
+			strings.HasSuffix(
+				args[1].(String).AsString(),
+				args[0].(String).AsString(),
+			),
+		), nil
+	},
+}
+
+var FuncContains = execution.Function{
+	Name: "contains",
+	ArgumentNames: [][]string{
+		{"substring", "text"},
+		{"element", "tuple"},
+	},
+	Description: docs.List(
+		docs.Text("Provided a String, returns whether it contains the given substring."),
+		docs.Text("Provided a Tuple, returns whether it contains the given element. "),
+	),
+	Validator: All(
+		ExactlyNArgs(2),
+		OneOf(
+			AllArgs(TypeOf(ZeroString())),
+			Arg(1, TypeOf(ZeroTuple())),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		switch arg := args[1].(type) {
+		case String:
+			return MakeBool(
+				strings.Contains(
+					args[1].(String).AsString(),
+					args[0].(String).AsString(),
+				),
+			), nil
+		case Tuple:
+			for _, el := range arg.AsSlice() {
+				if AreEqual(el, args[0]) {
+					return MakeBool(true), nil
+				}
+			}
+			return MakeBool(false), nil
+		default:
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
+		}
+	},
+}
+
+var FuncIndex = execution.Function{
+	Name: "index",
+	ArgumentNames: [][]string{
+		{"substring", "text"},
+		{"element", "tuple"},
+	},
+	Description: docs.List(
+		docs.Text("Provided a String, returns the index of the substring in the text, or -1 if the text doesn't contain it."),
+		docs.Text("Provided a Tuple, returns the index of the element in the tuple, or -1 if the tuple doesn't contain it."),
+	),
+	Validator: All(
+		ExactlyNArgs(2),
+		OneOf(
+			AllArgs(TypeOf(ZeroString())),
+			Arg(1, TypeOf(ZeroTuple())),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		switch arg := args[1].(type) {
+		case String:
+			return MakeInt(
+				strings.Index(
+					args[1].(String).AsString(),
+					args[0].(String).AsString(),
+				),
+			), nil
+		case Tuple:
+			for i, el := range arg.AsSlice() {
+				if AreEqual(el, args[0]) {
+					return MakeInt(i), nil
+				}
+			}
+			return MakeInt(-1), nil
+		default:
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
+		}
+	},
+}
+
 var FuncNth = execution.Function{
 	Name: "nth",
 	ArgumentNames: [][]string{
@@ -645,6 +787,71 @@ var FuncNth = execution.Function{
 	),
 	Logic: func(args ...Value) (Value, error) {
 		return args[1].(Tuple).AsSlice()[args[0].(Int).AsInt()], nil
+	},
+}
+
+var FuncLength = execution.Function{
+	Name: "length",
+	ArgumentNames: [][]string{
+		{"seq"},
+	},
+	Description: docs.Text("Returns the length of the given Tuple or String."),
+	Validator: All(
+		ExactlyNArgs(1),
+		Arg(0,
+			SingleOneOf(
+				TypeOf(ZeroString()),
+				TypeOf(ZeroTuple()),
+			),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		switch arg := args[0].(type) {
+		case String:
+			return MakeInt(len(arg)), nil
+		case Tuple:
+			return MakeInt(len(arg)), nil
+		default:
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
+		}
+	},
+}
+
+var FuncNow = execution.Function{
+	Name: "now",
+	ArgumentNames: [][]string{
+		{""},
+	},
+	Description: docs.Text("Returns the current time."),
+	Validator:   ExactlyNArgs(0),
+	Logic: func(args ...Value) (Value, error) {
+		return MakeTime(time.Now()), nil
+	},
+}
+
+var FuncStringJoin = execution.Function{
+	Name: "strjoin",
+	ArgumentNames: [][]string{
+		{"tuple", "delimiter"},
+	},
+	Description: docs.Text("Returns the elements of the string tuple joined into a string separated by the delimiter."),
+	Validator: All(
+		ExactlyNArgs(2),
+		Arg(0, TypeOf(ZeroTuple())),
+		Arg(1, TypeOf(ZeroString())),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		tup := args[0].(Tuple)
+		out := make([]string, len(tup))
+		for i := range tup {
+			str, ok := tup[i].(String)
+			if !ok {
+				return nil, errors.Errorf("tuple element with index %v not string, got %v", i, tup[i])
+			}
+			out[i] = str.AsString()
+		}
+		return MakeString(strings.Join(out, args[1].(String).AsString())), nil
 	},
 }
 

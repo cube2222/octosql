@@ -788,7 +788,7 @@ func TestDataSource_Get(t *testing.T) {
 				return
 			}
 
-			equal, err := execution.AreStreamsEqual(stream, tt.want)
+			equal, err := execution.AreStreamsEqualNoOrdering(stream, tt.want)
 			if err != nil && !tt.wantErr {
 				t.Errorf("AreStreamsEqual() error: %s", err)
 				return

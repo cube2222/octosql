@@ -2,6 +2,7 @@ package redis
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
@@ -202,7 +203,7 @@ func GetNewRecord(client *redis.Client, keyName, key, alias string) (*execution.
 		return nil, ErrNotFound
 	}
 
-	recordValues[keyName] = key
+	keyVariableName := octosql.NewVariableName(fmt.Sprintf("%s.%s", alias, keyName))
 
 	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
 	for k, v := range recordValues {
@@ -211,9 +212,17 @@ func GetNewRecord(client *redis.Client, keyName, key, alias string) (*execution.
 	}
 
 	fieldNames := make([]octosql.VariableName, 0)
+	fieldNames = append(fieldNames, keyVariableName)
 	for k := range aliasedRecord {
 		fieldNames = append(fieldNames, k)
 	}
+
+	aliasedRecord[keyVariableName] = octosql.NormalizeType(key)
+
+	// The key is always the first record field
+	sort.Slice(fieldNames[1:], func(i, j int) bool {
+		return fieldNames[i+1] < fieldNames[j+1]
+	})
 
 	return execution.NewRecord(fieldNames, aliasedRecord), nil
 }

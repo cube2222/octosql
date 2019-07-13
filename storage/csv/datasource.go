@@ -127,7 +127,7 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 		return nil, errors.Wrap(err, "couldn't read record")
 	}
 
-	aliasedRecord := make(map[octosql.VariableName]interface{})
+	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
 	for i, v := range line {
 		aliasedRecord[rs.aliasedFields[i]] = execution.ParseType(v)
 	}

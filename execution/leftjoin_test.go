@@ -30,20 +30,20 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 		{
 			name: "simple left join",
 			fields: fields{
-				variables: map[octosql.VariableName]interface{}{
-					octosql.NewVariableName("const"): 3,
+				variables: map[octosql.VariableName]octosql.Value{
+					octosql.NewVariableName("const"): octosql.MakeInt(3),
 				},
 				source: NewInMemoryStream(
 					[]*Record{
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames,
 							[]interface{}{"red", "test"},
 						),
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames,
 							[]interface{}{"blue", "test2"},
 						),
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames,
 							[]interface{}{"green", "test3"},
 						),
@@ -63,19 +63,19 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 						),
 					),
 					NewDummyNode([]*Record{
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames2,
 							[]interface{}{"green", 7},
 						),
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames2,
 							[]interface{}{"red", 5},
 						),
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames2,
 							[]interface{}{"green", 4},
 						),
-						NewRecordFromSlice(
+						NewRecordFromSliceWithNormalize(
 							fieldNames2,
 							[]interface{}{"green", 2},
 						),
@@ -83,19 +83,19 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 			},
 			want: NewInMemoryStream(
 				[]*Record{
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"bike", "name", "color", "score"},
 						[]interface{}{"red", "test", "red", 5},
 					),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						fieldNames,
 						[]interface{}{"blue", "test2"},
 					),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"bike", "name", "color", "score"},
 						[]interface{}{"green", "test3", "green", 7},
 					),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"bike", "name", "color", "score"},
 						[]interface{}{"green", "test3", "green", 4},
 					),
@@ -106,8 +106,8 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 		{
 			name: "empty stream",
 			fields: fields{
-				variables: map[octosql.VariableName]interface{}{
-					octosql.NewVariableName("const"): 3,
+				variables: map[octosql.VariableName]octosql.Value{
+					octosql.NewVariableName("const"): octosql.MakeInt(3),
 				},
 				source: NewInMemoryStream(nil),
 				joined: NewDummyNode(nil),

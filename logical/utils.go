@@ -14,10 +14,10 @@ func EqualNodes(node1, node2 Node) error {
 	case *UnionAll:
 		if node2, ok := node2.(*UnionAll); ok {
 			if err := EqualNodes(node1.first, node2.first); err != nil {
-				return errors.Errorf("first statements not equal: %+v, %+v", node1.first, node2.first)
+				return errors.Wrapf(err, "first statements not equal: %+v, %+v", node1.first, node2.first)
 			}
 			if err := EqualNodes(node1.second, node2.second); err != nil {
-				return errors.Errorf("second statements not equal: %+v, %+v", node1.second, node2.second)
+				return errors.Wrapf(err, "second statements not equal: %+v, %+v", node1.second, node2.second)
 			}
 			return nil
 		}
@@ -25,10 +25,10 @@ func EqualNodes(node1, node2 Node) error {
 	case *UnionDistinct:
 		if node2, ok := node2.(*UnionDistinct); ok {
 			if err := EqualNodes(node1.first, node2.first); err != nil {
-				return errors.Errorf("first statements not equal: %+v, %+v", node1.first, node2.first)
+				return errors.Wrapf(err, "first statements not equal: %+v, %+v", node1.first, node2.first)
 			}
 			if err := EqualNodes(node1.second, node2.second); err != nil {
-				return errors.Errorf("second statements not equal: %+v, %+v", node1.second, node2.second)
+				return errors.Wrapf(err, "second statements not equal: %+v, %+v", node1.second, node2.second)
 			}
 			return nil
 		}
@@ -123,6 +123,51 @@ func EqualNodes(node1, node2 Node) error {
 			return nil
 		}
 
+	case *GroupBy:
+		if node2, ok := node2.(*GroupBy); ok {
+			if err := EqualNodes(node1.source, node2.source); err != nil {
+				return errors.Wrap(err, "sources not equal")
+			}
+
+			if len(node1.key) != len(node2.key) {
+				return errors.Errorf("key count not equal: %v, %v", len(node1.key), len(node2.key))
+			}
+			for i := range node1.key {
+				if err := EqualExpressions(node1.key[i], node2.key[i]); err != nil {
+					return errors.Wrapf(err, "key expression with index %v not equal", i)
+				}
+			}
+
+			if len(node1.fields) != len(node2.fields) {
+				return errors.Errorf("field count not equal: %v, %v", len(node1.fields), len(node2.fields))
+			}
+			for i := range node1.fields {
+				if node1.fields[i] != node2.fields[i] {
+					return errors.Errorf("field with index %v not equal: %v and %v", i, node1.fields[i], node2.fields[i])
+				}
+			}
+
+			if len(node1.aggregates) != len(node2.aggregates) {
+				return errors.Errorf("aggregate count not equal: %v, %v", len(node1.aggregates), len(node2.aggregates))
+			}
+			for i := range node1.aggregates {
+				if node1.aggregates[i] != node2.aggregates[i] {
+					return errors.Errorf("aggregate with index %v not equal: %v and %v", i, node1.aggregates[i], node2.aggregates[i])
+				}
+			}
+
+			if len(node1.as) != len(node2.as) {
+				return errors.Errorf("'as' count not equal: %v, %v", len(node1.as), len(node2.as))
+			}
+			for i := range node1.as {
+				if node1.as[i] != node2.as[i] {
+					return errors.Errorf("'as' with index %v not equal: %v and %v", i, node1.as[i], node2.as[i])
+				}
+			}
+
+			return nil
+		}
+
 	default:
 		log.Fatalf("Unsupported equality comparison %v and %v", reflect.TypeOf(node1), reflect.TypeOf(node2))
 	}
@@ -197,24 +242,37 @@ func EqualExpressions(expr1, expr2 Expression) error {
 			if expr1.value != expr2.value {
 				return errors.Errorf("values not equal: %v %v, %v %v", reflect.TypeOf(expr1.value), expr1.value, reflect.TypeOf(expr2.value), expr2.value)
 			}
+			return nil
 		}
-		return nil
 
 	case *Variable:
 		if expr2, ok := expr2.(*Variable); ok {
 			if expr1.name != expr2.name {
 				return errors.Errorf("names not equal: %v, %v", expr1.name, expr2.name)
 			}
+			return nil
 		}
-		return nil
+
+	case *Tuple:
+		if expr2, ok := expr2.(*Tuple); ok {
+			if len(expr1.expressions) != len(expr2.expressions) {
+				return errors.Errorf("expressions count not equal: %v, %v", len(expr1.expressions), len(expr2.expressions))
+			}
+			for i := range expr1.expressions {
+				if err := EqualExpressions(expr1.expressions[i], expr2.expressions[i]); err != nil {
+					return errors.Wrapf(err, "expression %v not equal", i)
+				}
+			}
+			return nil
+		}
 
 	case *NodeExpression:
 		if expr2, ok := expr2.(*NodeExpression); ok {
 			if err := EqualNodes(expr1.node, expr2.node); err != nil {
 				return errors.Wrap(err, "nodes not equal")
 			}
+			return nil
 		}
-		return nil
 
 	case *AliasedExpression:
 		if expr2, ok := expr2.(*AliasedExpression); ok {

@@ -13,11 +13,11 @@ type Field struct {
 
 type Record struct {
 	fieldNames []octosql.VariableName
-	data       []interface{}
+	data       []octosql.Value
 }
 
-func NewRecord(fields []octosql.VariableName, data map[octosql.VariableName]interface{}) *Record {
-	dataInner := make([]interface{}, len(fields))
+func NewRecord(fields []octosql.VariableName, data map[octosql.VariableName]octosql.Value) *Record {
+	dataInner := make([]octosql.Value, len(fields))
 	for i := range fields {
 		dataInner[i] = data[fields[i]]
 	}
@@ -27,7 +27,7 @@ func NewRecord(fields []octosql.VariableName, data map[octosql.VariableName]inte
 	}
 }
 
-func (r *Record) Value(field octosql.VariableName) interface{} {
+func (r *Record) Value(field octosql.VariableName) octosql.Value {
 	for i := range r.fieldNames {
 		if r.fieldNames[i] == field {
 			return r.data[i]

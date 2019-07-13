@@ -25,7 +25,7 @@ func (node *Limit) Get(variables octosql.Variables) (RecordStream, error) {
 		return nil, errors.Wrap(err, "couldn't extract value from limit subexpression")
 	}
 
-	limitVal, ok := exprVal.(int)
+	limitVal, ok := exprVal.(octosql.Int)
 	if !ok {
 		return nil, errors.New("limit value not int")
 	}
@@ -33,7 +33,7 @@ func (node *Limit) Get(variables octosql.Variables) (RecordStream, error) {
 		return nil, errors.New("negative limit value")
 	}
 
-	return newLimitedStream(dataStream, limitVal), nil
+	return newLimitedStream(dataStream, limitVal.Int()), nil
 }
 
 func newLimitedStream(rs RecordStream, limit int) *LimitedStream {

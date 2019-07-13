@@ -32,13 +32,13 @@ func NewOrderBy(fields []OrderField, source Node) *OrderBy {
 	}
 }
 
-func isSorteable(x interface{}) bool {
+func isSorteable(x octosql.Value) bool {
 	switch x.(type) {
-	case int:
+	case octosql.Int:
 		return true
-	case float64:
+	case octosql.Float:
 		return true
-	case string:
+	case octosql.String:
 		return true
 	default:
 		return false
@@ -81,10 +81,10 @@ func validateRecords(records []*Record, orderFields []OrderField) error {
 	return nil
 }
 
-func compare(x, y interface{}) (int, error) {
+func compare(x, y octosql.Value) (int, error) {
 	switch x := x.(type) {
-	case int:
-		y, ok := y.(int)
+	case octosql.Int:
+		y, ok := y.(octosql.Int)
 		if !ok {
 			return 0, errors.Errorf("type mismatch between values")
 		}
@@ -96,8 +96,8 @@ func compare(x, y interface{}) (int, error) {
 		}
 
 		return 1, nil
-	case float64:
-		y, ok := y.(float64)
+	case octosql.Float:
+		y, ok := y.(octosql.Float)
 		if !ok {
 			return 0, errors.Errorf("type mismatch between values")
 		}
@@ -109,8 +109,8 @@ func compare(x, y interface{}) (int, error) {
 		}
 
 		return 1, nil
-	case string:
-		y, ok := y.(string)
+	case octosql.String:
+		y, ok := y.(octosql.String)
 		if !ok {
 			return 0, errors.Errorf("type mismatch between values")
 		}
@@ -118,6 +118,32 @@ func compare(x, y interface{}) (int, error) {
 		if x == y {
 			return 0, nil
 		} else if x < y {
+			return -1, nil
+		}
+
+		return 1, nil
+	case octosql.Time:
+		y, ok := y.(octosql.Time)
+		if !ok {
+			return 0, errors.Errorf("type mismatch between values")
+		}
+
+		if x == y {
+			return 0, nil
+		} else if x.Time().Before(y.Time()) {
+			return -1, nil
+		}
+
+		return 1, nil
+	case octosql.Bool:
+		y, ok := y.(octosql.Bool)
+		if !ok {
+			return 0, errors.Errorf("type mismatch between values")
+		}
+
+		if x == y {
+			return 0, nil
+		} else if !x && y {
 			return -1, nil
 		}
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
 )
@@ -88,9 +89,41 @@ func NewConstant(value interface{}) *Constant {
 
 func (v *Constant) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
 	name := physicalCreator.GetVariableName()
-	return physical.NewVariable(name), octosql.NewVariables(map[octosql.VariableName]interface{}{
-		name: v.value,
+	return physical.NewVariable(name), octosql.NewVariables(map[octosql.VariableName]octosql.Value{
+		name: execution.NormalizeType(v.value),
 	}), nil
+}
+
+type Tuple struct {
+	expressions []Expression
+}
+
+func NewTuple(expressions []Expression) *Tuple {
+	return &Tuple{expressions: expressions}
+}
+
+func (tup *Tuple) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
+	physicalExprs := make([]physical.Expression, len(tup.expressions))
+	variables := octosql.NoVariables()
+	for i := range tup.expressions {
+		physicalExpr, exprVariables, err := tup.expressions[i].Physical(ctx, physicalCreator)
+		if err != nil {
+			return nil, nil, errors.Wrapf(
+				err,
+				"couldn't get physical plan for tuple subexpression with index %d", i,
+			)
+		}
+		variables, err = variables.MergeWith(exprVariables)
+		if err != nil {
+			return nil, nil, errors.Wrapf(
+				err,
+				"couldn't merge variables with those of tuple subexpression with index %d", i,
+			)
+		}
+
+		physicalExprs[i] = physicalExpr
+	}
+	return physical.NewTuple(physicalExprs), variables, nil
 }
 
 type NodeExpression struct {

@@ -21,13 +21,13 @@ func TestOrderBy_Get(t *testing.T) {
 			name: "simple order - one column int ascending",
 			args: args{
 				stream: NewInMemoryStream([]*Record{
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"id", "age"},
 						[]interface{}{1, 7}),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"id", "age"},
 						[]interface{}{2, 10}),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"id", "age"},
 						[]interface{}{3, 2}),
 				}),
@@ -39,13 +39,13 @@ func TestOrderBy_Get(t *testing.T) {
 				},
 			},
 			want: NewInMemoryStream([]*Record{
-				NewRecordFromSlice(
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "age"},
 					[]interface{}{3, 2}),
-				NewRecordFromSlice(
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "age"},
 					[]interface{}{1, 7}),
-				NewRecordFromSlice(
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "age"},
 					[]interface{}{2, 10}),
 			}),
@@ -56,13 +56,13 @@ func TestOrderBy_Get(t *testing.T) {
 			name: "simple order - one column string descending",
 			args: args{
 				stream: NewInMemoryStream([]*Record{
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
 						[]interface{}{"b", 7}),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
 						[]interface{}{"c", 10}),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
 						[]interface{}{"a", 2}),
 				}),
@@ -74,13 +74,13 @@ func TestOrderBy_Get(t *testing.T) {
 				},
 			},
 			want: NewInMemoryStream([]*Record{
-				NewRecordFromSlice(
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
 					[]interface{}{"c", 10}),
-				NewRecordFromSlice(
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
 					[]interface{}{"b", 7}),
-				NewRecordFromSlice(
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
 					[]interface{}{"a", 2}),
 			}),
@@ -91,19 +91,19 @@ func TestOrderBy_Get(t *testing.T) {
 			name: "complex order - string ascending then int descending",
 			args: args{
 				stream: NewInMemoryStream([]*Record{
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
 						[]interface{}{"a", 7}),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
 						[]interface{}{"d", 19}),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
 						[]interface{}{"a", -2}),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
 						[]interface{}{"c", 1}),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
 						[]interface{}{"d", 17}),
 				}),
@@ -119,19 +119,19 @@ func TestOrderBy_Get(t *testing.T) {
 				},
 			},
 			want: NewInMemoryStream([]*Record{
-				NewRecordFromSlice(
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
 					[]interface{}{"a", 7}),
-				NewRecordFromSlice(
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
 					[]interface{}{"a", -2}),
-				NewRecordFromSlice(
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
 					[]interface{}{"c", 1}),
-				NewRecordFromSlice(
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
 					[]interface{}{"d", 19}),
-				NewRecordFromSlice(
+				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
 					[]interface{}{"d", 17}),
 			}),
@@ -142,10 +142,10 @@ func TestOrderBy_Get(t *testing.T) {
 			name: "failed - missing field",
 			args: args{
 				stream: NewInMemoryStream([]*Record{
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
 						[]interface{}{"a", 7}),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age?"},
 						[]interface{}{"d", 19}),
 				}),
@@ -164,10 +164,10 @@ func TestOrderBy_Get(t *testing.T) {
 			name: "failed - type mismatch",
 			args: args{
 				stream: NewInMemoryStream([]*Record{
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
 						[]interface{}{"a", 7}),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
 						[]interface{}{"d", 19.5}),
 				}),
@@ -185,10 +185,10 @@ func TestOrderBy_Get(t *testing.T) {
 			name: "failed - non sortable boolean",
 			args: args{
 				stream: NewInMemoryStream([]*Record{
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"is_nice"},
 						[]interface{}{false}),
-					NewRecordFromSlice(
+					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"is_nice"},
 						[]interface{}{true}),
 				}),

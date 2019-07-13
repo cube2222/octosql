@@ -86,7 +86,7 @@ func NewDataSourceBuilderFactory(host string, port int, user, password, database
 
 // NewDataSourceBuilderFactoryFromConfig creates a data source builder factory using the configuration.
 func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (physical.DataSourceBuilderFactory, error) {
-	host, port, err := config.GetIPAddress(dbConfig, "address")
+	host, port, err := config.GetIPAddress(dbConfig, "address", config.WithDefault([]interface{}{"localhost", 5432}))
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get address")
 	}
@@ -103,7 +103,7 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 		return nil, errors.Wrap(err, "couldn't get tableName")
 	}
 
-	primaryKeysStrings, err := config.GetStringList(dbConfig, "primaryKeys")
+	primaryKeysStrings, err := config.GetStringList(dbConfig, "primaryKeys", config.WithDefault([]string{}))
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get primaryKeys")
 	}
@@ -194,23 +194,17 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 		return nil, errors.Wrap(err, "couldn't scan row")
 	}
 
-	resultMap := make(map[octosql.VariableName]interface{})
+	resultMap := make(map[octosql.VariableName]octosql.Value)
 
 	for i, columnName := range rs.columns {
-		val := colPointers[i].(*interface{})
 		newName := octosql.VariableName(fmt.Sprintf("%s.%s", rs.alias, columnName))
-		resultMap[newName] = val
+		resultMap[newName] = execution.NormalizeType(cols[i])
 	}
 
 	fields := make([]octosql.VariableName, 0)
 
 	for k := range resultMap {
 		fields = append(fields, k)
-	}
-
-	resultMap, ok := execution.NormalizeType(resultMap).(map[octosql.VariableName]interface{})
-	if !ok {
-		return nil, errors.New("couldn't cast resultMap to map[octosql.VariableName]interface{}")
 	}
 
 	return execution.NewRecord(fields, resultMap), nil

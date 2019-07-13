@@ -69,6 +69,42 @@ func (v *Variable) MaterializeNamed(ctx context.Context) (execution.NamedExpress
 	return execution.NewVariable(v.Name), nil
 }
 
+// TupleExpression describes an expression which is a tuple of subexpressions.
+type Tuple struct {
+	Expressions []Expression
+}
+
+func NewTuple(expressions []Expression) *Tuple {
+	return &Tuple{Expressions: expressions}
+}
+
+func (tup *Tuple) Transform(ctx context.Context, transformers *Transformers) Expression {
+	exprs := make([]Expression, len(tup.Expressions))
+	for i := range tup.Expressions {
+		exprs[i] = tup.Expressions[i].Transform(ctx, transformers)
+	}
+	var transformed Expression = &Tuple{
+		Expressions: exprs,
+	}
+	if transformers.ExprT != nil {
+		transformed = transformers.ExprT(transformed)
+	}
+	return transformed
+}
+
+func (tup *Tuple) Materialize(ctx context.Context) (execution.Expression, error) {
+	matExprs := make([]execution.Expression, len(tup.Expressions))
+	for i := range tup.Expressions {
+		materialized, err := tup.Expressions[i].Materialize(ctx)
+		if err != nil {
+			return nil, errors.Wrapf(err, "couldn't materialize expression with index %v", i)
+		}
+		matExprs[i] = materialized
+	}
+
+	return execution.NewTuple(matExprs), nil
+}
+
 // NodeExpressions describes an expression which gets it's value from a node underneath.
 type NodeExpression struct {
 	Node Node

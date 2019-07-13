@@ -33,19 +33,19 @@ func (vn *VariableName) Name() string {
 	return vn.String()[i+1:]
 }
 
-type Variables map[VariableName]interface{}
+type Variables map[VariableName]Value
 
 func NoVariables() Variables {
 	return make(Variables)
 }
 
-func NewVariables(variables map[VariableName]interface{}) Variables {
+func NewVariables(variables map[VariableName]Value) Variables {
 	return Variables(variables)
 }
 
 var ErrVariableNotFound = errors.New("variable not found")
 
-func (vs Variables) Get(k VariableName) (interface{}, error) {
+func (vs Variables) Get(k VariableName) (Value, error) {
 	return vs[k], nil
 }
 

@@ -21,14 +21,15 @@ be stored in lowercase, and the user must input them as lowercase as well.
 */
 var functionTable = map[string]execution.Function{
 	"int":          functions.FuncInt,
+	"float":        functions.FuncFloat,
 	"lowercase":    functions.FuncLower,
 	"uppercase":    functions.FuncUpper,
 	"negate":       functions.FuncNegate,
 	"abs":          functions.FuncAbs,
 	"capitalize":   functions.FuncCapitalize,
 	"sqrt":         functions.FuncSqrt,
-	"max":          functions.FuncMax,
-	"min":          functions.FuncMin,
+	"greatest":     functions.FuncGreatest,
+	"least":        functions.FuncLeast,
 	"randint":      functions.FuncRandInt,
 	"randfloat":    functions.FuncRandFloat,
 	"ceiling":      functions.FuncCeil,

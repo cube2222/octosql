@@ -60,61 +60,19 @@ func TestDataSource_Get(t *testing.T) {
 				},
 			},
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": "key0",
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
 				},
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecord(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]interface{}{
-						"r.key":     "key0",
-						"r.age":     "3",
-						"r.city":    "warsaw",
-						"r.name":    "wojtek",
-						"r.surname": "k",
-					},
-				),
-			},
-			),
-			wantErr: false,
-		},
-		{
-			name: "different database index",
-			fields: fields{
-				hostname: hostname,
-				password: password,
-				port:     port,
-				dbIndex:  1,
-				dbKey:    dbKey,
-				filter: physical.NewPredicate(
-					physical.NewVariable("r.key"),
-					physical.NewRelation("equal"),
-					physical.NewVariable("const_0")),
-				alias: "r",
-				queries: map[string]map[string]interface{}{
-					"key0": {
-						"name":    "wojtek",
-						"surname": "k",
-						"age":     "3",
-						"city":    "warsaw",
-					},
-				},
-			},
-			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": "key0",
-				},
-			},
-			want: execution.NewInMemoryStream([]*execution.Record{
-				execution.NewRecord(
-					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]interface{}{
-						"r.key":     "key0",
-						"r.age":     "3",
-						"r.city":    "warsaw",
-						"r.name":    "wojtek",
-						"r.surname": "k",
+					map[octosql.VariableName]octosql.Value{
+						"r.key":     octosql.MakeString("key0"),
+						"r.age":     octosql.MakeString("3"),
+						"r.city":    octosql.MakeString("warsaw"),
+						"r.name":    octosql.MakeString("wojtek"),
+						"r.surname": octosql.MakeString("k"),
 					},
 				),
 			},
@@ -144,19 +102,19 @@ func TestDataSource_Get(t *testing.T) {
 				},
 			},
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": "key0",
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
 				},
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecord(
-					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]interface{}{
-						"r.key":     "key0",
-						"r.age":     "3",
-						"r.city":    "warsaw",
-						"r.name":    "wojtek",
-						"r.surname": "k",
+					[]octosql.VariableName{"r.some_other_key_name", "r.age", "r.city", "r.name", "r.surname"},
+					map[octosql.VariableName]octosql.Value{
+						"r.some_other_key_name": octosql.MakeString("key0"),
+						"r.age":                 octosql.MakeString("3"),
+						"r.city":                octosql.MakeString("warsaw"),
+						"r.name":                octosql.MakeString("wojtek"),
+						"r.surname":             octosql.MakeString("k"),
 					},
 				),
 			},
@@ -204,30 +162,30 @@ func TestDataSource_Get(t *testing.T) {
 				},
 			},
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": "key0",
-					"const_1": "key1",
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
+					"const_1": octosql.MakeString("key1"),
 				},
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecord(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]interface{}{
-						"r.key":     "key0",
-						"r.age":     "3",
-						"r.city":    "warsaw",
-						"r.name":    "wojtek",
-						"r.surname": "k",
+					map[octosql.VariableName]octosql.Value{
+						"r.key":     octosql.MakeString("key0"),
+						"r.age":     octosql.MakeString("3"),
+						"r.city":    octosql.MakeString("warsaw"),
+						"r.name":    octosql.MakeString("wojtek"),
+						"r.surname": octosql.MakeString("k"),
 					},
 				),
 				execution.NewRecord(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]interface{}{
-						"r.key":     "key1",
-						"r.age":     "4",
-						"r.city":    "zacisze",
-						"r.name":    "janek",
-						"r.surname": "ch",
+					map[octosql.VariableName]octosql.Value{
+						"r.key":     octosql.MakeString("key1"),
+						"r.age":     octosql.MakeString("4"),
+						"r.city":    octosql.MakeString("zacisze"),
+						"r.name":    octosql.MakeString("janek"),
+						"r.surname": octosql.MakeString("ch"),
 					},
 				),
 			},
@@ -263,20 +221,20 @@ func TestDataSource_Get(t *testing.T) {
 				},
 			},
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": "key0",
-					"const_1": "key1",
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
+					"const_1": octosql.MakeString("key1"),
 				},
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecord(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]interface{}{
-						"r.key":     "key0",
-						"r.age":     "3",
-						"r.city":    "warsaw",
-						"r.name":    "wojtek",
-						"r.surname": "k",
+					map[octosql.VariableName]octosql.Value{
+						"r.key":     octosql.MakeString("key0"),
+						"r.age":     octosql.MakeString("3"),
+						"r.city":    octosql.MakeString("warsaw"),
+						"r.name":    octosql.MakeString("wojtek"),
+						"r.surname": octosql.MakeString("k"),
 					},
 				),
 			},
@@ -321,47 +279,47 @@ func TestDataSource_Get(t *testing.T) {
 				},
 			},
 			args: args{
-				variables: map[octosql.VariableName]interface{}{},
+				variables: map[octosql.VariableName]octosql.Value{},
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecord(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]interface{}{
-						"r.key":     "key0",
-						"r.age":     "3",
-						"r.city":    "warsaw",
-						"r.name":    "wojtek",
-						"r.surname": "k",
+					map[octosql.VariableName]octosql.Value{
+						"r.key":     octosql.MakeString("key0"),
+						"r.age":     octosql.MakeString("3"),
+						"r.city":    octosql.MakeString("warsaw"),
+						"r.name":    octosql.MakeString("wojtek"),
+						"r.surname": octosql.MakeString("k"),
 					},
 				),
 				execution.NewRecord(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]interface{}{
-						"r.key":     "key1",
-						"r.age":     "4",
-						"r.city":    "zacisze",
-						"r.name":    "janek",
-						"r.surname": "ch",
+					map[octosql.VariableName]octosql.Value{
+						"r.key":     octosql.MakeString("key1"),
+						"r.age":     octosql.MakeString("4"),
+						"r.city":    octosql.MakeString("zacisze"),
+						"r.name":    octosql.MakeString("janek"),
+						"r.surname": octosql.MakeString("ch"),
 					},
 				),
 				execution.NewRecord(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]interface{}{
-						"r.key":     "key2",
-						"r.age":     "2",
-						"r.city":    "warsaw",
-						"r.name":    "kuba",
-						"r.surname": "m",
+					map[octosql.VariableName]octosql.Value{
+						"r.key":     octosql.MakeString("key2"),
+						"r.age":     octosql.MakeString("2"),
+						"r.city":    octosql.MakeString("warsaw"),
+						"r.name":    octosql.MakeString("kuba"),
+						"r.surname": octosql.MakeString("m"),
 					},
 				),
 				execution.NewRecord(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]interface{}{
-						"r.key":     "key3",
-						"r.age":     "1",
-						"r.city":    "ciechanow",
-						"r.name":    "adam",
-						"r.surname": "cz",
+					map[octosql.VariableName]octosql.Value{
+						"r.key":     octosql.MakeString("key3"),
+						"r.age":     octosql.MakeString("1"),
+						"r.city":    octosql.MakeString("ciechanow"),
+						"r.name":    octosql.MakeString("adam"),
+						"r.surname": octosql.MakeString("cz"),
 					},
 				),
 			},
@@ -434,32 +392,32 @@ func TestDataSource_Get(t *testing.T) {
 				},
 			},
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": "key0",
-					"const_1": "key1",
-					"const_2": "key2",
-					"const_3": "key3",
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
+					"const_1": octosql.MakeString("key1"),
+					"const_2": octosql.MakeString("key2"),
+					"const_3": octosql.MakeString("key3"),
 				},
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecord(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]interface{}{
-						"r.key":     "key0",
-						"r.age":     "3",
-						"r.city":    "warsaw",
-						"r.name":    "wojtek",
-						"r.surname": "k",
+					map[octosql.VariableName]octosql.Value{
+						"r.key":     octosql.MakeString("key0"),
+						"r.age":     octosql.MakeString("3"),
+						"r.city":    octosql.MakeString("warsaw"),
+						"r.name":    octosql.MakeString("wojtek"),
+						"r.surname": octosql.MakeString("k"),
 					},
 				),
 				execution.NewRecord(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]interface{}{
-						"r.key":     "key1",
-						"r.age":     "4",
-						"r.city":    "zacisze",
-						"r.name":    "janek",
-						"r.surname": "ch",
+					map[octosql.VariableName]octosql.Value{
+						"r.key":     octosql.MakeString("key1"),
+						"r.age":     octosql.MakeString("4"),
+						"r.city":    octosql.MakeString("zacisze"),
+						"r.name":    octosql.MakeString("janek"),
+						"r.surname": octosql.MakeString("ch"),
 					},
 				),
 			},
@@ -526,21 +484,21 @@ func TestDataSource_Get(t *testing.T) {
 				},
 			},
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": "key0",
-					"const_1": "key1",
-					"const_2": "key2",
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
+					"const_1": octosql.MakeString("key1"),
+					"const_2": octosql.MakeString("key2"),
 				},
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecord(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]interface{}{
-						"r.key":     "key1",
-						"r.age":     "4",
-						"r.city":    "zacisze",
-						"r.name":    "janek",
-						"r.surname": "ch",
+					map[octosql.VariableName]octosql.Value{
+						"r.key":     octosql.MakeString("key1"),
+						"r.age":     octosql.MakeString("4"),
+						"r.city":    octosql.MakeString("zacisze"),
+						"r.name":    octosql.MakeString("janek"),
+						"r.surname": octosql.MakeString("ch"),
 					},
 				),
 			},
@@ -570,9 +528,9 @@ func TestDataSource_Get(t *testing.T) {
 				},
 			},
 			args: args{
-				variables: map[octosql.VariableName]interface{}{},
+				variables: map[octosql.VariableName]octosql.Value{},
 			},
-			want:    nil,
+			want:    execution.NewInMemoryStream(nil),
 			wantErr: true,
 		},
 		{
@@ -591,11 +549,11 @@ func TestDataSource_Get(t *testing.T) {
 				queries: map[string]map[string]interface{}{},
 			},
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": "key0",
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
 				},
 			},
-			want:    nil,
+			want:    execution.NewInMemoryStream(nil),
 			wantErr: true,
 		},
 		{
@@ -614,11 +572,11 @@ func TestDataSource_Get(t *testing.T) {
 				queries: map[string]map[string]interface{}{},
 			},
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": "key0",
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
 				},
 			},
-			want:    nil,
+			want:    execution.NewInMemoryStream(nil),
 			wantErr: true,
 		},
 		{
@@ -637,11 +595,11 @@ func TestDataSource_Get(t *testing.T) {
 				queries: map[string]map[string]interface{}{},
 			},
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": "key0",
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
 				},
 			},
-			want:    nil,
+			want:    execution.NewInMemoryStream(nil),
 			wantErr: true,
 		},
 		{
@@ -660,11 +618,11 @@ func TestDataSource_Get(t *testing.T) {
 				queries: map[string]map[string]interface{}{},
 			},
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": "key0",
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
 				},
 			},
-			want:    nil,
+			want:    execution.NewInMemoryStream(nil),
 			wantErr: true,
 		},
 		{
@@ -680,9 +638,9 @@ func TestDataSource_Get(t *testing.T) {
 				queries:  map[string]map[string]interface{}{},
 			},
 			args: args{
-				variables: map[octosql.VariableName]interface{}{},
+				variables: map[octosql.VariableName]octosql.Value{},
 			},
-			want:    nil,
+			want:    execution.NewInMemoryStream(nil),
 			wantErr: true,
 		},
 	}
@@ -698,10 +656,12 @@ func TestDataSource_Get(t *testing.T) {
 				},
 			)
 
-			_, err := client.Ping().Result()
-			if err != nil {
-				//t.Errorf("Couldn't connect to database")
-				return
+			if tt.wantErr == false {
+				_, err := client.Ping().Result()
+				if err != nil {
+					t.Errorf("Couldn't connect to database: %v", err)
+					return
+				}
 			}
 
 			defer func() {
@@ -725,21 +685,31 @@ func TestDataSource_Get(t *testing.T) {
 			dsFactory := NewDataSourceBuilderFactory(fields.hostname, fields.port, fields.password, fields.dbIndex, fields.dbKey)
 			dsBuilder := dsFactory(fields.alias)
 			execNode, err := dsBuilder.Executor(fields.filter, fields.alias)
-			if err != nil {
+			if err != nil && !tt.wantErr {
 				t.Errorf("%v : while executing datasource builder", err)
+				return
+			} else if err != nil {
 				return
 			}
 
 			stream, err := execNode.Get(tt.args.variables)
-			if err != nil {
-				//t.Errorf("Error in Get")
+			if err != nil && !tt.wantErr {
+				t.Errorf("Error in Get: %v", err)
+				return
+			} else if err != nil {
 				return
 			}
 
 			equal, err := execution.AreStreamsEqual(stream, tt.want)
-			if err != nil {
+			if err != nil && !tt.wantErr {
 				t.Errorf("AreStreamsEqual() error: %s", err)
 				return
+			} else if err != nil {
+				return
+			}
+
+			if tt.wantErr {
+				t.Errorf("wanted error, but none received")
 			}
 
 			if !equal {

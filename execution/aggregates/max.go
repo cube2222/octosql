@@ -18,7 +18,7 @@ func NewMax() *Max {
 }
 
 func (agg *Max) AddRecord(key octosql.Tuple, value octosql.Value) error {
-	max, ok, err := agg.maxes.Get(key)
+	max, previousValueExists, err := agg.maxes.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current max out of hashmap")
 	}
@@ -35,7 +35,7 @@ func (agg *Max) AddRecord(key octosql.Tuple, value octosql.Value) error {
 				value, agg.typedValue)
 		}
 
-		if !ok || value > max.(octosql.Int) {
+		if !previousValueExists || value > max.(octosql.Int) {
 			max = value
 		}
 
@@ -47,7 +47,7 @@ func (agg *Max) AddRecord(key octosql.Tuple, value octosql.Value) error {
 				value, agg.typedValue)
 		}
 
-		if !ok || value > max.(octosql.Float) {
+		if !previousValueExists || value > max.(octosql.Float) {
 			max = value
 		}
 
@@ -59,7 +59,7 @@ func (agg *Max) AddRecord(key octosql.Tuple, value octosql.Value) error {
 				value, agg.typedValue)
 		}
 
-		if !ok || value > max.(octosql.String) {
+		if !previousValueExists || value > max.(octosql.String) {
 			max = value
 		}
 
@@ -71,7 +71,7 @@ func (agg *Max) AddRecord(key octosql.Tuple, value octosql.Value) error {
 				value, agg.typedValue)
 		}
 
-		if !ok || value == true {
+		if !previousValueExists || value == true {
 			max = value
 		}
 
@@ -83,7 +83,7 @@ func (agg *Max) AddRecord(key octosql.Tuple, value octosql.Value) error {
 				value, agg.typedValue)
 		}
 
-		if !ok || value.AsTime().After(max.(octosql.Time).AsTime()) {
+		if !previousValueExists || value.AsTime().After(max.(octosql.Time).AsTime()) {
 			max = value
 		}
 	default:

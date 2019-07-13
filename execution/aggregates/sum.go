@@ -18,7 +18,7 @@ func NewSum() *Sum {
 }
 
 func (agg *Sum) AddRecord(key octosql.Tuple, value octosql.Value) error {
-	sum, ok, err := agg.sums.Get(key)
+	sum, previousValueExists, err := agg.sums.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current sum out of hashmap")
 	}
@@ -35,7 +35,7 @@ func (agg *Sum) AddRecord(key octosql.Tuple, value octosql.Value) error {
 				value, agg.typedValue)
 		}
 
-		if ok {
+		if previousValueExists {
 			sum = sum.(octosql.Int) + value
 		} else {
 			sum = value
@@ -49,7 +49,7 @@ func (agg *Sum) AddRecord(key octosql.Tuple, value octosql.Value) error {
 				value, agg.typedValue)
 		}
 
-		if ok {
+		if previousValueExists {
 			sum = sum.(octosql.Float) + value
 		} else {
 			sum = value

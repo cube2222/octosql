@@ -584,8 +584,8 @@ var FuncSubstring = execution.Function{
 		{"word", "begin", "end"},
 	},
 	Description: docs.List(
-		docs.Text("Provided two arguments, returns word[begin:]"),
-		docs.Text("Provided three arguments, returns word[begin:end]"),
+		docs.Text("Provided two arguments, returns word[begin:]."),
+		docs.Text("Provided three arguments, returns word[begin:end]."),
 	),
 	Validator: All(
 		AtLeastNArgs(2),

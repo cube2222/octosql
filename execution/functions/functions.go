@@ -833,16 +833,16 @@ var FuncNow = execution.Function{
 var FuncStringJoin = execution.Function{
 	Name: "strjoin",
 	ArgumentNames: [][]string{
-		{"tuple", "delimiter"},
+		{"delimiter", "tuple"},
 	},
 	Description: docs.Text("Returns the elements of the string tuple joined into a string separated by the delimiter."),
 	Validator: All(
 		ExactlyNArgs(2),
-		Arg(0, TypeOf(ZeroTuple())),
-		Arg(1, TypeOf(ZeroString())),
+		Arg(0, TypeOf(ZeroString())),
+		Arg(1, TypeOf(ZeroTuple())),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		tup := args[0].(Tuple)
+		tup := args[1].(Tuple)
 		out := make([]string, len(tup))
 		for i := range tup {
 			str, ok := tup[i].(String)
@@ -851,7 +851,7 @@ var FuncStringJoin = execution.Function{
 			}
 			out[i] = str.AsString()
 		}
-		return MakeString(strings.Join(out, args[1].(String).AsString())), nil
+		return MakeString(strings.Join(out, args[0].(String).AsString())), nil
 	},
 }
 

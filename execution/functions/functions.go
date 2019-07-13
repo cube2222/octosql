@@ -1,6 +1,7 @@
 package functions
 
 import (
+	"log"
 	"math"
 	"math/rand"
 	"reflect"
@@ -60,7 +61,8 @@ var FuncInt = execution.Function{
 			}
 			return MakeInt(number), nil
 		default:
-			return nil, errors.Errorf("Type %v can't be parsed to int", reflect.TypeOf(arg))
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
 		}
 	},
 }
@@ -97,7 +99,8 @@ var FuncFloat = execution.Function{
 			}
 			return MakeFloat(number), nil
 		default:
-			return nil, errors.Errorf("Type %v can't be parsed to float64", reflect.TypeOf(arg))
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
 		}
 	},
 }
@@ -121,7 +124,8 @@ var FuncNegate = execution.Function{
 		case Float:
 			return -1 * arg, nil
 		default:
-			return nil, errors.Errorf("Type %v can't be negated", reflect.TypeOf(arg))
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
 		}
 	},
 }
@@ -151,7 +155,8 @@ var FuncAbs = execution.Function{
 			}
 			return arg, nil
 		default:
-			return nil, errors.Errorf("Can't take absolute value of type %v", reflect.TypeOf(arg))
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
 		}
 	},
 }
@@ -181,7 +186,8 @@ var FuncSqrt = execution.Function{
 			}
 			return MakeFloat(math.Sqrt(arg.AsFloat())), nil
 		default:
-			return nil, errors.Errorf("Can't take square root of type %v", reflect.TypeOf(arg))
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
 		}
 	},
 }
@@ -205,7 +211,8 @@ var FuncFloor = execution.Function{
 		case Float:
 			return MakeFloat(math.Floor(arg.AsFloat())), nil
 		default:
-			return nil, errors.Errorf("Can't take floor of type %v", reflect.TypeOf(arg))
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
 		}
 	},
 }
@@ -229,7 +236,8 @@ var FuncCeil = execution.Function{
 		case Float:
 			return MakeFloat(math.Ceil(arg.AsFloat())), nil
 		default:
-			return nil, errors.Errorf("Can't take ceiling of type %v", reflect.TypeOf(arg))
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
 		}
 	},
 }
@@ -259,7 +267,8 @@ var FuncLog = execution.Function{
 			}
 			return MakeFloat(math.Log2(arg.AsFloat())), nil
 		default:
-			return nil, errors.Errorf("Can't take log of type %v", reflect.TypeOf(arg))
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
 		}
 	},
 }
@@ -289,7 +298,8 @@ var FuncLn = execution.Function{
 			}
 			return MakeFloat(math.Log1p(arg.AsFloat()) - 1), nil
 		default:
-			return nil, errors.Errorf("Can't take ln of type %v", reflect.TypeOf(arg))
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
 		}
 	},
 }
@@ -306,22 +316,25 @@ var FuncLeast = execution.Function{
 		)(args...)
 	},
 	Logic: func(args ...Value) (Value, error) {
-		if allArgs(typeOf(ZeroInt()))(args...) == nil { /* ints */
+		switch args[0].(type) {
+		case Int:
 			var min Int = math.MaxInt64
 			for _, arg := range args {
 				min = intMin(min, arg.(Int))
 			}
 
 			return min, nil
-		} else { /* floats */
+		case Float:
 			min := math.Inf(1)
 			for _, arg := range args {
 				min = math.Min(min, arg.(Float).AsFloat())
 			}
 
 			return MakeFloat(min), nil
+		default:
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
 		}
-
 	},
 }
 
@@ -336,22 +349,25 @@ var FuncGreatest = execution.Function{
 		)(args...)
 	},
 	Logic: func(args ...Value) (Value, error) {
-		if allArgs(typeOf(ZeroInt()))(args...) == nil { /* ints */
+		switch args[0].(type) {
+		case Int:
 			var max Int = math.MinInt64
 			for _, arg := range args {
 				max = intMax(max, arg.(Int))
 			}
 
 			return max, nil
-		} else { /* floats */
+		case Float:
 			max := math.Inf(-1)
 			for _, arg := range args {
 				max = math.Max(max, arg.(Float).AsFloat())
 			}
 
 			return MakeFloat(max), nil
+		default:
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
 		}
-
 	},
 }
 
@@ -364,13 +380,13 @@ var FuncRandFloat = execution.Function{
 		)(args...)
 	},
 	Logic: func(args ...Value) (Value, error) {
-		argCount := len(args)
-		if argCount == 0 {
+		switch len(args) {
+		case 0:
 			return MakeFloat(rand.Float64()), nil
-		} else if argCount == 1 {
+		case 1:
 			upper := float64(args[0].(Int).AsInt())
 			return MakeFloat(upper * rand.Float64()), nil
-		} else {
+		default:
 			lower := float64(args[0].(Int).AsInt())
 			upper := float64(args[1].(Int).AsInt())
 
@@ -387,17 +403,17 @@ var FuncRandInt = execution.Function{
 		)(args...)
 	},
 	Logic: func(args ...Value) (Value, error) {
-		argCount := len(args)
-		if argCount == 0 {
+		switch len(args) {
+		case 0:
 			return MakeInt(rand.Int()), nil
-		} else if argCount == 1 {
+		case 1:
 			upper := args[0].(Int)
 			if upper <= 0 {
 				return nil, errors.Errorf("Upper boundary for random integer must be greater than zero")
 			}
 
 			return MakeInt(rand.Intn(upper.AsInt())), nil
-		} else {
+		default:
 			lower := args[0].(Int).AsInt()
 			upper := args[1].(Int).AsInt()
 
@@ -481,7 +497,7 @@ var FuncReverse = execution.Function{
 }
 
 var FuncSubstring = execution.Function{
-	Validator: func(args ...Value) error { /* this is a complicated validator */
+	Validator: func(args ...Value) error {
 		return all(
 			atLeastNArgs(2),
 			atMostNArgs(3),
@@ -493,11 +509,9 @@ var FuncSubstring = execution.Function{
 	Logic: func(args ...Value) (Value, error) {
 		str := args[0].(String)
 		start := args[1].(Int)
-		var end Int
+		end := MakeInt(len(str))
 
-		if len(args) == 2 {
-			end = MakeInt(len(str))
-		} else {
+		if len(args) == 3 {
 			end = args[2].(Int)
 		}
 

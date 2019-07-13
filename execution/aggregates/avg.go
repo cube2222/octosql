@@ -46,19 +46,19 @@ func (agg *Average) AddRecord(key octosql.Tuple, value octosql.Value) error {
 		return errors.Errorf("invalid type in average: %v with value %v", execution.GetType(value), value)
 	}
 
-	count, ok, err := agg.counts.Get(key)
+	count, previousValueExists, err := agg.counts.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current element count out of hashmap")
 	}
 
-	average, ok, err := agg.averages.Get(key)
+	average, previousValueExists, err := agg.averages.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current average out of hashmap")
 	}
 
 	var newAverage octosql.Float
 	var newCount int
-	if ok {
+	if previousValueExists {
 		newCount = count.(int) + 1
 		newAverage = (average.(octosql.Float)*octosql.MakeFloat(float64(newCount-1)) + floatValue) / octosql.MakeFloat(float64(newCount))
 	} else {

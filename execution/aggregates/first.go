@@ -17,12 +17,12 @@ func NewFirst() *First {
 }
 
 func (agg *First) AddRecord(key octosql.Tuple, value octosql.Value) error {
-	_, ok, err := agg.firsts.Get(key)
+	_, previousValueExists, err := agg.firsts.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current first out of hashmap")
 	}
 
-	if ok {
+	if previousValueExists {
 		return nil
 	}
 

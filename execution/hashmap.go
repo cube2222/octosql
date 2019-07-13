@@ -21,20 +21,20 @@ type entry struct {
 	value interface{}
 }
 
-func (g *HashMap) Set(key octosql.Value, value interface{}) error {
+func (hm *HashMap) Set(key octosql.Value, value interface{}) error {
 	hash, err := hashstructure.Hash(key, nil)
 	if err != nil {
 		return errors.Wrapf(err, "couldn't hash %+v", key)
 	}
 
-	list := g.container[hash]
+	list := hm.container[hash]
 	for i := range list {
 		if octosql.AreEqual(list[i].key, key) {
 			list[i].value = value
 			return nil
 		}
 	}
-	g.container[hash] = append(list, entry{
+	hm.container[hash] = append(list, entry{
 		key:   key,
 		value: value,
 	})
@@ -42,13 +42,13 @@ func (g *HashMap) Set(key octosql.Value, value interface{}) error {
 	return nil
 }
 
-func (g *HashMap) Get(key octosql.Value) (interface{}, bool, error) {
+func (hm *HashMap) Get(key octosql.Value) (interface{}, bool, error) {
 	hash, err := hashstructure.Hash(key, nil)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "couldn't hash %+v", key)
 	}
 
-	list := g.container[hash]
+	list := hm.container[hash]
 	for i := range list {
 		if octosql.AreEqual(list[i].key, key) {
 			return list[i].value, true, nil
@@ -57,14 +57,14 @@ func (g *HashMap) Get(key octosql.Value) (interface{}, bool, error) {
 	return nil, false, nil
 }
 
-func (g *HashMap) GetIterator() *Iterator {
-	hashes := make([]uint64, 0, len(g.container))
-	for k := range g.container {
+func (hm *HashMap) GetIterator() *Iterator {
+	hashes := make([]uint64, 0, len(hm.container))
+	for k := range hm.container {
 		hashes = append(hashes, k)
 	}
 
 	return &Iterator{
-		hm:             g,
+		hm:             hm,
 		hashes:         hashes,
 		hashesPosition: 0,
 		listPosition:   0,

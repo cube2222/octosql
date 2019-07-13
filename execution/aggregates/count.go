@@ -17,13 +17,13 @@ func NewCount() *Count {
 }
 
 func (agg *Count) AddRecord(key octosql.Tuple, value octosql.Value) error {
-	count, ok, err := agg.counts.Get(key)
+	count, previousValueExists, err := agg.counts.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current count out of hashmap")
 	}
 
 	var newCount octosql.Int
-	if ok {
+	if previousValueExists {
 		newCount = count.(octosql.Int) + 1
 	} else {
 		newCount = 1

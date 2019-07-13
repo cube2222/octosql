@@ -166,6 +166,7 @@ This stage also already understands the specifics of the underlying datasources.
 
 The optimizer uses a pattern matching approach, where it has rules for matching parts of the physical plan tree and how those patterns can be restructured into a more efficient version. The rules are meant to be as simple as possible and make the smallest possible changes. This way, the optimizer just keeps on iterating on the whole tree, until it can't change anything anymore. This ensures that the plan reaches a local performance minimum, and the rules should be structured so that this local minimum is equal - or close to - the global minimum.
 
+Here is an example diagram of an optimized physical plan.
 ![Physical Plan](images/physical.png)
 
 ### Execution Plan

@@ -193,6 +193,7 @@ Starting the execution plan creates a stream, which underneath may hold more str
 Where scan means that the whole table needs to be scanned for each access. We are planning to add an in memory index in the future, which would allow us to store small tables in-memory, saving us a lot of unnecessary reads.
 
 ## Roadmap
+- Additional Datasources.
 - SQL Constructs:
   - JSON Query
   - Window Functions

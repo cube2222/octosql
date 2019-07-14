@@ -25,19 +25,6 @@ const (
 	SumDistinct   Aggregate = "sum_distinct"
 )
 
-var aggregateTable = map[Aggregate]execution.AggregatePrototype{
-	Avg:           func() execution.Aggregate { return aggregates.NewAverage() },
-	AvgDistinct:   func() execution.Aggregate { return aggregates.NewDistinct(aggregates.NewAverage()) },
-	Count:         func() execution.Aggregate { return aggregates.NewCount() },
-	CountDistinct: func() execution.Aggregate { return aggregates.NewDistinct(aggregates.NewCount()) },
-	First:         func() execution.Aggregate { return aggregates.NewFirst() },
-	Last:          func() execution.Aggregate { return aggregates.NewLast() },
-	Max:           func() execution.Aggregate { return aggregates.NewMax() },
-	Min:           func() execution.Aggregate { return aggregates.NewMin() },
-	Sum:           func() execution.Aggregate { return aggregates.NewSum() },
-	SumDistinct:   func() execution.Aggregate { return aggregates.NewDistinct(aggregates.NewSum()) },
-}
-
 func NewAggregate(aggregate string) Aggregate {
 	return Aggregate(strings.ToLower(aggregate))
 }
@@ -97,7 +84,7 @@ func (node *GroupBy) Materialize(ctx context.Context) (execution.Node, error) {
 
 	aggregatePrototypes := make([]execution.AggregatePrototype, len(node.Aggregates))
 	for i := range node.Aggregates {
-		aggregatePrototypes[i] = aggregateTable[node.Aggregates[i]]
+		aggregatePrototypes[i] = aggregates.AggregateTable[string(node.Aggregates[i])]
 	}
 
 	return execution.NewGroupBy(source, key, node.Fields, aggregatePrototypes, node.As), nil

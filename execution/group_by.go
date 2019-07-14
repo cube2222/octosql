@@ -4,12 +4,14 @@ import (
 	"fmt"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/pkg/errors"
 )
 
 type AggregatePrototype func() Aggregate
 
 type Aggregate interface {
+	docs.Documented
 	AddRecord(key octosql.Tuple, value octosql.Value) error
 	GetAggregated(key octosql.Tuple) (octosql.Value, error)
 	String() string

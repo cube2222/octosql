@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 )
 
 type AggregateMock struct {
@@ -17,6 +18,10 @@ type AggregateMock struct {
 	getValues []octosql.Value
 
 	t *testing.T
+}
+
+func (mock *AggregateMock) Document() docs.Documentation {
+	panic("implement me")
 }
 
 func (mock *AggregateMock) AddRecord(key octosql.Tuple, value octosql.Value) error {

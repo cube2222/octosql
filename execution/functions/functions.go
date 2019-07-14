@@ -474,15 +474,15 @@ var FuncRegexp = execution.Function{
 /* Operators */
 
 var FuncAdd = execution.Function{
-	Validator: func(args ...interface{}) error {
+	Validator: func(args ...octosql.Value) error {
 		return combine(twoArgs, allNumbers)(args...)
 	},
-	Logic: func(args ...interface{}) (interface{}, error) {
+	Logic: func(args ...octosql.Value) (octosql.Value, error) {
 		first := args[0]
 		second := args[1]
 
-		firstInt, firstOk := first.(int)
-		secondInt, secondOk := second.(int)
+		firstInt, firstOk := second.(octosql.Int)
+		secondInt, secondOk := second.(octosql.Int)
 
 		if firstOk && secondOk {
 			return firstInt + secondInt, nil

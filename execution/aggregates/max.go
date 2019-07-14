@@ -71,7 +71,7 @@ func (agg *Max) AddRecord(key octosql.Tuple, value octosql.Value) error {
 				value, agg.typedValue)
 		}
 
-		if !previousValueExists || value == true {
+		if !previousValueExists || value.AsBool() {
 			max = value
 		}
 

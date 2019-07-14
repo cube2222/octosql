@@ -71,7 +71,7 @@ func (agg *Min) AddRecord(key octosql.Tuple, value octosql.Value) error {
 				value, agg.typedValue)
 		}
 
-		if !previousValueExists || value == false {
+		if !previousValueExists || value.AsBool() {
 			min = value
 		}
 

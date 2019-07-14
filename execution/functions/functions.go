@@ -223,7 +223,7 @@ var FuncFloor = execution.Function{
 	Logic: func(args ...Value) (Value, error) {
 		switch arg := args[0].(type) {
 		case Int:
-			return MakeFloat(math.Floor(float64(arg.AsInt()))), nil
+			return MakeFloat(float64(arg.AsInt())), nil
 		case Float:
 			return MakeFloat(math.Floor(arg.AsFloat())), nil
 		default:
@@ -251,7 +251,7 @@ var FuncCeil = execution.Function{
 	Logic: func(args ...Value) (Value, error) {
 		switch arg := args[0].(type) {
 		case Int:
-			return MakeFloat(math.Ceil(float64(arg.AsInt()))), nil
+			return MakeFloat(float64(arg.AsInt())), nil
 		case Float:
 			return MakeFloat(math.Ceil(arg.AsFloat())), nil
 		default:

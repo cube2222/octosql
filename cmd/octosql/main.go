@@ -28,9 +28,13 @@ var outputFormat string
 
 var rootCmd = &cobra.Command{
 	Use:   "octosql <query>",
-	Short: "A brief description of your application.", //TODO: write short description
-	Long:  `A long description of your application.`,  //TODO: write long description
-	Args:  cobra.ExactValidArgs(1),
+	Short: "OctoSQL is a data querying tool, allowing you to join, analyze and transform data from multiple data sources and file formats using SQL.",
+	Long: `OctoSQL is a SQL query engine which allows you to write standard SQL queries on data stored in multiple SQL databases, NoSQL databases and files in various formats trying to push down as much of the work as possible to the source databases, not transferring unnecessary data.
+
+OctoSQL does that by creating an internal representation of your query and later translating parts of it into the query languages or APIs of the source databases. Whenever a datasource doesn't support a given operation, OctoSQL will execute it in memory, so you don't have to worry about the specifics of the underlying datasources.
+
+With OctoSQL you don't need O(n) client tools or a large data analysis system deployment. Everything's contained in a single binary.`,
+	Args: cobra.ExactValidArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		ctx := context.Background()
 		query := args[0]

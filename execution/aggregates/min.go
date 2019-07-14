@@ -22,7 +22,7 @@ func (agg *Min) Document() docs.Documentation {
 	return docs.Section(
 		agg.String(),
 		docs.Body(
-			docs.Section("Description", docs.Text("Takes the minimum element in the group. Works with Ints, Floats, Strings, Booleans, Times.")),
+			docs.Section("Description", docs.Text("Takes the minimum element in the group. Works with Ints, Floats, Strings, Booleans, Times, Durations.")),
 		),
 	)
 }
@@ -82,6 +82,18 @@ func (agg *Min) AddRecord(key octosql.Tuple, value octosql.Value) error {
 		}
 
 		if !previousValueExists || value.AsBool() {
+			min = value
+		}
+
+	case octosql.Duration:
+		_, typeOk := agg.typedValue.(octosql.Duration)
+		if !typeOk {
+			return errors.Errorf("mixed types in min: %v and %v with values %v and %v",
+				execution.GetType(value), execution.GetType(agg.typedValue),
+				value, agg.typedValue)
+		}
+
+		if !previousValueExists || value < min.(octosql.Duration) {
 			min = value
 		}
 

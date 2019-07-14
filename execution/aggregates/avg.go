@@ -1,6 +1,8 @@
 package aggregates
 
 import (
+	"time"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/execution"
@@ -24,7 +26,7 @@ func (agg *Average) Document() docs.Documentation {
 	return docs.Section(
 		agg.String(),
 		docs.Body(
-			docs.Section("Description", docs.Text("Averages Floats or Ints in the group. You may not mix types.")),
+			docs.Section("Description", docs.Text("Averages Floats, Ints or Durations in the group. You may not mix types.")),
 		),
 	)
 }
@@ -52,6 +54,14 @@ func (agg *Average) AddRecord(key octosql.Tuple, value octosql.Value) error {
 				value, agg.typedValue)
 		}
 		floatValue = octosql.MakeFloat(float64(value.AsInt()))
+	case octosql.Duration:
+		_, typeOk := agg.typedValue.(octosql.Duration)
+		if !typeOk {
+			return errors.Errorf("mixed types in avg: %v and %v with values %v and %v",
+				execution.GetType(value), execution.GetType(agg.typedValue),
+				value, agg.typedValue)
+		}
+		floatValue = octosql.MakeFloat(float64(value.AsDuration()))
 	default:
 		return errors.Errorf("invalid type in average: %v with value %v", execution.GetType(value), value)
 	}
@@ -99,7 +109,12 @@ func (agg *Average) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
 		return nil, errors.Errorf("average for key not found")
 	}
 
-	return average.(octosql.Float), nil
+	switch agg.typedValue.(type) {
+	case octosql.Duration:
+		return octosql.MakeDuration(time.Duration(average.(octosql.Float).AsFloat())), nil
+	default:
+		return average.(octosql.Float), nil
+	}
 }
 
 func (agg *Average) String() string {

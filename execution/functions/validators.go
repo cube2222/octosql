@@ -8,7 +8,6 @@ import (
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/docs"
 	. "github.com/cube2222/octosql/execution"
-	"github.com/pkg/errors"
 )
 
 type SingleArgumentValidator interface {
@@ -85,7 +84,7 @@ func (v *oneOf) Validate(args ...octosql.Value) error {
 		}
 	}
 
-	return errors.Errorf("none of the conditions have been met: %+v", errs)
+	return fmt.Errorf("none of the conditions have been met: %+v", errs)
 }
 
 func (v *oneOf) Document() docs.Documentation {
@@ -114,7 +113,7 @@ func (v *singleOneOf) Validate(arg octosql.Value) error {
 		}
 	}
 
-	return errors.Errorf("none of the conditions have been met: %+v", errs)
+	return fmt.Errorf("none of the conditions have been met: %+v", errs)
 }
 
 func (v *singleOneOf) Document() docs.Documentation {
@@ -159,7 +158,7 @@ func AtLeastNArgs(n int) *atLeastNArgs {
 
 func (v *atLeastNArgs) Validate(args ...octosql.Value) error {
 	if len(args) < v.n {
-		return errors.Errorf("expected at least %s, but got %v", argumentCount(v.n), len(args))
+		return fmt.Errorf("expected at least %s, but got %v", argumentCount(v.n), len(args))
 	}
 	return nil
 }
@@ -178,7 +177,7 @@ func AtMostNArgs(n int) *atMostNArgs {
 
 func (v *atMostNArgs) Validate(args ...octosql.Value) error {
 	if len(args) > v.n {
-		return errors.Errorf("expected at most %s, but got %v", argumentCount(v.n), len(args))
+		return fmt.Errorf("expected at most %s, but got %v", argumentCount(v.n), len(args))
 	}
 	return nil
 }
@@ -197,7 +196,7 @@ func ExactlyNArgs(n int) *exactlyNArgs {
 
 func (v *exactlyNArgs) Validate(args ...octosql.Value) error {
 	if len(args) != v.n {
-		return errors.Errorf("expected exactly %s, but got %v", argumentCount(v.n), len(args))
+		return fmt.Errorf("expected exactly %s, but got %v", argumentCount(v.n), len(args))
 	}
 	return nil
 }
@@ -218,49 +217,49 @@ func (v *typeOf) Validate(arg octosql.Value) error {
 	switch v.wantedType.(type) {
 	case octosql.Phantom:
 		if _, ok := arg.(octosql.Phantom); !ok {
-			return errors.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroPhantom()).String(), arg)
+			return fmt.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroPhantom()).String(), arg)
 		}
 		return nil
 
 	case octosql.Int:
 		if _, ok := arg.(octosql.Int); !ok {
-			return errors.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroInt()).String(), arg)
+			return fmt.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroInt()).String(), arg)
 		}
 		return nil
 
 	case octosql.Float:
 		if _, ok := arg.(octosql.Float); !ok {
-			return errors.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroFloat()).String(), arg)
+			return fmt.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroFloat()).String(), arg)
 		}
 		return nil
 
 	case octosql.Bool:
 		if _, ok := arg.(octosql.Bool); !ok {
-			return errors.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroBool()).String(), arg)
+			return fmt.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroBool()).String(), arg)
 		}
 		return nil
 
 	case octosql.String:
 		if _, ok := arg.(octosql.String); !ok {
-			return errors.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroString()).String(), arg)
+			return fmt.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroString()).String(), arg)
 		}
 		return nil
 
 	case octosql.Time:
 		if _, ok := arg.(octosql.Time); !ok {
-			return errors.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroTime()).String(), arg)
+			return fmt.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroTime()).String(), arg)
 		}
 		return nil
 
 	case octosql.Tuple:
 		if _, ok := arg.(octosql.Tuple); !ok {
-			return errors.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroTuple()).String(), arg)
+			return fmt.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroTuple()).String(), arg)
 		}
 		return nil
 
 	case octosql.Object:
 		if _, ok := arg.(octosql.Object); !ok {
-			return errors.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroObject()).String(), arg)
+			return fmt.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroObject()).String(), arg)
 		}
 		return nil
 
@@ -285,7 +284,7 @@ func Arg(i int, validator SingleArgumentValidator) *arg {
 
 func (v *arg) Validate(args ...octosql.Value) error {
 	if err := v.validator.Validate(args[v.i]); err != nil {
-		return errors.Errorf("bad argument at index %v: %v", v.i, err)
+		return fmt.Errorf("bad argument at index %v: %v", v.i, err)
 	}
 	return nil
 }
@@ -308,7 +307,7 @@ func AllArgs(validator SingleArgumentValidator) *allArgs {
 func (v *allArgs) Validate(args ...octosql.Value) error {
 	for i := range args {
 		if err := v.validator.Validate(args[i]); err != nil {
-			return errors.Errorf("bad argument at index %v: %v", i, err)
+			return fmt.Errorf("bad argument at index %v: %v", i, err)
 		}
 	}
 	return nil

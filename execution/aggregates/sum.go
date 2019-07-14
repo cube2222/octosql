@@ -22,7 +22,7 @@ func (agg *Sum) Document() docs.Documentation {
 	return docs.Section(
 		agg.String(),
 		docs.Body(
-			docs.Section("Description", docs.Text("Sums Floats or Ints in the group. You may not mix types.")),
+			docs.Section("Description", docs.Text("Sums Floats, Ints or Durations in the group. You may not mix types.")),
 		),
 	)
 }
@@ -47,6 +47,20 @@ func (agg *Sum) AddRecord(key octosql.Tuple, value octosql.Value) error {
 
 		if previousValueExists {
 			sum = sum.(octosql.Int) + value
+		} else {
+			sum = value
+		}
+
+	case octosql.Duration:
+		_, typeOk := agg.typedValue.(octosql.Duration)
+		if !typeOk {
+			return errors.Errorf("mixed types in sum: %v and %v with values %v and %v",
+				execution.GetType(value), execution.GetType(agg.typedValue),
+				value, agg.typedValue)
+		}
+
+		if previousValueExists {
+			sum = sum.(octosql.Duration) + value
 		} else {
 			sum = value
 		}

@@ -1,6 +1,7 @@
 package functions
 
 import (
+	"fmt"
 	"log"
 	"math"
 	"math/rand"
@@ -13,7 +14,6 @@ import (
 	. "github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/execution"
-	"github.com/pkg/errors"
 )
 
 func execute(fun execution.Function, args ...Value) (Value, error) {
@@ -190,12 +190,12 @@ var FuncSqrt = execution.Function{
 		switch arg := args[0].(type) {
 		case Int:
 			if arg < 0 {
-				return nil, errors.Errorf("Can't take square root of value %v", arg)
+				return nil, fmt.Errorf("Can't take square root of value %v", arg)
 			}
 			return MakeFloat(math.Sqrt(float64(arg.AsInt()))), nil
 		case Float:
 			if arg < 0 {
-				return nil, errors.Errorf("Can't take square root of value %v", arg)
+				return nil, fmt.Errorf("Can't take square root of value %v", arg)
 			}
 			return MakeFloat(math.Sqrt(arg.AsFloat())), nil
 		default:
@@ -280,12 +280,12 @@ var FuncLog2 = execution.Function{
 		switch arg := args[0].(type) {
 		case Int:
 			if arg <= 0 {
-				return nil, errors.Errorf("Can't take log of value %v", arg)
+				return nil, fmt.Errorf("Can't take log of value %v", arg)
 			}
 			return MakeFloat(math.Log2(float64(arg.AsInt()))), nil
 		case Float:
 			if arg <= 0 {
-				return nil, errors.Errorf("Can't take log of value %v", arg)
+				return nil, fmt.Errorf("Can't take log of value %v", arg)
 			}
 			return MakeFloat(math.Log2(arg.AsFloat())), nil
 		default:
@@ -314,12 +314,12 @@ var FuncLn = execution.Function{
 		switch arg := args[0].(type) {
 		case Int:
 			if arg <= 0 {
-				return nil, errors.Errorf("Can't take ln of value %v", arg)
+				return nil, fmt.Errorf("Can't take ln of value %v", arg)
 			}
 			return MakeFloat(math.Log1p(float64(arg.AsInt())) - 1), nil
 		case Float:
 			if arg <= 0 {
-				return nil, errors.Errorf("Can't take ln of value %v", arg)
+				return nil, fmt.Errorf("Can't take ln of value %v", arg)
 			}
 			return MakeFloat(math.Log1p(arg.AsFloat()) - 1), nil
 		default:
@@ -458,7 +458,7 @@ var FuncRandInt = execution.Function{
 		case 1:
 			upper := args[0].(Int)
 			if upper <= 0 {
-				return nil, errors.Errorf("Upper boundary for random integer must be greater than zero")
+				return nil, fmt.Errorf("Upper boundary for random integer must be greater than zero")
 			}
 
 			return MakeInt(rand.Intn(upper.AsInt())), nil
@@ -467,7 +467,7 @@ var FuncRandInt = execution.Function{
 			upper := args[1].(Int).AsInt()
 
 			if upper <= lower {
-				return nil, errors.Errorf("Upper bound for random integers must be greater than the lower bound")
+				return nil, fmt.Errorf("Upper bound for random integers must be greater than the lower bound")
 			}
 
 			return MakeInt(lower + rand.Intn(upper-lower)), nil
@@ -621,7 +621,7 @@ var FuncMatchRegexp = execution.Function{
 	Logic: func(args ...Value) (Value, error) {
 		re, err := regexp.Compile(args[0].(String).AsString())
 		if err != nil {
-			return nil, errors.Errorf("Couldn't compile regular expression")
+			return nil, fmt.Errorf("Couldn't compile regular expression")
 		}
 
 		match := re.FindString(args[1].(String).AsString())
@@ -787,7 +787,7 @@ var FuncNth = execution.Function{
 	),
 	Logic: func(args ...Value) (Value, error) {
 		if args[0].(Int).AsInt() > len(args[1].(Tuple).AsSlice()) {
-			return nil, errors.Errorf(
+			return nil, fmt.Errorf(
 				"tried to access element with index %v in tuple with length %v",
 				args[0].(Int).AsInt(),
 				len(args[1].(Tuple).AsSlice()),
@@ -854,11 +854,158 @@ var FuncStringJoin = execution.Function{
 		for i := range tup {
 			str, ok := tup[i].(String)
 			if !ok {
-				return nil, errors.Errorf("tuple element with index %v not string, got %v", i, tup[i])
+				return nil, fmt.Errorf("tuple element with index %v not string, got %v", i, tup[i])
 			}
 			out[i] = str.AsString()
 		}
 		return MakeString(strings.Join(out, args[0].(String).AsString())), nil
+	},
+}
+
+/* Operators */
+
+var FuncAdd = execution.Function{
+	Name: "+",
+	ArgumentNames: [][]string{
+		{"left", "right"},
+	},
+	Description: docs.Text("Returns the sum of the two arguments."),
+	Validator: All(
+		AtLeastNArgs(1),
+		AtMostNArgs(2),
+		OneOf(
+			AllArgs(TypeOf(ZeroInt())),
+			AllArgs(TypeOf(ZeroFloat())),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		switch len(args) {
+		case 1:
+			switch args[0].(type) {
+			case Int:
+				return args[0].(Int), nil
+			case Float:
+				return args[0].(Float), nil
+			default:
+				log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+				panic("unreachable")
+			}
+
+		case 2:
+			switch args[0].(type) {
+			case Int:
+				return args[0].(Int) + args[1].(Int), nil
+			case Float:
+				return args[0].(Float) + args[1].(Float), nil
+			default:
+				log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+				panic("unreachable")
+			}
+
+		default:
+			log.Fatalf("unexpected argument count in function: %v", len(args))
+			panic("unreachable")
+		}
+	},
+}
+
+var FuncSubtract = execution.Function{
+	Name: "-",
+	ArgumentNames: [][]string{
+		{"left", "right"},
+	},
+	Description: docs.Text("Returns the difference between the two arguments."),
+	Validator: All(
+		AtLeastNArgs(1),
+		AtMostNArgs(2),
+		OneOf(
+			AllArgs(TypeOf(ZeroInt())),
+			AllArgs(TypeOf(ZeroFloat())),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		switch len(args) {
+		case 1:
+			switch args[0].(type) {
+			case Int:
+				return args[0].(Int) * -1, nil
+			case Float:
+				return args[0].(Float) * -1, nil
+			default:
+				log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+				panic("unreachable")
+			}
+
+		case 2:
+			switch args[0].(type) {
+			case Int:
+				return args[0].(Int) - args[1].(Int), nil
+			case Float:
+				return args[0].(Float) - args[1].(Float), nil
+			default:
+				log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+				panic("unreachable")
+			}
+
+		default:
+			log.Fatalf("unexpected argument count in function: %v", len(args))
+			panic("unreachable")
+		}
+	},
+}
+
+var FuncMultiply = execution.Function{
+	Name: "*",
+	ArgumentNames: [][]string{
+		{"left", "right"},
+	},
+	Description: docs.Text("Returns the dot product of the two arguments."),
+	Validator: All(
+		ExactlyNArgs(2),
+		OneOf(
+			AllArgs(TypeOf(ZeroInt())),
+			AllArgs(TypeOf(ZeroFloat())),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		switch args[0].(type) {
+		case Int:
+			return args[0].(Int) * args[1].(Int), nil
+		case Float:
+			return args[0].(Float) * args[1].(Float), nil
+		default:
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
+		}
+	},
+}
+
+var FuncDivide = execution.Function{
+	Name: "/",
+	ArgumentNames: [][]string{
+		{"left", "right"},
+	},
+	Description: docs.Text("Returns the division of the two arguments."),
+	Validator: All(
+		ExactlyNArgs(2),
+		OneOf(
+			AllArgs(TypeOf(ZeroInt())),
+			AllArgs(TypeOf(ZeroFloat())),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		switch args[0].(type) {
+		case Int:
+			if args[1].(Int) == 0 {
+				return nil, fmt.Errorf("division by zero")
+			}
+			return args[0].(Int) / args[1].(Int), nil
+		case Float:
+			return args[0].(Float) / args[1].(Float), nil
+		default:
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
+		}
 	},
 }
 

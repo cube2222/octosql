@@ -43,15 +43,16 @@ func Test_exactlyNArgs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := exactlyNArgs(tt.args.n, tt.args.args...); (err != nil) != tt.wantErr {
-				t.Errorf("exactlyNArgs() error = %v, wantErr %v", err, tt.wantErr)
+			if err := ExactlyNArgs(tt.args.n).Validate(tt.args.args...); (err != nil) != tt.wantErr {
+				t.Errorf("ExactlyNArgs() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 }
 
-func Test_atLeastOneArg(t *testing.T) {
+func Test_atLeastNArgs(t *testing.T) {
 	type args struct {
+		n    int
 		args []octosql.Value
 	}
 	tests := []struct {
@@ -62,6 +63,7 @@ func Test_atLeastOneArg(t *testing.T) {
 		{
 			name: "one arg - pass",
 			args: args{
+				1,
 				[]octosql.Value{octosql.MakeInt(1)},
 			},
 			wantErr: false,
@@ -69,6 +71,7 @@ func Test_atLeastOneArg(t *testing.T) {
 		{
 			name: "two args - pass",
 			args: args{
+				1,
 				[]octosql.Value{octosql.MakeInt(1), octosql.MakeString("hello")},
 			},
 			wantErr: false,
@@ -76,6 +79,31 @@ func Test_atLeastOneArg(t *testing.T) {
 		{
 			name: "zero args - fail",
 			args: args{
+				1,
+				[]octosql.Value{},
+			},
+			wantErr: true,
+		},
+		{
+			name: "one arg - fail",
+			args: args{
+				2,
+				[]octosql.Value{octosql.MakeInt(1)},
+			},
+			wantErr: true,
+		},
+		{
+			name: "two args - pass",
+			args: args{
+				2,
+				[]octosql.Value{octosql.MakeInt(1), octosql.MakeString("hello")},
+			},
+			wantErr: false,
+		},
+		{
+			name: "zero args - fail",
+			args: args{
+				2,
 				[]octosql.Value{},
 			},
 			wantErr: true,
@@ -83,15 +111,16 @@ func Test_atLeastOneArg(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := atLeastOneArg(tt.args.args...); (err != nil) != tt.wantErr {
+			if err := AtLeastNArgs(tt.args.n).Validate(tt.args.args...); (err != nil) != tt.wantErr {
 				t.Errorf("atLeastOneArg() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 }
 
-func Test_basicType(t *testing.T) {
+func Test_atMostNArgs(t *testing.T) {
 	type args struct {
+		n    int
 		args []octosql.Value
 	}
 	tests := []struct {
@@ -100,360 +129,198 @@ func Test_basicType(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "int - pass",
+			name: "one arg - pass",
 			args: args{
-				[]octosql.Value{octosql.MakeInt(7)},
+				1,
+				[]octosql.Value{octosql.MakeInt(1)},
 			},
 			wantErr: false,
 		},
 		{
-			name: "float - pass",
+			name: "two args - fail",
 			args: args{
-				[]octosql.Value{octosql.MakeFloat(7.0)},
-			},
-			wantErr: false,
-		},
-		{
-			name: "bool - pass",
-			args: args{
-				[]octosql.Value{octosql.MakeBool(false)},
-			},
-			wantErr: false,
-		},
-		{
-			name: "string - pass",
-			args: args{
-				[]octosql.Value{octosql.MakeString("nice")},
-			},
-			wantErr: false,
-		},
-		{
-			name: "slice - fail",
-			args: args{
-				[]octosql.Value{octosql.MakeTuple(octosql.Tuple{octosql.MakeInt(1), octosql.MakeInt(2), octosql.MakeInt(3)})},
+				1,
+				[]octosql.Value{octosql.MakeInt(1), octosql.MakeString("hello")},
 			},
 			wantErr: true,
 		},
 		{
-			name: "map - fail",
+			name: "zero args - pass",
 			args: args{
-				[]octosql.Value{octosql.MakeObject(map[string]octosql.Value{})},
+				1,
+				[]octosql.Value{},
+			},
+			wantErr: false,
+		},
+		{
+			name: "one arg - pass",
+			args: args{
+				2,
+				[]octosql.Value{octosql.MakeInt(1)},
+			},
+			wantErr: false,
+		},
+		{
+			name: "two args - pass",
+			args: args{
+				2,
+				[]octosql.Value{octosql.MakeInt(1), octosql.MakeString("hello")},
+			},
+			wantErr: false,
+		},
+		{
+			name: "zero args - pass",
+			args: args{
+				2,
+				[]octosql.Value{},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := AtMostNArgs(tt.args.n).Validate(tt.args.args...); (err != nil) != tt.wantErr {
+				t.Errorf("atMostOneArg() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_wantedType(t *testing.T) {
+	type args struct {
+		wantedType octosql.Value
+		arg        octosql.Value
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "int - int - pass",
+			args: args{
+				octosql.ZeroInt(),
+				octosql.MakeInt(7),
+			},
+			wantErr: false,
+		},
+		{
+			name: "int - float - fail",
+			args: args{
+				octosql.ZeroInt(),
+				octosql.MakeFloat(7.0),
+			},
+			wantErr: true,
+		},
+		{
+			name: "int - string - fail",
+			args: args{
+				octosql.ZeroInt(),
+				octosql.MakeString("aaa"),
+			},
+			wantErr: true,
+		},
+		{
+			name: "float - float - pass",
+			args: args{
+				octosql.ZeroFloat(),
+				octosql.MakeFloat(7.0),
+			},
+			wantErr: false,
+		},
+		{
+			name: "float - float - pass",
+			args: args{
+				octosql.ZeroFloat(),
+				octosql.MakeFloat(7.0),
+			},
+			wantErr: false,
+		},
+		{
+			name: "float - string - fail",
+			args: args{
+				octosql.ZeroFloat(),
+				octosql.MakeString("aaa"),
+			},
+			wantErr: true,
+		},
+		{
+			name: "bool - bool - pass",
+			args: args{
+				octosql.ZeroBool(),
+				octosql.MakeBool(false),
+			},
+			wantErr: false,
+		},
+		{
+			name: "string - string - pass",
+			args: args{
+				octosql.ZeroString(),
+				octosql.MakeString("nice"),
+			},
+			wantErr: false,
+		},
+		{
+			name: "string - int - fail",
+			args: args{
+				octosql.ZeroString(),
+				octosql.MakeInt(7),
+			},
+			wantErr: true,
+		},
+		{
+			name: "string - float - fail",
+			args: args{
+				octosql.ZeroString(),
+				octosql.MakeFloat(7.0),
+			},
+			wantErr: true,
+		},
+		{
+			name: "string - string - pass",
+			args: args{
+				octosql.ZeroString(),
+				octosql.MakeString("aaa"),
+			},
+			wantErr: false,
+		},
+		{
+			name: "tuple - tuple - pass",
+			args: args{
+				octosql.ZeroTuple(),
+				octosql.MakeTuple(octosql.Tuple{octosql.MakeInt(1), octosql.MakeInt(2), octosql.MakeInt(3)}),
+			},
+			wantErr: false,
+		},
+		{
+			name: "tuple - int - fail",
+			args: args{
+				octosql.ZeroTuple(),
+				octosql.MakeInt(4),
+			},
+			wantErr: true,
+		},
+		{
+			name: "object - object - pass",
+			args: args{
+				octosql.ZeroObject(),
+				octosql.MakeObject(map[string]octosql.Value{}),
+			},
+			wantErr: false,
+		},
+		{
+			name: "object - int - fail",
+			args: args{
+				octosql.ZeroObject(),
+				octosql.MakeInt(4),
 			},
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := basicType(tt.args.args...); (err != nil) != tt.wantErr {
+			if err := TypeOf(tt.args.wantedType).Validate(tt.args.arg); (err != nil) != tt.wantErr {
 				t.Errorf("basicType() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func Test_wantInt(t *testing.T) {
-	type args struct {
-		args []octosql.Value
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "int - pass",
-			args: args{
-				[]octosql.Value{octosql.MakeInt(7)},
-			},
-			wantErr: false,
-		},
-		{
-			name: "float - fail",
-			args: args{
-				[]octosql.Value{octosql.MakeFloat(7.0)},
-			},
-			wantErr: true,
-		},
-		{
-			name: "string - fail",
-			args: args{
-				[]octosql.Value{octosql.MakeString("aaa")},
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := wantInt(tt.args.args...); (err != nil) != tt.wantErr {
-				t.Errorf("wantInt() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func Test_wantFloat(t *testing.T) {
-	type args struct {
-		args []octosql.Value
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "int - fail",
-			args: args{
-				[]octosql.Value{octosql.MakeInt(7)},
-			},
-			wantErr: true,
-		},
-		{
-			name: "float - pass",
-			args: args{
-				[]octosql.Value{octosql.MakeFloat(7.0)},
-			},
-			wantErr: false,
-		},
-		{
-			name: "string - fail",
-			args: args{
-				[]octosql.Value{octosql.MakeString("aaa")},
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := wantFloat(tt.args.args...); (err != nil) != tt.wantErr {
-				t.Errorf("wantFloat() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func Test_wantString(t *testing.T) {
-	type args struct {
-		args []octosql.Value
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "int - fail",
-			args: args{
-				[]octosql.Value{octosql.MakeInt(7)},
-			},
-			wantErr: true,
-		},
-		{
-			name: "float - fail",
-			args: args{
-				[]octosql.Value{octosql.MakeFloat(7.0)},
-			},
-			wantErr: true,
-		},
-		{
-			name: "string - fail",
-			args: args{
-				[]octosql.Value{octosql.MakeString("aaa")},
-			},
-			wantErr: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := wantString(tt.args.args...); (err != nil) != tt.wantErr {
-				t.Errorf("wantString() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func Test_wantNumber(t *testing.T) {
-	type args struct {
-		args []octosql.Value
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "int - pass",
-			args: args{
-				[]octosql.Value{octosql.MakeInt(7)},
-			},
-			wantErr: false,
-		},
-		{
-			name: "float - pass",
-			args: args{
-				[]octosql.Value{octosql.MakeFloat(7.0)},
-			},
-			wantErr: false,
-		},
-		{
-			name: "string - fail",
-			args: args{
-				[]octosql.Value{octosql.MakeString("aaa")},
-			},
-			wantErr: true,
-		},
-		{
-			name: "bool - fail",
-			args: args{
-				[]octosql.Value{octosql.MakeBool(true)},
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := wantNumber(tt.args.args...); (err != nil) != tt.wantErr {
-				t.Errorf("wantNumber() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func Test_allInts(t *testing.T) {
-	type args struct {
-		args []octosql.Value
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "all ints - pass",
-			args: args{
-				[]octosql.Value{octosql.MakeInt(1), octosql.MakeInt(2), octosql.MakeInt(3), octosql.MakeInt(4)},
-			},
-			wantErr: false,
-		},
-		{
-			name: "empty - pass",
-			args: args{
-				[]octosql.Value{},
-			},
-			wantErr: false,
-		},
-		{
-			name: "mixed1 - fail",
-			args: args{
-				[]octosql.Value{octosql.MakeInt(1), octosql.MakeInt(2), octosql.MakeFloat(2.0), octosql.MakeInt(3), octosql.MakeInt(4)},
-			},
-			wantErr: true,
-		},
-		{
-			name: "mixed2 - fail",
-			args: args{
-				[]octosql.Value{octosql.MakeInt(1), octosql.MakeInt(2), octosql.MakeString("2"), octosql.MakeInt(3), octosql.MakeInt(4)},
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := allInts(tt.args.args...); (err != nil) != tt.wantErr {
-				t.Errorf("allInts() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func Test_allFloats(t *testing.T) {
-	type args struct {
-		args []octosql.Value
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "all floats - pass",
-			args: args{
-				[]octosql.Value{octosql.MakeFloat(1.0), octosql.MakeFloat(2.0), octosql.MakeFloat(3.0), octosql.MakeFloat(4.0)},
-			},
-			wantErr: false,
-		},
-		{
-			name: "empty - pass",
-			args: args{
-				[]octosql.Value{},
-			},
-			wantErr: false,
-		},
-		{
-			name: "mixed1 - fail",
-			args: args{
-				[]octosql.Value{octosql.MakeFloat(1.0), octosql.MakeInt(2), octosql.MakeFloat(2.0), octosql.MakeFloat(3.0), octosql.MakeInt(4)},
-			},
-			wantErr: true,
-		},
-		{
-			name: "mixed2 - fail",
-			args: args{
-				[]octosql.Value{octosql.MakeFloat(1.0), octosql.MakeFloat(2.0), octosql.MakeString("2"), octosql.MakeFloat(3.0), octosql.MakeFloat(4.0)},
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := allFloats(tt.args.args...); (err != nil) != tt.wantErr {
-				t.Errorf("allFloats() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func Test_allNumbers(t *testing.T) {
-	type args struct {
-		args []octosql.Value
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		{
-			name: "all ints - pass",
-			args: args{
-				[]octosql.Value{octosql.MakeInt(1), octosql.MakeInt(2), octosql.MakeInt(3), octosql.MakeInt(4)},
-			},
-			wantErr: false,
-		},
-		{
-			name: "empty - pass",
-			args: args{
-				[]octosql.Value{},
-			},
-			wantErr: false,
-		},
-		{
-			name: "mixed1 - pass",
-			args: args{
-				[]octosql.Value{octosql.MakeInt(1), octosql.MakeInt(2), octosql.MakeFloat(2.0), octosql.MakeInt(3), octosql.MakeInt(4)},
-			},
-			wantErr: false,
-		},
-		{
-			name: "mixed2 - fail",
-			args: args{
-				[]octosql.Value{octosql.MakeInt(1), octosql.MakeInt(2), octosql.MakeString("2"), octosql.MakeInt(3), octosql.MakeInt(4)},
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := allNumbers(tt.args.args...); (err != nil) != tt.wantErr {
-				t.Errorf("allNumbers() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

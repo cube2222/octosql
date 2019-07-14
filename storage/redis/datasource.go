@@ -206,7 +206,7 @@ func GetNewRecord(client *redis.Client, keyName, key, alias string) (*execution.
 	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
 	for k, v := range recordValues {
 		fieldName := octosql.NewVariableName(fmt.Sprintf("%s.%s", alias, k))
-		aliasedRecord[fieldName] = execution.NormalizeType(v)
+		aliasedRecord[fieldName] = octosql.NormalizeType(v)
 	}
 
 	fieldNames := make([]octosql.VariableName, 0)

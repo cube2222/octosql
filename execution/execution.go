@@ -5,13 +5,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// TODO: Temporary. Delete me.
-func (*Record) OctoValue() {}
-
-type RecordSliceValue []Record
-
-func (RecordSliceValue) OctoValue() {}
-
 type Node interface {
 	Get(variables octosql.Variables) (RecordStream, error)
 }
@@ -56,7 +49,7 @@ func NewTuple(expressions []Expression) *TupleExpression {
 func (tup *TupleExpression) ExpressionValue(variables octosql.Variables) (octosql.Value, error) {
 	outValues := make(octosql.Tuple, len(tup.expressions))
 	for i, expr := range tup.expressions {
-		value, err := extractSingleValue(expr, variables)
+		value, err := expr.ExpressionValue(variables)
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't get tuple subexpression with index %v", i)
 		}
@@ -80,11 +73,15 @@ func (ne *NodeExpression) ExpressionValue(variables octosql.Variables) (octosql.
 		return nil, errors.Wrap(err, "couldn't get record stream")
 	}
 
-	outRecords := make(RecordSliceValue, 0)
+	var firstRecord octosql.Tuple
+	outRecords := make(octosql.Tuple, 0)
 
 	var curRecord *Record
 	for curRecord, err = records.Next(); err == nil; curRecord, err = records.Next() {
-		outRecords = append(outRecords, *curRecord)
+		if firstRecord == nil {
+			firstRecord = curRecord.AsTuple()
+		}
+		outRecords = append(outRecords, curRecord.AsTuple())
 	}
 	if err != ErrEndOfStream {
 		return nil, errors.Wrap(err, "couldn't get records from stream")
@@ -98,16 +95,15 @@ func (ne *NodeExpression) ExpressionValue(variables octosql.Variables) (octosql.
 	}
 
 	// There is exactly one record
-	record := &outRecords[0]
-	if len(record.Fields()) > 1 {
-		return record, nil
+	if len(firstRecord.AsSlice()) > 1 {
+		return firstRecord, nil
 	}
-	if len(record.Fields()) == 0 {
+	if len(firstRecord.AsSlice()) == 0 {
 		return nil, nil
 	}
 
 	// There is exactly one field
-	return record.Value(record.Fields()[0].Name), nil
+	return firstRecord.AsSlice()[0], nil
 }
 
 type AliasedExpression struct {
@@ -125,26 +121,4 @@ func (alExpr *AliasedExpression) ExpressionValue(variables octosql.Variables) (o
 
 func (alExpr *AliasedExpression) Name() octosql.VariableName {
 	return alExpr.name
-}
-
-func extractSingleValue(expr Expression, variables octosql.Variables) (octosql.Value, error) {
-	value, err := expr.ExpressionValue(variables)
-	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't get expression's value")
-	}
-
-	if records, ok := value.(RecordSliceValue); ok {
-		if len(records) != 1 {
-			return nil, errors.Errorf("number of records different than 1: %+v", value)
-		}
-		value = &records[0]
-	}
-
-	if record, ok := value.(*Record); ok {
-		if len(record.Fields()) > 1 {
-			return nil, errors.Errorf("multi field record ended up in single expression field %+v", value)
-		}
-		return record.Value(record.Fields()[0].Name), nil
-	}
-	return value, nil
 }

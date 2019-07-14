@@ -41,7 +41,7 @@ func (agg *Average) AddRecord(key octosql.Tuple, value octosql.Value) error {
 				execution.GetType(value), execution.GetType(agg.typedValue),
 				value, agg.typedValue)
 		}
-		floatValue = octosql.MakeFloat(float64(value.Int()))
+		floatValue = octosql.MakeFloat(float64(value.AsInt()))
 	default:
 		return errors.Errorf("invalid type in average: %v with value %v", execution.GetType(value), value)
 	}

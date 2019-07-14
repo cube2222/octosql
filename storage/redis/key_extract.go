@@ -158,7 +158,7 @@ func (f *Equal) getAllKeys(variables octosql.Variables) (*redisKeys, error) {
 	case octosql.String:
 		return newRedisKeys(
 			map[string]interface{}{
-				exprValue.String(): nil,
+				exprValue.AsString(): nil,
 			}, DefaultKeys), nil
 
 	default:

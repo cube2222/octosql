@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
 )
@@ -90,7 +89,7 @@ func NewConstant(value interface{}) *Constant {
 func (v *Constant) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
 	name := physicalCreator.GetVariableName()
 	return physical.NewVariable(name), octosql.NewVariables(map[octosql.VariableName]octosql.Value{
-		name: execution.NormalizeType(v.value),
+		name: octosql.NormalizeType(v.value),
 	}), nil
 }
 

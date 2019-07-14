@@ -198,7 +198,7 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 
 	for i, columnName := range rs.columns {
 		newName := octosql.VariableName(fmt.Sprintf("%s.%s", rs.alias, columnName))
-		resultMap[newName] = execution.NormalizeType(cols[i])
+		resultMap[newName] = octosql.NormalizeType(cols[i])
 	}
 
 	fields := make([]octosql.VariableName, 0)

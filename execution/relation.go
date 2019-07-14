@@ -40,7 +40,7 @@ func (rel *Equal) Apply(variables octosql.Variables, left, right Expression) (bo
 			leftValue, rightValue, GetType(leftValue), GetType(rightValue))
 	}
 
-	return AreEqual(leftValue, rightValue), nil
+	return octosql.AreEqual(leftValue, rightValue), nil
 }
 
 type NotEqual struct {
@@ -95,7 +95,7 @@ func (rel *MoreThan) Apply(variables octosql.Variables, left, right Expression) 
 		return leftValue > rightValue, nil
 	case octosql.Time:
 		rightValue := rightValue.(octosql.Time)
-		return leftValue.Time().After(rightValue.Time()), nil
+		return leftValue.AsTime().After(rightValue.AsTime()), nil
 	}
 
 	return false, errors.Errorf(
@@ -179,7 +179,7 @@ func (rel *Like) Apply(variables octosql.Variables, left, right Expression) (boo
 			leftValue, rightValue, GetType(leftValue), GetType(rightValue))
 	}
 
-	match, err := regexp.MatchString(rightString.String(), leftString.String())
+	match, err := regexp.MatchString(rightString.AsString(), leftString.AsString())
 	if err != nil {
 		return false, errors.Wrapf(err, "couldn't match string in like relation with pattern %v", rightString)
 	}
@@ -204,50 +204,30 @@ func (rel *In) Apply(variables octosql.Variables, left, right Expression) (bool,
 	}
 
 	switch set := rightValue.(type) {
-	case RecordSliceValue:
-		for i := range set {
-			if len(set[i].Fields()) == 1 {
-				right := set[i].Value(set[i].Fields()[0].Name)
-				if AreEqual(leftValue, right) {
-					return true, nil
-				}
-				continue
-			}
-			switch leftValue.(type) {
-			case *Record:
-				return AreEqual(leftValue, &set[i]), nil
-			case octosql.Tuple:
-				fields := set[i].Fields()
-				values := make(octosql.Tuple, len(fields))
-				for i, field := range fields {
-					values[i] = set[i].Value(field.Name)
-				}
-				return AreEqual(leftValue, values), nil
-			}
-
-		}
-		return false, nil
-
-	case *Record:
-		switch leftValue.(type) {
-		case *Record:
-			return AreEqual(leftValue, rightValue), nil
-		case octosql.Tuple:
-			fields := set.Fields()
-			values := make(octosql.Tuple, len(fields))
-			for i, field := range fields {
-				values[i] = set.Value(field.Name)
-			}
-			return AreEqual(leftValue, values), nil
-		}
-
 	case octosql.Tuple:
 		for i := range set {
-			if AreEqual(leftValue, set[i]) {
+			if octosql.AreEqual(leftValue, set[i]) {
 				return true, nil
 			}
 		}
 		return false, nil
+
+	default:
+		return octosql.AreEqual(leftValue, rightValue), nil
 	}
-	return AreEqual(leftValue, rightValue), nil
+}
+
+type NotIn struct {
+}
+
+func NewNotIn() Relation {
+	return &NotIn{}
+}
+
+func (rel *NotIn) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
+	in, err := (*In).Apply(nil, variables, left, right)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't check containment")
+	}
+	return !in, nil
 }

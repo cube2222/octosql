@@ -37,14 +37,14 @@ var FuncInt = execution.Function{
 		case octosql.Int:
 			return arg, nil
 		case octosql.Float:
-			return octosql.MakeInt(int(arg.Float())), nil
+			return octosql.MakeInt(int(arg.AsFloat())), nil
 		case octosql.Bool:
 			if arg {
 				return octosql.MakeInt(1), nil
 			}
 			return octosql.MakeInt(0), nil
 		case octosql.String:
-			number, err := strconv.Atoi(arg.String())
+			number, err := strconv.Atoi(arg.AsString())
 			if err != nil {
 				return nil, err
 			}
@@ -62,7 +62,7 @@ var FuncFloat = execution.Function{
 	Logic: func(args ...octosql.Value) (octosql.Value, error) {
 		switch arg := args[0].(type) {
 		case octosql.Int:
-			return octosql.MakeFloat(float64(arg.Int())), nil
+			return octosql.MakeFloat(float64(arg.AsInt())), nil
 		case octosql.Float:
 			return arg, nil
 		case octosql.Bool:
@@ -71,7 +71,7 @@ var FuncFloat = execution.Function{
 			}
 			return octosql.MakeFloat(0.0), nil
 		case octosql.String:
-			number, err := strconv.ParseFloat(arg.String(), 64)
+			number, err := strconv.ParseFloat(arg.AsString(), 64)
 			if err != nil {
 				return nil, err
 			}
@@ -130,12 +130,12 @@ var FuncSqrt = execution.Function{
 			if arg < 0 {
 				return nil, errors.Errorf("Can't take square root of value %v", arg)
 			}
-			return octosql.MakeFloat(math.Sqrt(float64(arg.Int()))), nil
+			return octosql.MakeFloat(math.Sqrt(float64(arg.AsInt()))), nil
 		case octosql.Float:
 			if arg < 0 {
 				return nil, errors.Errorf("Can't take square root of value %v", arg)
 			}
-			return octosql.MakeFloat(math.Sqrt(arg.Float())), nil
+			return octosql.MakeFloat(math.Sqrt(arg.AsFloat())), nil
 		default:
 			return nil, errors.Errorf("Can't take square root of type %v", reflect.TypeOf(arg))
 		}
@@ -149,9 +149,9 @@ var FuncFloor = execution.Function{
 	Logic: func(args ...octosql.Value) (octosql.Value, error) {
 		switch arg := args[0].(type) {
 		case octosql.Int:
-			return octosql.MakeFloat(math.Floor(float64(arg.Int()))), nil
+			return octosql.MakeFloat(math.Floor(float64(arg.AsInt()))), nil
 		case octosql.Float:
-			return octosql.MakeFloat(math.Floor(arg.Float())), nil
+			return octosql.MakeFloat(math.Floor(arg.AsFloat())), nil
 		default:
 			return nil, errors.Errorf("Can't take floor of type %v", reflect.TypeOf(arg))
 		}
@@ -165,9 +165,9 @@ var FuncCeil = execution.Function{
 	Logic: func(args ...octosql.Value) (octosql.Value, error) {
 		switch arg := args[0].(type) {
 		case octosql.Int:
-			return octosql.MakeFloat(math.Ceil(float64(arg.Int()))), nil
+			return octosql.MakeFloat(math.Ceil(float64(arg.AsInt()))), nil
 		case octosql.Float:
-			return octosql.MakeFloat(math.Ceil(arg.Float())), nil
+			return octosql.MakeFloat(math.Ceil(arg.AsFloat())), nil
 		default:
 			return nil, errors.Errorf("Can't take ceiling of type %v", reflect.TypeOf(arg))
 		}
@@ -184,12 +184,12 @@ var FuncLog = execution.Function{
 			if arg <= 0 {
 				return nil, errors.Errorf("Can't take log of value %v", arg)
 			}
-			return octosql.MakeFloat(math.Log2(float64(arg.Int()))), nil
+			return octosql.MakeFloat(math.Log2(float64(arg.AsInt()))), nil
 		case octosql.Float:
 			if arg <= 0 {
 				return nil, errors.Errorf("Can't take log of value %v", arg)
 			}
-			return octosql.MakeFloat(math.Log2(arg.Float())), nil
+			return octosql.MakeFloat(math.Log2(arg.AsFloat())), nil
 		default:
 			return nil, errors.Errorf("Can't take log of type %v", reflect.TypeOf(arg))
 		}
@@ -206,12 +206,12 @@ var FuncLn = execution.Function{
 			if arg <= 0 {
 				return nil, errors.Errorf("Can't take ln of value %v", arg)
 			}
-			return octosql.MakeFloat(math.Log1p(float64(arg.Int())) - 1), nil
+			return octosql.MakeFloat(math.Log1p(float64(arg.AsInt())) - 1), nil
 		case octosql.Float:
 			if arg <= 0 {
 				return nil, errors.Errorf("Can't take ln of value %v", arg)
 			}
-			return octosql.MakeFloat(math.Log1p(arg.Float()) - 1), nil
+			return octosql.MakeFloat(math.Log1p(arg.AsFloat()) - 1), nil
 		default:
 			return nil, errors.Errorf("Can't take ln of type %v", reflect.TypeOf(arg))
 		}
@@ -241,7 +241,7 @@ var FuncLeast = execution.Function{
 		} else { /* floats */
 			min := math.Inf(1)
 			for _, arg := range args {
-				min = math.Min(min, arg.(octosql.Float).Float())
+				min = math.Min(min, arg.(octosql.Float).AsFloat())
 			}
 
 			return octosql.MakeFloat(min), nil
@@ -272,7 +272,7 @@ var FuncGreatest = execution.Function{
 		} else { /* floats */
 			max := math.Inf(-1)
 			for _, arg := range args {
-				max = math.Max(max, arg.(octosql.Float).Float())
+				max = math.Max(max, arg.(octosql.Float).AsFloat())
 			}
 
 			return octosql.MakeFloat(max), nil
@@ -299,11 +299,11 @@ var FuncRandFloat = execution.Function{
 		if argCount == 0 {
 			return octosql.MakeFloat(rand.Float64()), nil
 		} else if argCount == 1 {
-			upper := float64(args[0].(octosql.Int).Int())
+			upper := float64(args[0].(octosql.Int).AsInt())
 			return octosql.MakeFloat(upper * rand.Float64()), nil
 		} else {
-			lower := float64(args[0].(octosql.Int).Int())
-			upper := float64(args[1].(octosql.Int).Int())
+			lower := float64(args[0].(octosql.Int).AsInt())
+			upper := float64(args[1].(octosql.Int).AsInt())
 
 			return octosql.MakeFloat(lower + (upper-lower)*rand.Float64()), nil
 		}
@@ -332,10 +332,10 @@ var FuncRandInt = execution.Function{
 				return nil, errors.Errorf("Upper boundary for random integer must be greater than zero")
 			}
 
-			return octosql.MakeInt(rand.Intn(upper.Int())), nil
+			return octosql.MakeInt(rand.Intn(upper.AsInt())), nil
 		} else {
-			lower := args[0].(octosql.Int).Int()
-			upper := args[1].(octosql.Int).Int()
+			lower := args[0].(octosql.Int).AsInt()
+			upper := args[1].(octosql.Int).AsInt()
 
 			if upper <= lower {
 				return nil, errors.Errorf("Upper bound for random integers must be greater than the lower bound")
@@ -359,7 +359,7 @@ var FuncPower = execution.Function{
 		return nil
 	},
 	Logic: func(args ...octosql.Value) (octosql.Value, error) {
-		return octosql.MakeFloat(math.Pow(args[0].(octosql.Float).Float(), args[1].(octosql.Float).Float())), nil
+		return octosql.MakeFloat(math.Pow(args[0].(octosql.Float).AsFloat(), args[1].(octosql.Float).AsFloat())), nil
 	},
 }
 
@@ -370,7 +370,7 @@ var FuncLower = execution.Function{
 		return combine(oneArg, wantString)(args...)
 	},
 	Logic: func(args ...octosql.Value) (octosql.Value, error) {
-		return octosql.MakeString(strings.ToLower(args[0].(octosql.String).String())), nil
+		return octosql.MakeString(strings.ToLower(args[0].(octosql.String).AsString())), nil
 	},
 }
 
@@ -379,7 +379,7 @@ var FuncUpper = execution.Function{
 		return combine(oneArg, wantString)(args...)
 	},
 	Logic: func(args ...octosql.Value) (octosql.Value, error) {
-		return octosql.MakeString(strings.ToUpper(args[0].(octosql.String).String())), nil
+		return octosql.MakeString(strings.ToUpper(args[0].(octosql.String).AsString())), nil
 	},
 }
 
@@ -389,8 +389,8 @@ var FuncCapitalize = execution.Function{
 	},
 	Logic: func(args ...octosql.Value) (octosql.Value, error) {
 		arg := args[0].(octosql.String)
-		arg = octosql.MakeString(strings.ToLower(arg.String()))
-		return octosql.MakeString(strings.Title(arg.String())), nil
+		arg = octosql.MakeString(strings.ToLower(arg.AsString()))
+		return octosql.MakeString(strings.Title(arg.AsString())), nil
 	},
 }
 
@@ -457,17 +457,35 @@ var FuncRegexp = execution.Function{
 		return combine(twoArgs, allStrings)(args...)
 	},
 	Logic: func(args ...octosql.Value) (octosql.Value, error) {
-		re, err := regexp.Compile(args[0].(octosql.String).String())
+		re, err := regexp.Compile(args[0].(octosql.String).AsString())
 		if err != nil {
 			return nil, errors.Errorf("Couldn't compile regular expression")
 		}
 
-		match := re.FindString(args[1].(octosql.String).String())
+		match := re.FindString(args[1].(octosql.String).AsString())
 		if match == "" {
 			return nil, nil
 		}
 
 		return octosql.MakeString(match), nil
+	},
+}
+
+var FuncNth = execution.Function{
+	Validator: func(args ...octosql.Value) error {
+		if err := twoArgs(args...); err != nil {
+			return err
+		}
+		if _, ok := args[0].(octosql.Int); !ok {
+			return errors.Errorf("first argument to nth should be an integer, is %v", args[0])
+		}
+		if _, ok := args[1].(octosql.Tuple); !ok {
+			return errors.Errorf("second argument to nth should be a tuple, is %v", args[1])
+		}
+		return nil
+	},
+	Logic: func(args ...octosql.Value) (octosql.Value, error) {
+		return args[1].(octosql.Tuple).AsSlice()[args[0].(octosql.Int).AsInt()], nil
 	},
 }
 

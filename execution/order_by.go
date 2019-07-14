@@ -130,7 +130,7 @@ func compare(x, y octosql.Value) (int, error) {
 
 		if x == y {
 			return 0, nil
-		} else if x.Time().Before(y.Time()) {
+		} else if x.AsTime().Before(y.AsTime()) {
 			return -1, nil
 		}
 

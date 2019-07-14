@@ -14,6 +14,7 @@ import (
 	. "github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/execution"
+	"github.com/pkg/errors"
 )
 
 func execute(fun execution.Function, args ...Value) (Value, error) {
@@ -870,33 +871,43 @@ var FuncAdd = execution.Function{
 		{"left", "right"},
 	},
 	Description: docs.Text("Returns the sum of the two arguments."),
-	Validator: All(
-		AtLeastNArgs(1),
-		AtMostNArgs(2),
-		OneOf(
-			AllArgs(TypeOf(ZeroInt())),
-			AllArgs(TypeOf(ZeroFloat())),
+	Validator: OneOf(
+		All(
+			AtLeastNArgs(1),
+			AtMostNArgs(2),
+			OneOf(
+				AllArgs(TypeOf(ZeroInt())),
+				AllArgs(TypeOf(ZeroFloat())),
+				AllArgs(TypeOf(ZeroDuration())),
+			),
+		),
+		All(
+			ExactlyNArgs(2),
+			Arg(0, TypeOf(ZeroTime())),
+			Arg(1, TypeOf(ZeroDuration())),
 		),
 	),
 	Logic: func(args ...Value) (Value, error) {
 		switch len(args) {
 		case 1:
 			switch args[0].(type) {
-			case Int:
-				return args[0].(Int), nil
-			case Float:
-				return args[0].(Float), nil
+			case Int, Float, Duration:
+				return args[0], nil
 			default:
 				log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 				panic("unreachable")
 			}
 
 		case 2:
-			switch args[0].(type) {
+			switch arg := args[0].(type) {
 			case Int:
-				return args[0].(Int) + args[1].(Int), nil
+				return arg + args[1].(Int), nil
 			case Float:
-				return args[0].(Float) + args[1].(Float), nil
+				return arg + args[1].(Float), nil
+			case Duration:
+				return arg + args[1].(Duration), nil
+			case Time:
+				return MakeTime(arg.AsTime().Add(args[1].(Duration).AsDuration())), nil
 			default:
 				log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 				panic("unreachable")
@@ -915,33 +926,47 @@ var FuncSubtract = execution.Function{
 		{"left", "right"},
 	},
 	Description: docs.Text("Returns the difference between the two arguments."),
-	Validator: All(
-		AtLeastNArgs(1),
-		AtMostNArgs(2),
-		OneOf(
-			AllArgs(TypeOf(ZeroInt())),
-			AllArgs(TypeOf(ZeroFloat())),
+	Validator: OneOf(
+		All(
+			AtLeastNArgs(1),
+			AtMostNArgs(2),
+			OneOf(
+				AllArgs(TypeOf(ZeroInt())),
+				AllArgs(TypeOf(ZeroFloat())),
+				AllArgs(TypeOf(ZeroDuration())),
+			),
+		),
+		All(
+			ExactlyNArgs(2),
+			Arg(0, TypeOf(ZeroTime())),
+			Arg(1, TypeOf(ZeroDuration())),
 		),
 	),
 	Logic: func(args ...Value) (Value, error) {
 		switch len(args) {
 		case 1:
-			switch args[0].(type) {
+			switch arg := args[0].(type) {
 			case Int:
-				return args[0].(Int) * -1, nil
+				return arg * -1, nil
 			case Float:
-				return args[0].(Float) * -1, nil
+				return arg * -1, nil
+			case Duration:
+				return arg * -1, nil
 			default:
 				log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 				panic("unreachable")
 			}
 
 		case 2:
-			switch args[0].(type) {
+			switch arg := args[0].(type) {
 			case Int:
-				return args[0].(Int) - args[1].(Int), nil
+				return arg - args[1].(Int), nil
 			case Float:
-				return args[0].(Float) - args[1].(Float), nil
+				return arg - args[1].(Float), nil
+			case Duration:
+				return arg - args[1].(Duration), nil
+			case Time:
+				return MakeTime(arg.AsTime().Add(-1 * args[1].(Duration).AsDuration())), nil
 			default:
 				log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 				panic("unreachable")
@@ -965,14 +990,32 @@ var FuncMultiply = execution.Function{
 		OneOf(
 			AllArgs(TypeOf(ZeroInt())),
 			AllArgs(TypeOf(ZeroFloat())),
+			All(
+				Arg(0, TypeOf(ZeroDuration())),
+				Arg(1, TypeOf(ZeroInt())),
+			),
+			All(
+				Arg(0, TypeOf(ZeroDuration())),
+				Arg(1, TypeOf(ZeroFloat())),
+			),
 		),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		switch args[0].(type) {
+		switch arg := args[0].(type) {
 		case Int:
-			return args[0].(Int) * args[1].(Int), nil
+			return arg * args[1].(Int), nil
 		case Float:
-			return args[0].(Float) * args[1].(Float), nil
+			return arg * args[1].(Float), nil
+		case Duration:
+			switch arg2 := args[1].(type) {
+			case Int:
+				return MakeDuration(arg.AsDuration() * time.Duration(arg2.AsInt())), nil
+			case Float:
+				return MakeDuration(time.Duration(float64(arg.AsDuration()) * arg2.AsFloat())), nil
+			default:
+				log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[1]).String())
+				panic("unreachable")
+			}
 		default:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 			panic("unreachable")
@@ -991,19 +1034,123 @@ var FuncDivide = execution.Function{
 		OneOf(
 			AllArgs(TypeOf(ZeroInt())),
 			AllArgs(TypeOf(ZeroFloat())),
+			All(
+				Arg(0, TypeOf(ZeroDuration())),
+				Arg(1, TypeOf(ZeroInt())),
+			),
+			All(
+				Arg(0, TypeOf(ZeroDuration())),
+				Arg(1, TypeOf(ZeroFloat())),
+			),
+			All(
+				Arg(0, TypeOf(ZeroDuration())),
+				Arg(1, TypeOf(ZeroDuration())),
+			),
 		),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		switch args[0].(type) {
+		switch arg := args[0].(type) {
 		case Int:
 			if args[1].(Int) == 0 {
 				return nil, fmt.Errorf("division by zero")
 			}
-			return args[0].(Int) / args[1].(Int), nil
+			return arg / args[1].(Int), nil
 		case Float:
-			return args[0].(Float) / args[1].(Float), nil
+			return arg / args[1].(Float), nil
+		case Duration:
+			switch arg2 := args[1].(type) {
+			case Int:
+				if arg2 == 0 {
+					return nil, fmt.Errorf("division by zero")
+				}
+				return MakeDuration(arg.AsDuration() / time.Duration(arg2.AsInt())), nil
+
+			case Float:
+				return MakeDuration(arg.AsDuration() / time.Duration(arg2.AsFloat())), nil
+
+			case Duration:
+				return MakeFloat(float64(arg.AsDuration()) / float64(arg2.AsDuration())), nil
+
+			default:
+				log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[1]).String())
+				panic("unreachable")
+			}
+
 		default:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
+		}
+	},
+}
+
+var FuncDuration = execution.Function{
+	Name: "duration",
+	ArgumentNames: [][]string{
+		{"duration"},
+		{"count", "unit"},
+	},
+	Description: docs.List(
+		docs.Text("Provided one argument, parses the duration as in https://golang.org/pkg/time/#ParseDuration"),
+		docs.Text("Provided two arguments, returns the duration equal to count of unit."),
+	),
+	Validator: OneOf(
+		All(
+			ExactlyNArgs(1),
+			Arg(0, TypeOf(ZeroString())),
+		),
+		All(
+			ExactlyNArgs(2),
+			Arg(0, TypeOf(ZeroInt())),
+			Arg(1,
+				SingleAll(
+					TypeOf(ZeroString()),
+					ValueOf(
+						MakeString("nanosecond"),
+						MakeString("microsecond"),
+						MakeString("millisecond"),
+						MakeString("second"),
+						MakeString("minute"),
+						MakeString("hour"),
+						MakeString("day"),
+						MakeString("month"),
+					),
+				),
+			),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		switch len(args) {
+		case 1:
+			dur, err := time.ParseDuration(args[0].(String).AsString())
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't parse duration")
+			}
+			return MakeDuration(dur), nil
+
+		case 2:
+			count := time.Duration(args[0].(Int))
+			switch args[1].(String) {
+			case "nanosecond":
+				return MakeDuration(count), nil
+			case "microsecond":
+				return MakeDuration(count * time.Microsecond), nil
+			case "millisecond":
+				return MakeDuration(count * time.Millisecond), nil
+			case "second":
+				return MakeDuration(count * time.Second), nil
+			case "minute":
+				return MakeDuration(count * time.Minute), nil
+			case "hour":
+				return MakeDuration(count * time.Hour), nil
+			case "day":
+				return MakeDuration(count * time.Hour * 24), nil
+			default:
+				log.Fatalf("unexpected value in function: %v", args[1])
+				panic("unreachable")
+			}
+
+		default:
+			log.Fatalf("unexpected argument count in function: %v", len(args))
 			panic("unreachable")
 		}
 	},

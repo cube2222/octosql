@@ -119,6 +119,23 @@ func ZeroTime() Time {
 	return Time(time.Time{})
 }
 
+type Duration time.Duration
+
+func (Duration) octoValue()                  {}
+func (v Duration) AsDuration() time.Duration { return time.Duration(v) }
+func (v Duration) String() string {
+	return v.AsDuration().String()
+}
+func (v Duration) Document() docs.Documentation {
+	return docs.Text("Duration")
+}
+func MakeDuration(v time.Duration) Duration {
+	return Duration(v)
+}
+func ZeroDuration() Duration {
+	return Duration(time.Duration(0))
+}
+
 type Tuple []Value
 
 func (Tuple) octoValue()         {}
@@ -208,6 +225,8 @@ func NormalizeType(value interface{}) Value {
 		return nil
 	case time.Time:
 		return MakeTime(value)
+	case time.Duration:
+		return MakeDuration(value)
 	case struct{}:
 		return MakePhantom()
 	case Value:
@@ -257,6 +276,13 @@ func AreEqual(left, right Value) bool {
 			return false
 		}
 		return left.AsTime().Equal(right.AsTime())
+
+	case Duration:
+		right, ok := right.(Duration)
+		if !ok {
+			return false
+		}
+		return left == right
 
 	case Tuple:
 		right, ok := right.(Tuple)

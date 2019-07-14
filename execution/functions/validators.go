@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"strings"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/docs"
@@ -251,6 +252,12 @@ func (v *typeOf) Validate(arg octosql.Value) error {
 		}
 		return nil
 
+	case octosql.Duration:
+		if _, ok := arg.(octosql.Duration); !ok {
+			return fmt.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroDuration()).String(), arg)
+		}
+		return nil
+
 	case octosql.Tuple:
 		if _, ok := arg.(octosql.Tuple); !ok {
 			return fmt.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroTuple()).String(), arg)
@@ -271,6 +278,48 @@ func (v *typeOf) Validate(arg octosql.Value) error {
 
 func (v *typeOf) Document() docs.Documentation {
 	return docs.Paragraph(docs.Text("must be of type"), v.wantedType.Document())
+}
+
+type valueOf struct {
+	values []octosql.Value
+}
+
+func ValueOf(values ...octosql.Value) *valueOf {
+	return &valueOf{values: values}
+}
+
+func (v *valueOf) Validate(arg octosql.Value) error {
+	for i := range v.values {
+		if octosql.AreEqual(v.values[i], arg) {
+			return nil
+		}
+	}
+
+	values := make([]string, len(v.values))
+	for i := range v.values {
+		values[i] = v.values[i].String()
+	}
+
+	return fmt.Errorf(
+		"argument must be one of: [%s], got %v",
+		strings.Join(values, ", "),
+		arg,
+	)
+}
+
+func (v *valueOf) Document() docs.Documentation {
+	values := make([]string, len(v.values))
+	for i := range v.values {
+		values[i] = v.values[i].String()
+	}
+	return docs.Paragraph(
+		docs.Text(
+			fmt.Sprintf(
+				"must be one of: [%s]",
+				strings.Join(values, ", "),
+			),
+		),
+	)
 }
 
 type arg struct {

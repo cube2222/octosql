@@ -2,6 +2,9 @@ OctoSQL
 =======
 OctoSQL is a data querying tool, allowing you to join, analyze and transform data from multiple data sources and file formats using SQL.
 
+[![CircleCI](https://circleci.com/gh/cube2222/octosql.svg?style=shield)](https://circleci.com/gh/cube2222/octosql)
+[![GoDoc](https://godoc.org/github.com/cube2222/octosql?status.svg)](https://godoc.org/github.com/cube2222/octosql)
+
 ## Table of Contents
 - [What is OctoSQL?](#what-is-octosql)
 - [Quickstart](#quickstart)

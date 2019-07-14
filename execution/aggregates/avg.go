@@ -2,6 +2,7 @@ package aggregates
 
 import (
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 )
@@ -17,6 +18,15 @@ func NewAverage() *Average {
 		averages: execution.NewHashMap(),
 		counts:   execution.NewHashMap(),
 	}
+}
+
+func (agg *Average) Document() docs.Documentation {
+	return docs.Section(
+		agg.String(),
+		docs.Body(
+			docs.Section("Description", docs.Text("Averages Floats or Ints in the group. You may not mix types.")),
+		),
+	)
 }
 
 func (agg *Average) AddRecord(key octosql.Tuple, value octosql.Value) error {

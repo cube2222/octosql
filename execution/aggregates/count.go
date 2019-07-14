@@ -2,6 +2,7 @@ package aggregates
 
 import (
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 )
@@ -14,6 +15,15 @@ func NewCount() *Count {
 	return &Count{
 		counts: execution.NewHashMap(),
 	}
+}
+
+func (agg *Count) Document() docs.Documentation {
+	return docs.Section(
+		agg.String(),
+		docs.Body(
+			docs.Section("Description", docs.Text("Averages elements in the group.")),
+		),
+	)
 }
 
 func (agg *Count) AddRecord(key octosql.Tuple, value octosql.Value) error {

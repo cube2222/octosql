@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 )
@@ -18,6 +19,15 @@ func NewDistinct(underlying execution.Aggregate) *Distinct {
 		underlying: underlying,
 		groupSets:  execution.NewHashMap(),
 	}
+}
+
+func (agg *Distinct) Document() docs.Documentation {
+	return docs.Section(
+		agg.String(),
+		docs.Body(
+			docs.Section("Description", docs.Text(fmt.Sprintf("Works like [%s](#%s), only taking into account distinct elements per group.", agg.underlying.String(), agg.underlying.String()))),
+		),
+	)
 }
 
 func (agg *Distinct) AddRecord(key octosql.Tuple, value octosql.Value) error {

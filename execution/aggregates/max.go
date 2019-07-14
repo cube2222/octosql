@@ -2,6 +2,7 @@ package aggregates
 
 import (
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 )
@@ -15,6 +16,15 @@ func NewMax() *Max {
 	return &Max{
 		maxes: execution.NewHashMap(),
 	}
+}
+
+func (agg *Max) Document() docs.Documentation {
+	return docs.Section(
+		agg.String(),
+		docs.Body(
+			docs.Section("Description", docs.Text("Takes the maximum element in the group. Works with Ints, Floats, Strings, Booleans, Times.")),
+		),
+	)
 }
 
 func (agg *Max) AddRecord(key octosql.Tuple, value octosql.Value) error {

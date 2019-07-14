@@ -2,6 +2,7 @@ package aggregates
 
 import (
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 )
@@ -14,6 +15,15 @@ func NewFirst() *First {
 	return &First{
 		firsts: execution.NewHashMap(),
 	}
+}
+
+func (agg *First) Document() docs.Documentation {
+	return docs.Section(
+		agg.String(),
+		docs.Body(
+			docs.Section("Description", docs.Text("Takes the first received element in the group.")),
+		),
+	)
 }
 
 func (agg *First) AddRecord(key octosql.Tuple, value octosql.Value) error {

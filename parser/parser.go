@@ -467,9 +467,29 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 		}
 		return logical.NewTuple(expressions), nil
 
+	case *sqlparser.AndExpr:
+		return ParseLogicExpression(expr)
+	case *sqlparser.OrExpr:
+		return ParseLogicExpression(expr)
+	case *sqlparser.NotExpr:
+		return ParseLogicExpression(expr)
+	case *sqlparser.ComparisonExpr:
+		return ParseLogicExpression(expr)
+	case *sqlparser.ParenExpr:
+		return ParseExpression(expr.Expr)
+
 	default:
 		return nil, errors.Errorf("unsupported expression %+v of type %v", expr, reflect.TypeOf(expr))
 	}
+}
+
+func ParseLogicExpression(expr sqlparser.Expr) (*logical.LogicExpression, error) {
+	formula, err := ParseLogic(expr)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't parse logic formula")
+	}
+
+	return logical.NewLogicExpression(formula), nil
 }
 
 func ParseLogic(expr sqlparser.Expr) (logical.Formula, error) {

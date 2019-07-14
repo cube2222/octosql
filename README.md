@@ -142,9 +142,15 @@ Redis database with the given index. Currently only hashes are supported.
 - databaseKeyName - column name of Redis key in OctoSQL records, defaults to "key"
 
 ## Documentation
-The SQL dialect documentation:
-
 Documentation for the available functions: https://github.com/cube2222/octosql/wiki/Function-Documentation
+
+Documentation for the available aggregates: https://github.com/cube2222/octosql/wiki/Aggregate-Documentation
+
+The SQL dialect documentation: TODO :) in short though:
+
+Available SQL constructs: Select, Where, Order By, Group By, Offset, Limit, Left Join, Right Join, Inner Join, Distinct, Union, Union All.
+
+Available SQL types: Int, Float, String, Bool, Time, Tuple, Object (e.g. JSON)
 
 ## Architecture
 An OctoSQL invocation gets processed in multiple phases.

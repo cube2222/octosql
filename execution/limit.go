@@ -58,7 +58,7 @@ func (node *LimitedStream) Close() error {
 }
 
 func (node *LimitedStream) Next() (*Record, error) {
-	for node.limit > 0 {
+	if node.limit > 0 {
 		node.limit--
 		record, err := node.rs.Next()
 		if err != nil {

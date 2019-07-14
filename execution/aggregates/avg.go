@@ -51,7 +51,7 @@ func (agg *Average) AddRecord(key octosql.Tuple, value octosql.Value) error {
 		return errors.Wrap(err, "couldn't get current element count out of hashmap")
 	}
 
-	average, previousValueExists, err := agg.averages.Get(key)
+	average, _, err := agg.averages.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current average out of hashmap")
 	}

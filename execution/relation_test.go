@@ -149,7 +149,6 @@ func TestMoreThan_Apply(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		rel     *MoreThan
 		args    args
 		want    bool
 		wantErr bool
@@ -254,7 +253,6 @@ func TestLessThan_Apply(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		rel     *LessThan
 		args    args
 		want    bool
 		wantErr bool
@@ -359,7 +357,6 @@ func TestGreaterEqual_Apply(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		rel     *LessThan
 		args    args
 		want    bool
 		wantErr bool

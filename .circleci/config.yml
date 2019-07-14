@@ -9,11 +9,9 @@ workflows:
       - release:
           requires:
             - test
+            - test-mysql
             - test-postgres
             - test-redis
-          #filters:
-          #  branches:
-          #    only: master
 
 version: 2
 jobs:

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 )
 
 func TestOrderBy_Get(t *testing.T) {
@@ -159,7 +160,55 @@ func TestOrderBy_Get(t *testing.T) {
 			}),
 			wantErr: false,
 		},
+		{
+			name: "complex order - string ascending then int descending",
+			args: args{
+				stream: NewInMemoryStream([]*Record{
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"name", "age"},
+						[]interface{}{"a", 7.3}),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"name", "age"},
+						[]interface{}{"d", 19.02}),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"name", "age"},
+						[]interface{}{"a", -2.248}),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"name", "age"},
+						[]interface{}{"c", 1.123}),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"name", "age"},
+						[]interface{}{"d", 17.918}),
+				}),
+				expressions: []Expression{
+					NewVariable("name"),
+					NewFunctionExpression(&FuncIdentity, []Expression{NewVariable("age")}),
+				},
+				directions: []OrderDirection{
+					Ascending,
+					Descending,
+				},
+			},
 
+			want: NewInMemoryStream([]*Record{
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"name", "age"},
+					[]interface{}{"a", 7.3}),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"name", "age"},
+					[]interface{}{"a", -2.248}),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"name", "age"},
+					[]interface{}{"c", 1.123}),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"name", "age"},
+					[]interface{}{"d", 19.02}),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"name", "age"},
+					[]interface{}{"d", 17.918}),
+			}),
+			wantErr: false,
+		},
 		{
 			name: "failed - missing field",
 			args: args{
@@ -219,4 +268,21 @@ func TestOrderBy_Get(t *testing.T) {
 			}
 		})
 	}
+}
+
+type AnyOk struct {
+}
+
+func (*AnyOk) Document() docs.Documentation {
+	panic("implement me")
+}
+func (*AnyOk) Validate(args ...octosql.Value) error {
+	return nil
+}
+
+var FuncIdentity = Function{
+	Validator: &AnyOk{},
+	Logic: func(args ...octosql.Value) (octosql.Value, error) {
+		return args[0], nil
+	},
 }

@@ -81,7 +81,7 @@ You can choose between table, tabbed, json and csv output formats.
 ## Installation
 Either download the binary for your operating system (Linux, OS X and Windows are supported) from the [Releases page](https://github.com/cube2222/octosql/releases), or install using the go command line tool:
 ```bash
-go get github.com/cube2222/octosql/cmd/octosql
+go get -u github.com/cube2222/octosql/cmd/octosql
 ```
 ## Configuration
 The configuration file has the following form

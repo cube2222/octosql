@@ -206,3 +206,4 @@ Where scan means that the whole table needs to be scanned for each access. We ar
 - Querying a json or csv table from standard input.
 - Integration test suite
 - Tuple splitter, returning the row for each tuple element, with the given element instead of the tuple.
+- Describe-like functionality as in the diagram above.

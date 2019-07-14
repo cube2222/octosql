@@ -9,11 +9,9 @@ workflows:
       - release:
           requires:
             - test
+            - test-mysql
             - test-postgres
             - test-redis
-          filters:
-            branches:
-              only: master
 
 version: 2
 jobs:
@@ -94,6 +92,8 @@ jobs:
       - checkout
 
       - run: go install -v ./...
+      - run: GOOS=windows go install -v ./...
+      - run: GOOS=darwin go install -v ./...
 
       - store_artifacts:
           path: "/go/bin"

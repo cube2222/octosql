@@ -1,23 +1,23 @@
 package functions
 
 import (
+	"log"
 	"math"
 	"math/rand"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
+	. "github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 )
 
-/*
-	All of the functions in the funcTable must appear here.
-*/
-
-func execute(fun execution.Function, args ...interface{}) (interface{}, error) {
-	err := fun.Validator(args...)
+func execute(fun execution.Function, args ...Value) (Value, error) {
+	err := fun.Validator.Validate(args...)
 	if err != nil {
 		return nil, err
 	}
@@ -28,430 +28,849 @@ func execute(fun execution.Function, args ...interface{}) (interface{}, error) {
 /* Single number arguments functions */
 
 var FuncInt = execution.Function{
-	Validator: func(args ...interface{}) error {
-		return combine(oneArg, basicType)(args...)
+	Name: "int",
+	ArgumentNames: [][]string{
+		{"x"},
 	},
-	Logic: func(args ...interface{}) (interface{}, error) {
+	Description: docs.Text("Converts x to an Integer."),
+	Validator: All(
+		ExactlyNArgs(1),
+		Arg(0,
+			SingleOneOf(
+				TypeOf(ZeroBool()),
+				TypeOf(ZeroInt()),
+				TypeOf(ZeroFloat()),
+				TypeOf(ZeroString()),
+			),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
 		switch arg := args[0].(type) {
-		case int:
-			return arg, nil
-		case float64:
-			return int(arg), nil
-		case bool:
+		case Bool:
 			if arg {
-				return 1, nil
+				return MakeInt(1), nil
 			}
-			return 0, nil
-		case string:
-			number, err := strconv.Atoi(arg)
+			return MakeInt(0), nil
+		case Int:
+			return arg, nil
+		case Float:
+			return MakeInt(int(arg.AsFloat())), nil
+		case String:
+			number, err := strconv.Atoi(arg.AsString())
 			if err != nil {
 				return nil, err
 			}
-			return number, nil
+			return MakeInt(number), nil
 		default:
-			return nil, errors.Errorf("Type %v can't be parsed to int", reflect.TypeOf(arg))
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
+		}
+	},
+}
+
+var FuncFloat = execution.Function{
+	Name: "float",
+	ArgumentNames: [][]string{
+		{"x"},
+	},
+	Description: docs.Text("Converts x to a Float."),
+	Validator: All(
+		ExactlyNArgs(1),
+		Arg(0,
+			SingleOneOf(
+				TypeOf(ZeroBool()),
+				TypeOf(ZeroInt()),
+				TypeOf(ZeroFloat()),
+				TypeOf(ZeroString()),
+			),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		switch arg := args[0].(type) {
+		case Int:
+			return MakeFloat(float64(arg.AsInt())), nil
+		case Float:
+			return arg, nil
+		case Bool:
+			if arg {
+				return MakeFloat(1.0), nil
+			}
+			return MakeFloat(0.0), nil
+		case String:
+			number, err := strconv.ParseFloat(arg.AsString(), 64)
+			if err != nil {
+				return nil, err
+			}
+			return MakeFloat(number), nil
+		default:
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
 		}
 	},
 }
 
 var FuncNegate = execution.Function{
-	Validator: func(args ...interface{}) error {
-		return combine(oneArg, wantNumber)(args...)
+	Name: "negate",
+	ArgumentNames: [][]string{
+		{"x"},
 	},
-	Logic: func(args ...interface{}) (interface{}, error) {
+	Description: docs.Text("Returns x multiplied by -1."),
+	Validator: All(
+		ExactlyNArgs(1),
+		Arg(0,
+			SingleOneOf(
+				TypeOf(ZeroInt()),
+				TypeOf(ZeroFloat()),
+			),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
 		switch arg := args[0].(type) {
-		case int:
+		case Int:
 			return -1 * arg, nil
-		case float64:
+		case Float:
 			return -1 * arg, nil
 		default:
-			return nil, errors.Errorf("Type %v can't be negated", reflect.TypeOf(arg))
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
 		}
 	},
 }
 
 var FuncAbs = execution.Function{
-	Validator: func(args ...interface{}) error {
-		return combine(oneArg, wantNumber)(args...)
+	Name: "abs",
+	ArgumentNames: [][]string{
+		{"x"},
 	},
-	Logic: func(args ...interface{}) (interface{}, error) {
+	Description: docs.Text("Returns the absolute value of x."),
+	Validator: All(
+		ExactlyNArgs(1),
+		Arg(0,
+			SingleOneOf(
+				TypeOf(ZeroInt()),
+				TypeOf(ZeroFloat()),
+			),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
 		switch arg := args[0].(type) {
-		case int:
+		case Int:
 			if arg < 0 {
 				return -1 * arg, nil
 			}
 			return arg, nil
-		case float64:
+		case Float:
 			if arg < 0 {
 				return -1 * arg, nil
 			}
 			return arg, nil
 		default:
-			return nil, errors.Errorf("Can't take absolute value of type %v", reflect.TypeOf(arg))
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
 		}
 	},
 }
 
 var FuncSqrt = execution.Function{
-	Validator: func(args ...interface{}) error {
-		return combine(oneArg, wantNumber)(args...)
+	Name: "sqrt",
+	ArgumentNames: [][]string{
+		{"x"},
 	},
-	Logic: func(args ...interface{}) (interface{}, error) {
+	Description: docs.Text("Returns the square root of x."),
+	Validator: All(
+		ExactlyNArgs(1),
+		Arg(0,
+			SingleOneOf(
+				TypeOf(ZeroInt()),
+				TypeOf(ZeroFloat()),
+			),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
 		switch arg := args[0].(type) {
-		case int:
+		case Int:
 			if arg < 0 {
 				return nil, errors.Errorf("Can't take square root of value %v", arg)
 			}
-			return math.Sqrt(float64(arg)), nil
-		case float64:
+			return MakeFloat(math.Sqrt(float64(arg.AsInt()))), nil
+		case Float:
 			if arg < 0 {
 				return nil, errors.Errorf("Can't take square root of value %v", arg)
 			}
-			return math.Sqrt(arg), nil
+			return MakeFloat(math.Sqrt(arg.AsFloat())), nil
 		default:
-			return nil, errors.Errorf("Can't take square root of type %v", reflect.TypeOf(arg))
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
 		}
 	},
 }
 
 var FuncFloor = execution.Function{
-	Validator: func(args ...interface{}) error {
-		return combine(oneArg, wantNumber)(args...)
+	Name: "floor",
+	ArgumentNames: [][]string{
+		{"x"},
 	},
-	Logic: func(args ...interface{}) (interface{}, error) {
+	Description: docs.Text("Returns the floor of x."),
+	Validator: All(
+		ExactlyNArgs(1),
+		Arg(0,
+			SingleOneOf(
+				TypeOf(ZeroInt()),
+				TypeOf(ZeroFloat()),
+			),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
 		switch arg := args[0].(type) {
-		case int:
-			return math.Floor(float64(arg)), nil
-		case float64:
-			return math.Floor(arg), nil
+		case Int:
+			return MakeFloat(float64(arg.AsInt())), nil
+		case Float:
+			return MakeFloat(math.Floor(arg.AsFloat())), nil
 		default:
-			return nil, errors.Errorf("Can't take floor of type %v", reflect.TypeOf(arg))
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
 		}
 	},
 }
 
 var FuncCeil = execution.Function{
-	Validator: func(args ...interface{}) error {
-		return combine(oneArg, wantNumber)(args...)
+	Name: "ceil",
+	ArgumentNames: [][]string{
+		{"x"},
 	},
-	Logic: func(args ...interface{}) (interface{}, error) {
+	Description: docs.Text("Returns the ceiling of x."),
+	Validator: All(
+		ExactlyNArgs(1),
+		Arg(0,
+			SingleOneOf(
+				TypeOf(ZeroInt()),
+				TypeOf(ZeroFloat()),
+			),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
 		switch arg := args[0].(type) {
-		case int:
-			return math.Ceil(float64(arg)), nil
-		case float64:
-			return math.Ceil(arg), nil
+		case Int:
+			return MakeFloat(float64(arg.AsInt())), nil
+		case Float:
+			return MakeFloat(math.Ceil(arg.AsFloat())), nil
 		default:
-			return nil, errors.Errorf("Can't take ceiling of type %v", reflect.TypeOf(arg))
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
 		}
 	},
 }
 
-var FuncLog = execution.Function{
-	Validator: func(args ...interface{}) error {
-		return combine(oneArg, wantNumber)(args...)
+var FuncLog2 = execution.Function{
+	Name: "log2",
+	ArgumentNames: [][]string{
+		{"x"},
 	},
-	Logic: func(args ...interface{}) (interface{}, error) {
+	Description: docs.Text("Returns the logarithm base 2 of x."),
+	Validator: All(
+		ExactlyNArgs(1),
+		Arg(0,
+			SingleOneOf(
+				TypeOf(ZeroInt()),
+				TypeOf(ZeroFloat()),
+			),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
 		switch arg := args[0].(type) {
-		case int:
+		case Int:
 			if arg <= 0 {
 				return nil, errors.Errorf("Can't take log of value %v", arg)
 			}
-			return math.Log2(float64(arg)), nil
-		case float64:
+			return MakeFloat(math.Log2(float64(arg.AsInt()))), nil
+		case Float:
 			if arg <= 0 {
 				return nil, errors.Errorf("Can't take log of value %v", arg)
 			}
-			return math.Log2(arg), nil
+			return MakeFloat(math.Log2(arg.AsFloat())), nil
 		default:
-			return nil, errors.Errorf("Can't take log of type %v", reflect.TypeOf(arg))
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
 		}
 	},
 }
 
 var FuncLn = execution.Function{
-	Validator: func(args ...interface{}) error {
-		return combine(oneArg, wantNumber)(args...)
+	Name: "ln",
+	ArgumentNames: [][]string{
+		{"x"},
 	},
-	Logic: func(args ...interface{}) (interface{}, error) {
+	Description: docs.Text("Returns the natural logarithm of x."),
+	Validator: All(
+		ExactlyNArgs(1),
+		Arg(0,
+			SingleOneOf(
+				TypeOf(ZeroInt()),
+				TypeOf(ZeroFloat()),
+			),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
 		switch arg := args[0].(type) {
-		case int:
+		case Int:
 			if arg <= 0 {
 				return nil, errors.Errorf("Can't take ln of value %v", arg)
 			}
-			return math.Log1p(float64(arg)) - 1, nil
-		case float64:
+			return MakeFloat(math.Log1p(float64(arg.AsInt())) - 1), nil
+		case Float:
 			if arg <= 0 {
 				return nil, errors.Errorf("Can't take ln of value %v", arg)
 			}
-			return math.Log1p(arg) - 1, nil
+			return MakeFloat(math.Log1p(arg.AsFloat()) - 1), nil
 		default:
-			return nil, errors.Errorf("Can't take ln of type %v", reflect.TypeOf(arg))
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
 		}
 	},
 }
 
 /* Multiple numbers functions */
-var FuncMin = execution.Function{
-	Validator: func(args ...interface{}) error {
-		return atLeastOneArg(args...)
+var FuncLeast = execution.Function{
+	Name: "least",
+	ArgumentNames: [][]string{
+		{"...xs"},
 	},
-	Logic: func(args ...interface{}) (interface{}, error) {
-		errInts := allInts(args...)
-		errFloats := allFloats(args...)
-
-		if errInts != nil && errFloats != nil {
-			return nil, errors.Errorf("Arguments should be all ints or all floats")
-		}
-
-		if errInts == nil { /* ints */
-			min := math.MinInt64
+	Description: docs.Text("Returns the least argument."),
+	Validator: All(
+		AtLeastNArgs(1),
+		OneOf(
+			AllArgs(TypeOf(ZeroInt())),
+			AllArgs(TypeOf(ZeroFloat())),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		switch args[0].(type) {
+		case Int:
+			var min Int = math.MaxInt64
 			for _, arg := range args {
-				min = intMin(min, arg.(int))
+				min = intMin(min, arg.(Int))
 			}
 
 			return min, nil
-		} else { /* floats */
-			min := math.Inf(-1)
+		case Float:
+			min := math.Inf(1)
 			for _, arg := range args {
-				min = math.Min(min, arg.(float64))
+				min = math.Min(min, arg.(Float).AsFloat())
 			}
 
-			return min, nil
+			return MakeFloat(min), nil
+		default:
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
 		}
-
 	},
 }
 
-var FuncMax = execution.Function{
-	Validator: func(args ...interface{}) error {
-		return atLeastOneArg(args...)
+var FuncGreatest = execution.Function{
+	Name: "greatest",
+	ArgumentNames: [][]string{
+		{"...xs"},
 	},
-	Logic: func(args ...interface{}) (interface{}, error) {
-		errInts := allInts(args...)
-		errFloats := allFloats(args...)
-
-		if errInts != nil && errFloats != nil {
-			return nil, errors.Errorf("Arguments should be all ints or all floats")
-		}
-
-		if errInts == nil { /* ints */
-			max := math.MaxInt64
+	Description: docs.Text("Returns the greatest argument."),
+	Validator: All(
+		AtLeastNArgs(1),
+		OneOf(
+			AllArgs(TypeOf(ZeroInt())),
+			AllArgs(TypeOf(ZeroFloat())),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		switch args[0].(type) {
+		case Int:
+			var max Int = math.MinInt64
 			for _, arg := range args {
-				max = intMax(max, arg.(int))
+				max = intMax(max, arg.(Int))
 			}
 
 			return max, nil
-		} else { /* floats */
-			max := math.Inf(1)
+		case Float:
+			max := math.Inf(-1)
 			for _, arg := range args {
-				max = math.Max(max, arg.(float64))
+				max = math.Max(max, arg.(Float).AsFloat())
 			}
 
-			return max, nil
+			return MakeFloat(max), nil
+		default:
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
 		}
-
 	},
 }
 
 /* Other number functions */
 var FuncRandFloat = execution.Function{
-	Validator: func(args ...interface{}) error {
-		err := allInts(args...)
-		if err != nil {
-			return err
-		}
-
-		if len(args) > 2 {
-			return errors.Errorf("Expected at most two arguments, got %v", len(args))
-		}
-		return nil
+	Name: "randfloat",
+	ArgumentNames: [][]string{
+		{},
+		{"max"},
+		{"min", "max"},
 	},
-	Logic: func(args ...interface{}) (interface{}, error) {
-		argCount := len(args)
-		if argCount == 0 {
-			return rand.Float64(), nil
-		} else if argCount == 1 {
-			upper := float64(args[0].(int))
-			return upper * rand.Float64(), nil
-		} else {
-			lower := float64(args[0].(int))
-			upper := float64(args[1].(int))
+	Description: docs.List(
+		docs.Text("Provided no arguments, returns a pseudo-random Float in [0.0,1.0)."),
+		docs.Text("Provided one argument, returns a pseudo-random Float in [0.0,max)."),
+		docs.Text("Provided two arguments, returns a pseudo-random Float in [min,max)."),
+	),
+	Validator: All(
+		AtMostNArgs(2),
+		AllArgs(TypeOf(ZeroInt())),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		switch len(args) {
+		case 0:
+			return MakeFloat(rand.Float64()), nil
+		case 1:
+			upper := float64(args[0].(Int).AsInt())
+			return MakeFloat(upper * rand.Float64()), nil
+		default:
+			lower := float64(args[0].(Int).AsInt())
+			upper := float64(args[1].(Int).AsInt())
 
-			return lower + (upper-lower)*rand.Float64(), nil
+			return MakeFloat(lower + (upper-lower)*rand.Float64()), nil
 		}
 	},
 }
 
 var FuncRandInt = execution.Function{
-	Validator: func(args ...interface{}) error {
-		err := allInts(args...)
-		if err != nil {
-			return err
-		}
-
-		if len(args) > 2 {
-			return errors.Errorf("Expected at most two arguments, got %v", len(args))
-		}
-		return nil
+	Name: "randint",
+	ArgumentNames: [][]string{
+		{},
+		{"max"},
+		{"min", "max"},
 	},
-	Logic: func(args ...interface{}) (interface{}, error) {
-		argCount := len(args)
-		if argCount == 0 {
-			return rand.Int(), nil
-		} else if argCount == 1 {
-			upper := args[0].(int)
+	Description: docs.List(
+		docs.Text("Provided no arguments, returns a non-negative pseudo-random Int."),
+		docs.Text("Provided one argument, returns a non-negative pseudo-random Int in [0,max)."),
+		docs.Text("Provided two arguments, returns a pseudo-random Int in [min,max)."),
+	),
+	Validator: All(
+		AtMostNArgs(2),
+		AllArgs(TypeOf(ZeroInt())),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		switch len(args) {
+		case 0:
+			return MakeInt(rand.Int()), nil
+		case 1:
+			upper := args[0].(Int)
 			if upper <= 0 {
 				return nil, errors.Errorf("Upper boundary for random integer must be greater than zero")
 			}
 
-			return rand.Intn(upper), nil
-		} else {
-			lower := args[0].(int)
-			upper := args[1].(int)
+			return MakeInt(rand.Intn(upper.AsInt())), nil
+		default:
+			lower := args[0].(Int).AsInt()
+			upper := args[1].(Int).AsInt()
 
 			if upper <= lower {
 				return nil, errors.Errorf("Upper bound for random integers must be greater than the lower bound")
 			}
 
-			return lower + rand.Intn(upper-lower), nil
+			return MakeInt(lower + rand.Intn(upper-lower)), nil
 		}
 	},
 }
 
 var FuncPower = execution.Function{
-	Validator: func(args ...interface{}) error {
-		err := allFloats(args...)
-		if err != nil {
-			return err
-		}
-
-		if len(args) != 2 {
-			return errors.Errorf("Expected two arguments, got %v", len(args))
-		}
-		return nil
+	Name: "power",
+	ArgumentNames: [][]string{
+		{"x", "exponent"},
 	},
-	Logic: func(args ...interface{}) (interface{}, error) {
-		return math.Pow(args[0].(float64), args[1].(float64)), nil
+	Description: docs.Text("Returns x to the power of the exponent."),
+	Validator: All(
+		ExactlyNArgs(2),
+		AllArgs(TypeOf(ZeroFloat())),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		return MakeFloat(math.Pow(args[0].(Float).AsFloat(), args[1].(Float).AsFloat())), nil
 	},
 }
 
 /*  Single string functions  */
 
 var FuncLower = execution.Function{
-	Validator: func(args ...interface{}) error {
-		return combine(oneArg, wantString)(args...)
+	Name: "lowercase",
+	ArgumentNames: [][]string{
+		{"text"},
 	},
-	Logic: func(args ...interface{}) (interface{}, error) {
-		return strings.ToLower(args[0].(string)), nil
+	Description: docs.Text("Returns the text in lowercase."),
+	Validator: All(
+		ExactlyNArgs(1),
+		Arg(0, TypeOf(ZeroString())),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		return MakeString(strings.ToLower(args[0].(String).AsString())), nil
 	},
 }
 
 var FuncUpper = execution.Function{
-	Validator: func(args ...interface{}) error {
-		return combine(oneArg, wantString)(args...)
+	Name: "uppercase",
+	ArgumentNames: [][]string{
+		{"text"},
 	},
-	Logic: func(args ...interface{}) (interface{}, error) {
-		return strings.ToUpper(args[0].(string)), nil
+	Description: docs.Text("Returns the text in uppercase."),
+	Validator: All(
+		ExactlyNArgs(1),
+		Arg(0, TypeOf(ZeroString())),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		return MakeString(strings.ToUpper(args[0].(String).AsString())), nil
 	},
 }
 
 var FuncCapitalize = execution.Function{
-	Validator: func(args ...interface{}) error {
-		return combine(oneArg, wantString)(args...)
+	Name: "capitalize",
+	ArgumentNames: [][]string{
+		{"text"},
 	},
-	Logic: func(args ...interface{}) (interface{}, error) {
-		arg := args[0].(string)
-		arg = strings.ToLower(arg)
-		return strings.Title(arg), nil
+	Description: docs.Text("Returns the text with all words capitalized."),
+	Validator: All(
+		ExactlyNArgs(1),
+		Arg(0, TypeOf(ZeroString())),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		arg := args[0].(String)
+		arg = MakeString(strings.ToLower(arg.AsString()))
+		return MakeString(strings.Title(arg.AsString())), nil
 	},
 }
 
 var FuncReverse = execution.Function{
-	Validator: func(args ...interface{}) error {
-		return combine(oneArg, wantString)(args...)
+	Name: "reverse",
+	ArgumentNames: [][]string{
+		{"list"},
 	},
-	Logic: func(args ...interface{}) (interface{}, error) {
-		arg := args[0].(string)
-
-		runes := []rune(arg)
-		for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
-			runes[i], runes[j] = runes[j], runes[i]
+	Description: docs.List(
+		docs.Text("Provided a String, returns the reversed string."),
+		docs.Text("Provided a Tuple, returns the elements in reverse order."),
+	),
+	Validator: All(
+		ExactlyNArgs(1),
+		Arg(0,
+			SingleOneOf(
+				TypeOf(ZeroString()),
+				TypeOf(ZeroTuple()),
+			),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		switch arg := args[0].(type) {
+		case String:
+			out := make([]rune, len(arg))
+			for i, el := range arg.AsString() {
+				out[len(out)-i-1] = el
+			}
+			return MakeString(string(out)), nil
+		case Tuple:
+			out := make([]Value, len(arg))
+			for i, el := range arg.AsSlice() {
+				out[len(out)-i-1] = el
+			}
+			return MakeTuple(out), nil
+		default:
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
 		}
-		return string(runes), nil
 	},
 }
 
 var FuncSubstring = execution.Function{
-	Validator: func(args ...interface{}) error { /* this is a complicated validator */
-		if len(args) < 2 {
-			return errors.Errorf("Expected at least two arguments, got %v", len(args))
-		} else if len(args) > 3 {
-			return errors.Errorf("Expected at most three arguments, got %v", len(args))
-		}
-
-		err := wantString(args[0]) /* the first arg MUST be a string */
-		if err != nil {
-			return err
-		}
-
-		/* now we might either get (number, number) or (number) */
-		err = wantInt(args[1])
-		if err != nil {
-			return err
-		}
+	Name: "sub", //TODO: fix parsing so that you can name this function substring
+	ArgumentNames: [][]string{
+		{"word", "begin"},
+		{"word", "begin", "end"},
+	},
+	Description: docs.List(
+		docs.Text("Provided two arguments, returns word[begin:]."),
+		docs.Text("Provided three arguments, returns word[begin:end]."),
+	),
+	Validator: All(
+		AtLeastNArgs(2),
+		AtMostNArgs(3),
+		Arg(0, TypeOf(ZeroString())),
+		Arg(1, TypeOf(ZeroInt())),
+		IfArgPresent(2, Arg(2, TypeOf(ZeroInt()))),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		str := args[0].(String)
+		start := args[1].(Int)
+		end := MakeInt(len(str))
 
 		if len(args) == 3 {
-			err = wantInt(args[2])
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	},
-	Logic: func(args ...interface{}) (interface{}, error) {
-		str := args[0].(string)
-		start := args[1].(int)
-		var end int
-
-		if len(args) == 2 {
-			end = len(str)
-		} else {
-			end = args[2].(int)
+			end = args[2].(Int)
 		}
 
 		return str[start:end], nil
 	},
 }
 
-var FuncRegexp = execution.Function{
-	Validator: func(args ...interface{}) error {
-		return combine(twoArgs, allStrings)(args...)
+var FuncMatchRegexp = execution.Function{
+	Name: "matchregexp",
+	ArgumentNames: [][]string{
+		{"regexp", "text"},
 	},
-	Logic: func(args ...interface{}) (interface{}, error) {
-		re, err := regexp.Compile(args[0].(string))
+	Description: docs.Text("Returns the first match of regexp in the text."),
+	Validator: All(
+		ExactlyNArgs(2),
+		AllArgs(TypeOf(ZeroString())),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		re, err := regexp.Compile(args[0].(String).AsString())
 		if err != nil {
 			return nil, errors.Errorf("Couldn't compile regular expression")
 		}
 
-		match := re.FindString(args[1].(string))
+		match := re.FindString(args[1].(String).AsString())
 		if match == "" {
 			return nil, nil
 		}
 
-		return match, nil
+		return MakeString(match), nil
+	},
+}
+
+var FuncReplace = execution.Function{
+	Name: "replace",
+	ArgumentNames: [][]string{
+		{"old", "new", "text"},
+	},
+	Description: docs.Text("Returns the text with all the instances of old replaced with new."),
+	Validator: All(
+		ExactlyNArgs(3),
+		AllArgs(TypeOf(ZeroString())),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		return MakeString(
+			strings.Replace(
+				args[2].(String).AsString(),
+				args[0].(String).AsString(),
+				args[1].(String).AsString(),
+				-1),
+		), nil
+	},
+}
+
+var FuncHasPrefix = execution.Function{
+	Name: "hasprefix",
+	ArgumentNames: [][]string{
+		{"prefix", "text"},
+	},
+	Description: docs.Text("Returns whether the text begins with prefix."),
+	Validator: All(
+		ExactlyNArgs(2),
+		AllArgs(TypeOf(ZeroString())),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		return MakeBool(
+			strings.HasPrefix(
+				args[1].(String).AsString(),
+				args[0].(String).AsString(),
+			),
+		), nil
+	},
+}
+
+var FuncHasSuffix = execution.Function{
+	Name: "hassuffix",
+	ArgumentNames: [][]string{
+		{"suffix", "text"},
+	},
+	Description: docs.Text("Returns whether the text ends with suffix."),
+	Validator: All(
+		ExactlyNArgs(2),
+		AllArgs(TypeOf(ZeroString())),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		return MakeBool(
+			strings.HasSuffix(
+				args[1].(String).AsString(),
+				args[0].(String).AsString(),
+			),
+		), nil
+	},
+}
+
+var FuncContains = execution.Function{
+	Name: "contains",
+	ArgumentNames: [][]string{
+		{"substring", "text"},
+		{"element", "tuple"},
+	},
+	Description: docs.List(
+		docs.Text("Provided a String, returns whether it contains the given substring."),
+		docs.Text("Provided a Tuple, returns whether it contains the given element. "),
+	),
+	Validator: All(
+		ExactlyNArgs(2),
+		OneOf(
+			AllArgs(TypeOf(ZeroString())),
+			Arg(1, TypeOf(ZeroTuple())),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		switch arg := args[1].(type) {
+		case String:
+			return MakeBool(
+				strings.Contains(
+					args[1].(String).AsString(),
+					args[0].(String).AsString(),
+				),
+			), nil
+		case Tuple:
+			for _, el := range arg.AsSlice() {
+				if AreEqual(el, args[0]) {
+					return MakeBool(true), nil
+				}
+			}
+			return MakeBool(false), nil
+		default:
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
+		}
+	},
+}
+
+var FuncIndex = execution.Function{
+	Name: "index",
+	ArgumentNames: [][]string{
+		{"substring", "text"},
+		{"element", "tuple"},
+	},
+	Description: docs.List(
+		docs.Text("Provided a String, returns the index of the substring in the text, or -1 if the text doesn't contain it."),
+		docs.Text("Provided a Tuple, returns the index of the element in the tuple, or -1 if the tuple doesn't contain it."),
+	),
+	Validator: All(
+		ExactlyNArgs(2),
+		OneOf(
+			AllArgs(TypeOf(ZeroString())),
+			Arg(1, TypeOf(ZeroTuple())),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		switch arg := args[1].(type) {
+		case String:
+			return MakeInt(
+				strings.Index(
+					args[1].(String).AsString(),
+					args[0].(String).AsString(),
+				),
+			), nil
+		case Tuple:
+			for i, el := range arg.AsSlice() {
+				if AreEqual(el, args[0]) {
+					return MakeInt(i), nil
+				}
+			}
+			return MakeInt(-1), nil
+		default:
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
+		}
+	},
+}
+
+var FuncNth = execution.Function{
+	Name: "nth",
+	ArgumentNames: [][]string{
+		{"n", "tuple"},
+	},
+	Description: docs.Text("Returns the element with index n in the tuple."),
+	Validator: All(
+		ExactlyNArgs(2),
+		Arg(0, TypeOf(ZeroInt())),
+		Arg(1, TypeOf(ZeroTuple())),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		if args[0].(Int).AsInt() > len(args[1].(Tuple).AsSlice()) {
+			return nil, errors.Errorf(
+				"tried to access element with index %v in tuple with length %v",
+				args[0].(Int).AsInt(),
+				len(args[1].(Tuple).AsSlice()),
+			)
+		}
+		return args[1].(Tuple).AsSlice()[args[0].(Int).AsInt()], nil
+	},
+}
+
+var FuncLength = execution.Function{
+	Name: "length",
+	ArgumentNames: [][]string{
+		{"seq"},
+	},
+	Description: docs.Text("Returns the length of the given Tuple or String."),
+	Validator: All(
+		ExactlyNArgs(1),
+		Arg(0,
+			SingleOneOf(
+				TypeOf(ZeroString()),
+				TypeOf(ZeroTuple()),
+			),
+		),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		switch arg := args[0].(type) {
+		case String:
+			return MakeInt(len(arg)), nil
+		case Tuple:
+			return MakeInt(len(arg)), nil
+		default:
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			panic("unreachable")
+		}
+	},
+}
+
+var FuncNow = execution.Function{
+	Name: "now",
+	ArgumentNames: [][]string{
+		{""},
+	},
+	Description: docs.Text("Returns the current time."),
+	Validator:   ExactlyNArgs(0),
+	Logic: func(args ...Value) (Value, error) {
+		return MakeTime(time.Now()), nil
+	},
+}
+
+var FuncStringJoin = execution.Function{
+	Name: "strjoin",
+	ArgumentNames: [][]string{
+		{"delimiter", "tuple"},
+	},
+	Description: docs.Text("Returns the elements of the string tuple joined into a string separated by the delimiter."),
+	Validator: All(
+		ExactlyNArgs(2),
+		Arg(0, TypeOf(ZeroString())),
+		Arg(1, TypeOf(ZeroTuple())),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		tup := args[1].(Tuple)
+		out := make([]string, len(tup))
+		for i := range tup {
+			str, ok := tup[i].(String)
+			if !ok {
+				return nil, errors.Errorf("tuple element with index %v not string, got %v", i, tup[i])
+			}
+			out[i] = str.AsString()
+		}
+		return MakeString(strings.Join(out, args[0].(String).AsString())), nil
 	},
 }
 
 /* Auxiliary functions */
-func intMin(x, y int) int {
+func intMin(x, y Int) Int {
 	if x <= y {
 		return x
 	}
 	return y
 }
 
-func intMax(x, y int) int {
+func intMax(x, y Int) Int {
 	if x <= y {
 		return y
 	}

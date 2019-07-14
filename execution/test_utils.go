@@ -38,7 +38,7 @@ func (rms *recordMultiSet) Insert(rec *Record) error {
 	targetSlice := rms.set[hash]
 	for k := range targetSlice {
 		element := targetSlice[k]
-		if AreEqual(element.rec, rec) {
+		if element.rec.Equal(rec) {
 			rms.set[hash][k].count++
 			return nil
 		}
@@ -58,7 +58,7 @@ func (rms *recordMultiSet) GetCount(rec *Record) (int, error) {
 	targetSlice := rms.set[hash]
 	for k := range targetSlice {
 		element := targetSlice[k]
-		if AreEqual(element.rec, rec) {
+		if element.rec.Equal(rec) {
 			return element.count, nil
 		}
 	}
@@ -68,12 +68,12 @@ func (rms *recordMultiSet) GetCount(rec *Record) (int, error) {
 
 type entity struct {
 	fieldName octosql.VariableName
-	value     interface{}
+	value     octosql.Value
 }
 
 type row []entity
 
-func newEntity(name octosql.VariableName, value interface{}) entity {
+func newEntity(name octosql.VariableName, value octosql.Value) entity {
 	return entity{
 		fieldName: name,
 		value:     value,
@@ -101,10 +101,35 @@ func Normalize(rec *Record) *Record {
 		values[k] = ent.value
 	}
 
-	return NewRecordFromSlice(sortedFieldNames, values)
+	return NewRecordFromSliceWithNormalize(sortedFieldNames, values)
 }
 
 func AreStreamsEqual(first, second RecordStream) (bool, error) {
+	for {
+		firstRec, firstErr := first.Next()
+		secondRec, secondErr := second.Next()
+
+		if firstErr == secondErr && firstErr == ErrEndOfStream {
+			break
+		} else if firstErr == ErrEndOfStream && secondErr == nil {
+			return false, nil
+		} else if firstErr == nil && secondErr == ErrEndOfStream {
+			return false, nil
+		} else if firstErr != nil {
+			return false, errors.Wrap(firstErr, "error in Next for first stream")
+		} else if secondErr != nil {
+			return false, errors.Wrap(secondErr, "error in Next for second stream")
+		}
+
+		if !firstRec.Equal(secondRec) {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+func AreStreamsEqualNoOrdering(first, second RecordStream) (bool, error) {
 	firstMultiSet := newMultiSet()
 	secondMultiSet := newMultiSet()
 
@@ -124,14 +149,12 @@ func AreStreamsEqual(first, second RecordStream) (bool, error) {
 			return false, errors.Wrap(secondErr, "error in Next for second stream")
 		}
 
-		firstNormalized := Normalize(firstRec)
-		err := firstMultiSet.Insert(firstNormalized)
+		err := firstMultiSet.Insert(firstRec)
 		if err != nil {
 			return false, errors.Wrap(err, "couldn't insert into the multiset")
 		}
 
-		secondNormalized := Normalize(secondRec)
-		err = secondMultiSet.Insert(secondNormalized)
+		err = secondMultiSet.Insert(secondRec)
 		if err != nil {
 			return false, errors.Wrap(err, "couldn't insert into the multiset")
 		}
@@ -174,10 +197,21 @@ func (rms *recordMultiSet) isContained(other *recordMultiSet) (bool, error) {
 	return true, nil
 }
 
-func NewRecordFromSlice(fields []octosql.VariableName, data []interface{}) *Record {
+func NewRecordFromSlice(fields []octosql.VariableName, data []octosql.Value) *Record {
 	return &Record{
 		fieldNames: fields,
 		data:       data,
+	}
+}
+
+func NewRecordFromSliceWithNormalize(fields []octosql.VariableName, data []interface{}) *Record {
+	normalized := make([]octosql.Value, len(data))
+	for i := range data {
+		normalized[i] = octosql.NormalizeType(data[i])
+	}
+	return &Record{
+		fieldNames: fields,
+		data:       normalized,
 	}
 }
 
@@ -199,16 +233,16 @@ func (dn *DummyNode) Get(variables octosql.Variables) (RecordStream, error) {
 	return NewInMemoryStream(dn.data), nil
 }
 
-func NewDummyValue(value interface{}) *DummyValue {
+func NewDummyValue(value octosql.Value) *DummyValue {
 	return &DummyValue{
 		value,
 	}
 }
 
 type DummyValue struct {
-	value interface{}
+	value octosql.Value
 }
 
-func (dv *DummyValue) ExpressionValue(variables octosql.Variables) (interface{}, error) {
+func (dv *DummyValue) ExpressionValue(variables octosql.Variables) (octosql.Value, error) {
 	return dv.value, nil
 }

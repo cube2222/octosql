@@ -69,7 +69,7 @@ func (v *Variable) MaterializeNamed(ctx context.Context) (execution.NamedExpress
 	return execution.NewVariable(v.Name), nil
 }
 
-// Tuple describes an expression which is a tuple of subexpressions.
+// TupleExpression describes an expression which is a tuple of subexpressions.
 type Tuple struct {
 	Expressions []Expression
 }
@@ -130,6 +130,33 @@ func (ne *NodeExpression) Materialize(ctx context.Context) (execution.Expression
 		return nil, errors.Wrap(err, "couldn't materialize node")
 	}
 	return execution.NewNodeExpression(materialized), nil
+}
+
+// LogicExpressions describes a boolean expression which get's it's value from the logic formula underneath.
+type LogicExpression struct {
+	Formula Formula
+}
+
+func NewLogicExpression(formula Formula) *LogicExpression {
+	return &LogicExpression{Formula: formula}
+}
+
+func (le *LogicExpression) Transform(ctx context.Context, transformers *Transformers) Expression {
+	var expr Expression = &LogicExpression{
+		Formula: le.Formula.Transform(ctx, transformers),
+	}
+	if transformers.ExprT != nil {
+		expr = transformers.ExprT(expr)
+	}
+	return expr
+}
+
+func (le *LogicExpression) Materialize(ctx context.Context) (execution.Expression, error) {
+	materialized, err := le.Formula.Materialize(ctx)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't materialize formula")
+	}
+	return execution.NewLogicExpression(materialized), nil
 }
 
 // AliasedExpression describes an expression which is explicitly named.

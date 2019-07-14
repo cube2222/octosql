@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/memviz"
+	"github.com/cube2222/octosql"
 
 	"github.com/cube2222/octosql/logical"
 	"github.com/xwb1989/sqlparser"
@@ -616,6 +617,73 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 					),
 					"AND"),
 				logical.NewDataSource("people", "p"),
+			),
+			wantErr: false,
+		},
+		{
+			name: "implicit group by",
+			args: args{
+				statement: `SELECT COUNT(DISTINCT p.name) FROM people p`,
+			},
+			want: logical.NewMap(
+				[]logical.NamedExpression{
+					logical.NewVariable("p.name_count_distinct"),
+				},
+				logical.NewGroupBy(
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewVariable("p.name"),
+						},
+						logical.NewDataSource("people", "p"),
+						true,
+					),
+					[]logical.Expression{logical.NewConstant(true)},
+					[]octosql.VariableName{"p.name"},
+					[]logical.Aggregate{logical.CountDistinct},
+					[]octosql.VariableName{""},
+				),
+				false,
+			),
+			wantErr: false,
+		},
+		{
+			name: "normal group by",
+			args: args{
+				statement: `SELECT COUNT(DISTINCT p.name), FIRST(p.age as myage) as firstage, p.surname, p.surname as mysurname FROM people p GROUP BY p.age, p.city`,
+			},
+			want: logical.NewMap(
+				[]logical.NamedExpression{
+					logical.NewVariable("p.name_count_distinct"),
+					logical.NewVariable("firstage"),
+					logical.NewVariable("p.surname"),
+					logical.NewVariable("mysurname"),
+				},
+				logical.NewGroupBy(
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewVariable("p.name"),
+							logical.NewAliasedExpression(
+								"myage",
+								logical.NewVariable("p.age"),
+							),
+							logical.NewVariable("p.surname"),
+							logical.NewAliasedExpression(
+								"mysurname",
+								logical.NewVariable("p.surname"),
+							),
+						},
+						logical.NewDataSource("people", "p"),
+						true,
+					),
+					[]logical.Expression{
+						logical.NewVariable("p.age"),
+						logical.NewVariable("p.city"),
+					},
+					[]octosql.VariableName{"p.name", "myage", "p.surname", "mysurname"},
+					[]logical.Aggregate{logical.CountDistinct, logical.First, logical.First, logical.First},
+					[]octosql.VariableName{"", "firstage", "p.surname", "mysurname"},
+				),
+				false,
 			),
 			wantErr: false,
 		},

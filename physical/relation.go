@@ -17,6 +17,7 @@ const (
 	LessThan     Relation = "less_than"
 	Like         Relation = "like"
 	In           Relation = "in"
+	NotIn        Relation = "not_in"
 	GreaterEqual Relation = "greater_equal"
 	LessEqual    Relation = "less_equal"
 )
@@ -39,6 +40,8 @@ func (rel Relation) Materialize(ctx context.Context) execution.Relation {
 		return execution.NewLike()
 	case In:
 		return execution.NewIn()
+	case NotIn:
+		return execution.NewNotIn()
 	case GreaterEqual:
 		return execution.NewGreaterEqual()
 	case LessEqual:

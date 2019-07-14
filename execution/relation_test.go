@@ -22,9 +22,9 @@ func TestEqual_Apply(t *testing.T) {
 		{
 			name: "simple equal variable check",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": 3,
-					"b": 3,
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeInt(3),
+					"b": octosql.MakeInt(3),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -35,9 +35,9 @@ func TestEqual_Apply(t *testing.T) {
 		{
 			name: "simple unequal variable check",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": 3,
-					"b": 4,
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeInt(3),
+					"b": octosql.MakeInt(4),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -48,9 +48,9 @@ func TestEqual_Apply(t *testing.T) {
 		{
 			name: "simple incompatible variable check",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": 3,
-					"b": 3.0,
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeInt(3),
+					"b": octosql.MakeFloat(3.0),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -89,9 +89,9 @@ func TestNotEqual_Apply(t *testing.T) {
 		{
 			name: "simple equal variable check",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": 3,
-					"b": 3,
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeInt(3),
+					"b": octosql.MakeInt(3),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -102,9 +102,9 @@ func TestNotEqual_Apply(t *testing.T) {
 		{
 			name: "simple unequal variable check",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": 3,
-					"b": 4,
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeInt(3),
+					"b": octosql.MakeInt(4),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -115,9 +115,9 @@ func TestNotEqual_Apply(t *testing.T) {
 		{
 			name: "simple incompatible variable check",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": 3,
-					"b": 3.0,
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeInt(3),
+					"b": octosql.MakeFloat(3.0),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -149,7 +149,6 @@ func TestMoreThan_Apply(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		rel     *MoreThan
 		args    args
 		want    bool
 		wantErr bool
@@ -157,9 +156,9 @@ func TestMoreThan_Apply(t *testing.T) {
 		{
 			name: "simple greater than variable check",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": 4,
-					"b": 3,
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeInt(4),
+					"b": octosql.MakeInt(3),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -170,9 +169,9 @@ func TestMoreThan_Apply(t *testing.T) {
 		{
 			name: "simple greater than variable check",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": 4.0,
-					"b": 3.0,
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeFloat(4.0),
+					"b": octosql.MakeFloat(3.0),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -183,9 +182,9 @@ func TestMoreThan_Apply(t *testing.T) {
 		{
 			name: "simple greater than variable check",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": "b",
-					"b": "a",
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("b"),
+					"b": octosql.MakeString("a"),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -196,9 +195,9 @@ func TestMoreThan_Apply(t *testing.T) {
 		{
 			name: "simple greater than variable check",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": time.Date(2019, 03, 17, 16, 44, 16, 0, time.UTC),
-					"b": time.Date(2019, 03, 17, 15, 44, 16, 0, time.UTC),
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeTime(time.Date(2019, 03, 17, 16, 44, 16, 0, time.UTC)),
+					"b": octosql.MakeTime(time.Date(2019, 03, 17, 15, 44, 16, 0, time.UTC)),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -209,9 +208,9 @@ func TestMoreThan_Apply(t *testing.T) {
 		{
 			name: "simple incompatible variable check",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": 3,
-					"b": 3.0,
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeInt(3),
+					"b": octosql.MakeFloat(3.0),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -254,7 +253,6 @@ func TestLessThan_Apply(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		rel     *LessThan
 		args    args
 		want    bool
 		wantErr bool
@@ -262,9 +260,9 @@ func TestLessThan_Apply(t *testing.T) {
 		{
 			name: "simple less than variable check",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": 3,
-					"b": 4,
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeInt(3),
+					"b": octosql.MakeInt(4),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -275,9 +273,9 @@ func TestLessThan_Apply(t *testing.T) {
 		{
 			name: "simple less than variable check",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": 3.0,
-					"b": 4.0,
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeFloat(3.0),
+					"b": octosql.MakeFloat(4.0),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -288,9 +286,9 @@ func TestLessThan_Apply(t *testing.T) {
 		{
 			name: "simple less than variable check",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": "a",
-					"b": "b",
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("a"),
+					"b": octosql.MakeString("b"),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -301,9 +299,9 @@ func TestLessThan_Apply(t *testing.T) {
 		{
 			name: "simple less than variable check",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": time.Date(2019, 03, 17, 15, 44, 16, 0, time.UTC),
-					"b": time.Date(2019, 03, 17, 16, 44, 16, 0, time.UTC),
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeTime(time.Date(2019, 03, 17, 15, 44, 16, 0, time.UTC)),
+					"b": octosql.MakeTime(time.Date(2019, 03, 17, 16, 44, 16, 0, time.UTC)),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -314,9 +312,9 @@ func TestLessThan_Apply(t *testing.T) {
 		{
 			name: "simple incompatible variable check",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": 3,
-					"b": 3.0,
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeInt(3),
+					"b": octosql.MakeFloat(3.0),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -359,7 +357,6 @@ func TestGreaterEqual_Apply(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		rel     *LessThan
 		args    args
 		want    bool
 		wantErr bool
@@ -367,9 +364,9 @@ func TestGreaterEqual_Apply(t *testing.T) {
 		{
 			name: "simple >= integer variable check (>)",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": 5,
-					"b": 4,
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeInt(5),
+					"b": octosql.MakeInt(4),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -381,9 +378,9 @@ func TestGreaterEqual_Apply(t *testing.T) {
 		{
 			name: "simple >= integer variable check (==)",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": 4,
-					"b": 4,
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeInt(4),
+					"b": octosql.MakeInt(4),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -395,9 +392,9 @@ func TestGreaterEqual_Apply(t *testing.T) {
 		{
 			name: "simple >= integer variable check (<)",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": 4,
-					"b": 6,
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeInt(4),
+					"b": octosql.MakeInt(6),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -409,9 +406,9 @@ func TestGreaterEqual_Apply(t *testing.T) {
 		{
 			name: "simple >= string variable check (>)",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": "baba",
-					"b": "baaa",
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("baba"),
+					"b": octosql.MakeString("baaa"),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -423,9 +420,9 @@ func TestGreaterEqual_Apply(t *testing.T) {
 		{
 			name: "simple >= string variable check (==)",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": "baba",
-					"b": "baba",
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("baba"),
+					"b": octosql.MakeString("baba"),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -437,9 +434,9 @@ func TestGreaterEqual_Apply(t *testing.T) {
 		{
 			name: "simple >= string variable check (<)",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": "baba",
-					"b": "baca",
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("baba"),
+					"b": octosql.MakeString("baca"),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -451,9 +448,9 @@ func TestGreaterEqual_Apply(t *testing.T) {
 		{
 			name: "simple incompatible variables check",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": 3.0,
-					"b": 3,
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeFloat(3.0),
+					"b": octosql.MakeInt(3),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -493,9 +490,9 @@ func TestLessEqual_Apply(t *testing.T) {
 		{
 			name: "simple <= integer variable check (>)",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": 5,
-					"b": 4,
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeInt(5),
+					"b": octosql.MakeInt(4),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -507,9 +504,9 @@ func TestLessEqual_Apply(t *testing.T) {
 		{
 			name: "simple <= integer variable check (==)",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": 4,
-					"b": 4,
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeInt(4),
+					"b": octosql.MakeInt(4),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -521,9 +518,9 @@ func TestLessEqual_Apply(t *testing.T) {
 		{
 			name: "simple <= integer variable check (<)",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": 4,
-					"b": 6,
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeInt(4),
+					"b": octosql.MakeInt(6),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -535,9 +532,9 @@ func TestLessEqual_Apply(t *testing.T) {
 		{
 			name: "simple <= string variable check (>)",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": "baba",
-					"b": "baaa",
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("baba"),
+					"b": octosql.MakeString("baaa"),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -549,9 +546,9 @@ func TestLessEqual_Apply(t *testing.T) {
 		{
 			name: "simple <= string variable check (==)",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": "baba",
-					"b": "baba",
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("baba"),
+					"b": octosql.MakeString("baba"),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -563,9 +560,9 @@ func TestLessEqual_Apply(t *testing.T) {
 		{
 			name: "simple <= string variable check (<)",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": "baba",
-					"b": "baca",
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("baba"),
+					"b": octosql.MakeString("baca"),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -577,9 +574,9 @@ func TestLessEqual_Apply(t *testing.T) {
 		{
 			name: "simple incompatible variables check",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": 3.0,
-					"b": 3,
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeFloat(3.0),
+					"b": octosql.MakeInt(3),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -619,9 +616,9 @@ func TestLike_Apply(t *testing.T) {
 		{
 			name: "simple number regex",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": "123123",
-					"b": "^[0-9]+$",
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeString("^[0-9]+$"),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -632,9 +629,9 @@ func TestLike_Apply(t *testing.T) {
 		{
 			name: "simple number regex",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": "123123",
-					"b": "^[0-9]$",
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeString("^[0-9]$"),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -673,16 +670,14 @@ func TestIn_Apply(t *testing.T) {
 		{
 			name: "simple in",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": "123123",
-					"b": []Record{
-						*NewRecord([]octosql.VariableName{"a"}, map[octosql.VariableName]interface{}{
-							"a": "123124",
-						}),
-						*NewRecord([]octosql.VariableName{"a"}, map[octosql.VariableName]interface{}{
-							"a": "123123",
-						}),
-					},
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeString("123124"),
+							octosql.MakeString("123123"),
+						},
+					),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -693,16 +688,14 @@ func TestIn_Apply(t *testing.T) {
 		{
 			name: "simple in",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": "123123",
-					"b": []Record{
-						*NewRecord([]octosql.VariableName{"a"}, map[octosql.VariableName]interface{}{
-							"a": "123124",
-						}),
-						*NewRecord([]octosql.VariableName{"a"}, map[octosql.VariableName]interface{}{
-							"a": "123125",
-						}),
-					},
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeString("123124"),
+							octosql.MakeString("123125"),
+						},
+					),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -713,21 +706,23 @@ func TestIn_Apply(t *testing.T) {
 		{
 			name: "record in",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": NewRecord([]octosql.VariableName{"a", "b"}, map[octosql.VariableName]interface{}{
-						"a": "123124",
-						"b": 13,
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeTuple([]octosql.Value{
+						octosql.MakeString("123124"),
+						octosql.MakeInt(13),
 					}),
-					"b": []Record{
-						*NewRecord([]octosql.VariableName{"a", "b"}, map[octosql.VariableName]interface{}{
-							"a": "123124",
-							"b": 13,
-						}),
-						*NewRecord([]octosql.VariableName{"a", "b"}, map[octosql.VariableName]interface{}{
-							"a": "123123",
-							"b": 15,
-						}),
-					},
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123124"),
+								octosql.MakeInt(13),
+							}),
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123123"),
+								octosql.MakeInt(15),
+							}),
+						},
+					),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -738,21 +733,23 @@ func TestIn_Apply(t *testing.T) {
 		{
 			name: "record in",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": NewRecord([]octosql.VariableName{"a", "b"}, map[octosql.VariableName]interface{}{
-						"a": "123124",
-						"b": 13,
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeTuple([]octosql.Value{
+						octosql.MakeString("123124"),
+						octosql.MakeInt(13),
 					}),
-					"b": []Record{
-						*NewRecord([]octosql.VariableName{"a", "b"}, map[octosql.VariableName]interface{}{
-							"a": "123125",
-							"b": 13,
-						}),
-						*NewRecord([]octosql.VariableName{"a", "b"}, map[octosql.VariableName]interface{}{
-							"a": "123123",
-							"b": 15,
-						}),
-					},
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123125"),
+								octosql.MakeInt(13),
+							}),
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123123"),
+								octosql.MakeInt(15),
+							}),
+						},
+					),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -763,13 +760,14 @@ func TestIn_Apply(t *testing.T) {
 		{
 			name: "simple in",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": "123123",
-					"b": []Record{
-						*NewRecord([]octosql.VariableName{"a"}, map[octosql.VariableName]interface{}{
-							"a": "123123",
-						}),
-					},
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeString("123123"),
+							octosql.MakeInt(13),
+						},
+					),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -780,9 +778,9 @@ func TestIn_Apply(t *testing.T) {
 		{
 			name: "simple in",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{
-					"a": "123123",
-					"b": "123123",
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeString("123123"),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -794,6 +792,155 @@ func TestIn_Apply(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rel := &In{}
+			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("In.Apply() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("In.Apply() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNotIn_Apply(t *testing.T) {
+	type args struct {
+		variables octosql.Variables
+		left      Expression
+		right     Expression
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "simple in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeString("123124"),
+							octosql.MakeString("123123"),
+						},
+					),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: false,
+		},
+		{
+			name: "simple in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeString("123124"),
+							octosql.MakeString("123125"),
+						},
+					),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "record in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeTuple([]octosql.Value{
+						octosql.MakeString("123124"),
+						octosql.MakeInt(13),
+					}),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123124"),
+								octosql.MakeInt(13),
+							}),
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123123"),
+								octosql.MakeInt(15),
+							}),
+						},
+					),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: false,
+		},
+		{
+			name: "record in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeTuple([]octosql.Value{
+						octosql.MakeString("123124"),
+						octosql.MakeInt(13),
+					}),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123125"),
+								octosql.MakeInt(13),
+							}),
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123123"),
+								octosql.MakeInt(15),
+							}),
+						},
+					),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "simple in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeString("123123"),
+							octosql.MakeInt(13),
+						},
+					),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: false,
+		},
+		{
+			name: "simple in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeString("123123"),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rel := &NotIn{}
 			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("In.Apply() error = %v, wantErr %v", err, tt.wantErr)

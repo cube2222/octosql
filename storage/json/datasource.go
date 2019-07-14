@@ -115,9 +115,9 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 		return nil, errors.Wrap(err, "couldn't decode json record")
 	}
 
-	aliasedRecord := make(map[octosql.VariableName]interface{})
+	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
 	for k, v := range record {
-		aliasedRecord[octosql.VariableName(fmt.Sprintf("%s.%s", rs.alias, k))] = execution.NormalizeType(v)
+		aliasedRecord[octosql.VariableName(fmt.Sprintf("%s.%s", rs.alias, k))] = octosql.NormalizeType(v)
 	}
 
 	fields := make([]octosql.VariableName, 0)

@@ -12,13 +12,15 @@ import (
 )
 
 type Output struct {
-	w       io.Writer
-	records []*execution.Record
+	w        io.Writer
+	rowLines bool
+	records  []*execution.Record
 }
 
-func NewOutput(w io.Writer) output.Output {
+func NewOutput(w io.Writer, rowLines bool) output.Output {
 	return &Output{
-		w: w,
+		w:        w,
+		rowLines: rowLines,
 	}
 }
 
@@ -44,6 +46,7 @@ func (o *Output) Close() error {
 	}
 
 	table := tablewriter.NewWriter(os.Stdout)
+	table.SetRowLine(o.rowLines)
 	table.SetHeader(fields)
 	table.SetAutoFormatHeaders(false)
 

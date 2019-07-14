@@ -24,7 +24,7 @@ func TestAnd_Evaluate(t *testing.T) {
 		{
 			name: "false and false",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{},
+				variables: map[octosql.VariableName]octosql.Value{},
 			},
 			fields: fields{
 				Left:  NewConstant(false),
@@ -36,7 +36,7 @@ func TestAnd_Evaluate(t *testing.T) {
 		{
 			name: "false and true",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{},
+				variables: map[octosql.VariableName]octosql.Value{},
 			},
 			fields: fields{
 				Left:  NewConstant(false),
@@ -48,7 +48,7 @@ func TestAnd_Evaluate(t *testing.T) {
 		{
 			name: "true and false",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{},
+				variables: map[octosql.VariableName]octosql.Value{},
 			},
 			fields: fields{
 				Left:  NewConstant(true),
@@ -60,7 +60,7 @@ func TestAnd_Evaluate(t *testing.T) {
 		{
 			name: "true and true",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{},
+				variables: map[octosql.VariableName]octosql.Value{},
 			},
 			fields: fields{
 				Left:  NewConstant(true),
@@ -106,7 +106,7 @@ func TestOr_Evaluate(t *testing.T) {
 		{
 			name: "false or false",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{},
+				variables: map[octosql.VariableName]octosql.Value{},
 			},
 			fields: fields{
 				Left:  NewConstant(false),
@@ -118,7 +118,7 @@ func TestOr_Evaluate(t *testing.T) {
 		{
 			name: "false or true",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{},
+				variables: map[octosql.VariableName]octosql.Value{},
 			},
 			fields: fields{
 				Left:  NewConstant(false),
@@ -130,7 +130,7 @@ func TestOr_Evaluate(t *testing.T) {
 		{
 			name: "true or false",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{},
+				variables: map[octosql.VariableName]octosql.Value{},
 			},
 			fields: fields{
 				Left:  NewConstant(true),
@@ -142,7 +142,7 @@ func TestOr_Evaluate(t *testing.T) {
 		{
 			name: "true or true",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{},
+				variables: map[octosql.VariableName]octosql.Value{},
 			},
 			fields: fields{
 				Left:  NewConstant(true),
@@ -187,7 +187,7 @@ func TestNot_Evaluate(t *testing.T) {
 		{
 			name: "not false",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{},
+				variables: map[octosql.VariableName]octosql.Value{},
 			},
 			fields: fields{
 				Child: NewConstant(false),
@@ -199,7 +199,7 @@ func TestNot_Evaluate(t *testing.T) {
 		{
 			name: "not true",
 			args: args{
-				variables: map[octosql.VariableName]interface{}{},
+				variables: map[octosql.VariableName]octosql.Value{},
 			},
 			fields: fields{
 				Child: NewConstant(true),

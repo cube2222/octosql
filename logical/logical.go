@@ -88,8 +88,8 @@ func NewConstant(value interface{}) *Constant {
 
 func (v *Constant) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
 	name := physicalCreator.GetVariableName()
-	return physical.NewVariable(name), octosql.NewVariables(map[octosql.VariableName]interface{}{
-		name: v.value,
+	return physical.NewVariable(name), octosql.NewVariables(map[octosql.VariableName]octosql.Value{
+		name: octosql.NormalizeType(v.value),
 	}), nil
 }
 
@@ -139,6 +139,22 @@ func (ne *NodeExpression) Physical(ctx context.Context, physicalCreator *Physica
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for node expression")
 	}
 	return physical.NewNodeExpression(physicalNode), variables, nil
+}
+
+type LogicExpression struct {
+	formula Formula
+}
+
+func NewLogicExpression(formula Formula) *LogicExpression {
+	return &LogicExpression{formula: formula}
+}
+
+func (le *LogicExpression) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
+	physicalNode, variables, err := le.formula.Physical(ctx, physicalCreator)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't get physical plan for logic expression")
+	}
+	return physical.NewLogicExpression(physicalNode), variables, nil
 }
 
 type AliasedExpression struct {

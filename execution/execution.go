@@ -10,7 +10,7 @@ type Node interface {
 }
 
 type Expression interface {
-	ExpressionValue(variables octosql.Variables) (interface{}, error)
+	ExpressionValue(variables octosql.Variables) (octosql.Value, error)
 }
 
 type NamedExpression interface {
@@ -26,7 +26,7 @@ func NewVariable(name octosql.VariableName) *Variable {
 	return &Variable{name: name}
 }
 
-func (v *Variable) ExpressionValue(variables octosql.Variables) (interface{}, error) {
+func (v *Variable) ExpressionValue(variables octosql.Variables) (octosql.Value, error) {
 	val, err := variables.Get(v.name)
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't get variable %+v, available variables %+v", v.name, variables)
@@ -38,18 +38,18 @@ func (v *Variable) Name() octosql.VariableName {
 	return v.name
 }
 
-type Tuple struct {
+type TupleExpression struct {
 	expressions []Expression
 }
 
-func NewTuple(expressions []Expression) *Tuple {
-	return &Tuple{expressions: expressions}
+func NewTuple(expressions []Expression) *TupleExpression {
+	return &TupleExpression{expressions: expressions}
 }
 
-func (tup *Tuple) ExpressionValue(variables octosql.Variables) (interface{}, error) {
-	outValues := make([]interface{}, len(tup.expressions))
+func (tup *TupleExpression) ExpressionValue(variables octosql.Variables) (octosql.Value, error) {
+	outValues := make(octosql.Tuple, len(tup.expressions))
 	for i, expr := range tup.expressions {
-		value, err := extractSingleValue(expr, variables)
+		value, err := expr.ExpressionValue(variables)
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't get tuple subexpression with index %v", i)
 		}
@@ -67,17 +67,21 @@ func NewNodeExpression(node Node) *NodeExpression {
 	return &NodeExpression{node: node}
 }
 
-func (ne *NodeExpression) ExpressionValue(variables octosql.Variables) (interface{}, error) {
+func (ne *NodeExpression) ExpressionValue(variables octosql.Variables) (octosql.Value, error) {
 	records, err := ne.node.Get(variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get record stream")
 	}
 
-	outRecords := make([]Record, 0)
+	var firstRecord octosql.Tuple
+	outRecords := make(octosql.Tuple, 0)
 
 	var curRecord *Record
 	for curRecord, err = records.Next(); err == nil; curRecord, err = records.Next() {
-		outRecords = append(outRecords, *curRecord)
+		if firstRecord == nil {
+			firstRecord = curRecord.AsTuple()
+		}
+		outRecords = append(outRecords, curRecord.AsTuple())
 	}
 	if err != ErrEndOfStream {
 		return nil, errors.Wrap(err, "couldn't get records from stream")
@@ -91,16 +95,30 @@ func (ne *NodeExpression) ExpressionValue(variables octosql.Variables) (interfac
 	}
 
 	// There is exactly one record
-	record := &outRecords[0]
-	if len(record.Fields()) > 1 {
-		return record, nil
+	if len(firstRecord.AsSlice()) > 1 {
+		return firstRecord, nil
 	}
-	if len(record.Fields()) == 0 {
+	if len(firstRecord.AsSlice()) == 0 {
 		return nil, nil
 	}
 
 	// There is exactly one field
-	return record.Value(record.Fields()[0].Name), nil
+	return firstRecord.AsSlice()[0], nil
+}
+
+type LogicExpression struct {
+	formula Formula
+}
+
+func NewLogicExpression(formula Formula) *LogicExpression {
+	return &LogicExpression{
+		formula: formula,
+	}
+}
+
+func (le *LogicExpression) ExpressionValue(variables octosql.Variables) (octosql.Value, error) {
+	out, err := le.formula.Evaluate(variables)
+	return octosql.MakeBool(out), err
 }
 
 type AliasedExpression struct {
@@ -112,32 +130,10 @@ func NewAliasedExpression(name octosql.VariableName, expr Expression) *AliasedEx
 	return &AliasedExpression{name: name, expr: expr}
 }
 
-func (alExpr *AliasedExpression) ExpressionValue(variables octosql.Variables) (interface{}, error) {
+func (alExpr *AliasedExpression) ExpressionValue(variables octosql.Variables) (octosql.Value, error) {
 	return alExpr.expr.ExpressionValue(variables)
 }
 
 func (alExpr *AliasedExpression) Name() octosql.VariableName {
 	return alExpr.name
-}
-
-func extractSingleValue(expr Expression, variables octosql.Variables) (interface{}, error) {
-	value, err := expr.ExpressionValue(variables)
-	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't get expression's value")
-	}
-
-	if records, ok := value.([]Record); ok {
-		if len(records) != 1 {
-			return nil, errors.Errorf("number of records different than 1: %+v", value)
-		}
-		value = records[0]
-	}
-
-	if record, ok := value.(*Record); ok {
-		if len(record.Fields()) > 1 {
-			return nil, errors.Errorf("multi field record ended up in single expression field %+v", value)
-		}
-		return record.Value(record.Fields()[0].Name), nil
-	}
-	return value, nil
 }

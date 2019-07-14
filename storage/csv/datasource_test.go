@@ -1,10 +1,11 @@
 package csv
 
 import (
-	"fmt"
-	"github.com/cube2222/octosql"
 	"reflect"
 	"testing"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/execution"
 )
 
 type csvDsc struct {
@@ -65,7 +66,7 @@ func TestCSVDataSource_Get(t *testing.T) {
 
 func TestCSVRecordStream_Next(t *testing.T) {
 	type wanted struct {
-		record map[string]interface{}
+		record *execution.Record
 		error  bool
 	}
 
@@ -81,39 +82,47 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			fields:  []string{"name", "surname", "age", "city"},
 			want: []wanted{
 				{
-					record: map[string]interface{}{
-						"name":    "jan",
-						"surname": "chomiak",
-						"age":     3,
-						"city":    "warsaw",
-					},
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"jan", "chomiak", 3, "warsaw"}),
 					error: false,
 				},
 				{
-					record: map[string]interface{}{
-						"name":    "wojtek",
-						"surname": "kuzminski",
-						"age":     4,
-						"city":    "warsaw",
-					},
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"wojtek", "kuzminski", 4, "warsaw"}),
 					error: false,
 				},
 				{
-					record: map[string]interface{}{
-						"name":    "adam",
-						"surname": "cz",
-						"age":     5,
-						"city":    "ciechanowo",
-					},
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"adam", "cz", 5, "ciechanowo"}),
 					error: false,
 				},
 				{
-					record: map[string]interface{}{
-						"name":    "kuba",
-						"surname": "m",
-						"age":     2,
-						"city":    "warsaw",
-					},
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"kuba", "m", 2, "warsaw"}),
 					error: false,
 				},
 				{
@@ -132,10 +141,12 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			fields:  []string{"name", "surname"},
 			want: []wanted{
 				{
-					record: map[string]interface{}{
-						"name":    "andrzej",
-						"surname": "lepper",
-					},
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"wc.name",
+							"wc.surname",
+						},
+						[]interface{}{"test", "test"}),
 					error: false,
 				},
 				{
@@ -155,11 +166,6 @@ func TestCSVRecordStream_Next(t *testing.T) {
 				return
 			}
 
-			aliasedFields := make([]string, 0)
-			for i := range tt.fields {
-				aliasedFields = append(aliasedFields, fmt.Sprintf("%s.%s", ds.alias, tt.fields[i]))
-			}
-
 			for _, expected := range tt.want {
 				got, err := rs.Next()
 
@@ -170,13 +176,8 @@ func TestCSVRecordStream_Next(t *testing.T) {
 					continue
 				}
 
-				record := got.AsVariables()
-				for i := range tt.fields {
-					expectedValue := expected.record[tt.fields[i]]
-					gotValue := record[octosql.VariableName(aliasedFields[i])]
-					if !reflect.DeepEqual(expectedValue, gotValue) {
-						t.Errorf("DataSource.Next() error is %v, want %v", expectedValue, gotValue)
-					}
+				if !reflect.DeepEqual(expected.record, got) {
+					t.Errorf("DataSource.Next() is %v, want %v", expected.record, got)
 				}
 			}
 		})

@@ -5,50 +5,51 @@ import (
 	"reflect"
 	"testing"
 
+	. "github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 )
 
 func Test_parseInt(t *testing.T) {
-	type args []interface{}
+	type args []Value
 	tests := []struct {
 		name    string
 		args    args
-		want    interface{}
+		want    Value
 		wantErr bool
 	}{
 		{
 			name:    "FuncInt - parse float",
-			args:    []interface{}{7.0},
-			want:    7,
+			args:    []Value{MakeFloat(7.0)},
+			want:    MakeInt(7),
 			wantErr: false,
 		},
 		{
 			name:    "FuncInt - parse string",
-			args:    []interface{}{"192"},
-			want:    192,
+			args:    []Value{MakeString("192")},
+			want:    MakeInt(192),
 			wantErr: false,
 		},
 		{
 			name:    "FuncInt - parse bool",
-			args:    []interface{}{true},
-			want:    1,
+			args:    []Value{MakeBool(true)},
+			want:    MakeInt(1),
 			wantErr: false,
 		},
 		{
 			name:    "FuncInt - invalid string",
-			args:    []interface{}{"17a"},
+			args:    []Value{MakeString("17a")},
 			want:    nil,
 			wantErr: true,
 		},
 		{
 			name:    "FuncInt - no args",
-			args:    []interface{}{},
+			args:    []Value{},
 			want:    nil,
 			wantErr: true,
 		},
 		{
 			name:    "FuncInt - too many args",
-			args:    []interface{}{7.0, "1"},
+			args:    []Value{MakeFloat(7.0), MakeString("1")},
 			want:    nil,
 			wantErr: true,
 		},
@@ -70,12 +71,12 @@ func Test_parseInt(t *testing.T) {
 func Test_stringFunctions(t *testing.T) {
 	type args struct {
 		fun  execution.Function
-		args []interface{}
+		args []Value
 	}
 	tests := []struct {
 		name    string
 		args    args
-		want    interface{}
+		want    Value
 		wantErr bool
 	}{
 		/* uppercase tests */
@@ -83,16 +84,16 @@ func Test_stringFunctions(t *testing.T) {
 			name: "uppercase - pass",
 			args: args{
 				fun:  FuncUpper,
-				args: []interface{}{"aLa MA kotA i PSA"},
+				args: []Value{MakeString("aLa MA kotA i PSA")},
 			},
-			want:    "ALA MA KOTA I PSA",
+			want:    MakeString("ALA MA KOTA I PSA"),
 			wantErr: false,
 		},
 		{
 			name: "uppercase too many args - fail",
 			args: args{
 				fun:  FuncUpper,
-				args: []interface{}{"aLa MA kotA i PSA", "a co to jest?"},
+				args: []Value{MakeString("aLa MA kotA i PSA"), MakeString("a co to jest?")},
 			},
 			want:    nil,
 			wantErr: true,
@@ -101,7 +102,7 @@ func Test_stringFunctions(t *testing.T) {
 			name: "uppercase int - fail",
 			args: args{
 				fun:  FuncUpper,
-				args: []interface{}{17},
+				args: []Value{MakeInt(17)},
 			},
 			want:    nil,
 			wantErr: true,
@@ -111,16 +112,16 @@ func Test_stringFunctions(t *testing.T) {
 			name: "lowercase - pass",
 			args: args{
 				fun:  FuncLower,
-				args: []interface{}{"aLa MA kotA i PSA"},
+				args: []Value{MakeString("aLa MA kotA i PSA")},
 			},
-			want:    "ala ma kota i psa",
+			want:    MakeString("ala ma kota i psa"),
 			wantErr: false,
 		},
 		{
 			name: "lowercase no args - fail",
 			args: args{
 				fun:  FuncLower,
-				args: []interface{}{},
+				args: []Value{},
 			},
 			want:    nil,
 			wantErr: true,
@@ -129,7 +130,7 @@ func Test_stringFunctions(t *testing.T) {
 			name: "lowercase float - fail",
 			args: args{
 				fun:  FuncLower,
-				args: []interface{}{17.16},
+				args: []Value{MakeFloat(17.16)},
 			},
 			want:    nil,
 			wantErr: true,
@@ -139,25 +140,25 @@ func Test_stringFunctions(t *testing.T) {
 			name: "capitalize - pass",
 			args: args{
 				fun:  FuncCapitalize,
-				args: []interface{}{"pawełjumperLEGENDApolskiegoYT"},
+				args: []Value{MakeString("pawełjumperLEGENDApolskiegoYT")},
 			},
-			want:    "Pawełjumperlegendapolskiegoyt",
+			want:    MakeString("Pawełjumperlegendapolskiegoyt"),
 			wantErr: false,
 		},
 		{
 			name: "capitalize - pass2",
 			args: args{
 				fun:  FuncCapitalize,
-				args: []interface{}{"there Are Several Words here"},
+				args: []Value{MakeString("there Are Several Words here")},
 			},
-			want:    "There Are Several Words Here",
+			want:    MakeString("There Are Several Words Here"),
 			wantErr: false,
 		},
 		{
 			name: "capitalize no args - fail",
 			args: args{
 				fun:  FuncCapitalize,
-				args: []interface{}{},
+				args: []Value{},
 			},
 			want:    nil,
 			wantErr: true,
@@ -166,7 +167,7 @@ func Test_stringFunctions(t *testing.T) {
 			name: "capitalize float - fail",
 			args: args{
 				fun:  FuncCapitalize,
-				args: []interface{}{17.16},
+				args: []Value{MakeFloat(17.16)},
 			},
 			want:    nil,
 			wantErr: true,
@@ -176,25 +177,25 @@ func Test_stringFunctions(t *testing.T) {
 			name: "reverse - pass",
 			args: args{
 				fun:  FuncReverse,
-				args: []interface{}{"ala ma kota"},
+				args: []Value{MakeString("ala ma kota")},
 			},
-			want:    "atok am ala",
+			want:    MakeString("atok am ala"),
 			wantErr: false,
 		},
 		{
 			name: "reverse - pass2",
 			args: args{
 				fun:  FuncReverse,
-				args: []interface{}{"aBcD123-"},
+				args: []Value{MakeString("aBcD123-")},
 			},
-			want:    "-321DcBa",
+			want:    MakeString("-321DcBa"),
 			wantErr: false,
 		},
 		{
 			name: "reverse no args - fail",
 			args: args{
 				fun:  FuncReverse,
-				args: []interface{}{},
+				args: []Value{},
 			},
 			want:    nil,
 			wantErr: true,
@@ -203,7 +204,7 @@ func Test_stringFunctions(t *testing.T) {
 			name: "reverse bool - fail",
 			args: args{
 				fun:  FuncReverse,
-				args: []interface{}{true},
+				args: []Value{MakeBool(true)},
 			},
 			want:    nil,
 			wantErr: true,
@@ -212,7 +213,7 @@ func Test_stringFunctions(t *testing.T) {
 			name: "reverse too many args - fail",
 			args: args{
 				fun:  FuncReverse,
-				args: []interface{}{"aa", "bb"},
+				args: []Value{MakeString("aa"), MakeString("bb")},
 			},
 			want:    nil,
 			wantErr: true,
@@ -222,64 +223,64 @@ func Test_stringFunctions(t *testing.T) {
 		{
 			name: "simple match - 1",
 			args: args{
-				fun:  FuncRegexp,
-				args: []interface{}{"t[a+b]e", "tcetdetaetbe"},
+				fun:  FuncMatchRegexp,
+				args: []Value{MakeString("t[a+b]e"), MakeString("tcetdetaetbe")},
 			},
-			want:    "tae",
+			want:    MakeString("tae"),
 			wantErr: false,
 		},
 		{
 			name: "simple match - 2",
 			args: args{
-				fun:  FuncRegexp,
-				args: []interface{}{"a..d", "axdaxxdaxdxa"},
+				fun:  FuncMatchRegexp,
+				args: []Value{MakeString("a..d"), MakeString("axdaxxdaxdxa")},
 			},
-			want:    "axxd",
+			want:    MakeString("axxd"),
 			wantErr: false,
 		},
 		{
 			name: "simple match - 3",
 			args: args{
-				fun:  FuncRegexp,
-				args: []interface{}{".[0-9].", "this is a bit longer but 4 the matcher it's no problem"},
+				fun:  FuncMatchRegexp,
+				args: []Value{MakeString(".[0-9]."), MakeString("this is a bit longer but 4 the matcher it's no problem")},
 			},
-			want:    " 4 ", /* matches the spaces with . */
+			want:    MakeString(" 4 "), /* matches the spaces with . */
 			wantErr: false,
 		},
 		{
 			name: "simple match - 4",
 			args: args{
-				fun:  FuncRegexp,
-				args: []interface{}{"[1-9][0-9]{3}", "The year was 2312 and the aliens began their invasion"},
+				fun:  FuncMatchRegexp,
+				args: []Value{MakeString("[1-9][0-9]{3}"), MakeString("The year was 2312 and the aliens began their invasion")},
 			},
-			want:    "2312",
+			want:    MakeString("2312"),
 			wantErr: false,
 		},
 		{
 			name: "star regexp match - 1",
 			args: args{
-				fun:  FuncRegexp,
-				args: []interface{}{"AB*A", "My favourite band is not ABA, it's ABBA."},
+				fun:  FuncMatchRegexp,
+				args: []Value{MakeString("AB*A"), MakeString("My favourite band is not ABA, it's ABBA.")},
 			},
-			want:    "ABA",
+			want:    MakeString("ABA"),
 			wantErr: false,
 		},
 		{
 			name: "star regexp match - 2",
 			args: args{
-				fun:  FuncRegexp,
-				args: []interface{}{"a*ba*", "What is a bbba?"},
+				fun:  FuncMatchRegexp,
+				args: []Value{MakeString("a*ba*"), MakeString("What is a bbba?")},
 			},
-			want:    "b", /* matches the shortest */
+			want:    MakeString("b"), /* matches the shortest */
 			wantErr: false,
 		},
 		{
 			name: "complex regexp",
 			args: args{
-				fun:  FuncRegexp,
-				args: []interface{}{`[a + b]{2}c*d{3}`, "abcddaaacdddbacccdddabcda"},
+				fun:  FuncMatchRegexp,
+				args: []Value{MakeString(`[a + b]{2}c*d{3}`), MakeString("abcddaaacdddbacccdddabcda")},
 			},
-			want:    "aacddd",
+			want:    MakeString("aacddd"),
 			wantErr: false,
 		},
 	}
@@ -297,41 +298,40 @@ func Test_stringFunctions(t *testing.T) {
 	}
 }
 
-func Test_numerical(t *testing.T) {
+func Test_various(t *testing.T) {
 	type args struct {
 		fun  execution.Function
-		args []interface{}
+		args []Value
 	}
 	tests := []struct {
 		name    string
 		args    args
-		want    interface{}
+		want    Value
 		wantErr bool
 	}{
-
 		/* sqrt() */
 		{
 			name: "sqrt(4)",
 			args: args{
-				args: []interface{}{4},
+				args: []Value{MakeInt(4)},
 				fun:  FuncSqrt,
 			},
-			want:    2.0, /* type is important */
+			want:    MakeFloat(2.0), /* type is important */
 			wantErr: false,
 		},
 		{
 			name: "sqrt(7)",
 			args: args{
-				args: []interface{}{7},
+				args: []Value{MakeInt(7)},
 				fun:  FuncSqrt,
 			},
-			want:    math.Sqrt(7.0), /* type is important */
+			want:    MakeFloat(math.Sqrt(7.0)), /* type is important */
 			wantErr: false,
 		},
 		{
 			name: "sqrt(-1)",
 			args: args{
-				args: []interface{}{-1},
+				args: []Value{MakeInt(-1)},
 				fun:  FuncSqrt,
 			},
 			want:    nil,
@@ -342,26 +342,26 @@ func Test_numerical(t *testing.T) {
 		{
 			name: "log(8)",
 			args: args{
-				args: []interface{}{8},
-				fun:  FuncLog,
+				args: []Value{MakeInt(8)},
+				fun:  FuncLog2,
 			},
-			want:    3.0,
+			want:    MakeFloat(3.0),
 			wantErr: false,
 		},
 		{
 			name: "log(15.5)",
 			args: args{
-				args: []interface{}{15.5},
-				fun:  FuncLog,
+				args: []Value{MakeFloat(15.5)},
+				fun:  FuncLog2,
 			},
-			want:    math.Log2(15.5),
+			want:    MakeFloat(math.Log2(15.5)),
 			wantErr: false,
 		},
 		{
 			name: "log(0)",
 			args: args{
-				args: []interface{}{0},
-				fun:  FuncLog,
+				args: []Value{MakeInt(0)},
+				fun:  FuncLog2,
 			},
 			want:    nil,
 			wantErr: true,
@@ -371,10 +371,402 @@ func Test_numerical(t *testing.T) {
 		{
 			name: "3^4",
 			args: args{
-				args: []interface{}{3.0, 4.0},
+				args: []Value{MakeFloat(3.0), MakeFloat(4.0)},
 				fun:  FuncPower,
 			},
-			want:    81.0,
+			want:    MakeFloat(81.0),
+			wantErr: false,
+		},
+
+		{
+			name: "abs(-7)",
+			args: args{
+				args: []Value{MakeInt(-7)},
+				fun:  FuncAbs,
+			},
+			want:    MakeInt(7),
+			wantErr: false,
+		},
+		{
+			name: "abs(7)",
+			args: args{
+				args: []Value{MakeInt(7)},
+				fun:  FuncAbs,
+			},
+			want:    MakeInt(7),
+			wantErr: false,
+		},
+		{
+			name: "abs(-7.0)",
+			args: args{
+				args: []Value{MakeFloat(-7.0)},
+				fun:  FuncAbs,
+			},
+			want:    MakeFloat(7.0),
+			wantErr: false,
+		},
+		{
+			name: "abs(7.0)",
+			args: args{
+				args: []Value{MakeFloat(7)},
+				fun:  FuncAbs,
+			},
+			want:    MakeFloat(7.0),
+			wantErr: false,
+		},
+		{
+			name: "least(-1, 3, -3, 7, 2)",
+			args: args{
+				args: []Value{
+					MakeInt(-1),
+					MakeInt(3),
+					MakeInt(-3),
+					MakeInt(7),
+					MakeInt(2),
+				},
+				fun: FuncLeast,
+			},
+			want:    MakeInt(-3),
+			wantErr: false,
+		},
+		{
+			name: "greatest(-1, 3, -3, 7, 2)",
+			args: args{
+				args: []Value{
+					MakeInt(-1),
+					MakeInt(3),
+					MakeInt(-3),
+					MakeInt(7),
+					MakeInt(2),
+				},
+				fun: FuncGreatest,
+			},
+			want:    MakeInt(7),
+			wantErr: false,
+		},
+		{
+			name: "reverse(-1, 3, -3, 'test', 2)",
+			args: args{
+				args: []Value{
+					MakeTuple(
+						[]Value{
+							MakeInt(-1),
+							MakeInt(3),
+							MakeInt(-3),
+							MakeString("test"),
+							MakeInt(2),
+						},
+					),
+				},
+				fun: FuncReverse,
+			},
+			want: MakeTuple(
+				[]Value{
+					MakeInt(2),
+					MakeString("test"),
+					MakeInt(-3),
+					MakeInt(3),
+					MakeInt(-1),
+				},
+			),
+			wantErr: false,
+		},
+		{
+			name: "reverse('hello hello')",
+			args: args{
+				args: []Value{MakeString("hello hello")},
+				fun:  FuncReverse,
+			},
+			want:    MakeString("olleh olleh"),
+			wantErr: false,
+		},
+		{
+			name: "substring('hello hello', 3)",
+			args: args{
+				args: []Value{
+					MakeString("hello hello"),
+					MakeInt(3),
+				},
+				fun: FuncSubstring,
+			},
+			want:    MakeString("lo hello"),
+			wantErr: false,
+		},
+		{
+			name: "substring('hello hello', 3, 8)",
+			args: args{
+				args: []Value{
+					MakeString("hello hello"),
+					MakeInt(3),
+					MakeInt(8),
+				},
+				fun: FuncSubstring,
+			},
+			want:    MakeString("lo he"),
+			wantErr: false,
+		},
+		{
+			name: "regexp('[l]*o', 'hello hello')",
+			args: args{
+				args: []Value{
+					MakeString("[l]*o"),
+					MakeString("hello hello"),
+				},
+				fun: FuncMatchRegexp,
+			},
+			want:    MakeString("llo"),
+			wantErr: false,
+		},
+		{
+			name: "replace('llo', 'oll', 'hello hello')",
+			args: args{
+				args: []Value{
+					MakeString("llo"),
+					MakeString("oll"),
+					MakeString("hello hello"),
+				},
+				fun: FuncReplace,
+			},
+			want:    MakeString("heoll heoll"),
+			wantErr: false,
+		},
+		{
+			name: "hasprefix('hel', 'hello hello')",
+			args: args{
+				args: []Value{
+					MakeString("hel"),
+					MakeString("hello hello"),
+				},
+				fun: FuncHasPrefix,
+			},
+			want:    MakeBool(true),
+			wantErr: false,
+		},
+		{
+			name: "hasprefix('hel', 'hello hello')",
+			args: args{
+				args: []Value{
+					MakeString("hela"),
+					MakeString("hello hello"),
+				},
+				fun: FuncHasPrefix,
+			},
+			want:    MakeBool(false),
+			wantErr: false,
+		},
+		{
+			name: "hassuffix('hel', 'hello hello')",
+			args: args{
+				args: []Value{
+					MakeString("ello"),
+					MakeString("hello hello"),
+				},
+				fun: FuncHasSuffix,
+			},
+			want:    MakeBool(true),
+			wantErr: false,
+		},
+		{
+			name: "hassuffix('hel', 'hello hello')",
+			args: args{
+				args: []Value{
+					MakeString("allo"),
+					MakeString("hello hello"),
+				},
+				fun: FuncHasSuffix,
+			},
+			want:    MakeBool(false),
+			wantErr: false,
+		},
+		{
+			name: "contains('o h', 'hello hello')",
+			args: args{
+				args: []Value{
+					MakeString("o h"),
+					MakeString("hello hello"),
+				},
+				fun: FuncContains,
+			},
+			want:    MakeBool(true),
+			wantErr: false,
+		},
+		{
+			name: "contains(5, (1, 3, 'test', 5, 4))",
+			args: args{
+				args: []Value{
+					MakeInt(5),
+					MakeTuple(
+						[]Value{
+							MakeInt(1),
+							MakeInt(3),
+							MakeString("test"),
+							MakeInt(5),
+							MakeInt(4),
+						},
+					),
+				},
+				fun: FuncContains,
+			},
+			want:    MakeBool(true),
+			wantErr: false,
+		},
+		{
+			name: "contains(2, (1, 3, 'test', 5, 4))",
+			args: args{
+				args: []Value{
+					MakeInt(2),
+					MakeTuple(
+						[]Value{
+							MakeInt(1),
+							MakeInt(3),
+							MakeString("test"),
+							MakeInt(5),
+							MakeInt(4),
+						},
+					),
+				},
+				fun: FuncContains,
+			},
+			want:    MakeBool(false),
+			wantErr: false,
+		},
+		{
+			name: "index('o h', 'hello hello')",
+			args: args{
+				args: []Value{
+					MakeString("o h"),
+					MakeString("hello hello"),
+				},
+				fun: FuncIndex,
+			},
+			want:    MakeInt(4),
+			wantErr: false,
+		},
+		{
+			name: "contains(5, (1, 3, 'test', 5, 4))",
+			args: args{
+				args: []Value{
+					MakeInt(5),
+					MakeTuple(
+						[]Value{
+							MakeInt(1),
+							MakeInt(3),
+							MakeString("test"),
+							MakeInt(5),
+							MakeInt(4),
+						},
+					),
+				},
+				fun: FuncIndex,
+			},
+			want:    MakeInt(3),
+			wantErr: false,
+		},
+		{
+			name: "contains(2, (1, 3, 'test', 5, 4))",
+			args: args{
+				args: []Value{
+					MakeInt(2),
+					MakeTuple(
+						[]Value{
+							MakeInt(1),
+							MakeInt(3),
+							MakeString("test"),
+							MakeInt(5),
+							MakeInt(4),
+						},
+					),
+				},
+				fun: FuncIndex,
+			},
+			want:    MakeInt(-1),
+			wantErr: false,
+		},
+		{
+			name: "nth(1, (1, 3, 'test', 5, 4))",
+			args: args{
+				args: []Value{
+					MakeInt(1),
+					MakeTuple(
+						[]Value{
+							MakeInt(1),
+							MakeInt(3),
+							MakeString("test"),
+							MakeInt(5),
+							MakeInt(4),
+						},
+					),
+				},
+				fun: FuncNth,
+			},
+			want:    MakeInt(3),
+			wantErr: false,
+		},
+		{
+			name: "nth(2, (1, 3, 'test', 5, 4))",
+			args: args{
+				args: []Value{
+					MakeInt(2),
+					MakeTuple(
+						[]Value{
+							MakeInt(1),
+							MakeInt(3),
+							MakeString("test"),
+							MakeInt(5),
+							MakeInt(4),
+						},
+					),
+				},
+				fun: FuncNth,
+			},
+			want:    MakeString("test"),
+			wantErr: false,
+		},
+		{
+			name: "length((1, 3, 'test', 5, 4))",
+			args: args{
+				args: []Value{
+					MakeTuple(
+						[]Value{
+							MakeInt(1),
+							MakeInt(3),
+							MakeString("test"),
+							MakeInt(5),
+							MakeInt(4),
+						},
+					),
+				},
+				fun: FuncLength,
+			},
+			want:    MakeInt(5),
+			wantErr: false,
+		},
+		{
+			name: "length('hello hello')",
+			args: args{
+				args: []Value{MakeString("hello hello")},
+				fun:  FuncLength,
+			},
+			want:    MakeInt(11),
+			wantErr: false,
+		},
+		{
+			name: "strjoin('hello hello')",
+			args: args{
+				args: []Value{
+					MakeString(" - "),
+					MakeTuple(
+						[]Value{
+							MakeString("test1"),
+							MakeString("test2"),
+							MakeString("test3"),
+							MakeString("test4"),
+						},
+					),
+				},
+				fun: FuncStringJoin,
+			},
+			want:    MakeString("test1 - test2 - test3 - test4"),
 			wantErr: false,
 		},
 	}

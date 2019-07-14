@@ -51,7 +51,7 @@ func TestDataSource_Get(t *testing.T) {
 				tablename:  "animals",
 				alias:      "a",
 				primaryKey: []octosql.VariableName{"name"},
-				variables:  map[octosql.VariableName]interface{}{},
+				variables:  map[octosql.VariableName]octosql.Value{},
 				formula:    physical.NewConstant(true),
 				rows: [][]interface{}{
 					{"panda", 500},
@@ -62,19 +62,19 @@ func TestDataSource_Get(t *testing.T) {
 				tableDescription: "CREATE TABLE animals(name VARCHAR(20) PRIMARY KEY, population INTEGER);",
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
-				execution.NewRecordFromSlice(
-					[]octosql.VariableName{"a.name", "a.population"},
-					[]interface{}{"panda", 500},
-				),
-				execution.NewRecordFromSlice(
-					[]octosql.VariableName{"a.name", "a.population"},
-					[]interface{}{"mammoth", 0},
-				),
-				execution.NewRecordFromSlice(
+				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"a.name", "a.population"},
 					[]interface{}{"human", 7000000},
 				),
-				execution.NewRecordFromSlice(
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"a.name", "a.population"},
+					[]interface{}{"mammoth", 0},
+				),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"a.name", "a.population"},
+					[]interface{}{"panda", 500},
+				),
+				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"a.name", "a.population"},
 					[]interface{}{"zebra", 5000},
 				),
@@ -89,8 +89,8 @@ func TestDataSource_Get(t *testing.T) {
 				tablename:  "animals",
 				alias:      "a",
 				primaryKey: []octosql.VariableName{"name"},
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": 20000,
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeInt(20000),
 				},
 				formula: physical.NewPredicate(
 					physical.NewVariable("a.population"),
@@ -113,8 +113,8 @@ func TestDataSource_Get(t *testing.T) {
 				tablename:  "animals",
 				alias:      "a",
 				primaryKey: []octosql.VariableName{"name"},
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": "panda",
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("panda"),
 				},
 				formula: physical.NewPredicate(
 					physical.NewVariable("a.name"),
@@ -130,9 +130,9 @@ func TestDataSource_Get(t *testing.T) {
 				tableDescription: "CREATE TABLE animals(name VARCHAR(20) PRIMARY KEY, population INTEGER);",
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
-				execution.NewRecordFromSlice(
-					[]octosql.VariableName{"a.population", "a.name"},
-					[]interface{}{500, "panda"},
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"a.name", "a.population"},
+					[]interface{}{"panda", 500},
 				),
 			}),
 			wantErr: false,
@@ -144,8 +144,8 @@ func TestDataSource_Get(t *testing.T) {
 				tablename:  "people",
 				alias:      "p",
 				primaryKey: []octosql.VariableName{"id"},
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": 1,
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeInt(1),
 				},
 				formula: physical.NewPredicate(
 					physical.NewVariable("const_0"),
@@ -161,17 +161,17 @@ func TestDataSource_Get(t *testing.T) {
 				tableDescription: "CREATE TABLE people(id INTEGER PRIMARY KEY, name VARCHAR(20));",
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
-				execution.NewRecordFromSlice(
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"p.id", "p.name"},
+					[]interface{}{2, "Kuba"},
+				),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"p.id", "p.name"},
+					[]interface{}{3, "Wojtek"},
+				),
+				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{4, "Adam"},
-				),
-				execution.NewRecordFromSlice(
-					[]octosql.VariableName{"p.name", "p.id"},
-					[]interface{}{"Kuba", 2},
-				),
-				execution.NewRecordFromSlice(
-					[]octosql.VariableName{"p.name", "p.id"},
-					[]interface{}{"Wojtek", 3},
 				),
 			}),
 			wantErr: false,
@@ -183,9 +183,9 @@ func TestDataSource_Get(t *testing.T) {
 				tablename:  "people",
 				alias:      "p",
 				primaryKey: []octosql.VariableName{"id"},
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": 1,
-					"const_1": "Kuba",
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeInt(1),
+					"const_1": octosql.MakeString("Kuba"),
 				},
 				formula: physical.NewAnd(
 					physical.NewPredicate(
@@ -209,13 +209,13 @@ func TestDataSource_Get(t *testing.T) {
 				tableDescription: "CREATE TABLE people(id INTEGER PRIMARY KEY, name VARCHAR(20));",
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
-				execution.NewRecordFromSlice(
-					[]octosql.VariableName{"p.name", "p.id"},
-					[]interface{}{"Wojtek", 3},
-				),
-				execution.NewRecordFromSlice(
+				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{2, "Kuba"},
+				),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"p.id", "p.name"},
+					[]interface{}{3, "Wojtek"},
 				),
 			}),
 			wantErr: false,
@@ -227,9 +227,9 @@ func TestDataSource_Get(t *testing.T) {
 				tablename:  "people",
 				alias:      "p",
 				primaryKey: []octosql.VariableName{"id"},
-				variables: map[octosql.VariableName]interface{}{
-					"const_0": "K",
-					"const_1": 3,
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("K"),
+					"const_1": octosql.MakeInt(3),
 				},
 				formula: physical.NewOr(
 					physical.NewPredicate(
@@ -253,17 +253,17 @@ func TestDataSource_Get(t *testing.T) {
 				tableDescription: "CREATE TABLE people(id INTEGER PRIMARY KEY, name VARCHAR(20));",
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
-				execution.NewRecordFromSlice(
-					[]octosql.VariableName{"p.name", "p.id"},
-					[]interface{}{"Adam", 4},
-				),
-				execution.NewRecordFromSlice(
+				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{1, "Janek"},
 				),
-				execution.NewRecordFromSlice(
-					[]octosql.VariableName{"p.name", "p.id"},
-					[]interface{}{"Wojtek", 3},
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"p.id", "p.name"},
+					[]interface{}{3, "Wojtek"},
+				),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"p.id", "p.name"},
+					[]interface{}{4, "Adam"},
 				),
 			}),
 			wantErr: false,
@@ -275,7 +275,7 @@ func TestDataSource_Get(t *testing.T) {
 			args := tt.args
 			err := createTable(db, args.tableDescription)
 			if err != nil {
-				t.Errorf("Couldn't create table")
+				t.Errorf("Couldn't create table: %v", err)
 				return
 			}
 
@@ -283,7 +283,7 @@ func TestDataSource_Get(t *testing.T) {
 
 			err = insertValues(db, args.tablename, args.rows)
 			if err != nil {
-				t.Errorf("Couldn't insert values into table")
+				t.Errorf("Couldn't insert values into table: %v", err)
 				return
 			}
 
@@ -292,19 +292,19 @@ func TestDataSource_Get(t *testing.T) {
 
 			execNode, err := dsBuilder.Executor(args.formula, args.alias)
 			if err != nil {
-				t.Errorf("Couldn't get ExecutionNode")
+				t.Errorf("Couldn't get ExecutionNode: %v", err)
 				return
 			}
 
 			stream, err := execNode.Get(args.variables)
 			if err != nil {
-				t.Errorf("Couldn't get stream")
+				t.Errorf("Couldn't get stream: %v", err)
 				return
 			}
 
-			equal, err := execution.AreStreamsEqual(stream, tt.want)
+			equal, err := execution.AreStreamsEqualNoOrdering(stream, tt.want)
 			if err != nil {
-				t.Errorf("Error in AreStreamsEqual()")
+				t.Errorf("Error in AreStreamsEqual(): %v", err)
 				return
 			}
 
@@ -361,7 +361,6 @@ func spliceToString(values []interface{}) []string {
 	var result []string
 	for i := range values {
 		value := values[i]
-		value = execution.NormalizeType(value)
 		var str string
 		switch value := value.(type) {
 		case string:

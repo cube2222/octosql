@@ -155,14 +155,55 @@ func (f *Equal) getAllKeys(variables octosql.Variables) (*redisKeys, error) {
 	}
 
 	switch exprValue := exprValue.(type) {
-	case string:
+	case octosql.String:
 		return newRedisKeys(
 			map[string]interface{}{
-				exprValue: nil,
+				exprValue.AsString(): nil,
 			}, DefaultKeys), nil
 
 	default:
 		return nil, errors.Errorf("wrong expression value for a key in redis database")
+	}
+}
+
+type In struct {
+	child execution.Expression
+}
+
+func NewIn(child execution.Expression) *In {
+	return &In{
+		child: child,
+	}
+}
+
+func (f *In) getAllKeys(variables octosql.Variables) (*redisKeys, error) {
+	exprValue, err := f.child.ExpressionValue(variables)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get child expression value")
+	}
+
+	switch exprValue := exprValue.(type) {
+	case octosql.String:
+		return newRedisKeys(
+			map[string]interface{}{
+				exprValue.AsString(): nil,
+			}, DefaultKeys), nil
+	case octosql.Tuple:
+		out := make(map[string]interface{})
+
+		for _, element := range exprValue.AsSlice() {
+			str, ok := element.(octosql.String)
+			if !ok {
+				return nil, errors.Errorf("wrong expression value for a key in redis database: %v", element)
+			}
+
+			out[str.AsString()] = nil
+		}
+
+		return newRedisKeys(out, DefaultKeys), nil
+
+	default:
+		return nil, errors.Errorf("wrong expression value for a key in redis database: %v", exprValue)
 	}
 }
 
@@ -195,25 +236,43 @@ func NewKeyFormula(formula physical.Formula, key, alias string) (KeyFormula, err
 		return NewOr(leftFormula, rightFormula), nil
 
 	case *physical.Predicate:
-		if !isExpressionKeyAlias(formula.Left, key, alias) {
-			if !isExpressionKeyAlias(formula.Right, key, alias) {
-				return nil, errors.Errorf("neither of predicates expressions represents key identifier")
+		switch formula.Relation {
+		case physical.Equal:
+			if !isExpressionKeyAlias(formula.Left, key, alias) {
+				if !isExpressionKeyAlias(formula.Right, key, alias) {
+					return nil, errors.Errorf("neither of predicates expressions represents key identifier")
+				}
+
+				materializedLeft, err := formula.Left.Materialize(context.Background())
+				if err != nil {
+					return nil, errors.Wrap(err, "couldn't materialize left expression")
+				}
+
+				return NewEqual(materializedLeft), nil
 			}
 
-			materializedLeft, err := formula.Left.Materialize(context.Background())
+			materializedRight, err := formula.Right.Materialize(context.Background())
 			if err != nil {
-				return nil, errors.Wrap(err, "couldn't materialize left expression")
+				return nil, errors.Wrap(err, "couldn't materialize right expression")
 			}
 
-			return NewEqual(materializedLeft), nil
-		}
+			return NewEqual(materializedRight), nil
 
-		materializedRight, err := formula.Right.Materialize(context.Background())
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't materialize right expression")
-		}
+		case physical.In:
+			if !isExpressionKeyAlias(formula.Left, key, alias) {
+				return nil, errors.Errorf("left hand of IN pushed down to redis must be the key")
+			}
 
-		return NewEqual(materializedRight), nil
+			materializedRight, err := formula.Right.Materialize(context.Background())
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't materialize right expression")
+			}
+
+			return NewIn(materializedRight), nil
+
+		default:
+			return nil, errors.Errorf("invalid relation pushed down to redis: %v", formula.Relation)
+		}
 
 	case *physical.Constant:
 		return NewConstant(formula.Value), nil

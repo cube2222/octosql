@@ -60,11 +60,11 @@ func (stream *MappedStream) Next() (*Record, error) {
 	}
 
 	fieldNames := make([]octosql.VariableName, 0)
-	outValues := make(map[octosql.VariableName]interface{})
+	outValues := make(map[octosql.VariableName]octosql.Value)
 	for _, expr := range stream.expressions {
 		fieldNames = append(fieldNames, expr.Name())
 
-		value, err := extractSingleValue(expr, variables)
+		value, err := expr.ExpressionValue(variables)
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't get expression %v", expr.Name())
 		}

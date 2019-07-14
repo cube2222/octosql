@@ -60,7 +60,7 @@ func (stream *RequalifiedStream) Next() (*Record, error) {
 	oldFields := record.Fields()
 
 	fields := make([]octosql.VariableName, len(record.Fields()))
-	values := make(map[octosql.VariableName]interface{})
+	values := make(map[octosql.VariableName]octosql.Value)
 	for i := range oldFields {
 		name := string(oldFields[i].Name)
 		if dotIndex := strings.Index(name, "."); dotIndex != -1 {

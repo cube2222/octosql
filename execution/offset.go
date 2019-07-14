@@ -20,12 +20,12 @@ func (node *Offset) Get(variables octosql.Variables) (RecordStream, error) {
 		return nil, errors.Wrap(err, "couldn't get data record stream")
 	}
 
-	exprVal, err := extractSingleValue(node.offsetExpr, variables)
+	exprVal, err := node.offsetExpr.ExpressionValue(variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't extract value from offset subexpression")
 	}
 
-	offsetVal, ok := exprVal.(int)
+	offsetVal, ok := exprVal.(octosql.Int)
 	if !ok {
 		return nil, errors.New("offset value not int")
 	}

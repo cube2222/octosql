@@ -8,27 +8,24 @@ import (
 	"github.com/pkg/errors"
 )
 
-type OrderDirection = string
+type OrderDirection string
 
 const (
 	Ascending  OrderDirection = "asc"
 	Descending OrderDirection = "desc"
 )
 
-type OrderField struct {
-	ColumnName octosql.VariableName
-	Direction  OrderDirection
-}
-
 type OrderBy struct {
-	Fields []OrderField
-	Source Node
+	expressions []Expression
+	directions  []OrderDirection
+	source      Node
 }
 
-func NewOrderBy(fields []OrderField, source Node) *OrderBy {
+func NewOrderBy(exprs []Expression, directions []OrderDirection, source Node) *OrderBy {
 	return &OrderBy{
-		Fields: fields,
-		Source: source,
+		expressions: exprs,
+		directions:  directions,
+		source:      source,
 	}
 }
 
@@ -47,42 +44,6 @@ func isSorteable(x octosql.Value) bool {
 	default:
 		return false
 	}
-}
-
-func validateOrderField(records []*Record, field OrderField) error {
-	if len(records) == 0 { /* we can easily order an empty stream */
-		return nil
-	}
-
-	colName := field.ColumnName
-
-	for _, record := range records {
-		value := record.Value(colName)
-		if value == nil {
-			return errors.Errorf("one of the records has no mapping for %v", colName)
-		}
-
-		if reflect.TypeOf(value) != reflect.TypeOf(records[0].Value(field.ColumnName)) {
-			return errors.Errorf("two records have mismatched types for column %v", colName)
-		}
-	} /* now that we have checked that types match we can check if it's sortable */
-
-	if !isSorteable(records[0].Value(colName)) {
-		return errors.Errorf("type of this column is not sortable")
-	}
-
-	return nil
-}
-
-func validateRecords(records []*Record, orderFields []OrderField) error {
-	for _, field := range orderFields {
-		err := validateOrderField(records, field)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func compare(x, y octosql.Value) (int, error) {
@@ -157,8 +118,21 @@ func compare(x, y octosql.Value) (int, error) {
 	}
 }
 
-func createOrderedStream(ob []OrderField, sourceStream RecordStream) (RecordStream, error) {
+func (ob *OrderBy) Get(variables octosql.Variables) (RecordStream, error) {
+	sourceStream, err := ob.source.Get(variables)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get underlying stream in order by")
+	}
 
+	orderedStream, err := createOrderedStream(ob.expressions, ob.directions, variables, sourceStream)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't create ordered stream from source stream")
+	}
+
+	return orderedStream, nil
+}
+
+func createOrderedStream(expressions []Expression, directions []OrderDirection, variables octosql.Variables, sourceStream RecordStream) (stream RecordStream, outErr error) {
 	records := make([]*Record, 0)
 
 	for {
@@ -172,35 +146,46 @@ func createOrderedStream(ob []OrderField, sourceStream RecordStream) (RecordStre
 		records = append(records, rec)
 	}
 
-	err := validateRecords(records, ob)
-	if err != nil {
-		return nil, errors.Wrap(err, "records can't be sorted according to given columns")
-	}
-
-	var sortErr error = nil
-
+	defer func() {
+		if err := recover(); err != nil {
+			stream = nil
+			outErr = errors.Wrap(err.(error), "couldn't sort records")
+		}
+	}()
 	sort.Slice(records, func(i, j int) bool {
 		iRec := records[i]
 		jRec := records[j]
 
-		for _, column := range ob {
-			x := iRec.Value(column.ColumnName)
-			y := jRec.Value(column.ColumnName)
+		for num, expr := range expressions {
+			// TODO: Aggressive caching of these expressions...
+			iVars, err := variables.MergeWith(iRec.AsVariables())
+			if err != nil {
+				panic(errors.Wrap(err, "couldn't merge variables"))
+			}
+			jVars, err := variables.MergeWith(jRec.AsVariables())
+			if err != nil {
+				panic(errors.Wrap(err, "couldn't merge variables"))
+			}
 
-			if !isSorteable(x) {
-				sortErr = errors.Errorf("value %v of type %v is not comparable", x, reflect.TypeOf(x).String())
-				return false
+			x, err := expr.ExpressionValue(iVars)
+			if err != nil {
+				panic(errors.Wrapf(err, "couldn't get order by expression with index %v value", num))
+			}
+			y, err := expr.ExpressionValue(jVars)
+			if err != nil {
+				panic(errors.Wrapf(err, "couldn't get order by expression with index %v value", num))
 			}
 
 			if !isSorteable(x) {
-				sortErr = errors.Errorf("value %v of type %v is not comparable", y, reflect.TypeOf(y).String())
-				return false
+				panic(errors.Errorf("value %v of type %v is not comparable", x, reflect.TypeOf(x).String()))
+			}
+			if !isSorteable(y) {
+				panic(errors.Errorf("value %v of type %v is not comparable", y, reflect.TypeOf(y).String()))
 			}
 
 			cmp, err := compare(x, y)
 			if err != nil {
-				sortErr = errors.Errorf("failed to compare values %v and %v", x, y)
-				return false
+				panic(errors.Errorf("failed to compare values %v and %v", x, y))
 			}
 
 			answer := false
@@ -211,7 +196,7 @@ func createOrderedStream(ob []OrderField, sourceStream RecordStream) (RecordStre
 				answer = true
 			}
 
-			if column.Direction == Ascending {
+			if directions[num] == Ascending {
 				answer = !answer
 			}
 
@@ -221,23 +206,5 @@ func createOrderedStream(ob []OrderField, sourceStream RecordStream) (RecordStre
 		return false
 	})
 
-	if sortErr != nil {
-		return nil, errors.Wrap(sortErr, "got an error while sorting records")
-	}
-
 	return NewInMemoryStream(records), nil
-}
-
-func (ob *OrderBy) Get(variables octosql.Variables) (RecordStream, error) {
-	sourceStream, err := ob.Source.Get(variables)
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get underlying stream in order by")
-	}
-
-	orderedStream, err := createOrderedStream(ob.Fields, sourceStream)
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't create ordered stream from source stream")
-	}
-
-	return orderedStream, nil
 }

@@ -105,6 +105,31 @@ func Normalize(rec *Record) *Record {
 }
 
 func AreStreamsEqual(first, second RecordStream) (bool, error) {
+	for {
+		firstRec, firstErr := first.Next()
+		secondRec, secondErr := second.Next()
+
+		if firstErr == secondErr && firstErr == ErrEndOfStream {
+			break
+		} else if firstErr == ErrEndOfStream && secondErr == nil {
+			return false, nil
+		} else if firstErr == nil && secondErr == ErrEndOfStream {
+			return false, nil
+		} else if firstErr != nil {
+			return false, errors.Wrap(firstErr, "error in Next for first stream")
+		} else if secondErr != nil {
+			return false, errors.Wrap(secondErr, "error in Next for second stream")
+		}
+
+		if !firstRec.Equal(secondRec) {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+func AreStreamsEqualNoOrdering(first, second RecordStream) (bool, error) {
 	firstMultiSet := newMultiSet()
 	secondMultiSet := newMultiSet()
 
@@ -124,14 +149,12 @@ func AreStreamsEqual(first, second RecordStream) (bool, error) {
 			return false, errors.Wrap(secondErr, "error in Next for second stream")
 		}
 
-		firstNormalized := Normalize(firstRec)
-		err := firstMultiSet.Insert(firstNormalized)
+		err := firstMultiSet.Insert(firstRec)
 		if err != nil {
 			return false, errors.Wrap(err, "couldn't insert into the multiset")
 		}
 
-		secondNormalized := Normalize(secondRec)
-		err = secondMultiSet.Insert(secondNormalized)
+		err = secondMultiSet.Insert(secondRec)
 		if err != nil {
 			return false, errors.Wrap(err, "couldn't insert into the multiset")
 		}

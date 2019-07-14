@@ -7,8 +7,8 @@ OctoSQL is a data querying tool, allowing you to join, analyze and transform dat
 
 ## Table of Contents
 - [What is OctoSQL?](#what-is-octosql)
-- [Quickstart](#quickstart)
 - [Installation](#installation)
+- [Quickstart](#quickstart)
 - [Configuration](#configuration)
   - [JSON](#json)
   - [CSV](#csv)
@@ -31,6 +31,12 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 OctoSQL stems from Octopus SQL.
 
 Octopus, because octopi have many arms, so they can grasp and manipulate multiple objects, like OctoSQL is able to handle multiple datasources simultaneously.
+
+## Installation
+Either download the binary for your operating system (Linux, OS X and Windows are supported) from the [Releases page](https://github.com/cube2222/octosql/releases), or install using the go command line tool:
+```bash
+go get -u github.com/cube2222/octosql/cmd/octosql
+```
 
 ## Quickstart
 Let's say we have a csv file with cats, and a redis database with people (potential cat owners). Now we want to get a list of cities with the number of distinct cat names in them and the cumulative number of cat lives (as each cat has up to 9 lives left).
@@ -84,11 +90,6 @@ Example output:
 ```
 You can choose between table, tabbed, json and csv output formats.
 
-## Installation
-Either download the binary for your operating system (Linux, OS X and Windows are supported) from the [Releases page](https://github.com/cube2222/octosql/releases), or install using the go command line tool:
-```bash
-go get -u github.com/cube2222/octosql/cmd/octosql
-```
 ## Configuration
 The configuration file has the following form
 ```yaml

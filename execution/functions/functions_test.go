@@ -4,6 +4,7 @@ import (
 	"math"
 	"reflect"
 	"testing"
+	"time"
 
 	. "github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
@@ -767,6 +768,114 @@ func Test_various(t *testing.T) {
 				fun: FuncStringJoin,
 			},
 			want:    MakeString("test1 - test2 - test3 - test4"),
+			wantErr: false,
+		},
+		{
+			name: "2s + 3s",
+			args: args{
+				args: []Value{
+					MakeDuration(time.Second * 2),
+					MakeDuration(time.Second * 3),
+				},
+				fun: FuncAdd,
+			},
+			want:    MakeDuration(time.Second * 5),
+			wantErr: false,
+		},
+		{
+			name: "date + duration",
+			args: args{
+				args: []Value{
+					MakeTime(time.Date(2018, 11, 21, 10, 0, 0, 0, time.UTC)),
+					MakeDuration(time.Hour * 3),
+				},
+				fun: FuncAdd,
+			},
+			want:    MakeTime(time.Date(2018, 11, 21, 13, 0, 0, 0, time.UTC)),
+			wantErr: false,
+		},
+		{
+			name: "2s - 3s",
+			args: args{
+				args: []Value{
+					MakeDuration(time.Second * 2),
+					MakeDuration(time.Second * 3),
+				},
+				fun: FuncSubtract,
+			},
+			want:    MakeDuration(time.Second * -1),
+			wantErr: false,
+		},
+		{
+			name: "date - duration",
+			args: args{
+				args: []Value{
+					MakeTime(time.Date(2018, 11, 21, 10, 0, 0, 0, time.UTC)),
+					MakeDuration(time.Hour * 3),
+				},
+				fun: FuncSubtract,
+			},
+			want:    MakeTime(time.Date(2018, 11, 21, 7, 0, 0, 0, time.UTC)),
+			wantErr: false,
+		},
+		{
+			name: "2s * 3s",
+			args: args{
+				args: []Value{
+					MakeDuration(time.Second * 2),
+					MakeDuration(time.Second * 3),
+				},
+				fun: FuncMultiply,
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "2s * 3",
+			args: args{
+				args: []Value{
+					MakeDuration(time.Second * 2),
+					MakeInt(3),
+				},
+				fun: FuncMultiply,
+			},
+			want:    MakeDuration(time.Second * 6),
+			wantErr: false,
+		},
+		{
+			name: "4s / 2s",
+			args: args{
+				args: []Value{
+					MakeDuration(time.Second * 4),
+					MakeDuration(time.Second * 2),
+				},
+				fun: FuncDivide,
+			},
+			want:    MakeFloat(2.0),
+			wantErr: false,
+		},
+		{
+			name: "4s / 2s",
+			args: args{
+				args: []Value{
+					MakeDuration(time.Second * 4),
+					MakeInt(2),
+				},
+				fun: FuncDivide,
+			},
+			want:    MakeDuration(time.Second * 2),
+			wantErr: false,
+		},
+		{
+			name: "4s / 2.0s",
+			args: args{
+				args: []Value{
+					MakeDuration(time.Second * 4),
+					MakeFloat(2.0),
+				},
+				fun: FuncDivide,
+			},
+			want:    MakeDuration(time.Second * 2),
 			wantErr: false,
 		},
 	}

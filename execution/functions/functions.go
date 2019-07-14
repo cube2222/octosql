@@ -786,6 +786,13 @@ var FuncNth = execution.Function{
 		Arg(1, TypeOf(ZeroTuple())),
 	),
 	Logic: func(args ...Value) (Value, error) {
+		if args[0].(Int).AsInt() > len(args[1].(Tuple).AsSlice()) {
+			return nil, errors.Errorf(
+				"tried to access element with index %v in tuple with length %v",
+				args[0].(Int).AsInt(),
+				len(args[1].(Tuple).AsSlice()),
+			)
+		}
 		return args[1].(Tuple).AsSlice()[args[0].(Int).AsInt()], nil
 	},
 }

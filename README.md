@@ -1,6 +1,6 @@
 OctoSQL
 =======
-OctoSQL is a data query tool, allowing you to join, analyze and transform data from multiple data sources and file formats using SQL.
+OctoSQL is a data querying tool, allowing you to join, analyze and transform data from multiple data sources and file formats using SQL.
 
 ## Table of Contents
 - [What is OctoSQL?](#what-is-octosql)
@@ -8,9 +8,8 @@ OctoSQL is a data query tool, allowing you to join, analyze and transform data f
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Documentation](#documentation)
-- Supported Databases (with an optimal functionality matrix)
 - [Architecture](#architecture)
-- Some examples of query diagrams
+- [Datasource Pushdown Operations](#datasource-pushdown-operations)
 - [Roadmap](#roadmap)
 
 ## What is OctoSQL?
@@ -23,10 +22,10 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 ### Why the name?
 OctoSQL stems from Octopus SQL.
 
-Octopus, because octopi have many arms, so they can grasp an manipulate many objects, like OctoSQL is able to handle multiple databases simultaneously.
+Octopus, because octopi have many arms, so they can grasp and manipulate multiple objects, like OctoSQL is able to handle multiple datasources simultaneously.
 
 ## Quickstart
-Let's say we have a csv file with cats, and a redis database with people (potential cat owners). Now we want to get a list of cats with the cities their owners live in.
+Let's say we have a csv file with cats, and a redis database with people (potential cat owners). Now we want to get a list of cities with the number of distinct cat names in them and the cumulative number of cat lives (as each cat has up to 9 lives left).
 
 First, create a configuration file ([Configuration Syntax](#configuration))
 For example:
@@ -82,7 +81,7 @@ Either download the binary for your operating system (Linux, OS X and Windows ar
 go get github.com/cube2222/octosql/cmd/octosql
 ```
 ## Configuration
-The configuration file has the form
+The configuration file has the following form
 ```yaml
 dataSources:
   - name: <table_name_in_octosql>
@@ -146,11 +145,11 @@ Documentation for the available functions: https://github.com/cube2222/octosql/w
 
 Documentation for the available aggregates: https://github.com/cube2222/octosql/wiki/Aggregate-Documentation
 
-The SQL dialect documentation: TODO :) in short though:
+The SQL dialect documentation: TODO ;) in short though:
 
-Available SQL constructs: Select, Where, Order By, Group By, Offset, Limit, Left Join, Right Join, Inner Join, Distinct, Union, Union All.
+Available SQL constructs: Select, Where, Order By, Group By, Offset, Limit, Left Join, Right Join, Inner Join, Distinct, Union, Union All, Subqueries, Operators.
 
-Available SQL types: Int, Float, String, Bool, Time, Tuple, Object (e.g. JSON)
+Available SQL types: Int, Float, String, Bool, Time, Tuple (array), Object (e.g. JSON)
 
 ## Architecture
 An OctoSQL invocation gets processed in multiple phases.
@@ -164,9 +163,9 @@ The SQL AST gets converted into a logical query plan. This plan is still mostly 
 If you wanted to add a new query language to OctoSQL, the only problem you'd have to solve is translating it to this logical plan.
 
 ### Physical Plan
-The logical plan gets converted into a physical plan. This conversion finds any logical errors in the query. If this phase is reached, then the input is correct and OctoSQL can execute it.
+The logical plan gets converted into a physical plan. This conversion finds any semantic errors in the query. If this phase is reached, then the input is correct and OctoSQL will be able execute it.
 
-This phase also already understands the specifics of the underlying datasources. So it's here where the optimizer will iteratively transform the plan, pushing computiation nodes down to the datasources, and deduplicating unnecessary parts.
+This phase already understands the specifics of the underlying datasources. So it's here where the optimizer will iteratively transform the plan, pushing computiation nodes down to the datasources, and deduplicating unnecessary parts.
 
 The optimizer uses a pattern matching approach, where it has rules for matching parts of the physical plan tree and how those patterns can be restructured into a more efficient version. The rules are meant to be as simple as possible and make the smallest possible changes. This way, the optimizer just keeps on iterating on the whole tree, until it can't change anything anymore. This ensures that the plan reaches a local performance minimum, and the rules should be structured so that this local minimum is equal - or close to - the global minimum.
 
@@ -179,13 +178,31 @@ The physical plan gets materialized into an execution plan. This phase has to be
 ### Stream
 Starting the execution plan creates a stream, which underneath may hold more streams, or parts of the execution plan to create streams in the future. This stream works in a pull based model.
 
+## Database Pushdown Operations
+|Datasource	|Equality	|In	|> < <= =>	|
+|---	|---	|---	|---	|
+|MySQL	|supported	|supported	|supported	|
+|PostgreSQL	|supported	|supported	|supported	|
+|Redis	|supported	|supported	|scan	|
+|JSON	|scan	|scan	|scan	|
+|CSV	|scan	|scan	|scan	|
+
+Where scan means that the whole table needs to be scanned for each access. We are planning to add an in memory index in the future, which would allow us to store small tables in-memory, saving us a lot of unnecessary reads.
+
 ## Roadmap
-- Parallelize expression evaluation.
-- Add arithmetic operators.
-- Write custom sql parser, so we can use sane function names.
-- Push down functions to supported databases.
-- Implement an in-memory index to save values of subqueries, so as not to recalculate them each time.
+- SQL Constructs:
+  - JSON Query
+  - Window Functions
+  - Polymorphic Table Functions (i.e. RANGE(1, 10) in table position)
+  - HAVING, ALL, ANY
+- Parallel expression evaluation.
+- Custom sql parser, so we can use sane function names, and support new sql constructs.
+- Streams support (Kafka, Redis)
+- Push down functions, aggregates to databases that support them.
+- An in-memory index to save values of subqueries and save on rescanning tables which don't support a given operation, so as not to recalculate them each time.
 - MapReduce style distributed execution mode.
-- Function Tables (RANGE(1, 10) for example)
-- Better nested JSON support.
-- HAVING clause.
+- Runtime statistics
+- Server mode
+- Querying a json or csv table from standard input.
+- Integration test suite
+- Tuple splitter, returning the row for each tuple element, with the given element instead of the tuple.

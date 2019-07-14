@@ -141,6 +141,22 @@ func (ne *NodeExpression) Physical(ctx context.Context, physicalCreator *Physica
 	return physical.NewNodeExpression(physicalNode), variables, nil
 }
 
+type LogicExpression struct {
+	formula Formula
+}
+
+func NewLogicExpression(formula Formula) *LogicExpression {
+	return &LogicExpression{formula: formula}
+}
+
+func (le *LogicExpression) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
+	physicalNode, variables, err := le.formula.Physical(ctx, physicalCreator)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't get physical plan for logic expression")
+	}
+	return physical.NewLogicExpression(physicalNode), variables, nil
+}
+
 type AliasedExpression struct {
 	name octosql.VariableName
 	expr Expression

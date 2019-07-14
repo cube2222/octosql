@@ -106,6 +106,21 @@ func (ne *NodeExpression) ExpressionValue(variables octosql.Variables) (octosql.
 	return firstRecord.AsSlice()[0], nil
 }
 
+type LogicExpression struct {
+	formula Formula
+}
+
+func NewLogicExpression(formula Formula) *LogicExpression {
+	return &LogicExpression{
+		formula: formula,
+	}
+}
+
+func (le *LogicExpression) ExpressionValue(variables octosql.Variables) (octosql.Value, error) {
+	out, err := le.formula.Evaluate(variables)
+	return octosql.MakeBool(out), err
+}
+
 type AliasedExpression struct {
 	name octosql.VariableName
 	expr Expression

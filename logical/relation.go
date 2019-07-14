@@ -17,6 +17,7 @@ const (
 	LessThan     Relation = "<"
 	Like         Relation = "like"
 	In           Relation = "in"
+	NotIn        Relation = "not in"
 	GreaterEqual Relation = ">="
 	LessEqual    Relation = "<="
 )
@@ -39,6 +40,8 @@ func (rel Relation) Physical(ctx context.Context) (physical.Relation, error) {
 		return physical.Like, nil
 	case In:
 		return physical.In, nil
+	case NotIn:
+		return physical.NotIn, nil
 	case GreaterEqual:
 		return physical.GreaterEqual, nil
 	case LessEqual:

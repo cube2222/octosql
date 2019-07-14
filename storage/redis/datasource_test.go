@@ -2,9 +2,10 @@ package redis
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/cube2222/octosql/physical"
 	"github.com/go-redis/redis"
-	"testing"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
@@ -506,6 +507,93 @@ func TestDataSource_Get(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "simple test - IN",
+			fields: fields{
+				hostname: hostname,
+				password: password,
+				port:     port,
+				dbIndex:  dbIndex,
+				dbKey:    dbKey,
+				filter: physical.NewPredicate(
+					physical.NewVariable("r.key"),
+					physical.NewRelation("in"),
+					physical.NewTuple([]physical.Expression{
+						physical.NewVariable("const_0"),
+						physical.NewVariable("const_1"),
+						physical.NewVariable("const_2"),
+					}),
+				),
+				alias: "r",
+				queries: map[string]map[string]interface{}{
+					"key0": {
+						"name":    "wojtek",
+						"surname": "k",
+						"age":     "3",
+						"city":    "warsaw",
+					},
+					"key1": {
+						"name":    "janek",
+						"surname": "ch",
+						"age":     "4",
+						"city":    "zacisze",
+					},
+					"key2": {
+						"name":    "kuba",
+						"surname": "m",
+						"age":     "2",
+						"city":    "warsaw",
+					},
+					"key3": {
+						"name":    "ooo",
+						"surname": "aaaa",
+						"age":     "2",
+						"city":    "eeee",
+					},
+				},
+			},
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeString("key0"),
+					"const_1": octosql.MakeString("key1"),
+					"const_2": octosql.MakeString("key2"),
+				},
+			},
+			want: execution.NewInMemoryStream([]*execution.Record{
+				execution.NewRecord(
+					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
+					map[octosql.VariableName]octosql.Value{
+						"r.key":     octosql.MakeString("key0"),
+						"r.age":     octosql.MakeString("3"),
+						"r.city":    octosql.MakeString("warsaw"),
+						"r.name":    octosql.MakeString("wojtek"),
+						"r.surname": octosql.MakeString("k"),
+					},
+				),
+				execution.NewRecord(
+					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
+					map[octosql.VariableName]octosql.Value{
+						"r.key":     octosql.MakeString("key1"),
+						"r.age":     octosql.MakeString("4"),
+						"r.city":    octosql.MakeString("zacisze"),
+						"r.name":    octosql.MakeString("janek"),
+						"r.surname": octosql.MakeString("ch"),
+					},
+				),
+				execution.NewRecord(
+					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
+					map[octosql.VariableName]octosql.Value{
+						"r.key":     octosql.MakeString("key2"),
+						"r.age":     octosql.MakeString("2"),
+						"r.city":    octosql.MakeString("warsaw"),
+						"r.name":    octosql.MakeString("kuba"),
+						"r.surname": octosql.MakeString("m"),
+					},
+				),
+			},
+			),
+			wantErr: false,
+		},
+		{
 			name: "wrong - no variables",
 			fields: fields{
 				hostname: hostname,
@@ -700,7 +788,7 @@ func TestDataSource_Get(t *testing.T) {
 				return
 			}
 
-			equal, err := execution.AreStreamsEqual(stream, tt.want)
+			equal, err := execution.AreStreamsEqualNoOrdering(stream, tt.want)
 			if err != nil && !tt.wantErr {
 				t.Errorf("AreStreamsEqual() error: %s", err)
 				return

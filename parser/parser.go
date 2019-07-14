@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/logical"
 	"github.com/pkg/errors"
 	"github.com/xwb1989/sqlparser"
@@ -165,12 +164,12 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 	}
 
 	if statement.OrderBy != nil {
-		fields, err := parseOrderByFields(statement.OrderBy)
+		orderByExpressions, orderByDirections, err := parseOrderByExpressions(statement.OrderBy)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't parse arguments of order by")
 		}
 
-		root = logical.NewOrderBy(fields, root)
+		root = logical.NewOrderBy(orderByExpressions, orderByDirections, root)
 	}
 
 	// Now we only keep the selected variables.
@@ -488,9 +487,29 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 		}
 		return logical.NewTuple(expressions), nil
 
+	case *sqlparser.AndExpr:
+		return ParseLogicExpression(expr)
+	case *sqlparser.OrExpr:
+		return ParseLogicExpression(expr)
+	case *sqlparser.NotExpr:
+		return ParseLogicExpression(expr)
+	case *sqlparser.ComparisonExpr:
+		return ParseLogicExpression(expr)
+	case *sqlparser.ParenExpr:
+		return ParseExpression(expr.Expr)
+
 	default:
 		return nil, errors.Errorf("unsupported expression %+v of type %v", expr, reflect.TypeOf(expr))
 	}
+}
+
+func ParseLogicExpression(expr sqlparser.Expr) (*logical.LogicExpression, error) {
+	formula, err := ParseLogic(expr)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't parse logic formula")
+	}
+
+	return logical.NewLogicExpression(formula), nil
 }
 
 func ParseLogic(expr sqlparser.Expr) (logical.Formula, error) {
@@ -544,29 +563,21 @@ func ParseInfixComparison(left, right sqlparser.Expr, operator string) (logical.
 	return logical.NewPredicate(leftParsed, logical.NewRelation(operator), rightParsed), nil
 }
 
-func parseOrderByFields(order sqlparser.OrderBy) ([]execution.OrderField, error) {
-	columns := make([]execution.OrderField, 0)
+func parseOrderByExpressions(orderBy sqlparser.OrderBy) ([]logical.Expression, []logical.OrderDirection, error) {
+	expressions := make([]logical.Expression, len(orderBy))
+	directions := make([]logical.OrderDirection, len(orderBy))
 
-	for _, field := range order {
-		typed, ok := field.Expr.(*sqlparser.ColName)
-		if !ok {
-			return nil, errors.Errorf("Expected a column name as argument of order by clause")
+	for i, field := range orderBy {
+		expr, err := ParseExpression(field.Expr)
+		if err != nil {
+			return nil, nil, errors.Errorf("couldn't parse order by expression with index %v", i)
 		}
 
-		name := typed.Name.String()
-		if !typed.Qualifier.Name.IsEmpty() {
-			name = fmt.Sprintf("%s.%s", typed.Qualifier.Name.String(), name)
-		}
-
-		order := execution.OrderField{
-			ColumnName: octosql.VariableName(name),
-			Direction:  field.Direction,
-		}
-
-		columns = append(columns, order)
+		expressions[i] = expr
+		directions[i] = logical.OrderDirection(field.Direction)
 	}
 
-	return columns, nil
+	return expressions, directions, nil
 }
 
 func parseTwoSubexpressions(limit, offset sqlparser.Expr) (logical.Expression, logical.Expression, error) {

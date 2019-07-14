@@ -64,7 +64,7 @@ func (stream *MappedStream) Next() (*Record, error) {
 	for _, expr := range stream.expressions {
 		fieldNames = append(fieldNames, expr.Name())
 
-		value, err := extractSingleValue(expr, variables)
+		value, err := expr.ExpressionValue(variables)
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't get expression %v", expr.Name())
 		}

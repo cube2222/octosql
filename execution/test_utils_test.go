@@ -59,7 +59,7 @@ func TestAreStreamsEqual(t *testing.T) {
 					},
 				),
 			},
-			want:    true,
+			want:    false,
 			wantErr: false,
 		},
 		{
@@ -78,7 +78,7 @@ func TestAreStreamsEqual(t *testing.T) {
 					},
 				),
 			},
-			want:    true,
+			want:    false,
 			wantErr: false,
 		},
 		{
@@ -92,8 +92,8 @@ func TestAreStreamsEqual(t *testing.T) {
 				),
 				second: NewInMemoryStream(
 					[]*Record{
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"age", "name"}, []interface{}{7, "Wojtek"}),
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"name", "age"}, []interface{}{"Janek", 10}),
+						NewRecordFromSliceWithNormalize([]octosql.VariableName{"age", "name"}, []interface{}{10, "Janek"}),
+						NewRecordFromSliceWithNormalize([]octosql.VariableName{"name", "age"}, []interface{}{"Wojtek", 7}),
 					},
 				),
 			},
@@ -135,7 +135,7 @@ func TestAreStreamsEqual(t *testing.T) {
 					},
 				),
 			},
-			want:    true,
+			want:    false,
 			wantErr: false,
 		},
 	}

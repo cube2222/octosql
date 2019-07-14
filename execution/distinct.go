@@ -87,7 +87,7 @@ func (rs *recordSet) Has(r *Record) (bool, error) {
 	}
 
 	for i := range rs.set[hash] {
-		if AreEqual(r, rs.set[hash][i]) {
+		if r.Equal(rs.set[hash][i]) {
 			return true, nil
 		}
 	}

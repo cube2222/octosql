@@ -2,6 +2,7 @@ package aggregates
 
 import (
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 )
@@ -15,6 +16,15 @@ func NewMin() *Min {
 	return &Min{
 		mins: execution.NewHashMap(),
 	}
+}
+
+func (agg *Min) Document() docs.Documentation {
+	return docs.Section(
+		agg.String(),
+		docs.Body(
+			docs.Section("Description", docs.Text("Takes the minimum element in the group. Works with Ints, Floats, Strings, Booleans, Times.")),
+		),
+	)
 }
 
 func (agg *Min) AddRecord(key octosql.Tuple, value octosql.Value) error {
@@ -71,7 +81,7 @@ func (agg *Min) AddRecord(key octosql.Tuple, value octosql.Value) error {
 				value, agg.typedValue)
 		}
 
-		if !previousValueExists || value == false {
+		if !previousValueExists || value.AsBool() {
 			min = value
 		}
 
@@ -83,7 +93,7 @@ func (agg *Min) AddRecord(key octosql.Tuple, value octosql.Value) error {
 				value, agg.typedValue)
 		}
 
-		if !previousValueExists || value.Time().Before(min.(octosql.Time).Time()) {
+		if !previousValueExists || value.AsTime().Before(min.(octosql.Time).AsTime()) {
 			min = value
 		}
 

@@ -190,15 +190,11 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 
 	resultMap := make(map[octosql.VariableName]octosql.Value)
 
+	fields := make([]octosql.VariableName, len(rs.columns))
 	for i, columnName := range rs.columns {
 		newName := octosql.VariableName(fmt.Sprintf("%s.%s", rs.alias, columnName))
-		resultMap[newName] = execution.NormalizeType(cols[i])
-	}
-
-	fields := make([]octosql.VariableName, 0)
-
-	for k := range resultMap {
-		fields = append(fields, k)
+		fields[i] = newName
+		resultMap[newName] = octosql.NormalizeType(cols[i])
 	}
 
 	return execution.NewRecord(fields, resultMap), nil

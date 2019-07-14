@@ -2,6 +2,7 @@ package aggregates
 
 import (
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 )
@@ -15,6 +16,15 @@ func NewSum() *Sum {
 	return &Sum{
 		sums: execution.NewHashMap(),
 	}
+}
+
+func (agg *Sum) Document() docs.Documentation {
+	return docs.Section(
+		agg.String(),
+		docs.Body(
+			docs.Section("Description", docs.Text("Sums Floats or Ints in the group. You may not mix types.")),
+		),
+	)
 }
 
 func (agg *Sum) AddRecord(key octosql.Tuple, value octosql.Value) error {

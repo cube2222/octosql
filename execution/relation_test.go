@@ -149,7 +149,6 @@ func TestMoreThan_Apply(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		rel     *MoreThan
 		args    args
 		want    bool
 		wantErr bool
@@ -254,7 +253,6 @@ func TestLessThan_Apply(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		rel     *LessThan
 		args    args
 		want    bool
 		wantErr bool
@@ -359,7 +357,6 @@ func TestGreaterEqual_Apply(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		rel     *LessThan
 		args    args
 		want    bool
 		wantErr bool
@@ -675,18 +672,12 @@ func TestIn_Apply(t *testing.T) {
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{
 					"a": octosql.MakeString("123123"),
-					"b": RecordSliceValue{
-						*NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"a"},
-							[]interface{}{
-								"123124",
-							}),
-						*NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"a"},
-							[]interface{}{
-								"123123",
-							}),
-					},
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeString("123124"),
+							octosql.MakeString("123123"),
+						},
+					),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -699,18 +690,12 @@ func TestIn_Apply(t *testing.T) {
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{
 					"a": octosql.MakeString("123123"),
-					"b": RecordSliceValue{
-						*NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"a"},
-							[]interface{}{
-								"123124",
-							}),
-						*NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"a"},
-							[]interface{}{
-								"123125",
-							}),
-					},
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeString("123124"),
+							octosql.MakeString("123125"),
+						},
+					),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -722,26 +707,22 @@ func TestIn_Apply(t *testing.T) {
 			name: "record in",
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{
-					"a": NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"a", "b"},
-						[]interface{}{
-							"123124",
-							13,
-						}),
-					"b": RecordSliceValue{
-						*NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"a", "b"},
-							[]interface{}{
-								"123124",
-								13,
+					"a": octosql.MakeTuple([]octosql.Value{
+						octosql.MakeString("123124"),
+						octosql.MakeInt(13),
+					}),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123124"),
+								octosql.MakeInt(13),
 							}),
-						*NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"a", "b"},
-							[]interface{}{
-								"123123",
-								15,
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123123"),
+								octosql.MakeInt(15),
 							}),
-					},
+						},
+					),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -753,26 +734,22 @@ func TestIn_Apply(t *testing.T) {
 			name: "record in",
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{
-					"a": NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"a", "b"},
-						[]interface{}{
-							"123124",
-							13,
-						}),
-					"b": RecordSliceValue{
-						*NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"a", "b"},
-							[]interface{}{
-								"123125",
-								13,
+					"a": octosql.MakeTuple([]octosql.Value{
+						octosql.MakeString("123124"),
+						octosql.MakeInt(13),
+					}),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123125"),
+								octosql.MakeInt(13),
 							}),
-						*NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"a", "b"},
-							[]interface{}{
-								"123123",
-								15,
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123123"),
+								octosql.MakeInt(15),
 							}),
-					},
+						},
+					),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -785,13 +762,12 @@ func TestIn_Apply(t *testing.T) {
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{
 					"a": octosql.MakeString("123123"),
-					"b": RecordSliceValue{
-						*NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"a"},
-							[]interface{}{
-								"123123",
-							}),
-					},
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeString("123123"),
+							octosql.MakeInt(13),
+						},
+					),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -816,6 +792,155 @@ func TestIn_Apply(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rel := &In{}
+			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("In.Apply() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("In.Apply() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNotIn_Apply(t *testing.T) {
+	type args struct {
+		variables octosql.Variables
+		left      Expression
+		right     Expression
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "simple in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeString("123124"),
+							octosql.MakeString("123123"),
+						},
+					),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: false,
+		},
+		{
+			name: "simple in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeString("123124"),
+							octosql.MakeString("123125"),
+						},
+					),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "record in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeTuple([]octosql.Value{
+						octosql.MakeString("123124"),
+						octosql.MakeInt(13),
+					}),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123124"),
+								octosql.MakeInt(13),
+							}),
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123123"),
+								octosql.MakeInt(15),
+							}),
+						},
+					),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: false,
+		},
+		{
+			name: "record in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeTuple([]octosql.Value{
+						octosql.MakeString("123124"),
+						octosql.MakeInt(13),
+					}),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123125"),
+								octosql.MakeInt(13),
+							}),
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123123"),
+								octosql.MakeInt(15),
+							}),
+						},
+					),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "simple in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeString("123123"),
+							octosql.MakeInt(13),
+						},
+					),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: false,
+		},
+		{
+			name: "simple in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeString("123123"),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rel := &NotIn{}
 			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("In.Apply() error = %v, wantErr %v", err, tt.wantErr)

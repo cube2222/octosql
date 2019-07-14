@@ -7,22 +7,37 @@ import (
 	"github.com/pkg/errors"
 )
 
+type OrderDirection string
+
+const (
+	Ascending  OrderDirection = "asc"
+	Descending OrderDirection = "desc"
+)
+
 type OrderBy struct {
-	Fields []execution.OrderField
-	Source Node
+	Expressions []Expression
+	Directions  []OrderDirection
+	Source      Node
 }
 
-func NewOrderBy(fields []execution.OrderField, source Node) *OrderBy {
+func NewOrderBy(expressions []Expression, directions []OrderDirection, source Node) *OrderBy {
 	return &OrderBy{
-		Fields: fields,
-		Source: source,
+		Expressions: expressions,
+		Directions:  directions,
+		Source:      source,
 	}
 }
 
 func (node *OrderBy) Transform(ctx context.Context, transformers *Transformers) Node {
+	exprs := make([]Expression, len(node.Expressions))
+	for i := range node.Expressions {
+		exprs[i] = node.Expressions[i].Transform(ctx, transformers)
+	}
+
 	var transformed Node = &OrderBy{
-		Fields: node.Fields,
-		Source: node.Source.Transform(ctx, transformers),
+		Expressions: exprs,
+		Directions:  node.Directions,
+		Source:      node.Source.Transform(ctx, transformers),
 	}
 
 	if transformers.NodeT != nil {
@@ -32,10 +47,24 @@ func (node *OrderBy) Transform(ctx context.Context, transformers *Transformers) 
 }
 
 func (node *OrderBy) Materialize(ctx context.Context) (execution.Node, error) {
+	exprs := make([]execution.Expression, len(node.Expressions))
+	for i := range node.Expressions {
+		var err error
+		exprs[i], err = node.Expressions[i].Materialize(ctx)
+		if err != nil {
+			return nil, errors.Wrapf(err, "couldn't materialize expression with index %v", i)
+		}
+	}
+
+	directions := make([]execution.OrderDirection, len(node.Expressions))
+	for i := range node.Directions {
+		directions[i] = execution.OrderDirection(node.Directions[i])
+	}
+
 	sourceNode, err := node.Source.Materialize(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get execution node from order by source")
 	}
 
-	return execution.NewOrderBy(node.Fields, sourceNode), nil
+	return execution.NewOrderBy(exprs, directions, sourceNode), nil
 }

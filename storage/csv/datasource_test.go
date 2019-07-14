@@ -1,7 +1,6 @@
 package csv
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -165,11 +164,6 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			if err != nil {
 				t.Errorf("DataSource.Get() error: %v", err)
 				return
-			}
-
-			aliasedFields := make([]string, 0)
-			for i := range tt.fields {
-				aliasedFields = append(aliasedFields, fmt.Sprintf("%s.%s", ds.alias, tt.fields[i]))
 			}
 
 			for _, expected := range tt.want {

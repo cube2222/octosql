@@ -14,7 +14,6 @@ func TestJSONRecordStream_Get(t *testing.T) {
 		path        string
 		arrayFormat bool
 		alias       string
-		fields      []string
 		want        execution.RecordStream
 	}{
 		{

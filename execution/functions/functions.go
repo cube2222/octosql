@@ -1023,20 +1023,3 @@ func intMax(x, y Int) Int {
 	}
 	return x
 }
-
-func floatify(x interface{}) (float64, error) {
-	switch x := x.(type) {
-	case int:
-		return float64(x), nil
-	case float64:
-		return x, nil
-	case bool:
-		if x {
-			return 1.0, nil
-		}
-
-		return 0.0, nil
-	default:
-		return 0.0, fmt.Errorf("couldn't convert value %v of type %v to float", x, reflect.TypeOf(x))
-	}
-}

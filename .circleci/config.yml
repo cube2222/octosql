@@ -25,6 +25,7 @@ jobs:
     steps:
       - run: go get github.com/burntsushi/go-sumtype
       - checkout
+      - run: GO111MODULE=on go mod vendor
       - run: go-sumtype ./...
 
   test:

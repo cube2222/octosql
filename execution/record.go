@@ -33,7 +33,7 @@ func (r *Record) Value(field octosql.VariableName) octosql.Value {
 			return r.data[i]
 		}
 	}
-	return nil
+	return octosql.MakeNull()
 }
 
 func (r *Record) Fields() []Field {

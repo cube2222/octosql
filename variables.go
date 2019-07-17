@@ -46,7 +46,11 @@ func NewVariables(variables map[VariableName]Value) Variables {
 var ErrVariableNotFound = errors.New("variable not found")
 
 func (vs Variables) Get(k VariableName) (Value, error) {
-	return vs[k], nil
+	out, ok := vs[k]
+	if !ok {
+		return MakeNull(), nil
+	}
+	return out, nil
 }
 
 func (vs Variables) MergeWith(other Variables) (Variables, error) {

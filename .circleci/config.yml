@@ -21,7 +21,7 @@ jobs:
     docker:
       - image: circleci/golang:1.12
 
-    working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
+    working_directory: /go/src/github.com/cube2222/octosql
     steps:
       - run: go get github.com/burntsushi/go-sumtype
       - checkout
@@ -33,7 +33,7 @@ jobs:
     environment:
       GO111MODULE: "on"
 
-    working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
+    working_directory: /go/src/github.com/cube2222/octosql
     steps:
       - checkout
 
@@ -56,7 +56,7 @@ jobs:
           MYSQL_ROOT_PASSWORD: toor
           MYSQL_DATABASE: mydb
 
-    working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
+    working_directory: /go/src/github.com/cube2222/octosql
     steps:
       - checkout
 
@@ -74,7 +74,7 @@ jobs:
           POSTGRES_PASSWORD: toor
           POSTGRES_DB: mydb
 
-    working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
+    working_directory: /go/src/github.com/cube2222/octosql
     steps:
       - checkout
 
@@ -87,7 +87,7 @@ jobs:
           GO111MODULE: "on"
       - image: circleci/redis:latest
 
-    working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
+    working_directory: /go/src/github.com/cube2222/octosql
     steps:
       - checkout
 
@@ -99,7 +99,7 @@ jobs:
     environment:
       GO111MODULE: "on"
 
-    working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
+    working_directory: /go/src/github.com/cube2222/octosql
     steps:
       - checkout
 

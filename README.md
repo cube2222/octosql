@@ -1,9 +1,9 @@
-OctoSQL
+OctoSQL [![CircleCI](https://circleci.com/gh/cube2222/octosql.svg?style=shield)](https://circleci.com/gh/cube2222/octosql) [![GoDoc](https://godoc.org/github.com/cube2222/octosql?status.svg)](https://godoc.org/github.com/cube2222/octosql)
 =======
-OctoSQL is a query tool that allows you to join, analyse and transform data from multiple databases and file formats using SQL.
 
-[![CircleCI](https://circleci.com/gh/cube2222/octosql.svg?style=shield)](https://circleci.com/gh/cube2222/octosql)
-[![GoDoc](https://godoc.org/github.com/cube2222/octosql?status.svg)](https://godoc.org/github.com/cube2222/octosql)
+![octosql-logo](https://github.com/styczynski/octosql/blob/master/static/octosql.png?raw=true)
+
+OctoSQL is a query tool that allows you to join, analyse and transform data from multiple databases and file formats using SQL.
 
 ## Table of Contents
 - [What is OctoSQL?](#what-is-octosql)

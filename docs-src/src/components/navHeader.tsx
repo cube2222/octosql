@@ -50,20 +50,13 @@ export class NavHeader extends React.PureComponent<INavHeaderProps, {}> {
                     </a>
                     <div>
                         <NavbarHeading className="docs-heading">
-                            <span>Blueprint</span> {this.renderVersionsMenu()}
+                            <span>OctoSQL</span> {this.renderVersionsMenu()}
                         </NavbarHeading>
-                        <a className={Classes.TEXT_MUTED} href="https://github.com/palantir/blueprint" target="_blank">
+                        <a className={Classes.TEXT_MUTED} href="https://github.com/cube2222/octosql" target="_blank">
                             <small>View on GitHub</small>
                         </a>
                     </div>
                 </div>
-                <div className="docs-nav-divider" />
-                <NavButton
-                    icon={useDarkTheme ? "flash" : "moon"}
-                    hotkey="shift + d"
-                    text={useDarkTheme ? "Light theme" : "Dark theme"}
-                    onClick={this.handleDarkSwitchChange}
-                />
             </>
         );
     }
@@ -71,12 +64,6 @@ export class NavHeader extends React.PureComponent<INavHeaderProps, {}> {
     public renderHotkeys() {
         return (
             <Hotkeys>
-                <Hotkey
-                    global={true}
-                    combo="shift + d"
-                    label="Toggle dark theme"
-                    onKeyDown={this.handleDarkSwitchChange}
-                />
             </Hotkeys>
         );
     }

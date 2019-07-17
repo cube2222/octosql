@@ -82,41 +82,93 @@ You can choose between table, tabbed, json and csv output formats.
 
 @## Datasources support
 
-##### options:
+#### options:
 - path - path to file containing the data, required
 - arrayFormat - if the JSON list of records format should be used, defaults to false
 
 ---
-#### CSV
-CSV file seperated using commas. The first row should contain column names.
-##### options:
+@### CSV
+
+CSV file separated using commas. The first row should contain column names.
+
+#### Options:
 - path - path to file containing the data, required
 
----
-#### PostgreSQL
+#### Example configuration
+```yaml
+    - name: csv_table
+      type: csv
+      config:
+        path: ./example.csv
+```
+
+@### PostgreSQL
+
 Single PostgreSQL database table.
-##### options:
+
+##### Options:
 - address - address including port number, defaults to localhost:5432
 - user - required
 - password - required
 - databaseName - required
 - tableName - required
----
-#### MySQL
+
+##### Example configuration
+```yaml
+    - name: pgsql_table
+      type: postgresql
+      config:
+        address: localhost:5432
+        user: pguser
+        password: pgpassword
+        databaseName: pgdb
+        tableName: postgres_table
+```
+
+@### MySQL
+
 Single MySQL database table.
-##### options:
+
+##### Options:
+
 - address - address including port number, defaults to localhost:3306
 - user - required
 - password - required
 - databaseName - required
 - tableName - required
----
-#### Redis
+
+##### Example configuration
+```yaml
+    - name: mysql_table
+      type: mysql
+      config:
+        address: localhost:3306
+        user: mysql_user
+        password: mysql_password
+        databaseName: mysql_db
+        tableName: mysql_table
+```
+
+@### Redis
+
 Redis database with the given index. Currently only hashes are supported.
-##### options:
+
+##### Options:
+
 - address - address including port number, defaults to localhost:6379
 - password - defaults to ""
 - databaseIndex - index number of Redis database, defaults to 0
 - databaseKeyName - column name of Redis key in OctoSQL records, defaults to "key"
+
+##### Example configuration
+```yaml
+    - name: redis_table
+      type: redis
+      config:
+        address: localhost:6379
+        password: redis_password
+        databaseIndex: 0
+        databaseKeyName: key
+```
 
 @page quick-insights

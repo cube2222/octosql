@@ -18,88 +18,38 @@ import React from "react";
 
 export const NavIcon: React.SFC<{ route: string }> = ({ route }) => {
     return (
-        <svg className="docs-nav-package-icon" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
-            {ICON_CONTENTS[route]}
-        </svg>
+        ICON_CONTENTS[route]
     );
 };
 
 const OPACITY = 0.6;
 const ICON_CONTENTS: Record<string, JSX.Element> = {
-    blueprint: (
-        <g fillRule="evenodd">
-            <path d="M17 12v4a2 2 0 0 1-2 2h-1v-3a1 1 0 0 0-1-1h-1a1 1 0 0 0-1 1v3H9a2 2 0 0 1-2-2v-4l5-3.3 5 3.3z" />
-            <path
-                d="M12 7.202l-5.445 3.63a1 1 0 0 1-1.11-1.664l6-4a1 1 0 0 1 1.11 0l6 4a1 1 0 0 1-1.11 1.664L12 7.202z"
-                fillRule="nonzero"
-                opacity={OPACITY}
-            />
-        </g>
-    ),
-
-    core: (
-        <g fillRule="evenodd">
-            <path d="M12 7.211l4 2.6v3.6l-4 2.6-4-2.6v-3.6z" />
-            <path
-                d="M13.094 4.325l5 3.266A2 2 0 0 1 19 9.265v4.692a2 2 0 0 1-.906 1.675l-5 3.265a2 2 0 0 1-2.188 0l-5-3.265A2 2 0 0 1 5 13.957V9.265a2 2 0 0 1 .906-1.674l5-3.266a2 2 0 0 1 2.188 0zM12 6.02l-5 3.25v4.685l5 3.25 5-3.25V9.269l-5-3.25z"
-                opacity={OPACITY}
-            />
-        </g>
-    ),
-
-    datetime: (
-        <g fillRule="evenodd">
-            <path d="M6 10h12v6a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-6z" opacity={OPACITY} />
-            <path d="M8 6h8a2 2 0 0 1 2 2v1H6V8a2 2 0 0 1 2-2z" />
-        </g>
-    ),
-
-    icons: (
-        <g fillRule="evenodd">
-            <path d="M11.657 5l2.058 4.168 4.6.669-3.329 3.245.786 4.581-4.115-2.163V5z" opacity={OPACITY} />
-            <path d="M11.657 5v10.5l-4.114 2.163.786-4.581L5 9.837l4.6-.669L11.657 5z" />
-        </g>
-    ),
-
-    labs: (
-        <g fillRule="evenodd">
-            <path
-                d="M10 9V7h-.5a.5.5 0 0 1 0-1h5a.5.5 0 0 1 0 1H14v2l3.927 5.89A2 2 0 0 1 16.263 18H7.737a2 2 0 0 1-1.664-3.11L10 9z"
-                opacity={OPACITY}
-            />
-            <path d="M17.281 13.917l.649.974A2 2 0 0 1 16.266 18H7.74a2 2 0 0 1-1.664-3.11l2.25-3.375c1.363-.21 2.755.165 4.177 1.124 1.255.847 2.848 1.273 4.778 1.278z" />
-        </g>
-    ),
-
-    resources: (
-        <g fillRule="evenodd">
-            <path d="M5 11l7 7 7-7H5z" />
-            <path opacity={OPACITY} d="M5 11l3-4h8l3 4z" />
-        </g>
-    ),
-
-    select: (
-        <g transform="translate(5 6)" fillRule="evenodd">
-            <rect y="4" width="14" height="4" rx="1" />
-            <rect opacity={OPACITY} x="2" width="10" height="3" rx="1" />
-            <rect opacity={OPACITY} x="2" y="9" width="10" height="3" rx="1" />
-        </g>
-    ),
-
-    table: (
-        <g fillRule="evenodd">
-            <path
-                d="M10 15v-2h4v2h-4zm0 1h4v2h-4v-2zm8-1h-3v-2h3v2zm0 1a2 2 0 0 1-2 2h-1v-2h3zM6 15v-2h3v2H6zm0 1h3v2H8a2 2 0 0 1-2-2zm4-4v-2h4v2h-4zm8 0h-3v-2h3v2zM6 12v-2h3v2H6z"
-                opacity={OPACITY}
-            />
-            <path d="M8 6h8a2 2 0 0 1 2 2v1H6V8a2 2 0 0 1 2-2z" />
-        </g>
-    ),
-
-    timezone: (
-        <g transform="translate(6 5)" fillRule="evenodd">
-            <ellipse opacity={OPACITY / 1.5} cx="6" cy="10.5" rx="6" ry="2.5" />
-            <path d="M2 4c0-2 1.5-4 4-4s4 2 4 4c0 1.333-1.333 3.667-4 7-2.667-3.333-4-5.667-4-7zm4 2a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
-        </g>
+    octosql: (
+        <svg width="24" height="24" version="1.1" viewBox="0 0 40.392155 29.307758" xmlns="http://www.w3.org/2000/svg" xmlns:cc="http://creativecommons.org/ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xlink="http://www.w3.org/1999/xlink">
+            <defs>
+                <linearGradient id="linearGradient879">
+                    <stop stop-color="#3870ac" offset="0"/>
+                    <stop stop-color="#005bec" offset="1"/>
+                </linearGradient>
+                <linearGradient id="linearGradient881" x1="42.201" x2="48.022" y1="65.357" y2="44.984" gradientTransform="matrix(1.0154 0 0 .97298 -18.885 -39.423)" gradientUnits="userSpaceOnUse" xlink:href="#linearGradient879"/>
+                <linearGradient id="linearGradient886" x1="44.133" x2="48.022" y1="55.138" y2="44.984" gradientTransform="matrix(.0042033 .49808 -.41992 .0035437 58.658 9.5102)" gradientUnits="userSpaceOnUse" xlink:href="#linearGradient879"/>
+                <linearGradient id="linearGradient914" x1="44.133" x2="48.022" y1="55.138" y2="44.984" gradientTransform="matrix(-.0042033 .49808 .41992 .0035437 -12.897 6.7848)" gradientUnits="userSpaceOnUse" xlink:href="#linearGradient879"/>
+            </defs>
+            <g transform="translate(-3.7765 -3.0991)">
+                <path d="m31.688 17.071c0 0.5861-0.12213 1.8789-0.21776 2.4248-0.5589 3.1907-2.1411 5.658-3.2421 7.8745-1.2475 2.5115-1.5795 4.5471-2.1919 4.1912-3.2757-1.904-7.851-5.9357-7.851-13.829 0-7.8933 3.0994-14.292 6.9226-14.292 3.8233 0 6.5802 5.7373 6.5802 13.631z" fill="url(#linearGradient881)" opacity=".793" stroke-width="0"/>
+                <g fill="none" stroke="#000500" stroke-width=".836">
+                    <path d="m16.733 20.468c-0.14554-1.8057-0.09558-3.8649 0.02633-5.9873 0.36113-6.287 3.9878-11.192 8.1004-10.956 4.1126 0.23623 7.1537 5.5244 6.7926 11.811l-2e-6 3e-6c-0.1789 3.1147-0.64386 6.999-1.9694 9.4658"/>
+                    <g>
+                        <path d="m17.819 24.831c0.61198 2.0566 2.7951 4.1363 1.3376 5.8582-2.6627 3.1454-13.528-6.5576-13.528-6.5576"/>
+                        <path d="m42.911 26.592s-12.984 7.0491-14.737 5.0344c-0.08868-0.10194 4.5293-7.8895 6.2728-10.785"/>
+                        <path d="m29.683 24.802-3.6918 6.718"/>
+                    </g>
+                    <path d="m17.819 24.831c-0.42263-1.6592 0.47799-3.7885 2.5798-3.7967 1.7629-0.0069 2.6535 1.4566 2.6277 2.9054-0.0025 0.13941-1.2683 0.64775-2.4719 1.1338"/>
+                    <path d="m29.683 24.802c0.42263-1.6592-0.47799-3.7885-2.5798-3.7967-1.7629-0.0069-2.6536 1.4566-2.6277 2.9054 0.0047 0.26394 4.5378 1.8503 4.6036 2.1043"/>
+                </g>
+                <path d="m42.911 26.592s-5.7969 2.917-7.6204 3.7982c-1.2643 0.6109-4.3379 1.4811-4.3379 1.4811-1.2173 0.25997-2.7439-0.06774-2.7439-0.06774 1.8701-5.9568 5.025-12.237 5.025-12.237s3.5393 3.8677 9.6773 7.0254z" fill="url(#linearGradient886)" opacity=".201" stroke-width="0"/>
+                <path d="m2.7182 22.809s5.9292 3.9754 7.7527 4.8565c1.2643 0.6109 6.653 3.4654 6.653 3.4654 1.2173 0.25997 2.5455-1.5229 2.5455-1.5229-1.8701-5.9568-5.6864-10.716-5.6864-10.716s-5.1268 0.75882-11.265 3.9166z" fill="url(#linearGradient914)" opacity=".201" stroke-width="0"/>
+            </g>
+        </svg>
     ),
 };

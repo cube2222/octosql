@@ -6,23 +6,14 @@
         "moduleResolution": "node",
         "module": "esnext",
         "importHelpers": true,
-        "target": "es5",
+        "target": "esnext",
+        "allowSyntheticDefaultImports": true,
         "jsx": "react",
         "lib": ["es5", "es6", "dom"],
         "baseUrl": "./",
-        "paths": {
-            "@blinkforms/core": ["./blinkforms/typescript-core"],
-            "@blinkforms/react": ["./blinkforms/react-json-blinkforms/bin/index.js"]
-        }
+        "experimentalDecorators": true
     },
     "include": [
-        "./blinkforms/**/*",
         "./src/**/*"
-    ],
-    "awesomeTypescriptLoaderOptions": {
-        "reportFiles": [
-            "./blinkforms/**/*",
-            "./src/**/*"
-        ]
-    }
+    ]
 }

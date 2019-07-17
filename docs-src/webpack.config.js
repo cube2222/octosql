@@ -40,7 +40,7 @@ module.exports = Object.assign({}, baseConfig, {
 
     module: {
         rules: (baseConfig.module.rules || []).concat([
-          /*{
+          {
             test: /\.ts|\.tsx$/,
             enforce: 'pre',
             use: [
@@ -52,11 +52,11 @@ module.exports = Object.assign({}, baseConfig, {
                       tsConfigFile: 'tsconfig.json',
                       emitErrors: true,
                       failOnHint: true,
-                      fix: true
+                      fix: true,
                   }
                }
             ]
-          },*/
+          },
           {
             test: /\.js$/,
             use: ['babel-loader', 'source-map-loader'],
@@ -77,17 +77,10 @@ module.exports = Object.assign({}, baseConfig, {
     },
     
     plugins: baseConfig.plugins.concat([
-        new CheckerPlugin(),
         new CopyWebpackPlugin([
             // to: is relative to dist/
             { from: "src/index.html", to: "." },
             { from: "src/assets/favicon.png", to: "assets" },
-        ]),
-        new webpack.NormalModuleReplacementPlugin(/@blinkforms\/core/, function(resource) {
-            resource.request = resource.request.replace(/@blinkforms\/core/, path.resolve(__dirname, path.join('.', 'blinkforms', 'typescript-core')));
-        }),
-        new webpack.NormalModuleReplacementPlugin(/@blinkforms\/react/, function(resource) {
-            resource.request = resource.request.replace(/@blinkforms\/react/, path.resolve(__dirname, path.join('.', 'blinkforms', 'react-json-blinkforms', 'bin', 'index.js')));
-        }),
+        ])
     ]),
 });

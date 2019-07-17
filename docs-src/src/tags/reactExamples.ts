@@ -17,8 +17,6 @@
 import { IExampleMap, IExampleProps } from "@blueprintjs/docs-theme";
 import * as React from "react";
 
-import * as ReactJsonBlinkformExamples from "../../blinkforms/react-json-blinkforms/examples";
-
 /** Interface for `IExampleProps` `data` in this here Blueprint docs-app. */
 export interface IBlueprintExampleData {
     /** CSS class of theme, typically `""` or `Classes.DARK`. */
@@ -46,7 +44,5 @@ function getPackageExamples(
 }
 
 export const reactExamples: IExampleMap = (() => {
-    return {
-        ...getPackageExamples("react-json-blinkforms", ReactJsonBlinkformExamples as any),
-    };
+    return {};
 })();

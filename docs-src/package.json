@@ -54,6 +54,8 @@
     "npm-run-all": "^4.1.2",
     "styled-components": "^4.3.2",
     "ts-node": "^8.3.0",
+    "tslint": "^5.18.0",
+    "tslint-loader": "^3.5.4",
     "typescript": "^3.2.1",
     "webpack-cli": "^3.1.2",
     "webpack-dev-server": "^3.1.0"

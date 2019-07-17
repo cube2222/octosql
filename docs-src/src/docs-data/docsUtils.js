@@ -12,9 +12,9 @@ const HIGHLIGHTS_LANGUAGES = ["better-handlebars", "language-less", "tree-sitter
 
 const highlighter = new Highlights();
 // a few additional languages... highlights comes with a basic set.
-for (const lang of HIGHLIGHTS_LANGUAGES) {
-    highlighter.requireGrammarsSync({ modulePath: require.resolve(`${lang}/package.json`) });
-}
+//for (const lang of HIGHLIGHTS_LANGUAGES) {
+//    highlighter.requireGrammarsSync({ modulePath: require.resolve(`${lang}/package.json`) });
+//}
 
 // highlights the given text in the given language scope. returns HTML string wrapped in <pre> tag.
 // must provide full TextMate language scope: "text.html.basic"

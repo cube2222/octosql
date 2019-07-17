@@ -16,11 +16,11 @@ const semver = require("semver");
 const docsUtils = require("./docsUtils");
 
 // assume we are running from packages/docs-app
-const ROOT_DIR = path.resolve(process.cwd(), "../blinkforms/");
-const PACKAGES_DIR = path.resolve(process.cwd(), "../blinkforms/");
+const ROOT_DIR = path.resolve(process.cwd(), "../../docs/");
+const PACKAGES_DIR = path.resolve(process.cwd(), "../../docs/");
 const GENERATED_SRC_DIR = path.resolve(process.cwd(), "./generated");
 const BUILD_DIR = path.resolve(process.cwd(), "build");
-const NAV_PAGE_NAME = "_nav";
+const NAV_PAGE_NAME = '_nav';
 
 const DOCS_DATA_PATH = path.join(GENERATED_SRC_DIR, "docs.json");
 
@@ -59,7 +59,7 @@ function generateDocumentalistData() {
         )
         .use(".scss", new dm.KssPlugin())
         .use("../package.json", new dm.NpmPlugin())
-        .documentGlobs("../blinkforms/**/*.{scss,md}", "../blinkforms/**/index.{ts,tsx}", "../blinkforms/**/package.json")
+        .documentGlobs("../../docs/**/*.{scss,md}", "../../docs/**/index.{ts,tsx}", "../../docs/**/package.json")
         .then(docs => JSON.stringify(docs, transformDocumentalistData, 2))
         .then(content => fs.writeFileSync(DOCS_DATA_PATH, content));
 }

@@ -6,4 +6,4 @@
 **/node_modules/
 
 # Docs generated json
-./docs-src/src/generated/
+docs-src/src/generated/

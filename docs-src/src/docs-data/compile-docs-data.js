@@ -16,8 +16,8 @@ const semver = require("semver");
 const docsUtils = require("./docsUtils");
 
 // assume we are running from packages/docs-app
-const ROOT_DIR = path.resolve(process.cwd(), "../../docs/");
-const PACKAGES_DIR = path.resolve(process.cwd(), "../../docs/");
+const ROOT_DIR = path.resolve(process.cwd(), "../../docs-content/");
+const PACKAGES_DIR = path.resolve(process.cwd(), "../../docs-content/");
 const GENERATED_SRC_DIR = path.resolve(process.cwd(), "./generated");
 const BUILD_DIR = path.resolve(process.cwd(), "build");
 const NAV_PAGE_NAME = '_nav';
@@ -59,7 +59,7 @@ function generateDocumentalistData() {
         )
         .use(".scss", new dm.KssPlugin())
         .use("../package.json", new dm.NpmPlugin())
-        .documentGlobs("../../docs/**/*.{scss,md}", "../../docs/**/index.{ts,tsx}", "../../docs/**/package.json")
+        .documentGlobs("../../docs-content/**/*.{scss,md}", "../../docs-content/**/index.{ts,tsx}", "../../docs-content/**/package.json")
         .then(docs => JSON.stringify(docs, transformDocumentalistData, 2))
         .then(content => fs.writeFileSync(DOCS_DATA_PATH, content));
 }

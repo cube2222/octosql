@@ -104,7 +104,7 @@ export class NavHeader extends React.PureComponent<INavHeaderProps, {}> {
         );
     }
 
-    private handleDarkSwitchChange = () => {
+    private handleDarkSwitchChange() {
         this.props.onToggleDark(!this.props.useDarkTheme);
     };
 }

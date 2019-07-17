@@ -9,11 +9,18 @@
         "target": "esnext",
         "allowSyntheticDefaultImports": true,
         "jsx": "react",
-        "lib": ["es5", "es6", "dom"],
+        "lib": ["es5", "es6", "dom", "es2018"],
         "baseUrl": "./",
-        "experimentalDecorators": true
+        "experimentalDecorators": true,
+        "allowJs": true,
+        "typeRoots": [
+            "./node_modules/@types"
+        ]
     },
     "include": [
         "./src/**/*"
-    ]
+    ],
+    "awesomeTypescriptLoaderOptions": {
+        "transpileOnly": true
+    }
 }

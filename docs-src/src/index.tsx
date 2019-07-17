@@ -20,8 +20,8 @@ import "dom4";
 import * as React from "react";
 import * as ReactDOM from "react-dom";
 
-import { docsData } from "./docs-data";
 import { createDefaultRenderers, ReactDocsTagRenderer, ReactExampleTagRenderer } from "@blueprintjs/docs-theme";
+import { docsData } from "./docs-data";
 
 import { BlueprintDocs } from "./components/blueprintDocs";
 import * as ReactDocs from "./tags/reactDocs";

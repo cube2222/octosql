@@ -28,7 +28,7 @@ const RESOURCES: IResourceProps[] = [
 export const Resources: React.SFC = () => (
     <>
         <div className="blueprint-resources">
-            {RESOURCES.map(resource => (
+            {RESOURCES.map((resource) => (
                 <ResourceCard key={resource.fileName} {...resource} />
             ))}
         </div>

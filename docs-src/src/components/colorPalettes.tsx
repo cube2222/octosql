@@ -78,7 +78,7 @@ const ColorPalette: React.SFC<{ colors: string[] }> = ({ colors }) => (
 // no text in swatch; display all hex codes underneath
 export const ColorBar: React.SFC<{ colors: string[] }> = ({ colors }) => {
     const hexString = colors.map(getHexCode).join(", ");
-    const jsonString = `[${colors.map(c => `"${getHexCode(c)}"`).join(", ")}]`;
+    const jsonString = `[${colors.map((c) => `"${getHexCode(c)}"`).join(", ")}]`;
 
     const swatches = colors.map((name, i) => (
         <div className="docs-color-swatch" key={i} style={{ backgroundColor: getHexCode(name) }} />

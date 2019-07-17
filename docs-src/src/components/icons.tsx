@@ -49,7 +49,7 @@ export class Icons extends React.PureComponent<IIconsProps, IIconsState> {
         const groupElements = Object.keys(this.iconGroups)
             .sort()
             .map(this.maybeRenderIconGroup, this)
-            .filter(group => group != null);
+            .filter((group) => group != null);
         return (
             <div className="docs-icons">
                 <InputGroup
@@ -96,13 +96,13 @@ export class Icons extends React.PureComponent<IIconsProps, IIconsState> {
             return icons;
         }
         const { iconFilter } = this.props;
-        return icons.filter(icon => iconFilter(this.state.filter, icon));
+        return icons.filter((icon) => iconFilter(this.state.filter, icon));
     }
 
     private handleFilterChange = (e: React.SyntheticEvent<HTMLInputElement>) => {
         const filter = (e.target as HTMLInputElement).value;
         this.setState({ filter });
-    };
+    }
 }
 
 function isIconFiltered(query: string, icon: IIcon) {

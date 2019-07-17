@@ -34,14 +34,15 @@ module.exports = Object.assign({}, baseConfig, {
     },
 
     output: {
-        filename: "[name].js",
-        path: path.resolve(__dirname, "./dist"),
+        filename: "[name].docs.js",
+        path: path.resolve(__dirname, "../docs"),
     },
 
     module: {
         rules: (baseConfig.module.rules || []).concat([
-          {
+          /*{
             test: /\.ts|\.tsx$/,
+            exclude: /node_modules/,
             enforce: 'pre',
             use: [
                {
@@ -56,7 +57,7 @@ module.exports = Object.assign({}, baseConfig, {
                   }
                }
             ]
-          },
+          },*/
           {
             test: /\.js$/,
             use: ['babel-loader', 'source-map-loader'],
@@ -65,6 +66,7 @@ module.exports = Object.assign({}, baseConfig, {
           {
             test: /\.tsx?$/,
             use: ['babel-loader', 'awesome-typescript-loader'],
+            exclude: /node_modules/,
           },
           {
             test: /\.(jpe?g|png|gif|svg)$/i,
@@ -73,7 +75,7 @@ module.exports = Object.assign({}, baseConfig, {
               'image-webpack-loader?bypassOnDebug&optipng.optimizationLevel=7&gifsicle.interlaced=false',
             ],
           },
-        ])
+        ]).concat([])
     },
     
     plugins: baseConfig.plugins.concat([

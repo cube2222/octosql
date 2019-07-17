@@ -87,7 +87,7 @@ export class ClickToCopy extends React.PureComponent<IClickToCopyProps, IClickTo
         document.execCommand("copy");
         this.setState({ hasCopied: true });
         Utils.safeInvoke(this.props.onClick, e);
-    };
+    }
 
     // tslint:disable-next-line:member-ordering
     private handleKeyDown = createKeyEventHandler(
@@ -102,5 +102,5 @@ export class ClickToCopy extends React.PureComponent<IClickToCopyProps, IClickTo
     private handleMouseLeave = (e: React.SyntheticEvent<HTMLElement>) => {
         this.setState({ hasCopied: false });
         Utils.safeInvoke(this.props.onMouseLeave, e);
-    };
+    }
 }

@@ -15,11 +15,11 @@
  */
 
 import { AnchorButton, Classes, setHotkeysDialogProps, Tag } from "@blueprintjs/core";
-import { IDocsCompleteData } from "../docs-data";
 import { Documentation, IDocumentationProps, INavMenuItemProps, NavMenuItem } from "@blueprintjs/docs-theme";
 import classNames from "classnames";
 import { IHeadingNode, IPageData, isPageNode, ITsDocBase } from "documentalist/dist/client";
 import * as React from "react";
+import { IDocsCompleteData } from "../docs-data";
 import { NavHeader } from "./navHeader";
 import { NavIcon } from "./navIcons";
 
@@ -72,9 +72,9 @@ export class BlueprintDocs extends React.Component<IBlueprintDocsProps, { themeN
                 onToggleDark={this.handleToggleDark}
                 useDarkTheme={this.state.themeName === DARK_THEME}
                 useNextVersion={this.props.useNextVersion}
-                packageData={this.getNpmPackage("@blueprintjs/core")||{
-                    version: '1',
-                    versions: '1',
+                packageData={this.getNpmPackage("@blueprintjs/core") || {
+                    version: "1",
+                    versions: "1",
                 } /* FIXME Remove that or */}
             />
         );
@@ -116,7 +116,7 @@ export class BlueprintDocs extends React.Component<IBlueprintDocsProps, { themeN
             }
         }
         return <NavMenuItem {...props} />;
-    };
+    }
 
     private renderPageActions(page: IPageData) {
         return (
@@ -170,12 +170,12 @@ export class BlueprintDocs extends React.Component<IBlueprintDocsProps, { themeN
         Array.from(document.querySelectorAll(`.${Classes.CHECKBOX} input[indeterminate]`)).forEach(
             (el: HTMLInputElement) => (el.indeterminate = true),
         );
-    };
+    }
 
     private handleToggleDark = (useDark: boolean) => {
         const nextThemeName = useDark ? DARK_THEME : LIGHT_THEME;
         setTheme(nextThemeName);
         setHotkeysDialogProps({ className: nextThemeName });
         this.setState({ themeName: nextThemeName });
-    };
+    }
 }

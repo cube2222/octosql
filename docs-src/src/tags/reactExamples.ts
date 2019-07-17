@@ -36,7 +36,7 @@ function getPackageExamples(
         const example = packageExamples[exampleName];
         const fileName = exampleName.charAt(0).toLowerCase() + exampleName.slice(1) + ".tsx";
         ret[exampleName] = {
-            render: props => React.createElement(example, { ...props, data: { themeName: getTheme() } }),
+            render: (props) => React.createElement(example, { ...props, data: { themeName: getTheme() } }),
             sourceUrl: [SRC_HREF_BASE, `${packageName}-examples`, fileName].join("/"),
         };
     }

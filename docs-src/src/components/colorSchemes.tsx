@@ -89,13 +89,13 @@ export class ColorScheme extends React.PureComponent<IColorSchemeProps, IColorSc
         steps: this.props.steps || 5,
     };
 
-    private handleStepChange = handleNumberChange(steps => {
+    private handleStepChange = handleNumberChange((steps) => {
         this.setState({
             steps: Math.max(MIN_STEPS, Math.min(MAX_STEPS, steps)),
         });
     });
 
-    private handleSchemaChange = handleNumberChange(activeSchema =>
+    private handleSchemaChange = handleNumberChange((activeSchema) =>
         this.setState({
             activePalette: 0,
             activeSchema,
@@ -133,7 +133,7 @@ export class ColorScheme extends React.PureComponent<IColorSchemeProps, IColorSc
 
     private handlePaletteChange = (key: number) => {
         this.setState({ activePalette: key });
-    };
+    }
 
     private renderRadioGroup() {
         if (this.props.schemes.length === 1) {
@@ -188,7 +188,7 @@ export class ColorScheme extends React.PureComponent<IColorSchemeProps, IColorSc
                 .correctLightness(true)
                 .colors(steps);
         }
-    };
+    }
 
     private renderPalette(palette: string[], key: number, diverging?: boolean) {
         const colors = this.generateColorPalette(palette, diverging, 5);

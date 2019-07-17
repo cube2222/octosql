@@ -334,7 +334,7 @@ func insertValues(db *sql.DB, tablename string, values [][]interface{}) error {
 			continue
 		}
 
-		stringRow := spliceToString(row)
+		stringRow := sliceToString(row)
 
 		query := fmt.Sprintf("INSERT INTO %s VALUES (%s);", tablename, strings.Join(stringRow, ", "))
 
@@ -356,7 +356,7 @@ func dropTable(db *sql.DB, tablename string) error {
 	return nil
 }
 
-func spliceToString(values []interface{}) []string {
+func sliceToString(values []interface{}) []string {
 	var result []string
 	for i := range values {
 		value := values[i]

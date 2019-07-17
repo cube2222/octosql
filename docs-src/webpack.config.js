@@ -34,7 +34,7 @@ module.exports = Object.assign({}, baseConfig, {
     },
 
     output: {
-        filename: "[name].docs.js",
+        filename: "[name].js",
         path: path.resolve(__dirname, "../docs"),
     },
 

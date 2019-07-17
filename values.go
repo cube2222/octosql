@@ -11,10 +11,28 @@ import (
 	"github.com/cube2222/octosql/docs"
 )
 
+//go-sumtype:decl Value
 type Value interface {
 	docs.Documented
 	octoValue()
 	fmt.Stringer
+}
+
+type Null struct{}
+
+func (Null) octoValue()            {}
+func (v Null) AsNull() interface{} { return nil }
+func (v Null) String() string {
+	return "<null>"
+}
+func (v Null) Document() docs.Documentation {
+	return docs.Text("Null")
+}
+func MakeNull() Null {
+	return Null(struct{}{})
+}
+func ZeroNull() Null {
+	return struct{}{}
 }
 
 type Phantom struct{}
@@ -182,6 +200,8 @@ func ZeroObject() Object {
 // All types coming out of data sources have to be already normalized this way.
 func NormalizeType(value interface{}) Value {
 	switch value := value.(type) {
+	case nil:
+		return MakeNull()
 	case bool:
 		return MakeBool(value)
 	case int:
@@ -242,6 +262,20 @@ func AreEqual(left, right Value) bool {
 		return true
 	}
 	switch left := left.(type) {
+	case Null:
+		_, ok := right.(Null)
+		if !ok {
+			return false
+		}
+		return true
+
+	case Phantom:
+		_, ok := right.(Phantom)
+		if !ok {
+			return false
+		}
+		return true
+
 	case Int:
 		right, ok := right.(Int)
 		if !ok {

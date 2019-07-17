@@ -216,6 +216,12 @@ func TypeOf(wantedType octosql.Value) *typeOf {
 
 func (v *typeOf) Validate(arg octosql.Value) error {
 	switch v.wantedType.(type) {
+	case octosql.Null:
+		if _, ok := arg.(octosql.Null); !ok {
+			return fmt.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroNull()).String(), arg)
+		}
+		return nil
+
 	case octosql.Phantom:
 		if _, ok := arg.(octosql.Phantom); !ok {
 			return fmt.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroPhantom()).String(), arg)

@@ -2,12 +2,14 @@ workflows:
   version: 2
   test-release:
     jobs:
+      - lint
       - test
       - test-mysql
       - test-postgres
       - test-redis
       - release:
           requires:
+            - lint
             - test
             - test-mysql
             - test-postgres
@@ -15,6 +17,16 @@ workflows:
 
 version: 2
 jobs:
+  lint:
+    docker:
+      - image: circleci/golang:1.12
+
+    working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
+    steps:
+      - run: go get github.com/burntsushi/go-sumtype
+      - checkout
+      - run: go-sumtype ./...
+
   test:
     docker:
       - image: circleci/golang:1.12

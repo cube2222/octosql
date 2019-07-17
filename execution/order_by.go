@@ -41,9 +41,11 @@ func isSorteable(x octosql.Value) bool {
 		return true
 	case octosql.Time:
 		return true
-	default:
+	case octosql.Null, octosql.Phantom, octosql.Duration, octosql.Tuple, octosql.Object:
 		return false
 	}
+
+	panic("unreachable")
 }
 
 func compare(x, y octosql.Value) (int, error) {
@@ -113,9 +115,12 @@ func compare(x, y octosql.Value) (int, error) {
 		}
 
 		return 1, nil
-	default:
+
+	case octosql.Null, octosql.Phantom, octosql.Duration, octosql.Tuple, octosql.Object:
 		return 0, errors.Errorf("unsupported type in sorting")
 	}
+
+	panic("unreachable")
 }
 
 func (ob *OrderBy) Get(variables octosql.Variables) (RecordStream, error) {

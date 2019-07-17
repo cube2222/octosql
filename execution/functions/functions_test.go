@@ -878,6 +878,42 @@ func Test_various(t *testing.T) {
 			want:    MakeDuration(time.Second * 2),
 			wantErr: false,
 		},
+		{
+			name: "impute(2, 5)",
+			args: args{
+				args: []Value{
+					MakeInt(2),
+					MakeInt(5),
+				},
+				fun: FuncImpute,
+			},
+			want:    MakeInt(5),
+			wantErr: false,
+		},
+		{
+			name: "impute(2, <null>)",
+			args: args{
+				args: []Value{
+					MakeInt(2),
+					MakeNull(),
+				},
+				fun: FuncImpute,
+			},
+			want:    MakeInt(2),
+			wantErr: false,
+		},
+		{
+			name: "impute('text', <null>)",
+			args: args{
+				args: []Value{
+					MakeString("text"),
+					MakeNull(),
+				},
+				fun: FuncImpute,
+			},
+			want:    MakeString("text"),
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

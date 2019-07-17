@@ -1,54 +1,122 @@
-@# Blueprint
+@# OctoSQL
 
-#### Blueprint is a React-based UI toolkit for the web.
+### Superpowered for joining, analysing and transforming data from multiple databases using SQL.
 
-It is optimized for building complex data-dense interfaces for desktop applications.
+OctoSQL is a SQL query engine which allows you to write standard SQL queries on data stored in multiple SQL databases, NoSQL databases and files in various formats trying to push down as much of the work as possible to the source databases, not transferring unnecessary data.
 
-@reactDocs Welcome
+OctoSQL does that by creating an internal representation of your query and later translating parts of it into the query languages or APIs of the source databases. Whenever a datasource doesn't support a given operation, OctoSQL will execute it in memory, so you don't have to worry about the specifics of the underlying datasources.
 
-<div class="@ns-callout @ns-intent-success @ns-icon-endorsed">
-    <h4 class="@ns-heading">Blueprint v3 is available now! [See what's new.](#blueprint/whats-new-3.0)</h4>
-</div>
+With OctoSQL you don't need O(n) client tools or a large data analysis system deployment. Everything's contained in a single binary.
+
+#### Name ethymology
+
+OctoSQL stems from Octopus SQL.
+
+Octopus, because octopi have many arms, so they can grasp and manipulate multiple objects, like OctoSQL is able to handle multiple datasources simultaneously.
 
 @## Quick start
 
 ### Install
 
-**@blueprintjs/core** is the primary Blueprint package on NPM and home to over 40 components.
-
+Either download the binary for your operating system (Linux, OS X and Windows are supported) from the Releases page, or install using the go command line tool:
 ```sh
-yarn add @blueprintjs/core react react-dom
+go get -u github.com/cube2222/octosql/cmd/octosql
 ```
 
-Additional components live in the **@blueprintjs/icons**, **@blueprintjs/datetime**, **@blueprintjs/select**, **@blueprintjs/table**, and **@blueprintjs/timezone** packages, separated by use case and significant dependencies. All have peer dependencies on **react** and **react-dom**, so these two packages must be installed alongside Blueprint.
+### Setup your datasources
 
-### Import
+Let's say we have a csv file with cats, and a redis database with people (potential cat owners). Now we want to get a list of cities with the number of distinct cat names in them and the cumulative number of cat lives (as each cat has up to 9 lives left).
 
-Import React components from the appropriate package.
-
-```tsx
-import { Button } from "@blueprintjs/core";
-
-<Button intent="success" text="button content" onClick={incrementCounter} />
+First, create a configuration file ([Configuration Syntax](#configuration))
+For example:
+```yaml
+dataSources:
+  - name: cats
+    type: csv
+    config:
+      path: "~/Documents/cats.csv"
+  - name: people
+    type: redis
+    config:
+      address: "localhost:6379"
+      password: ""
+      databaseIndex: 0
+      databaseKeyName: "id"
 ```
 
-Don't forget to include the **main CSS file** from each Blueprint package!
-
-```html
-<!-- in index.html, or however you manage your CSS files -->
-<link href="path/to/node_modules/normalize.css/normalize.css" rel="stylesheet" />
-<!-- blueprint-icons.css file must be included alongside blueprint.css! -->
-<link href="path/to/node_modules/@blueprintjs/icons/lib/css/blueprint-icons.css" rel="stylesheet" />
-<link href="path/to/node_modules/@blueprintjs/core/lib/css/blueprint.css" rel="stylesheet" />
-<!-- add other blueprint-*.css files here -->
+Then, set the **OCTOSQL_CONFIG** environment variable to point to the configuration file.
+```bash
+export OCTOSQL_CONFIG=~/octosql.yaml
 ```
+You can also use the --config command line argument.
 
-@## Browser support
+### First query
 
-**Blueprint supports Chrome, Firefox, Safari, IE 11, and Microsoft Edge.**
+You can now query your datasources. Let's type the following command:
 
-You may experience degraded visuals in IE.
-IE 10 and below are unsupported due to their lack of support for CSS Flexbox Layout.
-These browsers were deprecated by Microsoft (end of support) in [January 2016](https://www.microsoft.com/en-us/WindowsForBusiness/End-of-IE-support).
+```bash
+octosql "SELECT p.city, FIRST(c.name), COUNT(DISTINCT c.name) cats, SUM(c.livesleft) catlives
+FROM cats c JOIN people p ON c.ownerid = p.id
+GROUP BY p.city
+ORDER BY catlives DESC
+LIMIT 9"
+```
+Example output:
+```
++---------+--------------+------+----------+
+| p.city  | c.name_first | cats | catlives |
++---------+--------------+------+----------+
+| Warren  | Zoey         |   68 |      570 |
+| Gadsden | Snickers     |   52 |      388 |
+| Staples | Harley       |   54 |      383 |
+| Buxton  | Lucky        |   45 |      373 |
+| Bethany | Princess     |   46 |      366 |
+| Noxen   | Sheba        |   49 |      361 |
+| Yorklyn | Scooter      |   45 |      359 |
+| Tuttle  | Toby         |   57 |      356 |
+| Ada     | Jasmine      |   49 |      351 |
++---------+--------------+------+----------+
+```
+You can choose between table, tabbed, json and csv output formats.
 
-@page getting-started
+
+@## Datasources support
+
+##### options:
+- path - path to file containing the data, required
+- arrayFormat - if the JSON list of records format should be used, defaults to false
+
+---
+#### CSV
+CSV file seperated using commas. The first row should contain column names.
+##### options:
+- path - path to file containing the data, required
+
+---
+#### PostgreSQL
+Single PostgreSQL database table.
+##### options:
+- address - address including port number, defaults to localhost:5432
+- user - required
+- password - required
+- databaseName - required
+- tableName - required
+---
+#### MySQL
+Single MySQL database table.
+##### options:
+- address - address including port number, defaults to localhost:3306
+- user - required
+- password - required
+- databaseName - required
+- tableName - required
+---
+#### Redis
+Redis database with the given index. Currently only hashes are supported.
+##### options:
+- address - address including port number, defaults to localhost:6379
+- password - defaults to ""
+- databaseIndex - index number of Redis database, defaults to 0
+- databaseKeyName - column name of Redis key in OctoSQL records, defaults to "key"
+
+@page quick-insights

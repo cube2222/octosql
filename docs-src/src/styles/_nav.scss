@@ -1,0 +1,177 @@
+// Copyright 2018 Palantir Technologies, Inc. All rights reserved.
+// Licensed under the Apache License, Version 2.0.
+
+$pkg-icon-width: 24px;
+
+$package-colors: (
+  "blueprint": ($gray1, $black),
+  "core": ($blue3, $blue2),
+  "datetime": ($red3, $red2),
+  "icons": ($gold4, $gold3),
+  "select": ($cobalt3, $cobalt2),
+  "table": ($forest3, $forest2),
+  "timezone": ($vermilion4, $vermilion3),
+  "labs": ($indigo3, $indigo2),
+  "resources": ($orange3, $orange2),
+);
+
+$dark-package-colors: (
+  "blueprint": ($gray3, $white),
+  "core": ($blue4, $blue5),
+  "datetime": ($red4, $red5),
+  "icons": ($gold4, $gold5),
+  "select": ($cobalt4, $cobalt5),
+  "table": ($forest4, $forest5),
+  "timezone": ($vermilion5, $vermilion5),
+  "labs": ($indigo4, $indigo5),
+  "resources": ($orange5, $orange5),
+);
+
+.docs-logo {
+  display: block;
+  opacity: 0.8;
+  margin-right: $sidebar-padding;
+  transition: opacity ($pt-transition-duration * 2) $pt-transition-ease;
+
+  &:hover {
+    opacity: 0.9;
+  }
+
+  &:active {
+    opacity: 1;
+  }
+
+  svg {
+    fill: $dark-gray5;
+
+    .#{$ns}-dark & {
+      fill: $gray5;
+    }
+  }
+}
+
+.docs-heading {
+  margin-right: $pt-grid-size;
+  font-size: $pt-grid-size * 2;
+  font-weight: 600;
+
+  .#{$ns}-tag {
+    margin-left: $pt-grid-size / 2;
+    padding-left: $pt-grid-size;
+    vertical-align: middle;
+  }
+}
+
+.docs-version-list {
+  min-width: $pt-grid-size * 12;
+  max-height: $pt-grid-size * 20;
+  overflow: auto;
+}
+
+.docs-nav-tag {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.docs-nav-package-icon {
+  margin-right: $pt-grid-size;
+  border-radius: $pt-border-radius * 3;
+}
+
+.docs-nav-package {
+  @include pt-flex-container(row);
+  align-items: center;
+
+  .#{$ns}-menu-item {
+    flex: 1 1 auto;
+    background-color: transparent;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  @each $package-name in map-keys($package-colors) {
+    $color: nth(map-get($package-colors, $package-name), 1);
+    $dark-color: nth(map-get($dark-package-colors, $package-name), 1);
+    $text-color: nth(map-get($package-colors, $package-name), 2);
+    $dark-text-color: nth(map-get($dark-package-colors, $package-name), 2);
+
+    &[data-route="#{$package-name}"] {
+      .docs-nav-package-icon {
+        background-color: rgba($color, 0.1);
+        fill: $color;
+
+        .#{$ns}-dark & {
+          background-color: rgba($dark-color, 0.15);
+          fill: $dark-color;
+        }
+      }
+
+      // stylelint-disable max-nesting-depth
+      &:hover,
+      &.docs-nav-expanded {
+        .#{$ns}-menu-item,
+        + .docs-nav-menu .#{$ns}-menu-item.#{$ns}-active {
+          color: $text-color;
+
+          .#{$ns}-dark & {
+            color: $dark-text-color;
+          }
+        }
+
+        .docs-nav-package-icon {
+          background-color: rgba($color, 0.8);
+          fill: $white;
+
+          .#{$ns}-dark & {
+            background-color: rgba($dark-color, 0.8);
+          }
+        }
+
+        &:active .docs-nav-package-icon {
+          background-color: $color;
+
+          .#{$ns}-dark & {
+            background-color: $dark-color;
+          }
+        }
+      }
+      // stylelint-enable max-nesting-depth
+    }
+  }
+
+  + .docs-nav-menu {
+    margin-bottom: $pt-grid-size / 2;
+    margin-left: $pkg-icon-width + $pt-grid-size;
+
+    &:empty {
+      display: none;
+    }
+  }
+}
+
+.docs-nav-section {
+  margin-top: $pt-grid-size * 2;
+  margin-bottom: $pt-grid-size;
+  text-transform: uppercase;
+  font-size: small;
+  font-weight: 700;
+
+  // dedent menu under a section title
+  + .docs-nav-menu {
+    margin-left: 0;
+  }
+}
+
+.docs-copyright {
+  display: flex;
+  align-items: center;
+
+  svg {
+    height: 1.2em;
+    padding: 0 ($pt-grid-size / 2);
+  }
+
+  a:not(:hover) {
+    color: inherit;
+  }
+}

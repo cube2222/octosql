@@ -1,0 +1,6 @@
+# Ignore Idea project files
+.idea/
+.DS_Store
+
+# Ignore npm dependencies
+**/node_modules/

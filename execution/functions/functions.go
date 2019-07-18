@@ -1156,25 +1156,49 @@ var FuncDuration = execution.Function{
 	},
 }
 
-var FuncImpute = execution.Function{
-	Name: "impute",
+var FuncCoalesce = execution.Function{
+	Name: "coalesce",
 	ArgumentNames: [][]string{
-		{"replacement", "maybe_null"},
+		{"...args"},
 	},
 	Description: docs.List(
-		docs.Text("Return maybe_null if it's not null, otherwise return the replacement."),
+		docs.Text("Returns the first non-null argument, or null if there isn't any."),
+	),
+	Validator: All(
+		AtLeastNArgs(1),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		for i := range args {
+			switch arg := args[i].(type) {
+			case Null:
+				continue
+			case Phantom, Int, Float, Bool, String, Time, Duration, Tuple, Object:
+				return arg, nil
+			}
+			panic("unreachable")
+		}
+
+		return MakeNull(), nil
+	},
+}
+
+var FuncNullIf = execution.Function{
+	Name: "nullif",
+	ArgumentNames: [][]string{
+		{"to_replace", "target"},
+	},
+	Description: docs.List(
+		docs.Text("Returns null if target equals to_replace, returns target otherwise."),
 	),
 	Validator: All(
 		ExactlyNArgs(2),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		switch arg := args[1].(type) {
-		case Null:
-			return args[0], nil
-		case Phantom, Int, Float, Bool, String, Time, Duration, Tuple, Object:
-			return arg, nil
+		if AreEqual(args[0], args[1]) {
+			return MakeNull(), nil
 		}
-		panic("unreachable")
+
+		return args[1], nil
 	},
 }
 

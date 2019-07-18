@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
@@ -44,8 +45,14 @@ type DataSource struct {
 func NewDataSourceBuilderFactory(host string, port int, user, password, databaseName, tableName string,
 	primaryKeys []octosql.VariableName) physical.DataSourceBuilderFactory {
 
-	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
-		"password=%s dbname=%s sslmode=disable", host, port, user, password, databaseName)
+	sb := &strings.Builder{}
+	sb.WriteString(fmt.Sprintf("host=%s port=%d user=%s ", host, port, user))
+	if password != "" {
+		sb.WriteString(fmt.Sprintf("password=%s ", password))
+	}
+	sb.WriteString(fmt.Sprintf("dbname=%s sslmode=disable", databaseName))
+
+	psqlInfo := sb.String()
 
 	return physical.NewDataSourceBuilderFactory(
 		func(filter physical.Formula, alias string) (execution.Node, error) {

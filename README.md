@@ -1,4 +1,4 @@
-<img src="https://github.com/styczynski/octosql/blob/master/static/octosql.svg">OctoSQL
+![OctoSQL](images/octosql.svg)OctoSQL
 =======
 OctoSQL is a query tool that allows you to join, analyse and transform data from multiple databases and file formats using SQL.
 

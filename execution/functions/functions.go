@@ -62,10 +62,10 @@ var FuncInt = execution.Function{
 				return nil, err
 			}
 			return MakeInt(number), nil
-		default:
+		case Null, Phantom, Time, Duration, Tuple, Object:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
-			panic("unreachable")
 		}
+		panic("unreachable")
 	},
 }
 
@@ -103,10 +103,10 @@ var FuncFloat = execution.Function{
 				return nil, err
 			}
 			return MakeFloat(number), nil
-		default:
+		case Null, Phantom, Time, Duration, Tuple, Object:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
-			panic("unreachable")
 		}
+		panic("unreachable")
 	},
 }
 
@@ -131,10 +131,10 @@ var FuncNegate = execution.Function{
 			return -1 * arg, nil
 		case Float:
 			return -1 * arg, nil
-		default:
+		case Null, Phantom, Bool, String, Time, Duration, Tuple, Object:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
-			panic("unreachable")
 		}
+		panic("unreachable")
 	},
 }
 
@@ -165,10 +165,10 @@ var FuncAbs = execution.Function{
 				return -1 * arg, nil
 			}
 			return arg, nil
-		default:
+		case Null, Phantom, Bool, String, Time, Duration, Tuple, Object:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
-			panic("unreachable")
 		}
+		panic("unreachable")
 	},
 }
 
@@ -191,18 +191,18 @@ var FuncSqrt = execution.Function{
 		switch arg := args[0].(type) {
 		case Int:
 			if arg < 0 {
-				return nil, fmt.Errorf("Can't take square root of value %v", arg)
+				return nil, fmt.Errorf("can't take square root of value %v", arg)
 			}
 			return MakeFloat(math.Sqrt(float64(arg.AsInt()))), nil
 		case Float:
 			if arg < 0 {
-				return nil, fmt.Errorf("Can't take square root of value %v", arg)
+				return nil, fmt.Errorf("can't take square root of value %v", arg)
 			}
 			return MakeFloat(math.Sqrt(arg.AsFloat())), nil
-		default:
+		case Null, Phantom, Bool, String, Time, Duration, Tuple, Object:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
-			panic("unreachable")
 		}
+		panic("unreachable")
 	},
 }
 
@@ -227,10 +227,10 @@ var FuncFloor = execution.Function{
 			return MakeFloat(float64(arg.AsInt())), nil
 		case Float:
 			return MakeFloat(math.Floor(arg.AsFloat())), nil
-		default:
+		case Null, Phantom, Bool, String, Time, Duration, Tuple, Object:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
-			panic("unreachable")
 		}
+		panic("unreachable")
 	},
 }
 
@@ -255,10 +255,10 @@ var FuncCeil = execution.Function{
 			return MakeFloat(float64(arg.AsInt())), nil
 		case Float:
 			return MakeFloat(math.Ceil(arg.AsFloat())), nil
-		default:
+		case Null, Phantom, Bool, String, Time, Duration, Tuple, Object:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
-			panic("unreachable")
 		}
+		panic("unreachable")
 	},
 }
 
@@ -281,18 +281,18 @@ var FuncLog2 = execution.Function{
 		switch arg := args[0].(type) {
 		case Int:
 			if arg <= 0 {
-				return nil, fmt.Errorf("Can't take log of value %v", arg)
+				return nil, fmt.Errorf("can't take log of value %v", arg)
 			}
 			return MakeFloat(math.Log2(float64(arg.AsInt()))), nil
 		case Float:
 			if arg <= 0 {
-				return nil, fmt.Errorf("Can't take log of value %v", arg)
+				return nil, fmt.Errorf("can't take log of value %v", arg)
 			}
 			return MakeFloat(math.Log2(arg.AsFloat())), nil
-		default:
+		case Null, Phantom, Bool, String, Time, Duration, Tuple, Object:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
-			panic("unreachable")
 		}
+		panic("unreachable")
 	},
 }
 
@@ -315,18 +315,18 @@ var FuncLn = execution.Function{
 		switch arg := args[0].(type) {
 		case Int:
 			if arg <= 0 {
-				return nil, fmt.Errorf("Can't take ln of value %v", arg)
+				return nil, fmt.Errorf("can't take ln of value %v", arg)
 			}
 			return MakeFloat(math.Log1p(float64(arg.AsInt())) - 1), nil
 		case Float:
 			if arg <= 0 {
-				return nil, fmt.Errorf("Can't take ln of value %v", arg)
+				return nil, fmt.Errorf("can't take ln of value %v", arg)
 			}
 			return MakeFloat(math.Log1p(arg.AsFloat()) - 1), nil
-		default:
+		case Null, Phantom, Bool, String, Time, Duration, Tuple, Object:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
-			panic("unreachable")
 		}
+		panic("unreachable")
 	},
 }
 
@@ -360,10 +360,10 @@ var FuncLeast = execution.Function{
 			}
 
 			return MakeFloat(min), nil
-		default:
+		case Null, Phantom, Bool, String, Time, Duration, Tuple, Object:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
-			panic("unreachable")
 		}
+		panic("unreachable")
 	},
 }
 
@@ -396,10 +396,10 @@ var FuncGreatest = execution.Function{
 			}
 
 			return MakeFloat(max), nil
-		default:
+		case Null, Phantom, Bool, String, Time, Duration, Tuple, Object:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
-			panic("unreachable")
 		}
+		panic("unreachable")
 	},
 }
 
@@ -572,10 +572,10 @@ var FuncReverse = execution.Function{
 				out[len(out)-i-1] = el
 			}
 			return MakeTuple(out), nil
-		default:
+		case Null, Phantom, Int, Float, Bool, Time, Duration, Object:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
-			panic("unreachable")
 		}
+		panic("unreachable")
 	},
 }
 
@@ -622,7 +622,7 @@ var FuncMatchRegexp = execution.Function{
 	Logic: func(args ...Value) (Value, error) {
 		re, err := regexp.Compile(args[0].(String).AsString())
 		if err != nil {
-			return nil, fmt.Errorf("Couldn't compile regular expression")
+			return nil, fmt.Errorf("couldn't compile regular expression")
 		}
 
 		match := re.FindString(args[1].(String).AsString())
@@ -728,10 +728,10 @@ var FuncContains = execution.Function{
 				}
 			}
 			return MakeBool(false), nil
-		default:
+		case Null, Phantom, Int, Float, Bool, Time, Duration, Object:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
-			panic("unreachable")
 		}
+		panic("unreachable")
 	},
 }
 
@@ -768,10 +768,10 @@ var FuncIndex = execution.Function{
 				}
 			}
 			return MakeInt(-1), nil
-		default:
+		case Null, Phantom, Int, Float, Bool, Time, Duration, Object:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
-			panic("unreachable")
 		}
+		panic("unreachable")
 	},
 }
 
@@ -819,10 +819,10 @@ var FuncLength = execution.Function{
 			return MakeInt(len(arg)), nil
 		case Tuple:
 			return MakeInt(len(arg)), nil
-		default:
+		case Null, Phantom, Int, Float, Bool, Time, Duration, Object:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
-			panic("unreachable")
 		}
+		panic("unreachable")
 	},
 }
 
@@ -893,10 +893,10 @@ var FuncAdd = execution.Function{
 			switch args[0].(type) {
 			case Int, Float, Duration:
 				return args[0], nil
-			default:
+			case Null, Phantom, Bool, String, Time, Tuple, Object:
 				log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
-				panic("unreachable")
 			}
+			panic("unreachable")
 
 		case 2:
 			switch arg := args[0].(type) {
@@ -908,10 +908,10 @@ var FuncAdd = execution.Function{
 				return arg + args[1].(Duration), nil
 			case Time:
 				return MakeTime(arg.AsTime().Add(args[1].(Duration).AsDuration())), nil
-			default:
+			case Null, Phantom, Bool, String, Tuple, Object:
 				log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
-				panic("unreachable")
 			}
+			panic("unreachable")
 
 		default:
 			log.Fatalf("unexpected argument count in function: %v", len(args))
@@ -952,10 +952,10 @@ var FuncSubtract = execution.Function{
 				return arg * -1, nil
 			case Duration:
 				return arg * -1, nil
-			default:
+			case Null, Phantom, Bool, String, Time, Tuple, Object:
 				log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
-				panic("unreachable")
 			}
+			panic("unreachable")
 
 		case 2:
 			switch arg := args[0].(type) {
@@ -967,10 +967,10 @@ var FuncSubtract = execution.Function{
 				return arg - args[1].(Duration), nil
 			case Time:
 				return MakeTime(arg.AsTime().Add(-1 * args[1].(Duration).AsDuration())), nil
-			default:
+			case Null, Phantom, Bool, String, Tuple, Object:
 				log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
-				panic("unreachable")
 			}
+			panic("unreachable")
 
 		default:
 			log.Fatalf("unexpected argument count in function: %v", len(args))
@@ -1012,14 +1012,14 @@ var FuncMultiply = execution.Function{
 				return MakeDuration(arg.AsDuration() * time.Duration(arg2.AsInt())), nil
 			case Float:
 				return MakeDuration(time.Duration(float64(arg.AsDuration()) * arg2.AsFloat())), nil
-			default:
+			case Null, Phantom, Bool, String, Time, Duration, Tuple, Object:
 				log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[1]).String())
-				panic("unreachable")
 			}
-		default:
-			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 			panic("unreachable")
+		case Null, Phantom, Bool, String, Time, Tuple, Object:
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 		}
+		panic("unreachable")
 	},
 }
 
@@ -1071,15 +1071,15 @@ var FuncDivide = execution.Function{
 			case Duration:
 				return MakeFloat(float64(arg.AsDuration()) / float64(arg2.AsDuration())), nil
 
-			default:
+			case Null, Phantom, Bool, String, Time, Tuple, Object:
 				log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[1]).String())
-				panic("unreachable")
 			}
-
-		default:
-			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 			panic("unreachable")
+
+		case Null, Phantom, Bool, String, Time, Tuple, Object:
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 		}
+		panic("unreachable")
 	},
 }
 
@@ -1153,6 +1153,52 @@ var FuncDuration = execution.Function{
 			log.Fatalf("unexpected argument count in function: %v", len(args))
 			panic("unreachable")
 		}
+	},
+}
+
+var FuncCoalesce = execution.Function{
+	Name: "coalesce",
+	ArgumentNames: [][]string{
+		{"...args"},
+	},
+	Description: docs.List(
+		docs.Text("Returns the first non-null argument, or null if there isn't any."),
+	),
+	Validator: All(
+		AtLeastNArgs(1),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		for i := range args {
+			switch arg := args[i].(type) {
+			case Null:
+				continue
+			case Phantom, Int, Float, Bool, String, Time, Duration, Tuple, Object:
+				return arg, nil
+			}
+			panic("unreachable")
+		}
+
+		return MakeNull(), nil
+	},
+}
+
+var FuncNullIf = execution.Function{
+	Name: "nullif",
+	ArgumentNames: [][]string{
+		{"to_replace", "target"},
+	},
+	Description: docs.List(
+		docs.Text("Returns null if target equals to_replace, returns target otherwise."),
+	),
+	Validator: All(
+		ExactlyNArgs(2),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		if AreEqual(args[0], args[1]) {
+			return MakeNull(), nil
+		}
+
+		return args[1], nil
 	},
 }
 

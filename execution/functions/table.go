@@ -44,6 +44,8 @@ var usableFunctions = []execution.Function{
 	FuncMultiply,
 	FuncDivide,
 	FuncDuration,
+	FuncCoalesce,
+	FuncNullIf,
 }
 
 func init() {

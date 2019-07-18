@@ -878,6 +878,141 @@ func Test_various(t *testing.T) {
 			want:    MakeDuration(time.Second * 2),
 			wantErr: false,
 		},
+		{
+			name: "coalesce(2, 5)",
+			args: args{
+				args: []Value{
+					MakeInt(2),
+					MakeInt(5),
+				},
+				fun: FuncCoalesce,
+			},
+			want:    MakeInt(2),
+			wantErr: false,
+		},
+		{
+			name: "coalesce(2, <null>)",
+			args: args{
+				args: []Value{
+					MakeInt(2),
+					MakeNull(),
+				},
+				fun: FuncCoalesce,
+			},
+			want:    MakeInt(2),
+			wantErr: false,
+		},
+		{
+			name: "coalesce('text', <null>)",
+			args: args{
+				args: []Value{
+					MakeString("text"),
+					MakeNull(),
+				},
+				fun: FuncCoalesce,
+			},
+			want:    MakeString("text"),
+			wantErr: false,
+		},
+		{
+			name: "coalesce(<null>, 2)",
+			args: args{
+				args: []Value{
+					MakeNull(),
+					MakeInt(2),
+				},
+				fun: FuncCoalesce,
+			},
+			want:    MakeInt(2),
+			wantErr: false,
+		},
+		{
+			name: "coalesce(<null>, 'text')",
+			args: args{
+				args: []Value{
+					MakeNull(),
+					MakeString("text"),
+				},
+				fun: FuncCoalesce,
+			},
+			want:    MakeString("text"),
+			wantErr: false,
+		},
+		{
+			name: "coalesce(<null>, <null>, 1, 2)",
+			args: args{
+				args: []Value{
+					MakeNull(),
+					MakeNull(),
+					MakeInt(1),
+					MakeInt(2),
+				},
+				fun: FuncCoalesce,
+			},
+			want:    MakeInt(1),
+			wantErr: false,
+		},
+		{
+			name: "coalesce(<null>, <null>, <null>)",
+			args: args{
+				args: []Value{
+					MakeNull(),
+					MakeNull(),
+					MakeNull(),
+				},
+				fun: FuncCoalesce,
+			},
+			want:    MakeNull(),
+			wantErr: false,
+		},
+		{
+			name: "nullif('test', 'test')",
+			args: args{
+				args: []Value{
+					MakeString("test"),
+					MakeString("test"),
+				},
+				fun: FuncNullIf,
+			},
+			want:    MakeNull(),
+			wantErr: false,
+		},
+		{
+			name: "nullif('test', 'test2')",
+			args: args{
+				args: []Value{
+					MakeString("test"),
+					MakeString("test2"),
+				},
+				fun: FuncNullIf,
+			},
+			want:    MakeString("test2"),
+			wantErr: false,
+		},
+		{
+			name: "nullif('test', 5)",
+			args: args{
+				args: []Value{
+					MakeString("test"),
+					MakeInt(5),
+				},
+				fun: FuncNullIf,
+			},
+			want:    MakeInt(5),
+			wantErr: false,
+		},
+		{
+			name: "nullif(5, 5)",
+			args: args{
+				args: []Value{
+					MakeInt(5),
+					MakeInt(5),
+				},
+				fun: FuncNullIf,
+			},
+			want:    MakeNull(),
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

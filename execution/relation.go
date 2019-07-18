@@ -96,11 +96,13 @@ func (rel *MoreThan) Apply(variables octosql.Variables, left, right Expression) 
 	case octosql.Time:
 		rightValue := rightValue.(octosql.Time)
 		return leftValue.AsTime().After(rightValue.AsTime()), nil
+	case octosql.Null, octosql.Phantom, octosql.Bool, octosql.Duration, octosql.Tuple, octosql.Object:
+		return false, errors.Errorf(
+			"invalid operands to more_than %v and %v with types %v and %v, only int, float, string and time allowed",
+			leftValue, rightValue, GetType(leftValue), GetType(rightValue))
 	}
 
-	return false, errors.Errorf(
-		"invalid operands to more_than %v and %v with types %v and %v, only int, float, string and time allowed",
-		leftValue, rightValue, GetType(leftValue), GetType(rightValue))
+	panic("unreachable")
 }
 
 type LessThan struct {

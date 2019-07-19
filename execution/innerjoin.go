@@ -7,12 +7,13 @@ import (
 
 // InnerJoin currently only supports lookup joins.
 type InnerJoin struct {
-	source Node
-	joined Node
+	prefetchCount int
+	source        Node
+	joined        Node
 }
 
-func NewInnerJoin(source Node, joined Node) *InnerJoin {
-	return &InnerJoin{source: source, joined: joined}
+func NewInnerJoin(prefetchCount int, source Node, joined Node) *InnerJoin {
+	return &InnerJoin{prefetchCount: prefetchCount, source: source, joined: joined}
 }
 
 func (node *InnerJoin) Get(variables octosql.Variables) (RecordStream, error) {
@@ -22,7 +23,7 @@ func (node *InnerJoin) Get(variables octosql.Variables) (RecordStream, error) {
 	}
 
 	return &InnerJoinedStream{
-		joiner:          NewJoiner(variables, recordStream, node.joined),
+		joiner:          NewJoiner(node.prefetchCount, variables, recordStream, node.joined),
 		curRecord:       nil,
 		curJoinedStream: nil,
 	}, nil

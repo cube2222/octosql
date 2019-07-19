@@ -7,12 +7,13 @@ import (
 
 // LeftJoin currently only supports lookup joins.
 type LeftJoin struct {
-	source Node
-	joined Node
+	prefetchCount int
+	source        Node
+	joined        Node
 }
 
-func NewLeftJoin(source Node, joined Node) *LeftJoin {
-	return &LeftJoin{source: source, joined: joined}
+func NewLeftJoin(prefetchCount int, source Node, joined Node) *LeftJoin {
+	return &LeftJoin{prefetchCount: prefetchCount, source: source, joined: joined}
 }
 
 func (node *LeftJoin) Get(variables octosql.Variables) (RecordStream, error) {
@@ -22,7 +23,7 @@ func (node *LeftJoin) Get(variables octosql.Variables) (RecordStream, error) {
 	}
 
 	return &LeftJoinedStream{
-		joiner:          NewJoiner(variables, recordStream, node.joined),
+		joiner:          NewJoiner(node.prefetchCount, variables, recordStream, node.joined),
 		curRecord:       nil,
 		curJoinedStream: nil,
 	}, nil

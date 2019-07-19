@@ -395,7 +395,7 @@ func TestNewKeyFormula(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewKeyFormula(tt.args.formula, tt.args.key, tt.args.alias)
+			got, err := NewKeyFormula(tt.args.formula, tt.args.key, tt.args.alias, matCtx)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewKeyFormula() error = %v, wantErr %v", err, tt.wantErr)
 				return

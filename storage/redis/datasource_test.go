@@ -1,9 +1,11 @@
 package redis
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
+	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/physical"
 	"github.com/go-redis/redis"
 
@@ -770,9 +772,23 @@ func TestDataSource_Get(t *testing.T) {
 				}
 			}
 
-			dsFactory := NewDataSourceBuilderFactory(fields.hostname, fields.port, fields.password, fields.dbIndex, fields.dbKey)
-			dsBuilder := dsFactory(fields.alias)
-			execNode, err := dsBuilder.Executor(fields.filter, fields.alias)
+			dsFactory := NewDataSourceBuilderFactory(fields.dbKey)
+			dsBuilder := dsFactory("test", fields.alias)
+
+			execNode, err := dsBuilder.Materialize(context.Background(), &physical.MaterializationContext{
+				Config: &config.Config{
+					DataSources: []config.DataSourceConfig{
+						{
+							Name: "test",
+							Config: map[string]interface{}{
+								"address":       fmt.Sprintf("%v:%v", fields.hostname, fields.port),
+								"password":      fields.password,
+								"databaseIndex": fields.dbIndex,
+							},
+						},
+					},
+				},
+			})
 			if err != nil && !tt.wantErr {
 				t.Errorf("%v : while executing datasource builder", err)
 				return

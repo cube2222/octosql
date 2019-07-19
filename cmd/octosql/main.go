@@ -14,6 +14,7 @@ import (
 	jsonoutput "github.com/cube2222/octosql/output/json"
 	"github.com/cube2222/octosql/output/table"
 	"github.com/cube2222/octosql/parser"
+	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/storage/csv"
 	"github.com/cube2222/octosql/storage/json"
 	"github.com/cube2222/octosql/storage/mysql"
@@ -44,8 +45,8 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 		if err != nil {
 			log.Fatal(err)
 		}
-		dataSourceRespository, err := config.CreateDataSourceRepositoryFromConfig(
-			map[string]config.Factory{
+		dataSourceRespository, err := physical.CreateDataSourceRepositoryFromConfig(
+			map[string]physical.Factory{
 				"csv":      csv.NewDataSourceBuilderFactoryFromConfig,
 				"json":     json.NewDataSourceBuilderFactoryFromConfig,
 				"mysql":    mysql.NewDataSourceBuilderFactoryFromConfig,
@@ -74,7 +75,7 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 			log.Fatal("invalid output type")
 		}
 
-		app := app.NewApp(dataSourceRespository, out)
+		app := app.NewApp(cfg, dataSourceRespository, out)
 
 		// Parse query
 		stmt, err := sqlparser.Parse(query)

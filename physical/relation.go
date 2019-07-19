@@ -26,7 +26,7 @@ func NewRelation(relation string) Relation {
 	return Relation(relation)
 }
 
-func (rel Relation) Materialize(ctx context.Context) execution.Relation {
+func (rel Relation) Materialize(ctx context.Context, matCtx *MaterializationContext) execution.Relation {
 	switch rel {
 	case Equal:
 		return execution.NewEqual()

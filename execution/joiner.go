@@ -7,6 +7,8 @@ import (
 
 // Joiner is used to join one source stream with another datasource.
 type Joiner struct {
+	prefetchCount int
+
 	variables octosql.Variables
 	source    RecordStream
 	joined    Node
@@ -17,19 +19,18 @@ type Joiner struct {
 	errors             chan error
 }
 
-func NewJoiner(variables octosql.Variables, sourceStream RecordStream, joined Node) *Joiner {
+func NewJoiner(prefetchCount int, variables octosql.Variables, sourceStream RecordStream, joined Node) *Joiner {
 	return &Joiner{
-		variables: variables,
-		source:    sourceStream,
-		joined:    joined,
-		errors:    make(chan error),
+		prefetchCount: prefetchCount,
+		variables:     variables,
+		source:        sourceStream,
+		joined:        joined,
+		errors:        make(chan error),
 	}
 }
 
-const MaxPending = 32
-
 func (joiner *Joiner) fillPending() error {
-	for len(joiner.pendingRecords) < MaxPending && !joiner.reachedEndOfStream {
+	for len(joiner.pendingRecords) < joiner.prefetchCount && !joiner.reachedEndOfStream {
 		srcRecord, err := joiner.source.Next()
 		if err != nil {
 			if err == ErrEndOfStream {

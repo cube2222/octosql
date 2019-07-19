@@ -104,13 +104,13 @@ func parenthesize(str string) string {
 }
 
 //materializes the values in the map so that one can later call EvaluateExpression on them
-func (aliases *aliases) materializeAliases() ([]execution.Expression, error) {
+func (aliases *aliases) materializeAliases(matCtx *physical.MaterializationContext) ([]execution.Expression, error) {
 	result := make([]execution.Expression, len(aliases.PlaceholderToExpression))
 
 	ctx := context.Background()
 
 	for placeholder, expression := range aliases.PlaceholderToExpression {
-		exec, err := expression.Materialize(ctx)
+		exec, err := expression.Materialize(ctx, matCtx)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't materialize expression in materializeAliases")
 		}

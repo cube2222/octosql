@@ -207,15 +207,15 @@ func (f *In) getAllKeys(variables octosql.Variables) (*redisKeys, error) {
 	}
 }
 
-func NewKeyFormula(formula physical.Formula, key, alias string) (KeyFormula, error) {
+func NewKeyFormula(formula physical.Formula, key, alias string, matCtx *physical.MaterializationContext) (KeyFormula, error) {
 	switch formula := formula.(type) {
 	case *physical.And:
-		leftFormula, err := NewKeyFormula(formula.Left, key, alias)
+		leftFormula, err := NewKeyFormula(formula.Left, key, alias, matCtx)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't create KeyFormula from left formula")
 		}
 
-		rightFormula, err := NewKeyFormula(formula.Right, key, alias)
+		rightFormula, err := NewKeyFormula(formula.Right, key, alias, matCtx)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't create KeyFormula from right formula")
 		}
@@ -223,12 +223,12 @@ func NewKeyFormula(formula physical.Formula, key, alias string) (KeyFormula, err
 		return NewAnd(leftFormula, rightFormula), nil
 
 	case *physical.Or:
-		leftFormula, err := NewKeyFormula(formula.Left, key, alias)
+		leftFormula, err := NewKeyFormula(formula.Left, key, alias, matCtx)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't create KeyFormula from left formula")
 		}
 
-		rightFormula, err := NewKeyFormula(formula.Right, key, alias)
+		rightFormula, err := NewKeyFormula(formula.Right, key, alias, matCtx)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't create KeyFormula from left formula")
 		}
@@ -243,7 +243,7 @@ func NewKeyFormula(formula physical.Formula, key, alias string) (KeyFormula, err
 					return nil, errors.Errorf("neither of predicates expressions represents key identifier")
 				}
 
-				materializedLeft, err := formula.Left.Materialize(context.Background())
+				materializedLeft, err := formula.Left.Materialize(context.Background(), matCtx)
 				if err != nil {
 					return nil, errors.Wrap(err, "couldn't materialize left expression")
 				}
@@ -251,7 +251,7 @@ func NewKeyFormula(formula physical.Formula, key, alias string) (KeyFormula, err
 				return NewEqual(materializedLeft), nil
 			}
 
-			materializedRight, err := formula.Right.Materialize(context.Background())
+			materializedRight, err := formula.Right.Materialize(context.Background(), matCtx)
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't materialize right expression")
 			}
@@ -263,7 +263,7 @@ func NewKeyFormula(formula physical.Formula, key, alias string) (KeyFormula, err
 				return nil, errors.Errorf("left hand of IN pushed down to redis must be the key")
 			}
 
-			materializedRight, err := formula.Right.Materialize(context.Background())
+			materializedRight, err := formula.Right.Materialize(context.Background(), matCtx)
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't materialize right expression")
 			}

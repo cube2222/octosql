@@ -13,7 +13,7 @@ type Formula interface {
 	Transform(ctx context.Context, transformers *Transformers) Formula
 	SplitByAnd() []Formula
 	ExtractPredicates() []*Predicate
-	Materialize(ctx context.Context) (execution.Formula, error)
+	Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Formula, error)
 }
 
 type Constant struct {
@@ -42,7 +42,7 @@ func (f *Constant) ExtractPredicates() []*Predicate {
 	return []*Predicate{}
 }
 
-func (f *Constant) Materialize(ctx context.Context) (execution.Formula, error) {
+func (f *Constant) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Formula, error) {
 	return execution.NewConstant(f.Value), nil
 }
 
@@ -73,12 +73,12 @@ func (f *And) ExtractPredicates() []*Predicate {
 	return append(f.Left.ExtractPredicates(), f.Right.ExtractPredicates()...)
 }
 
-func (f *And) Materialize(ctx context.Context) (execution.Formula, error) {
-	materializedLeft, err := f.Left.Materialize(ctx)
+func (f *And) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Formula, error) {
+	materializedLeft, err := f.Left.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize left operand")
 	}
-	materializedRight, err := f.Right.Materialize(ctx)
+	materializedRight, err := f.Right.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize right operand")
 	}
@@ -112,12 +112,12 @@ func (f *Or) ExtractPredicates() []*Predicate {
 	return append(f.Left.ExtractPredicates(), f.Right.ExtractPredicates()...)
 }
 
-func (f *Or) Materialize(ctx context.Context) (execution.Formula, error) {
-	materializedLeft, err := f.Left.Materialize(ctx)
+func (f *Or) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Formula, error) {
+	materializedLeft, err := f.Left.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize left operand")
 	}
-	materializedRight, err := f.Right.Materialize(ctx)
+	materializedRight, err := f.Right.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize right operand")
 	}
@@ -150,8 +150,8 @@ func (f *Not) ExtractPredicates() []*Predicate {
 	return f.Child.ExtractPredicates()
 }
 
-func (f *Not) Materialize(ctx context.Context) (execution.Formula, error) {
-	materialized, err := f.Child.Materialize(ctx)
+func (f *Not) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Formula, error) {
+	materialized, err := f.Child.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize operand")
 	}
@@ -188,14 +188,14 @@ func (f *Predicate) ExtractPredicates() []*Predicate {
 	return []*Predicate{f}
 }
 
-func (f *Predicate) Materialize(ctx context.Context) (execution.Formula, error) {
-	materializedLeft, err := f.Left.Materialize(ctx)
+func (f *Predicate) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Formula, error) {
+	materializedLeft, err := f.Left.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize left operand")
 	}
-	materializedRight, err := f.Right.Materialize(ctx)
+	materializedRight, err := f.Right.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize right operand")
 	}
-	return execution.NewPredicate(materializedLeft, f.Relation.Materialize(ctx), materializedRight), nil
+	return execution.NewPredicate(materializedLeft, f.Relation.Materialize(ctx, matCtx), materializedRight), nil
 }

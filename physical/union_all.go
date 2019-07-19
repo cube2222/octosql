@@ -26,12 +26,12 @@ func (node *UnionAll) Transform(ctx context.Context, transformers *Transformers)
 	return transformed
 }
 
-func (node *UnionAll) Materialize(ctx context.Context) (execution.Node, error) {
-	firstNode, err := node.First.Materialize(ctx)
+func (node *UnionAll) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
+	firstNode, err := node.First.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize first node")
 	}
-	secondNode, err := node.Second.Materialize(ctx)
+	secondNode, err := node.Second.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize second node")
 	}

@@ -23,14 +23,6 @@ var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 	physical.Secondary: make(map[physical.Relation]struct{}),
 }
 
-// for csv/datasource_test.go usage only
-func newDataSource(path, alias string) *DataSource {
-	return &DataSource{
-		path:  path,
-		alias: alias,
-	}
-}
-
 type DataSource struct {
 	path  string
 	alias string

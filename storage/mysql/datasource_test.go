@@ -21,7 +21,7 @@ func TestDataSource_Get(t *testing.T) {
 	port := 3306
 	user := "root"
 	password := "toor"
-	dbname := "mydb"
+	dbname := "app"
 
 	mysqlInfo := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true", user, password, host, port, dbname)
 
@@ -289,13 +289,14 @@ func TestDataSource_Get(t *testing.T) {
 			}
 
 			dsFactory := NewDataSourceBuilderFactory(args.primaryKey)
-			dsBuilder := dsFactory("test", args.alias)
+			dsBuilder := dsFactory(args.tablename, args.alias)
+			dsBuilder.Filter = physical.NewAnd(dsBuilder.Filter, args.formula)
 
 			execNode, err := dsBuilder.Materialize(context.Background(), &physical.MaterializationContext{
 				Config: &config.Config{
 					DataSources: []config.DataSourceConfig{
 						{
-							Name: "test",
+							Name: args.tablename,
 							Config: map[string]interface{}{
 								"address":      fmt.Sprintf("%v:%v", host, port),
 								"user":         user,

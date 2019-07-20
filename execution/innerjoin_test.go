@@ -116,6 +116,7 @@ func TestInnerJoinedStream_Next(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			stream := &InnerJoinedStream{
 				joiner: NewJoiner(
+					2,
 					tt.fields.variables,
 					tt.fields.source,
 					tt.fields.joined,

@@ -85,6 +85,7 @@ func (dsb *DataSourceBuilder) Transform(ctx context.Context, transformers *Trans
 		PrimaryKeys:      dsb.PrimaryKeys,
 		AvailableFilters: dsb.AvailableFilters,
 		Filter:           dsb.Filter.Transform(ctx, transformers),
+		Name:             dsb.Name,
 		Alias:            dsb.Alias,
 	}
 	if transformers.NodeT != nil {

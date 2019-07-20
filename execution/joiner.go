@@ -74,11 +74,11 @@ func (joiner *Joiner) GetNextRecord() (*Record, RecordStream, error) {
 		return nil, nil, errors.Wrap(err, "could't fill pending record queue")
 	}
 
-	if len(joiner.pendingRecords) == 0 {
+	if joiner.elements == 0 {
 		return nil, nil, ErrEndOfStream
 	}
 
-	outRecord := joiner.pendingRecords[0]
+	outRecord := joiner.pendingRecords[joiner.ringBegin]
 	var outStream RecordStream
 	select {
 	case err := <-joiner.errors:

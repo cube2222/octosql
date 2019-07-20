@@ -13,24 +13,28 @@ type Joiner struct {
 	source    RecordStream
 	joined    Node
 
-	pendingRecords     []*Record
-	pendingJoins       []<-chan RecordStream
+	ringBegin, elements int
+	pendingRecords      []*Record
+	pendingJoins        []<-chan RecordStream
+
 	reachedEndOfStream bool
 	errors             chan error
 }
 
 func NewJoiner(prefetchCount int, variables octosql.Variables, sourceStream RecordStream, joined Node) *Joiner {
 	return &Joiner{
-		prefetchCount: prefetchCount,
-		variables:     variables,
-		source:        sourceStream,
-		joined:        joined,
-		errors:        make(chan error),
+		prefetchCount:  prefetchCount,
+		variables:      variables,
+		source:         sourceStream,
+		joined:         joined,
+		pendingRecords: make([]*Record, prefetchCount),
+		pendingJoins:   make([]<-chan RecordStream, prefetchCount),
+		errors:         make(chan error),
 	}
 }
 
 func (joiner *Joiner) fillPending() error {
-	for len(joiner.pendingRecords) < joiner.prefetchCount && !joiner.reachedEndOfStream {
+	for joiner.elements < joiner.prefetchCount && !joiner.reachedEndOfStream {
 		srcRecord, err := joiner.source.Next()
 		if err != nil {
 			if err == ErrEndOfStream {
@@ -46,8 +50,10 @@ func (joiner *Joiner) fillPending() error {
 		}
 
 		joinedStreamChan := make(chan RecordStream)
-		joiner.pendingRecords = append(joiner.pendingRecords, srcRecord)
-		joiner.pendingJoins = append(joiner.pendingJoins, joinedStreamChan)
+		newPos := (joiner.ringBegin + joiner.elements) % joiner.prefetchCount
+		joiner.pendingRecords[newPos] = srcRecord
+		joiner.pendingJoins[newPos] = joinedStreamChan
+		joiner.elements++
 
 		go func() {
 			joinedStream, err := joiner.joined.Get(variables)
@@ -62,7 +68,10 @@ func (joiner *Joiner) fillPending() error {
 	return nil
 }
 
+var i = 0
+
 func (joiner *Joiner) GetNextRecord() (*Record, RecordStream, error) {
+	i = (i + 1) % 13
 	err := joiner.fillPending()
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could't fill pending record queue")
@@ -77,10 +86,11 @@ func (joiner *Joiner) GetNextRecord() (*Record, RecordStream, error) {
 	select {
 	case err := <-joiner.errors:
 		return nil, nil, errors.Wrap(err, "couldn't get joined stream from worker")
-	case outStream = <-joiner.pendingJoins[0]:
+	case outStream = <-joiner.pendingJoins[joiner.ringBegin]:
 	}
-	joiner.pendingRecords = joiner.pendingRecords[1:]
-	joiner.pendingJoins = joiner.pendingJoins[1:]
+
+	joiner.ringBegin = (joiner.ringBegin + 1) % joiner.prefetchCount
+	joiner.elements--
 
 	return outRecord, outStream, nil
 }

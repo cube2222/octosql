@@ -68,10 +68,7 @@ func (joiner *Joiner) fillPending() error {
 	return nil
 }
 
-var i = 0
-
 func (joiner *Joiner) GetNextRecord() (*Record, RecordStream, error) {
-	i = (i + 1) % 13
 	err := joiner.fillPending()
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could't fill pending record queue")
@@ -88,7 +85,6 @@ func (joiner *Joiner) GetNextRecord() (*Record, RecordStream, error) {
 		return nil, nil, errors.Wrap(err, "couldn't get joined stream from worker")
 	case outStream = <-joiner.pendingJoins[joiner.ringBegin]:
 	}
-
 	joiner.ringBegin = (joiner.ringBegin + 1) % joiner.prefetchCount
 	joiner.elements--
 

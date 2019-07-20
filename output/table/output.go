@@ -3,7 +3,6 @@ package table
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
@@ -45,7 +44,7 @@ func (o *Output) Close() error {
 		}
 	}
 
-	table := tablewriter.NewWriter(os.Stdout)
+	table := tablewriter.NewWriter(o.w)
 	table.SetRowLine(o.rowLines)
 	table.SetHeader(fields)
 	table.SetAutoFormatHeaders(false)

@@ -4,7 +4,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
@@ -46,7 +45,7 @@ func (o *Output) Close() error {
 		}
 	}
 
-	out := csv.NewWriter(os.Stdout)
+	out := csv.NewWriter(o.w)
 	out.Comma = o.separator
 	err := out.Write(fields)
 	if err != nil {

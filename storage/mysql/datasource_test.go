@@ -21,7 +21,7 @@ func TestDataSource_Get(t *testing.T) {
 	port := 3306
 	user := "root"
 	password := "toor"
-	dbname := "app"
+	dbname := "mydb"
 
 	mysqlInfo := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true", user, password, host, port, dbname)
 

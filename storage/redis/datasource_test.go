@@ -774,6 +774,7 @@ func TestDataSource_Get(t *testing.T) {
 
 			dsFactory := NewDataSourceBuilderFactory(fields.dbKey)
 			dsBuilder := dsFactory("test", fields.alias)
+			dsBuilder.Filter = physical.NewAnd(dsBuilder.Filter, fields.filter)
 
 			execNode, err := dsBuilder.Materialize(context.Background(), &physical.MaterializationContext{
 				Config: &config.Config{

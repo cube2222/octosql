@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	_ "github.com/lib/pq"
@@ -286,10 +288,26 @@ func TestDataSource_Get(t *testing.T) {
 				return
 			}
 
-			dsFactory := NewDataSourceBuilderFactory(host, port, user, password, dbname, args.tablename, args.primaryKey)
-			dsBuilder := dsFactory(args.alias)
+			dsFactory := NewDataSourceBuilderFactory(args.primaryKey)
+			dsBuilder := dsFactory(args.tablename, args.alias)
+			dsBuilder.Filter = physical.NewAnd(dsBuilder.Filter, args.formula)
 
-			execNode, err := dsBuilder.Executor(args.formula, args.alias)
+			execNode, err := dsBuilder.Materialize(context.Background(), &physical.MaterializationContext{
+				Config: &config.Config{
+					DataSources: []config.DataSourceConfig{
+						{
+							Name: args.tablename,
+							Config: map[string]interface{}{
+								"address":      fmt.Sprintf("%v:%v", host, port),
+								"user":         user,
+								"password":     password,
+								"databaseName": dbname,
+								"tableName":    args.tablename,
+							},
+						},
+					},
+				},
+			})
 			if err != nil {
 				t.Errorf("Couldn't get ExecutionNode: %v", err)
 				return

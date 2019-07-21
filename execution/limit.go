@@ -59,7 +59,6 @@ func (node *LimitedStream) Close() error {
 
 func (node *LimitedStream) Next() (*Record, error) {
 	if node.limit > 0 {
-		node.limit--
 		record, err := node.rs.Next()
 		if err != nil {
 			if err == ErrEndOfStream {
@@ -67,6 +66,10 @@ func (node *LimitedStream) Next() (*Record, error) {
 				return nil, ErrEndOfStream
 			}
 			return nil, errors.Wrap(err, "LimitedStream: couldn't get record")
+		}
+		node.limit--
+		if node.limit == 0 {
+			node.rs.Close()
 		}
 		return record, nil
 	}

@@ -1,11 +1,14 @@
 package csv
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/physical"
 )
 
 type csvDsc struct {
@@ -53,7 +56,21 @@ func TestCSVDataSource_Get(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		ds := newDataSource(csvDbs[tt.csvName].path, csvDbs[tt.csvName].alias)
+		ds, err := NewDataSourceBuilderFactory()("test", csvDbs[tt.csvName].alias).Materialize(context.Background(), &physical.MaterializationContext{
+			Config: &config.Config{
+				DataSources: []config.DataSourceConfig{
+					{
+						Name: "test",
+						Config: map[string]interface{}{
+							"path": csvDbs[tt.csvName].path,
+						},
+					},
+				},
+			},
+		})
+		if err != nil {
+			t.Errorf("Error creating data source: %v", err)
+		}
 
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := ds.Get(octosql.NoVariables())
@@ -159,7 +176,21 @@ func TestCSVRecordStream_Next(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ds := newDataSource(csvDbs[tt.csvName].path, csvDbs[tt.csvName].alias)
+			ds, err := NewDataSourceBuilderFactory()("test", csvDbs[tt.csvName].alias).Materialize(context.Background(), &physical.MaterializationContext{
+				Config: &config.Config{
+					DataSources: []config.DataSourceConfig{
+						{
+							Name: "test",
+							Config: map[string]interface{}{
+								"path": csvDbs[tt.csvName].path,
+							},
+						},
+					},
+				},
+			})
+			if err != nil {
+				t.Errorf("Error creating data source: %v", err)
+			}
 			rs, err := ds.Get(octosql.NoVariables())
 			if err != nil {
 				t.Errorf("DataSource.Get() error: %v", err)

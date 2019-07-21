@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/physical"
 )
 
 func TestJSONRecordStream_Get(t *testing.T) {
@@ -72,7 +74,19 @@ func TestJSONRecordStream_Get(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ds, err := NewDataSourceBuilderFactory(tt.path, tt.arrayFormat)(tt.alias).Materialize(context.Background())
+			ds, err := NewDataSourceBuilderFactory()("test", tt.alias).Materialize(context.Background(), &physical.MaterializationContext{
+				Config: &config.Config{
+					DataSources: []config.DataSourceConfig{
+						{
+							Name: "test",
+							Config: map[string]interface{}{
+								"path":        tt.path,
+								"arrayFormat": tt.arrayFormat,
+							},
+						},
+					},
+				},
+			})
 			if err != nil {
 				t.Errorf("Error creating data source: %v", err)
 			}

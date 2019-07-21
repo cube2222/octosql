@@ -27,13 +27,13 @@ func (node *Offset) Transform(ctx context.Context, transformers *Transformers) N
 	return transformed
 }
 
-func (node *Offset) Materialize(ctx context.Context) (execution.Node, error) {
-	dataNode, err := node.data.Materialize(ctx)
+func (node *Offset) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
+	dataNode, err := node.data.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize data node")
 	}
 
-	offsetExpr, err := node.offsetExpr.Materialize(ctx)
+	offsetExpr, err := node.offsetExpr.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize offset expression")
 	}

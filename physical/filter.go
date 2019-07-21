@@ -27,12 +27,12 @@ func (node *Filter) Transform(ctx context.Context, transformers *Transformers) N
 	return transformed
 }
 
-func (node *Filter) Materialize(ctx context.Context) (execution.Node, error) {
-	materializedFormula, err := node.Formula.Materialize(ctx)
+func (node *Filter) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
+	materializedFormula, err := node.Formula.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize formula")
 	}
-	materializedSource, err := node.Source.Materialize(ctx)
+	materializedSource, err := node.Source.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize Source")
 	}

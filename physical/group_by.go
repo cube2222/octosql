@@ -66,15 +66,15 @@ func (node *GroupBy) Transform(ctx context.Context, transformers *Transformers) 
 	return transformed
 }
 
-func (node *GroupBy) Materialize(ctx context.Context) (execution.Node, error) {
-	source, err := node.Source.Materialize(ctx)
+func (node *GroupBy) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
+	source, err := node.Source.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize Source node")
 	}
 
 	key := make([]execution.Expression, len(node.Key))
 	for i := range node.Key {
-		keyPart, err := node.Key[i].Materialize(ctx)
+		keyPart, err := node.Key[i].Materialize(ctx, matCtx)
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't materialize group key expression with index %v", i)
 		}

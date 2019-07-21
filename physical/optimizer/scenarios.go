@@ -77,10 +77,11 @@ var MergeDataSourceBuilderWithRequalifier = Scenario{
 		dataSourceBuilder := match.Nodes["data_source_builder"].(*physical.DataSourceBuilder)
 
 		return &physical.DataSourceBuilder{
-			Executor:         dataSourceBuilder.Executor,
+			Materializer:     dataSourceBuilder.Materializer,
 			PrimaryKeys:      dataSourceBuilder.PrimaryKeys,
 			AvailableFilters: dataSourceBuilder.AvailableFilters,
 			Filter:           dataSourceBuilder.Filter, // TODO: fixme variable names
+			Name:             dataSourceBuilder.Name,
 			Alias:            match.Strings["qualifier"],
 		}
 	},
@@ -208,10 +209,11 @@ var MergeDataSourceBuilderWithFilter = Scenario{
 		filters = filters[:len(filters)-1]
 
 		var out physical.Node = &physical.DataSourceBuilder{
-			Executor:         ds.Executor,
+			Materializer:     ds.Materializer,
 			PrimaryKeys:      ds.PrimaryKeys,
 			AvailableFilters: ds.AvailableFilters,
 			Filter:           dsFilter,
+			Name:             ds.Name,
 			Alias:            ds.Alias,
 		}
 

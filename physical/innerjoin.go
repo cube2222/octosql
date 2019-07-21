@@ -3,6 +3,7 @@ package physical
 import (
 	"context"
 
+	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 )
@@ -27,16 +28,21 @@ func (node *InnerJoin) Transform(ctx context.Context, transformers *Transformers
 	return transformed
 }
 
-func (node *InnerJoin) Materialize(ctx context.Context) (execution.Node, error) {
-	materializedSource, err := node.Source.Materialize(ctx)
+func (node *InnerJoin) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
+	prefetchCount, err := config.GetInt(matCtx.Config.Execution, "lookupJoinPrefetchCount", config.WithDefault(32))
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get lookupJoinPrefetchCount configuration")
+	}
+
+	materializedSource, err := node.Source.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize source node")
 	}
 
-	materializedJoined, err := node.Joined.Materialize(ctx)
+	materializedJoined, err := node.Joined.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize joined node")
 	}
 
-	return execution.NewInnerJoin(materializedSource, materializedJoined), nil
+	return execution.NewInnerJoin(prefetchCount, materializedSource, materializedJoined), nil
 }

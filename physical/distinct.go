@@ -27,8 +27,8 @@ func (node *Distinct) Transform(ctx context.Context, transformers *Transformers)
 	return transformed
 }
 
-func (node *Distinct) Materialize(ctx context.Context) (execution.Node, error) {
-	childNode, err := node.Child.Materialize(ctx)
+func (node *Distinct) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
+	childNode, err := node.Child.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize child node in distinct")
 	}

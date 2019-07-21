@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"context"
 	"fmt"
 	"sort"
 
@@ -29,18 +30,31 @@ type DataSource struct {
 
 // NewDataSourceBuilderFactory creates a new datasource builder factory for a redis database.
 // dbKey is the name for hard-coded key alias used in future formulas for redis queries
-func NewDataSourceBuilderFactory(hostname string, port int, password string, dbIndex int, dbKey string) physical.DataSourceBuilderFactory {
+func NewDataSourceBuilderFactory(dbKey string) physical.DataSourceBuilderFactory {
 	return physical.NewDataSourceBuilderFactory(
-		func(filter physical.Formula, alias string) (execution.Node, error) {
+		func(ctx context.Context, matCtx *physical.MaterializationContext, dbConfig map[string]interface{}, filter physical.Formula, alias string) (execution.Node, error) {
+			host, port, err := config.GetIPAddress(dbConfig, "address", config.WithDefault([]interface{}{"localhost", 6379}))
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't get address")
+			}
+			dbIndex, err := config.GetInt(dbConfig, "databaseIndex", config.WithDefault(0))
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't get database index")
+			}
+			password, err := config.GetString(dbConfig, "password", config.WithDefault("")) // TODO: Change to environment.
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't get password")
+			}
+
 			client := redis.NewClient(
 				&redis.Options{
-					Addr:     fmt.Sprintf("%s:%d", hostname, port),
+					Addr:     fmt.Sprintf("%s:%d", host, port),
 					Password: password,
 					DB:       dbIndex,
 				},
 			)
 
-			keyFormula, err := NewKeyFormula(filter, dbKey, alias)
+			keyFormula, err := NewKeyFormula(filter, dbKey, alias, matCtx)
 			if err != nil {
 				return nil, errors.Errorf("couldn't create KeyFormula")
 			}
@@ -61,24 +75,12 @@ func NewDataSourceBuilderFactory(hostname string, port int, password string, dbI
 
 // NewDataSourceBuilderFactoryFromConfig creates a data source builder factory using the configuration.
 func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (physical.DataSourceBuilderFactory, error) {
-	host, port, err := config.GetIPAddress(dbConfig, "address", config.WithDefault([]interface{}{"localhost", 6379}))
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get address")
-	}
-	dbIndex, err := config.GetInt(dbConfig, "databaseIndex", config.WithDefault(0))
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get database index")
-	}
 	dbKey, err := config.GetString(dbConfig, "databaseKeyName", config.WithDefault("key"))
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get database key name")
 	}
-	password, err := config.GetString(dbConfig, "password", config.WithDefault("")) // TODO: Change to environment.
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get password")
-	}
 
-	return NewDataSourceBuilderFactory(host, port, password, dbIndex, dbKey), nil
+	return NewDataSourceBuilderFactory(dbKey), nil
 }
 
 func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, error) {

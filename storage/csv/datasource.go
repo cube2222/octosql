@@ -5,6 +5,7 @@ package csv
 
 import (
 	"bufio"
+	"context"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -22,22 +23,19 @@ var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 	physical.Secondary: make(map[physical.Relation]struct{}),
 }
 
-// for csv/datasource_test.go usage only
-func newDataSource(path, alias string) *DataSource {
-	return &DataSource{
-		path:  path,
-		alias: alias,
-	}
-}
-
 type DataSource struct {
 	path  string
 	alias string
 }
 
-func NewDataSourceBuilderFactory(path string) physical.DataSourceBuilderFactory {
+func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 	return physical.NewDataSourceBuilderFactory(
-		func(filter physical.Formula, alias string) (execution.Node, error) {
+		func(ctx context.Context, matCtx *physical.MaterializationContext, dbConfig map[string]interface{}, filter physical.Formula, alias string) (execution.Node, error) {
+			path, err := config.GetString(dbConfig, "path")
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't get path")
+			}
+
 			return &DataSource{
 				path:  path,
 				alias: alias,
@@ -50,12 +48,7 @@ func NewDataSourceBuilderFactory(path string) physical.DataSourceBuilderFactory 
 
 // NewDataSourceBuilderFactoryFromConfig creates a data source builder factory using the configuration.
 func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (physical.DataSourceBuilderFactory, error) {
-	path, err := config.GetString(dbConfig, "path")
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get path")
-	}
-
-	return NewDataSourceBuilderFactory(path), nil
+	return NewDataSourceBuilderFactory(), nil
 }
 
 func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, error) {

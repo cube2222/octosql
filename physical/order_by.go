@@ -46,11 +46,11 @@ func (node *OrderBy) Transform(ctx context.Context, transformers *Transformers) 
 	return transformed
 }
 
-func (node *OrderBy) Materialize(ctx context.Context) (execution.Node, error) {
+func (node *OrderBy) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
 	exprs := make([]execution.Expression, len(node.Expressions))
 	for i := range node.Expressions {
 		var err error
-		exprs[i], err = node.Expressions[i].Materialize(ctx)
+		exprs[i], err = node.Expressions[i].Materialize(ctx, matCtx)
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't materialize expression with index %v", i)
 		}
@@ -61,7 +61,7 @@ func (node *OrderBy) Materialize(ctx context.Context) (execution.Node, error) {
 		directions[i] = execution.OrderDirection(node.Directions[i])
 	}
 
-	sourceNode, err := node.Source.Materialize(ctx)
+	sourceNode, err := node.Source.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get execution node from order by source")
 	}

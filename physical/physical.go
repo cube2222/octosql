@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 )
@@ -16,18 +17,29 @@ type Transformers struct {
 	FormulaT   func(Formula) Formula
 }
 
+// MaterializationContext is a structure containing the configuration for the materialization.
+type MaterializationContext struct {
+	Config *config.Config
+}
+
+func NewMaterializationContext(config *config.Config) *MaterializationContext {
+	return &MaterializationContext{
+		Config: config,
+	}
+}
+
 // Node describes a single record stream source.
 type Node interface {
 	// Transform returns a new Node after recursively calling Transform
 	Transform(ctx context.Context, transformers *Transformers) Node
-	Materialize(ctx context.Context) (execution.Node, error)
+	Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error)
 }
 
 // Expressions describes a single value source.
 type Expression interface {
 	// Transform returns a new Expression after recursively calling Transform
 	Transform(ctx context.Context, transformers *Transformers) Expression
-	Materialize(ctx context.Context) (execution.Expression, error)
+	Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Expression, error)
 }
 
 // NamedExpressions describes a single named value source.
@@ -35,7 +47,7 @@ type NamedExpression interface {
 	Expression
 	// TransformNamed returns a new NamedExpression after recursively calling Transform
 	TransformNamed(ctx context.Context, transformers *Transformers) NamedExpression
-	MaterializeNamed(ctx context.Context) (execution.NamedExpression, error)
+	MaterializeNamed(ctx context.Context, matCtx *MaterializationContext) (execution.NamedExpression, error)
 }
 
 // Variables describes a variable Name.
@@ -51,8 +63,8 @@ func (v *Variable) Transform(ctx context.Context, transformers *Transformers) Ex
 	return v.TransformNamed(ctx, transformers)
 }
 
-func (v *Variable) Materialize(ctx context.Context) (execution.Expression, error) {
-	return v.MaterializeNamed(ctx)
+func (v *Variable) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Expression, error) {
+	return v.MaterializeNamed(ctx, matCtx)
 }
 
 func (v *Variable) TransformNamed(ctx context.Context, transformers *Transformers) NamedExpression {
@@ -65,7 +77,7 @@ func (v *Variable) TransformNamed(ctx context.Context, transformers *Transformer
 	return expr
 }
 
-func (v *Variable) MaterializeNamed(ctx context.Context) (execution.NamedExpression, error) {
+func (v *Variable) MaterializeNamed(ctx context.Context, matCtx *MaterializationContext) (execution.NamedExpression, error) {
 	return execution.NewVariable(v.Name), nil
 }
 
@@ -92,10 +104,10 @@ func (tup *Tuple) Transform(ctx context.Context, transformers *Transformers) Exp
 	return transformed
 }
 
-func (tup *Tuple) Materialize(ctx context.Context) (execution.Expression, error) {
+func (tup *Tuple) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Expression, error) {
 	matExprs := make([]execution.Expression, len(tup.Expressions))
 	for i := range tup.Expressions {
-		materialized, err := tup.Expressions[i].Materialize(ctx)
+		materialized, err := tup.Expressions[i].Materialize(ctx, matCtx)
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't materialize expression with index %v", i)
 		}
@@ -124,8 +136,8 @@ func (ne *NodeExpression) Transform(ctx context.Context, transformers *Transform
 	return expr
 }
 
-func (ne *NodeExpression) Materialize(ctx context.Context) (execution.Expression, error) {
-	materialized, err := ne.Node.Materialize(ctx)
+func (ne *NodeExpression) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Expression, error) {
+	materialized, err := ne.Node.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize node")
 	}
@@ -151,8 +163,8 @@ func (le *LogicExpression) Transform(ctx context.Context, transformers *Transfor
 	return expr
 }
 
-func (le *LogicExpression) Materialize(ctx context.Context) (execution.Expression, error) {
-	materialized, err := le.Formula.Materialize(ctx)
+func (le *LogicExpression) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Expression, error) {
+	materialized, err := le.Formula.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize formula")
 	}
@@ -173,8 +185,8 @@ func (alExpr *AliasedExpression) Transform(ctx context.Context, transformers *Tr
 	return alExpr.TransformNamed(ctx, transformers)
 }
 
-func (alExpr *AliasedExpression) Materialize(ctx context.Context) (execution.Expression, error) {
-	return alExpr.MaterializeNamed(ctx)
+func (alExpr *AliasedExpression) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Expression, error) {
+	return alExpr.MaterializeNamed(ctx, matCtx)
 }
 
 func (alExpr *AliasedExpression) TransformNamed(ctx context.Context, transformers *Transformers) NamedExpression {
@@ -188,8 +200,8 @@ func (alExpr *AliasedExpression) TransformNamed(ctx context.Context, transformer
 	return expr
 }
 
-func (alExpr *AliasedExpression) MaterializeNamed(ctx context.Context) (execution.NamedExpression, error) {
-	materialized, err := alExpr.Expr.Materialize(ctx)
+func (alExpr *AliasedExpression) MaterializeNamed(ctx context.Context, matCtx *MaterializationContext) (execution.NamedExpression, error) {
+	materialized, err := alExpr.Expr.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize node")
 	}

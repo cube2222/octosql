@@ -33,16 +33,16 @@ func (node *Map) Transform(ctx context.Context, transformers *Transformers) Node
 	return transformed
 }
 
-func (node *Map) Materialize(ctx context.Context) (execution.Node, error) {
+func (node *Map) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
 	matExprs := make([]execution.NamedExpression, len(node.Expressions))
 	for i := range node.Expressions {
-		materialized, err := node.Expressions[i].MaterializeNamed(ctx)
+		materialized, err := node.Expressions[i].MaterializeNamed(ctx, matCtx)
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't materialize expression with index %v", i)
 		}
 		matExprs[i] = materialized
 	}
-	materialized, err := node.Source.Materialize(ctx)
+	materialized, err := node.Source.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize Source node")
 	}

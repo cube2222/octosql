@@ -1,6 +1,7 @@
 package json
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -24,9 +25,17 @@ type DataSource struct {
 	arrayFormat bool
 }
 
-func NewDataSourceBuilderFactory(path string, arrayFormat bool) physical.DataSourceBuilderFactory {
+func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 	return physical.NewDataSourceBuilderFactory(
-		func(filter physical.Formula, alias string) (execution.Node, error) {
+		func(ctx context.Context, matCtx *physical.MaterializationContext, dbConfig map[string]interface{}, filter physical.Formula, alias string) (execution.Node, error) {
+			path, err := config.GetString(dbConfig, "path")
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't get path")
+			}
+			arrayFormat, err := config.GetBool(dbConfig, "arrayFormat", config.WithDefault(false))
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't get if json in array form")
+			}
 
 			return &DataSource{
 				path:        path,
@@ -41,16 +50,7 @@ func NewDataSourceBuilderFactory(path string, arrayFormat bool) physical.DataSou
 
 // NewDataSourceBuilderFactoryFromConfig creates a data source builder factory using the configuration.
 func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (physical.DataSourceBuilderFactory, error) {
-	path, err := config.GetString(dbConfig, "path")
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get path")
-	}
-	arrayFormat, err := config.GetBool(dbConfig, "arrayFormat", config.WithDefault(false))
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get if json in array form")
-	}
-
-	return NewDataSourceBuilderFactory(path, arrayFormat), nil
+	return NewDataSourceBuilderFactory(), nil
 }
 
 func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, error) {

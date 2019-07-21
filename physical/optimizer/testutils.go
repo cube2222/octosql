@@ -18,6 +18,6 @@ func (node *PlaceholderNode) Transform(ctx context.Context, transformers *physic
 	}
 }
 
-func (*PlaceholderNode) Materialize(ctx context.Context) (execution.Node, error) {
+func (*PlaceholderNode) Materialize(ctx context.Context, matCtx *physical.MaterializationContext) (execution.Node, error) {
 	panic("tried to materialize a stub node meant only for optimizer tests")
 }

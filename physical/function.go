@@ -1,6 +1,8 @@
 package physical
 
 import (
+	context2 "context"
+
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/execution/functions"
 	"github.com/pkg/errors"
@@ -40,7 +42,7 @@ func (fe *FunctionExpression) Transform(ctx context.Context, transformers *Trans
 	return expr
 }
 
-func (fe *FunctionExpression) Materialize(ctx context.Context) (execution.Expression, error) {
+func (fe *FunctionExpression) Materialize(ctx context2.Context, matCtx *MaterializationContext) (execution.Expression, error) {
 	function, ok := functions.FunctionTable[fe.name]
 	if !ok {
 		return nil, errors.Errorf("No function %v found", fe.name)
@@ -48,7 +50,7 @@ func (fe *FunctionExpression) Materialize(ctx context.Context) (execution.Expres
 
 	materialized := make([]execution.Expression, 0)
 	for i := range fe.arguments {
-		materializedArg, err := fe.arguments[i].Materialize(ctx)
+		materializedArg, err := fe.arguments[i].Materialize(ctx, matCtx)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't materialize argument")
 		}

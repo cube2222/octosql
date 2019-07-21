@@ -115,9 +115,12 @@ func TestInnerJoinedStream_Next(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stream := &InnerJoinedStream{
-				variables: tt.fields.variables,
-				source:    tt.fields.source,
-				joined:    tt.fields.joined,
+				joiner: NewJoiner(
+					2,
+					tt.fields.variables,
+					tt.fields.source,
+					tt.fields.joined,
+				),
 			}
 			equal, err := AreStreamsEqual(stream, tt.want)
 			if (err != nil) != tt.wantErr {

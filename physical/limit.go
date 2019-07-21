@@ -27,13 +27,13 @@ func (node *Limit) Transform(ctx context.Context, transformers *Transformers) No
 	return transformed
 }
 
-func (node *Limit) Materialize(ctx context.Context) (execution.Node, error) {
-	dataNode, err := node.data.Materialize(ctx)
+func (node *Limit) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
+	dataNode, err := node.data.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize data node")
 	}
 
-	limitExpr, err := node.limitExpr.Materialize(ctx)
+	limitExpr, err := node.limitExpr.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize limit expression")
 	}

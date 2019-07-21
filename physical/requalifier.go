@@ -27,8 +27,8 @@ func (node *Requalifier) Transform(ctx context.Context, transformers *Transforme
 	return transformed
 }
 
-func (node *Requalifier) Materialize(ctx context.Context) (execution.Node, error) {
-	materialized, err := node.Source.Materialize(ctx)
+func (node *Requalifier) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
+	materialized, err := node.Source.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize Source node")
 	}

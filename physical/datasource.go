@@ -17,7 +17,7 @@ const (
 )
 
 // DataSourceBuilderFactory is a function used to create a new aliased data source builder.
-type DataSourceBuilderFactory func(alias string) *DataSourceBuilder
+type DataSourceBuilderFactory func(name, alias string) *DataSourceBuilder
 
 // DataSourceRepository is used to register factories for builders for any data source.
 // It can also later create a builder for any of those data source.
@@ -42,7 +42,7 @@ func (repo *DataSourceRepository) Get(dataSourceName, alias string) (*DataSource
 		return nil, errors.Errorf("no such datasource: %s, available datasources: %+v", dataSourceName, dss)
 	}
 
-	return ds(alias), nil
+	return ds(dataSourceName, alias), nil
 }
 
 // Register registers a builder factory for the given data source ColumnName.
@@ -58,20 +58,22 @@ func (repo *DataSourceRepository) Register(dataSourceName string, factory DataSo
 // DataSourceBuilder is used to build a data source instance with an alias.
 // It may be given filters, which are later executed at the database level.
 type DataSourceBuilder struct {
-	Executor         func(formula Formula, alias string) (execution.Node, error)
+	Materializer     func(ctx context.Context, matCtx *MaterializationContext, dbConfig map[string]interface{}, filter Formula, alias string) (execution.Node, error)
 	PrimaryKeys      []octosql.VariableName
 	AvailableFilters map[FieldType]map[Relation]struct{}
 	Filter           Formula
+	Name             string
 	Alias            string
 }
 
-func NewDataSourceBuilderFactory(executor func(filter Formula, alias string) (execution.Node, error), primaryKeys []octosql.VariableName, availableFilters map[FieldType]map[Relation]struct{}) DataSourceBuilderFactory {
-	return func(alias string) *DataSourceBuilder {
+func NewDataSourceBuilderFactory(materializer func(ctx context.Context, matCtx *MaterializationContext, dbConfig map[string]interface{}, filter Formula, alias string) (execution.Node, error), primaryKeys []octosql.VariableName, availableFilters map[FieldType]map[Relation]struct{}) DataSourceBuilderFactory {
+	return func(name, alias string) *DataSourceBuilder {
 		return &DataSourceBuilder{
-			Executor:         executor,
+			Materializer:     materializer,
 			PrimaryKeys:      primaryKeys,
 			AvailableFilters: availableFilters,
 			Filter:           NewConstant(true),
+			Name:             name,
 			Alias:            alias,
 		}
 	}
@@ -79,10 +81,11 @@ func NewDataSourceBuilderFactory(executor func(filter Formula, alias string) (ex
 
 func (dsb *DataSourceBuilder) Transform(ctx context.Context, transformers *Transformers) Node {
 	var transformed Node = &DataSourceBuilder{
-		Executor:         dsb.Executor,
+		Materializer:     dsb.Materializer,
 		PrimaryKeys:      dsb.PrimaryKeys,
 		AvailableFilters: dsb.AvailableFilters,
 		Filter:           dsb.Filter.Transform(ctx, transformers),
+		Name:             dsb.Name,
 		Alias:            dsb.Alias,
 	}
 	if transformers.NodeT != nil {
@@ -91,6 +94,11 @@ func (dsb *DataSourceBuilder) Transform(ctx context.Context, transformers *Trans
 	return transformed
 }
 
-func (dsb *DataSourceBuilder) Materialize(ctx context.Context) (execution.Node, error) {
-	return dsb.Executor(dsb.Filter, dsb.Alias)
+func (dsb *DataSourceBuilder) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
+	dbConfig, err := matCtx.Config.GetDataSourceConfig(dsb.Name)
+	if err != nil {
+		return nil, errors.Wrapf(err, "couldn't get config for database %v", dsb.Name)
+	}
+
+	return dsb.Materializer(ctx, matCtx, dbConfig, dsb.Filter, dsb.Alias)
 }

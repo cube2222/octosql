@@ -7,12 +7,13 @@ import (
 
 // InnerJoin currently only supports lookup joins.
 type InnerJoin struct {
-	source Node
-	joined Node
+	prefetchCount int
+	source        Node
+	joined        Node
 }
 
-func NewInnerJoin(source Node, joined Node) *InnerJoin {
-	return &InnerJoin{source: source, joined: joined}
+func NewInnerJoin(prefetchCount int, source Node, joined Node) *InnerJoin {
+	return &InnerJoin{prefetchCount: prefetchCount, source: source, joined: joined}
 }
 
 func (node *InnerJoin) Get(variables octosql.Variables) (RecordStream, error) {
@@ -22,26 +23,23 @@ func (node *InnerJoin) Get(variables octosql.Variables) (RecordStream, error) {
 	}
 
 	return &InnerJoinedStream{
-		variables:       variables,
-		source:          recordStream,
-		joined:          node.joined,
+		joiner:          NewJoiner(node.prefetchCount, variables, recordStream, node.joined),
 		curRecord:       nil,
 		curJoinedStream: nil,
 	}, nil
 }
 
 type InnerJoinedStream struct {
-	variables       octosql.Variables
-	source          RecordStream
-	joined          Node
+	joiner *Joiner
+
 	curRecord       *Record
 	curJoinedStream RecordStream
 }
 
 func (stream *InnerJoinedStream) Close() error {
-	err := stream.source.Close()
+	err := stream.joiner.Close()
 	if err != nil {
-		return errors.Wrap(err, "Couldn't close source stream")
+		return errors.Wrap(err, "couldn't close joiner")
 	}
 
 	err = stream.curJoinedStream.Close()
@@ -55,25 +53,14 @@ func (stream *InnerJoinedStream) Close() error {
 func (stream *InnerJoinedStream) Next() (*Record, error) {
 	for {
 		if stream.curRecord == nil {
-			srcRecord, err := stream.source.Next()
+			var err error
+			stream.curRecord, stream.curJoinedStream, err = stream.joiner.GetNextRecord()
 			if err != nil {
 				if err == ErrEndOfStream {
 					return nil, ErrEndOfStream
 				}
-				return nil, errors.Wrap(err, "couldn't get source record")
+				return nil, errors.Wrap(err, "couldn't get next source record with joined stream from joiner")
 			}
-
-			variables, err := stream.variables.MergeWith(srcRecord.AsVariables())
-			if err != nil {
-				return nil, errors.Wrap(err, "couldn't merge given variables with source record variables")
-			}
-
-			stream.curJoinedStream, err = stream.joined.Get(variables)
-			if err != nil {
-				return nil, errors.Wrap(err, "couldn't get joined stream")
-			}
-
-			stream.curRecord = srcRecord
 		}
 
 		joinedRecord, err := stream.curJoinedStream.Next()

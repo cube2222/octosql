@@ -3,7 +3,6 @@ package config
 import (
 	"os"
 
-	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 )
@@ -15,7 +14,18 @@ type DataSourceConfig struct {
 }
 
 type Config struct {
-	DataSources []DataSourceConfig `yaml:"dataSources"`
+	DataSources []DataSourceConfig     `yaml:"dataSources"`
+	Execution   map[string]interface{} `yaml:"execution"`
+}
+
+func (config *Config) GetDataSourceConfig(name string) (map[string]interface{}, error) {
+	for i := range config.DataSources {
+		if config.DataSources[i].Name == name {
+			return config.DataSources[i].Config, nil
+		}
+	}
+
+	return nil, ErrNotFound
 }
 
 func ReadConfig(path string) (*Config, error) {
@@ -33,28 +43,4 @@ func ReadConfig(path string) (*Config, error) {
 	}
 
 	return &config, nil
-}
-
-type Factory func(dbConfig map[string]interface{}) (physical.DataSourceBuilderFactory, error)
-
-// CreateDataSourceRepositoryFromConfig creates a DataSourceRepository from a config,
-// using the given configuration reading data source factories.
-// The map should be given as databaseType -> Factory.
-func CreateDataSourceRepositoryFromConfig(factories map[string]Factory, config *Config) (*physical.DataSourceRepository, error) {
-	repo := physical.NewDataSourceRepository()
-	for _, dsConfig := range config.DataSources {
-		factory, ok := factories[dsConfig.Type]
-		if !ok {
-			return nil, errors.Errorf("unknown data source type: %v, available: %+v", dsConfig.Type, factories)
-		}
-		ds, err := factory(dsConfig.Config)
-		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't parse %v config of %v type", dsConfig.Name, dsConfig.Type)
-		}
-		err = repo.Register(dsConfig.Name, ds)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't register datasource")
-		}
-	}
-	return repo, nil
 }

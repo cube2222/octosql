@@ -77,10 +77,11 @@ var MergeDataSourceBuilderWithRequalifier = Scenario{
 		dataSourceBuilder := match.Nodes["data_source_builder"].(*physical.DataSourceBuilder)
 
 		return &physical.DataSourceBuilder{
-			Executor:         dataSourceBuilder.Executor,
+			Materializer:     dataSourceBuilder.Materializer,
 			PrimaryKeys:      dataSourceBuilder.PrimaryKeys,
 			AvailableFilters: dataSourceBuilder.AvailableFilters,
 			Filter:           dataSourceBuilder.Filter, // TODO: fixme variable names
+			Name:             dataSourceBuilder.Name,
 			Alias:            match.Strings["qualifier"],
 		}
 	},
@@ -104,61 +105,46 @@ var MergeDataSourceBuilderWithFilter = Scenario{
 	filterChecker:
 		for _, filter := range filters {
 			predicates := filter.ExtractPredicates()
+			foundAnyLocalVariables := false
 			for _, predicate := range predicates {
-				pushdownable := false
+				predicateMovable := false
+
 				varsLeft := GetVariables(context.Background(), predicate.Left)
-				varLeft, leftOk := predicate.Left.(*physical.Variable)
 				varsRight := GetVariables(context.Background(), predicate.Right)
-				varRight, rightOk := predicate.Right.(*physical.Variable)
-
-				varLeftPushdownable := leftOk && varLeft.Name.Source() == ds.Alias
-				varRightPushdownable := rightOk && varRight.Name.Source() == ds.Alias
-
-				if varLeftPushdownable && varRightPushdownable {
-					if _, ok := ds.AvailableFilters[physical.Secondary][predicate.Relation]; ok {
-						pushdownable = true
-					}
-				}
-
-				var localVarsLeftPresent, localVarsRightPresent bool
+				localVarsLeft := make([]octosql.VariableName, 0)
+				localVarsRight := make([]octosql.VariableName, 0)
 
 				for i := range varsLeft {
 					if varsLeft[i].Source() == ds.Alias {
-						localVarsLeftPresent = true
+						localVarsLeft = append(localVarsLeft, varsLeft[i])
 					}
 				}
 				for i := range varsRight {
 					if varsRight[i].Source() == ds.Alias {
-						localVarsRightPresent = true
+						localVarsRight = append(localVarsRight, varsRight[i])
 					}
 				}
 
-				if varLeftPushdownable && !localVarsRightPresent {
-					if _, ok := ds.AvailableFilters[physical.Primary][predicate.Relation]; ok {
-						if subset(ds.PrimaryKeys, []octosql.VariableName{varLeft.Name}) {
-							pushdownable = true
-						}
-					}
+				if len(localVarsLeft) > 0 || len(localVarsRight) > 0 {
+					foundAnyLocalVariables = true
+				}
 
-					if _, ok := ds.AvailableFilters[physical.Secondary][predicate.Relation]; ok {
-						pushdownable = true
+				if _, ok := ds.AvailableFilters[physical.Primary][predicate.Relation]; ok {
+					if subset(ds.PrimaryKeys, localVarsLeft) && subset(ds.PrimaryKeys, localVarsRight) {
+						predicateMovable = true
 					}
 				}
 
-				if varRightPushdownable && !localVarsLeftPresent {
-					if _, ok := ds.AvailableFilters[physical.Primary][predicate.Relation]; ok {
-						if subset(ds.PrimaryKeys, []octosql.VariableName{varRight.Name}) {
-							pushdownable = true
-						}
-					}
-
-					if _, ok := ds.AvailableFilters[physical.Secondary][predicate.Relation]; ok {
-						pushdownable = true
-					}
+				if _, ok := ds.AvailableFilters[physical.Secondary][predicate.Relation]; ok {
+					predicateMovable = true
 				}
-				if !pushdownable {
+
+				if !predicateMovable {
 					continue filterChecker
 				}
+			}
+			if !foundAnyLocalVariables {
+				continue
 			}
 			return true
 		}
@@ -173,61 +159,46 @@ var MergeDataSourceBuilderWithFilter = Scenario{
 	filterChecker:
 		for index, filter := range filters {
 			predicates := filter.ExtractPredicates()
+			foundAnyLocalVariables := false
 			for _, predicate := range predicates {
-				pushdownable := false
+				allPredicatesMovable := false
+
 				varsLeft := GetVariables(context.Background(), predicate.Left)
-				varLeft, leftOk := predicate.Left.(*physical.Variable)
 				varsRight := GetVariables(context.Background(), predicate.Right)
-				varRight, rightOk := predicate.Right.(*physical.Variable)
-
-				varLeftPushdownable := leftOk && varLeft.Name.Source() == ds.Alias
-				varRightPushdownable := rightOk && varRight.Name.Source() == ds.Alias
-
-				if varLeftPushdownable && varRightPushdownable {
-					if _, ok := ds.AvailableFilters[physical.Secondary][predicate.Relation]; ok {
-						pushdownable = true
-					}
-				}
-
-				var localVarsLeftPresent, localVarsRightPresent bool
+				localVarsLeft := make([]octosql.VariableName, 0)
+				localVarsRight := make([]octosql.VariableName, 0)
 
 				for i := range varsLeft {
 					if varsLeft[i].Source() == ds.Alias {
-						localVarsLeftPresent = true
+						localVarsLeft = append(localVarsLeft, varsLeft[i])
 					}
 				}
 				for i := range varsRight {
 					if varsRight[i].Source() == ds.Alias {
-						localVarsRightPresent = true
+						localVarsRight = append(localVarsRight, varsRight[i])
 					}
 				}
 
-				if varLeftPushdownable && !localVarsRightPresent {
-					if _, ok := ds.AvailableFilters[physical.Primary][predicate.Relation]; ok {
-						if subset(ds.PrimaryKeys, []octosql.VariableName{varLeft.Name}) {
-							pushdownable = true
-						}
-					}
+				if len(localVarsLeft) > 0 || len(localVarsRight) > 0 {
+					foundAnyLocalVariables = true
+				}
 
-					if _, ok := ds.AvailableFilters[physical.Secondary][predicate.Relation]; ok {
-						pushdownable = true
+				if _, ok := ds.AvailableFilters[physical.Primary][predicate.Relation]; ok {
+					if subset(ds.PrimaryKeys, localVarsLeft) && subset(ds.PrimaryKeys, localVarsRight) {
+						allPredicatesMovable = true
 					}
 				}
 
-				if varRightPushdownable && !localVarsLeftPresent {
-					if _, ok := ds.AvailableFilters[physical.Primary][predicate.Relation]; ok {
-						if subset(ds.PrimaryKeys, []octosql.VariableName{varRight.Name}) {
-							pushdownable = true
-						}
-					}
-
-					if _, ok := ds.AvailableFilters[physical.Secondary][predicate.Relation]; ok {
-						pushdownable = true
-					}
+				if _, ok := ds.AvailableFilters[physical.Secondary][predicate.Relation]; ok {
+					allPredicatesMovable = true
 				}
-				if !pushdownable {
+
+				if !allPredicatesMovable {
 					continue filterChecker
 				}
+			}
+			if !foundAnyLocalVariables {
+				continue
 			}
 			extractable = index
 			break
@@ -238,10 +209,11 @@ var MergeDataSourceBuilderWithFilter = Scenario{
 		filters = filters[:len(filters)-1]
 
 		var out physical.Node = &physical.DataSourceBuilder{
-			Executor:         ds.Executor,
+			Materializer:     ds.Materializer,
 			PrimaryKeys:      ds.PrimaryKeys,
 			AvailableFilters: ds.AvailableFilters,
 			Filter:           dsFilter,
+			Name:             ds.Name,
 			Alias:            ds.Alias,
 		}
 

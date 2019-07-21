@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strconv"
@@ -42,20 +43,42 @@ type DataSource struct {
 	alias   string
 }
 
-func NewDataSourceBuilderFactory(host string, port int, user, password, databaseName, tableName string,
-	primaryKeys []octosql.VariableName) physical.DataSourceBuilderFactory {
-
-	sb := &strings.Builder{}
-	sb.WriteString(fmt.Sprintf("host=%s port=%d user=%s ", host, port, user))
-	if password != "" {
-		sb.WriteString(fmt.Sprintf("password=%s ", password))
-	}
-	sb.WriteString(fmt.Sprintf("dbname=%s sslmode=disable", databaseName))
-
-	psqlInfo := sb.String()
-
+func NewDataSourceBuilderFactory(primaryKeys []octosql.VariableName) physical.DataSourceBuilderFactory {
 	return physical.NewDataSourceBuilderFactory(
-		func(filter physical.Formula, alias string) (execution.Node, error) {
+		func(ctx context.Context, matCtx *physical.MaterializationContext, dbConfig map[string]interface{}, filter physical.Formula, alias string) (execution.Node, error) {
+			// Get execution configuration
+			host, port, err := config.GetIPAddress(dbConfig, "address", config.WithDefault([]interface{}{"localhost", 5432}))
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't get address")
+			}
+			user, err := config.GetString(dbConfig, "user")
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't get user")
+			}
+			databaseName, err := config.GetString(dbConfig, "databaseName")
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't get databaseName")
+			}
+			tableName, err := config.GetString(dbConfig, "tableName")
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't get tableName")
+			}
+			password, err := config.GetString(dbConfig, "password")
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't get password")
+			}
+
+			// Build dsn
+			sb := &strings.Builder{}
+			sb.WriteString(fmt.Sprintf("host=%s port=%d user=%s ", host, port, user))
+			if password != "" {
+				sb.WriteString(fmt.Sprintf("password=%s ", password))
+			}
+			sb.WriteString(fmt.Sprintf("dbname=%s sslmode=disable", databaseName))
+
+			psqlInfo := sb.String()
+
+			// Open the connection
 			db, err := sql.Open("postgres", psqlInfo)
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't open connection to postgres database")
@@ -73,7 +96,7 @@ func NewDataSourceBuilderFactory(host string, port int, user, password, database
 			}
 
 			//materialize the created aliases
-			execAliases, err := aliases.materializeAliases()
+			execAliases, err := aliases.materializeAliases(matCtx)
 
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't materialize aliases")
@@ -93,23 +116,6 @@ func NewDataSourceBuilderFactory(host string, port int, user, password, database
 
 // NewDataSourceBuilderFactoryFromConfig creates a data source builder factory using the configuration.
 func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (physical.DataSourceBuilderFactory, error) {
-	host, port, err := config.GetIPAddress(dbConfig, "address", config.WithDefault([]interface{}{"localhost", 5432}))
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get address")
-	}
-	user, err := config.GetString(dbConfig, "user")
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get user")
-	}
-	databaseName, err := config.GetString(dbConfig, "databaseName")
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get databaseName")
-	}
-	tableName, err := config.GetString(dbConfig, "tableName")
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get tableName")
-	}
-
 	primaryKeysStrings, err := config.GetStringList(dbConfig, "primaryKeys", config.WithDefault([]string{}))
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get primaryKeys")
@@ -119,12 +125,7 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 		primaryKeys = append(primaryKeys, octosql.NewVariableName(str))
 	}
 
-	password, err := config.GetString(dbConfig, "password") // TODO: Change to environment.
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get password")
-	}
-
-	return NewDataSourceBuilderFactory(host, port, user, password, databaseName, tableName, primaryKeys), nil
+	return NewDataSourceBuilderFactory(primaryKeys), nil
 }
 
 func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, error) {

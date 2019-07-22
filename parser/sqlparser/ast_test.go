@@ -29,8 +29,6 @@ import (
 	"strings"
 	"testing"
 	"unsafe"
-
-	"github.com/cube2222/octosql/parser/sqlparser/dependency/sqltypes"
 )
 
 func TestAppend(t *testing.T) {
@@ -590,47 +588,6 @@ func TestReplaceExpr(t *testing.T) {
 		got := String(expr)
 		if tcase.out != got {
 			t.Errorf("ReplaceExpr(%s): %s, want %s", tcase.in, got, tcase.out)
-		}
-	}
-}
-
-func TestExprFromValue(t *testing.T) {
-	tcases := []struct {
-		in  sqltypes.Value
-		out SQLNode
-		err string
-	}{{
-		in:  sqltypes.NULL,
-		out: &NullVal{},
-	}, {
-		in:  sqltypes.NewInt64(1),
-		out: NewIntVal([]byte("1")),
-	}, {
-		in:  sqltypes.NewFloat64(1.1),
-		out: NewFloatVal([]byte("1.1")),
-	}, {
-		in:  sqltypes.MakeTrusted(sqltypes.Decimal, []byte("1.1")),
-		out: NewFloatVal([]byte("1.1")),
-	}, {
-		in:  sqltypes.NewVarChar("aa"),
-		out: NewStrVal([]byte("aa")),
-	}, {
-		in:  sqltypes.MakeTrusted(sqltypes.Expression, []byte("rand()")),
-		err: "cannot convert value EXPRESSION(rand()) to AST",
-	}}
-	for _, tcase := range tcases {
-		got, err := ExprFromValue(tcase.in)
-		if tcase.err != "" {
-			if err == nil || err.Error() != tcase.err {
-				t.Errorf("ExprFromValue(%v) err: %v, want %s", tcase.in, err, tcase.err)
-			}
-			continue
-		}
-		if err != nil {
-			t.Error(err)
-		}
-		if got, want := got, tcase.out; !reflect.DeepEqual(got, want) {
-			t.Errorf("ExprFromValue(%v): %v, want %s", tcase.in, got, want)
 		}
 	}
 }

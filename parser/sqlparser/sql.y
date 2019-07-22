@@ -146,7 +146,7 @@ func skipToEnd(yylex interface{}) {
 %left <bytes> AND
 %right <bytes> NOT '!'
 %left <bytes> BETWEEN CASE WHEN THEN ELSE END
-%left <bytes> '=' '<' '>' LE GE NE NULL_SAFE_EQUAL IS LIKE REGEXP IN
+%left <bytes> '=' '<' '>' LE GE NE NULL_SAFE_EQUAL IS LIKE REGEXP IN RIGHTARROW
 %left <bytes> '|'
 %left <bytes> '&'
 %left <bytes> SHIFT_LEFT SHIFT_RIGHT
@@ -1950,9 +1950,9 @@ table_valued_function_arguments:
   }
 
 table_valued_function_argument:
-  sql_id '=' '>' expression
+  sql_id RIGHTARROW expression
   {
-    $$ = &TableValuedFunctionArgument{Name: $1, Expr: $4}
+    $$ = &TableValuedFunctionArgument{Name: $1, Expr: $3}
   }
 
 column_list:

@@ -9,7 +9,7 @@ import (
 	"github.com/cube2222/octosql"
 
 	"github.com/cube2222/octosql/logical"
-	"github.com/xwb1989/sqlparser"
+	"github.com/cube2222/octosql/parser/sqlparser"
 )
 
 func TestParseNode(t *testing.T) {

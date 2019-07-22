@@ -14,6 +14,7 @@ import (
 	jsonoutput "github.com/cube2222/octosql/output/json"
 	"github.com/cube2222/octosql/output/table"
 	"github.com/cube2222/octosql/parser"
+	"github.com/cube2222/octosql/parser/sqlparser"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/storage/csv"
 	"github.com/cube2222/octosql/storage/json"
@@ -21,7 +22,6 @@ import (
 	"github.com/cube2222/octosql/storage/postgres"
 	"github.com/cube2222/octosql/storage/redis"
 	"github.com/spf13/cobra"
-	"github.com/xwb1989/sqlparser"
 )
 
 var configPath string

@@ -8,8 +8,8 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/logical"
+	"github.com/cube2222/octosql/parser/sqlparser"
 	"github.com/pkg/errors"
-	"github.com/xwb1989/sqlparser"
 )
 
 // TODO: W sumie to jeszcze moze byc "boolean node expression" chociaz oczywiscie dziala przez (costam) = TRUE

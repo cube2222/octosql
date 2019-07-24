@@ -242,6 +242,8 @@ func ParseTableExpression(expr sqlparser.TableExpr) (logical.Node, error) {
 		return ParseJoinTableExpression(expr)
 	case *sqlparser.ParenTableExpr:
 		return ParseTableExpression(expr.Exprs[0])
+	case *sqlparser.TableValuedFunction:
+		return ParseTableValuedFunction(expr)
 	default:
 		return nil, errors.Errorf("invalid table expression %+v of type %v", expr, reflect.TypeOf(expr))
 	}
@@ -310,6 +312,20 @@ func ParseJoinTableExpression(expr *sqlparser.JoinTableExpr) (logical.Node, erro
 	default:
 		return nil, errors.Errorf("invalid join expression: %v", expr.Join)
 	}
+}
+
+func ParseTableValuedFunction(expr *sqlparser.TableValuedFunction) (*logical.TableValuedFunction, error) {
+	name := expr.Name.String()
+	arguments := make(map[octosql.VariableName]logical.Expression)
+	for i := range expr.Args {
+		argExpr, err := ParseExpression(expr.Args[i].Expr)
+		if err != nil {
+			return nil, errors.Wrapf(err, "couldn't parse table valued function argument \"%v\"", expr.Args[i].Name.String())
+		}
+		arguments[octosql.NewVariableName(expr.Args[i].Name.String())] = argExpr
+	}
+
+	return logical.NewTableValuedFunction(name, arguments), nil
 }
 
 func ParseAggregate(expr sqlparser.Expr) (logical.Aggregate, logical.NamedExpression, error) {

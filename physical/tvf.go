@@ -40,12 +40,12 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 	// In this switch you'd for example type assert an expression into a NodeExpression,
 	// and take out the underlying Node to be a direct child of the TVF.
 	switch node.Name {
-	case "range": //TODO: fixme reserved keyword
+	case "range":
 		startExpr, ok := node.Arguments["range_start"]
 		if !ok {
 			return nil, errors.Errorf("required parameter start not provided")
 		}
-		endExpr, ok := node.Arguments["range_end"] //TODO: fixme reserved keyword
+		endExpr, ok := node.Arguments["range_end"]
 		if !ok {
 			return nil, errors.Errorf("required parameter end not provided")
 		}

@@ -314,7 +314,7 @@ func ParseJoinTableExpression(expr *sqlparser.JoinTableExpr) (logical.Node, erro
 	}
 }
 
-func ParseTableValuedFunction(expr *sqlparser.TableValuedFunction) (*logical.TableValuedFunction, error) {
+func ParseTableValuedFunction(expr *sqlparser.TableValuedFunction) (logical.Node, error) {
 	name := expr.Name.String()
 	arguments := make(map[octosql.VariableName]logical.Expression)
 	for i := range expr.Args {
@@ -325,7 +325,10 @@ func ParseTableValuedFunction(expr *sqlparser.TableValuedFunction) (*logical.Tab
 		arguments[octosql.NewVariableName(expr.Args[i].Name.String())] = argExpr
 	}
 
-	return logical.NewTableValuedFunction(name, arguments), nil
+	return logical.NewRequalifier(
+		expr.As.String(),
+		logical.NewTableValuedFunction(name, arguments),
+	), nil
 }
 
 func ParseAggregate(expr sqlparser.Expr) (logical.Aggregate, logical.NamedExpression, error) {

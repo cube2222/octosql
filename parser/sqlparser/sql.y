@@ -1915,9 +1915,9 @@ table_factor:
   {
     $$ = &ParenTableExpr{Exprs: $2}
   }
-| ID openb table_valued_function_arguments_opt closeb
+| ID openb table_valued_function_arguments_opt closeb as_opt table_id
   {
-    $$ = &TableValuedFunction{Name: NewColIdent(string($1)), Args: $3}
+    $$ = &TableValuedFunction{Name: NewColIdent(string($1)), Args: $3, As: $6}
   }
 
 aliased_table_name:

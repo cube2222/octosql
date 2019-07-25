@@ -2081,6 +2081,7 @@ func (node *JoinTableExpr) walkSubtree(visit Visit) error {
 type TableValuedFunction struct {
 	Name ColIdent
 	Args TableValuedFunctionArguments
+	As   TableIdent
 }
 
 // Format formats the node.

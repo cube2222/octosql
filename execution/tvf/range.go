@@ -2,6 +2,7 @@ package tvf
 
 import (
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 )
@@ -15,6 +16,16 @@ func NewRange(start, end execution.Expression) *Range {
 		start: start,
 		end:   end,
 	}
+}
+
+func (r *Range) Document() docs.Documentation {
+	return docs.Section(
+		"range",
+		docs.Body(
+			docs.Section("Calling", docs.List(docs.Text("range(range_start => \\<int\\>, range_end => \\<int\\>)"))),
+			docs.Section("Description", docs.Text("Returns a list of numbers from range_start inclusive to range_end exclusive. The field name of the number will be i.")),
+		),
+	)
 }
 
 func (r *Range) Get(variables octosql.Variables) (execution.RecordStream, error) {

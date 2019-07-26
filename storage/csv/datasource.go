@@ -4,7 +4,6 @@ package csv
 // .csv reader trims leading white space(s)
 
 import (
-	"bufio"
 	"context"
 	"encoding/csv"
 	"fmt"
@@ -56,7 +55,7 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't open file")
 	}
-	r := csv.NewReader(bufio.NewReader(file))
+	r := csv.NewReader(file)
 	r.TrimLeadingSpace = true
 
 	columns, err := r.Read()
@@ -73,7 +72,7 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 	set := make(map[octosql.VariableName]struct{})
 	for _, f := range aliasedFields {
 		if _, present := set[f]; present {
-			return nil, errors.New("column names not unique") // cannot use Wrap() :(
+			return nil, errors.New("column names not unique")
 		}
 		set[f] = struct{}{}
 	}

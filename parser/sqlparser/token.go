@@ -301,7 +301,6 @@ var keywords = map[string]int{
 	"processlist":         PROCESSLIST,
 	"procedure":           PROCEDURE,
 	"query":               QUERY,
-	"range":               UNUSED,
 	"read":                READ,
 	"reads":               UNUSED,
 	"read_write":          UNUSED,
@@ -535,6 +534,10 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 		tkn.next()
 		switch ch {
 		case '=', ',', '(', ')', '+', '*', '%', '^', '~':
+			if tkn.lastChar == '>' {
+				tkn.next()
+				return RIGHTARROW, nil
+			}
 			return int(ch), nil
 		case '&':
 			if tkn.lastChar == '&' {

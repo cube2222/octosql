@@ -57,6 +57,8 @@ func skipToEnd(yylex interface{}) {
 %}
 
 %union {
+  tableValuedFunctionArguments TableValuedFunctionArguments
+  tableValuedFunctionArgument *TableValuedFunctionArgument
   empty         struct{}
   statement     Statement
   selStmt       SelectStatement
@@ -144,7 +146,7 @@ func skipToEnd(yylex interface{}) {
 %left <bytes> AND
 %right <bytes> NOT '!'
 %left <bytes> BETWEEN CASE WHEN THEN ELSE END
-%left <bytes> '=' '<' '>' LE GE NE NULL_SAFE_EQUAL IS LIKE REGEXP IN
+%left <bytes> '=' '<' '>' LE GE NE NULL_SAFE_EQUAL IS LIKE REGEXP IN RIGHTARROW
 %left <bytes> '|'
 %left <bytes> '&'
 %left <bytes> SHIFT_LEFT SHIFT_RIGHT
@@ -224,6 +226,8 @@ func skipToEnd(yylex interface{}) {
 %type <expr> expression
 %type <tableExprs> from_opt table_references
 %type <tableExpr> table_reference table_factor join_table
+%type <tableValuedFunctionArguments> table_valued_function_arguments table_valued_function_arguments_opt
+%type <tableValuedFunctionArgument> table_valued_function_argument
 %type <joinCondition> join_condition join_condition_opt on_expression_opt
 %type <tableNames> table_name_list delete_table_list
 %type <str> inner_join outer_join straight_join natural_join
@@ -1911,6 +1915,10 @@ table_factor:
   {
     $$ = &ParenTableExpr{Exprs: $2}
   }
+| ID openb table_valued_function_arguments_opt closeb as_opt table_id
+  {
+    $$ = &TableValuedFunction{Name: NewColIdent(string($1)), Args: $3, As: $6}
+  }
 
 aliased_table_name:
 table_name as_opt_id index_hint_list
@@ -1920,6 +1928,31 @@ table_name as_opt_id index_hint_list
 | table_name PARTITION openb partition_list closeb as_opt_id index_hint_list
   {
     $$ = &AliasedTableExpr{Expr:$1, Partitions: $4, As: $6, Hints: $7}
+  }
+
+table_valued_function_arguments_opt:
+  {
+    $$ = nil
+  }
+| table_valued_function_arguments
+  {
+    $$ = $1
+  }
+
+table_valued_function_arguments:
+  table_valued_function_argument
+  {
+    $$ = TableValuedFunctionArguments{$1}
+  }
+| table_valued_function_arguments ',' table_valued_function_argument
+  {
+    $$ = append($$, $3)
+  }
+
+table_valued_function_argument:
+  sql_id RIGHTARROW expression
+  {
+    $$ = &TableValuedFunctionArgument{Name: $1, Expr: $3}
   }
 
 column_list:

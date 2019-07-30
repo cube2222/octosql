@@ -1877,9 +1877,10 @@ type TableExpr interface {
 	SQLNode
 }
 
-func (*AliasedTableExpr) iTableExpr() {}
-func (*ParenTableExpr) iTableExpr()   {}
-func (*JoinTableExpr) iTableExpr()    {}
+func (*AliasedTableExpr) iTableExpr()    {}
+func (*ParenTableExpr) iTableExpr()      {}
+func (*JoinTableExpr) iTableExpr()       {}
+func (*TableValuedFunction) iTableExpr() {}
 
 // AliasedTableExpr represents a table expression
 // coupled with an optional alias or index hint.
@@ -2074,6 +2075,71 @@ func (node *JoinTableExpr) walkSubtree(visit Visit) error {
 		node.LeftExpr,
 		node.RightExpr,
 		node.Condition,
+	)
+}
+
+type TableValuedFunction struct {
+	Name ColIdent
+	Args TableValuedFunctionArguments
+	As   TableIdent
+}
+
+// Format formats the node.
+func (node *TableValuedFunction) Format(buf *TrackedBuffer) {
+	buf.Myprintf("%v(%v)", node.Name, node.Args)
+}
+
+func (node *TableValuedFunction) walkSubtree(visit Visit) error {
+	if node == nil {
+		return nil
+	}
+	return Walk(
+		visit,
+		node.Name,
+		node.Args,
+	)
+}
+
+// TableValuedFunctionArguments represents SELECT expressions.
+type TableValuedFunctionArguments []*TableValuedFunctionArgument
+
+// Format formats the node.
+func (node TableValuedFunctionArguments) Format(buf *TrackedBuffer) {
+	var prefix string
+	for _, n := range node {
+		buf.Myprintf("%s%v", prefix, n)
+		prefix = ", "
+	}
+}
+
+func (node TableValuedFunctionArguments) walkSubtree(visit Visit) error {
+	for _, n := range node {
+		if err := Walk(visit, n); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// TableValuedFunctionArgument defines an aliased SELECT expression.
+type TableValuedFunctionArgument struct {
+	Name ColIdent
+	Expr Expr
+}
+
+// Format formats the node.
+func (node *TableValuedFunctionArgument) Format(buf *TrackedBuffer) {
+	buf.Myprintf("%v => %v", node.Name, node.Expr)
+}
+
+func (node *TableValuedFunctionArgument) walkSubtree(visit Visit) error {
+	if node == nil {
+		return nil
+	}
+	return Walk(
+		visit,
+		node.Name,
+		node.Expr,
 	)
 }
 

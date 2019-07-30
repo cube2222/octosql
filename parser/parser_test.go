@@ -687,6 +687,29 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 			),
 			wantErr: false,
 		},
+		{
+			name: "table valued function",
+			args: args{
+				statement: `SELECT * FROM func(
+								arg1=>"test", 
+								arg2=>2, 
+								arg3=> interval 2 hour) x`,
+			},
+			want: logical.NewRequalifier("x",
+				logical.NewTableValuedFunction(
+					"func",
+					map[octosql.VariableName]logical.Expression{
+						octosql.NewVariableName("arg1"): logical.NewConstant("test"),
+						octosql.NewVariableName("arg2"): logical.NewConstant(2),
+						octosql.NewVariableName("arg3"): logical.NewFunctionExpression("duration", []logical.Expression{
+							logical.NewConstant(2),
+							logical.NewConstant("hour"),
+						}),
+					},
+				),
+			),
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

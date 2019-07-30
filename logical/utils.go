@@ -1,6 +1,7 @@
 package logical
 
 import (
+	"fmt"
 	"log"
 	"reflect"
 
@@ -36,7 +37,7 @@ func EqualNodes(node1, node2 Node) error {
 	case *Map:
 		if node2, ok := node2.(*Map); ok {
 			if len(node1.expressions) != len(node2.expressions) {
-				return errors.Errorf("expressions count not equal: %v, %v", len(node1.expressions), len(node2.expressions))
+				return fmt.Errorf("expressions count not equal: %v, %v", len(node1.expressions), len(node2.expressions))
 			}
 			for i := range node1.expressions {
 				if err := EqualExpressions(node1.expressions[i], node2.expressions[i]); err != nil {
@@ -63,7 +64,7 @@ func EqualNodes(node1, node2 Node) error {
 	case *Requalifier:
 		if node2, ok := node2.(*Requalifier); ok {
 			if node1.qualifier != node2.qualifier {
-				return errors.Errorf("qualifiers not equal: %v, %v", node1.qualifier, node2.qualifier)
+				return fmt.Errorf("qualifiers not equal: %v, %v", node1.qualifier, node2.qualifier)
 			}
 			if err := EqualNodes(node1.source, node2.source); err != nil {
 				return errors.Wrap(err, "sources not qual")
@@ -74,10 +75,10 @@ func EqualNodes(node1, node2 Node) error {
 	case *DataSource:
 		if node2, ok := node2.(*DataSource); ok {
 			if node1.name != node2.name {
-				return errors.Errorf("names not equal: %v, %v", node1.name, node2.name)
+				return fmt.Errorf("names not equal: %v, %v", node1.name, node2.name)
 			}
 			if node1.alias != node2.alias {
-				return errors.Errorf("aliases not equal: %v, %v", node1.alias, node2.alias)
+				return fmt.Errorf("aliases not equal: %v, %v", node1.alias, node2.alias)
 			}
 			return nil
 		}
@@ -130,7 +131,7 @@ func EqualNodes(node1, node2 Node) error {
 			}
 
 			if len(node1.key) != len(node2.key) {
-				return errors.Errorf("key count not equal: %v, %v", len(node1.key), len(node2.key))
+				return fmt.Errorf("key count not equal: %v, %v", len(node1.key), len(node2.key))
 			}
 			for i := range node1.key {
 				if err := EqualExpressions(node1.key[i], node2.key[i]); err != nil {
@@ -139,32 +140,54 @@ func EqualNodes(node1, node2 Node) error {
 			}
 
 			if len(node1.fields) != len(node2.fields) {
-				return errors.Errorf("field count not equal: %v, %v", len(node1.fields), len(node2.fields))
+				return fmt.Errorf("field count not equal: %v, %v", len(node1.fields), len(node2.fields))
 			}
 			for i := range node1.fields {
 				if node1.fields[i] != node2.fields[i] {
-					return errors.Errorf("field with index %v not equal: %v and %v", i, node1.fields[i], node2.fields[i])
+					return fmt.Errorf("field with index %v not equal: %v and %v", i, node1.fields[i], node2.fields[i])
 				}
 			}
 
 			if len(node1.aggregates) != len(node2.aggregates) {
-				return errors.Errorf("aggregate count not equal: %v, %v", len(node1.aggregates), len(node2.aggregates))
+				return fmt.Errorf("aggregate count not equal: %v, %v", len(node1.aggregates), len(node2.aggregates))
 			}
 			for i := range node1.aggregates {
 				if node1.aggregates[i] != node2.aggregates[i] {
-					return errors.Errorf("aggregate with index %v not equal: %v and %v", i, node1.aggregates[i], node2.aggregates[i])
+					return fmt.Errorf("aggregate with index %v not equal: %v and %v", i, node1.aggregates[i], node2.aggregates[i])
 				}
 			}
 
 			if len(node1.as) != len(node2.as) {
-				return errors.Errorf("'as' count not equal: %v, %v", len(node1.as), len(node2.as))
+				return fmt.Errorf("'as' count not equal: %v, %v", len(node1.as), len(node2.as))
 			}
 			for i := range node1.as {
 				if node1.as[i] != node2.as[i] {
-					return errors.Errorf("'as' with index %v not equal: %v and %v", i, node1.as[i], node2.as[i])
+					return fmt.Errorf("'as' with index %v not equal: %v and %v", i, node1.as[i], node2.as[i])
 				}
 			}
 
+			return nil
+		}
+
+	case *TableValuedFunction:
+		if node2, ok := node2.(*TableValuedFunction); ok {
+			if node1.name != node2.name {
+				return fmt.Errorf("names not equal: %v and %v", node1.name, node2.name)
+			}
+
+			if len(node1.arguments) != len(node2.arguments) {
+				return fmt.Errorf("argument counts not equal: %v and %v", len(node1.arguments), len(node2.arguments))
+			}
+
+			for arg, value1 := range node1.arguments {
+				value2, ok := node2.arguments[arg]
+				if !ok {
+					return fmt.Errorf("arguments not equal: %v missing", arg)
+				}
+				if err := EqualExpressions(value1, value2); err != nil {
+					return errors.Wrapf(err, "argument %v values not equal", arg)
+				}
+			}
 			return nil
 		}
 
@@ -172,7 +195,7 @@ func EqualNodes(node1, node2 Node) error {
 		log.Fatalf("Unsupported equality comparison %v and %v", reflect.TypeOf(node1), reflect.TypeOf(node2))
 	}
 
-	return errors.Errorf("incompatible types: %v and %v", reflect.TypeOf(node1), reflect.TypeOf(node2))
+	return fmt.Errorf("incompatible types: %v and %v", reflect.TypeOf(node1), reflect.TypeOf(node2))
 }
 
 func EqualFormula(expr1, expr2 Formula) error {
@@ -180,7 +203,7 @@ func EqualFormula(expr1, expr2 Formula) error {
 	case *BooleanConstant:
 		if expr2, ok := expr2.(*BooleanConstant); ok {
 			if expr1.Value != expr2.Value {
-				return errors.Errorf("values not equal: %v, %v", expr1.Value, expr2.Value)
+				return fmt.Errorf("values not equal: %v, %v", expr1.Value, expr2.Value)
 
 			}
 			return nil
@@ -189,7 +212,7 @@ func EqualFormula(expr1, expr2 Formula) error {
 	case *InfixOperator:
 		if expr2, ok := expr2.(*InfixOperator); ok {
 			if expr1.Operator != expr2.Operator {
-				return errors.Errorf("operators not equal: %v, %v", expr1.Operator, expr2.Operator)
+				return fmt.Errorf("operators not equal: %v, %v", expr1.Operator, expr2.Operator)
 
 			}
 			if err := EqualFormula(expr1.Left, expr2.Left); err != nil {
@@ -204,7 +227,7 @@ func EqualFormula(expr1, expr2 Formula) error {
 	case *PrefixOperator:
 		if expr2, ok := expr2.(*PrefixOperator); ok {
 			if expr1.Operator != expr2.Operator {
-				return errors.Errorf("operators not equal: %v, %v", expr1.Operator, expr2.Operator)
+				return fmt.Errorf("operators not equal: %v, %v", expr1.Operator, expr2.Operator)
 
 			}
 			if err := EqualFormula(expr1.Child, expr2.Child); err != nil {
@@ -216,7 +239,7 @@ func EqualFormula(expr1, expr2 Formula) error {
 	case *Predicate:
 		if expr2, ok := expr2.(*Predicate); ok {
 			if expr1.Relation != expr2.Relation {
-				return errors.Errorf("relations not equal: %v, %v", expr1.Relation, expr2.Relation)
+				return fmt.Errorf("relations not equal: %v, %v", expr1.Relation, expr2.Relation)
 
 			}
 			if err := EqualExpressions(expr1.Left, expr2.Left); err != nil {
@@ -232,7 +255,7 @@ func EqualFormula(expr1, expr2 Formula) error {
 		log.Fatalf("Unsupported equality comparison %v and %v", reflect.TypeOf(expr1), reflect.TypeOf(expr2))
 	}
 
-	return errors.Errorf("incompatible types: %v and %v", reflect.TypeOf(expr1), reflect.TypeOf(expr2))
+	return fmt.Errorf("incompatible types: %v and %v", reflect.TypeOf(expr1), reflect.TypeOf(expr2))
 }
 
 func EqualExpressions(expr1, expr2 Expression) error {
@@ -240,7 +263,7 @@ func EqualExpressions(expr1, expr2 Expression) error {
 	case *Constant:
 		if expr2, ok := expr2.(*Constant); ok {
 			if expr1.value != expr2.value {
-				return errors.Errorf("values not equal: %v %v, %v %v", reflect.TypeOf(expr1.value), expr1.value, reflect.TypeOf(expr2.value), expr2.value)
+				return fmt.Errorf("values not equal: %v %v, %v %v", reflect.TypeOf(expr1.value), expr1.value, reflect.TypeOf(expr2.value), expr2.value)
 			}
 			return nil
 		}
@@ -248,7 +271,7 @@ func EqualExpressions(expr1, expr2 Expression) error {
 	case *Variable:
 		if expr2, ok := expr2.(*Variable); ok {
 			if expr1.name != expr2.name {
-				return errors.Errorf("names not equal: %v, %v", expr1.name, expr2.name)
+				return fmt.Errorf("names not equal: %v, %v", expr1.name, expr2.name)
 			}
 			return nil
 		}
@@ -256,7 +279,7 @@ func EqualExpressions(expr1, expr2 Expression) error {
 	case *Tuple:
 		if expr2, ok := expr2.(*Tuple); ok {
 			if len(expr1.expressions) != len(expr2.expressions) {
-				return errors.Errorf("expressions count not equal: %v, %v", len(expr1.expressions), len(expr2.expressions))
+				return fmt.Errorf("expressions count not equal: %v, %v", len(expr1.expressions), len(expr2.expressions))
 			}
 			for i := range expr1.expressions {
 				if err := EqualExpressions(expr1.expressions[i], expr2.expressions[i]); err != nil {
@@ -277,10 +300,26 @@ func EqualExpressions(expr1, expr2 Expression) error {
 	case *AliasedExpression:
 		if expr2, ok := expr2.(*AliasedExpression); ok {
 			if expr1.name != expr2.name {
-				return errors.Errorf("names not equal: %v, %v", expr1.name, expr2.name)
+				return fmt.Errorf("names not equal: %v, %v", expr1.name, expr2.name)
 			}
 			if err := EqualExpressions(expr1.expr, expr2.expr); err != nil {
 				return errors.Wrap(err, "expressions not equal")
+			}
+			return nil
+		}
+
+	case *FunctionExpression:
+		if expr2, ok := expr2.(*FunctionExpression); ok {
+			if expr1.name != expr2.name {
+				return fmt.Errorf("names not equal: %v, %v", expr1.name, expr2.name)
+			}
+			if len(expr1.arguments) != len(expr2.arguments) {
+				return fmt.Errorf("argument counts not equal: %v and %v", len(expr1.arguments), len(expr2.arguments))
+			}
+			for i := range expr1.arguments {
+				if err := EqualExpressions(expr1.arguments[i], expr2.arguments[i]); err != nil {
+					return errors.Wrapf(err, "argument with index %v not equal", i)
+				}
 			}
 			return nil
 		}
@@ -289,5 +328,5 @@ func EqualExpressions(expr1, expr2 Expression) error {
 		log.Fatalf("Unsupported equality comparison %v and %v", reflect.TypeOf(expr1), reflect.TypeOf(expr2))
 	}
 
-	return errors.Errorf("incompatible types: %v and %v", reflect.TypeOf(expr1), reflect.TypeOf(expr2))
+	return fmt.Errorf("incompatible types: %v and %v", reflect.TypeOf(expr1), reflect.TypeOf(expr2))
 }

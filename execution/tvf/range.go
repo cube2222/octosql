@@ -58,7 +58,7 @@ type RangeStream struct {
 }
 
 func (s *RangeStream) Next() (*execution.Record, error) {
-	if s.current == s.endExclusive {
+	if s.current >= s.endExclusive {
 		return nil, execution.ErrEndOfStream
 	}
 

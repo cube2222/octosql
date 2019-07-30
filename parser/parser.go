@@ -513,12 +513,9 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 			return nil, errors.Wrap(err, "couldn't parse expression in interval")
 		}
 
-		return logical.NewFunctionExpression(
-			"duration",
-			[]logical.Expression{
-				subExpr,
-				logical.NewConstant(strings.TrimSuffix(strings.ToLower(expr.Unit), "s")),
-			},
+		return logical.NewInterval(
+			subExpr,
+			logical.NewConstant(strings.TrimSuffix(strings.ToLower(expr.Unit), "s")),
 		), nil
 
 	case *sqlparser.AndExpr:

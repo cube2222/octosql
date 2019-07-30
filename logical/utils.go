@@ -324,6 +324,17 @@ func EqualExpressions(expr1, expr2 Expression) error {
 			return nil
 		}
 
+	case *Interval:
+		if expr2, ok := expr2.(*Interval); ok {
+			if err := EqualExpressions(expr1.count, expr2.count); err != nil {
+				return errors.Wrap(err, "count not equal")
+			}
+			if err := EqualExpressions(expr1.unit, expr2.unit); err != nil {
+				return errors.Wrap(err, "units not equal")
+			}
+			return nil
+		}
+
 	default:
 		log.Fatalf("Unsupported equality comparison %v and %v", reflect.TypeOf(expr1), reflect.TypeOf(expr2))
 	}

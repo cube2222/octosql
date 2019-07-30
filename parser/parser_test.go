@@ -701,10 +701,10 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 					map[octosql.VariableName]logical.Expression{
 						octosql.NewVariableName("arg1"): logical.NewConstant("test"),
 						octosql.NewVariableName("arg2"): logical.NewConstant(2),
-						octosql.NewVariableName("arg3"): logical.NewFunctionExpression("duration", []logical.Expression{
+						octosql.NewVariableName("arg3"): logical.NewInterval(
 							logical.NewConstant(2),
 							logical.NewConstant("hour"),
-						}),
+						),
 					},
 				),
 			),

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/pkg/errors"
 )
 
@@ -37,4 +38,8 @@ func (node *UnionAll) Materialize(ctx context.Context, matCtx *MaterializationCo
 	}
 
 	return execution.NewUnionAll(firstNode, secondNode), nil
+}
+
+func (node *UnionAll) Metadata() *metadata.NodeMetadata {
+	return metadata.NewNodeMeatada(metadata.CombineCardinalities(node.First.Metadata().Cardinality(), node.Second.Metadata().Cardinality()))
 }

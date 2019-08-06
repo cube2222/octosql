@@ -5,6 +5,7 @@ import (
 
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/pkg/errors"
 )
 
@@ -45,4 +46,8 @@ func (node *InnerJoin) Materialize(ctx context.Context, matCtx *MaterializationC
 	}
 
 	return execution.NewInnerJoin(prefetchCount, materializedSource, materializedJoined), nil
+}
+
+func (node *InnerJoin) Metadata() *metadata.NodeMetadata {
+	return metadata.NewNodeMeatada(metadata.CombineCardinalities(node.Source.Metadata().Cardinality(), node.Joined.Metadata().Cardinality()))
 }

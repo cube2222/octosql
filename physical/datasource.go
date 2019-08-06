@@ -5,6 +5,7 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/pkg/errors"
 )
 
@@ -64,9 +65,10 @@ type DataSourceBuilder struct {
 	Filter           Formula
 	Name             string
 	Alias            string
+	Cardinality      metadata.Cardinality
 }
 
-func NewDataSourceBuilderFactory(materializer func(ctx context.Context, matCtx *MaterializationContext, dbConfig map[string]interface{}, filter Formula, alias string) (execution.Node, error), primaryKeys []octosql.VariableName, availableFilters map[FieldType]map[Relation]struct{}) DataSourceBuilderFactory {
+func NewDataSourceBuilderFactory(materializer func(ctx context.Context, matCtx *MaterializationContext, dbConfig map[string]interface{}, filter Formula, alias string) (execution.Node, error), primaryKeys []octosql.VariableName, availableFilters map[FieldType]map[Relation]struct{}, cardinality metadata.Cardinality) DataSourceBuilderFactory {
 	return func(name, alias string) *DataSourceBuilder {
 		return &DataSourceBuilder{
 			Materializer:     materializer,
@@ -75,6 +77,7 @@ func NewDataSourceBuilderFactory(materializer func(ctx context.Context, matCtx *
 			Filter:           NewConstant(true),
 			Name:             name,
 			Alias:            alias,
+			Cardinality:      cardinality,
 		}
 	}
 }
@@ -101,4 +104,8 @@ func (dsb *DataSourceBuilder) Materialize(ctx context.Context, matCtx *Materiali
 	}
 
 	return dsb.Materializer(ctx, matCtx, dbConfig, dsb.Filter, dsb.Alias)
+}
+
+func (dsb *DataSourceBuilder) Metadata() *metadata.NodeMetadata {
+	return metadata.NewNodeMeatada(dsb.Cardinality)
 }

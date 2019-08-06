@@ -4,22 +4,23 @@ import (
 	"context"
 
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/pkg/errors"
 )
 
 type Limit struct {
-	data      Node
-	limitExpr Expression
+	Source    Node
+	LimitExpr Expression
 }
 
 func NewLimit(data Node, expr Expression) *Limit {
-	return &Limit{data: data, limitExpr: expr}
+	return &Limit{Source: data, LimitExpr: expr}
 }
 
 func (node *Limit) Transform(ctx context.Context, transformers *Transformers) Node {
 	var transformed Node = &Limit{
-		data:      node.data.Transform(ctx, transformers),
-		limitExpr: node.limitExpr.Transform(ctx, transformers),
+		Source:    node.Source.Transform(ctx, transformers),
+		LimitExpr: node.LimitExpr.Transform(ctx, transformers),
 	}
 	if transformers.NodeT != nil {
 		transformed = transformers.NodeT(transformed)
@@ -28,15 +29,19 @@ func (node *Limit) Transform(ctx context.Context, transformers *Transformers) No
 }
 
 func (node *Limit) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
-	dataNode, err := node.data.Materialize(ctx, matCtx)
+	dataNode, err := node.Source.Materialize(ctx, matCtx)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't materialize data node")
+		return nil, errors.Wrap(err, "couldn't materialize source node")
 	}
 
-	limitExpr, err := node.limitExpr.Materialize(ctx, matCtx)
+	limitExpr, err := node.LimitExpr.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize limit expression")
 	}
 
 	return execution.NewLimit(dataNode, limitExpr), nil
+}
+
+func (node *Limit) Metadata() *metadata.NodeMetadata {
+	return metadata.NewNodeMeatada(metadata.BoundedFitsInLocalStorage)
 }

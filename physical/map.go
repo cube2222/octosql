@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/pkg/errors"
 )
 
@@ -48,4 +49,8 @@ func (node *Map) Materialize(ctx context.Context, matCtx *MaterializationContext
 	}
 
 	return execution.NewMap(matExprs, materialized, node.Keep), nil
+}
+
+func (node *Map) Metadata() *metadata.NodeMetadata {
+	return metadata.NewNodeMeatada(node.Source.Metadata().Cardinality())
 }

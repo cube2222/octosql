@@ -6,6 +6,7 @@ import (
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/execution/tvf"
+	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/pkg/errors"
 )
 
@@ -64,4 +65,13 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 	}
 
 	return nil, errors.Errorf("invalid table valued function: %v", node.Name)
+}
+
+func (node *TableValuedFunction) Metadata() *metadata.NodeMetadata {
+	switch node.Name {
+	case "range":
+		return metadata.NewNodeMeatada(metadata.BoundedFitsInLocalStorage)
+	default:
+		return metadata.NewNodeMeatada(metadata.Unbounded)
+	}
 }

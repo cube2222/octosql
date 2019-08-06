@@ -7,6 +7,7 @@ import (
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/execution/aggregates"
+	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/pkg/errors"
 )
 
@@ -88,4 +89,12 @@ func (node *GroupBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 	}
 
 	return execution.NewGroupBy(source, key, node.Fields, aggregatePrototypes, node.As), nil
+}
+
+func (node *GroupBy) Metadata() *metadata.NodeMetadata {
+	var cardinality = node.Metadata().Cardinality()
+	if cardinality == metadata.BoundedDoesntFitInLocalStorage {
+		cardinality = metadata.BoundedFitsInLocalStorage
+	}
+	return metadata.NewNodeMeatada(cardinality)
 }

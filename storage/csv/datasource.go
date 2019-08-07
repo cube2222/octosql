@@ -23,8 +23,9 @@ var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 }
 
 type DataSource struct {
-	path  string
-	alias string
+	path           string
+	alias          string
+	hasColumnNames bool
 }
 
 func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
@@ -35,9 +36,12 @@ func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 				return nil, errors.Wrap(err, "couldn't get path")
 			}
 
+			hasColumns, err := config.GetBool(dbConfig, "columns", config.WithDefault(true))
+
 			return &DataSource{
-				path:  path,
-				alias: alias,
+				path:           path,
+				alias:          alias,
+				hasColumnNames: hasColumns,
 			}, nil
 		},
 		nil,
@@ -58,9 +62,35 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 	r := csv.NewReader(file)
 	r.TrimLeadingSpace = true
 
-	columns, err := r.Read()
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't read column names")
+	var columns []string
+
+	/* if the files has column names then it's the first row */
+	if ds.hasColumnNames {
+		columns, err = r.Read()
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't read column names")
+		}
+	} else { /* otherwise we must determine how many rows there are and create columns col1, col2... */
+		lengthReader := csv.NewReader(file)
+		lengthReader.TrimLeadingSpace = true
+
+		firstRow, err := lengthReader.Read()
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't read first row to determine number of columns")
+		}
+
+		columnCount := len(firstRow)
+
+		columns = make([]string, columnCount)
+
+		for i := 0; i < columnCount; i++ {
+			columns[i] = fmt.Sprintf("col%d", i+1)
+		}
+
+		_, err = file.Seek(0, 0) /* we must return to the beginning of file */
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't go back to beginning of file")
+		}
 	}
 
 	aliasedFields := make([]octosql.VariableName, 0)

@@ -122,7 +122,7 @@ JSON file in one of the following forms:
 CSV file seperated using commas. The first row should contain column names.
 ##### options:
 - path - path to file containing the data, required
-
+- columns - optional, defaults to true. If false then column names are col1, col2...
 ---
 #### PostgreSQL
 Single PostgreSQL database table.

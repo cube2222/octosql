@@ -43,5 +43,5 @@ func (node *Offset) Materialize(ctx context.Context, matCtx *MaterializationCont
 }
 
 func (node *Offset) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMeatada(node.Source.Metadata().Cardinality())
+	return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality())
 }

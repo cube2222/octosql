@@ -49,5 +49,5 @@ func (node *LeftJoin) Materialize(ctx context.Context, matCtx *MaterializationCo
 }
 
 func (node *LeftJoin) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMeatada(metadata.CombineCardinalities(node.Source.Metadata().Cardinality(), node.Joined.Metadata().Cardinality()))
+	return metadata.NewNodeMetadata(metadata.CombineCardinalities(node.Source.Metadata().Cardinality(), node.Joined.Metadata().Cardinality()))
 }

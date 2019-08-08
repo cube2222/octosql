@@ -37,5 +37,5 @@ func (node *Requalifier) Materialize(ctx context.Context, matCtx *Materializatio
 }
 
 func (node *Requalifier) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMeatada(node.Source.Metadata().Cardinality())
+	return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality())
 }

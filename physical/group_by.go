@@ -96,5 +96,5 @@ func (node *GroupBy) Metadata() *metadata.NodeMetadata {
 	if cardinality == metadata.BoundedDoesntFitInLocalStorage {
 		cardinality = metadata.BoundedFitsInLocalStorage
 	}
-	return metadata.NewNodeMeatada(cardinality)
+	return metadata.NewNodeMetadata(cardinality)
 }

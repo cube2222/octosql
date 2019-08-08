@@ -65,7 +65,9 @@ type DataSourceBuilder struct {
 	Filter           Formula
 	Name             string
 	Alias            string
-	Cardinality      metadata.Cardinality
+
+	// This field will be used to decide on join strategies or if the source is a stream.
+	Cardinality metadata.Cardinality
 }
 
 func NewDataSourceBuilderFactory(materializer func(ctx context.Context, matCtx *MaterializationContext, dbConfig map[string]interface{}, filter Formula, alias string) (execution.Node, error), primaryKeys []octosql.VariableName, availableFilters map[FieldType]map[Relation]struct{}, cardinality metadata.Cardinality) DataSourceBuilderFactory {
@@ -107,5 +109,5 @@ func (dsb *DataSourceBuilder) Materialize(ctx context.Context, matCtx *Materiali
 }
 
 func (dsb *DataSourceBuilder) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMeatada(dsb.Cardinality)
+	return metadata.NewNodeMetadata(dsb.Cardinality)
 }

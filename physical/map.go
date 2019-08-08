@@ -52,5 +52,5 @@ func (node *Map) Materialize(ctx context.Context, matCtx *MaterializationContext
 }
 
 func (node *Map) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMeatada(node.Source.Metadata().Cardinality())
+	return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality())
 }

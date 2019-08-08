@@ -70,8 +70,8 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 func (node *TableValuedFunction) Metadata() *metadata.NodeMetadata {
 	switch node.Name {
 	case "range":
-		return metadata.NewNodeMeatada(metadata.BoundedFitsInLocalStorage)
+		return metadata.NewNodeMetadata(metadata.BoundedFitsInLocalStorage)
 	default:
-		return metadata.NewNodeMeatada(metadata.Unbounded)
+		return metadata.NewNodeMetadata(metadata.Unbounded)
 	}
 }

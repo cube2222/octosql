@@ -33,7 +33,7 @@ func (meta *NodeMetadata) Cardinality() Cardinality {
 	return meta.cardinality
 }
 
-func NewNodeMeatada(cardinality Cardinality) *NodeMetadata {
+func NewNodeMetadata(cardinality Cardinality) *NodeMetadata {
 	return &NodeMetadata{
 		cardinality: cardinality,
 	}

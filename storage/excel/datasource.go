@@ -1,7 +1,6 @@
 package excel
 
 import (
-	"context"
 	"fmt"
 	"github.com/360EntSecGroup-Skylar/excelize"
 	"github.com/cube2222/octosql"
@@ -9,6 +8,10 @@ import (
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
+	"regexp"
+	"strconv"
+	"unicode"
 )
 
 var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
@@ -21,29 +24,47 @@ type DataSource struct {
 	alias          string
 	hasColumnNames bool
 	sheet          string
-	root           string
+	rootColumn     int
+	rootRow        int
 }
 
-var ErrEmptyRow error = errors.New("the row is empty")
+func isCellNameValid(cell string) bool {
+	cellNameRegexp := "[A-Z]+[1-9][0-9]*"
 
-func readRow(file *excelize.File, sheet string, rootCell cell) ([]string, error) {
-	result := make([]string, 0)
+	r, _ := regexp.Compile(cellNameRegexp)
 
-	for true {
-		value := file.GetCellValue(sheet, rootCell.getCellName())
-		if value == "" {
-			break
+	return r.MatchString(cell)
+}
+
+func getCellRowCol(cell string) (row, col string) {
+	for index, char := range cell {
+		if unicode.IsDigit(char) {
+			return cell[index:], cell[:index]
 		}
-
-		result = append(result, value)
-		rootCell = rootCell.getCellToTheRight()
 	}
 
-	if len(result) == 0 {
-		return nil, ErrEmptyRow
+	return "", cell
+}
+
+func getRowColCoords(cell string) (row int, col int, err error) {
+	rowStr, colStr := getCellRowCol(cell)
+	col = excelize.TitleToNumber(colStr)
+	rowTmp, err := strconv.ParseInt(rowStr, 10, 64)
+	if err != nil {
+		return 0, 0, errors.Wrap(err, "couldn't parse row")
 	}
 
-	return result, nil
+	return int(rowTmp) - 1, col, nil
+}
+
+func normalizeRows(rows [][]string, col int, row int) [][]string {
+	result := make([][]string, 0)
+
+	for i := row; i < len(rows); i++ {
+		result = append(result, rows[i][col:])
+	}
+
+	return result
 }
 
 func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
@@ -69,12 +90,22 @@ func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 				return nil, errors.Wrap(err, "couldn't get root cell")
 			}
 
+			if !isCellNameValid(root) {
+				return nil, errors.Wrap(err, "the root cell of the table is invalid")
+			}
+
+			row, col, err := getRowColCoords(root)
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't extract column and row numbers from cell")
+			}
+
 			return &DataSource{
 				path:           path,
 				alias:          alias,
 				hasColumnNames: hasColumns,
 				sheet:          sheet,
-				root:           root,
+				rootColumn:     col,
+				rootRow:        row,
 			}, nil
 		},
 		nil,
@@ -93,27 +124,21 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 		return nil, errors.Wrap(err, "couldn't open file")
 	}
 
-	rootCell, err := getCellFromName(ds.root)
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't parse root cell")
+	rows := file.GetRows(ds.sheet)
+	if len(rows) <= ds.rootColumn {
+		return nil, errors.New("the sheet doesn't have enough columns starting from root cell")
 	}
+
+	rows = normalizeRows(rows, ds.rootColumn, ds.rootRow)
 
 	var columns []string
 
 	/* if the files has column names then it's the first row */
 	if ds.hasColumnNames {
-		columns, err = readRow(file, ds.sheet, rootCell)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't read column names")
-		}
+		columns = rows[0]
 
 	} else { /* otherwise we must determine how many rows there are and create columns col1, col2... */
-		tempColumns, err := readRow(file, ds.sheet, rootCell)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't get first row to determine number of rows")
-		}
-
-		columnCount := len(tempColumns)
+		columnCount := len(rows[0])
 
 		columns = make([]string, columnCount)
 
@@ -135,27 +160,26 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 		set[f] = struct{}{}
 	}
 
+	startingRow := 0
 	if ds.hasColumnNames {
-		rootCell = rootCell.getCellBelow()
+		startingRow = 1
 	}
 
 	return &RecordStream{
-		file:                file,
-		sheet:               ds.sheet,
-		isDone:              false,
-		alias:               ds.alias,
-		aliasedFields:       aliasedFields,
-		currentRowStartCell: rootCell,
+		isDone:          false,
+		alias:           ds.alias,
+		aliasedFields:   aliasedFields,
+		rows:            rows,
+		currentRowIndex: startingRow,
 	}, nil
 }
 
 type RecordStream struct {
-	file                *excelize.File
-	sheet               string
-	isDone              bool
-	alias               string
-	aliasedFields       []octosql.VariableName
-	currentRowStartCell cell
+	isDone          bool
+	alias           string
+	aliasedFields   []octosql.VariableName
+	rows            [][]string
+	currentRowIndex int
 }
 
 func (rs *RecordStream) Close() error {
@@ -167,22 +191,17 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 		return nil, execution.ErrEndOfStream
 	}
 
-	line, err := readRow(rs.file, rs.sheet, rs.currentRowStartCell)
-	if err == ErrEmptyRow {
+	if rs.currentRowIndex >= len(rs.rows) {
 		rs.isDone = true
 		return nil, execution.ErrEndOfStream
 	}
 
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't read record")
-	}
-
-	rs.currentRowStartCell = rs.currentRowStartCell.getCellBelow()
-
 	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
-	for i, v := range line {
+	for i, v := range rs.rows[rs.currentRowIndex] {
 		aliasedRecord[rs.aliasedFields[i]] = execution.ParseType(v)
 	}
+
+	rs.currentRowIndex++
 
 	return execution.NewRecord(rs.aliasedFields, aliasedRecord), nil
 }

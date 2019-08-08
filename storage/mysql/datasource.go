@@ -9,6 +9,7 @@ import (
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
+	"github.com/cube2222/octosql/physical/metadata"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 )
@@ -101,6 +102,7 @@ func NewDataSourceBuilderFactory(primaryKeys []octosql.VariableName) physical.Da
 		},
 		primaryKeys,
 		availableFilters,
+		metadata.BoundedDoesntFitInLocalStorage,
 	)
 }
 

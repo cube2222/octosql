@@ -4,20 +4,21 @@ import (
 	"context"
 
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/pkg/errors"
 )
 
 type Distinct struct {
-	Child Node
+	Source Node
 }
 
 func NewDistinct(child Node) *Distinct {
-	return &Distinct{Child: child}
+	return &Distinct{Source: child}
 }
 
 func (node *Distinct) Transform(ctx context.Context, transformers *Transformers) Node {
 	var transformed Node = &Distinct{
-		Child: node.Child.Transform(ctx, transformers),
+		Source: node.Source.Transform(ctx, transformers),
 	}
 
 	if transformers.NodeT != nil {
@@ -28,10 +29,14 @@ func (node *Distinct) Transform(ctx context.Context, transformers *Transformers)
 }
 
 func (node *Distinct) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
-	childNode, err := node.Child.Materialize(ctx, matCtx)
+	childNode, err := node.Source.Materialize(ctx, matCtx)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't materialize child node in distinct")
+		return nil, errors.Wrap(err, "couldn't materialize source node in distinct")
 	}
 
 	return execution.NewDistinct(childNode), nil
+}
+
+func (node *Distinct) Metadata() *metadata.NodeMetadata {
+	return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality())
 }

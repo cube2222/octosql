@@ -126,13 +126,13 @@ CSV file seperated using commas. The first row should contain column names.
 
 ---
 #### Excel
-A single, coherent table in a Excel spreadsheet.
-The data may or may not have column names as first row.
-The data can be in any sheet, and start at any point, but it must
-be coherent (no spaces between rows, no spaces between columns).
+A single table in an Excel spreadsheet.
+The table may or may not have column names as it's first row.
+The table can be in any sheet, and start at any point, but it cannot
+contain spaces between columns nor spaces between rows.
 ##### options:
 - path - path to file, required
-- columns - does the first row contain column names, optional: defaults to true
+- headerRow - does the first row contain column names, optional: defaults to true
 - sheet - name of the sheet in which data is stored, optional: defaults to "Sheet1"
 - root - name of cell (i.e "A3", "BA14") which is the leftmost cell of the first
 row, optional: defaults to "A1"

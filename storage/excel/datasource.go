@@ -2,6 +2,10 @@ package excel
 
 import (
 	"fmt"
+	"regexp"
+	"strconv"
+	"unicode"
+
 	"github.com/360EntSecGroup-Skylar/excelize"
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
@@ -9,9 +13,6 @@ import (
 	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
-	"regexp"
-	"strconv"
-	"unicode"
 )
 
 var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
@@ -29,7 +30,7 @@ type DataSource struct {
 }
 
 func isCellNameValid(cell string) bool {
-	cellNameRegexp := "[A-Z]+[1-9][0-9]*"
+	cellNameRegexp := "^[A-Z]+[1-9][0-9]*$"
 
 	r, _ := regexp.Compile(cellNameRegexp)
 
@@ -75,7 +76,8 @@ func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 				return nil, errors.Wrap(err, "couldn't get path")
 			}
 
-			hasColumns, err := config.GetBool(dbConfig, "columns", config.WithDefault(true))
+			//TODO: don't hardcode fields in config parsing
+			hasColumns, err := config.GetBool(dbConfig, "headerRow", config.WithDefault(true))
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't get column option")
 			}

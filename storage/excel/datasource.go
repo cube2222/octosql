@@ -126,22 +126,31 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 		return nil, errors.Wrap(err, "couldn't open file")
 	}
 
-	rows := file.GetRows(ds.sheet)
-	if len(rows) <= ds.rootColumn {
-		return nil, errors.New("the sheet doesn't have enough columns starting from root cell")
+	rows, err := file.Rows(ds.sheet)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get sheet's rows")
 	}
 
-	rows = normalizeRows(rows, ds.rootColumn, ds.rootRow)
+	for i := 0; i <= ds.rootRow; i++ { /* skip some potential empty rows */
+		rows.Next()
+	}
 
 	var columns []string
+	var firstRow []string
 
 	/* if the files has column names then it's the first row */
 	if ds.hasColumnNames {
-		columns = rows[0]
+		columns = rows.Columns()[ds.rootColumn:]
 
-	} else { /* otherwise we must determine how many rows there are and create columns col1, col2... */
-		columnCount := len(rows[0])
+	} else {
+		/*
+			otherwise we must determine how many rows there are and create columns col1, col2...
+			but we need to read the first row, which we will have to store to later return
+			during the first call of Next()
+		*/
+		firstRow = rows.Columns()[ds.rootColumn:]
 
+		columnCount := len(firstRow)
 		columns = make([]string, columnCount)
 
 		for i := 0; i < columnCount; i++ {
@@ -162,26 +171,25 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 		set[f] = struct{}{}
 	}
 
-	startingRow := 0
-	if ds.hasColumnNames {
-		startingRow = 1
-	}
-
 	return &RecordStream{
-		isDone:          false,
-		alias:           ds.alias,
-		aliasedFields:   aliasedFields,
-		rows:            rows,
-		currentRowIndex: startingRow,
+		isDone:            false,
+		alias:             ds.alias,
+		aliasedFields:     aliasedFields,
+		rows:              rows,
+		potentialFirstRow: firstRow,
+		hasFirstRowLoaded: !ds.hasColumnNames,
+		columnOffset:      ds.rootColumn,
 	}, nil
 }
 
 type RecordStream struct {
-	isDone          bool
-	alias           string
-	aliasedFields   []octosql.VariableName
-	rows            [][]string
-	currentRowIndex int
+	isDone            bool
+	alias             string
+	aliasedFields     []octosql.VariableName
+	rows              *excelize.Rows
+	potentialFirstRow []string
+	hasFirstRowLoaded bool
+	columnOffset      int
 }
 
 func (rs *RecordStream) Close() error {
@@ -193,17 +201,25 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 		return nil, execution.ErrEndOfStream
 	}
 
-	if rs.currentRowIndex >= len(rs.rows) {
-		rs.isDone = true
-		return nil, execution.ErrEndOfStream
+	var row []string
+
+	if rs.hasFirstRowLoaded {
+		rs.hasFirstRowLoaded = false
+		row = rs.potentialFirstRow
+	} else {
+		if !rs.rows.Next() {
+			rs.isDone = true
+			rs.Close()
+			return nil, execution.ErrEndOfStream
+		}
+
+		row = rs.rows.Columns()[rs.columnOffset:]
 	}
 
 	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
-	for i, v := range rs.rows[rs.currentRowIndex] {
+	for i, v := range row {
 		aliasedRecord[rs.aliasedFields[i]] = execution.ParseType(v)
 	}
-
-	rs.currentRowIndex++
 
 	return execution.NewRecord(rs.aliasedFields, aliasedRecord), nil
 }

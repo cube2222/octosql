@@ -15,6 +15,7 @@ OctoSQL is a query tool that allows you to join, analyse and transform data from
   - [PostgreSQL](#postgresql)
   - [MySQL](#mysql)
   - [Redis](#redis)
+  - [Excel](#excel)
 - [Documentation](#documentation)
 - [Architecture](#architecture)
 - [Datasource Pushdown Operations](#datasource-pushdown-operations)
@@ -123,6 +124,18 @@ CSV file seperated using commas. The first row should contain column names.
 ##### options:
 - path - path to file containing the data, required
 
+---
+#### Excel
+A single, coherent table in a Excel spreadsheet.
+The data may or may not have column names as first row.
+The data can be in any sheet, and start at any point, but it must
+be coherent (no spaces between rows, no spaces between columns).
+##### options:
+- path - path to file, required
+- columns - does the first row contain column names, optional: defaults to true
+- sheet - name of the sheet in which data is stored, optional: defaults to "Sheet1"
+- root - name of cell (i.e "A3", "BA14") which is the leftmost cell of the first
+row, optional: defaults to "A1"
 ---
 #### PostgreSQL
 Single PostgreSQL database table.

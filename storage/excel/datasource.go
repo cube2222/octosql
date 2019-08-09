@@ -153,8 +153,22 @@ func (rs *RecordStream) Close() error {
 	return nil
 }
 
+func extractRow(row []string, columnOffset int) []string {
+	trimmedRow := make([]string, 0)
+
+	for i := columnOffset; i < len(row); i++ {
+		if row[i] != "" {
+			trimmedRow = append(trimmedRow, row[i])
+		} else {
+			break
+		}
+	}
+
+	return trimmedRow
+}
+
 func (rs *RecordStream) initializeColumnsWithHeaderRow() error {
-	columns := rs.rows.Columns()[rs.columnOffset:]
+	columns := extractRow(rs.rows.Columns(), rs.columnOffset)
 
 	rs.aliasedFields = make([]octosql.VariableName, 0)
 	for _, c := range columns {
@@ -174,7 +188,7 @@ func (rs *RecordStream) initializeColumnsWithHeaderRow() error {
 }
 
 func (rs *RecordStream) initializeColumnsWithoutHeaderRow() *execution.Record {
-	firstRow := rs.rows.Columns()[rs.columnOffset:]
+	firstRow := extractRow(rs.rows.Columns(), rs.columnOffset)
 
 	rs.aliasedFields = make([]octosql.VariableName, 0)
 	for i := range firstRow {
@@ -215,7 +229,11 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 		return nil, execution.ErrEndOfStream
 	}
 
-	row := rs.rows.Columns()[rs.columnOffset:]
+	row := extractRow(rs.rows.Columns(), rs.columnOffset)
+	if len(row) != len(rs.aliasedFields) {
+		rs.isDone = true
+		return nil, execution.ErrEndOfStream
+	}
 
 	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
 	for i, v := range row {

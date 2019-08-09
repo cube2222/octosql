@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
@@ -211,7 +212,7 @@ func GetNewRecord(client *redis.Client, keyName, key, alias string) (*execution.
 
 	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
 	for k, v := range recordValues {
-		fieldName := octosql.NewVariableName(fmt.Sprintf("%s.%s", alias, k))
+		fieldName := octosql.NewVariableName(strings.ToLower(fmt.Sprintf("%s.%s", alias, k)))
 		aliasedRecord[fieldName] = octosql.NormalizeType(v)
 	}
 

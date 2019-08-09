@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
@@ -67,7 +68,8 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 
 	aliasedFields := make([]octosql.VariableName, 0)
 	for _, c := range columns {
-		aliasedFields = append(aliasedFields, octosql.VariableName(fmt.Sprintf("%s.%s", ds.alias, c)))
+		columnName := strings.ToLower(fmt.Sprintf("%s.%s", ds.alias, c))
+		aliasedFields = append(aliasedFields, octosql.VariableName(columnName))
 	}
 	r.FieldsPerRecord = len(aliasedFields)
 

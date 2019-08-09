@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
@@ -194,7 +195,7 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 
 	fields := make([]octosql.VariableName, len(rs.columns))
 	for i, columnName := range rs.columns {
-		newName := octosql.VariableName(fmt.Sprintf("%s.%s", rs.alias, columnName))
+		newName := octosql.VariableName(strings.ToLower(fmt.Sprintf("%s.%s", rs.alias, columnName)))
 		fields[i] = newName
 		resultMap[newName] = octosql.NormalizeType(cols[i])
 	}

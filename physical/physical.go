@@ -2,6 +2,7 @@ package physical
 
 import (
 	"context"
+	"strings"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
@@ -58,7 +59,8 @@ type Variable struct {
 }
 
 func NewVariable(name octosql.VariableName) *Variable {
-	return &Variable{Name: name}
+	lowerCased := strings.ToLower(name.String())
+	return &Variable{Name: octosql.VariableName(lowerCased)}
 }
 
 func (v *Variable) Transform(ctx context.Context, transformers *Transformers) Expression {

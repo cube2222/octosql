@@ -5,6 +5,7 @@ import (
 
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
+	"github.com/cube2222/octosql/physical/metadata"
 )
 
 // Named placeholder node to use in tests. Easy satisfaction for reflect.DeepEquals.
@@ -20,4 +21,8 @@ func (node *PlaceholderNode) Transform(ctx context.Context, transformers *physic
 
 func (*PlaceholderNode) Materialize(ctx context.Context, matCtx *physical.MaterializationContext) (execution.Node, error) {
 	panic("tried to materialize a stub node meant only for optimizer tests")
+}
+
+func (*PlaceholderNode) Metadata() *metadata.NodeMetadata {
+	panic("implement me")
 }

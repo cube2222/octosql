@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/cube2222/octosql/physical"
@@ -141,7 +142,7 @@ func TestFormulaToSQL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := formulaToSQL(tt.args.formula, tt.args.aliases); got != tt.want {
+			if got := formulaToSQL(tt.args.formula, tt.args.aliases); strings.ToLower(got) != strings.ToLower(tt.want) {
 				t.Errorf("formulaToSQL() = %v, want %v", got, tt.want)
 			}
 

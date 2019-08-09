@@ -33,7 +33,15 @@ var csvDbs = map[string]csvDsc{
 	},
 	"notUnique": {
 		alias: "nu",
-		path:  exampleDir + "notUnique",
+		path:  exampleDir + "notUnique.csv",
+	},
+	"hasHeaders": {
+		alias: "hh",
+		path:  exampleDir + "hasHeaders.csv",
+	},
+	"noHeaders": {
+		alias: "nh",
+		path:  exampleDir + "noHeaders.csv",
 	},
 }
 
@@ -88,15 +96,17 @@ func TestCSVRecordStream_Next(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		csvName string
-		fields  []string
-		want    []wanted
+		name            string
+		csvName         string
+		hasColumnHeader bool
+		fields          []string
+		want            []wanted
 	}{
 		{
-			name:    "reading people.csv - happy path",
-			csvName: "people",
-			fields:  []string{"name", "surname", "age", "city"},
+			name:            "reading people.csv - happy path",
+			csvName:         "people",
+			hasColumnHeader: true,
+			fields:          []string{"name", "surname", "age", "city"},
 			want: []wanted{
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
@@ -153,9 +163,10 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			},
 		},
 		{
-			name:    "wrong numbers of columns in a row",
-			csvName: "wrongCount",
-			fields:  []string{"name", "surname"},
+			name:            "wrong numbers of columns in a row",
+			csvName:         "wrongCount",
+			hasColumnHeader: true,
+			fields:          []string{"name", "surname"},
 			want: []wanted{
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
@@ -172,6 +183,60 @@ func TestCSVRecordStream_Next(t *testing.T) {
 				},
 			},
 		},
+
+		{
+			name:            "file with header row",
+			csvName:         "hasHeaders",
+			hasColumnHeader: true,
+			fields:          []string{"name", "surname"},
+			want: []wanted{
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"hh.dog",
+							"hh.age",
+						},
+						[]interface{}{"Barry", 3}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"hh.dog",
+							"hh.age",
+						},
+						[]interface{}{"Flower", 14}),
+					error: false,
+				},
+			},
+		},
+
+		{
+			name:            "file without header row",
+			csvName:         "noHeaders",
+			hasColumnHeader: false,
+			fields:          []string{"name", "surname"},
+			want: []wanted{
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"nh.col1",
+							"nh.col2",
+						},
+						[]interface{}{"Barry", 3}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"nh.col1",
+							"nh.col2",
+						},
+						[]interface{}{"Flower", 14}),
+					error: false,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -182,7 +247,8 @@ func TestCSVRecordStream_Next(t *testing.T) {
 						{
 							Name: "test",
 							Config: map[string]interface{}{
-								"path": csvDbs[tt.csvName].path,
+								"path":      csvDbs[tt.csvName].path,
+								"headerRow": tt.hasColumnHeader,
 							},
 						},
 					},

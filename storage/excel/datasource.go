@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 	"unicode"
 
 	"github.com/360EntSecGroup-Skylar/excelize"
@@ -76,7 +77,6 @@ func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 				return nil, errors.Wrap(err, "couldn't get path")
 			}
 
-			//TODO: don't hardcode fields in config parsing
 			hasColumns, err := config.GetBool(dbConfig, "headerRow", config.WithDefault(true))
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't get column option")
@@ -160,7 +160,8 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 
 	aliasedFields := make([]octosql.VariableName, 0)
 	for _, c := range columns {
-		aliasedFields = append(aliasedFields, octosql.VariableName(fmt.Sprintf("%s.%s", ds.alias, c)))
+		lowerCased := strings.ToLower(fmt.Sprintf("%s.%s", ds.alias, c))
+		aliasedFields = append(aliasedFields, octosql.VariableName(lowerCased))
 	}
 
 	set := make(map[octosql.VariableName]struct{})

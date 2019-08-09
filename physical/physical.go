@@ -6,6 +6,7 @@ import (
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/pkg/errors"
 )
 
@@ -33,6 +34,7 @@ type Node interface {
 	// Transform returns a new Node after recursively calling Transform
 	Transform(ctx context.Context, transformers *Transformers) Node
 	Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error)
+	Metadata() *metadata.NodeMetadata
 }
 
 // Expressions describes a single value source.

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/pkg/errors"
 )
 
@@ -67,4 +68,8 @@ func (node *OrderBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 	}
 
 	return execution.NewOrderBy(exprs, directions, sourceNode), nil
+}
+
+func (node *OrderBy) Metadata() *metadata.NodeMetadata {
+	return metadata.NewNodeMetadata(metadata.BoundedFitsInLocalStorage)
 }

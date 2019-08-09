@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/pkg/errors"
 )
 
@@ -33,4 +34,8 @@ func (node *Requalifier) Materialize(ctx context.Context, matCtx *Materializatio
 		return nil, errors.Wrap(err, "couldn't materialize Source node")
 	}
 	return execution.NewRequalifier(node.Qualifier, materialized), nil
+}
+
+func (node *Requalifier) Metadata() *metadata.NodeMetadata {
+	return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality())
 }

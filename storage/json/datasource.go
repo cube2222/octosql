@@ -11,6 +11,7 @@ import (
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
+	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/pkg/errors"
 )
 
@@ -45,6 +46,7 @@ func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 		},
 		nil,
 		availableFilters,
+		metadata.BoundedFitsInLocalStorage,
 	)
 }
 

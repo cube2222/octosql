@@ -59,16 +59,6 @@ func getRowColCoords(cell string) (row int, col int, err error) {
 	return int(rowTmp) - 1, col, nil
 }
 
-func normalizeRows(rows [][]string, col int, row int) [][]string {
-	result := make([][]string, 0)
-
-	for i := row; i < len(rows); i++ {
-		result = append(result, rows[i][col:])
-	}
-
-	return result
-}
-
 func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 	return physical.NewDataSourceBuilderFactory(
 		func(ctx context.Context, matCtx *physical.MaterializationContext, dbConfig map[string]interface{}, filter physical.Formula, alias string) (execution.Node, error) {
@@ -132,69 +122,70 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 	}
 
 	for i := 0; i <= ds.rootRow; i++ { /* skip some potential empty rows */
-		rows.Next()
-	}
-
-	var columns []string
-	var firstRow []string
-
-	/* if the files has column names then it's the first row */
-	if ds.hasColumnNames {
-		columns = rows.Columns()[ds.rootColumn:]
-
-	} else {
-		/*
-			otherwise we must determine how many rows there are and create columns col1, col2...
-			but we need to read the first row, which we will have to store to later return
-			during the first call of Next()
-		*/
-		firstRow = rows.Columns()[ds.rootColumn:]
-
-		columnCount := len(firstRow)
-		columns = make([]string, columnCount)
-
-		for i := 0; i < columnCount; i++ {
-			columns[i] = fmt.Sprintf("col%d", i+1)
+		if !rows.Next() {
+			return nil, errors.New("encountered an error while omitting initial rows")
 		}
-	}
-
-	aliasedFields := make([]octosql.VariableName, 0)
-	for _, c := range columns {
-		lowerCased := strings.ToLower(fmt.Sprintf("%s.%s", ds.alias, c))
-		aliasedFields = append(aliasedFields, octosql.VariableName(lowerCased))
-	}
-
-	set := make(map[octosql.VariableName]struct{})
-	for _, f := range aliasedFields {
-		if _, present := set[f]; present {
-			return nil, errors.New("column names not unique")
-		}
-		set[f] = struct{}{}
 	}
 
 	return &RecordStream{
-		isDone:            false,
-		alias:             ds.alias,
-		aliasedFields:     aliasedFields,
-		rows:              rows,
-		potentialFirstRow: firstRow,
-		hasFirstRowLoaded: !ds.hasColumnNames,
-		columnOffset:      ds.rootColumn,
+		isDone:       false,
+		alias:        ds.alias,
+		rows:         rows,
+		hasHeaderRow: ds.hasColumnNames,
+		first:        true,
+		columnOffset: ds.rootColumn,
 	}, nil
 }
 
 type RecordStream struct {
-	isDone            bool
-	alias             string
-	aliasedFields     []octosql.VariableName
-	rows              *excelize.Rows
-	potentialFirstRow []string
-	hasFirstRowLoaded bool
-	columnOffset      int
+	isDone        bool
+	alias         string
+	aliasedFields []octosql.VariableName
+	rows          *excelize.Rows
+	hasHeaderRow  bool
+	first         bool
+	columnOffset  int
 }
 
 func (rs *RecordStream) Close() error {
 	return nil
+}
+
+func (rs *RecordStream) InitializeColumns() (*execution.Record, error) {
+	if rs.hasHeaderRow {
+		columns := rs.rows.Columns()[rs.columnOffset:]
+
+		rs.aliasedFields = make([]octosql.VariableName, 0)
+		for _, c := range columns {
+			lowerCased := strings.ToLower(fmt.Sprintf("%s.%s", rs.alias, c))
+			rs.aliasedFields = append(rs.aliasedFields, octosql.VariableName(lowerCased))
+		}
+
+		set := make(map[octosql.VariableName]struct{})
+		for _, f := range rs.aliasedFields {
+			if _, present := set[f]; present {
+				return nil, errors.New("column names not unique")
+			}
+			set[f] = struct{}{}
+		}
+
+		return nil, nil
+	} else {
+		firstRow := rs.rows.Columns()[rs.columnOffset:]
+
+		rs.aliasedFields = make([]octosql.VariableName, 0)
+		for i := range firstRow {
+			columnName := fmt.Sprintf("col%d", i+1)
+			rs.aliasedFields = append(rs.aliasedFields, octosql.VariableName(columnName))
+		}
+
+		aliasedRecord := make(map[octosql.VariableName]octosql.Value)
+		for i, v := range firstRow {
+			aliasedRecord[rs.aliasedFields[i]] = execution.ParseType(v)
+		}
+
+		return execution.NewRecord(rs.aliasedFields, aliasedRecord), nil
+	}
 }
 
 func (rs *RecordStream) Next() (*execution.Record, error) {
@@ -202,20 +193,27 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 		return nil, execution.ErrEndOfStream
 	}
 
-	var row []string
+	if rs.first {
+		rs.first = false
 
-	if rs.hasFirstRowLoaded {
-		rs.hasFirstRowLoaded = false
-		row = rs.potentialFirstRow
-	} else {
-		if !rs.rows.Next() {
-			rs.isDone = true
-			rs.Close()
-			return nil, execution.ErrEndOfStream
+		rec, err := rs.InitializeColumns()
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't initialize columns for record stream")
 		}
 
-		row = rs.rows.Columns()[rs.columnOffset:]
+		if rs.hasHeaderRow {
+			return rs.Next()
+		} else {
+			return rec, nil
+		}
 	}
+
+	if !rs.rows.Next() {
+		rs.isDone = true
+		return nil, execution.ErrEndOfStream
+	}
+
+	row := rs.rows.Columns()[rs.columnOffset:]
 
 	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
 	for i, v := range row {

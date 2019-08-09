@@ -151,7 +151,7 @@ func (rs *RecordStream) Close() error {
 	return nil
 }
 
-func (rs *RecordStream) InitializeColumns() (*execution.Record, error) {
+func (rs *RecordStream) initializeColumns() (*execution.Record, error) {
 	if rs.hasHeaderRow {
 		columns := rs.rows.Columns()[rs.columnOffset:]
 
@@ -196,7 +196,7 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 	if rs.first {
 		rs.first = false
 
-		rec, err := rs.InitializeColumns()
+		rec, err := rs.initializeColumns()
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't initialize columns for record stream")
 		}

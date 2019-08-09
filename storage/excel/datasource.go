@@ -153,41 +153,41 @@ func (rs *RecordStream) Close() error {
 	return nil
 }
 
-func (rs *RecordStream) initializeColumns() (*execution.Record, error) {
-	if rs.hasHeaderRow {
-		columns := rs.rows.Columns()[rs.columnOffset:]
+func (rs *RecordStream) initializeColumnsWithHeaderRow() error {
+	columns := rs.rows.Columns()[rs.columnOffset:]
 
-		rs.aliasedFields = make([]octosql.VariableName, 0)
-		for _, c := range columns {
-			lowerCased := strings.ToLower(fmt.Sprintf("%s.%s", rs.alias, c))
-			rs.aliasedFields = append(rs.aliasedFields, octosql.VariableName(lowerCased))
-		}
-
-		set := make(map[octosql.VariableName]struct{})
-		for _, f := range rs.aliasedFields {
-			if _, present := set[f]; present {
-				return nil, errors.New("column names not unique")
-			}
-			set[f] = struct{}{}
-		}
-
-		return nil, nil
-	} else {
-		firstRow := rs.rows.Columns()[rs.columnOffset:]
-
-		rs.aliasedFields = make([]octosql.VariableName, 0)
-		for i := range firstRow {
-			columnName := fmt.Sprintf("col%d", i+1)
-			rs.aliasedFields = append(rs.aliasedFields, octosql.VariableName(columnName))
-		}
-
-		aliasedRecord := make(map[octosql.VariableName]octosql.Value)
-		for i, v := range firstRow {
-			aliasedRecord[rs.aliasedFields[i]] = execution.ParseType(v)
-		}
-
-		return execution.NewRecord(rs.aliasedFields, aliasedRecord), nil
+	rs.aliasedFields = make([]octosql.VariableName, 0)
+	for _, c := range columns {
+		lowerCased := strings.ToLower(fmt.Sprintf("%s.%s", rs.alias, c))
+		rs.aliasedFields = append(rs.aliasedFields, octosql.VariableName(lowerCased))
 	}
+
+	set := make(map[octosql.VariableName]struct{})
+	for _, f := range rs.aliasedFields {
+		if _, present := set[f]; present {
+			return errors.New("column names not unique")
+		}
+		set[f] = struct{}{}
+	}
+
+	return nil
+}
+
+func (rs *RecordStream) initializeColumnsWithoutHeaderRow() *execution.Record {
+	firstRow := rs.rows.Columns()[rs.columnOffset:]
+
+	rs.aliasedFields = make([]octosql.VariableName, 0)
+	for i := range firstRow {
+		columnName := fmt.Sprintf("%s.col%d", rs.alias, i+1)
+		rs.aliasedFields = append(rs.aliasedFields, octosql.VariableName(columnName))
+	}
+
+	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
+	for i, v := range firstRow {
+		aliasedRecord[rs.aliasedFields[i]] = execution.ParseType(v)
+	}
+
+	return execution.NewRecord(rs.aliasedFields, aliasedRecord)
 }
 
 func (rs *RecordStream) Next() (*execution.Record, error) {
@@ -198,15 +198,15 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 	if rs.first {
 		rs.first = false
 
-		rec, err := rs.initializeColumns()
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't initialize columns for record stream")
-		}
-
 		if rs.hasHeaderRow {
+			err := rs.initializeColumnsWithHeaderRow()
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't initialize columns for record stream from first row")
+			}
+
 			return rs.Next()
 		} else {
-			return rec, nil
+			return rs.initializeColumnsWithoutHeaderRow(), nil
 		}
 	}
 

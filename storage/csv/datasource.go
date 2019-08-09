@@ -36,7 +36,7 @@ func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 				return nil, errors.Wrap(err, "couldn't get path")
 			}
 
-			hasColumns, err := config.GetBool(dbConfig, "columns", config.WithDefault(true))
+			hasColumns, err := config.GetBool(dbConfig, "headerRow", config.WithDefault(true))
 
 			return &DataSource{
 				path:           path,

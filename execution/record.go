@@ -132,6 +132,15 @@ func (r *Record) Equal(other *Record) bool {
 			return false
 		}
 	}
+
+	if !r.metadata.eventTime.Equal(other.metadata.eventTime) {
+		return false
+	}
+
+	if r.metadata.undo != other.metadata.undo {
+		return false
+	}
+
 	return true
 }
 

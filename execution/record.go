@@ -70,7 +70,7 @@ func (r *Record) Value(field octosql.VariableName) octosql.Value {
 		case "undo":
 			return octosql.MakeBool(r.IsUndo())
 		case "event_time":
-			return octosql.MakeTime(r.metadata.eventTime)
+			return r.EventTime()
 		default:
 			return octosql.MakeNull()
 		}
@@ -95,7 +95,7 @@ func (r *Record) Fields() []Field {
 			Name: octosql.NewVariableName("sys.event_time"),
 		})
 	}
-	if r.metadata.undo {
+	if r.IsUndo() {
 		fields = append(fields, Field{
 			Name: octosql.NewVariableName("sys.undo"),
 		})
@@ -148,7 +148,7 @@ func (r *Record) IsUndo() bool {
 	return r.metadata.undo
 }
 
-func (r *Record) EventTimeField() octosql.Value {
+func (r *Record) EventTime() octosql.Value {
 	return octosql.MakeTime(r.metadata.eventTime)
 }
 

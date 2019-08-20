@@ -216,12 +216,13 @@ func (rs *RecordStream) initializeColumnsWithoutHeaderRow() *execution.Record {
 		rs.aliasedFields = append(rs.aliasedFields, octosql.VariableName(columnName))
 	}
 
-	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
-	for i, v := range firstRow {
-		aliasedRecord[rs.aliasedFields[i]] = execution.ParseType(v)
+	data := make([]octosql.Value, 0)
+	for _, v := range firstRow {
+		data = append(data, execution.ParseType(v))
 	}
 
-	return execution.NewRecord(rs.aliasedFields, aliasedRecord)
+	return execution.NewRecordFromSlice(rs.aliasedFields, data)
+
 }
 
 func isEmptyRow(row []string) bool {
@@ -265,17 +266,17 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 		return nil, execution.ErrEndOfStream
 	}
 
-	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
+	data := make([]octosql.Value, 0)
 	for i, v := range row {
-		aliasedRecord[rs.aliasedFields[i]] = execution.ParseType(v)
+		data = append(data, execution.ParseType(v))
 
 		//We treat the "" string as a null
-		if aliasedRecord[rs.aliasedFields[i]] == octosql.ZeroString() {
-			aliasedRecord[rs.aliasedFields[i]] = octosql.MakeNull()
+		if data[i] == octosql.ZeroString() {
+			data[i] = octosql.MakeNull()
 		}
 	}
 
-	return execution.NewRecord(rs.aliasedFields, aliasedRecord), nil
+	return execution.NewRecordFromSlice(rs.aliasedFields, data), nil
 }
 
 func min(a, b int) int {

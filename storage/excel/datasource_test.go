@@ -360,6 +360,36 @@ func TestDataSource_Get(t *testing.T) {
 			}),
 			wantErr: false,
 		},
+
+		{
+			name: "table with nil inside",
+			fields: fields{
+				path:           "fixtures/test.xlsx",
+				alias:          "t",
+				hasColumnNames: true,
+				sheet:          "CustomSheet",
+				rootColumn:     0,
+				rootRow:        8,
+			},
+			args: args{
+				variables: octosql.NoVariables(),
+			},
+			want: execution.NewInMemoryStream([]*execution.Record{
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"t.name", "t.age", "t.id"},
+					[]interface{}{"Bob", 13, 1},
+				),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"t.name", "t.age", "t.id"},
+					[]interface{}{"Ally", nil, 2},
+				),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"t.name", "t.age", "t.id"},
+					[]interface{}{nil, 7, nil},
+				),
+			}),
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

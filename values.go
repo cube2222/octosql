@@ -261,6 +261,12 @@ func AreEqual(left, right Value) bool {
 	if left == nil && right == nil {
 		return true
 	}
+
+	if (left == nil && right != nil) ||
+		(left != nil && right == nil) {
+		return false
+	}
+
 	switch left := left.(type) {
 	case Null:
 		_, ok := right.(Null)

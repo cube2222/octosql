@@ -153,7 +153,17 @@ func (rs *RecordStream) Close() error {
 	return nil
 }
 
-func extractRow(row []string, columnOffset int) []string {
+func padRow(row []string, targetLen int) []string {
+	difference := targetLen - len(row)
+
+	for i := 0; i < difference; i++ {
+		row = append(row, "")
+	}
+
+	return row
+}
+
+func extractHeaderRow(row []string, columnOffset int) []string {
 	trimmedRow := make([]string, 0)
 
 	for i := columnOffset; i < len(row); i++ {
@@ -167,8 +177,18 @@ func extractRow(row []string, columnOffset int) []string {
 	return trimmedRow
 }
 
+func extractStandardRow(row []string, columnOffset int, columnCount int) []string {
+	columnLimit := min(len(row), columnCount+columnOffset)
+
+	if len(row) <= columnOffset {
+		return make([]string, 0)
+	}
+
+	return padRow(row[columnOffset:columnLimit], columnCount)
+}
+
 func (rs *RecordStream) initializeColumnsWithHeaderRow() error {
-	columns := extractRow(rs.rows.Columns(), rs.columnOffset)
+	columns := extractHeaderRow(rs.rows.Columns(), rs.columnOffset)
 
 	rs.aliasedFields = make([]octosql.VariableName, 0)
 	for _, c := range columns {
@@ -188,7 +208,7 @@ func (rs *RecordStream) initializeColumnsWithHeaderRow() error {
 }
 
 func (rs *RecordStream) initializeColumnsWithoutHeaderRow() *execution.Record {
-	firstRow := extractRow(rs.rows.Columns(), rs.columnOffset)
+	firstRow := extractHeaderRow(rs.rows.Columns(), rs.columnOffset)
 
 	rs.aliasedFields = make([]octosql.VariableName, 0)
 	for i := range firstRow {
@@ -202,6 +222,16 @@ func (rs *RecordStream) initializeColumnsWithoutHeaderRow() *execution.Record {
 	}
 
 	return execution.NewRecord(rs.aliasedFields, aliasedRecord)
+}
+
+func isEmptyRow(row []string) bool {
+	for i := range row {
+		if row[i] != "" {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (rs *RecordStream) Next() (*execution.Record, error) {
@@ -229,16 +259,29 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 		return nil, execution.ErrEndOfStream
 	}
 
-	row := extractRow(rs.rows.Columns(), rs.columnOffset)
-	if len(row) != len(rs.aliasedFields) {
-		rs.isDone = true
+	row := extractStandardRow(rs.rows.Columns(), rs.columnOffset, len(rs.aliasedFields))
+
+	if isEmptyRow(row) {
 		return nil, execution.ErrEndOfStream
 	}
 
 	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
 	for i, v := range row {
 		aliasedRecord[rs.aliasedFields[i]] = execution.ParseType(v)
+
+		//We treat the "" string as a null
+		if aliasedRecord[rs.aliasedFields[i]] == octosql.ZeroString() {
+			aliasedRecord[rs.aliasedFields[i]] = octosql.MakeNull()
+		}
 	}
 
 	return execution.NewRecord(rs.aliasedFields, aliasedRecord), nil
+}
+
+func min(a, b int) int {
+	if a > b {
+		return b
+	}
+
+	return a
 }

@@ -121,6 +121,116 @@ func TestSerialize(t *testing.T) {
 				}),
 			}),
 		},
+		{
+			value: octosql.MakeObject(map[string]octosql.Value{
+				"name": octosql.MakeString("red"),
+				"age":  octosql.MakeInt(3),
+				"countries": octosql.MakeTuple([]octosql.Value{
+					octosql.MakeString("blue"),
+					octosql.MakeString("gren"),
+					octosql.MakeObject(map[string]octosql.Value{
+						"name": octosql.MakeString("red"),
+						"age":  octosql.MakeInt(3),
+						"countries": octosql.MakeTuple([]octosql.Value{
+							octosql.MakeString("blue"),
+							octosql.MakeString("gren"),
+							octosql.MakeObject(map[string]octosql.Value{
+								"name": octosql.MakeString("red"),
+								"age":  octosql.MakeInt(3),
+								"countries": octosql.MakeTuple([]octosql.Value{
+									octosql.MakeString("blue"),
+									octosql.MakeString("gren"),
+									octosql.MakeObject(map[string]octosql.Value{
+										"name": octosql.MakeString("red"),
+										"age":  octosql.MakeInt(3),
+										"countries": octosql.MakeTuple([]octosql.Value{
+											octosql.MakeString("blue"),
+											octosql.MakeString("gren"),
+											octosql.MakeObject(map[string]octosql.Value{
+												"name": octosql.MakeString("red"),
+												"age":  octosql.MakeInt(3),
+												"countries": octosql.MakeTuple([]octosql.Value{
+													octosql.MakeString("blue"),
+													octosql.MakeString("gren"),
+													octosql.MakeObject(map[string]octosql.Value{
+														"name": octosql.MakeString("red"),
+														"age":  octosql.MakeInt(3),
+														"countries": octosql.MakeTuple([]octosql.Value{
+															octosql.MakeString("blue"),
+															octosql.MakeString("gren"),
+														}),
+														"address": octosql.MakeObject(map[string]octosql.Value{
+															"city":   octosql.MakeString("purple"),
+															"street": octosql.MakeString("fuchsia"),
+														}),
+														"time":     octosql.MakeTime(time.Now()),
+														"duration": octosql.MakeDuration(time.Hour * 3),
+														"phantom":  octosql.MakePhantom(),
+														"null":     octosql.MakeNull(),
+														"bool":     octosql.MakeBool(true),
+														"float":    octosql.MakeFloat(math.Pi),
+													}),
+												}),
+												"address": octosql.MakeObject(map[string]octosql.Value{
+													"city":   octosql.MakeString("purple"),
+													"street": octosql.MakeString("fuchsia"),
+												}),
+												"time":     octosql.MakeTime(time.Now()),
+												"duration": octosql.MakeDuration(time.Hour * 3),
+												"phantom":  octosql.MakePhantom(),
+												"null":     octosql.MakeNull(),
+												"bool":     octosql.MakeBool(true),
+												"float":    octosql.MakeFloat(math.Pi),
+											}),
+										}),
+										"address": octosql.MakeObject(map[string]octosql.Value{
+											"city":   octosql.MakeString("purple"),
+											"street": octosql.MakeString("fuchsia"),
+										}),
+										"time":     octosql.MakeTime(time.Now()),
+										"duration": octosql.MakeDuration(time.Hour * 3),
+										"phantom":  octosql.MakePhantom(),
+										"null":     octosql.MakeNull(),
+										"bool":     octosql.MakeBool(true),
+										"float":    octosql.MakeFloat(math.Pi),
+									}),
+								}),
+								"address": octosql.MakeObject(map[string]octosql.Value{
+									"city":   octosql.MakeString("purple"),
+									"street": octosql.MakeString("fuchsia"),
+								}),
+								"time":     octosql.MakeTime(time.Now()),
+								"duration": octosql.MakeDuration(time.Hour * 3),
+								"phantom":  octosql.MakePhantom(),
+								"null":     octosql.MakeNull(),
+								"bool":     octosql.MakeBool(true),
+								"float":    octosql.MakeFloat(math.Pi),
+							}),
+						}),
+						"address": octosql.MakeObject(map[string]octosql.Value{
+							"city":   octosql.MakeString("purple"),
+							"street": octosql.MakeString("fuchsia"),
+						}),
+						"time":     octosql.MakeTime(time.Now()),
+						"duration": octosql.MakeDuration(time.Hour * 3),
+						"phantom":  octosql.MakePhantom(),
+						"null":     octosql.MakeNull(),
+						"bool":     octosql.MakeBool(true),
+						"float":    octosql.MakeFloat(math.Pi),
+					}),
+				}),
+				"address": octosql.MakeObject(map[string]octosql.Value{
+					"city":   octosql.MakeString("purple"),
+					"street": octosql.MakeString("fuchsia"),
+				}),
+				"time":     octosql.MakeTime(time.Now()),
+				"duration": octosql.MakeDuration(time.Hour * 3),
+				"phantom":  octosql.MakePhantom(),
+				"null":     octosql.MakeNull(),
+				"bool":     octosql.MakeBool(true),
+				"float":    octosql.MakeFloat(math.Pi),
+			}),
+		},
 	}
 	for _, tt := range tests {
 		t.Run("serialization", func(t *testing.T) {

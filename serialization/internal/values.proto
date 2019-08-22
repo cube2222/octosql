@@ -23,5 +23,5 @@ message Tuple {
 }
 
 message Object {
-    map<string, Value> fields = 10;
+    map<string, Value> fields = 1;
 }

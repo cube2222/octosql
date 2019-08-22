@@ -2123,13 +2123,13 @@ func (node TableValuedFunctionArguments) walkSubtree(visit Visit) error {
 
 // TableValuedFunctionArgument defines an aliased SELECT expression.
 type TableValuedFunctionArgument struct {
-	Name ColIdent
-	Expr Expr
+	Name  ColIdent
+	Value TableValuedFunctionArgumentValue
 }
 
 // Format formats the node.
 func (node *TableValuedFunctionArgument) Format(buf *TrackedBuffer) {
-	buf.Myprintf("%v => %v", node.Name, node.Expr)
+	buf.Myprintf("%v => %v", node.Name, node.Value)
 }
 
 func (node *TableValuedFunctionArgument) walkSubtree(visit Visit) error {
@@ -2139,7 +2139,69 @@ func (node *TableValuedFunctionArgument) walkSubtree(visit Visit) error {
 	return Walk(
 		visit,
 		node.Name,
+		node.Value,
+	)
+}
+
+// TableValuedFunctionArgumentValue defines table valued function argument value.
+type TableValuedFunctionArgumentValue interface {
+	iTableValuedFunctionArgumentValue()
+	SQLNode
+}
+
+func (*ExprTableValuedFunctionArgumentValue) iTableValuedFunctionArgumentValue()            {}
+func (*TableDescriptorTableValuedFunctionArgumentValue) iTableValuedFunctionArgumentValue() {}
+func (*FieldDescriptorTableValuedFunctionArgumentValue) iTableValuedFunctionArgumentValue() {}
+
+type ExprTableValuedFunctionArgumentValue struct {
+	Expr Expr
+}
+
+func (node *ExprTableValuedFunctionArgumentValue) Format(buf *TrackedBuffer) {
+	buf.Myprintf("%v", node.Expr)
+}
+
+func (node *ExprTableValuedFunctionArgumentValue) walkSubtree(visit Visit) error {
+	if node == nil {
+		return nil
+	}
+	return Walk(
+		visit,
 		node.Expr,
+	)
+}
+
+type TableDescriptorTableValuedFunctionArgumentValue struct {
+	Table TableExpr
+}
+
+func (node *TableDescriptorTableValuedFunctionArgumentValue) Format(buf *TrackedBuffer) {
+	buf.Myprintf("TABLE(%v)", node.Table)
+}
+
+func (node *TableDescriptorTableValuedFunctionArgumentValue) walkSubtree(visit Visit) error {
+	if node == nil {
+		return nil
+	}
+	return Walk(
+		visit,
+	)
+}
+
+type FieldDescriptorTableValuedFunctionArgumentValue struct {
+	Field string
+}
+
+func (node *FieldDescriptorTableValuedFunctionArgumentValue) Format(buf *TrackedBuffer) {
+	buf.Myprintf("DESCRIPTOR(%v)", node.Field)
+}
+
+func (node *FieldDescriptorTableValuedFunctionArgumentValue) walkSubtree(visit Visit) error {
+	if node == nil {
+		return nil
+	}
+	return Walk(
+		visit,
 	)
 }
 

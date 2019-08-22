@@ -8,8 +8,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// W przyszłości można zrobić z tego może metodę na Node,
-// jeśli np. optymalizatorowi się przyda, a nie tylko do testów.
 func EqualNodes(node1, node2 Node) error {
 	switch node1 := node1.(type) {
 	case *UnionAll:
@@ -184,7 +182,7 @@ func EqualNodes(node1, node2 Node) error {
 				if !ok {
 					return fmt.Errorf("arguments not equal: %v missing", arg)
 				}
-				if err := EqualExpressions(value1, value2); err != nil {
+				if err := EqualTableValuedFunctionArgumentValue(value1, value2); err != nil {
 					return errors.Wrapf(err, "argument %v values not equal", arg)
 				}
 			}
@@ -340,4 +338,20 @@ func EqualExpressions(expr1, expr2 Expression) error {
 	}
 
 	return fmt.Errorf("incompatible types: %v and %v", reflect.TypeOf(expr1), reflect.TypeOf(expr2))
+}
+
+func EqualTableValuedFunctionArgumentValue(value1 *TableValuedFunctionArgumentValue, value2 *TableValuedFunctionArgumentValue) error {
+	if value1.argumentType != value2.argumentType {
+		return fmt.Errorf("argument types not equal: %v, %v", value1.argumentType, value2.argumentType)
+	}
+	if err := EqualExpressions(value1.expression, value2.expression); err != nil {
+		return errors.Wrap(err, "expressions not equal")
+	}
+	if err := EqualNodes(value1.source, value2.source); err != nil {
+		return errors.Wrap(err, "sources not equal")
+	}
+	if value1.descriptor != value2.descriptor {
+		return fmt.Errorf("descriptors not equal: %v, %v", value1.descriptor, value2.descriptor)
+	}
+	return nil
 }

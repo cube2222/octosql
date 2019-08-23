@@ -170,15 +170,11 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 		return nil, execution.ErrEndOfStream
 	}
 
-	data := make([]octosql.Value, 0)
 	for i, v := range row {
-		data = append(data, execution.ParseType(v))
-
-		//We treat the "" string as a null
-		if data[i] == octosql.ZeroString() {
-			data[i] = octosql.MakeNull()
+		if v == octosql.ZeroString() {
+			row[i] = octosql.MakeNull()
 		}
 	}
 
-	return execution.NewRecordFromSlice(rs.aliasedFields, data), nil
+	return execution.NewRecordFromSlice(rs.aliasedFields, row), nil
 }

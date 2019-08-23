@@ -414,15 +414,15 @@ func TestDataSource_Get(t *testing.T) {
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.col1", "t.col2"},
-					[]interface{}{time.Date(2017, 3, 14, 13, 0, 0, 0, time.UTC), 1},
+					[]interface{}{time.Date(2017, 3, 14, 12, 59, 59, 999999790, time.UTC), 1},
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.col1", "t.col2"},
-					[]interface{}{time.Date(2017, 3, 15, 13, 0, 0, 0, time.UTC), 2},
+					[]interface{}{time.Date(2017, 3, 15, 12, 59, 59, 995000194, time.UTC), 2},
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.col1", "t.col2"},
-					[]interface{}{time.Date(2019, 5, 19, 14, 0, 0, 0, time.UTC), 3},
+					[]interface{}{time.Date(2019, 5, 19, 14, 0, 0, 209, time.UTC), 3},
 				),
 			}),
 			wantErr: false,
@@ -445,15 +445,15 @@ func TestDataSource_Get(t *testing.T) {
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.date", "t.points"},
-					[]interface{}{time.Date(2017, 3, 14, 13, 0, 0, 0, time.UTC), 101},
+					[]interface{}{time.Date(2017, 3, 14, 12, 59, 59, 999999790, time.UTC), 101},
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.date", "t.points"},
-					[]interface{}{time.Date(2017, 3, 15, 13, 0, 0, 0, time.UTC), 102},
+					[]interface{}{time.Date(2017, 3, 15, 12, 59, 59, 995000194, time.UTC), 102},
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.date", "t.points"},
-					[]interface{}{time.Date(2019, 5, 19, 14, 0, 0, 0, time.UTC), 103},
+					[]interface{}{time.Date(2019, 5, 19, 14, 0, 0, 209, time.UTC), 103},
 				),
 			}),
 			wantErr: false,

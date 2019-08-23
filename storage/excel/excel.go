@@ -16,10 +16,6 @@ import (
 
 var excelInitialDate = time.Date(1900, time.January, 1, 0, 0, 0, 0, time.UTC)
 
-const hoursInDay = 24
-const secondsInHour = 3600
-const nanosecondsInSecond = 1000000000
-
 func isCellNameValid(cell string) bool {
 	cellNameRegexp := "^[A-Z]+[1-9][0-9]*$"
 
@@ -92,7 +88,6 @@ func isDateStyle(style int) bool {
 
 func getDateFromExcelTime(timeValueStr string) (time.Time, error) {
 	timeValue, err := strconv.ParseFloat(timeValueStr, 64)
-
 	if err != nil {
 		return time.Now(), errors.Wrap(err, "couldn't convert string to float")
 	}
@@ -101,7 +96,7 @@ func getDateFromExcelTime(timeValueStr string) (time.Time, error) {
 	addedDays := excelInitialDate.Add(time.Hour * 24 * time.Duration(daysPart-2))
 
 	timeLeft := timeValue - float64(daysPart) //fractions of day
-	timeLeft *= nanosecondsInSecond * secondsInHour * hoursInDay
+	timeLeft *= float64((time.Hour * 24) / time.Nanosecond)
 
 	fullDate := addedDays.Add(time.Nanosecond * time.Duration(timeLeft))
 
@@ -109,17 +104,22 @@ func getDateFromExcelTime(timeValueStr string) (time.Time, error) {
 }
 
 func padRow(row []string, targetLen int) []string {
+	newRow := make([]string, len(row))
+	copy(newRow, row)
+
 	difference := targetLen - len(row)
 
 	for i := 0; i < difference; i++ {
-		row = append(row, "")
+		newRow = append(newRow, "")
 	}
 
-	return row
+	return newRow
 }
 
-func (rs *RecordStream) parseDataTypes(row []string) error {
+func (rs *RecordStream) parseDataTypes(row []string) ([]octosql.Value, error) {
 	currentColumn := rs.rootColumnName
+	resultRow := make([]octosql.Value, len(row))
+
 	for i, v := range row {
 		currentCell := createCellName(currentColumn, rs.currentRowNumber)
 
@@ -129,30 +129,32 @@ func (rs *RecordStream) parseDataTypes(row []string) error {
 			dateValue, err := getDateFromExcelTime(v)
 
 			if err != nil {
-				return errors.Wrap(err, "couldn't get date from excel time")
+				return nil, errors.Wrap(err, "couldn't get date from excel time")
 			}
 
-			row[i] = dateValue.Format(time.RFC3339Nano)
+			resultRow[i] = octosql.MakeTime(dateValue)
+		} else {
+			resultRow[i] = execution.ParseType(row[i])
 		}
 
 		currentColumn = getNextColumn(currentColumn)
 	}
 
-	return nil
+	return resultRow, nil
 }
 
-func (rs *RecordStream) extractHeaderRow(row []string) ([]string, error) {
-	resultRow := make([]string, 0)
+func (rs *RecordStream) extractHeaderRow(row []string) ([]octosql.Value, error) {
+	stringRow := make([]string, 0)
 
 	for i := rs.columnOffset; i < len(row); i++ {
 		if row[i] != "" {
-			resultRow = append(resultRow, row[i])
+			stringRow = append(stringRow, row[i])
 		} else {
 			break
 		}
 	}
 
-	err := rs.parseDataTypes(resultRow)
+	resultRow, err := rs.parseDataTypes(stringRow)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't parse types in row")
 	}
@@ -162,17 +164,17 @@ func (rs *RecordStream) extractHeaderRow(row []string) ([]string, error) {
 	return resultRow, nil
 }
 
-func (rs *RecordStream) extractStandardRow(row []string) ([]string, error) {
+func (rs *RecordStream) extractStandardRow(row []string) ([]octosql.Value, error) {
 	columnCount := len(rs.aliasedFields)
 	columnLimit := min(len(row), columnCount+rs.columnOffset)
 
 	if len(row) <= rs.columnOffset {
-		return make([]string, 0), nil
+		return make([]octosql.Value, 0), nil
 	}
 
-	resultRow := padRow(row[rs.columnOffset:columnLimit], columnCount)
+	stringRow := padRow(row[rs.columnOffset:columnLimit], columnCount)
 
-	err := rs.parseDataTypes(resultRow)
+	resultRow, err := rs.parseDataTypes(stringRow)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't parse types in row")
 	}
@@ -190,7 +192,16 @@ func (rs *RecordStream) initializeColumnsWithHeaderRow() error {
 
 	rs.aliasedFields = make([]octosql.VariableName, 0)
 	for _, c := range columns {
-		lowerCased := strings.ToLower(fmt.Sprintf("%s.%s", rs.alias, c))
+		var colName string
+
+		cStr, ok := c.(octosql.String)
+		if !ok {
+			colName = c.String()
+		} else {
+			colName = cStr.AsString()
+		}
+
+		lowerCased := strings.ToLower(fmt.Sprintf("%s.%s", rs.alias, colName))
 		rs.aliasedFields = append(rs.aliasedFields, octosql.VariableName(lowerCased))
 	}
 
@@ -217,17 +228,12 @@ func (rs *RecordStream) initializeColumnsWithoutHeaderRow() (*execution.Record, 
 		rs.aliasedFields = append(rs.aliasedFields, octosql.VariableName(columnName))
 	}
 
-	data := make([]octosql.Value, 0)
-	for _, v := range firstRow {
-		data = append(data, execution.ParseType(v))
-	}
-
-	return execution.NewRecordFromSlice(rs.aliasedFields, data), nil
+	return execution.NewRecordFromSlice(rs.aliasedFields, firstRow), nil
 }
 
-func isRowEmpty(row []string) bool {
+func isRowEmpty(row []octosql.Value) bool {
 	for i := range row {
-		if row[i] != "" {
+		if row[i] != octosql.ZeroString() {
 			return false
 		}
 	}

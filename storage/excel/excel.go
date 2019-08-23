@@ -143,6 +143,21 @@ func (rs *RecordStream) parseDataTypes(row []string) ([]octosql.Value, error) {
 	return resultRow, nil
 }
 
+func (rs *RecordStream) extractColumnRow(row []string) []string {
+	stringRow := make([]string, 0)
+
+	for i := rs.columnOffset; i < len(row); i++ {
+		if row[i] != "" {
+			stringRow = append(stringRow, row[i])
+		} else {
+			break
+		}
+	}
+
+	rs.currentRowNumber++
+	return stringRow
+}
+
 func (rs *RecordStream) extractHeaderRow(row []string) ([]octosql.Value, error) {
 	stringRow := make([]string, 0)
 
@@ -185,23 +200,11 @@ func (rs *RecordStream) extractStandardRow(row []string) ([]octosql.Value, error
 }
 
 func (rs *RecordStream) initializeColumnsWithHeaderRow() error {
-	columns, err := rs.extractHeaderRow(rs.rows.Columns())
-	if err != nil {
-		return errors.Wrap(err, "couldn't extract header row")
-	}
+	columns := rs.extractColumnRow(rs.rows.Columns())
 
 	rs.aliasedFields = make([]octosql.VariableName, 0)
 	for _, c := range columns {
-		var colName string
-
-		cStr, ok := c.(octosql.String)
-		if !ok {
-			colName = c.String()
-		} else {
-			colName = cStr.AsString()
-		}
-
-		lowerCased := strings.ToLower(fmt.Sprintf("%s.%s", rs.alias, colName))
+		lowerCased := strings.ToLower(fmt.Sprintf("%s.%s", rs.alias, c))
 		rs.aliasedFields = append(rs.aliasedFields, octosql.VariableName(lowerCased))
 	}
 

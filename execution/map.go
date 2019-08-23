@@ -80,5 +80,5 @@ func (stream *MappedStream) Next() (*Record, error) {
 		}
 	}
 
-	return NewRecord(fieldNames, outValues), nil
+	return NewRecord(fieldNames, outValues, WithMetadataFrom(srcRecord)), nil
 }

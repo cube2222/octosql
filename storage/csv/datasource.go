@@ -87,7 +87,7 @@ type RecordStream struct {
 func (rs *RecordStream) Close() error {
 	err := rs.file.Close()
 	if err != nil {
-		return errors.Wrap(err, "Couldn't close underlying file")
+		return errors.Wrap(err, "couldn't close underlying file")
 	}
 
 	return nil

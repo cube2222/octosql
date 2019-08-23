@@ -317,7 +317,7 @@ func ParseJoinTableExpression(expr *sqlparser.JoinTableExpr) (logical.Node, erro
 
 func ParseTableValuedFunction(expr *sqlparser.TableValuedFunction) (logical.Node, error) {
 	name := expr.Name.String()
-	arguments := make(map[octosql.VariableName]*logical.TableValuedFunctionArgumentValue)
+	arguments := make(map[octosql.VariableName]logical.TableValuedFunctionArgumentValue)
 	for i := range expr.Args {
 		parsed, err := ParseTableValuedFunctionArgument(expr.Args[i].Value)
 		if err != nil {
@@ -332,7 +332,7 @@ func ParseTableValuedFunction(expr *sqlparser.TableValuedFunction) (logical.Node
 	), nil
 }
 
-func ParseTableValuedFunctionArgument(expr sqlparser.TableValuedFunctionArgumentValue) (*logical.TableValuedFunctionArgumentValue, error) {
+func ParseTableValuedFunctionArgument(expr sqlparser.TableValuedFunctionArgumentValue) (logical.TableValuedFunctionArgumentValue, error) {
 	switch expr := expr.(type) {
 	case *sqlparser.ExprTableValuedFunctionArgumentValue:
 		parsed, err := ParseExpression(expr.Expr)

@@ -17,7 +17,7 @@ type Transformers struct {
 	ExprT                             func(Expression) Expression
 	NamedExprT                        func(NamedExpression) NamedExpression
 	FormulaT                          func(Formula) Formula
-	TableValuedFunctionArgumentValueT func(*TableValuedFunctionArgumentValue) *TableValuedFunctionArgumentValue
+	TableValuedFunctionArgumentValueT func(TableValuedFunctionArgumentValue) TableValuedFunctionArgumentValue
 }
 
 // MaterializationContext is a structure containing the configuration for the materialization.

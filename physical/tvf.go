@@ -2,7 +2,7 @@ package physical
 
 import (
 	"context"
-	"fmt"
+	"reflect"
 
 	"github.com/pkg/errors"
 
@@ -12,52 +12,51 @@ import (
 	"github.com/cube2222/octosql/physical/metadata"
 )
 
-type TableValuedFunctionArgumentValueType string
-
-const (
-	TableValuedFunctionArgumentValueExpression TableValuedFunctionArgumentValueType = "expression"
-	TableValuedFunctionArgumentValueTable      TableValuedFunctionArgumentValueType = "table"
-	TableValuedFunctionArgumentValueDescriptor TableValuedFunctionArgumentValueType = "descriptor"
-)
-
-type TableValuedFunctionArgumentValue struct {
-	ArgumentType TableValuedFunctionArgumentValueType
-	Expression   Expression
-	Source       Node
-	descriptor   string
+type TableValuedFunctionArgumentValue interface {
+	iTableValuedFunctionArgumentValue()
+	Transform(ctx context.Context, transformers *Transformers) TableValuedFunctionArgumentValue
 }
 
-func NewTableValuedFunctionArgumentValueExpression(expression Expression) *TableValuedFunctionArgumentValue {
-	return &TableValuedFunctionArgumentValue{ArgumentType: TableValuedFunctionArgumentValueExpression, Expression: expression}
+func (*TableValuedFunctionArgumentValueExpression) iTableValuedFunctionArgumentValue() {}
+func (*TableValuedFunctionArgumentValueTable) iTableValuedFunctionArgumentValue()      {}
+func (*TableValuedFunctionArgumentValueDescriptor) iTableValuedFunctionArgumentValue() {}
+
+type TableValuedFunctionArgumentValueExpression struct {
+	Expression Expression
 }
 
-func NewTableValuedFunctionArgumentValueTable(source Node) *TableValuedFunctionArgumentValue {
-	return &TableValuedFunctionArgumentValue{ArgumentType: TableValuedFunctionArgumentValueTable, Source: source}
+func NewTableValuedFunctionArgumentValueExpression(expression Expression) *TableValuedFunctionArgumentValueExpression {
+	return &TableValuedFunctionArgumentValueExpression{Expression: expression}
 }
 
-func NewTableValuedFunctionArgumentValueDescriptor(descriptor string) *TableValuedFunctionArgumentValue {
-	return &TableValuedFunctionArgumentValue{ArgumentType: TableValuedFunctionArgumentValueDescriptor, descriptor: descriptor}
+func (arg *TableValuedFunctionArgumentValueExpression) Transform(ctx context.Context, transformers *Transformers) TableValuedFunctionArgumentValue {
+	return &TableValuedFunctionArgumentValueExpression{Expression: arg.Expression.Transform(ctx, transformers)}
 }
 
-func (arg *TableValuedFunctionArgumentValue) Transform(ctx context.Context, transformers *Transformers) *TableValuedFunctionArgumentValue {
-	transformed := &TableValuedFunctionArgumentValue{
-		ArgumentType: arg.ArgumentType,
+type TableValuedFunctionArgumentValueTable struct {
+	Source Node
+}
+
+func NewTableValuedFunctionArgumentValueTable(source Node) *TableValuedFunctionArgumentValueTable {
+	return &TableValuedFunctionArgumentValueTable{Source: source}
+}
+
+func (arg *TableValuedFunctionArgumentValueTable) Transform(ctx context.Context, transformers *Transformers) TableValuedFunctionArgumentValue {
+	return &TableValuedFunctionArgumentValueTable{Source: arg.Source.Transform(ctx, transformers)}
+}
+
+type TableValuedFunctionArgumentValueDescriptor struct {
+	Descriptor string
+}
+
+func NewTableValuedFunctionArgumentValueDescriptor(descriptor string) *TableValuedFunctionArgumentValueDescriptor {
+	return &TableValuedFunctionArgumentValueDescriptor{Descriptor: descriptor}
+}
+
+func (arg *TableValuedFunctionArgumentValueDescriptor) Transform(ctx context.Context, transformers *Transformers) TableValuedFunctionArgumentValue {
+	var transformed TableValuedFunctionArgumentValue = &TableValuedFunctionArgumentValueDescriptor{
+		Descriptor: arg.Descriptor,
 	}
-
-	switch arg.ArgumentType {
-	case TableValuedFunctionArgumentValueExpression:
-		transformed.Expression = arg.Expression.Transform(ctx, transformers)
-
-	case TableValuedFunctionArgumentValueTable:
-		transformed.Source = arg.Source.Transform(ctx, transformers)
-
-	case TableValuedFunctionArgumentValueDescriptor:
-		transformed.descriptor = arg.descriptor
-
-	default:
-		panic(errors.Errorf("invalid table valued function argument type: %v", arg.ArgumentType))
-	}
-
 	if transformers.TableValuedFunctionArgumentValueT != nil {
 		transformed = transformers.TableValuedFunctionArgumentValueT(transformed)
 	}
@@ -66,10 +65,10 @@ func (arg *TableValuedFunctionArgumentValue) Transform(ctx context.Context, tran
 
 type TableValuedFunction struct {
 	Name      string
-	Arguments map[octosql.VariableName]*TableValuedFunctionArgumentValue
+	Arguments map[octosql.VariableName]TableValuedFunctionArgumentValue
 }
 
-func NewTableValuedFunction(name string, args map[octosql.VariableName]*TableValuedFunctionArgumentValue) *TableValuedFunction {
+func NewTableValuedFunction(name string, args map[octosql.VariableName]TableValuedFunctionArgumentValue) *TableValuedFunction {
 	return &TableValuedFunction{
 		Name:      name,
 		Arguments: args,
@@ -77,7 +76,7 @@ func NewTableValuedFunction(name string, args map[octosql.VariableName]*TableVal
 }
 
 func (node *TableValuedFunction) Transform(ctx context.Context, transformers *Transformers) Node {
-	Arguments := make(map[octosql.VariableName]*TableValuedFunctionArgumentValue, len(node.Arguments))
+	Arguments := make(map[octosql.VariableName]TableValuedFunctionArgumentValue, len(node.Arguments))
 	for i := range node.Arguments {
 		Arguments[i] = node.Arguments[i].Transform(ctx, transformers)
 	}
@@ -96,11 +95,12 @@ func (node *TableValuedFunction) getArgumentExpression(name octosql.VariableName
 	if !ok {
 		return nil, errors.Errorf("argument %v not provided", name)
 	}
-	if arg.ArgumentType != TableValuedFunctionArgumentValueExpression {
-		return nil, errors.Errorf("argument %v should be expression, is %v", name, arg.ArgumentType)
+	argExpression, ok := arg.(*TableValuedFunctionArgumentValueExpression)
+	if !ok {
+		return nil, errors.Errorf("argument %v should be expression, is %v", name, reflect.TypeOf(arg))
 	}
 
-	return arg.Expression, nil
+	return argExpression.Expression, nil
 }
 
 func (node *TableValuedFunction) getArgumentTable(name octosql.VariableName) (Node, error) {
@@ -108,11 +108,12 @@ func (node *TableValuedFunction) getArgumentTable(name octosql.VariableName) (No
 	if !ok {
 		return nil, errors.Errorf("argument %v not provided", name)
 	}
-	if arg.ArgumentType != TableValuedFunctionArgumentValueTable {
-		return nil, errors.Errorf("argument %v should be table, is %v", name, arg.ArgumentType)
+	argExpression, ok := arg.(*TableValuedFunctionArgumentValueTable)
+	if !ok {
+		return nil, errors.Errorf("argument %v should be table, is %v", name, reflect.TypeOf(arg))
 	}
 
-	return arg.Source, nil
+	return argExpression.Source, nil
 }
 
 func (node *TableValuedFunction) getArgumentDescriptor(name octosql.VariableName) (string, error) {
@@ -120,11 +121,12 @@ func (node *TableValuedFunction) getArgumentDescriptor(name octosql.VariableName
 	if !ok {
 		return "", errors.Errorf("argument %v not provided", name)
 	}
-	if arg.ArgumentType != TableValuedFunctionArgumentValueDescriptor {
-		return "", errors.Errorf("argument %v should be field descriptor, is %v", name, arg.ArgumentType)
+	argExpression, ok := arg.(*TableValuedFunctionArgumentValueDescriptor)
+	if !ok {
+		return "", errors.Errorf("argument %v should be field descriptor, is %v", name, reflect.TypeOf(arg))
 	}
 
-	return arg.descriptor, nil
+	return argExpression.Descriptor, nil
 }
 
 func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
@@ -153,8 +155,6 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 		return tvf.NewRange(startMat, endMat), nil
 
 	}
-
-	panic(fmt.Sprintf("%+v", node.Arguments["data"]))
 
 	return nil, errors.Errorf("invalid table valued function: %v", node.Name)
 }

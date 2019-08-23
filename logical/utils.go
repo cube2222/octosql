@@ -340,18 +340,32 @@ func EqualExpressions(expr1, expr2 Expression) error {
 	return fmt.Errorf("incompatible types: %v and %v", reflect.TypeOf(expr1), reflect.TypeOf(expr2))
 }
 
-func EqualTableValuedFunctionArgumentValue(value1 *TableValuedFunctionArgumentValue, value2 *TableValuedFunctionArgumentValue) error {
-	if value1.argumentType != value2.argumentType {
-		return fmt.Errorf("argument types not equal: %v, %v", value1.argumentType, value2.argumentType)
+func EqualTableValuedFunctionArgumentValue(value1 TableValuedFunctionArgumentValue, value2 TableValuedFunctionArgumentValue) error {
+	switch value1 := value1.(type) {
+	case *TableValuedFunctionArgumentValueExpression:
+		if value2, ok := value2.(*TableValuedFunctionArgumentValueExpression); ok {
+			if err := EqualExpressions(value1.expression, value2.expression); err != nil {
+				return errors.Wrap(err, "expressions not equal")
+			}
+		}
+
+	case *TableValuedFunctionArgumentValueTable:
+		if value2, ok := value2.(*TableValuedFunctionArgumentValueTable); ok {
+			if err := EqualNodes(value1.source, value2.source); err != nil {
+				return errors.Wrap(err, "sources not equal")
+			}
+		}
+
+	case *TableValuedFunctionArgumentValueDescriptor:
+		if value2, ok := value2.(*TableValuedFunctionArgumentValueDescriptor); ok {
+			if value1.descriptor != value2.descriptor {
+				return fmt.Errorf("descriptors not equal: %v, %v", value1.descriptor, value2.descriptor)
+			}
+		}
+
+	default:
+		log.Fatalf("Unsupported equality comparison %v and %v", reflect.TypeOf(value1), reflect.TypeOf(value2))
 	}
-	if err := EqualExpressions(value1.expression, value2.expression); err != nil {
-		return errors.Wrap(err, "expressions not equal")
-	}
-	if err := EqualNodes(value1.source, value2.source); err != nil {
-		return errors.Wrap(err, "sources not equal")
-	}
-	if value1.descriptor != value2.descriptor {
-		return fmt.Errorf("descriptors not equal: %v, %v", value1.descriptor, value2.descriptor)
-	}
-	return nil
+
+	return fmt.Errorf("incompatible types: %v and %v", reflect.TypeOf(value1), reflect.TypeOf(value2))
 }

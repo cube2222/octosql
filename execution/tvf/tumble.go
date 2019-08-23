@@ -62,17 +62,10 @@ type TumbleStream struct {
 }
 
 func (s *TumbleStream) Next() (*execution.Record, error) {
-	if s.current >= s.endExclusive {
-		return nil, execution.ErrEndOfStream
-	}
 
-	out := execution.NewRecordFromSlice([]octosql.VariableName{"i"}, []octosql.Value{s.current})
-	s.current++
-
-	return out, nil
+	return nil, nil
 }
 
 func (s *TumbleStream) Close() error {
-	s.current = s.endExclusive
 	return nil
 }

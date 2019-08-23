@@ -56,11 +56,6 @@ func TestCSVDataSource_Get(t *testing.T) {
 			csvName: "cities",
 			wantErr: false,
 		},
-		{
-			name:    "not unique columns",
-			csvName: "notUnique",
-			wantErr: true,
-		},
 	}
 
 	for _, tt := range tests {
@@ -70,7 +65,8 @@ func TestCSVDataSource_Get(t *testing.T) {
 					{
 						Name: "test",
 						Config: map[string]interface{}{
-							"path": csvDbs[tt.csvName].path,
+							"path":      csvDbs[tt.csvName].path,
+							"headerRow": true,
 						},
 					},
 				},
@@ -185,10 +181,23 @@ func TestCSVRecordStream_Next(t *testing.T) {
 		},
 
 		{
+			name:            "not unique columns",
+			csvName:         "notUnique",
+			hasColumnHeader: true,
+			fields:          []string{"name", "name"},
+			want: []wanted{
+				{
+					record: nil,
+					error:  true,
+				},
+			},
+		},
+
+		{
 			name:            "file with header row",
 			csvName:         "hasHeaders",
 			hasColumnHeader: true,
-			fields:          []string{"name", "surname"},
+			fields:          []string{"dog", "age"},
 			want: []wanted{
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
@@ -215,7 +224,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			name:            "file without header row",
 			csvName:         "noHeaders",
 			hasColumnHeader: false,
-			fields:          []string{"name", "surname"},
+			fields:          []string{"col1", "col2"},
 			want: []wanted{
 				{
 					record: execution.NewRecordFromSliceWithNormalize(

@@ -60,7 +60,7 @@ func ParseType(str string) octosql.Value {
 		return octosql.NormalizeType(jsonObject)
 	}
 
-	t, err := time.Parse(time.RFC3339, str)
+	t, err := time.Parse(time.RFC3339Nano, str)
 	if err == nil {
 		return octosql.MakeTime(t)
 	}

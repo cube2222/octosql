@@ -1,12 +1,6 @@
 package excel
 
 import (
-	"fmt"
-	"regexp"
-	"strconv"
-	"strings"
-	"unicode"
-
 	"github.com/360EntSecGroup-Skylar/excelize"
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
@@ -23,41 +17,13 @@ var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 }
 
 type DataSource struct {
-	path           string
-	alias          string
-	hasColumnNames bool
-	sheet          string
-	rootColumn     int
-	rootRow        int
-}
-
-func isCellNameValid(cell string) bool {
-	cellNameRegexp := "^[A-Z]+[1-9][0-9]*$"
-
-	r, _ := regexp.Compile(cellNameRegexp)
-
-	return r.MatchString(cell)
-}
-
-func getCellRowCol(cell string) (row, col string) {
-	for index, char := range cell {
-		if unicode.IsDigit(char) {
-			return cell[index:], cell[:index]
-		}
-	}
-
-	return "", cell
-}
-
-func getRowColCoords(cell string) (row int, col int, err error) {
-	rowStr, colStr := getCellRowCol(cell)
-	col = excelize.TitleToNumber(colStr)
-	rowTmp, err := strconv.ParseInt(rowStr, 10, 64)
-	if err != nil {
-		return 0, 0, errors.Wrap(err, "couldn't parse row")
-	}
-
-	return int(rowTmp) - 1, col, nil
+	path             string
+	alias            string
+	hasColumnNames   bool
+	sheet            string
+	rootColumnString string
+	rootColumn       int
+	rootRow          int
 }
 
 func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
@@ -87,23 +53,26 @@ func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 				return nil, errors.Wrap(err, "the root cell of the table is invalid")
 			}
 
-			row, col, err := getRowColCoords(root)
+			_, colStr := getRowAndColumnFromCell(root)
+
+			row, col, err := getCoordinatesFromCell(root)
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't extract column and row numbers from cell")
 			}
 
 			return &DataSource{
-				path:           path,
-				alias:          alias,
-				hasColumnNames: hasColumns,
-				sheet:          sheet,
-				rootColumn:     col,
-				rootRow:        row,
+				path:             path,
+				alias:            alias,
+				hasColumnNames:   hasColumns,
+				sheet:            sheet,
+				rootColumn:       col,
+				rootRow:          row,
+				rootColumnString: colStr,
 			}, nil
 		},
 		nil,
 		availableFilters,
-		metadata.BoundedDoesntFitInLocalStorage,
+		metadata.BoundedFitsInLocalStorage,
 	)
 }
 
@@ -130,12 +99,16 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 	}
 
 	return &RecordStream{
-		isDone:       false,
-		alias:        ds.alias,
-		rows:         rows,
-		hasHeaderRow: ds.hasColumnNames,
-		first:        true,
-		columnOffset: ds.rootColumn,
+		isDone:           false,
+		first:            true,
+		hasHeaderRow:     ds.hasColumnNames,
+		alias:            ds.alias,
+		columnOffset:     ds.rootColumn,
+		rows:             rows,
+		currentRowNumber: ds.rootRow + 1,
+		file:             file,
+		rootColumnName:   ds.rootColumnString,
+		sheet:            ds.sheet,
 	}, nil
 }
 
@@ -147,92 +120,15 @@ type RecordStream struct {
 	hasHeaderRow  bool
 	first         bool
 	columnOffset  int
+	file          *excelize.File
+
+	sheet            string
+	currentRowNumber int
+	rootColumnName   string
 }
 
 func (rs *RecordStream) Close() error {
 	return nil
-}
-
-func padRow(row []string, targetLen int) []string {
-	difference := targetLen - len(row)
-
-	for i := 0; i < difference; i++ {
-		row = append(row, "")
-	}
-
-	return row
-}
-
-func extractHeaderRow(row []string, columnOffset int) []string {
-	trimmedRow := make([]string, 0)
-
-	for i := columnOffset; i < len(row); i++ {
-		if row[i] != "" {
-			trimmedRow = append(trimmedRow, row[i])
-		} else {
-			break
-		}
-	}
-
-	return trimmedRow
-}
-
-func extractStandardRow(row []string, columnOffset int, columnCount int) []string {
-	columnLimit := min(len(row), columnCount+columnOffset)
-
-	if len(row) <= columnOffset {
-		return make([]string, 0)
-	}
-
-	return padRow(row[columnOffset:columnLimit], columnCount)
-}
-
-func (rs *RecordStream) initializeColumnsWithHeaderRow() error {
-	columns := extractHeaderRow(rs.rows.Columns(), rs.columnOffset)
-
-	rs.aliasedFields = make([]octosql.VariableName, 0)
-	for _, c := range columns {
-		lowerCased := strings.ToLower(fmt.Sprintf("%s.%s", rs.alias, c))
-		rs.aliasedFields = append(rs.aliasedFields, octosql.VariableName(lowerCased))
-	}
-
-	set := make(map[octosql.VariableName]struct{})
-	for _, f := range rs.aliasedFields {
-		if _, present := set[f]; present {
-			return errors.New("column names not unique")
-		}
-		set[f] = struct{}{}
-	}
-
-	return nil
-}
-
-func (rs *RecordStream) initializeColumnsWithoutHeaderRow() *execution.Record {
-	firstRow := extractHeaderRow(rs.rows.Columns(), rs.columnOffset)
-
-	rs.aliasedFields = make([]octosql.VariableName, 0)
-	for i := range firstRow {
-		columnName := fmt.Sprintf("%s.col%d", rs.alias, i+1)
-		rs.aliasedFields = append(rs.aliasedFields, octosql.VariableName(columnName))
-	}
-
-	data := make([]octosql.Value, 0)
-	for _, v := range firstRow {
-		data = append(data, execution.ParseType(v))
-	}
-
-	return execution.NewRecordFromSlice(rs.aliasedFields, data)
-
-}
-
-func isEmptyRow(row []string) bool {
-	for i := range row {
-		if row[i] != "" {
-			return false
-		}
-	}
-
-	return true
 }
 
 func (rs *RecordStream) Next() (*execution.Record, error) {
@@ -251,7 +147,12 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 
 			return rs.Next()
 		} else {
-			return rs.initializeColumnsWithoutHeaderRow(), nil
+			rec, err := rs.initializeColumnsWithoutHeaderRow()
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't initialize columns")
+			}
+
+			return rec, nil
 		}
 	}
 
@@ -260,9 +161,12 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 		return nil, execution.ErrEndOfStream
 	}
 
-	row := extractStandardRow(rs.rows.Columns(), rs.columnOffset, len(rs.aliasedFields))
+	row, err := rs.extractStandardRow(rs.rows.Columns())
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't extract row")
+	}
 
-	if isEmptyRow(row) {
+	if isRowEmpty(row) {
 		return nil, execution.ErrEndOfStream
 	}
 
@@ -277,12 +181,4 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 	}
 
 	return execution.NewRecordFromSlice(rs.aliasedFields, data), nil
-}
-
-func min(a, b int) int {
-	if a > b {
-		return b
-	}
-
-	return a
 }

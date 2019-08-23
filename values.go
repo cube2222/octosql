@@ -11,6 +11,9 @@ import (
 	"github.com/cube2222/octosql/docs"
 )
 
+//the precision in time values is 10^8 ns which is 0,1s
+const timePrecision = 100000000
+
 //go-sumtype:decl Value
 type Value interface {
 	docs.Documented
@@ -256,6 +259,14 @@ func NormalizeType(value interface{}) Value {
 	panic("unreachable")
 }
 
+func abs(x int64) int64 {
+	if x >= 0 {
+		return x
+	}
+
+	return -1 * x
+}
+
 // octosql.AreEqual checks the equality of the given values, returning false if the types don't match.
 func AreEqual(left, right Value) bool {
 	if left == nil && right == nil {
@@ -315,7 +326,13 @@ func AreEqual(left, right Value) bool {
 		if !ok {
 			return false
 		}
-		return left.AsTime().Equal(right.AsTime())
+
+		leftNano := left.AsTime().UnixNano()
+		rightNano := right.AsTime().UnixNano()
+
+		diff := abs(leftNano - rightNano)
+
+		return diff < timePrecision
 
 	case Duration:
 		right, ok := right.(Duration)

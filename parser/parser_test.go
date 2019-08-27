@@ -695,7 +695,7 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 								arg1=>"test", 
 								arg2=>2, 
 								arg3=> interval 2 hour,
-								arg4=>DESCRIPTOR(test2)) x`,
+								arg4=>DESCRIPTOR(test2.test3)) x`,
 			},
 			want: logical.NewRequalifier("x",
 				logical.NewTableValuedFunction(
@@ -708,7 +708,7 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 							logical.NewConstant(2),
 							logical.NewConstant("hour"),
 						)),
-						octosql.NewVariableName("arg4"): logical.NewTableValuedFunctionArgumentValueDescriptor("test2"),
+						octosql.NewVariableName("arg4"): logical.NewTableValuedFunctionArgumentValueDescriptor("test2.test3"),
 					},
 				),
 			),

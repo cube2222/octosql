@@ -2189,7 +2189,7 @@ func (node *TableDescriptorTableValuedFunctionArgumentValue) walkSubtree(visit V
 }
 
 type FieldDescriptorTableValuedFunctionArgumentValue struct {
-	Field string
+	Field *ColName
 }
 
 func (node *FieldDescriptorTableValuedFunctionArgumentValue) Format(buf *TrackedBuffer) {
@@ -2202,6 +2202,7 @@ func (node *FieldDescriptorTableValuedFunctionArgumentValue) walkSubtree(visit V
 	}
 	return Walk(
 		visit,
+		node.Field,
 	)
 }
 

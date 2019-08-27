@@ -9,7 +9,7 @@ import (
 type VariableName string
 
 func NewVariableName(varname string) VariableName {
-	if varname[0] == '.' {
+	if len(varname) > 0 && varname[0] == '.' {
 		varname = varname[1:]
 	}
 	return VariableName(strings.ToLower(varname))

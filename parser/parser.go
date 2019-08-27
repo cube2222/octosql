@@ -347,7 +347,11 @@ func ParseTableValuedFunctionArgument(expr sqlparser.TableValuedFunctionArgument
 		return logical.NewTableValuedFunctionArgumentValueTable(parsed), nil
 
 	case *sqlparser.FieldDescriptorTableValuedFunctionArgumentValue:
-		return logical.NewTableValuedFunctionArgumentValueDescriptor(octosql.NewVariableName(expr.Field)), nil
+		name := expr.Field.Name.String()
+		if !expr.Field.Qualifier.Name.IsEmpty() {
+			name = fmt.Sprintf("%s.%s", expr.Field.Qualifier.Name.String(), name)
+		}
+		return logical.NewTableValuedFunctionArgumentValueDescriptor(octosql.NewVariableName(name)), nil
 
 	default:
 		return nil, errors.Errorf("invalid table valued function argument: %v", expr)

@@ -347,6 +347,7 @@ func EqualTableValuedFunctionArgumentValue(value1 TableValuedFunctionArgumentVal
 			if err := EqualExpressions(value1.expression, value2.expression); err != nil {
 				return errors.Wrap(err, "expressions not equal")
 			}
+			return nil
 		}
 
 	case *TableValuedFunctionArgumentValueTable:
@@ -354,6 +355,7 @@ func EqualTableValuedFunctionArgumentValue(value1 TableValuedFunctionArgumentVal
 			if err := EqualNodes(value1.source, value2.source); err != nil {
 				return errors.Wrap(err, "sources not equal")
 			}
+			return nil
 		}
 
 	case *TableValuedFunctionArgumentValueDescriptor:
@@ -361,6 +363,7 @@ func EqualTableValuedFunctionArgumentValue(value1 TableValuedFunctionArgumentVal
 			if value1.descriptor != value2.descriptor {
 				return fmt.Errorf("descriptors not equal: %v, %v", value1.descriptor, value2.descriptor)
 			}
+			return nil
 		}
 
 	default:

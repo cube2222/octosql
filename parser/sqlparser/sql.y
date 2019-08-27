@@ -1966,10 +1966,10 @@ table_valued_function_argument_value:
   {
     $$ = &TableDescriptorTableValuedFunctionArgumentValue{Table: $3}
   }
-| DESCRIPTOR openb STRING closeb
-  {
-    $$ = &FieldDescriptorTableValuedFunctionArgumentValue{Field: string($3)}
-  }
+|   DESCRIPTOR openb column_name closeb
+    {
+      $$ = &FieldDescriptorTableValuedFunctionArgumentValue{Field: $3}
+    }
 
 column_list:
   sql_id

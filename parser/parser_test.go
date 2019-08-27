@@ -691,20 +691,24 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 			name: "table valued function",
 			args: args{
 				statement: `SELECT * FROM func(
+								arg0=>TABLE(test1),
 								arg1=>"test", 
 								arg2=>2, 
-								arg3=> interval 2 hour) x`,
+								arg3=> interval 2 hour,
+								arg4=>DESCRIPTOR(test2)) x`,
 			},
 			want: logical.NewRequalifier("x",
 				logical.NewTableValuedFunction(
 					"func",
-					map[octosql.VariableName]logical.Expression{
-						octosql.NewVariableName("arg1"): logical.NewConstant("test"),
-						octosql.NewVariableName("arg2"): logical.NewConstant(2),
-						octosql.NewVariableName("arg3"): logical.NewInterval(
+					map[octosql.VariableName]logical.TableValuedFunctionArgumentValue{
+						octosql.NewVariableName("arg0"): logical.NewTableValuedFunctionArgumentValueTable(logical.NewDataSource("test1", "")),
+						octosql.NewVariableName("arg1"): logical.NewTableValuedFunctionArgumentValueExpression(logical.NewConstant("test")),
+						octosql.NewVariableName("arg2"): logical.NewTableValuedFunctionArgumentValueExpression(logical.NewConstant(2)),
+						octosql.NewVariableName("arg3"): logical.NewTableValuedFunctionArgumentValueExpression(logical.NewInterval(
 							logical.NewConstant(2),
 							logical.NewConstant("hour"),
-						),
+						)),
+						octosql.NewVariableName("arg4"): logical.NewTableValuedFunctionArgumentValueDescriptor("test2"),
 					},
 				),
 			),

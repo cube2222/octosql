@@ -13,8 +13,6 @@ import (
 	"github.com/cube2222/octosql/parser/sqlparser"
 )
 
-// TODO: W sumie to jeszcze moze byc "boolean node expression" chociaz oczywiscie dziala przez (costam) = TRUE
-
 func ParseUnion(statement *sqlparser.Union) (logical.Node, error) {
 	var err error
 	var root logical.Node

@@ -24,8 +24,9 @@ var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 }
 
 type DataSource struct {
-	path  string
-	alias string
+	path           string
+	alias          string
+	hasColumnNames bool
 }
 
 func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
@@ -36,9 +37,12 @@ func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 				return nil, errors.Wrap(err, "couldn't get path")
 			}
 
+			hasColumns, err := config.GetBool(dbConfig, "headerRow", config.WithDefault(true))
+
 			return &DataSource{
-				path:  path,
-				alias: alias,
+				path:           path,
+				alias:          alias,
+				hasColumnNames: hasColumns,
 			}, nil
 		},
 		nil,
@@ -60,54 +64,105 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 	r := csv.NewReader(file)
 	r.TrimLeadingSpace = true
 
-	columns, err := r.Read()
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't read column names")
-	}
-
-	aliasedFields := make([]octosql.VariableName, 0)
-	for _, c := range columns {
-		aliasedFields = append(aliasedFields, octosql.VariableName(fmt.Sprintf("%s.%s", ds.alias, c)))
-	}
-	r.FieldsPerRecord = len(aliasedFields)
-
-	set := make(map[octosql.VariableName]struct{})
-	for _, f := range aliasedFields {
-		if _, present := set[f]; present {
-			return nil, errors.New("column names not unique")
-		}
-		set[f] = struct{}{}
-	}
-
 	return &RecordStream{
-		file:          file,
-		r:             r,
-		isDone:        false,
-		alias:         ds.alias,
-		aliasedFields: aliasedFields,
+		file:            file,
+		r:               r,
+		isDone:          false,
+		alias:           ds.alias,
+		first:           true,
+		hasColumnHeader: ds.hasColumnNames,
 	}, nil
 }
 
 type RecordStream struct {
-	file          *os.File
-	r             *csv.Reader
-	isDone        bool
-	alias         string
-	aliasedFields []octosql.VariableName
+	file            *os.File
+	r               *csv.Reader
+	isDone          bool
+	alias           string
+	aliasedFields   []octosql.VariableName
+	first           bool
+	hasColumnHeader bool
 }
 
 func (rs *RecordStream) Close() error {
 	err := rs.file.Close()
 	if err != nil {
-		return errors.Wrap(err, "Couldn't close underlying file")
+		return errors.Wrap(err, "couldn't close underlying file")
 	}
 
 	return nil
 }
 
+func parseDataTypes(row []string) []octosql.Value {
+	resultRow := make([]octosql.Value, len(row))
+	for i, v := range row {
+		resultRow[i] = execution.ParseType(v)
+	}
+
+	return resultRow
+}
+
+func (rs *RecordStream) initializeColumnsWithHeaderRow() error {
+	columns, err := rs.r.Read()
+	if err != nil {
+		return errors.Wrap(err, "couldn't read row")
+	}
+
+	rs.aliasedFields = make([]octosql.VariableName, len(columns))
+	for i, c := range columns {
+		rs.aliasedFields[i] = octosql.VariableName(fmt.Sprintf("%s.%s", rs.alias, c))
+	}
+
+	rs.r.FieldsPerRecord = len(rs.aliasedFields)
+
+	set := make(map[octosql.VariableName]struct{})
+	for _, f := range rs.aliasedFields {
+		if _, present := set[f]; present {
+			return errors.New("column names not unique")
+		}
+		set[f] = struct{}{}
+	}
+
+	return nil
+}
+
+func (rs *RecordStream) initializeColumnsWithoutHeaderRow() (*execution.Record, error) {
+	row, err := rs.r.Read()
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't read row")
+	}
+
+	rs.aliasedFields = make([]octosql.VariableName, len(row))
+	for i := range row {
+		rs.aliasedFields[i] = octosql.VariableName(fmt.Sprintf("%s.col%d", rs.alias, i+1))
+	}
+
+	return execution.NewRecordFromSlice(rs.aliasedFields, parseDataTypes(row)), nil
+}
+
 func (rs *RecordStream) Next() (*execution.Record, error) {
 	if rs.isDone {
 		return nil, execution.ErrEndOfStream
+	}
+
+	if rs.first {
+		rs.first = false
+
+		if rs.hasColumnHeader {
+			err := rs.initializeColumnsWithHeaderRow()
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't initialize columns for record stream")
+			}
+
+			return rs.Next()
+		} else {
+			record, err := rs.initializeColumnsWithoutHeaderRow()
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't initialize columns for record stream")
+			}
+
+			return record, nil
+		}
 	}
 
 	line, err := rs.r.Read()

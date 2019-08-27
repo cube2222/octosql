@@ -15,6 +15,6 @@ jobs:
       - name: Fill vendor
         run: GO111MODULE=on go mod vendor
       - name: install go-sumtype
-        run: go install ./...
+        run: go get -u github.com/BurntSushi/go-sumtype
       - name: Run go-sumtype
         run: go-sumtype ./...

@@ -46,10 +46,10 @@ func (arg *TableValuedFunctionArgumentValueTable) Transform(ctx context.Context,
 }
 
 type TableValuedFunctionArgumentValueDescriptor struct {
-	Descriptor string
+	Descriptor octosql.VariableName
 }
 
-func NewTableValuedFunctionArgumentValueDescriptor(descriptor string) *TableValuedFunctionArgumentValueDescriptor {
+func NewTableValuedFunctionArgumentValueDescriptor(descriptor octosql.VariableName) *TableValuedFunctionArgumentValueDescriptor {
 	return &TableValuedFunctionArgumentValueDescriptor{Descriptor: descriptor}
 }
 
@@ -116,14 +116,14 @@ func (node *TableValuedFunction) getArgumentTable(name octosql.VariableName) (No
 	return argExpression.Source, nil
 }
 
-func (node *TableValuedFunction) getArgumentDescriptor(name octosql.VariableName) (string, error) {
+func (node *TableValuedFunction) getArgumentDescriptor(name octosql.VariableName) (octosql.VariableName, error) {
 	arg, ok := node.Arguments[name]
 	if !ok {
-		return "", errors.Errorf("argument %v not provided", name)
+		return octosql.NewVariableName(""), errors.Errorf("argument %v not provided", name)
 	}
 	argExpression, ok := arg.(*TableValuedFunctionArgumentValueDescriptor)
 	if !ok {
-		return "", errors.Errorf("argument %v should be field descriptor, is %v", name, reflect.TypeOf(arg))
+		return octosql.NewVariableName(""), errors.Errorf("argument %v should be field descriptor, is %v", name, reflect.TypeOf(arg))
 	}
 
 	return argExpression.Descriptor, nil
@@ -134,11 +134,11 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 	// and take out the underlying Node to be a direct child of the TVF.
 	switch node.Name {
 	case "range":
-		startExpr, err := node.getArgumentExpression("range_start")
+		startExpr, err := node.getArgumentExpression(octosql.NewVariableName("range_start"))
 		if err != nil {
 			return nil, err
 		}
-		endExpr, err := node.getArgumentExpression("range_end")
+		endExpr, err := node.getArgumentExpression(octosql.NewVariableName("range_end"))
 		if err != nil {
 			return nil, err
 		}
@@ -153,6 +153,31 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 		}
 
 		return tvf.NewRange(startMat, endMat), nil
+
+	case "tumble":
+		source, err := node.getArgumentTable(octosql.NewVariableName("source"))
+		if err != nil {
+			return nil, err
+		}
+		timeField, err := node.getArgumentDescriptor(octosql.NewVariableName("time_field"))
+		if err != nil {
+			return nil, err
+		}
+		windowLength, err := node.getArgumentExpression(octosql.NewVariableName("window_length"))
+		if err != nil {
+			return nil, err
+		}
+
+		matSource, err := source.Materialize(ctx, matCtx)
+		if err != nil {
+			return nil, errors.Errorf("couldn't materialize source")
+		}
+		matWindowLength, err := windowLength.Materialize(ctx, matCtx)
+		if err != nil {
+			return nil, errors.Errorf("couldn't materialize window length expression")
+		}
+
+		return tvf.NewTumble(matSource, timeField, matWindowLength), nil
 
 	}
 

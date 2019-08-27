@@ -53,10 +53,10 @@ func (arg *TableValuedFunctionArgumentValueTable) Physical(ctx context.Context, 
 }
 
 type TableValuedFunctionArgumentValueDescriptor struct {
-	descriptor string
+	descriptor octosql.VariableName
 }
 
-func NewTableValuedFunctionArgumentValueDescriptor(descriptor string) *TableValuedFunctionArgumentValueDescriptor {
+func NewTableValuedFunctionArgumentValueDescriptor(descriptor octosql.VariableName) *TableValuedFunctionArgumentValueDescriptor {
 	return &TableValuedFunctionArgumentValueDescriptor{descriptor: descriptor}
 }
 

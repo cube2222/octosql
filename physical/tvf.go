@@ -167,6 +167,10 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 		if err != nil {
 			return nil, err
 		}
+		windowOffset, err := node.getArgumentExpression(octosql.NewVariableName("offset"))
+		if err != nil {
+			return nil, err
+		}
 
 		matSource, err := source.Materialize(ctx, matCtx)
 		if err != nil {
@@ -176,8 +180,12 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 		if err != nil {
 			return nil, errors.Errorf("couldn't materialize window length expression")
 		}
+		matWindowOffset, err := windowOffset.Materialize(ctx, matCtx)
+		if err != nil {
+			return nil, errors.Errorf("couldn't materialize window offset expression")
+		}
 
-		return tvf.NewTumble(matSource, timeField, matWindowLength), nil
+		return tvf.NewTumble(matSource, timeField, matWindowLength, matWindowOffset), nil
 
 	}
 

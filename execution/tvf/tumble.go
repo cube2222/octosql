@@ -90,7 +90,7 @@ func (s *TumbleStream) Next() (*execution.Record, error) {
 		return nil, fmt.Errorf("couldn't get time field '%v' as time, got: %v", s.timeField.String(), srcRecord.Value(s.timeField))
 	}
 
-	windowStart := timeValue.AsTime().Add(s.offset.AsDuration()).Truncate(s.windowLength.AsDuration()).Add(-1 * s.offset.AsDuration())
+	windowStart := timeValue.AsTime().Add(-1 * s.offset.AsDuration()).Truncate(s.windowLength.AsDuration()).Add(s.offset.AsDuration())
 	windowEnd := windowStart.Add(s.windowLength.AsDuration())
 
 	fields := make([]octosql.VariableName, len(srcRecord.Fields()), len(srcRecord.Fields())+2)

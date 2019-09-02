@@ -5,13 +5,14 @@ import (
 	"database/sql"
 	"fmt"
 
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/metadata"
-	_ "github.com/go-sql-driver/mysql"
-	"github.com/pkg/errors"
 )
 
 var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{

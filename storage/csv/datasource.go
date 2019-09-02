@@ -9,13 +9,15 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"unicode/utf8"
+
+	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/metadata"
-	"github.com/pkg/errors"
 )
 
 var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
@@ -27,6 +29,7 @@ type DataSource struct {
 	path           string
 	alias          string
 	hasColumnNames bool
+	separator      rune
 }
 
 func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
@@ -36,13 +39,24 @@ func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't get path")
 			}
-
 			hasColumns, err := config.GetBool(dbConfig, "headerRow", config.WithDefault(true))
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't get headerRow")
+			}
+			separator, err := config.GetString(dbConfig, "separator", config.WithDefault(','))
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't get separator")
+			}
+			r, _ := utf8.DecodeRune([]byte(separator))
+			if r == utf8.RuneError {
+				return nil, errors.Errorf("couldn't decode separator %s to rune", separator)
+			}
 
 			return &DataSource{
 				path:           path,
 				alias:          alias,
 				hasColumnNames: hasColumns,
+				separator:      r,
 			}, nil
 		},
 		nil,
@@ -62,6 +76,7 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 		return nil, errors.Wrap(err, "couldn't open file")
 	}
 	r := csv.NewReader(file)
+	r.Comma = ds.separator
 	r.TrimLeadingSpace = true
 
 	return &RecordStream{

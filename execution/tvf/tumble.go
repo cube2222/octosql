@@ -26,13 +26,12 @@ func NewTumble(source execution.Node, timeField octosql.VariableName, windowLeng
 	}
 }
 
-// TODO: fixme
 func (r *Tumble) Document() docs.Documentation {
 	return docs.Section(
-		"range",
+		"tumble",
 		docs.Body(
-			docs.Section("Calling", docs.List(docs.Text("range(range_start => \\<int\\>, range_end => \\<int\\>)"))),
-			docs.Section("Description", docs.Text("Returns a list of numbers from range_start inclusive to range_end exclusive. The field name of the number will be i.")),
+			docs.Section("Calling", docs.List(docs.Text("tumble(source => \\<Source\\>, time_field => \\<Descriptor\\>, window_length => \\<interval\\>, offset => \\<interval\\>"))),
+			docs.Section("Description", docs.Text("Adds window_start and window_end of the record, based on which window the time_field value falls into. The source may be specified as a subquery or as TABLE(tablename), and the time_field should be specified as DESCRIPTOR(field_name).")),
 		),
 	)
 }

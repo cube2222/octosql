@@ -3,8 +3,9 @@ package execution
 import (
 	"sort"
 
-	"github.com/cube2222/octosql"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
 )
 
 type multiSetElement struct {
@@ -197,15 +198,12 @@ func (rms *recordMultiSet) isContained(other *recordMultiSet) (bool, error) {
 	return true, nil
 }
 
-func NewRecordFromSliceWithNormalize(fields []octosql.VariableName, data []interface{}) *Record {
+func NewRecordFromSliceWithNormalize(fields []octosql.VariableName, data []interface{}, opts ...RecordOption) *Record {
 	normalized := make([]octosql.Value, len(data))
 	for i := range data {
 		normalized[i] = octosql.NormalizeType(data[i])
 	}
-	return &Record{
-		fieldNames: fields,
-		data:       normalized,
-	}
+	return NewRecordFromSlice(fields, normalized, opts...)
 }
 
 func NewDummyNode(data []*Record) *DummyNode {

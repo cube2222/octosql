@@ -160,6 +160,7 @@ var keywords = map[string]int{
 	"delete":              DELETE,
 	"desc":                DESC,
 	"describe":            DESCRIBE,
+	"descriptor":          DESCRIPTOR,
 	"deterministic":       UNUSED,
 	"distinct":            DISTINCT,
 	"distinctrow":         UNUSED,

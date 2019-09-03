@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"time"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
@@ -119,7 +120,13 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 
 	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
 	for k, v := range record {
-		aliasedRecord[octosql.VariableName(fmt.Sprintf("%s.%s", rs.alias, k))] = octosql.NormalizeType(v)
+		if str, ok := v.(string); ok {
+			parsed, err := time.Parse(time.RFC3339, str)
+			if err == nil {
+				v = parsed
+			}
+		}
+		aliasedRecord[octosql.NewVariableName(fmt.Sprintf("%s.%s", rs.alias, k))] = octosql.NormalizeType(v)
 	}
 
 	fields := make([]octosql.VariableName, 0)

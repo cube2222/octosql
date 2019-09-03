@@ -6,13 +6,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/parser/sqlparser"
-	"github.com/pkg/errors"
 )
-
-// TODO: W sumie to jeszcze moze byc "boolean node expression" chociaz oczywiscie dziala przez (costam) = TRUE
 
 func ParseUnion(statement *sqlparser.Union) (logical.Node, error) {
 	var err error
@@ -67,7 +66,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		return nil, errors.Errorf("currently only one expression in from supported, got %v", len(statement.From))
 	}
 
-	root, err = ParseTableExpression(statement.From[0])
+	root, err = ParseTableExpression(statement.From[0], true)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't parse from expression")
 	}
@@ -234,14 +233,14 @@ func ParseNode(statement sqlparser.SelectStatement) (logical.Node, error) {
 	}
 }
 
-func ParseTableExpression(expr sqlparser.TableExpr) (logical.Node, error) {
+func ParseTableExpression(expr sqlparser.TableExpr, mustBeAliased bool) (logical.Node, error) {
 	switch expr := expr.(type) {
 	case *sqlparser.AliasedTableExpr:
-		return ParseAliasedTableExpression(expr)
+		return ParseAliasedTableExpression(expr, mustBeAliased)
 	case *sqlparser.JoinTableExpr:
 		return ParseJoinTableExpression(expr)
 	case *sqlparser.ParenTableExpr:
-		return ParseTableExpression(expr.Exprs[0])
+		return ParseTableExpression(expr.Exprs[0], mustBeAliased)
 	case *sqlparser.TableValuedFunction:
 		return ParseTableValuedFunction(expr)
 	default:
@@ -249,10 +248,10 @@ func ParseTableExpression(expr sqlparser.TableExpr) (logical.Node, error) {
 	}
 }
 
-func ParseAliasedTableExpression(expr *sqlparser.AliasedTableExpr) (logical.Node, error) {
+func ParseAliasedTableExpression(expr *sqlparser.AliasedTableExpr, mustBeAliased bool) (logical.Node, error) {
 	switch subExpr := expr.Expr.(type) {
 	case sqlparser.TableName:
-		if expr.As.IsEmpty() {
+		if expr.As.IsEmpty() && mustBeAliased {
 			return nil, errors.Errorf("table \"%v\" must have unique alias", subExpr.Name)
 		}
 		return logical.NewDataSource(subExpr.Name.String(), expr.As.String()), nil
@@ -270,11 +269,11 @@ func ParseAliasedTableExpression(expr *sqlparser.AliasedTableExpr) (logical.Node
 }
 
 func ParseJoinTableExpression(expr *sqlparser.JoinTableExpr) (logical.Node, error) {
-	leftTable, err := ParseTableExpression(expr.LeftExpr)
+	leftTable, err := ParseTableExpression(expr.LeftExpr, true)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't parse join left table expression")
 	}
-	rightTable, err := ParseTableExpression(expr.RightExpr)
+	rightTable, err := ParseTableExpression(expr.RightExpr, true)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't parse join right table expression")
 	}
@@ -316,19 +315,47 @@ func ParseJoinTableExpression(expr *sqlparser.JoinTableExpr) (logical.Node, erro
 
 func ParseTableValuedFunction(expr *sqlparser.TableValuedFunction) (logical.Node, error) {
 	name := expr.Name.String()
-	arguments := make(map[octosql.VariableName]logical.Expression)
+	arguments := make(map[octosql.VariableName]logical.TableValuedFunctionArgumentValue)
 	for i := range expr.Args {
-		argExpr, err := ParseExpression(expr.Args[i].Expr)
+		parsed, err := ParseTableValuedFunctionArgument(expr.Args[i].Value)
 		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't parse table valued function argument \"%v\"", expr.Args[i].Name.String())
+			return nil, errors.Wrapf(err, "couldn't parse table valued function argument \"%v\" with index %v", expr.Args[i].Name.String(), i)
 		}
-		arguments[octosql.NewVariableName(expr.Args[i].Name.String())] = argExpr
+		arguments[octosql.NewVariableName(expr.Args[i].Name.String())] = parsed
 	}
 
 	return logical.NewRequalifier(
 		expr.As.String(),
 		logical.NewTableValuedFunction(name, arguments),
 	), nil
+}
+
+func ParseTableValuedFunctionArgument(expr sqlparser.TableValuedFunctionArgumentValue) (logical.TableValuedFunctionArgumentValue, error) {
+	switch expr := expr.(type) {
+	case *sqlparser.ExprTableValuedFunctionArgumentValue:
+		parsed, err := ParseExpression(expr.Expr)
+		if err != nil {
+			return nil, errors.Wrapf(err, "couldn't parse table valued function argument expression \"%v\"", expr.Expr)
+		}
+		return logical.NewTableValuedFunctionArgumentValueExpression(parsed), nil
+
+	case *sqlparser.TableDescriptorTableValuedFunctionArgumentValue:
+		parsed, err := ParseTableExpression(expr.Table, false)
+		if err != nil {
+			return nil, errors.Wrapf(err, "couldn't parse table valued function argument table expression \"%v\"", expr.Table)
+		}
+		return logical.NewTableValuedFunctionArgumentValueTable(parsed), nil
+
+	case *sqlparser.FieldDescriptorTableValuedFunctionArgumentValue:
+		name := expr.Field.Name.String()
+		if !expr.Field.Qualifier.Name.IsEmpty() {
+			name = fmt.Sprintf("%s.%s", expr.Field.Qualifier.Name.String(), name)
+		}
+		return logical.NewTableValuedFunctionArgumentValueDescriptor(octosql.NewVariableName(name)), nil
+
+	default:
+		return nil, errors.Errorf("invalid table valued function argument: %v", expr)
+	}
 }
 
 func ParseAggregate(expr sqlparser.Expr) (logical.Aggregate, logical.NamedExpression, error) {

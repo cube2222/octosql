@@ -59,6 +59,7 @@ func skipToEnd(yylex interface{}) {
 %union {
   tableValuedFunctionArguments TableValuedFunctionArguments
   tableValuedFunctionArgument *TableValuedFunctionArgument
+  tableValuedFunctionArgumentValue TableValuedFunctionArgumentValue
   empty         struct{}
   statement     Statement
   selStmt       SelectStatement
@@ -166,7 +167,7 @@ func skipToEnd(yylex interface{}) {
 
 // DDL Tokens
 %token <bytes> CREATE ALTER DROP RENAME ANALYZE ADD FLUSH
-%token <bytes> SCHEMA TABLE INDEX VIEW TO IGNORE IF UNIQUE PRIMARY COLUMN  SPATIAL FULLTEXT KEY_BLOCK_SIZE
+%token <bytes> SCHEMA TABLE DESCRIPTOR INDEX VIEW TO IGNORE IF UNIQUE PRIMARY COLUMN  SPATIAL FULLTEXT KEY_BLOCK_SIZE
 %token <bytes> ACTION CASCADE CONSTRAINT FOREIGN NO REFERENCES RESTRICT
 %token <bytes> SHOW DESCRIBE EXPLAIN DATE ESCAPE REPAIR OPTIMIZE TRUNCATE
 %token <bytes> MAXVALUE PARTITION REORGANIZE LESS THAN PROCEDURE TRIGGER
@@ -228,6 +229,7 @@ func skipToEnd(yylex interface{}) {
 %type <tableExpr> table_reference table_factor join_table
 %type <tableValuedFunctionArguments> table_valued_function_arguments table_valued_function_arguments_opt
 %type <tableValuedFunctionArgument> table_valued_function_argument
+%type <tableValuedFunctionArgumentValue> table_valued_function_argument_value
 %type <joinCondition> join_condition join_condition_opt on_expression_opt
 %type <tableNames> table_name_list delete_table_list
 %type <str> inner_join outer_join straight_join natural_join
@@ -1950,10 +1952,24 @@ table_valued_function_arguments:
   }
 
 table_valued_function_argument:
-  sql_id RIGHTARROW expression
+  sql_id RIGHTARROW table_valued_function_argument_value
   {
-    $$ = &TableValuedFunctionArgument{Name: $1, Expr: $3}
+    $$ = &TableValuedFunctionArgument{Name: $1, Value: $3}
   }
+
+table_valued_function_argument_value:
+  expression
+  {
+    $$ = &ExprTableValuedFunctionArgumentValue{Expr: $1}
+  }
+| TABLE openb table_reference closeb
+  {
+    $$ = &TableDescriptorTableValuedFunctionArgumentValue{Table: $3}
+  }
+|   DESCRIPTOR openb column_name closeb
+    {
+      $$ = &FieldDescriptorTableValuedFunctionArgumentValue{Field: $3}
+    }
 
 column_list:
   sql_id

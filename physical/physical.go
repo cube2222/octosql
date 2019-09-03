@@ -3,19 +3,21 @@ package physical
 import (
 	"context"
 
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical/metadata"
-	"github.com/pkg/errors"
 )
 
 // Transformers is a structure containing functions to transform each of the physical plan components.
 type Transformers struct {
-	NodeT      func(Node) Node
-	ExprT      func(Expression) Expression
-	NamedExprT func(NamedExpression) NamedExpression
-	FormulaT   func(Formula) Formula
+	NodeT                             func(Node) Node
+	ExprT                             func(Expression) Expression
+	NamedExprT                        func(NamedExpression) NamedExpression
+	FormulaT                          func(Formula) Formula
+	TableValuedFunctionArgumentValueT func(TableValuedFunctionArgumentValue) TableValuedFunctionArgumentValue
 }
 
 // MaterializationContext is a structure containing the configuration for the materialization.

@@ -43,6 +43,14 @@ var csvDbs = map[string]csvDsc{
 		alias: "nh",
 		path:  exampleDir + "noHeaders.csv",
 	},
+	"peopleDot": {
+		alias: "p",
+		path:  exampleDir + "peopleDot.csv",
+	},
+	"peopleSemicolon": {
+		alias: "p",
+		path:  exampleDir + "peopleSemicolon.csv",
+	},
 }
 
 func TestCSVDataSource_Get(t *testing.T) {
@@ -67,6 +75,7 @@ func TestCSVDataSource_Get(t *testing.T) {
 						Config: map[string]interface{}{
 							"path":      csvDbs[tt.csvName].path,
 							"headerRow": true,
+							"separator": ",",
 						},
 					},
 				},
@@ -95,6 +104,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 		name            string
 		csvName         string
 		hasColumnHeader bool
+		separator       string
 		fields          []string
 		want            []wanted
 	}{
@@ -102,6 +112,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			name:            "reading people.csv - happy path",
 			csvName:         "people",
 			hasColumnHeader: true,
+			separator:       ",",
 			fields:          []string{"name", "surname", "age", "city"},
 			want: []wanted{
 				{
@@ -162,6 +173,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			name:            "wrong numbers of columns in a row",
 			csvName:         "wrongCount",
 			hasColumnHeader: true,
+			separator:       ",",
 			fields:          []string{"name", "surname"},
 			want: []wanted{
 				{
@@ -184,6 +196,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			name:            "not unique columns",
 			csvName:         "notUnique",
 			hasColumnHeader: true,
+			separator:       ",",
 			fields:          []string{"name", "name"},
 			want: []wanted{
 				{
@@ -197,6 +210,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			name:            "file with header row",
 			csvName:         "hasHeaders",
 			hasColumnHeader: true,
+			separator:       ",",
 			fields:          []string{"dog", "age"},
 			want: []wanted{
 				{
@@ -224,6 +238,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			name:            "file without header row",
 			csvName:         "noHeaders",
 			hasColumnHeader: false,
+			separator:       ",",
 			fields:          []string{"col1", "col2"},
 			want: []wanted{
 				{
@@ -246,6 +261,177 @@ func TestCSVRecordStream_Next(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:            "reading peopleDot.csv - happy path",
+			csvName:         "peopleDot",
+			hasColumnHeader: true,
+			separator:       ".",
+			fields:          []string{"name", "surname", "age", "city"},
+			want: []wanted{
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"jan", "chomiak", 3, "warsaw"}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"wojtek", "kuzminski", 4, "warsaw"}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"adam", "cz", 5, "ciechanowo"}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"kuba", "m", 2, "warsaw"}),
+					error: false,
+				},
+				{
+					record: nil,
+					error:  true,
+				},
+				{
+					record: nil,
+					error:  true,
+				},
+			},
+		},
+		{
+			name:            "reading peopleSemicolon.csv - happy path",
+			csvName:         "peopleSemicolon",
+			hasColumnHeader: true,
+			separator:       ";",
+			fields:          []string{"name", "surname", "age", "city"},
+			want: []wanted{
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"jan", "chomiak", 3, "warsaw"}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"wojtek", "kuzminski", 4, "warsaw"}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"adam", "cz", 5, "ciechanowo"}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"kuba", "m", 2, "warsaw"}),
+					error: false,
+				},
+				{
+					record: nil,
+					error:  true,
+				},
+				{
+					record: nil,
+					error:  true,
+				},
+			},
+		},
+		{
+			name:            "reading peopleSemicolon.csv - wrong separator",
+			csvName:         "people",
+			hasColumnHeader: true,
+			separator:       ";",
+			fields:          []string{"name, surname, age, city"},
+			want: []wanted{
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name, surname, age, city",
+						},
+						[]interface{}{"jan, chomiak, 3, warsaw"}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name, surname, age, city",
+						},
+						[]interface{}{"wojtek, kuzminski, 4, warsaw"}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name, surname, age, city",
+						},
+						[]interface{}{"adam, cz, 5, ciechanowo"}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name, surname, age, city",
+						},
+						[]interface{}{"kuba, m, 2, warsaw"}),
+					error: false,
+				},
+				{
+					record: nil,
+					error:  true,
+				},
+				{
+					record: nil,
+					error:  true,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -258,6 +444,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 							Config: map[string]interface{}{
 								"path":      csvDbs[tt.csvName].path,
 								"headerRow": tt.hasColumnHeader,
+								"separator": tt.separator,
 							},
 						},
 					},

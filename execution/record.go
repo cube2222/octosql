@@ -128,7 +128,7 @@ func (r *Record) Equal(other *Record) bool {
 		if myFields[i] != otherFields[i] {
 			return false
 		}
-		if !octosql.AreEqual(r.data[i], other.data[i]) {
+		if !octosql.AreEqual(r.Value(myFields[i].Name), other.Value(myFields[i].Name)) {
 			return false
 		}
 	}

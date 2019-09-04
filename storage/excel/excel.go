@@ -165,9 +165,9 @@ func (rs *RecordStream) extractColumnNamesFromRow(row []string) []string {
 }
 
 /*
-This function does the same thing as the function above, but it parses data types.
-It is used to read the first row of a table without a header row - it reads until the
-first nil, parses types and returns a slice of octosql.Value
+This function does the same thing as the function that extracts column names,
+but it parses data types. It is used to read the first row of a table
+without a header row - it reads until the first nil, parses types and returns a slice of octosql.Value
 */
 func (rs *RecordStream) extractRowUntilFirstNil(row []string) ([]octosql.Value, error) {
 	stringRow := make([]string, 0)

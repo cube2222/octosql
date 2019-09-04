@@ -143,7 +143,13 @@ func (rs *RecordStream) parseDataTypes(row []string) ([]octosql.Value, error) {
 	return resultRow, nil
 }
 
-func (rs *RecordStream) extractColumnRow(row []string) []string {
+/*
+This function extracts column names from a row read by the excelize library.
+It starts at the offset position and reads until first nil without parsing types.
+For example when given a row: val1, val2, "", name, surname, "" and offset = 2,
+then the extracted column names would be []{"name", "surname"}
+*/
+func (rs *RecordStream) extractColumnNamesFromRow(row []string) []string {
 	stringRow := make([]string, 0)
 
 	for i := rs.columnOffset; i < len(row); i++ {
@@ -158,7 +164,12 @@ func (rs *RecordStream) extractColumnRow(row []string) []string {
 	return stringRow
 }
 
-func (rs *RecordStream) extractHeaderRow(row []string) ([]octosql.Value, error) {
+/*
+This function does the same thing as the function above, but it parses data types.
+It is used to read the first row of a table without a header row - it reads until the
+first nil, parses types and returns a slice of octosql.Value
+*/
+func (rs *RecordStream) extractRowUntilFirstNil(row []string) ([]octosql.Value, error) {
 	stringRow := make([]string, 0)
 
 	for i := rs.columnOffset; i < len(row); i++ {
@@ -179,7 +190,12 @@ func (rs *RecordStream) extractHeaderRow(row []string) ([]octosql.Value, error) 
 	return resultRow, nil
 }
 
-func (rs *RecordStream) extractStandardRow(row []string) ([]octosql.Value, error) {
+/*
+This function extracts a row from a full row read by the excelize library.
+It reads exactly numberOfColumns values starting from the offset position,
+and transforms every "" into a nil.
+*/
+func (rs *RecordStream) extractRow(row []string) ([]octosql.Value, error) {
 	columnCount := len(rs.aliasedFields)
 	columnLimit := min(len(row), columnCount+rs.columnOffset)
 
@@ -200,7 +216,7 @@ func (rs *RecordStream) extractStandardRow(row []string) ([]octosql.Value, error
 }
 
 func (rs *RecordStream) initializeColumnsWithHeaderRow() error {
-	columns := rs.extractColumnRow(rs.rows.Columns())
+	columns := rs.extractColumnNamesFromRow(rs.rows.Columns())
 
 	rs.aliasedFields = make([]octosql.VariableName, 0)
 	for _, c := range columns {
@@ -220,7 +236,7 @@ func (rs *RecordStream) initializeColumnsWithHeaderRow() error {
 }
 
 func (rs *RecordStream) initializeColumnsWithoutHeaderRow() (*execution.Record, error) {
-	firstRow, err := rs.extractHeaderRow(rs.rows.Columns())
+	firstRow, err := rs.extractRowUntilFirstNil(rs.rows.Columns())
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't extract header row")
 	}

@@ -161,7 +161,7 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 		return nil, execution.ErrEndOfStream
 	}
 
-	row, err := rs.extractStandardRow(rs.rows.Columns())
+	row, err := rs.extractRow(rs.rows.Columns())
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't extract row")
 	}

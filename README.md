@@ -122,8 +122,8 @@ JSON file in one of the following forms:
 CSV file separated using commas. The first row should contain column names.
 ##### options:
 - path - path to file containing the data, required
-- headerRow - whether the first row of the CSV file contains column names or not, optional: defaults to true
-- separator - columns separator, optional: defaults to ","
+- headerRow - whether the first row of the CSV file contains column names or not, defaults to true
+- separator - columns separator, defaults to ","
 ---
 #### PostgreSQL
 Single PostgreSQL database table.

@@ -2,13 +2,14 @@ package excel
 
 import (
 	"github.com/360EntSecGroup-Skylar/excelize"
+	"github.com/pkg/errors"
+	"golang.org/x/net/context"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/metadata"
-	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 )
 
 var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
@@ -19,11 +20,11 @@ var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 type DataSource struct {
 	path             string
 	alias            string
-	hasColumnNames   bool
+	hasHeaderRow     bool
 	sheet            string
-	rootColumnString string
-	rootColumn       int
-	rootRow          int
+	timeColumns      []string
+	horizontalOffset int
+	verticalOffset   int
 }
 
 func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
@@ -34,9 +35,9 @@ func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 				return nil, errors.Wrap(err, "couldn't get path")
 			}
 
-			hasColumns, err := config.GetBool(dbConfig, "headerRow", config.WithDefault(true))
+			hasHeaderRow, err := config.GetBool(dbConfig, "headerRow", config.WithDefault(true))
 			if err != nil {
-				return nil, errors.Wrap(err, "couldn't get column option")
+				return nil, errors.Wrap(err, "couldn't get header row option")
 			}
 
 			sheet, err := config.GetString(dbConfig, "sheet", config.WithDefault("Sheet1"))
@@ -44,30 +45,29 @@ func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 				return nil, errors.Wrap(err, "couldn't get sheet name")
 			}
 
-			root, err := config.GetString(dbConfig, "root", config.WithDefault("A1"))
+			rootCell, err := config.GetString(dbConfig, "rootCell", config.WithDefault("A1"))
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't get root cell")
 			}
 
-			if !isCellNameValid(root) {
-				return nil, errors.Wrap(err, "the root cell of the table is invalid")
+			timeColumns, err := config.GetStringList(dbConfig, "timeColumns", config.WithDefault([]string{}))
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't get time columns")
 			}
 
-			_, colStr := getRowAndColumnFromCell(root)
-
-			row, col, err := getCoordinatesFromCell(root)
+			verticalOffset, horizontalOffset, err := getCoordinatesFromCell(rootCell)
 			if err != nil {
-				return nil, errors.Wrap(err, "couldn't extract column and row numbers from cell")
+				return nil, errors.Wrap(err, "couldn't extract column and row numbers from root cell")
 			}
 
 			return &DataSource{
 				path:             path,
 				alias:            alias,
-				hasColumnNames:   hasColumns,
+				hasHeaderRow:     hasHeaderRow,
 				sheet:            sheet,
-				rootColumn:       col,
-				rootRow:          row,
-				rootColumnString: colStr,
+				timeColumns:      timeColumns,
+				horizontalOffset: horizontalOffset,
+				verticalOffset:   verticalOffset,
 			}, nil
 		},
 		nil,
@@ -92,39 +92,44 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 		return nil, errors.Wrap(err, "couldn't get sheet's rows")
 	}
 
-	for i := 0; i <= ds.rootRow; i++ { /* skip some potential empty rows */
+	for i := 0; i <= ds.verticalOffset; i++ {
 		if !rows.Next() {
-			return nil, errors.New("encountered an error while omitting initial rows")
+			return nil, errors.New("root cell is lower than row count")
 		}
 	}
 
 	return &RecordStream{
-		isDone:           false,
 		first:            true,
-		hasHeaderRow:     ds.hasColumnNames,
+		hasHeaderRow:     ds.hasHeaderRow,
+		timeColumnNames:  ds.timeColumns,
 		alias:            ds.alias,
-		columnOffset:     ds.rootColumn,
-		rows:             rows,
-		currentRowNumber: ds.rootRow + 1,
-		file:             file,
-		rootColumnName:   ds.rootColumnString,
-		sheet:            ds.sheet,
+		horizontalOffset: ds.horizontalOffset,
+
+		isDone: false,
+		rows:   rows,
 	}, nil
 }
 
-type RecordStream struct {
-	isDone        bool
-	alias         string
-	aliasedFields []octosql.VariableName
-	rows          *excelize.Rows
-	hasHeaderRow  bool
-	first         bool
-	columnOffset  int
-	file          *excelize.File
+func contains(xs []string, x string) bool {
+	for i := range xs {
+		if x == xs[i] {
+			return true
+		}
+	}
+	return false
+}
 
-	sheet            string
-	currentRowNumber int
-	rootColumnName   string
+type RecordStream struct {
+	first            bool
+	hasHeaderRow     bool
+	timeColumnNames  []string
+	alias            string
+	horizontalOffset int
+
+	isDone      bool
+	columnNames []octosql.VariableName
+	timeColumns []bool
+	rows        *excelize.Rows
 }
 
 func (rs *RecordStream) Close() error {
@@ -136,45 +141,56 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 		return nil, execution.ErrEndOfStream
 	}
 
+	curRow := rs.rows.Columns()
+
 	if rs.first {
 		rs.first = false
 
+		var cols []octosql.VariableName
+		var err error
 		if rs.hasHeaderRow {
-			err := rs.initializeColumnsWithHeaderRow()
+			cols, err = getHeaderRow(rs.alias, rs.horizontalOffset, curRow)
 			if err != nil {
-				return nil, errors.Wrap(err, "couldn't initialize columns for record stream from first row")
+				return nil, errors.Wrap(err, "couldn't get header row")
 			}
 
-			return rs.Next()
+			if !rs.rows.Next() {
+				rs.isDone = true
+				return nil, execution.ErrEndOfStream
+			}
+			curRow = rs.rows.Columns()
 		} else {
-			rec, err := rs.initializeColumnsWithoutHeaderRow()
+			cols, err = generatePlaceholders(rs.alias, rs.horizontalOffset, curRow)
 			if err != nil {
-				return nil, errors.Wrap(err, "couldn't initialize columns")
+				return nil, errors.Wrap(err, "couldn't generate placeholder headers")
 			}
+		}
 
-			return rec, nil
+		rs.columnNames = cols
+
+		rs.timeColumns = make([]bool, len(cols))
+		for i := range cols {
+			if contains(rs.timeColumnNames, cols[i].Name()) {
+				rs.timeColumns[i] = true
+			}
 		}
 	}
 
-	if !rs.rows.Next() {
-		rs.isDone = true
-		return nil, execution.ErrEndOfStream
-	}
-
-	row, err := rs.extractRow(rs.rows.Columns())
+	row, err := rs.extractRow(curRow)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't extract row")
 	}
 
 	if isRowEmpty(row) {
+		rs.isDone = true
 		return nil, execution.ErrEndOfStream
 	}
 
-	for i, v := range row {
-		if v == octosql.ZeroString() {
-			row[i] = octosql.MakeNull()
-		}
+	out := execution.NewRecordFromSlice(rs.columnNames, row)
+
+	if !rs.rows.Next() {
+		rs.isDone = true
 	}
 
-	return execution.NewRecordFromSlice(rs.aliasedFields, row), nil
+	return out, nil
 }

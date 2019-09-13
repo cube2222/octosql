@@ -134,7 +134,8 @@ contain spaces between columns nor spaces between rows.
 - path - path to file, required
 - headerRow - does the first row contain column names, optional: defaults to true
 - sheet - name of the sheet in which data is stored, optional: defaults to "Sheet1"
-- root - name of cell (i.e "A3", "BA14") which is the leftmost cell of the first
+- rootCell - name of cell (i.e "A3", "BA14") which is the leftmost cell of the first
+- timeColumns - a list of columns to parse as datetime values with second precision
 row, optional: defaults to "A1"
 ---
 #### PostgreSQL

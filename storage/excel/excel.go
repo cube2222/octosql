@@ -9,19 +9,28 @@ import (
 	"unicode"
 
 	"github.com/360EntSecGroup-Skylar/excelize"
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
-	"github.com/pkg/errors"
 )
 
-var excelInitialDate = time.Date(1900, time.January, 1, 0, 0, 0, 0, time.UTC)
+var cellRegexp = regexp.MustCompile("^[A-Z]+[1-9][0-9]*$")
 
-func isCellNameValid(cell string) bool {
-	cellNameRegexp := "^[A-Z]+[1-9][0-9]*$"
+func getCoordinatesFromCell(cell string) (row int, col int, err error) {
+	if !cellRegexp.MatchString(cell) {
+		return 0, 0, errors.Wrap(err, "invalid cell")
+	}
 
-	r, _ := regexp.Compile(cellNameRegexp)
+	rowStr, colStr := getRowAndColumnFromCell(cell)
+	col = excelize.TitleToNumber(colStr)
 
-	return r.MatchString(cell)
+	rowTmp, err := strconv.ParseInt(rowStr, 10, 64)
+	if err != nil {
+		return 0, 0, errors.Wrap(err, "couldn't parse row")
+	}
+
+	return int(rowTmp) - 1, col, nil
 }
 
 func getRowAndColumnFromCell(cell string) (row, col string) {
@@ -34,73 +43,79 @@ func getRowAndColumnFromCell(cell string) (row, col string) {
 	return "", cell
 }
 
-func getCoordinatesFromCell(cell string) (row int, col int, err error) {
-	rowStr, colStr := getRowAndColumnFromCell(cell)
-	col = excelize.TitleToNumber(colStr)
+func getHeaderRow(datasourceAlias string, horizontalOffset int, row []string) ([]octosql.VariableName, error) {
+	rawColumnNames := readRowNoGaps(horizontalOffset, row)
 
-	rowTmp, err := strconv.ParseInt(rowStr, 10, 64)
-	if err != nil {
-		return 0, 0, errors.Wrap(err, "couldn't parse row")
+	columnNames := make([]octosql.VariableName, len(rawColumnNames))
+	for i, c := range rawColumnNames {
+		lowerCased := strings.ToLower(fmt.Sprintf("%s.%s", datasourceAlias, c))
+		columnNames[i] = octosql.NewVariableName(lowerCased)
 	}
 
-	return int(rowTmp) - 1, col, nil
-}
-
-func isAllZs(cell string) bool {
-	for _, char := range cell {
-		if char != 'Z' {
-			return false
+	set := make(map[octosql.VariableName]struct{})
+	for _, col := range columnNames {
+		if _, present := set[col]; present {
+			return nil, errors.New("column names not unique")
 		}
+		set[col] = struct{}{}
 	}
 
-	return true
+	return columnNames, nil
 }
 
-func getNextColumn(cell string) string {
-	if isAllZs(cell) {
-		return strings.Repeat("A", len(cell)+1)
+func generatePlaceholders(datasourceAlias string, horizontalOffset int, row []string) ([]octosql.VariableName, error) {
+	firstRow := readRowNoGaps(horizontalOffset, row)
+
+	columnNames := make([]octosql.VariableName, len(firstRow))
+	for i := range firstRow {
+		columnName := fmt.Sprintf("%s.col%d", datasourceAlias, i+1)
+		columnNames[i] = octosql.NewVariableName(columnName)
 	}
 
-	nextCol := ""
+	return columnNames, nil
+}
 
-	index := len(cell)
-	for i := len(cell) - 1; i >= 0; i-- {
-		index--
+/*
+readRowNoGaps extracts strings from a row read by the excelize library.
+It starts at the offset position and reads until first nil without parsing types.
+For example when given a row: val1, val2, "", name, surname, "" and offset = 2,
+then the extracted strings would be []{"name", "surname"}
+*/
+func readRowNoGaps(horizontalOffset int, row []string) []string {
+	stringRow := make([]string, 0)
 
-		if cell[i] == 'Z' {
-			nextCol += "A"
+	for i := horizontalOffset; i < len(row); i++ {
+		if row[i] != "" {
+			stringRow = append(stringRow, row[i])
 		} else {
-			nextCol = string(cell[i]+1) + nextCol
 			break
 		}
 	}
 
-	return cell[:index] + nextCol
+	return stringRow
 }
 
-func createCellName(colName string, row int) string {
-	return colName + strconv.Itoa(row)
-}
+/*
+This function extracts a row from a full row read by the excelize library.
+It reads exactly numberOfColumns values starting from the offset position,
+and transforms every "" into a nil.
+*/
+func (rs *RecordStream) extractRow(row []string) ([]octosql.Value, error) {
+	columnCount := len(rs.columnNames)
+	columnLimit := min(len(row), columnCount+rs.horizontalOffset)
 
-func isDateStyle(style int) bool {
-	return style == 2 || style == 3 || style == 4
-}
-
-func getDateFromExcelTime(timeValueStr string) (time.Time, error) {
-	timeValue, err := strconv.ParseFloat(timeValueStr, 64)
-	if err != nil {
-		return time.Now(), errors.Wrap(err, "couldn't convert string to float")
+	if len(row) <= rs.horizontalOffset {
+		return make([]octosql.Value, 0), nil
 	}
 
-	daysPart := int64(timeValue)
-	addedDays := excelInitialDate.Add(time.Hour * 24 * time.Duration(daysPart-2))
+	stringRow := padRow(row[rs.horizontalOffset:columnLimit], columnCount)
 
-	timeLeft := timeValue - float64(daysPart) //fractions of day
-	timeLeft *= float64((time.Hour * 24) / time.Nanosecond)
+	resultRow, err := rs.parseDataTypes(stringRow)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't parse types in row")
+	}
 
-	fullDate := addedDays.Add(time.Nanosecond * time.Duration(timeLeft))
-
-	return fullDate, nil
+	return resultRow, nil
 }
 
 func padRow(row []string, targetLen int) []string {
@@ -117,17 +132,15 @@ func padRow(row []string, targetLen int) []string {
 }
 
 func (rs *RecordStream) parseDataTypes(row []string) ([]octosql.Value, error) {
-	currentColumn := rs.rootColumnName
 	resultRow := make([]octosql.Value, len(row))
 
 	for i, v := range row {
-		currentCell := createCellName(currentColumn, rs.currentRowNumber)
-
-		style := rs.file.GetCellStyle(rs.sheet, currentCell)
-
-		if isDateStyle(style) {
+		if v == "" {
+			resultRow[i] = octosql.MakeNull()
+			continue
+		}
+		if rs.timeColumns[i] {
 			dateValue, err := getDateFromExcelTime(v)
-
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't get date from excel time")
 			}
@@ -136,123 +149,33 @@ func (rs *RecordStream) parseDataTypes(row []string) ([]octosql.Value, error) {
 		} else {
 			resultRow[i] = execution.ParseType(row[i])
 		}
-
-		currentColumn = getNextColumn(currentColumn)
 	}
 
 	return resultRow, nil
 }
 
-/*
-This function extracts column names from a row read by the excelize library.
-It starts at the offset position and reads until first nil without parsing types.
-For example when given a row: val1, val2, "", name, surname, "" and offset = 2,
-then the extracted column names would be []{"name", "surname"}
-*/
-func (rs *RecordStream) extractColumnNamesFromRow(row []string) []string {
-	stringRow := make([]string, 0)
+var excelInitialDate = time.Date(1900, time.January, 1, 0, 0, 0, 0, time.UTC)
 
-	for i := rs.columnOffset; i < len(row); i++ {
-		if row[i] != "" {
-			stringRow = append(stringRow, row[i])
-		} else {
-			break
-		}
-	}
-
-	rs.currentRowNumber++
-	return stringRow
-}
-
-/*
-This function does the same thing as the function that extracts column names,
-but it parses data types. It is used to read the first row of a table
-without a header row - it reads until the first nil, parses types and returns a slice of octosql.Value
-*/
-func (rs *RecordStream) extractRowUntilFirstNil(row []string) ([]octosql.Value, error) {
-	stringRow := make([]string, 0)
-
-	for i := rs.columnOffset; i < len(row); i++ {
-		if row[i] != "" {
-			stringRow = append(stringRow, row[i])
-		} else {
-			break
-		}
-	}
-
-	resultRow, err := rs.parseDataTypes(stringRow)
+func getDateFromExcelTime(timeValueStr string) (time.Time, error) {
+	timeValue, err := strconv.ParseFloat(timeValueStr, 64)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't parse types in row")
+		return time.Now(), errors.Wrap(err, "couldn't convert string to float")
 	}
 
-	rs.currentRowNumber++
+	daysPart := int64(timeValue)
+	addedDays := excelInitialDate.Add(time.Hour * 24 * time.Duration(daysPart-2))
 
-	return resultRow, nil
-}
+	timeLeft := timeValue - float64(daysPart) //fractions of day
+	timeLeft *= float64(time.Hour * 24 / time.Millisecond)
 
-/*
-This function extracts a row from a full row read by the excelize library.
-It reads exactly numberOfColumns values starting from the offset position,
-and transforms every "" into a nil.
-*/
-func (rs *RecordStream) extractRow(row []string) ([]octosql.Value, error) {
-	columnCount := len(rs.aliasedFields)
-	columnLimit := min(len(row), columnCount+rs.columnOffset)
+	fullDate := addedDays.Add(time.Millisecond * time.Duration(timeLeft))
 
-	if len(row) <= rs.columnOffset {
-		return make([]octosql.Value, 0), nil
-	}
-
-	stringRow := padRow(row[rs.columnOffset:columnLimit], columnCount)
-
-	resultRow, err := rs.parseDataTypes(stringRow)
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't parse types in row")
-	}
-
-	rs.currentRowNumber++
-
-	return resultRow, nil
-}
-
-func (rs *RecordStream) initializeColumnsWithHeaderRow() error {
-	columns := rs.extractColumnNamesFromRow(rs.rows.Columns())
-
-	rs.aliasedFields = make([]octosql.VariableName, 0)
-	for _, c := range columns {
-		lowerCased := strings.ToLower(fmt.Sprintf("%s.%s", rs.alias, c))
-		rs.aliasedFields = append(rs.aliasedFields, octosql.VariableName(lowerCased))
-	}
-
-	set := make(map[octosql.VariableName]struct{})
-	for _, f := range rs.aliasedFields {
-		if _, present := set[f]; present {
-			return errors.New("column names not unique")
-		}
-		set[f] = struct{}{}
-	}
-
-	return nil
-}
-
-func (rs *RecordStream) initializeColumnsWithoutHeaderRow() (*execution.Record, error) {
-	firstRow, err := rs.extractRowUntilFirstNil(rs.rows.Columns())
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't extract header row")
-	}
-
-	rs.aliasedFields = make([]octosql.VariableName, 0)
-	for i := range firstRow {
-		columnName := fmt.Sprintf("%s.col%d", rs.alias, i+1)
-		rs.aliasedFields = append(rs.aliasedFields, octosql.VariableName(columnName))
-	}
-
-	return execution.NewRecordFromSlice(rs.aliasedFields, firstRow), nil
+	return fullDate.Round(time.Second), nil
 }
 
 func isRowEmpty(row []octosql.Value) bool {
 	for i := range row {
-		if row[i] != octosql.ZeroString() {
+		if row[i] != octosql.MakeNull() {
 			return false
 		}
 	}

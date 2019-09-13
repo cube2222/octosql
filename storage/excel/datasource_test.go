@@ -8,120 +8,6 @@ import (
 	"github.com/cube2222/octosql/execution"
 )
 
-func Test_isCellNameValid(t *testing.T) {
-	type args struct {
-		cell string
-	}
-	tests := []struct {
-		name string
-		args args
-		want bool
-	}{
-		{
-			name: "correct cell name - single column, single row",
-			args: args{
-				cell: "B6",
-			},
-			want: true,
-		},
-
-		{
-			name: "correct cell name - multi column, single row",
-			args: args{
-				cell: "AZBE6",
-			},
-			want: true,
-		},
-
-		{
-			name: "correct cell name - single column, multi row",
-			args: args{
-				cell: "A9283",
-			},
-			want: true,
-		},
-
-		{
-			name: "correct cell name - multi column, multi row",
-			args: args{
-				cell: "ZZXY9283",
-			},
-			want: true,
-		},
-
-		{
-			name: "incorrect cell name - no column",
-			args: args{
-				cell: "1234",
-			},
-			want: false,
-		},
-
-		{
-			name: "incorrect cell name - no row",
-			args: args{
-				cell: "ABCDE",
-			},
-			want: false,
-		},
-
-		{
-			name: "incorrect cell name - mixed order",
-			args: args{
-				cell: "1A",
-			},
-			want: false,
-		},
-
-		{
-			name: "incorrect cell name - mixed order 2",
-			args: args{
-				cell: "A1A",
-			},
-			want: false,
-		},
-
-		{
-			name: "incorrect cell name - lowercase letter",
-			args: args{
-				cell: "c2",
-			},
-			want: false,
-		},
-
-		{
-			name: "incorrect cell name - illegal character",
-			args: args{
-				cell: "AB?321",
-			},
-			want: false,
-		},
-
-		{
-			name: "incorrect cell name - leading zeros",
-			args: args{
-				cell: "ABCD00123",
-			},
-			want: false,
-		},
-
-		{
-			name: "incorrect cell name - zero row",
-			args: args{
-				cell: "ABCD0",
-			},
-			want: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := isCellNameValid(tt.args.cell); got != tt.want {
-				t.Errorf("isCellNameValid() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func Test_getCellRowCol(t *testing.T) {
 	type args struct {
 		cell string
@@ -253,11 +139,12 @@ func TestDataSource_Get(t *testing.T) {
 	type fields struct {
 		path             string
 		alias            string
-		hasColumnNames   bool
+		hasHeaderRow     bool
 		sheet            string
-		rootColumn       int
-		rootRow          int
+		horizontalOffset int
+		verticalOffset   int
 		rootColumnString string
+		timeColumns      []string
 	}
 	type args struct {
 		variables octosql.Variables
@@ -274,10 +161,10 @@ func TestDataSource_Get(t *testing.T) {
 			fields: fields{
 				path:             "fixtures/test.xlsx",
 				alias:            "t",
-				hasColumnNames:   true,
+				hasHeaderRow:     true,
 				sheet:            "Sheet1",
-				rootColumn:       0,
-				rootRow:          0,
+				horizontalOffset: 0,
+				verticalOffset:   0,
 				rootColumnString: "A",
 			},
 			args: args{
@@ -305,10 +192,10 @@ func TestDataSource_Get(t *testing.T) {
 			fields: fields{
 				path:             "fixtures/test.xlsx",
 				alias:            "t",
-				hasColumnNames:   false,
+				hasHeaderRow:     false,
 				sheet:            "CustomSheet",
-				rootColumn:       1,
-				rootRow:          2,
+				horizontalOffset: 1,
+				verticalOffset:   2,
 				rootColumnString: "B",
 			},
 			args: args{
@@ -340,10 +227,10 @@ func TestDataSource_Get(t *testing.T) {
 			fields: fields{
 				path:             "fixtures/test.xlsx",
 				alias:            "t",
-				hasColumnNames:   true,
+				hasHeaderRow:     true,
 				sheet:            "CustomSheet",
-				rootColumn:       4,
-				rootRow:          1,
+				horizontalOffset: 4,
+				verticalOffset:   1,
 				rootColumnString: "E",
 			},
 			args: args{
@@ -371,10 +258,10 @@ func TestDataSource_Get(t *testing.T) {
 			fields: fields{
 				path:             "fixtures/test.xlsx",
 				alias:            "t",
-				hasColumnNames:   true,
+				hasHeaderRow:     true,
 				sheet:            "CustomSheet",
-				rootColumn:       0,
-				rootRow:          8,
+				horizontalOffset: 0,
+				verticalOffset:   8,
 				rootColumnString: "A",
 			},
 			args: args{
@@ -402,11 +289,12 @@ func TestDataSource_Get(t *testing.T) {
 			fields: fields{
 				path:             "fixtures/test.xlsx",
 				alias:            "t",
-				hasColumnNames:   false,
+				hasHeaderRow:     false,
 				sheet:            "DateSheet",
-				rootColumn:       0,
-				rootRow:          1,
+				horizontalOffset: 0,
+				verticalOffset:   1,
 				rootColumnString: "A",
+				timeColumns:      []string{"col1"},
 			},
 			args: args{
 				variables: octosql.NoVariables(),
@@ -414,15 +302,15 @@ func TestDataSource_Get(t *testing.T) {
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.col1", "t.col2"},
-					[]interface{}{time.Date(2017, 3, 14, 12, 59, 59, 999999790, time.UTC), 1},
+					[]interface{}{time.Date(2017, 3, 14, 13, 0, 0, 0, time.UTC), 1},
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.col1", "t.col2"},
-					[]interface{}{time.Date(2017, 3, 15, 12, 59, 59, 995000194, time.UTC), 2},
+					[]interface{}{time.Date(2017, 3, 15, 13, 0, 0, 0, time.UTC), 2},
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.col1", "t.col2"},
-					[]interface{}{time.Date(2019, 5, 19, 14, 0, 0, 209, time.UTC), 3},
+					[]interface{}{time.Date(2019, 5, 19, 14, 0, 0, 0, time.UTC), 3},
 				),
 			}),
 			wantErr: false,
@@ -433,11 +321,12 @@ func TestDataSource_Get(t *testing.T) {
 			fields: fields{
 				path:             "fixtures/test.xlsx",
 				alias:            "t",
-				hasColumnNames:   true,
+				hasHeaderRow:     true,
 				sheet:            "DateSheet",
-				rootColumn:       3,
-				rootRow:          2,
+				horizontalOffset: 3,
+				verticalOffset:   2,
 				rootColumnString: "D",
+				timeColumns:      []string{"date"},
 			},
 			args: args{
 				variables: octosql.NoVariables(),
@@ -445,15 +334,15 @@ func TestDataSource_Get(t *testing.T) {
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.date", "t.points"},
-					[]interface{}{time.Date(2017, 3, 14, 12, 59, 59, 999999790, time.UTC), 101},
+					[]interface{}{time.Date(2017, 3, 14, 13, 0, 0, 0, time.UTC), 101},
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.date", "t.points"},
-					[]interface{}{time.Date(2017, 3, 15, 12, 59, 59, 995000194, time.UTC), 102},
+					[]interface{}{time.Date(2017, 3, 15, 13, 0, 0, 0, time.UTC), 102},
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.date", "t.points"},
-					[]interface{}{time.Date(2019, 5, 19, 14, 0, 0, 209, time.UTC), 103},
+					[]interface{}{time.Date(2019, 5, 19, 14, 0, 0, 0, time.UTC), 103},
 				),
 			}),
 			wantErr: false,
@@ -464,11 +353,11 @@ func TestDataSource_Get(t *testing.T) {
 			ds := &DataSource{
 				path:             tt.fields.path,
 				alias:            tt.fields.alias,
-				hasColumnNames:   tt.fields.hasColumnNames,
+				hasHeaderRow:     tt.fields.hasHeaderRow,
 				sheet:            tt.fields.sheet,
-				rootColumn:       tt.fields.rootColumn,
-				rootRow:          tt.fields.rootRow,
-				rootColumnString: tt.fields.rootColumnString,
+				horizontalOffset: tt.fields.horizontalOffset,
+				verticalOffset:   tt.fields.verticalOffset,
+				timeColumns:      tt.fields.timeColumns,
 			}
 			got, err := ds.Get(tt.args.variables)
 			if (err != nil) != tt.wantErr {

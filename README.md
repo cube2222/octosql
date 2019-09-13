@@ -208,7 +208,6 @@ Where scan means that the whole table needs to be scanned for each access. We ar
   - Polymorphic Table Functions (i.e. RANGE(1, 10) in table position)
   - HAVING, ALL, ANY
 - Parallel expression evaluation.
-- Custom sql parser, so we can use sane function names, and support new sql constructs.
 - Streams support (Kafka, Redis)
 - Push down functions, aggregates to databases that support them.
 - An in-memory index to save values of subqueries and save on rescanning tables which don't support a given operation, so as not to recalculate them each time.

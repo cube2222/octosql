@@ -60,7 +60,7 @@ func TestAreStreamsEqual(t *testing.T) {
 				),
 			},
 			want:    false,
-			wantErr: false,
+			wantErr: true,
 		},
 		{
 			name: "different order streams",
@@ -79,7 +79,7 @@ func TestAreStreamsEqual(t *testing.T) {
 				),
 			},
 			want:    false,
-			wantErr: false,
+			wantErr: true,
 		},
 		{
 			name: "very complex test",
@@ -117,7 +117,7 @@ func TestAreStreamsEqual(t *testing.T) {
 				),
 			},
 			want:    false,
-			wantErr: false,
+			wantErr: true,
 		},
 		{
 			name: "mismatched column name",
@@ -136,7 +136,7 @@ func TestAreStreamsEqual(t *testing.T) {
 				),
 			},
 			want:    false,
-			wantErr: false,
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {

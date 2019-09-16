@@ -22,7 +22,7 @@ func NewPhysicalPlanCreator(repo *physical.DataSourceRepository) *PhysicalPlanCr
 }
 
 func (creator *PhysicalPlanCreator) GetVariableName() (out octosql.VariableName) {
-	out = octosql.VariableName(fmt.Sprintf("const_%d", creator.variableCounter))
+	out = octosql.NewVariableName(fmt.Sprintf("const_%d", creator.variableCounter))
 	creator.variableCounter++
 	return
 }

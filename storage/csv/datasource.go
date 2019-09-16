@@ -125,7 +125,7 @@ func (rs *RecordStream) initializeColumnsWithHeaderRow() error {
 
 	rs.aliasedFields = make([]octosql.VariableName, len(columns))
 	for i, c := range columns {
-		rs.aliasedFields[i] = octosql.VariableName(fmt.Sprintf("%s.%s", rs.alias, c))
+		rs.aliasedFields[i] = octosql.NewVariableName(fmt.Sprintf("%s.%s", rs.alias, c))
 	}
 
 	rs.r.FieldsPerRecord = len(rs.aliasedFields)
@@ -149,7 +149,7 @@ func (rs *RecordStream) initializeColumnsWithoutHeaderRow() (*execution.Record, 
 
 	rs.aliasedFields = make([]octosql.VariableName, len(row))
 	for i := range row {
-		rs.aliasedFields[i] = octosql.VariableName(fmt.Sprintf("%s.col%d", rs.alias, i+1))
+		rs.aliasedFields[i] = octosql.NewVariableName(fmt.Sprintf("%s.col%d", rs.alias, i+1))
 	}
 
 	return execution.NewRecordFromSlice(rs.aliasedFields, parseDataTypes(row)), nil

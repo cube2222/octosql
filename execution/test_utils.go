@@ -199,22 +199,12 @@ func (rms *recordMultiSet) isContained(other *recordMultiSet) (bool, error) {
 	return true, nil
 }
 
-func NewRecordFromSlice(fields []octosql.VariableName, data []octosql.Value) *Record {
-	return &Record{
-		fieldNames: fields,
-		data:       data,
-	}
-}
-
-func NewRecordFromSliceWithNormalize(fields []octosql.VariableName, data []interface{}) *Record {
+func NewRecordFromSliceWithNormalize(fields []octosql.VariableName, data []interface{}, opts ...RecordOption) *Record {
 	normalized := make([]octosql.Value, len(data))
 	for i := range data {
 		normalized[i] = octosql.NormalizeType(data[i])
 	}
-	return &Record{
-		fieldNames: fields,
-		data:       normalized,
-	}
+	return NewRecordFromSlice(fields, normalized, opts...)
 }
 
 func NewDummyNode(data []*Record) *DummyNode {

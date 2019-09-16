@@ -1,36 +1,79 @@
 package execution
 
 import (
-	"fmt"
 	"io"
-	"strings"
-
-	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/pkg/errors"
 )
 
 type Field struct {
 	Name octosql.VariableName
 }
 
+type metadata struct {
+	undo      bool
+	eventTime time.Time
+}
+
 type Record struct {
+	metadata   metadata
 	fieldNames []octosql.VariableName
 	data       []octosql.Value
 }
 
-func NewRecord(fields []octosql.VariableName, data map[octosql.VariableName]octosql.Value) *Record {
+type RecordOption func(stream *Record)
+
+func WithUndo() RecordOption {
+	return func(r *Record) {
+		r.metadata.undo = true
+	}
+}
+
+func WithEventTime(eventTime time.Time) RecordOption {
+	return func(r *Record) {
+		r.metadata.eventTime = eventTime
+	}
+}
+
+func WithMetadataFrom(base *Record) RecordOption {
+	return func(r *Record) {
+		r.metadata = base.metadata
+	}
+}
+
+func NewRecord(fields []octosql.VariableName, data map[octosql.VariableName]octosql.Value, opts ...RecordOption) *Record {
 	dataInner := make([]octosql.Value, len(fields))
 	for i := range fields {
 		dataInner[i] = data[fields[i]]
 	}
-	return &Record{
+	return NewRecordFromSlice(fields, dataInner, opts...)
+}
+
+func NewRecordFromSlice(fields []octosql.VariableName, data []octosql.Value, opts ...RecordOption) *Record {
+	r := &Record{
 		fieldNames: fields,
-		data:       dataInner,
+		data:       data,
 	}
+
+	for _, opt := range opts {
+		opt(r)
+	}
+
+	return r
 }
 
 func (r *Record) Value(field octosql.VariableName) octosql.Value {
+	if field.Source() == "sys" {
+		switch field.Name() {
+		case "undo":
+			return octosql.MakeBool(r.IsUndo())
+		case "event_time":
+			return r.EventTime()
+		default:
+			return octosql.MakeNull()
+		}
+	}
 	for i := range r.fieldNames {
 		if r.fieldNames[i] == field {
 			return r.data[i]
@@ -44,6 +87,16 @@ func (r *Record) Fields() []Field {
 	for _, fieldName := range r.fieldNames {
 		fields = append(fields, Field{
 			Name: fieldName,
+		})
+	}
+	if !r.metadata.eventTime.IsZero() {
+		fields = append(fields, Field{
+			Name: octosql.NewVariableName("sys.event_time"),
+		})
+	}
+	if r.IsUndo() {
+		fields = append(fields, Field{
+			Name: octosql.NewVariableName("sys.undo"),
 		})
 	}
 
@@ -74,10 +127,19 @@ func (r *Record) Equal(other *Record) bool {
 		if myFields[i] != otherFields[i] {
 			return false
 		}
-		if !octosql.AreEqual(r.data[i], other.data[i]) {
+		if !octosql.AreEqual(r.Value(myFields[i].Name), other.Value(myFields[i].Name)) {
 			return false
 		}
 	}
+
+	if !r.metadata.eventTime.Equal(other.metadata.eventTime) {
+		return false
+	}
+
+	if r.metadata.undo != other.metadata.undo {
+		return false
+	}
+
 	return true
 }
 
@@ -88,6 +150,14 @@ func (r *Record) String() string {
 	}
 
 	return fmt.Sprintf("{%s}", strings.Join(parts, ", "))
+}
+
+func (r *Record) IsUndo() bool {
+	return r.metadata.undo
+}
+
+func (r *Record) EventTime() octosql.Value {
+	return octosql.MakeTime(r.metadata.eventTime)
 }
 
 type RecordStream interface {

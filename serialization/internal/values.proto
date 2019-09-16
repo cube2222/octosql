@@ -1,0 +1,27 @@
+syntax = "proto3";
+package internal;
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+message Value {
+    oneof value {
+        bool null = 1;
+        bool phantom = 2;
+        int64 int = 3;
+        double float = 4;
+        bool bool = 5;
+        string string = 6;
+        google.protobuf.Timestamp time = 7;
+        google.protobuf.Duration duration = 8;
+        Tuple tuple = 9;
+        Object object = 10;
+    }
+}
+
+message Tuple {
+    repeated Value fields = 1;
+}
+
+message Object {
+    map<string, Value> fields = 1;
+}

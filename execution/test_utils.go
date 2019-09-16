@@ -1,10 +1,12 @@
 package execution
 
 import (
+	"fmt"
 	"sort"
 
-	"github.com/cube2222/octosql"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
 )
 
 type multiSetElement struct {
@@ -112,9 +114,9 @@ func AreStreamsEqual(first, second RecordStream) (bool, error) {
 		if firstErr == secondErr && firstErr == ErrEndOfStream {
 			break
 		} else if firstErr == ErrEndOfStream && secondErr == nil {
-			return false, nil
+			return false, fmt.Errorf("no record in first stream, %s in second", secondRec.String())
 		} else if firstErr == nil && secondErr == ErrEndOfStream {
-			return false, nil
+			return false, fmt.Errorf("no record in second stream, %s in first", firstRec.String())
 		} else if firstErr != nil {
 			return false, errors.Wrap(firstErr, "error in Next for first stream")
 		} else if secondErr != nil {
@@ -122,7 +124,7 @@ func AreStreamsEqual(first, second RecordStream) (bool, error) {
 		}
 
 		if !firstRec.Equal(secondRec) {
-			return false, nil
+			return false, fmt.Errorf("records not equal: %s and %s", firstRec.String(), secondRec.String())
 		}
 	}
 
@@ -197,22 +199,12 @@ func (rms *recordMultiSet) isContained(other *recordMultiSet) (bool, error) {
 	return true, nil
 }
 
-func NewRecordFromSlice(fields []octosql.VariableName, data []octosql.Value) *Record {
-	return &Record{
-		fieldNames: fields,
-		data:       data,
-	}
-}
-
-func NewRecordFromSliceWithNormalize(fields []octosql.VariableName, data []interface{}) *Record {
+func NewRecordFromSliceWithNormalize(fields []octosql.VariableName, data []interface{}, opts ...RecordOption) *Record {
 	normalized := make([]octosql.Value, len(data))
 	for i := range data {
 		normalized[i] = octosql.NormalizeType(data[i])
 	}
-	return &Record{
-		fieldNames: fields,
-		data:       normalized,
-	}
+	return NewRecordFromSlice(fields, normalized, opts...)
 }
 
 func NewDummyNode(data []*Record) *DummyNode {

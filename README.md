@@ -15,6 +15,7 @@ OctoSQL is a query tool that allows you to join, analyse and transform data from
   - [PostgreSQL](#postgresql)
   - [MySQL](#mysql)
   - [Redis](#redis)
+  - [Excel](#excel)
 - [Documentation](#documentation)
 - [Architecture](#architecture)
 - [Datasource Pushdown Operations](#datasource-pushdown-operations)
@@ -119,10 +120,24 @@ JSON file in one of the following forms:
 
 ---
 #### CSV
-CSV file seperated using commas. The first row should contain column names.
+CSV file separated using commas. The first row should contain column names.
 ##### options:
 - path - path to file containing the data, required
-
+- headerRow - whether the first row of the CSV file contains column names or not, defaults to true
+- separator - columns separator, defaults to ","
+---
+#### Excel
+A single table in an Excel spreadsheet.
+The table may or may not have column names as it's first row.
+The table can be in any sheet, and start at any point, but it cannot
+contain spaces between columns nor spaces between rows.
+##### options:
+- path - path to file, required
+- headerRow - does the first row contain column names, optional: defaults to true
+- sheet - name of the sheet in which data is stored, optional: defaults to "Sheet1"
+- rootCell - name of cell (i.e "A3", "BA14") which is the leftmost cell of the first
+- timeColumns - a list of columns to parse as datetime values with second precision
+row, optional: defaults to "A1"
 ---
 #### PostgreSQL
 Single PostgreSQL database table.
@@ -207,7 +222,6 @@ Where scan means that the whole table needs to be scanned for each access. We ar
   - Polymorphic Table Functions (i.e. RANGE(1, 10) in table position)
   - HAVING, ALL, ANY
 - Parallel expression evaluation.
-- Custom sql parser, so we can use sane function names, and support new sql constructs.
 - Streams support (Kafka, Redis)
 - Push down functions, aggregates to databases that support them.
 - An in-memory index to save values of subqueries and save on rescanning tables which don't support a given operation, so as not to recalculate them each time.

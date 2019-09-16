@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/cube2222/octosql/storage/excel"
 	"log"
 	"os"
 	"reflect"
@@ -52,6 +53,7 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 				"mysql":    mysql.NewDataSourceBuilderFactoryFromConfig,
 				"postgres": postgres.NewDataSourceBuilderFactoryFromConfig,
 				"redis":    redis.NewDataSourceBuilderFactoryFromConfig,
+				"excel":    excel.NewDataSourceBuilderFactoryFromConfig,
 			},
 			cfg,
 		)

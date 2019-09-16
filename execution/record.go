@@ -1,11 +1,14 @@
 package execution
 
 import (
+	"fmt"
 	"io"
+	"strings"
 	"time"
 
-	"github.com/cube2222/octosql"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
 )
 
 type Field struct {
@@ -142,6 +145,15 @@ func (r *Record) Equal(other *Record) bool {
 	}
 
 	return true
+}
+
+func (r *Record) String() string {
+	parts := make([]string, len(r.fieldNames))
+	for i := range r.fieldNames {
+		parts[i] = fmt.Sprintf("%s: %s", r.fieldNames[i].String(), r.data[i].String())
+	}
+
+	return fmt.Sprintf("{%s}", strings.Join(parts, ", "))
 }
 
 func (r *Record) IsUndo() bool {

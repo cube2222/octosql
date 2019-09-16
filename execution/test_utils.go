@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/pkg/errors"
@@ -113,9 +114,9 @@ func AreStreamsEqual(first, second RecordStream) (bool, error) {
 		if firstErr == secondErr && firstErr == ErrEndOfStream {
 			break
 		} else if firstErr == ErrEndOfStream && secondErr == nil {
-			return false, nil
+			return false, fmt.Errorf("no record in first stream, %s in second", secondRec.String())
 		} else if firstErr == nil && secondErr == ErrEndOfStream {
-			return false, nil
+			return false, fmt.Errorf("no record in second stream, %s in first", firstRec.String())
 		} else if firstErr != nil {
 			return false, errors.Wrap(firstErr, "error in Next for first stream")
 		} else if secondErr != nil {
@@ -123,7 +124,7 @@ func AreStreamsEqual(first, second RecordStream) (bool, error) {
 		}
 
 		if !firstRec.Equal(secondRec) {
-			return false, nil
+			return false, fmt.Errorf("records not equal: %s and %s", firstRec.String(), secondRec.String())
 		}
 	}
 

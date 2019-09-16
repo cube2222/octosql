@@ -151,6 +151,22 @@ func TestAreEqual(t *testing.T) {
 			},
 			want: false,
 		},
+		{
+			name: "compare nil to non-nil",
+			args: args{
+				left:  nil,
+				right: MakeInt(7),
+			},
+			want: false,
+		},
+		{
+			name: "compare non-nil to nil",
+			args: args{
+				left:  MakeInt(3),
+				right: nil,
+			},
+			want: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

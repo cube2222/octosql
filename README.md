@@ -218,8 +218,6 @@ Where scan means that the whole table needs to be scanned for each access. We ar
 - Additional Datasources.
 - SQL Constructs:
   - JSON Query
-  - Window Functions
-  - Polymorphic Table Functions (i.e. RANGE(1, 10) in table position)
   - HAVING, ALL, ANY
 - Parallel expression evaluation.
 - Streams support (Kafka, Redis)

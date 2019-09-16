@@ -43,7 +43,7 @@ func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't get headerRow")
 			}
-			separator, err := config.GetString(dbConfig, "separator", config.WithDefault(','))
+			separator, err := config.GetString(dbConfig, "separator", config.WithDefault(","))
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't get separator")
 			}

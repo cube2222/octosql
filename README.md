@@ -170,9 +170,11 @@ Documentation for the available functions: https://github.com/cube2222/octosql/w
 
 Documentation for the available aggregates: https://github.com/cube2222/octosql/wiki/Aggregate-Documentation
 
+Documentation for the available table valued functions: https://github.com/cube2222/octosql/wiki/Table-Valued-Functions-Documentation
+
 The SQL dialect documentation: TODO ;) in short though:
 
-Available SQL constructs: Select, Where, Order By, Group By, Offset, Limit, Left Join, Right Join, Inner Join, Distinct, Union, Union All, Subqueries, Operators.
+Available SQL constructs: Select, Where, Order By, Group By, Offset, Limit, Left Join, Right Join, Inner Join, Distinct, Union, Union All, Subqueries, Operators, Table Valued Functions.
 
 Available SQL types: Int, Float, String, Bool, Time, Duration, Tuple (array), Object (e.g. JSON)
 

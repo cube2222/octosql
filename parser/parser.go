@@ -414,7 +414,7 @@ func ParseAliasedExpression(expr *sqlparser.AliasedExpr) (logical.NamedExpressio
 		}
 		return nil, errors.Errorf("expressions in select statement and aggregate expressions must be named")
 	}
-	return logical.NewAliasedExpression(octosql.VariableName(expr.As.String()), subExpr), nil
+	return logical.NewAliasedExpression(octosql.NewVariableName(expr.As.String()), subExpr), nil
 }
 
 func ParseFunctionArgument(expr *sqlparser.AliasedExpr) (logical.Expression, error) {
@@ -479,7 +479,7 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 		if !expr.Qualifier.Name.IsEmpty() {
 			name = fmt.Sprintf("%s.%s", expr.Qualifier.Name.String(), name)
 		}
-		return logical.NewVariable(octosql.VariableName(name)), nil
+		return logical.NewVariable(octosql.NewVariableName(name)), nil
 
 	case *sqlparser.Subquery:
 		selectExpr, ok := expr.Select.(*sqlparser.Select)

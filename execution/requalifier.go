@@ -68,7 +68,7 @@ func (stream *RequalifiedStream) Next() (*Record, error) {
 				name = name[dotIndex+1:]
 			}
 		}
-		qualifiedName := octosql.VariableName(fmt.Sprintf("%s.%s", stream.qualifier, name))
+		qualifiedName := octosql.NewVariableName(fmt.Sprintf("%s.%s", stream.qualifier, name))
 
 		fields[i] = qualifiedName
 		values[qualifiedName] = record.Value(oldFields[i].Name)

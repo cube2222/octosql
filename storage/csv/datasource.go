@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/pkg/errors"
@@ -87,7 +88,7 @@ func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, 
 	aliasedFields := make([]octosql.VariableName, 0)
 	for _, c := range columns {
 		columnName := strings.ToLower(fmt.Sprintf("%s.%s", ds.alias, c))
-		aliasedFields = append(aliasedFields, octosql.VariableName(columnName))
+		aliasedFields = append(aliasedFields, octosql.NewVariableName(columnName))
 	}
 	r.FieldsPerRecord = len(aliasedFields)
 

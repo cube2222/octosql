@@ -127,9 +127,8 @@ func (rs *RecordStream) Next() (*execution.Record, error) {
 				v = parsed
 			}
 		}
-		aliasedRecord[octosql.NewVariableName(fmt.Sprintf("%s.%s", rs.alias, k))] = octosql.NormalizeType(v)
 		columnName := strings.ToLower(fmt.Sprintf("%s.%s", rs.alias, k))
-		aliasedRecord[octosql.VariableName(columnName)] = octosql.NormalizeType(v)
+		aliasedRecord[octosql.NewVariableName(columnName)] = octosql.NormalizeType(v)
 	}
 
 	fields := make([]octosql.VariableName, 0)

@@ -2,6 +2,7 @@ module github.com/cube2222/octosql
 
 require (
 	github.com/360EntSecGroup-Skylar/excelize v1.4.1
+	github.com/apache/thrift v0.13.0
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible // indirect
 	github.com/bradleyjkemp/memmap v0.2.2 // indirect
 	github.com/bradleyjkemp/memviz v0.2.2
@@ -22,3 +23,5 @@ require (
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 	gopkg.in/yaml.v2 v2.2.2
 )
+
+go 1.13

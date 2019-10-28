@@ -161,6 +161,14 @@ func createOrderedStream(expressions []Expression, directions []OrderDirection, 
 		iRec := records[i]
 		jRec := records[j]
 
+		if !iRec.IsDataRecord() && jRec.IsDataRecord() {
+			if jRec.IsDataRecord() {
+				return true // Metadata records get thrown at the end
+			} else {
+				return false // Don't mangle metadata record order
+			}
+		}
+
 		for num, expr := range expressions {
 			// TODO: Aggressive caching of these expressions...
 			iVars, err := variables.MergeWith(iRec.AsVariables())

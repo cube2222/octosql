@@ -62,6 +62,12 @@ func (stream *LeftJoinedStream) Next() (*Record, error) {
 				}
 				return nil, errors.Wrap(err, "couldn't get next source record with joined stream from joiner")
 			}
+			if !stream.curRecord.IsDataRecord() {
+				out := stream.curRecord
+				stream.curRecord = nil
+				stream.curJoinedStream = nil
+				return out, nil
+			}
 
 			stream.joinedAnyRecord = false
 		}
@@ -80,6 +86,9 @@ func (stream *LeftJoinedStream) Next() (*Record, error) {
 				continue
 			}
 			return nil, errors.Wrap(err, "couldn't get joined record")
+		}
+		if !joinedRecord.IsDataRecord() {
+			return joinedRecord, nil
 		}
 		stream.joinedAnyRecord = true
 

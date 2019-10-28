@@ -52,6 +52,10 @@ func (ds *DistinctStream) Next() (*Record, error) {
 			return nil, errors.Wrap(err, "couldn't get record from stream in DistinctStream")
 		}
 
+		if !record.IsDataRecord() {
+			return record, nil
+		}
+
 		already, err := ds.records.Has(record)
 
 		if err != nil {

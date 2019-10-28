@@ -52,6 +52,10 @@ func (stream *FilteredStream) Next() (*Record, error) {
 			return nil, errors.Wrap(err, "couldn't get source record")
 		}
 
+		if !record.IsDataRecord() {
+			return record, nil
+		}
+
 		variables, err := stream.variables.MergeWith(record.AsVariables())
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't merge given variables with record variables")

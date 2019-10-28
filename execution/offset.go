@@ -33,13 +33,16 @@ func (node *Offset) Get(variables octosql.Variables) (RecordStream, error) {
 		return nil, errors.New("negative offset value")
 	}
 
-	for ; offsetVal > 0; offsetVal-- {
-		_, err := dataStream.Next()
+	for offsetVal > 0 {
+		rec, err := dataStream.Next()
 		if err != nil {
 			if err == ErrEndOfStream {
 				return dataStream, nil
 			}
 			return nil, errors.Wrap(err, "couldn't read record from RecordStream")
+		}
+		if rec.IsDataRecord() {
+			offsetVal--
 		}
 	}
 

@@ -54,6 +54,10 @@ func (stream *MappedStream) Next() (*Record, error) {
 		return nil, errors.Wrap(err, "couldn't get source record")
 	}
 
+	if !srcRecord.IsDataRecord() {
+		return srcRecord, nil
+	}
+
 	variables, err := stream.variables.MergeWith(srcRecord.AsVariables())
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't merge given variables with record variables")

@@ -57,6 +57,10 @@ func (stream *RequalifiedStream) Next() (*Record, error) {
 		}
 		return nil, errors.Wrap(err, "couldn't get source record")
 	}
+	if !record.IsDataRecord() {
+		return record, nil
+	}
+
 	oldFields := record.Fields()
 
 	fields := make([]octosql.VariableName, len(record.Fields()))

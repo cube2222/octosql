@@ -20,7 +20,15 @@ type metadata struct {
 	eventTime time.Time
 }
 
+type RecordType int
+
+const (
+	Data      RecordType = iota
+	Watermark RecordType = iota
+)
+
 type Record struct {
+	recordType RecordType
 	metadata   metadata
 	fieldNames []octosql.VariableName
 	data       []octosql.Value
@@ -56,6 +64,7 @@ func NewRecord(fields []octosql.VariableName, data map[octosql.VariableName]octo
 
 func NewRecordFromSlice(fields []octosql.VariableName, data []octosql.Value, opts ...RecordOption) *Record {
 	r := &Record{
+		recordType: Data,
 		fieldNames: fields,
 		data:       data,
 	}
@@ -162,6 +171,10 @@ func (r *Record) IsUndo() bool {
 
 func (r *Record) EventTime() octosql.Value {
 	return octosql.MakeTime(r.metadata.eventTime)
+}
+
+func (r *Record) IsDataRecord() bool {
+	return r.recordType == Data
 }
 
 type RecordStream interface {

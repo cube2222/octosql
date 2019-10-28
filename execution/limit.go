@@ -43,6 +43,8 @@ func newLimitedStream(rs RecordStream, limit int) *LimitedStream {
 	}
 }
 
+// LimitedStream passes records through until the limit is reached.
+// There is explicitly no special metadata record handling here.
 type LimitedStream struct {
 	rs    RecordStream
 	limit int

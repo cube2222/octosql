@@ -1,8 +1,9 @@
 package execution
 
 import (
-	"github.com/cube2222/octosql"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
 )
 
 type Filter struct {
@@ -21,9 +22,10 @@ func (node *Filter) Get(variables octosql.Variables) (RecordStream, error) {
 	}
 
 	return &FilteredStream{
-		formula:   node.formula,
-		variables: variables,
-		source:    recordStream,
+		formula:                      node.formula,
+		variables:                    variables,
+		source:                       recordStream,
+		PassthroughMetaRecordHandler: NewPassthroughMetaRecordHandler(recordStream),
 	}, nil
 }
 
@@ -31,6 +33,7 @@ type FilteredStream struct {
 	formula   Formula
 	variables octosql.Variables
 	source    RecordStream
+	*PassthroughMetaRecordHandler
 }
 
 func (stream *FilteredStream) Close() error {

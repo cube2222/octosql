@@ -1,0 +1,15 @@
+syntax = "proto3";
+package metarecord;
+option go_package = "github.com/cube2222/octosql/execution";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+message MetaRecord {
+    oneof value {
+        Watermark watermark = 1;
+    }
+}
+
+message Watermark {
+
+}

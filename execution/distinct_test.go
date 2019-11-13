@@ -29,7 +29,7 @@ func TestDistinct_Get(t *testing.T) {
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"id", "age"},
 						[]interface{}{3, 2}),
-				}),
+				}, nil),
 			},
 			want: NewInMemoryStream([]*Record{
 				NewRecordFromSliceWithNormalize(
@@ -41,7 +41,7 @@ func TestDistinct_Get(t *testing.T) {
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "age"},
 					[]interface{}{2, 10}),
-			}),
+			}, nil),
 		},
 
 		{
@@ -57,13 +57,13 @@ func TestDistinct_Get(t *testing.T) {
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"id", "age"},
 						[]interface{}{1, 7}),
-				}),
+				}, nil),
 			},
 			want: NewInMemoryStream([]*Record{
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "age"},
 					[]interface{}{1, 7}),
-			}),
+			}, nil),
 		},
 
 		{
@@ -79,7 +79,7 @@ func TestDistinct_Get(t *testing.T) {
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"id"},
 						[]interface{}{3}),
-				}),
+				}, nil),
 			},
 			want: NewInMemoryStream([]*Record{
 				NewRecordFromSliceWithNormalize(
@@ -91,7 +91,7 @@ func TestDistinct_Get(t *testing.T) {
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id"},
 					[]interface{}{3}),
-			}),
+			}, nil),
 		},
 
 		{
@@ -113,7 +113,7 @@ func TestDistinct_Get(t *testing.T) {
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"continent", "name"},
 						[]interface{}{"Africa", "lion"}),
-				}),
+				}, nil),
 			},
 			want: NewInMemoryStream([]*Record{
 				NewRecordFromSliceWithNormalize(
@@ -122,7 +122,7 @@ func TestDistinct_Get(t *testing.T) {
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"continent", "name"},
 					[]interface{}{"Europe", "pigeon"}),
-			}),
+			}, nil),
 		},
 
 		{
@@ -144,7 +144,7 @@ func TestDistinct_Get(t *testing.T) {
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"id", "name"},
 						[]interface{}{4, "Wojtek"}),
-				}),
+				}, nil),
 			},
 			want: NewInMemoryStream([]*Record{
 				NewRecordFromSliceWithNormalize(
@@ -159,7 +159,7 @@ func TestDistinct_Get(t *testing.T) {
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "name"},
 					[]interface{}{4, "Wojtek"}),
-			}),
+			}, nil),
 		},
 
 		{
@@ -175,7 +175,7 @@ func TestDistinct_Get(t *testing.T) {
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"numbers"},
 						[]interface{}{[]interface{}{7, 8}}),
-				}),
+				}, nil),
 			},
 			want: NewInMemoryStream([]*Record{
 				NewRecordFromSliceWithNormalize(
@@ -187,7 +187,7 @@ func TestDistinct_Get(t *testing.T) {
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"numbers"},
 					[]interface{}{[]interface{}{7, 8}}),
-			}),
+			}, nil),
 		},
 
 		{
@@ -203,7 +203,7 @@ func TestDistinct_Get(t *testing.T) {
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"numbers"},
 						[]interface{}{[]interface{}{7, 8}}),
-				}),
+				}, nil),
 			},
 			want: NewInMemoryStream([]*Record{
 				NewRecordFromSliceWithNormalize(
@@ -212,7 +212,7 @@ func TestDistinct_Get(t *testing.T) {
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"numbers"},
 					[]interface{}{[]interface{}{7, 8}}),
-			}),
+			}, nil),
 		},
 
 		{
@@ -240,7 +240,7 @@ func TestDistinct_Get(t *testing.T) {
 							"1": "bbb",
 							"2": "ccd",
 						}}),
-				}),
+				}, nil),
 			},
 			want: NewInMemoryStream([]*Record{
 				NewRecordFromSliceWithNormalize(
@@ -257,7 +257,7 @@ func TestDistinct_Get(t *testing.T) {
 						"1": "bbb",
 						"2": "ccd",
 					}}),
-			}),
+			}, nil),
 		},
 
 		{
@@ -285,7 +285,7 @@ func TestDistinct_Get(t *testing.T) {
 							"1": "bbb",
 							"2": "ccd",
 						}, []interface{}{1, 2}}),
-				}),
+				}, nil),
 			},
 			want: NewInMemoryStream([]*Record{
 				NewRecordFromSliceWithNormalize(
@@ -309,7 +309,7 @@ func TestDistinct_Get(t *testing.T) {
 						"1": "bbb",
 						"2": "ccd",
 					}, []interface{}{1, 2}}),
-			}),
+			}, nil),
 		},
 
 		{
@@ -377,7 +377,7 @@ func TestDistinct_Get(t *testing.T) {
 					NewRecordFromSliceWithNormalize( //unique - second row template; mixed columns same values
 						[]octosql.VariableName{"id", "scores", "age"},
 						[]interface{}{[]interface{}{9, 1, 11}, 1, 17}),
-				}),
+				}, nil),
 			},
 
 			want: NewInMemoryStream([]*Record{
@@ -432,7 +432,7 @@ func TestDistinct_Get(t *testing.T) {
 				NewRecordFromSliceWithNormalize( //unique - second row template; mixed columns same values
 					[]octosql.VariableName{"id", "scores", "age"},
 					[]interface{}{[]interface{}{9, 1, 11}, 1, 17}),
-			}),
+			}, nil),
 		},
 
 		{
@@ -457,7 +457,7 @@ func TestDistinct_Get(t *testing.T) {
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"date"},
 						[]interface{}{time.Date(2019, 11, 27, 0, 0, 2, 0, time.FixedZone("Poland", 0))}),
-				}),
+				}, nil),
 			},
 			want: NewInMemoryStream([]*Record{
 				NewRecordFromSliceWithNormalize(
@@ -475,7 +475,7 @@ func TestDistinct_Get(t *testing.T) {
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"date"},
 					[]interface{}{time.Date(2019, 11, 28, 0, 0, 2, 0, time.FixedZone("Poland", 0))}),
-			}),
+			}, nil),
 		},
 	}
 

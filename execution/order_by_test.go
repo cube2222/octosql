@@ -35,7 +35,7 @@ func TestOrderBy_Get(t *testing.T) {
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"id", "age"},
 						[]interface{}{3, 2}),
-				}),
+				}, nil),
 				expressions: []Expression{NewVariable(octosql.NewVariableName("age"))},
 				directions:  []OrderDirection{Ascending},
 			},
@@ -49,7 +49,7 @@ func TestOrderBy_Get(t *testing.T) {
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "age"},
 					[]interface{}{2, 10}),
-			}),
+			}, nil),
 			wantErr: false,
 		},
 		{
@@ -65,7 +65,7 @@ func TestOrderBy_Get(t *testing.T) {
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
 						[]interface{}{"a", 2}),
-				}),
+				}, nil),
 				expressions: []Expression{NewVariable(octosql.NewVariableName("name"))},
 				directions:  []OrderDirection{Descending},
 			},
@@ -79,7 +79,7 @@ func TestOrderBy_Get(t *testing.T) {
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
 					[]interface{}{"a", 2}),
-			}),
+			}, nil),
 			wantErr: false,
 		},
 		{
@@ -95,7 +95,7 @@ func TestOrderBy_Get(t *testing.T) {
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "birth"},
 						[]interface{}{"a", now.Add(-1 * time.Hour)}),
-				}),
+				}, nil),
 				expressions: []Expression{NewVariable(octosql.NewVariableName("birth"))},
 				directions:  []OrderDirection{Descending},
 			},
@@ -109,7 +109,7 @@ func TestOrderBy_Get(t *testing.T) {
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "birth"},
 					[]interface{}{"a", now.Add(-1 * time.Hour)}),
-			}),
+			}, nil),
 			wantErr: false,
 		},
 		{
@@ -131,7 +131,7 @@ func TestOrderBy_Get(t *testing.T) {
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
 						[]interface{}{"d", 17}),
-				}),
+				}, nil),
 				expressions: []Expression{
 					NewVariable(octosql.NewVariableName("name")),
 					NewVariable(octosql.NewVariableName("age")),
@@ -157,7 +157,7 @@ func TestOrderBy_Get(t *testing.T) {
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
 					[]interface{}{"d", 17}),
-			}),
+			}, nil),
 			wantErr: false,
 		},
 		{
@@ -179,7 +179,7 @@ func TestOrderBy_Get(t *testing.T) {
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
 						[]interface{}{"d", 17.918}),
-				}),
+				}, nil),
 				expressions: []Expression{
 					NewVariable("name"),
 					NewFunctionExpression(&FuncIdentity, []Expression{NewVariable("age")}),
@@ -206,7 +206,7 @@ func TestOrderBy_Get(t *testing.T) {
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
 					[]interface{}{"d", 17.918}),
-			}),
+			}, nil),
 			wantErr: false,
 		},
 		{
@@ -219,7 +219,7 @@ func TestOrderBy_Get(t *testing.T) {
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age?"},
 						[]interface{}{"d", 19}),
-				}),
+				}, nil),
 				expressions: []Expression{NewVariable(octosql.NewVariableName("age"))},
 				directions:  []OrderDirection{Descending},
 			},
@@ -237,7 +237,7 @@ func TestOrderBy_Get(t *testing.T) {
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
 						[]interface{}{"d", 19.5}),
-				}),
+				}, nil),
 				expressions: []Expression{NewVariable(octosql.NewVariableName("age"))},
 				directions:  []OrderDirection{Descending},
 			},

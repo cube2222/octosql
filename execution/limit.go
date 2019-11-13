@@ -6,16 +6,16 @@ import (
 )
 
 type Limit struct {
-	data      Node
+	child     Node
 	limitExpr Expression
 }
 
-func NewLimit(data Node, limit Expression) *Limit {
-	return &Limit{data: data, limitExpr: limit}
+func NewLimit(child Node, limit Expression) *Limit {
+	return &Limit{child: child, limitExpr: limit}
 }
 
 func (node *Limit) Get(variables octosql.Variables) (RecordStream, error) {
-	dataStream, err := node.data.Get(variables)
+	dataStream, err := node.child.Get(variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get data RecordStream")
 	}
@@ -38,14 +38,16 @@ func (node *Limit) Get(variables octosql.Variables) (RecordStream, error) {
 
 func newLimitedStream(rs RecordStream, limit int) *LimitedStream {
 	return &LimitedStream{
-		rs:    rs,
-		limit: limit,
+		rs:                           rs,
+		limit:                        limit,
+		PassthroughMetaRecordHandler: NewPassthroughMetaRecordHandler(rs),
 	}
 }
 
 type LimitedStream struct {
 	rs    RecordStream
 	limit int
+	*PassthroughMetaRecordHandler
 }
 
 func (node *LimitedStream) Close() error {

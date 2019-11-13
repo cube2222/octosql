@@ -6,16 +6,16 @@ import (
 )
 
 type Offset struct {
-	data       Node
+	child      Node
 	offsetExpr Expression
 }
 
-func NewOffset(data Node, offsetExpr Expression) *Offset {
-	return &Offset{data: data, offsetExpr: offsetExpr}
+func NewOffset(child Node, offsetExpr Expression) *Offset {
+	return &Offset{child: child, offsetExpr: offsetExpr}
 }
 
 func (node *Offset) Get(variables octosql.Variables) (RecordStream, error) {
-	dataStream, err := node.data.Get(variables)
+	dataStream, err := node.child.Get(variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get data record stream")
 	}

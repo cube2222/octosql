@@ -166,6 +166,7 @@ func (r *Record) EventTime() octosql.Value {
 
 type RecordStream interface {
 	Next() (*Record, error)
+	MetaRecordHandler
 	io.Closer
 }
 

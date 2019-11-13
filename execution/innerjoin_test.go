@@ -33,22 +33,20 @@ func TestInnerJoinedStream_Next(t *testing.T) {
 				variables: map[octosql.VariableName]octosql.Value{
 					octosql.NewVariableName("const"): octosql.MakeInt(3),
 				},
-				source: NewInMemoryStream(
-					[]*Record{
-						NewRecordFromSliceWithNormalize(
-							fieldNames,
-							[]interface{}{"red", "test"},
-						),
-						NewRecordFromSliceWithNormalize(
-							fieldNames,
-							[]interface{}{"blue", "test2"},
-						),
-						NewRecordFromSliceWithNormalize(
-							fieldNames,
-							[]interface{}{"green", "test3"},
-						),
-					},
-				),
+				source: NewInMemoryStream([]*Record{
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{"red", "test"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{"blue", "test2"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{"green", "test3"},
+					),
+				}, nil),
 				joined: NewFilter(
 					NewAnd(
 						NewPredicate(
@@ -81,22 +79,20 @@ func TestInnerJoinedStream_Next(t *testing.T) {
 						),
 					})),
 			},
-			want: NewInMemoryStream(
-				[]*Record{
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"bike", "name", "color", "score"},
-						[]interface{}{"red", "test", "red", 5},
-					),
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"bike", "name", "color", "score"},
-						[]interface{}{"green", "test3", "green", 7},
-					),
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"bike", "name", "color", "score"},
-						[]interface{}{"green", "test3", "green", 4},
-					),
-				},
-			),
+			want: NewInMemoryStream([]*Record{
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"bike", "name", "color", "score"},
+					[]interface{}{"red", "test", "red", 5},
+				),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"bike", "name", "color", "score"},
+					[]interface{}{"green", "test3", "green", 7},
+				),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"bike", "name", "color", "score"},
+					[]interface{}{"green", "test3", "green", 4},
+				),
+			}, nil),
 			wantErr: false,
 		},
 		{
@@ -105,10 +101,10 @@ func TestInnerJoinedStream_Next(t *testing.T) {
 				variables: map[octosql.VariableName]octosql.Value{
 					octosql.NewVariableName("const"): octosql.MakeInt(3),
 				},
-				source: NewInMemoryStream(nil),
+				source: NewInMemoryStream(nil, nil),
 				joined: NewDummyNode(nil),
 			},
-			want:    NewInMemoryStream(nil),
+			want:    NewInMemoryStream(nil, nil),
 			wantErr: false,
 		},
 	}

@@ -79,8 +79,7 @@ func TestDataSource_Get(t *testing.T) {
 					[]octosql.VariableName{"a.name", "a.population"},
 					[]interface{}{"zebra", 5000},
 				),
-			},
-			),
+			}, nil),
 			wantErr: false,
 		},
 
@@ -104,7 +103,7 @@ func TestDataSource_Get(t *testing.T) {
 				},
 				tableDescription: "CREATE TABLE animals(name VARCHAR(20) PRIMARY KEY, population INTEGER);",
 			},
-			want:    execution.NewInMemoryStream([]*execution.Record{}),
+			want:    execution.NewInMemoryStream([]*execution.Record{}, nil),
 			wantErr: false,
 		},
 
@@ -135,7 +134,7 @@ func TestDataSource_Get(t *testing.T) {
 					[]octosql.VariableName{"a.name", "a.population"},
 					[]interface{}{"panda", 500},
 				),
-			}),
+			}, nil),
 			wantErr: false,
 		},
 
@@ -174,7 +173,7 @@ func TestDataSource_Get(t *testing.T) {
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{4, "Adam"},
 				),
-			}),
+			}, nil),
 			wantErr: false,
 		},
 
@@ -218,7 +217,7 @@ func TestDataSource_Get(t *testing.T) {
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{3, "Wojtek"},
 				),
-			}),
+			}, nil),
 			wantErr: false,
 		},
 
@@ -266,7 +265,7 @@ func TestDataSource_Get(t *testing.T) {
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{4, "Adam"},
 				),
-			}),
+			}, nil),
 			wantErr: false,
 		},
 	}

@@ -1,8 +1,9 @@
 package execution
 
 import (
-	"github.com/cube2222/octosql"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
 )
 
 type Map struct {
@@ -22,10 +23,11 @@ func (node *Map) Get(variables octosql.Variables) (RecordStream, error) {
 	}
 
 	return &MappedStream{
-		expressions: node.expressions,
-		variables:   variables,
-		source:      recordStream,
-		keep:        node.keep,
+		expressions:                  node.expressions,
+		variables:                    variables,
+		source:                       recordStream,
+		keep:                         node.keep,
+		PassthroughMetaRecordHandler: NewPassthroughMetaRecordHandler(recordStream),
 	}, nil
 }
 
@@ -34,6 +36,7 @@ type MappedStream struct {
 	variables   octosql.Variables
 	source      RecordStream
 	keep        bool
+	*PassthroughMetaRecordHandler
 }
 
 func (stream *MappedStream) Close() error {

@@ -219,10 +219,10 @@ type DummyNode struct {
 
 func (dn *DummyNode) Get(variables octosql.Variables) (RecordStream, error) {
 	if dn.data == nil {
-		return NewInMemoryStream([]*Record{}), nil
+		return NewInMemoryStream([]*Record{}, nil), nil
 	}
 
-	return NewInMemoryStream(dn.data), nil
+	return NewInMemoryStream(dn.data, nil), nil
 }
 
 func NewDummyValue(value octosql.Value) *DummyValue {

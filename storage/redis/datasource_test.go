@@ -78,8 +78,7 @@ func TestDataSource_Get(t *testing.T) {
 						"r.surname": octosql.MakeString("k"),
 					},
 				),
-			},
-			),
+			}, nil),
 			wantErr: false,
 		},
 		{
@@ -120,8 +119,7 @@ func TestDataSource_Get(t *testing.T) {
 						"r.surname":             octosql.MakeString("k"),
 					},
 				),
-			},
-			),
+			}, nil),
 			wantErr: false,
 		},
 		{
@@ -191,8 +189,7 @@ func TestDataSource_Get(t *testing.T) {
 						"r.surname": octosql.MakeString("ch"),
 					},
 				),
-			},
-			),
+			}, nil),
 			wantErr: false,
 		},
 		{
@@ -240,8 +237,7 @@ func TestDataSource_Get(t *testing.T) {
 						"r.surname": octosql.MakeString("k"),
 					},
 				),
-			},
-			),
+			}, nil),
 			wantErr: false,
 		},
 		{
@@ -325,8 +321,7 @@ func TestDataSource_Get(t *testing.T) {
 						"r.surname": octosql.MakeString("cz"),
 					},
 				),
-			},
-			),
+			}, nil),
 			wantErr: false,
 		},
 		{
@@ -423,8 +418,7 @@ func TestDataSource_Get(t *testing.T) {
 						"r.surname": octosql.MakeString("ch"),
 					},
 				),
-			},
-			),
+			}, nil),
 			wantErr: false,
 		},
 		{
@@ -504,8 +498,7 @@ func TestDataSource_Get(t *testing.T) {
 						"r.surname": octosql.MakeString("ch"),
 					},
 				),
-			},
-			),
+			}, nil),
 			wantErr: false,
 		},
 		{
@@ -591,8 +584,7 @@ func TestDataSource_Get(t *testing.T) {
 						"r.surname": octosql.MakeString("m"),
 					},
 				),
-			},
-			),
+			}, nil),
 			wantErr: false,
 		},
 		{
@@ -620,7 +612,7 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{},
 			},
-			want:    execution.NewInMemoryStream(nil),
+			want:    execution.NewInMemoryStream(nil, nil),
 			wantErr: true,
 		},
 		{
@@ -643,7 +635,7 @@ func TestDataSource_Get(t *testing.T) {
 					"const_0": octosql.MakeString("key0"),
 				},
 			},
-			want:    execution.NewInMemoryStream(nil),
+			want:    execution.NewInMemoryStream(nil, nil),
 			wantErr: true,
 		},
 		{
@@ -666,7 +658,7 @@ func TestDataSource_Get(t *testing.T) {
 					"const_0": octosql.MakeString("key0"),
 				},
 			},
-			want:    execution.NewInMemoryStream(nil),
+			want:    execution.NewInMemoryStream(nil, nil),
 			wantErr: true,
 		},
 		{
@@ -689,7 +681,7 @@ func TestDataSource_Get(t *testing.T) {
 					"const_0": octosql.MakeString("key0"),
 				},
 			},
-			want:    execution.NewInMemoryStream(nil),
+			want:    execution.NewInMemoryStream(nil, nil),
 			wantErr: true,
 		},
 		{
@@ -712,7 +704,7 @@ func TestDataSource_Get(t *testing.T) {
 					"const_0": octosql.MakeString("key0"),
 				},
 			},
-			want:    execution.NewInMemoryStream(nil),
+			want:    execution.NewInMemoryStream(nil, nil),
 			wantErr: true,
 		},
 		{
@@ -730,7 +722,7 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{},
 			},
-			want:    execution.NewInMemoryStream(nil),
+			want:    execution.NewInMemoryStream(nil, nil),
 			wantErr: true,
 		},
 	}

@@ -79,7 +79,7 @@ func TestTumble_Get(t *testing.T) {
 					[]interface{}{4, baseTime.Add(time.Second * 13), baseTime.Add(time.Second * 13), baseTime.Add(time.Second * 23)},
 					execution.WithEventTime(baseTime.Add(time.Second*23)),
 				),
-			}),
+			}, nil),
 			wantErr: false,
 		},
 		{
@@ -134,7 +134,7 @@ func TestTumble_Get(t *testing.T) {
 					[]interface{}{4, baseTime.Add(time.Second * 13), baseTime.Add(time.Second * 10), baseTime.Add(time.Second * 20)},
 					execution.WithEventTime(baseTime.Add(time.Second*20)),
 				),
-			}),
+			}, nil),
 			wantErr: false,
 		},
 	}

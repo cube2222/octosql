@@ -71,7 +71,7 @@ func TestRange_Get(t *testing.T) {
 					[]octosql.VariableName{"i"},
 					[]interface{}{9},
 				),
-			}),
+			}, nil),
 			wantErr: false,
 		},
 		{
@@ -107,7 +107,7 @@ func TestRange_Get(t *testing.T) {
 					[]octosql.VariableName{"i"},
 					[]interface{}{9},
 				),
-			}),
+			}, nil),
 			wantErr: false,
 		},
 		{
@@ -122,7 +122,7 @@ func TestRange_Get(t *testing.T) {
 					"end":   octosql.MakeInt(3),
 				}),
 			},
-			want:    execution.NewInMemoryStream([]*execution.Record{}),
+			want:    execution.NewInMemoryStream([]*execution.Record{}, nil),
 			wantErr: false,
 		},
 		{
@@ -137,7 +137,7 @@ func TestRange_Get(t *testing.T) {
 					"end":   octosql.MakeInt(3),
 				}),
 			},
-			want:    execution.NewInMemoryStream([]*execution.Record{}),
+			want:    execution.NewInMemoryStream([]*execution.Record{}, nil),
 			wantErr: false,
 		},
 	}

@@ -79,7 +79,7 @@ func TestOffset_Get(t *testing.T) {
 					[]interface{}{
 						2.23e7,
 					}),
-			}),
+			}, nil),
 			wantError: NO_ERROR,
 		},
 		{
@@ -103,7 +103,7 @@ func TestOffset_Get(t *testing.T) {
 						}),
 				},
 			}, NewDummyValue(octosql.MakeInt(4))),
-			wantStream: NewInMemoryStream([]*Record{}),
+			wantStream: NewInMemoryStream([]*Record{}, nil),
 			wantError:  NO_ERROR,
 		},
 	}

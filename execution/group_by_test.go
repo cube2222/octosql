@@ -118,7 +118,7 @@ func TestGroupBy_AggregateCalling(t *testing.T) {
 			NewRecordFromSliceWithNormalize(fields, []interface{}{"Nala", 5, 3}),
 			NewRecordFromSliceWithNormalize(fields, []interface{}{"Tiger", 4, 3}),
 			NewRecordFromSliceWithNormalize(fields, []interface{}{"Lucy", 3, 3}),
-		}),
+		}, nil),
 		variables:  octosql.NoVariables(),
 		key:        []Expression{NewVariable("ownerid")},
 		groups:     NewHashMap(),

@@ -86,7 +86,7 @@ func TestLimit_Get(t *testing.T) {
 					[]interface{}{
 						false,
 					}),
-			}),
+			}, nil),
 			wantError: NO_ERROR,
 		},
 		{
@@ -103,7 +103,7 @@ func TestLimit_Get(t *testing.T) {
 						}),
 				},
 			}, NewDummyValue(octosql.MakeInt(0))),
-			wantStream: NewInMemoryStream([]*Record{}),
+			wantStream: NewInMemoryStream([]*Record{}, nil),
 			wantError:  NO_ERROR,
 		},
 	}
@@ -159,7 +159,7 @@ func TestLimitedStream_Next(t *testing.T) {
 						[]interface{}{
 							2,
 						}),
-				}),
+				}, nil),
 				1,
 			),
 			wantStream: NewInMemoryStream([]*Record{
@@ -170,7 +170,7 @@ func TestLimitedStream_Next(t *testing.T) {
 					[]interface{}{
 						1,
 					}),
-			}),
+			}, nil),
 		},
 	}
 

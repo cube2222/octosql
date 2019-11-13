@@ -211,5 +211,5 @@ func createOrderedStream(expressions []Expression, directions []OrderDirection, 
 		return false
 	})
 
-	return NewInMemoryStream(records), nil
+	return NewInMemoryStream(records, NewPassthroughMetaRecordHandler(sourceStream)), nil
 }

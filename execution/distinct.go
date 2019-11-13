@@ -21,9 +21,10 @@ func (node *Distinct) Get(variables octosql.Variables) (RecordStream, error) {
 	}
 
 	return &DistinctStream{
-		stream:    stream,
-		variables: variables,
-		records:   newRecordSet(),
+		stream:                       stream,
+		variables:                    variables,
+		records:                      newRecordSet(),
+		PassthroughMetaRecordHandler: NewPassthroughMetaRecordHandler(stream),
 	}, nil
 }
 
@@ -31,6 +32,7 @@ type DistinctStream struct {
 	stream    RecordStream
 	variables octosql.Variables
 	records   *recordSet
+	*PassthroughMetaRecordHandler
 }
 
 func (ds *DistinctStream) Close() error {

@@ -183,7 +183,7 @@ func TestDataSource_Get(t *testing.T) {
 					[]octosql.VariableName{"t.name", "t.surname", "t.age"},
 					[]interface{}{"Wojtek", "Kuźmiński", 21},
 				),
-			}),
+			}, nil),
 			wantErr: false,
 		},
 
@@ -218,7 +218,7 @@ func TestDataSource_Get(t *testing.T) {
 					[]octosql.VariableName{"t.col1", "t.col2"},
 					[]interface{}{"Miami", -5},
 				),
-			}),
+			}, nil),
 			wantErr: false,
 		},
 
@@ -249,7 +249,7 @@ func TestDataSource_Get(t *testing.T) {
 					[]octosql.VariableName{"t.id", "t.points"},
 					[]interface{}{3, 19},
 				),
-			}),
+			}, nil),
 			wantErr: false,
 		},
 
@@ -280,7 +280,7 @@ func TestDataSource_Get(t *testing.T) {
 					[]octosql.VariableName{"t.name", "t.age", "t.id"},
 					[]interface{}{nil, 7, nil},
 				),
-			}),
+			}, nil),
 			wantErr: false,
 		},
 
@@ -312,7 +312,7 @@ func TestDataSource_Get(t *testing.T) {
 					[]octosql.VariableName{"t.col1", "t.col2"},
 					[]interface{}{time.Date(2019, 5, 19, 14, 0, 0, 0, time.UTC), 3},
 				),
-			}),
+			}, nil),
 			wantErr: false,
 		},
 
@@ -344,7 +344,7 @@ func TestDataSource_Get(t *testing.T) {
 					[]octosql.VariableName{"t.date", "t.points"},
 					[]interface{}{time.Date(2019, 5, 19, 14, 0, 0, 0, time.UTC), 103},
 				),
-			}),
+			}, nil),
 			wantErr: false,
 		},
 	}

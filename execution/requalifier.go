@@ -5,8 +5,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/cube2222/octosql"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
 )
 
 type Requalifier struct {
@@ -25,9 +26,10 @@ func (node *Requalifier) Get(variables octosql.Variables) (RecordStream, error) 
 	}
 
 	return &RequalifiedStream{
-		qualifier: node.qualifier,
-		variables: variables,
-		source:    recordStream,
+		qualifier:                    node.qualifier,
+		variables:                    variables,
+		source:                       recordStream,
+		PassthroughMetaRecordHandler: NewPassthroughMetaRecordHandler(recordStream),
 	}, nil
 }
 
@@ -35,6 +37,7 @@ type RequalifiedStream struct {
 	qualifier string
 	variables octosql.Variables
 	source    RecordStream
+	*PassthroughMetaRecordHandler
 }
 
 // TODO: Do table name validation on logical -> physical plan transformation

@@ -3,12 +3,14 @@ package execution
 type InMemoryStream struct {
 	data  []*Record
 	index int
+	MetaRecordHandler
 }
 
-func NewInMemoryStream(data []*Record) *InMemoryStream {
+func NewInMemoryStream(data []*Record, metaRecordHandler MetaRecordHandler) *InMemoryStream {
 	return &InMemoryStream{
-		data:  data,
-		index: 0,
+		data:              data,
+		index:             0,
+		MetaRecordHandler: metaRecordHandler,
 	}
 }
 

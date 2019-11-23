@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/bradleyjkemp/memviz"
+	memmap "github.com/bradleyjkemp/memviz"
 	"github.com/cube2222/octosql"
 
 	"github.com/cube2222/octosql/logical"

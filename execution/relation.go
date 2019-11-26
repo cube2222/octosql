@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"context"
 	"reflect"
 	"regexp"
 
@@ -9,7 +10,7 @@ import (
 )
 
 type Relation interface {
-	Apply(variables octosql.Variables, left, right Expression) (bool, error)
+	Apply(ctx context.Context, variables octosql.Variables, left, right Expression) (bool, error)
 }
 
 type Equal struct {
@@ -19,12 +20,12 @@ func NewEqual() Relation {
 	return &Equal{}
 }
 
-func (rel *Equal) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
-	leftValue, err := left.ExpressionValue(variables)
+func (rel *Equal) Apply(ctx context.Context, variables octosql.Variables, left, right Expression) (bool, error) {
+	leftValue, err := left.ExpressionValue(ctx, variables)
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get value of left operator in equal")
 	}
-	rightValue, err := right.ExpressionValue(variables)
+	rightValue, err := right.ExpressionValue(ctx, variables)
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get value of right operator in equal")
 	}
@@ -50,8 +51,8 @@ func NewNotEqual() Relation {
 	return &NotEqual{}
 }
 
-func (rel *NotEqual) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
-	equal, err := (*Equal).Apply(nil, variables, left, right)
+func (rel *NotEqual) Apply(ctx context.Context, variables octosql.Variables, left, right Expression) (bool, error) {
+	equal, err := (*Equal).Apply(nil, ctx, variables, left, right)
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't check equality")
 	}
@@ -65,12 +66,12 @@ func NewMoreThan() Relation {
 	return &MoreThan{}
 }
 
-func (rel *MoreThan) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
-	leftValue, err := left.ExpressionValue(variables)
+func (rel *MoreThan) Apply(ctx context.Context, variables octosql.Variables, left, right Expression) (bool, error) {
+	leftValue, err := left.ExpressionValue(ctx, variables)
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get value of left operator in more than")
 	}
-	rightValue, err := right.ExpressionValue(variables)
+	rightValue, err := right.ExpressionValue(ctx, variables)
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get value of right operator in more than")
 	}
@@ -112,8 +113,8 @@ func NewLessThan() Relation {
 	return &LessThan{}
 }
 
-func (rel *LessThan) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
-	more, err := (*MoreThan).Apply(nil, variables, right, left)
+func (rel *LessThan) Apply(ctx context.Context, variables octosql.Variables, left, right Expression) (bool, error) {
+	more, err := (*MoreThan).Apply(nil, ctx, variables, right, left)
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't check reverse more_than")
 	}
@@ -127,8 +128,8 @@ func NewGreaterEqual() Relation {
 	return &GreaterEqual{}
 }
 
-func (rel *GreaterEqual) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
-	less, err := (*LessThan).Apply(nil, variables, left, right)
+func (rel *GreaterEqual) Apply(ctx context.Context, variables octosql.Variables, left, right Expression) (bool, error) {
+	less, err := (*LessThan).Apply(nil, ctx, variables, left, right)
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get less for greater_equal")
 	}
@@ -143,8 +144,8 @@ func NewLessEqual() Relation {
 	return &LessEqual{}
 }
 
-func (rel *LessEqual) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
-	more, err := (*MoreThan).Apply(nil, variables, left, right)
+func (rel *LessEqual) Apply(ctx context.Context, variables octosql.Variables, left, right Expression) (bool, error) {
+	more, err := (*MoreThan).Apply(nil, ctx, variables, left, right)
 	if err != nil {
 		return false, errors.Wrap(err, "coudln't get more for less_equal")
 	}
@@ -159,12 +160,12 @@ func NewLike() Relation {
 	return &Like{}
 }
 
-func (rel *Like) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
-	leftValue, err := left.ExpressionValue(variables)
+func (rel *Like) Apply(ctx context.Context, variables octosql.Variables, left, right Expression) (bool, error) {
+	leftValue, err := left.ExpressionValue(ctx, variables)
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get value of left operator in LIKE")
 	}
-	rightValue, err := right.ExpressionValue(variables)
+	rightValue, err := right.ExpressionValue(ctx, variables)
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get value of right operator in LIKE")
 	}
@@ -195,12 +196,12 @@ func NewIn() Relation {
 	return &In{}
 }
 
-func (rel *In) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
-	leftValue, err := left.ExpressionValue(variables)
+func (rel *In) Apply(ctx context.Context, variables octosql.Variables, left, right Expression) (bool, error) {
+	leftValue, err := left.ExpressionValue(ctx, variables)
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get value of left operator in IN")
 	}
-	rightValue, err := right.ExpressionValue(variables)
+	rightValue, err := right.ExpressionValue(ctx, variables)
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get value of right operator in IN")
 	}
@@ -226,8 +227,8 @@ func NewNotIn() Relation {
 	return &NotIn{}
 }
 
-func (rel *NotIn) Apply(variables octosql.Variables, left, right Expression) (bool, error) {
-	in, err := (*In).Apply(nil, variables, left, right)
+func (rel *NotIn) Apply(ctx context.Context, variables octosql.Variables, left, right Expression) (bool, error) {
+	in, err := (*In).Apply(nil, ctx, variables, left, right)
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't check containment")
 	}

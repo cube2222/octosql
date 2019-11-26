@@ -1,6 +1,7 @@
 package excel
 
 import (
+	context2 "context"
 	"testing"
 	"time"
 
@@ -359,13 +360,13 @@ func TestDataSource_Get(t *testing.T) {
 				verticalOffset:   tt.fields.verticalOffset,
 				timeColumns:      tt.fields.timeColumns,
 			}
-			got, err := ds.Get(tt.args.variables)
+			got, err := ds.Get(tt.args.variables, ctx)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataSource.Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
-			areEqual, err := execution.AreStreamsEqual(got, tt.want)
+			areEqual, err := execution.AreStreamsEqual(context2.Background(), got, tt.want)
 			if err != nil {
 				t.Errorf("Error in areStreamsEqual %v", err)
 				return

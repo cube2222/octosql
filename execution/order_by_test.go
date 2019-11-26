@@ -1,6 +1,7 @@
 package execution
 
 import (
+	context2 "context"
 	"testing"
 	"time"
 
@@ -256,7 +257,7 @@ func TestOrderBy_Get(t *testing.T) {
 				return
 			}
 
-			equal, err := AreStreamsEqual(tt.want, ordered)
+			equal, err := AreStreamsEqual(context2.Background(), tt.want, ordered)
 			if err != nil {
 				t.Errorf("Error in AreStreamsEqual(): %v", err)
 				return

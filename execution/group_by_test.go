@@ -137,7 +137,7 @@ func TestGroupBy_AggregateCalling(t *testing.T) {
 	var rec *Record
 	var err error
 	i := 0
-	for rec, err = groupby.Next(); err == nil; rec, err = groupby.Next() {
+	for rec, err = groupby.Next(ctx); err == nil; rec, err = groupby.Next(ctx) {
 		if !reflect.DeepEqual(rec, expectedOutput[i]) {
 			t.Errorf("Record got %+v wanted %+v", rec, expectedOutput[i])
 			return

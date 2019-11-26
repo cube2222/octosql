@@ -797,7 +797,7 @@ func TestDataSource_Get(t *testing.T) {
 				return
 			}
 
-			stream, err := execNode.Get(tt.args.variables)
+			stream, err := execNode.Get(ctx, tt.args.variables)
 			if err != nil && !tt.wantErr {
 				t.Errorf("Error in Get: %v", err)
 				return
@@ -805,7 +805,7 @@ func TestDataSource_Get(t *testing.T) {
 				return
 			}
 
-			equal, err := execution.AreStreamsEqualNoOrdering(stream, tt.want)
+			equal, err := execution.AreStreamsEqualNoOrdering(context.Background(), stream, tt.want)
 			if err != nil && !tt.wantErr {
 				t.Errorf("AreStreamsEqual() error: %s", err)
 				return

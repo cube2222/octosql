@@ -86,7 +86,7 @@ func TestCSVDataSource_Get(t *testing.T) {
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := ds.Get(octosql.NoVariables())
+			_, err := ds.Get(ctx, octosql.NoVariables())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataSource.Get() error is %v, want %v", err, tt.wantErr)
 			}
@@ -453,14 +453,14 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			if err != nil {
 				t.Errorf("Error creating data source: %v", err)
 			}
-			rs, err := ds.Get(octosql.NoVariables())
+			rs, err := ds.Get(ctx, octosql.NoVariables())
 			if err != nil {
 				t.Errorf("DataSource.Get() error: %v", err)
 				return
 			}
 
 			for _, expected := range tt.want {
-				got, err := rs.Next()
+				got, err := rs.Next(ctx)
 
 				if err != nil || (err != nil) != expected.error {
 					if (err != nil) != expected.error {

@@ -1,6 +1,7 @@
 package tvf
 
 import (
+	context2 "context"
 	"testing"
 	"time"
 
@@ -146,12 +147,12 @@ func TestTumble_Get(t *testing.T) {
 				windowLength: tt.fields.windowLength,
 				offset:       tt.fields.offset,
 			}
-			got, err := r.Get(tt.args.variables)
+			got, err := r.Get(tt.args.variables, ctx)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Tumble.Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			eq, err := execution.AreStreamsEqual(got, tt.want)
+			eq, err := execution.AreStreamsEqual(context2.Background(), got, tt.want)
 			if err != nil {
 				t.Errorf("Tumble.Get() AreStreamsEqual error = %v", err)
 			}

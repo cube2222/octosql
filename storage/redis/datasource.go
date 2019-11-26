@@ -85,8 +85,8 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 	return NewDataSourceBuilderFactory(dbKey), nil
 }
 
-func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, error) {
-	keysWanted, err := ds.keyFormula.getAllKeys(variables)
+func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables) (execution.RecordStream, error) {
+	keysWanted, err := ds.keyFormula.getAllKeys(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get all keys from filter")
 	}
@@ -144,7 +144,7 @@ func (rs *KeySpecificStream) Close() error {
 	return nil
 }
 
-func (rs *KeySpecificStream) Next() (*execution.Record, error) {
+func (rs *KeySpecificStream) Next(ctx context.Context) (*execution.Record, error) {
 	if rs.isDone {
 		return nil, execution.ErrEndOfStream
 	}
@@ -169,7 +169,7 @@ func (rs *EntireDatabaseStream) Close() error {
 	return nil
 }
 
-func (rs *EntireDatabaseStream) Next() (*execution.Record, error) {
+func (rs *EntireDatabaseStream) Next(ctx context.Context) (*execution.Record, error) {
 	for {
 		if rs.isDone {
 			return nil, execution.ErrEndOfStream

@@ -687,7 +687,7 @@ func TestAnd_GetAllKeys(t *testing.T) {
 				left:  tt.fields.left,
 				right: tt.fields.right,
 			}
-			got, err := f.getAllKeys(tt.args.variables)
+			got, err := f.getAllKeys(tt.args.variables, ctx)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("And.getAllKeys() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1012,7 +1012,7 @@ func TestOr_GetAllKeys(t *testing.T) {
 				left:  tt.fields.left,
 				right: tt.fields.right,
 			}
-			got, err := f.getAllKeys(tt.args.variables)
+			got, err := f.getAllKeys(tt.args.variables, ctx)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Or.getAllKeys() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1096,7 +1096,7 @@ func TestEqual_GetAllKeys(t *testing.T) {
 			f := &Equal{
 				child: tt.fields.child,
 			}
-			got, err := f.getAllKeys(tt.args.variables)
+			got, err := f.getAllKeys(tt.args.variables, ctx)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Equal.getAllKeys() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1172,7 +1172,7 @@ func TestIn_GetAllKeys(t *testing.T) {
 			f := &In{
 				child: tt.fields.child,
 			}
-			got, err := f.getAllKeys(tt.args.variables)
+			got, err := f.getAllKeys(tt.args.variables, ctx)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("In.getAllKeys() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1232,7 +1232,7 @@ func TestConstant_getAllKeys(t *testing.T) {
 			f := &Constant{
 				value: tt.fields.value,
 			}
-			got, err := f.getAllKeys(tt.args.variables)
+			got, err := f.getAllKeys(tt.args.variables, ctx)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Constant.getAllKeys() error = %v, wantErr %v", err, tt.wantErr)
 				return

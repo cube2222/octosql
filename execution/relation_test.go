@@ -62,7 +62,7 @@ func TestEqual_Apply(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rel := &Equal{}
-			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
+			got, err := rel.Apply(tt.args.variables, ctx, tt.args.left, tt.args.right)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Equal.Apply() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -129,7 +129,7 @@ func TestNotEqual_Apply(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rel := &NotEqual{}
-			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
+			got, err := rel.Apply(tt.args.variables, ctx, tt.args.left, tt.args.right)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NotEqual.Apply() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -222,7 +222,7 @@ func TestMoreThan_Apply(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rel := &MoreThan{}
-			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
+			got, err := rel.Apply(tt.args.variables, ctx, tt.args.left, tt.args.right)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("MoreThan.Apply() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -230,7 +230,7 @@ func TestMoreThan_Apply(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("MoreThan.Apply() = %v, want %v", got, tt.want)
 			}
-			gotOpposite, err := rel.Apply(tt.args.variables, tt.args.right, tt.args.left)
+			gotOpposite, err := rel.Apply(tt.args.variables, ctx, tt.args.right, tt.args.left)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("MoreThan.Apply() opposite error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -326,7 +326,7 @@ func TestLessThan_Apply(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rel := &LessThan{}
-			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
+			got, err := rel.Apply(tt.args.variables, ctx, tt.args.left, tt.args.right)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LessThan.Apply() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -334,7 +334,7 @@ func TestLessThan_Apply(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("LessThan.Apply() = %v, want %v", got, tt.want)
 			}
-			gotOpposite, err := rel.Apply(tt.args.variables, tt.args.right, tt.args.left)
+			gotOpposite, err := rel.Apply(tt.args.variables, ctx, tt.args.right, tt.args.left)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("MoreThan.Apply() opposite error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -462,7 +462,7 @@ func TestGreaterEqual_Apply(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rel := &GreaterEqual{}
-			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
+			got, err := rel.Apply(tt.args.variables, ctx, tt.args.left, tt.args.right)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LessThan.Apply() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -588,7 +588,7 @@ func TestLessEqual_Apply(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rel := &LessEqual{}
-			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
+			got, err := rel.Apply(tt.args.variables, ctx, tt.args.left, tt.args.right)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LessThan.Apply() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -643,7 +643,7 @@ func TestLike_Apply(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rel := &Like{}
-			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
+			got, err := rel.Apply(tt.args.variables, ctx, tt.args.left, tt.args.right)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Like.Apply() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -792,7 +792,7 @@ func TestIn_Apply(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rel := &In{}
-			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
+			got, err := rel.Apply(tt.args.variables, ctx, tt.args.left, tt.args.right)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("In.Apply() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -941,7 +941,7 @@ func TestNotIn_Apply(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rel := &NotIn{}
-			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
+			got, err := rel.Apply(tt.args.variables, ctx, tt.args.left, tt.args.right)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("In.Apply() error = %v, wantErr %v", err, tt.wantErr)
 				return

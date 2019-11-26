@@ -1,6 +1,7 @@
 package tvf
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -36,13 +37,13 @@ func (r *Tumble) Document() docs.Documentation {
 	)
 }
 
-func (r *Tumble) Get(variables octosql.Variables) (execution.RecordStream, error) {
-	source, err := r.source.Get(variables)
+func (r *Tumble) Get(ctx context.Context, variables octosql.Variables) (execution.RecordStream, error) {
+	source, err := r.source.Get(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get source")
 	}
 
-	duration, err := r.windowLength.ExpressionValue(variables)
+	duration, err := r.windowLength.ExpressionValue(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get window length")
 	}
@@ -51,7 +52,7 @@ func (r *Tumble) Get(variables octosql.Variables) (execution.RecordStream, error
 		return nil, errors.Errorf("invalid tumble duration: %v", duration)
 	}
 
-	offset, err := r.offset.ExpressionValue(variables)
+	offset, err := r.offset.ExpressionValue(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get window offset")
 	}
@@ -75,8 +76,8 @@ type TumbleStream struct {
 	offset       octosql.Duration
 }
 
-func (s *TumbleStream) Next() (*execution.Record, error) {
-	srcRecord, err := s.source.Next()
+func (s *TumbleStream) Next(ctx context.Context) (*execution.Record, error) {
+	srcRecord, err := s.source.Next(ctx)
 	if err != nil {
 		if err == execution.ErrEndOfStream {
 			return nil, execution.ErrEndOfStream

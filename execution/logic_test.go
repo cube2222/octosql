@@ -76,7 +76,7 @@ func TestAnd_Evaluate(t *testing.T) {
 				Left:  tt.fields.Left,
 				Right: tt.fields.Right,
 			}
-			got, err := f.Evaluate(tt.args.variables)
+			got, err := f.Evaluate(tt.args.variables, ctx)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("And.Evaluate() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -158,7 +158,7 @@ func TestOr_Evaluate(t *testing.T) {
 				Left:  tt.fields.Left,
 				Right: tt.fields.Right,
 			}
-			got, err := f.Evaluate(tt.args.variables)
+			got, err := f.Evaluate(tt.args.variables, ctx)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Or.Evaluate() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -213,7 +213,7 @@ func TestNot_Evaluate(t *testing.T) {
 			f := &Not{
 				Child: tt.fields.Child,
 			}
-			got, err := f.Evaluate(tt.args.variables)
+			got, err := f.Evaluate(tt.args.variables, ctx)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Not.Evaluate() error = %v, wantErr %v", err, tt.wantErr)
 				return

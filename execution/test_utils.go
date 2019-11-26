@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"context"
 	"fmt"
 	"sort"
 
@@ -106,10 +107,10 @@ func Normalize(rec *Record) *Record {
 	return NewRecordFromSliceWithNormalize(sortedFieldNames, values)
 }
 
-func AreStreamsEqual(first, second RecordStream) (bool, error) {
+func AreStreamsEqual(ctx context.Context, first, second RecordStream) (bool, error) {
 	for {
-		firstRec, firstErr := first.Next()
-		secondRec, secondErr := second.Next()
+		firstRec, firstErr := first.Next(ctx)
+		secondRec, secondErr := second.Next(ctx)
 
 		if firstErr == secondErr && firstErr == ErrEndOfStream {
 			break
@@ -131,13 +132,13 @@ func AreStreamsEqual(first, second RecordStream) (bool, error) {
 	return true, nil
 }
 
-func AreStreamsEqualNoOrdering(first, second RecordStream) (bool, error) {
+func AreStreamsEqualNoOrdering(ctx context.Context, first, second RecordStream) (bool, error) {
 	firstMultiSet := newMultiSet()
 	secondMultiSet := newMultiSet()
 
 	for {
-		firstRec, firstErr := first.Next()
-		secondRec, secondErr := second.Next()
+		firstRec, firstErr := first.Next(ctx)
+		secondRec, secondErr := second.Next(ctx)
 
 		if firstErr == secondErr && firstErr == ErrEndOfStream {
 			break
@@ -217,7 +218,7 @@ type DummyNode struct {
 	data []*Record
 }
 
-func (dn *DummyNode) Get(variables octosql.Variables) (RecordStream, error) {
+func (dn *DummyNode) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
 	if dn.data == nil {
 		return NewInMemoryStream([]*Record{}), nil
 	}
@@ -235,6 +236,6 @@ type DummyValue struct {
 	value octosql.Value
 }
 
-func (dv *DummyValue) ExpressionValue(variables octosql.Variables) (octosql.Value, error) {
+func (dv *DummyValue) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
 	return dv.value, nil
 }

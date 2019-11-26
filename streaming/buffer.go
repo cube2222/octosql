@@ -1,6 +1,7 @@
 package streaming
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -27,7 +28,7 @@ func NewBuffer() *Buffer {
 	}
 }
 
-func (b *Buffer) Next() (*execution.Record, error) {
+func (b *Buffer) Next(ctx context.Context) (*execution.Record, error) {
 	b.Lock()
 	defer b.Unlock()
 	for {

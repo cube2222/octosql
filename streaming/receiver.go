@@ -25,6 +25,6 @@ func (r *Receiver) Receive(record *execution.Record) error {
 	return nil
 }
 
-func (b *Receiver) MarkEndOfStream() error {
-	return b.recordSink.MarkEndOfStream()
+func (r *Receiver) MarkEndOfStream() error {
+	return r.recordSink.MarkEndOfStream()
 }

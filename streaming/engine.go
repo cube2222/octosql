@@ -2,7 +2,6 @@ package streaming
 
 import (
 	"log"
-	"time"
 
 	"github.com/pkg/errors"
 
@@ -10,15 +9,13 @@ import (
 )
 
 type RecordSink interface {
-	AddRecord(record *execution.Record, ack func()) error
+	AddRecord(record *execution.Record, tx StateTransaction)
 	MarkEndOfStream() error
 }
 
 type PullEngine struct {
-	recordSink      RecordSink
-	source          execution.RecordStream
-	ackFunc         func(id execution.ID)
-	watermarkSource func() (time.Time, bool)
+	recordSink RecordSink
+	source     execution.RecordStream
 }
 
 func NewPullEngine(sink RecordSink) *PullEngine {
@@ -41,7 +38,7 @@ func (engine *PullEngine) Run() {
 }
 
 func (engine *PullEngine) loop() error {
-	r, err := engine.source.Next()
+	r, err := engine.source.Next(ctx)
 	if err != nil {
 		if err == execution.ErrEndOfStream {
 			err := engine.recordSink.MarkEndOfStream()

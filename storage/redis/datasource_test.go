@@ -14,6 +14,7 @@ import (
 )
 
 func TestDataSource_Get(t *testing.T) {
+	ctx := context.Background()
 	hostname := "localhost"
 	password := ""
 	port := 6379

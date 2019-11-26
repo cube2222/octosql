@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -50,6 +51,7 @@ func (*AggregateMock) String() string {
 }
 
 func TestGroupBy_AggregateCalling(t *testing.T) {
+	ctx := context.Background()
 	fields := []octosql.VariableName{"cat", "livesleft", "ownerid"}
 
 	firstAggregate := &AggregateMock{

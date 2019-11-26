@@ -11,6 +11,7 @@ import (
 )
 
 func TestJSONRecordStream_Get(t *testing.T) {
+	ctx := context.Background()
 	tests := []struct {
 		name        string
 		path        string

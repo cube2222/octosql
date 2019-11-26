@@ -54,6 +54,7 @@ var csvDbs = map[string]csvDsc{
 }
 
 func TestCSVDataSource_Get(t *testing.T) {
+	ctx := context.Background()
 	tests := []struct {
 		name    string
 		csvName string
@@ -95,6 +96,7 @@ func TestCSVDataSource_Get(t *testing.T) {
 }
 
 func TestCSVRecordStream_Next(t *testing.T) {
+	ctx := context.Background()
 	type wanted struct {
 		record *execution.Record
 		error  bool

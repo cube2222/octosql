@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 )
@@ -137,6 +139,7 @@ func Test_getRowColCoords(t *testing.T) {
 }
 
 func TestDataSource_Get(t *testing.T) {
+	ctx := context.Background()
 	type fields struct {
 		path             string
 		alias            string
@@ -360,7 +363,7 @@ func TestDataSource_Get(t *testing.T) {
 				verticalOffset:   tt.fields.verticalOffset,
 				timeColumns:      tt.fields.timeColumns,
 			}
-			got, err := ds.Get(tt.args.variables, ctx)
+			got, err := ds.Get(ctx, tt.args.variables)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataSource.Get() error = %v, wantErr %v", err, tt.wantErr)
 				return

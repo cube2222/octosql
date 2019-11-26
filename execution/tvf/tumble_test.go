@@ -5,11 +5,14 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 )
 
 func TestTumble_Get(t *testing.T) {
+	ctx := context.Background()
 	baseTime := time.Date(2019, 9, 3, 12, 0, 0, 0, time.UTC)
 
 	type fields struct {
@@ -147,7 +150,7 @@ func TestTumble_Get(t *testing.T) {
 				windowLength: tt.fields.windowLength,
 				offset:       tt.fields.offset,
 			}
-			got, err := r.Get(tt.args.variables, ctx)
+			got, err := r.Get(ctx, tt.args.variables)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Tumble.Get() error = %v, wantErr %v", err, tt.wantErr)
 				return

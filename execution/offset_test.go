@@ -2,11 +2,15 @@ package execution
 
 import (
 	context2 "context"
+
+	"golang.org/x/net/context"
+
 	"github.com/cube2222/octosql"
 	"testing"
 )
 
 func TestOffset_Get(t *testing.T) {
+	ctx := context.Background()
 	const NO_ERROR = ""
 
 	tests := []struct {
@@ -111,7 +115,7 @@ func TestOffset_Get(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rs, err := tt.node.Get(tt.vars, ctx)
+			rs, err := tt.node.Get(ctx, tt.vars)
 
 			if (err == nil) != (tt.wantError == NO_ERROR) {
 				t.Errorf("exactly one of test.wantError, tt.node.Get() is not nil")

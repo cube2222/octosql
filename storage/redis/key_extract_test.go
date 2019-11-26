@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -408,6 +409,7 @@ func TestNewKeyFormula(t *testing.T) {
 }
 
 func TestAnd_GetAllKeys(t *testing.T) {
+	ctx := context.Background()
 	type fields struct {
 		left  KeyFormula
 		right KeyFormula
@@ -687,7 +689,7 @@ func TestAnd_GetAllKeys(t *testing.T) {
 				left:  tt.fields.left,
 				right: tt.fields.right,
 			}
-			got, err := f.getAllKeys(tt.args.variables, ctx)
+			got, err := f.getAllKeys(ctx, tt.args.variables)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("And.getAllKeys() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -700,6 +702,7 @@ func TestAnd_GetAllKeys(t *testing.T) {
 }
 
 func TestOr_GetAllKeys(t *testing.T) {
+	ctx := context.Background()
 	type fields struct {
 		left  KeyFormula
 		right KeyFormula
@@ -1012,7 +1015,7 @@ func TestOr_GetAllKeys(t *testing.T) {
 				left:  tt.fields.left,
 				right: tt.fields.right,
 			}
-			got, err := f.getAllKeys(tt.args.variables, ctx)
+			got, err := f.getAllKeys(ctx, tt.args.variables)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Or.getAllKeys() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1025,6 +1028,7 @@ func TestOr_GetAllKeys(t *testing.T) {
 }
 
 func TestEqual_GetAllKeys(t *testing.T) {
+	ctx := context.Background()
 	type fields struct {
 		child execution.Expression
 	}
@@ -1096,7 +1100,7 @@ func TestEqual_GetAllKeys(t *testing.T) {
 			f := &Equal{
 				child: tt.fields.child,
 			}
-			got, err := f.getAllKeys(tt.args.variables, ctx)
+			got, err := f.getAllKeys(ctx, tt.args.variables)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Equal.getAllKeys() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1109,6 +1113,7 @@ func TestEqual_GetAllKeys(t *testing.T) {
 }
 
 func TestIn_GetAllKeys(t *testing.T) {
+	ctx := context.Background()
 	type fields struct {
 		child execution.Expression
 	}
@@ -1172,7 +1177,7 @@ func TestIn_GetAllKeys(t *testing.T) {
 			f := &In{
 				child: tt.fields.child,
 			}
-			got, err := f.getAllKeys(tt.args.variables, ctx)
+			got, err := f.getAllKeys(ctx, tt.args.variables)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("In.getAllKeys() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1185,6 +1190,7 @@ func TestIn_GetAllKeys(t *testing.T) {
 }
 
 func TestConstant_getAllKeys(t *testing.T) {
+	ctx := context.Background()
 	type fields struct {
 		value bool
 	}
@@ -1232,7 +1238,7 @@ func TestConstant_getAllKeys(t *testing.T) {
 			f := &Constant{
 				value: tt.fields.value,
 			}
-			got, err := f.getAllKeys(tt.args.variables, ctx)
+			got, err := f.getAllKeys(ctx, tt.args.variables)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Constant.getAllKeys() error = %v, wantErr %v", err, tt.wantErr)
 				return

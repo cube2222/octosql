@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 )
 
 func TestOrderBy_Get(t *testing.T) {
+	ctx := context.Background()
 	now := time.Now()
 
 	type args struct {
@@ -248,7 +250,7 @@ func TestOrderBy_Get(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ordered, err := createOrderedStream(tt.args.expressions, tt.args.directions, octosql.NoVariables(), tt.args.stream)
+			ordered, err := createOrderedStream(ctx, tt.args.expressions, tt.args.directions, octosql.NoVariables(), tt.args.stream)
 			if err != nil && !tt.wantErr {
 				t.Errorf("Error in create stream: %v", err)
 				return
@@ -256,7 +258,7 @@ func TestOrderBy_Get(t *testing.T) {
 				return
 			}
 
-			equal, err := AreStreamsEqual(tt.want, ordered)
+			equal, err := AreStreamsEqual(context.Background(), tt.want, ordered)
 			if err != nil {
 				t.Errorf("Error in AreStreamsEqual(): %v", err)
 				return

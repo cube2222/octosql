@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -180,7 +181,7 @@ func (r *Record) ID() ID {
 }
 
 type RecordStream interface {
-	Next() (*Record, error)
+	Next(ctx context.Context) (*Record, error)
 	io.Closer
 }
 

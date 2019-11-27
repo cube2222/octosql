@@ -11,6 +11,7 @@ import (
 )
 
 func TestJSONRecordStream_Get(t *testing.T) {
+	ctx := context.Background()
 	tests := []struct {
 		name        string
 		path        string
@@ -91,13 +92,13 @@ func TestJSONRecordStream_Get(t *testing.T) {
 				t.Errorf("Error creating data source: %v", err)
 			}
 
-			got, err := ds.Get(octosql.NoVariables())
+			got, err := ds.Get(ctx, octosql.NoVariables())
 			if err != nil {
 				t.Errorf("DataSource.Get() error: %v", err)
 				return
 			}
 
-			if ok, err := execution.AreStreamsEqual(tt.want, got); !ok {
+			if ok, err := execution.AreStreamsEqual(context.Background(), tt.want, got); !ok {
 				t.Errorf("Streams aren't equal: %v", err)
 				return
 			}

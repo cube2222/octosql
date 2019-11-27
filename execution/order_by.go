@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"context"
 	"reflect"
 	"sort"
 
@@ -123,13 +124,13 @@ func compare(x, y octosql.Value) (int, error) {
 	panic("unreachable")
 }
 
-func (ob *OrderBy) Get(variables octosql.Variables) (RecordStream, error) {
-	sourceStream, err := ob.source.Get(variables)
+func (ob *OrderBy) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
+	sourceStream, err := ob.source.Get(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get underlying stream in order by")
 	}
 
-	orderedStream, err := createOrderedStream(ob.expressions, ob.directions, variables, sourceStream)
+	orderedStream, err := createOrderedStream(ctx, ob.expressions, ob.directions, variables, sourceStream)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't create ordered stream from source stream")
 	}
@@ -137,11 +138,11 @@ func (ob *OrderBy) Get(variables octosql.Variables) (RecordStream, error) {
 	return orderedStream, nil
 }
 
-func createOrderedStream(expressions []Expression, directions []OrderDirection, variables octosql.Variables, sourceStream RecordStream) (stream RecordStream, outErr error) {
+func createOrderedStream(ctx context.Context, expressions []Expression, directions []OrderDirection, variables octosql.Variables, sourceStream RecordStream) (stream RecordStream, outErr error) {
 	records := make([]*Record, 0)
 
 	for {
-		rec, err := sourceStream.Next()
+		rec, err := sourceStream.Next(ctx)
 		if err == ErrEndOfStream {
 			break
 		} else if err != nil {
@@ -172,11 +173,11 @@ func createOrderedStream(expressions []Expression, directions []OrderDirection, 
 				panic(errors.Wrap(err, "couldn't merge variables"))
 			}
 
-			x, err := expr.ExpressionValue(iVars)
+			x, err := expr.ExpressionValue(ctx, iVars)
 			if err != nil {
 				panic(errors.Wrapf(err, "couldn't get order by expression with index %v value", num))
 			}
-			y, err := expr.ExpressionValue(jVars)
+			y, err := expr.ExpressionValue(ctx, jVars)
 			if err != nil {
 				panic(errors.Wrapf(err, "couldn't get order by expression with index %v value", num))
 			}

@@ -4,6 +4,9 @@ import (
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/execution"
+
+	"context"
+
 	"github.com/pkg/errors"
 )
 
@@ -28,8 +31,8 @@ func (r *Range) Document() docs.Documentation {
 	)
 }
 
-func (r *Range) Get(variables octosql.Variables) (execution.RecordStream, error) {
-	start, err := r.start.ExpressionValue(variables)
+func (r *Range) Get(ctx context.Context, variables octosql.Variables) (execution.RecordStream, error) {
+	start, err := r.start.ExpressionValue(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get range start point")
 	}
@@ -38,7 +41,7 @@ func (r *Range) Get(variables octosql.Variables) (execution.RecordStream, error)
 		return nil, errors.Errorf("invalid range start point: %v", start)
 	}
 
-	end, err := r.end.ExpressionValue(variables)
+	end, err := r.end.ExpressionValue(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get range end point")
 	}
@@ -57,7 +60,7 @@ type RangeStream struct {
 	current, endExclusive octosql.Int
 }
 
-func (s *RangeStream) Next() (*execution.Record, error) {
+func (s *RangeStream) Next(ctx context.Context) (*execution.Record, error) {
 	if s.current >= s.endExclusive {
 		return nil, execution.ErrEndOfStream
 	}

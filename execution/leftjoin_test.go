@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"context"
 	"testing"
 
 	"github.com/cube2222/octosql"
@@ -126,7 +127,7 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 					tt.fields.joined,
 				),
 			}
-			equal, err := AreStreamsEqual(stream, tt.want)
+			equal, err := AreStreamsEqual(context.Background(), stream, tt.want)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LeftJoinedStream.Next() error = %v, wantErr %v", err, tt.wantErr)
 				return

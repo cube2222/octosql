@@ -34,7 +34,7 @@ func newRedisKeys(keys map[string]interface{}, resultType resultType) *redisKeys
 // Formula build from physical.Formula, so that it accepts formulas for redis database
 // Also, getAllKeys returns all keys, that will be subject of HGetAll
 type KeyFormula interface {
-	getAllKeys(variables octosql.Variables) (*redisKeys, error)
+	getAllKeys(ctx context.Context, variables octosql.Variables) (*redisKeys, error)
 }
 
 // Just as with logical constant
@@ -50,7 +50,7 @@ func NewConstant(value bool) *Constant {
 	}
 }
 
-func (f *Constant) getAllKeys(variables octosql.Variables) (*redisKeys, error) {
+func (f *Constant) getAllKeys(ctx context.Context, variables octosql.Variables) (*redisKeys, error) {
 	if f.value {
 		return newRedisKeys(make(map[string]interface{}), True), nil
 	}
@@ -71,13 +71,13 @@ func NewAnd(left, right KeyFormula) *And {
 	}
 }
 
-func (f *And) getAllKeys(variables octosql.Variables) (*redisKeys, error) {
-	leftKeys, err := f.left.getAllKeys(variables)
+func (f *And) getAllKeys(ctx context.Context, variables octosql.Variables) (*redisKeys, error) {
+	leftKeys, err := f.left.getAllKeys(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get all keys from left KeyFormula")
 	}
 
-	rightKeys, err := f.right.getAllKeys(variables)
+	rightKeys, err := f.right.getAllKeys(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get all keys from right KeyFormula")
 	}
@@ -112,13 +112,13 @@ func NewOr(left, right KeyFormula) *Or {
 	}
 }
 
-func (f *Or) getAllKeys(variables octosql.Variables) (*redisKeys, error) {
-	leftKeys, err := f.left.getAllKeys(variables)
+func (f *Or) getAllKeys(ctx context.Context, variables octosql.Variables) (*redisKeys, error) {
+	leftKeys, err := f.left.getAllKeys(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get all keys from left KeyFormula")
 	}
 
-	rightKeys, err := f.right.getAllKeys(variables)
+	rightKeys, err := f.right.getAllKeys(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get all keys from right KeyFormula")
 	}
@@ -148,8 +148,8 @@ func NewEqual(child execution.Expression) *Equal {
 	}
 }
 
-func (f *Equal) getAllKeys(variables octosql.Variables) (*redisKeys, error) {
-	exprValue, err := f.child.ExpressionValue(variables)
+func (f *Equal) getAllKeys(ctx context.Context, variables octosql.Variables) (*redisKeys, error) {
+	exprValue, err := f.child.ExpressionValue(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get child expression value")
 	}
@@ -176,8 +176,8 @@ func NewIn(child execution.Expression) *In {
 	}
 }
 
-func (f *In) getAllKeys(variables octosql.Variables) (*redisKeys, error) {
-	exprValue, err := f.child.ExpressionValue(variables)
+func (f *In) getAllKeys(ctx context.Context, variables octosql.Variables) (*redisKeys, error) {
+	exprValue, err := f.child.ExpressionValue(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get child expression value")
 	}

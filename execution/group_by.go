@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/cube2222/octosql"
@@ -31,8 +32,8 @@ func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, ag
 	return &GroupBy{source: source, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, as: as}
 }
 
-func (node *GroupBy) Get(variables octosql.Variables) (RecordStream, error) {
-	source, err := node.source.Get(variables)
+func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
+	source, err := node.source.Get(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get stream for source in group by")
 	}
@@ -72,10 +73,10 @@ type GroupByStream struct {
 	iterator   *Iterator
 }
 
-func (stream *GroupByStream) Next() (*Record, error) {
+func (stream *GroupByStream) Next(ctx context.Context) (*Record, error) {
 	if stream.iterator == nil {
 		for {
-			record, err := stream.source.Next()
+			record, err := stream.source.Next(ctx)
 			if err != nil {
 				if err == ErrEndOfStream {
 					stream.fieldNames = make([]octosql.VariableName, len(stream.fields))
@@ -105,7 +106,7 @@ func (stream *GroupByStream) Next() (*Record, error) {
 
 			key := make(octosql.Tuple, len(stream.key))
 			for i := range stream.key {
-				key[i], err = stream.key[i].ExpressionValue(variables)
+				key[i], err = stream.key[i].ExpressionValue(ctx, variables)
 				if err != nil {
 					return nil, errors.Wrapf(err, "couldn't evaluate group key expression with index %v", i)
 				}

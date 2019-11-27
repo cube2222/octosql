@@ -1,6 +1,7 @@
 package excel
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -136,6 +137,7 @@ func Test_getRowColCoords(t *testing.T) {
 }
 
 func TestDataSource_Get(t *testing.T) {
+	ctx := context.Background()
 	type fields struct {
 		path             string
 		alias            string
@@ -359,13 +361,13 @@ func TestDataSource_Get(t *testing.T) {
 				verticalOffset:   tt.fields.verticalOffset,
 				timeColumns:      tt.fields.timeColumns,
 			}
-			got, err := ds.Get(tt.args.variables)
+			got, err := ds.Get(ctx, tt.args.variables)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataSource.Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
-			areEqual, err := execution.AreStreamsEqual(got, tt.want)
+			areEqual, err := execution.AreStreamsEqual(context.Background(), got, tt.want)
 			if err != nil {
 				t.Errorf("Error in areStreamsEqual %v", err)
 				return

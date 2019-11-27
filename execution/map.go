@@ -2,6 +2,9 @@ package execution
 
 import (
 	"github.com/cube2222/octosql"
+
+	"context"
+
 	"github.com/pkg/errors"
 )
 
@@ -15,8 +18,8 @@ func NewMap(expressions []NamedExpression, child Node, keep bool) *Map {
 	return &Map{expressions: expressions, source: child, keep: keep}
 }
 
-func (node *Map) Get(variables octosql.Variables) (RecordStream, error) {
-	recordStream, err := node.source.Get(variables)
+func (node *Map) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
+	recordStream, err := node.source.Get(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get record stream")
 	}
@@ -45,8 +48,8 @@ func (stream *MappedStream) Close() error {
 	return nil
 }
 
-func (stream *MappedStream) Next() (*Record, error) {
-	srcRecord, err := stream.source.Next()
+func (stream *MappedStream) Next(ctx context.Context) (*Record, error) {
+	srcRecord, err := stream.source.Next(ctx)
 	if err != nil {
 		if err == ErrEndOfStream {
 			return nil, ErrEndOfStream
@@ -64,7 +67,7 @@ func (stream *MappedStream) Next() (*Record, error) {
 	for _, expr := range stream.expressions {
 		fieldNames = append(fieldNames, expr.Name())
 
-		value, err := expr.ExpressionValue(variables)
+		value, err := expr.ExpressionValue(ctx, variables)
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't get expression %v", expr.Name())
 		}

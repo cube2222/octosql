@@ -1,12 +1,14 @@
 package execution
 
 import (
+	"context"
 	"testing"
 
 	"github.com/cube2222/octosql"
 )
 
 func TestAnd_Evaluate(t *testing.T) {
+	ctx := context.Background()
 	type fields struct {
 		Left  Formula
 		Right Formula
@@ -76,7 +78,7 @@ func TestAnd_Evaluate(t *testing.T) {
 				Left:  tt.fields.Left,
 				Right: tt.fields.Right,
 			}
-			got, err := f.Evaluate(tt.args.variables)
+			got, err := f.Evaluate(ctx, tt.args.variables)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("And.Evaluate() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -89,6 +91,7 @@ func TestAnd_Evaluate(t *testing.T) {
 }
 
 func TestOr_Evaluate(t *testing.T) {
+	ctx := context.Background()
 	type fields struct {
 		Left  Formula
 		Right Formula
@@ -158,7 +161,7 @@ func TestOr_Evaluate(t *testing.T) {
 				Left:  tt.fields.Left,
 				Right: tt.fields.Right,
 			}
-			got, err := f.Evaluate(tt.args.variables)
+			got, err := f.Evaluate(ctx, tt.args.variables)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Or.Evaluate() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -171,6 +174,7 @@ func TestOr_Evaluate(t *testing.T) {
 }
 
 func TestNot_Evaluate(t *testing.T) {
+	ctx := context.Background()
 	type fields struct {
 		Child Formula
 	}
@@ -213,7 +217,7 @@ func TestNot_Evaluate(t *testing.T) {
 			f := &Not{
 				Child: tt.fields.Child,
 			}
-			got, err := f.Evaluate(tt.args.variables)
+			got, err := f.Evaluate(ctx, tt.args.variables)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Not.Evaluate() error = %v, wantErr %v", err, tt.wantErr)
 				return

@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
@@ -18,8 +19,8 @@ func NewRequalifier(qualifier string, child Node) *Requalifier {
 	return &Requalifier{qualifier: qualifier, source: child}
 }
 
-func (node *Requalifier) Get(variables octosql.Variables) (RecordStream, error) {
-	recordStream, err := node.source.Get(variables)
+func (node *Requalifier) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
+	recordStream, err := node.source.Get(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get record stream")
 	}
@@ -49,8 +50,8 @@ func (stream *RequalifiedStream) Close() error {
 	return nil
 }
 
-func (stream *RequalifiedStream) Next() (*Record, error) {
-	record, err := stream.source.Next()
+func (stream *RequalifiedStream) Next(ctx context.Context) (*Record, error) {
+	record, err := stream.source.Next(ctx)
 	if err != nil {
 		if err == ErrEndOfStream {
 			return nil, ErrEndOfStream

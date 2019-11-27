@@ -1,7 +1,7 @@
 package execution
 
 import (
-	context2 "context"
+	"context"
 	"testing"
 	"time"
 
@@ -488,7 +488,7 @@ func TestDistinct_Get(t *testing.T) {
 				records:   newRecordSet(),
 			}
 
-			equal, err := AreStreamsEqualNoOrdering(context2.Background(), tt.want, &distinct)
+			equal, err := AreStreamsEqualNoOrdering(context.Background(), tt.want, &distinct)
 			if err != nil {
 				t.Errorf("Error in AreStreamsEqual()")
 				return

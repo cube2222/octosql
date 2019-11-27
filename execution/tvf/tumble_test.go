@@ -1,11 +1,9 @@
 package tvf
 
 import (
-	context2 "context"
+	"context"
 	"testing"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
@@ -155,7 +153,7 @@ func TestTumble_Get(t *testing.T) {
 				t.Errorf("Tumble.Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			eq, err := execution.AreStreamsEqual(context2.Background(), got, tt.want)
+			eq, err := execution.AreStreamsEqual(context.Background(), got, tt.want)
 			if err != nil {
 				t.Errorf("Tumble.Get() AreStreamsEqual error = %v", err)
 			}

@@ -1,11 +1,9 @@
 package excel
 
 import (
-	context2 "context"
+	"context"
 	"testing"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
@@ -369,7 +367,7 @@ func TestDataSource_Get(t *testing.T) {
 				return
 			}
 
-			areEqual, err := execution.AreStreamsEqual(context2.Background(), got, tt.want)
+			areEqual, err := execution.AreStreamsEqual(context.Background(), got, tt.want)
 			if err != nil {
 				t.Errorf("Error in areStreamsEqual %v", err)
 				return

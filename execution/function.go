@@ -1,7 +1,7 @@
 package execution
 
 import (
-	context2 "context"
+	"context"
 	"fmt"
 	"strings"
 
@@ -50,7 +50,7 @@ func NewFunctionExpression(fun *Function, args []Expression) *FunctionExpression
 	}
 }
 
-func (fe *FunctionExpression) ExpressionValue(ctx context2.Context, variables octosql.Variables) (octosql.Value, error) {
+func (fe *FunctionExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
 	values := make([]octosql.Value, 0)
 	for i := range fe.arguments {
 		value, err := fe.arguments[i].ExpressionValue(ctx, variables)

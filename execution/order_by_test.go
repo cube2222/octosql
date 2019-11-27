@@ -1,11 +1,9 @@
 package execution
 
 import (
-	context2 "context"
+	"context"
 	"testing"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/docs"
@@ -260,7 +258,7 @@ func TestOrderBy_Get(t *testing.T) {
 				return
 			}
 
-			equal, err := AreStreamsEqual(context2.Background(), tt.want, ordered)
+			equal, err := AreStreamsEqual(context.Background(), tt.want, ordered)
 			if err != nil {
 				t.Errorf("Error in AreStreamsEqual(): %v", err)
 				return

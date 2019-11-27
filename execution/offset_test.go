@@ -1,9 +1,7 @@
 package execution
 
 import (
-	context2 "context"
-
-	"golang.org/x/net/context"
+	"context"
 
 	"github.com/cube2222/octosql"
 	"testing"
@@ -129,7 +127,7 @@ func TestOffset_Get(t *testing.T) {
 				return
 			}
 
-			equal, err := AreStreamsEqual(context2.Background(), rs, tt.wantStream)
+			equal, err := AreStreamsEqual(context.Background(), rs, tt.wantStream)
 			if !equal {
 				t.Errorf("limitedStream doesn't work as expected")
 			}

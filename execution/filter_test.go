@@ -1,7 +1,7 @@
 package execution
 
 import (
-	context2 "context"
+	"context"
 	"testing"
 
 	"github.com/cube2222/octosql"
@@ -172,7 +172,7 @@ func TestFilteredStream_Next(t *testing.T) {
 				variables: tt.fields.variables,
 				source:    tt.fields.source,
 			}
-			equal, err := AreStreamsEqual(context2.Background(), stream, tt.want)
+			equal, err := AreStreamsEqual(context.Background(), stream, tt.want)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("FilteredStream.Next() error = %v, wantErr %v", err, tt.wantErr)
 				return

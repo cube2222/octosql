@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"context"
 	"testing"
 
 	"github.com/cube2222/octosql"
@@ -231,7 +232,7 @@ func TestMappedStream_Next(t *testing.T) {
 				source:      tt.fields.source,
 				keep:        tt.fields.keep,
 			}
-			equal, err := AreStreamsEqual(stream, tt.want)
+			equal, err := AreStreamsEqual(context.Background(), stream, tt.want)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("MappedStream.Next() error = %v, wantErr %v", err, tt.wantErr)
 				return

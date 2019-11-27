@@ -1,5 +1,7 @@
 package execution
 
+import "context"
+
 type InMemoryStream struct {
 	data  []*Record
 	index int
@@ -16,7 +18,7 @@ func (ims *InMemoryStream) Close() error {
 	return nil
 }
 
-func (ims *InMemoryStream) Next() (*Record, error) {
+func (ims *InMemoryStream) Next(ctx context.Context) (*Record, error) {
 	if ims.index >= len(ims.data) {
 		return nil, ErrEndOfStream
 	}

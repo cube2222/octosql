@@ -2,6 +2,9 @@ package execution
 
 import (
 	"github.com/cube2222/octosql"
+
+	"context"
+
 	"github.com/mitchellh/hashstructure"
 	"github.com/pkg/errors"
 )
@@ -14,8 +17,8 @@ func NewDistinct(child Node) *Distinct {
 	return &Distinct{child: child}
 }
 
-func (node *Distinct) Get(variables octosql.Variables) (RecordStream, error) {
-	stream, err := node.child.Get(variables)
+func (node *Distinct) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
+	stream, err := node.child.Get(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get stream for child node in distinct")
 	}
@@ -42,9 +45,9 @@ func (ds *DistinctStream) Close() error {
 	return nil
 }
 
-func (ds *DistinctStream) Next() (*Record, error) {
+func (ds *DistinctStream) Next(ctx context.Context) (*Record, error) {
 	for {
-		record, err := ds.stream.Next()
+		record, err := ds.stream.Next(ctx)
 		if err != nil {
 			if err == ErrEndOfStream {
 				return nil, ErrEndOfStream

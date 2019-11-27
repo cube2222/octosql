@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -165,7 +166,7 @@ func (r *Record) EventTime() octosql.Value {
 }
 
 type RecordStream interface {
-	Next() (*Record, error)
+	Next(ctx context.Context) (*Record, error)
 	io.Closer
 }
 

@@ -1,12 +1,11 @@
 package physical
 
 import (
-	context2 "context"
+	"context"
 
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/execution/functions"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 )
 
 /* This assumes that the allowed functions map single value
@@ -42,7 +41,7 @@ func (fe *FunctionExpression) Transform(ctx context.Context, transformers *Trans
 	return expr
 }
 
-func (fe *FunctionExpression) Materialize(ctx context2.Context, matCtx *MaterializationContext) (execution.Expression, error) {
+func (fe *FunctionExpression) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Expression, error) {
 	function, ok := functions.FunctionTable[fe.name]
 	if !ok {
 		return nil, errors.Errorf("No function %v found", fe.name)

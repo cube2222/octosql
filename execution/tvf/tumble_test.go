@@ -153,7 +153,7 @@ func TestTumble_Get(t *testing.T) {
 				t.Errorf("Tumble.Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			eq, err := execution.AreStreamsEqual(context.Background(), got, tt.want)
+			eq, err := execution.AreStreamsEqual(ctx, got, tt.want)
 			if err != nil {
 				t.Errorf("Tumble.Get() AreStreamsEqual error = %v", err)
 			}

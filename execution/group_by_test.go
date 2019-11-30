@@ -49,11 +49,11 @@ func (mock *AggregateMock) AddRecord(key octosql.Value, value octosql.Value) err
 }
 
 func (mock *AggregateMock) GetAggregated(key octosql.Value) (octosql.Value, error) {
-	_, ok := mock.getKeySet[getHash(key)]
+	_, ok := mock.getKeySet[getHash(key.AsSlice()[0])]
 	if !ok {
 		mock.t.Errorf("invalid %v call key: got %v wanted one of %v", mock.getI, key, mock.getKeySet)
 	}
-	delete(mock.getKeySet, getHash(key))
+	delete(mock.getKeySet, getHash(key.AsSlice()[0]))
 	mock.getI++
 	return mock.getValues[mock.getI-1], nil
 }

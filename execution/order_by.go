@@ -31,94 +31,19 @@ func NewOrderBy(exprs []Expression, directions []OrderDirection, source Node) *O
 }
 
 func isSorteable(x octosql.Value) bool {
-	switch x.(type) {
-	case octosql.Bool:
+	switch x.GetType() {
+	case octosql.TypeBool:
 		return true
-	case octosql.Int:
+	case octosql.TypeInt:
 		return true
-	case octosql.Float:
+	case octosql.TypeFloat:
 		return true
-	case octosql.String:
+	case octosql.TypeString:
 		return true
-	case octosql.Time:
+	case octosql.TypeTime:
 		return true
-	case octosql.Null, octosql.Phantom, octosql.Duration, octosql.Tuple, octosql.Object:
+	case octosql.TypeNull, octosql.TypePhantom, octosql.TypeDuration, octosql.TypeTuple, octosql.TypeObject:
 		return false
-	}
-
-	panic("unreachable")
-}
-
-func compare(x, y octosql.Value) (int, error) {
-	switch x := x.(type) {
-	case octosql.Int:
-		y, ok := y.(octosql.Int)
-		if !ok {
-			return 0, errors.Errorf("type mismatch between values")
-		}
-
-		if x == y {
-			return 0, nil
-		} else if x < y {
-			return -1, nil
-		}
-
-		return 1, nil
-	case octosql.Float:
-		y, ok := y.(octosql.Float)
-		if !ok {
-			return 0, errors.Errorf("type mismatch between values")
-		}
-
-		if x == y {
-			return 0, nil
-		} else if x < y {
-			return -1, nil
-		}
-
-		return 1, nil
-	case octosql.String:
-		y, ok := y.(octosql.String)
-		if !ok {
-			return 0, errors.Errorf("type mismatch between values")
-		}
-
-		if x == y {
-			return 0, nil
-		} else if x < y {
-			return -1, nil
-		}
-
-		return 1, nil
-	case octosql.Time:
-		y, ok := y.(octosql.Time)
-		if !ok {
-			return 0, errors.Errorf("type mismatch between values")
-		}
-
-		if x == y {
-			return 0, nil
-		} else if x.AsTime().Before(y.AsTime()) {
-			return -1, nil
-		}
-
-		return 1, nil
-	case octosql.Bool:
-		y, ok := y.(octosql.Bool)
-		if !ok {
-			return 0, errors.Errorf("type mismatch between values")
-		}
-
-		if x == y {
-			return 0, nil
-		} else if !x && y {
-			return -1, nil
-		}
-
-		return 1, nil
-
-	case octosql.Null, octosql.Phantom, octosql.Duration, octosql.Tuple, octosql.Object:
-		return 0, errors.Errorf("unsupported type in sorting")
 	}
 
 	panic("unreachable")
@@ -189,7 +114,7 @@ func createOrderedStream(ctx context.Context, expressions []Expression, directio
 				panic(errors.Errorf("value %v of type %v is not comparable", y, reflect.TypeOf(y).String()))
 			}
 
-			cmp, err := compare(x, y)
+			cmp, err := octosql.Compare(x, y)
 			if err != nil {
 				panic(errors.Errorf("failed to compare values %v and %v", x, y))
 			}

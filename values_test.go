@@ -1,7 +1,6 @@
 package octosql
 
 import (
-	"reflect"
 	"testing"
 	"time"
 )
@@ -30,21 +29,21 @@ func TestNormalizeType(t *testing.T) {
 					"name":       MakeString("warsaw"),
 					"population": MakeFloat(1700000.0),
 				}),
-				"array": Tuple{
-					Tuple{
+				"array": MakeTuple([]Value{
+					MakeTuple([]Value{
 						MakeFloat(1),
 						MakeInt(2),
 						MakeInt(3),
-					},
+					}),
 					MakeBool(true),
-				},
+				}),
 			}),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NormalizeType(tt.value); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NormalizeType() = %v, want %v", got, tt.want)
+			if got := NormalizeType(tt.value); !AreEqual(got, tt.want) {
+				t.Errorf("NormalizeType() = %s, want %s", got.String(), tt.want.String())
 			}
 		})
 	}
@@ -154,7 +153,7 @@ func TestAreEqual(t *testing.T) {
 		{
 			name: "compare nil to non-nil",
 			args: args{
-				left:  nil,
+				left:  ZeroValue(),
 				right: MakeInt(7),
 			},
 			want: false,
@@ -163,9 +162,17 @@ func TestAreEqual(t *testing.T) {
 			name: "compare non-nil to nil",
 			args: args{
 				left:  MakeInt(3),
-				right: nil,
+				right: ZeroValue(),
 			},
 			want: false,
+		},
+		{
+			name: "compare zero values",
+			args: args{
+				left:  ZeroValue(),
+				right: ZeroValue(),
+			},
+			want: true,
 		},
 	}
 	for _, tt := range tests {

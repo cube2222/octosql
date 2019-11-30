@@ -26,7 +26,7 @@ func (agg *First) Document() docs.Documentation {
 	)
 }
 
-func (agg *First) AddRecord(key octosql.Tuple, value octosql.Value) error {
+func (agg *First) AddRecord(key octosql.Value, value octosql.Value) error {
 	_, previousValueExists, err := agg.firsts.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current first out of hashmap")
@@ -44,14 +44,14 @@ func (agg *First) AddRecord(key octosql.Tuple, value octosql.Value) error {
 	return nil
 }
 
-func (agg *First) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
+func (agg *First) GetAggregated(key octosql.Value) (octosql.Value, error) {
 	first, ok, err := agg.firsts.Get(key)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get first out of hashmap")
+		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get first out of hashmap")
 	}
 
 	if !ok {
-		return nil, errors.Errorf("first for key not found")
+		return octosql.ZeroValue(), errors.Errorf("first for key not found")
 	}
 
 	return first.(octosql.Value), nil

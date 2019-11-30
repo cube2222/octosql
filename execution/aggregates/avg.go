@@ -31,39 +31,27 @@ func (agg *Average) Document() docs.Documentation {
 	)
 }
 
-func (agg *Average) AddRecord(key octosql.Tuple, value octosql.Value) error {
-	if agg.typedValue == nil {
+func (agg *Average) AddRecord(key octosql.Value, value octosql.Value) error {
+	if octosql.AreEqual(agg.typedValue, octosql.ZeroValue()) {
 		agg.typedValue = value
 	}
 
-	var floatValue octosql.Float
-	switch value := value.(type) {
-	case octosql.Float:
-		_, typeOk := agg.typedValue.(octosql.Float)
-		if !typeOk {
-			return errors.Errorf("mixed types in avg: %v and %v with values %v and %v",
-				execution.GetType(value), execution.GetType(agg.typedValue),
-				value, agg.typedValue)
-		}
-		floatValue = value
-	case octosql.Int:
-		_, typeOk := agg.typedValue.(octosql.Int)
-		if !typeOk {
-			return errors.Errorf("mixed types in avg: %v and %v with values %v and %v",
-				execution.GetType(value), execution.GetType(agg.typedValue),
-				value, agg.typedValue)
-		}
-		floatValue = octosql.MakeFloat(float64(value.AsInt()))
-	case octosql.Duration:
-		_, typeOk := agg.typedValue.(octosql.Duration)
-		if !typeOk {
-			return errors.Errorf("mixed types in avg: %v and %v with values %v and %v",
-				execution.GetType(value), execution.GetType(agg.typedValue),
-				value, agg.typedValue)
-		}
-		floatValue = octosql.MakeFloat(float64(value.AsDuration()))
+	if agg.typedValue.GetType() != value.GetType() {
+		return errors.Errorf("mixed types in avg: %v and %v with values %v and %v",
+			value.GetType(), agg.typedValue.GetType(),
+			value, agg.typedValue)
+	}
+
+	var floatValue float64
+	switch value.GetType() {
+	case octosql.TypeFloat:
+		floatValue = value.AsFloat()
+	case octosql.TypeInt:
+		floatValue = float64(value.AsInt())
+	case octosql.TypeDuration:
+		floatValue = float64(value.AsDuration())
 	default:
-		return errors.Errorf("invalid type in average: %v with value %v", execution.GetType(value), value)
+		return errors.Errorf("invalid type in average: %v with value %v", value.GetType(), value)
 	}
 
 	count, previousValueExists, err := agg.counts.Get(key)
@@ -76,11 +64,11 @@ func (agg *Average) AddRecord(key octosql.Tuple, value octosql.Value) error {
 		return errors.Wrap(err, "couldn't get current average out of hashmap")
 	}
 
-	var newAverage octosql.Float
+	var newAverage float64
 	var newCount int
 	if previousValueExists {
 		newCount = count.(int) + 1
-		newAverage = (average.(octosql.Float)*octosql.MakeFloat(float64(newCount-1)) + floatValue) / octosql.MakeFloat(float64(newCount))
+		newAverage = (average.(float64)*float64(newCount-1) + floatValue) / float64(newCount)
 	} else {
 		newCount = 1
 		newAverage = floatValue
@@ -99,21 +87,21 @@ func (agg *Average) AddRecord(key octosql.Tuple, value octosql.Value) error {
 	return nil
 }
 
-func (agg *Average) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
+func (agg *Average) GetAggregated(key octosql.Value) (octosql.Value, error) {
 	average, ok, err := agg.averages.Get(key)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get average out of hashmap")
+		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get average out of hashmap")
 	}
 
 	if !ok {
-		return nil, errors.Errorf("average for key not found")
+		return octosql.ZeroValue(), errors.Errorf("average for key not found")
 	}
 
-	switch agg.typedValue.(type) {
-	case octosql.Duration:
-		return octosql.MakeDuration(time.Duration(average.(octosql.Float).AsFloat())), nil
+	switch agg.typedValue.GetType() {
+	case octosql.TypeDuration:
+		return octosql.MakeDuration(time.Duration(average.(float64))), nil
 	default:
-		return average.(octosql.Float), nil
+		return octosql.MakeFloat(average.(float64)), nil
 	}
 }
 

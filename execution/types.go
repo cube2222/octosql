@@ -18,25 +18,6 @@ const (
 	DatatypeTuple   Datatype = "octosql.Tuple"
 )
 
-func GetType(i octosql.Value) Datatype {
-	if _, ok := i.(octosql.Bool); ok {
-		return DatatypeBoolean
-	}
-	if _, ok := i.(octosql.Int); ok {
-		return DatatypeInt
-	}
-	if _, ok := i.(octosql.Float); ok {
-		return DatatypeFloat64
-	}
-	if _, ok := i.(octosql.String); ok {
-		return DatatypeString
-	}
-	if _, ok := i.(octosql.Tuple); ok {
-		return DatatypeTuple
-	}
-	return DatatypeString // TODO: Unknown
-}
-
 // ParseType tries to parse the given string into any type it succeeds to. Returns back the string on failure.
 func ParseType(str string) octosql.Value {
 	integer, err := strconv.ParseInt(str, 10, 64)

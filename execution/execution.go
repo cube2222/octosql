@@ -32,7 +32,7 @@ func NewVariable(name octosql.VariableName) *Variable {
 func (v *Variable) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
 	val, err := variables.Get(v.name)
 	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't get variable %+v, available variables %+v", v.name, variables)
+		return octosql.ZeroValue(), errors.Wrapf(err, "couldn't get variable %+v, available variables %+v", v.name, variables)
 	}
 	return val, nil
 }
@@ -50,16 +50,16 @@ func NewTuple(expressions []Expression) *TupleExpression {
 }
 
 func (tup *TupleExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
-	outValues := make(octosql.Tuple, len(tup.expressions))
+	outValues := make([]octosql.Value, len(tup.expressions))
 	for i, expr := range tup.expressions {
 		value, err := expr.ExpressionValue(ctx, variables)
 		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't get tuple subexpression with index %v", i)
+			return octosql.ZeroValue(), errors.Wrapf(err, "couldn't get tuple subexpression with index %v", i)
 		}
 		outValues[i] = value
 	}
 
-	return outValues, nil
+	return octosql.MakeTuple(outValues), nil
 }
 
 type NodeExpression struct {
@@ -73,28 +73,28 @@ func NewNodeExpression(node Node) *NodeExpression {
 func (ne *NodeExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
 	records, err := ne.node.Get(ctx, variables)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get record stream")
+		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get record stream")
 	}
 
-	var firstRecord octosql.Tuple
-	outRecords := make(octosql.Tuple, 0)
+	var firstRecord octosql.Value
+	outRecords := make([]octosql.Value, 0)
 
 	var curRecord *Record
 	for curRecord, err = records.Next(ctx); err == nil; curRecord, err = records.Next(ctx) {
-		if firstRecord == nil {
+		if octosql.AreEqual(firstRecord, octosql.ZeroValue()) {
 			firstRecord = curRecord.AsTuple()
 		}
 		outRecords = append(outRecords, curRecord.AsTuple())
 	}
 	if err != ErrEndOfStream {
-		return nil, errors.Wrap(err, "couldn't get records from stream")
+		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get records from stream")
 	}
 
 	if len(outRecords) > 1 {
-		return outRecords, nil
+		return octosql.MakeTuple(outRecords), nil
 	}
 	if len(outRecords) == 0 {
-		return nil, nil
+		return octosql.ZeroValue(), nil
 	}
 
 	// There is exactly one record
@@ -102,7 +102,7 @@ func (ne *NodeExpression) ExpressionValue(ctx context.Context, variables octosql
 		return firstRecord, nil
 	}
 	if len(firstRecord.AsSlice()) == 0 {
-		return nil, nil
+		return octosql.ZeroValue(), nil
 	}
 
 	// There is exactly one field

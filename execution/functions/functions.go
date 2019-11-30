@@ -20,7 +20,7 @@ import (
 func execute(fun execution.Function, args ...Value) (Value, error) {
 	err := fun.Validator.Validate(args...)
 	if err != nil {
-		return nil, err
+		return ZeroValue(), err
 	}
 
 	return fun.Logic(args...)
@@ -46,23 +46,24 @@ var FuncInt = execution.Function{
 		),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		switch arg := args[0].(type) {
-		case Bool:
-			if arg {
+		arg := args[0]
+		switch arg.GetType() {
+		case TypeBool:
+			if arg.AsBool() {
 				return MakeInt(1), nil
 			}
 			return MakeInt(0), nil
-		case Int:
+		case TypeInt:
 			return arg, nil
-		case Float:
+		case TypeFloat:
 			return MakeInt(int(arg.AsFloat())), nil
-		case String:
+		case TypeString:
 			number, err := strconv.Atoi(arg.AsString())
 			if err != nil {
-				return nil, err
+				return ZeroValue(), err
 			}
 			return MakeInt(number), nil
-		case Null, Phantom, Time, Duration, Tuple, Object:
+		case TypeNull, TypePhantom, TypeTime, TypeDuration, TypeTuple, TypeObject:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 		}
 		panic("unreachable")

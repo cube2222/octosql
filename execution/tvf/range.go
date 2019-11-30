@@ -36,8 +36,7 @@ func (r *Range) Get(ctx context.Context, variables octosql.Variables) (execution
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get range start point")
 	}
-	octoStart, ok := start.(octosql.Int)
-	if !ok {
+	if start.GetType() != octosql.TypeInt {
 		return nil, errors.Errorf("invalid range start point: %v", start)
 	}
 
@@ -45,19 +44,18 @@ func (r *Range) Get(ctx context.Context, variables octosql.Variables) (execution
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get range end point")
 	}
-	octoEnd, ok := end.(octosql.Int)
-	if !ok {
+	if end.GetType() != octosql.TypeInt {
 		return nil, errors.Errorf("invalid range start point: %v", end)
 	}
 
 	return &RangeStream{
-		current:      octoStart,
-		endExclusive: octoEnd,
+		current:      start.AsInt(),
+		endExclusive: end.AsInt(),
 	}, nil
 }
 
 type RangeStream struct {
-	current, endExclusive octosql.Int
+	current, endExclusive int
 }
 
 func (s *RangeStream) Next(ctx context.Context) (*execution.Record, error) {
@@ -65,7 +63,7 @@ func (s *RangeStream) Next(ctx context.Context) (*execution.Record, error) {
 		return nil, execution.ErrEndOfStream
 	}
 
-	out := execution.NewRecordFromSlice([]octosql.VariableName{"i"}, []octosql.Value{s.current})
+	out := execution.NewRecordFromSlice([]octosql.VariableName{"i"}, []octosql.Value{octosql.MakeInt(s.current)})
 	s.current++
 
 	return out, nil

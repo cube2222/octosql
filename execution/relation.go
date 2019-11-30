@@ -2,11 +2,11 @@ package execution
 
 import (
 	"context"
-	"reflect"
 	"regexp"
 
-	"github.com/cube2222/octosql"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
 )
 
 type Relation interface {
@@ -29,16 +29,11 @@ func (rel *Equal) Apply(ctx context.Context, variables octosql.Variables, left, 
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get value of right operator in equal")
 	}
-	if leftValue == nil || rightValue == nil {
-		if leftValue == nil && rightValue == nil {
-			return true, nil
-		}
-		return false, nil
-	}
-	if reflect.TypeOf(leftValue).Kind() != reflect.TypeOf(rightValue).Kind() {
+
+	if leftValue.GetType() != rightValue.GetType() {
 		return false, errors.Errorf(
 			"invalid operands to equal %v and %v with types %v and %v",
-			leftValue, rightValue, GetType(leftValue), GetType(rightValue))
+			leftValue, rightValue, leftValue.GetType(), rightValue.GetType())
 	}
 
 	return octosql.AreEqual(leftValue, rightValue), nil
@@ -75,32 +70,25 @@ func (rel *MoreThan) Apply(ctx context.Context, variables octosql.Variables, lef
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get value of right operator in more than")
 	}
-	if leftValue == nil || rightValue == nil {
-		return false, errors.Errorf("invalid null operand to more_than %v and %v", leftValue, rightValue)
-	}
-	if reflect.TypeOf(leftValue).Kind() != reflect.TypeOf(rightValue).Kind() {
+	if leftValue.GetType() != rightValue.GetType() {
 		return false, errors.Errorf(
 			"invalid operands to more_than %v and %v with types %v and %v",
-			leftValue, rightValue, GetType(leftValue), GetType(rightValue))
+			leftValue, rightValue, leftValue.GetType(), rightValue.GetType())
 	}
 
-	switch leftValue := leftValue.(type) {
-	case octosql.Int:
-		rightValue := rightValue.(octosql.Int)
-		return leftValue > rightValue, nil
-	case octosql.Float:
-		rightValue := rightValue.(octosql.Float)
-		return leftValue > rightValue, nil
-	case octosql.String:
-		rightValue := rightValue.(octosql.String)
-		return leftValue > rightValue, nil
-	case octosql.Time:
-		rightValue := rightValue.(octosql.Time)
+	switch leftValue.GetType() {
+	case octosql.TypeInt:
+		return leftValue.AsInt() > rightValue.AsInt(), nil
+	case octosql.TypeFloat:
+		return leftValue.AsFloat() > rightValue.AsFloat(), nil
+	case octosql.TypeString:
+		return leftValue.AsString() > rightValue.AsString(), nil
+	case octosql.TypeTime:
 		return leftValue.AsTime().After(rightValue.AsTime()), nil
-	case octosql.Null, octosql.Phantom, octosql.Bool, octosql.Duration, octosql.Tuple, octosql.Object:
+	case octosql.TypeNull, octosql.TypePhantom, octosql.TypeBool, octosql.TypeDuration, octosql.TypeTuple, octosql.TypeObject:
 		return false, errors.Errorf(
 			"invalid operands to more_than %v and %v with types %v and %v, only int, float, string and time allowed",
-			leftValue, rightValue, GetType(leftValue), GetType(rightValue))
+			leftValue, rightValue, leftValue.GetType(), rightValue.GetType())
 	}
 
 	panic("unreachable")
@@ -169,22 +157,20 @@ func (rel *Like) Apply(ctx context.Context, variables octosql.Variables, left, r
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get value of right operator in LIKE")
 	}
-	leftString, ok := leftValue.(octosql.String)
-	if !ok {
+	if leftValue.GetType() != octosql.TypeString {
 		return false, errors.Errorf(
 			"invalid operands to like %v and %v with types %v and %v, only string allowed",
-			leftValue, rightValue, GetType(leftValue), GetType(rightValue))
+			leftValue, rightValue, leftValue.GetType(), rightValue.GetType())
 	}
-	rightString, ok := rightValue.(octosql.String)
-	if !ok {
+	if rightValue.GetType() != octosql.TypeString {
 		return false, errors.Errorf(
 			"invalid operands to like %v and %v with types %v and %v, only string allowed",
-			leftValue, rightValue, GetType(leftValue), GetType(rightValue))
+			leftValue, rightValue, leftValue.GetType(), rightValue.GetType())
 	}
 
-	match, err := regexp.MatchString(rightString.AsString(), leftString.AsString())
+	match, err := regexp.MatchString(rightValue.AsString(), leftValue.AsString())
 	if err != nil {
-		return false, errors.Wrapf(err, "couldn't match string in like relation with pattern %v", rightString)
+		return false, errors.Wrapf(err, "couldn't match string in like relation with pattern %v", rightValue)
 	}
 	return match, nil
 }
@@ -206,8 +192,9 @@ func (rel *In) Apply(ctx context.Context, variables octosql.Variables, left, rig
 		return false, errors.Wrap(err, "couldn't get value of right operator in IN")
 	}
 
-	switch set := rightValue.(type) {
-	case octosql.Tuple:
+	switch rightValue.GetType() {
+	case octosql.TypeTuple:
+		set := rightValue.AsSlice()
 		for i := range set {
 			if octosql.AreEqual(leftValue, set[i]) {
 				return true, nil

@@ -21,7 +21,7 @@ func (mock *AddRecordMock) Document() docs.Documentation {
 	panic("implement me")
 }
 
-func (mock *AddRecordMock) AddRecord(key octosql.Tuple, value octosql.Value) error {
+func (mock *AddRecordMock) AddRecord(key octosql.Value, value octosql.Value) error {
 	if !reflect.DeepEqual(mock.keys[mock.i], key) {
 		mock.t.Errorf("invalid %v call key: got %v wanted %v", mock.i, key, mock.keys[mock.i])
 	}
@@ -32,7 +32,7 @@ func (mock *AddRecordMock) AddRecord(key octosql.Tuple, value octosql.Value) err
 	return nil
 }
 
-func (*AddRecordMock) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
+func (*AddRecordMock) GetAggregated(key octosql.Value) (octosql.Value, error) {
 	panic("implement me")
 }
 

@@ -1,199 +1,118 @@
 package octosql
 
 import (
-	"encoding/json"
-	"fmt"
 	"log"
 	"reflect"
-	"strings"
 	"time"
 
-	"github.com/cube2222/octosql/docs"
+	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/ptypes"
+	"github.com/golang/protobuf/ptypes/duration"
+	"github.com/golang/protobuf/ptypes/timestamp"
+	"github.com/pkg/errors"
 )
 
-//go-sumtype:decl Value
-type Value interface {
-	docs.Documented
-	octoValue()
-	fmt.Stringer
-}
+// go-sumtype:decl Value
+// type Value interface {
+//	docs.Documented
 
-type Null struct{}
-
-func (Null) octoValue()            {}
-func (v Null) AsNull() interface{} { return nil }
-func (v Null) String() string {
-	return "<null>"
+func MakeNull() Value {
+	return Value{Value: &Value_Null{Null: true}}
 }
-func (v Null) Document() docs.Documentation {
-	return docs.Text("Null")
-}
-func MakeNull() Null {
-	return Null(struct{}{})
-}
-func ZeroNull() Null {
-	return struct{}{}
+func ZeroNull() Value {
+	return Value{Value: &Value_Null{Null: true}}
 }
 
 type Phantom struct{}
 
-func (Phantom) octoValue()           {}
-func (v Phantom) AsStruct() struct{} { return struct{}(v) }
-func (v Phantom) String() string {
-	return "<phantom>"
+func MakePhantom() Value {
+	return Value{Value: &Value_Phantom{Phantom: true}}
 }
-func (v Phantom) Document() docs.Documentation {
-	return docs.Text("Phantom")
-}
-func MakePhantom() Phantom {
-	return Phantom(struct{}{})
-}
-func ZeroPhantom() Phantom {
-	return struct{}{}
+func ZeroPhantom() Value {
+	return Value{Value: &Value_Phantom{Phantom: true}}
 }
 
 type Int int
 
-func (Int) octoValue()   {}
-func (v Int) AsInt() int { return int(v) }
-func (v Int) String() string {
-	return fmt.Sprint(v.AsInt())
+func MakeInt(v int) Value {
+	return Value{Value: &Value_Int{Int: int64(v)}}
 }
-func (v Int) Document() docs.Documentation {
-	return docs.Text("Int")
-}
-func MakeInt(v int) Int {
-	return Int(v)
-}
-func ZeroInt() Int {
-	return 0
+func ZeroInt() Value {
+	return Value{Value: &Value_Int{Int: int64(0)}}
 }
 
 type Float float64
 
-func (Float) octoValue()         {}
-func (v Float) AsFloat() float64 { return float64(v) }
-func (v Float) String() string {
-	return fmt.Sprint(v.AsFloat())
+func MakeFloat(v float64) Value {
+	return Value{Value: &Value_Float{Float: v}}
 }
-func (v Float) Document() docs.Documentation {
-	return docs.Text("Float")
-}
-func MakeFloat(v float64) Float {
-	return Float(v)
-}
-func ZeroFloat() Float {
-	return 0
+func ZeroFloat() Value {
+	return Value{Value: &Value_Float{Float: 0}}
 }
 
-type Bool bool
-
-func (Bool) octoValue()     {}
-func (v Bool) AsBool() bool { return bool(v) }
-func (v Bool) String() string {
-	return fmt.Sprint(v.AsBool())
+func MakeBool(v bool) Value {
+	return Value{Value: &Value_Bool{Bool: v}}
 }
-func (v Bool) Document() docs.Documentation {
-	return docs.Text("Bool")
-}
-func MakeBool(v bool) Bool {
-	return Bool(v)
-}
-func ZeroBool() Bool {
-	return false
+func ZeroBool() Value {
+	return Value{Value: &Value_Bool{Bool: false}}
 }
 
-type String string
-
-func (String) octoValue()         {}
-func (v String) AsString() string { return string(v) }
-func (v String) String() string {
-	return fmt.Sprintf("'%s'", v.AsString())
+func MakeString(v string) Value {
+	return Value{Value: &Value_String_{String_: v}}
 }
-func (v String) Document() docs.Documentation {
-	return docs.Text("String")
-}
-func MakeString(v string) String {
-	return String(v)
-}
-func ZeroString() String {
-	return ""
+func ZeroString() Value {
+	return Value{Value: &Value_String_{String_: ""}}
 }
 
-type Time time.Time
-
-func (Time) octoValue()          {}
-func (v Time) AsTime() time.Time { return time.Time(v) }
-func (v Time) String() string {
-	return v.AsTime().Format(time.RFC3339Nano)
-}
-func (v Time) Document() docs.Documentation {
-	return docs.Text("Time")
-}
-func MakeTime(v time.Time) Time {
-	return Time(v)
-}
-func ZeroTime() Time {
-	return Time(time.Time{})
-}
-
-type Duration time.Duration
-
-func (Duration) octoValue()                  {}
-func (v Duration) AsDuration() time.Duration { return time.Duration(v) }
-func (v Duration) String() string {
-	return v.AsDuration().String()
-}
-func (v Duration) Document() docs.Documentation {
-	return docs.Text("Duration")
-}
-func MakeDuration(v time.Duration) Duration {
-	return Duration(v)
-}
-func ZeroDuration() Duration {
-	return Duration(time.Duration(0))
-}
-
-type Tuple []Value
-
-func (Tuple) octoValue()         {}
-func (v Tuple) AsSlice() []Value { return []Value(v) }
-func (v Tuple) String() string {
-	valueStrings := make([]string, len(v.AsSlice()))
-	for i, value := range v.AsSlice() {
-		valueStrings[i] = fmt.Sprint(value)
-	}
-	return fmt.Sprintf("(%s)", strings.Join(valueStrings, ", "))
-}
-func (v Tuple) Document() docs.Documentation {
-	return docs.Text("Tuple")
-}
-func MakeTuple(v []Value) Tuple {
-	return Tuple(v)
-}
-func ZeroTuple() Tuple {
-	return nil
-}
-
-type Object map[string]Value
-
-func (Object) octoValue()                {}
-func (v Object) AsMap() map[string]Value { return map[string]Value(v) }
-func (v Object) String() string {
-	text, err := json.Marshal(v.AsMap())
+func MakeTime(v time.Time) Value {
+	t, err := ptypes.TimestampProto(v)
 	if err != nil {
-		return fmt.Sprint(v.AsMap())
+		panic(err)
 	}
-	return string(text)
+	return Value{Value: &Value_Time{Time: t}}
 }
-func (v Object) Document() docs.Documentation {
-	return docs.Text("Object")
+func ZeroTime() Value {
+	return Value{Value: &Value_Time{Time: &timestamp.Timestamp{}}}
 }
-func MakeObject(v map[string]Value) Object {
-	return Object(v)
+
+func MakeDuration(v time.Duration) Value {
+	return Value{Value: &Value_Duration{Duration: ptypes.DurationProto(v)}}
 }
-func ZeroObject() Object {
-	return nil
+func ZeroDuration() Value {
+	return Value{Value: &Value_Duration{Duration: &duration.Duration{}}}
+}
+
+func MakeTuple(v []Value) Value {
+	tuple := &Tuple{
+		Fields: make([]*Value, len(v)),
+	}
+	for i, v := range v {
+		vInternal := v
+		tuple.Fields[i] = &vInternal
+	}
+	return Value{Value: &Value_Tuple{Tuple: tuple}}
+}
+func ZeroTuple() Value {
+	return Value{Value: &Value_Tuple{Tuple: &Tuple{
+		Fields: nil,
+	}}}
+}
+
+func MakeObject(v map[string]Value) Value {
+	object := &Object{
+		Fields: make(map[string]*Value),
+	}
+	for k, v := range v {
+		vInternal := v
+		object.Fields[k] = &vInternal
+	}
+
+	return Value{Value: &Value_Object{Object: object}}
+}
+func ZeroObject() Value {
+	return Value{Value: &Value_Object{Object: &Object{
+		Fields: nil,
+	}}}
 }
 
 // NormalizeType brings various primitive types into the type we want them to be.
@@ -227,22 +146,22 @@ func NormalizeType(value interface{}) Value {
 	case string:
 		return MakeString(value)
 	case []interface{}:
-		out := make(Tuple, len(value))
+		out := make([]Value, len(value))
 		for i := range value {
 			out[i] = NormalizeType(value[i])
 		}
-		return out
+		return MakeTuple(out)
 	case map[string]interface{}:
-		out := make(Object)
+		out := make(map[string]Value)
 		for k, v := range value {
 			out[k] = NormalizeType(v)
 		}
-		return out
+		return MakeObject(out)
 	case *interface{}:
 		if value != nil {
 			return NormalizeType(*value)
 		}
-		return nil
+		return MakeNull()
 	case time.Time:
 		return MakeTime(value)
 	case time.Duration:
@@ -258,104 +177,186 @@ func NormalizeType(value interface{}) Value {
 
 // octosql.AreEqual checks the equality of the given values, returning false if the types don't match.
 func AreEqual(left, right Value) bool {
-	if left == nil && right == nil {
-		return true
+	return proto.Equal(&left, &right)
+}
+
+type Comparison int
+
+const (
+	LessThan    Comparison = -1
+	Equal       Comparison = 0
+	GreaterThan            = 1
+)
+
+func Compare(x, y Value) (Comparison, error) {
+	switch x.GetType() {
+	case TypeInt:
+		if y.GetType() != TypeInt {
+			return 0, errors.Errorf("type mismatch between values")
+		}
+
+		x := x.AsInt()
+		y := y.AsInt()
+
+		if x == y {
+			return 0, nil
+		} else if x < y {
+			return -1, nil
+		}
+
+		return 1, nil
+	case TypeFloat:
+		if y.GetType() != TypeFloat {
+			return 0, errors.Errorf("type mismatch between values")
+		}
+		x := x.AsFloat()
+		y := y.AsFloat()
+
+		if x == y {
+			return 0, nil
+		} else if x < y {
+			return -1, nil
+		}
+
+		return 1, nil
+	case TypeString:
+		if y.GetType() != TypeString {
+			return 0, errors.Errorf("type mismatch between values")
+		}
+
+		x := x.AsString()
+		y := y.AsString()
+
+		if x == y {
+			return 0, nil
+		} else if x < y {
+			return -1, nil
+		}
+
+		return 1, nil
+	case TypeTime:
+		if y.GetType() != TypeTime {
+			return 0, errors.Errorf("type mismatch between values")
+		}
+
+		x := x.AsTime()
+		y := y.AsTime()
+
+		if x == y {
+			return 0, nil
+		} else if x.Before(y) {
+			return -1, nil
+		}
+
+		return 1, nil
+	case TypeBool:
+		if y.GetType() != TypeBool {
+			return 0, errors.Errorf("type mismatch between values")
+		}
+
+		x := x.AsBool()
+		y := y.AsBool()
+
+		if x == y {
+			return 0, nil
+		} else if !x && y {
+			return -1, nil
+		}
+
+		return 1, nil
+
+	case TypeNull, TypePhantom, TypeDuration, TypeTuple, TypeObject:
+		return 0, errors.Errorf("unsupported type in sorting")
 	}
 
-	if (left == nil && right != nil) ||
-		(left != nil && right == nil) {
-		return false
-	}
-
-	switch left := left.(type) {
-	case Null:
-		_, ok := right.(Null)
-		if !ok {
-			return false
-		}
-		return true
-
-	case Phantom:
-		_, ok := right.(Phantom)
-		if !ok {
-			return false
-		}
-		return true
-
-	case Int:
-		right, ok := right.(Int)
-		if !ok {
-			return false
-		}
-		return left == right
-
-	case Float:
-		right, ok := right.(Float)
-		if !ok {
-			return false
-		}
-		return left == right
-
-	case Bool:
-		right, ok := right.(Bool)
-		if !ok {
-			return false
-		}
-		return left == right
-
-	case String:
-		right, ok := right.(String)
-		if !ok {
-			return false
-		}
-		return left == right
-
-	case Time:
-		right, ok := right.(Time)
-		if !ok {
-			return false
-		}
-
-		return left.AsTime().Equal(right.AsTime())
-
-	case Duration:
-		right, ok := right.(Duration)
-		if !ok {
-			return false
-		}
-		return left == right
-
-	case Tuple:
-		right, ok := right.(Tuple)
-		if !ok {
-			return false
-		}
-		if len(left) != len(right) {
-			return false
-		}
-		for i := range left {
-			if !AreEqual(left[i], right[i]) {
-				return false
-			}
-		}
-		return true
-
-	case Object:
-		right, ok := right.(Object)
-		if !ok {
-			return false
-		}
-		if len(left) != len(right) {
-			return false
-		}
-		for k := range left {
-			if !AreEqual(left[k], right[k]) {
-				return false
-			}
-		}
-		return true
-
-	}
-	log.Fatalf("unhandled type of octosql.Value: %v", reflect.TypeOf(left).String())
 	panic("unreachable")
+}
+
+func ZeroValue() Value {
+	return Value{}
+}
+
+func (v Value) AsInt() int {
+	return int(v.GetInt())
+}
+
+func (v Value) AsFloat() float64 {
+	return v.GetFloat()
+}
+
+func (v Value) AsBool() bool {
+	return v.GetBool()
+}
+
+func (v Value) AsString() string {
+	return v.GetString_()
+}
+
+func (v Value) AsTime() time.Time {
+	t, err := ptypes.Timestamp(v.GetTime())
+	if err != nil {
+		panic(err)
+	}
+	return t
+}
+
+func (v Value) AsDuration() time.Duration {
+	d, err := ptypes.Duration(v.GetDuration())
+	if err != nil {
+		panic(err)
+	}
+	return d
+}
+
+func (v Value) AsSlice() []Value {
+	t := v.GetTuple()
+	out := make([]Value, len(t.Fields))
+	for i := range out {
+		out[i] = *t.Fields[i]
+	}
+	return out
+}
+
+type Type int
+
+const (
+	TypeZero Type = iota
+	TypeNull
+	TypePhantom
+	TypeInt
+	TypeFloat
+	TypeBool
+	TypeString
+	TypeTime
+	TypeDuration
+	TypeTuple
+	TypeObject
+)
+
+// Można na tych Value pod spodem zdefiniowac GetType i użyć wirtualnych metod, a nie type switch
+func (v Value) GetType() Type {
+	switch v.Value.(type) {
+	case *Value_Null:
+		return TypeNull
+	case *Value_Phantom:
+		return TypePhantom
+	case *Value_Int:
+		return TypeInt
+	case *Value_Float:
+		return TypeFloat
+	case *Value_Bool:
+		return TypeBool
+	case *Value_String_:
+		return TypeString
+	case *Value_Time:
+		return TypeTime
+	case *Value_Duration:
+		return TypeDuration
+	case *Value_Tuple:
+		return TypeTuple
+	case *Value_Object:
+		return TypeObject
+	default:
+		return TypeZero
+	}
 }

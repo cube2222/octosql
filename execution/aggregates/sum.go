@@ -27,60 +27,47 @@ func (agg *Sum) Document() docs.Documentation {
 	)
 }
 
-func (agg *Sum) AddRecord(key octosql.Tuple, value octosql.Value) error {
+func (agg *Sum) AddRecord(key octosql.Value, value octosql.Value) error {
 	sum, previousValueExists, err := agg.sums.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current sum out of hashmap")
 	}
+	octoSum := sum.(octosql.Value)
 
-	if agg.typedValue == nil {
+	if octosql.AreEqual(agg.typedValue, octosql.ZeroValue()) {
 		agg.typedValue = value
 	}
-	switch value := value.(type) {
-	case octosql.Int:
-		_, typeOk := agg.typedValue.(octosql.Int)
-		if !typeOk {
-			return errors.Errorf("mixed types in sum: %v and %v with values %v and %v",
-				execution.GetType(value), execution.GetType(agg.typedValue),
-				value, agg.typedValue)
-		}
 
+	if agg.typedValue.GetType() != value.GetType() {
+		return errors.Errorf("mixed types in avg: %v and %v with values %v and %v",
+			value.GetType(), agg.typedValue.GetType(),
+			value, agg.typedValue)
+	}
+
+	switch value.GetType() {
+	case octosql.TypeInt:
 		if previousValueExists {
-			sum = sum.(octosql.Int) + value
+			octoSum = octosql.MakeInt(octoSum.AsInt() + value.AsInt())
 		} else {
-			sum = value
+			octoSum = value
 		}
 
-	case octosql.Duration:
-		_, typeOk := agg.typedValue.(octosql.Duration)
-		if !typeOk {
-			return errors.Errorf("mixed types in sum: %v and %v with values %v and %v",
-				execution.GetType(value), execution.GetType(agg.typedValue),
-				value, agg.typedValue)
-		}
-
+	case octosql.TypeDuration:
 		if previousValueExists {
-			sum = sum.(octosql.Duration) + value
+			octoSum = octosql.MakeDuration(octoSum.AsDuration() + value.AsDuration())
 		} else {
-			sum = value
+			octoSum = value
 		}
 
-	case octosql.Float:
-		_, typeOk := agg.typedValue.(octosql.Float)
-		if !typeOk {
-			return errors.Errorf("mixed types in sum: %v and %v with values %v and %v",
-				execution.GetType(value), execution.GetType(agg.typedValue),
-				value, agg.typedValue)
-		}
-
+	case octosql.TypeFloat:
 		if previousValueExists {
-			sum = sum.(octosql.Float) + value
+			octoSum = octosql.MakeFloat(octoSum.AsFloat() + value.AsFloat())
 		} else {
-			sum = value
+			octoSum = value
 		}
 
 	default:
-		return errors.Errorf("invalid type in sum: %v with value %v", execution.GetType(value), value)
+		return errors.Errorf("invalid type in sum: %v with value %v", value.GetType(), value)
 	}
 
 	err = agg.sums.Set(key, sum)
@@ -91,14 +78,14 @@ func (agg *Sum) AddRecord(key octosql.Tuple, value octosql.Value) error {
 	return nil
 }
 
-func (agg *Sum) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
+func (agg *Sum) GetAggregated(key octosql.Value) (octosql.Value, error) {
 	sum, ok, err := agg.sums.Get(key)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get sum out of hashmap")
+		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get sum out of hashmap")
 	}
 
 	if !ok {
-		return nil, errors.Errorf("sum for key not found")
+		return octosql.ZeroValue(), errors.Errorf("sum for key not found")
 	}
 
 	return sum.(octosql.Value), nil

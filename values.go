@@ -375,7 +375,32 @@ func (v Value) GetType() Type {
 }
 
 func (v Value) Document() docs.Documentation {
-	return nil // TODO
+	switch v.GetType() {
+	case TypeZero:
+		return docs.Text("Zero Value")
+	case TypeNull:
+		return docs.Text("Null")
+	case TypePhantom:
+		return docs.Text("Phantom")
+	case TypeInt:
+		return docs.Text("Int")
+	case TypeFloat:
+		return docs.Text("Float")
+	case TypeBool:
+		return docs.Text("Bool")
+	case TypeString:
+		return docs.Text("String")
+	case TypeTime:
+		return docs.Text("Time")
+	case TypeDuration:
+		return docs.Text("Duration")
+	case TypeTuple:
+		return docs.Text("Tuple")
+	case TypeObject:
+		return docs.Text("Object")
+	default:
+		panic("invalid type")
+	}
 }
 
 func (v Value) Show() string {
@@ -393,7 +418,7 @@ func (v Value) Show() string {
 	case TypeBool:
 		return fmt.Sprint(v.AsBool())
 	case TypeString:
-		return v.AsString()
+		return fmt.Sprintf("'%s'", v.AsString())
 	case TypeTime:
 		return v.AsTime().Format(time.RFC3339Nano)
 	case TypeDuration:
@@ -411,7 +436,7 @@ func (v Value) Show() string {
 		}
 		return fmt.Sprintf("{%s}", strings.Join(pairStrings, ", "))
 	default:
-		return "<invalidType>"
+		panic("invalid type")
 	}
 }
 

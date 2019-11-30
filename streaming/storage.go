@@ -42,6 +42,7 @@ func NewBadgerStorage(db *badger.DB) *BadgerStorage {
 }
 
 func (bs *BadgerStorage) BeginTransaction() *badgerTransaction {
+	bs.db.DropPrefix()
 	tx := bs.db.NewTransaction(true)
 	return &badgerTransaction{tx: tx, prefix: nil}
 }
@@ -88,5 +89,4 @@ func (tx *badgerTransaction) Commit() error {
 
 func (tx *badgerTransaction) Abort() {
 	tx.tx.Discard()
-	return nil
 }

@@ -1,6 +1,7 @@
 package streaming
 
 import (
+	"context"
 	"log"
 
 	"github.com/pkg/errors"
@@ -16,17 +17,20 @@ type RecordSink interface {
 type PullEngine struct {
 	recordSink RecordSink
 	source     execution.RecordStream
+	storage    *BadgerStorage
 }
 
-func NewPullEngine(sink RecordSink) *PullEngine {
+func NewPullEngine(sink RecordSink, storage *BadgerStorage, source execution.RecordStream) *PullEngine {
 	return &PullEngine{
-		recordSink: NewBuffer(),
+		recordSink: sink,
+		storage:    storage,
+		source:     source,
 	}
 }
 
-func (engine *PullEngine) Run() {
+func (engine *PullEngine) Run(ctx context.Context) {
 	for {
-		err := engine.loop()
+		err := engine.loop(ctx)
 		if err == execution.ErrEndOfStream {
 			log.Println("end of stream, stopping loop")
 			return
@@ -37,8 +41,9 @@ func (engine *PullEngine) Run() {
 	}
 }
 
-func (engine *PullEngine) loop() error {
-	r, err := engine.source.Next(ctx)
+func (engine *PullEngine) loop(ctx context.Context) error {
+	tx := engine.storage.BeginTransaction()
+	r, err := engine.source.Next(InjectStateTransaction(ctx, tx))
 	if err != nil {
 		if err == execution.ErrEndOfStream {
 			err := engine.recordSink.MarkEndOfStream()
@@ -49,12 +54,7 @@ func (engine *PullEngine) loop() error {
 		}
 		return errors.Wrap(err, "couldn't get next record")
 	}
-	err = engine.recordSink.AddRecord(r, func() {
-		engine.ackFunc(r.ID())
-	})
-	if err != nil {
-		return errors.Wrap(err, "couldn't add record to sink")
-	}
+	engine.recordSink.AddRecord(r, tx)
 
 	return nil
 }

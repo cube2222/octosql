@@ -362,22 +362,22 @@ var FuncLeast = execution.Function{
 		),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		switch args[0].(type) {
-		case Int:
-			var min Int = math.MaxInt64
+		switch args[0].GetType() {
+		case TypeInt:
+			min := math.MaxInt64
 			for _, arg := range args {
-				min = intMin(min, arg.(Int))
+				min = intMin(min, arg.AsInt())
 			}
 
-			return min, nil
-		case Float:
+			return MakeInt(min), nil
+		case TypeFloat:
 			min := math.Inf(1)
 			for _, arg := range args {
-				min = math.Min(min, arg.(Float).AsFloat())
+				min = math.Min(min, arg.AsFloat())
 			}
 
 			return MakeFloat(min), nil
-		case Null, Phantom, Bool, String, Time, Duration, Tuple, Object:
+		case TypeNull, TypePhantom, TypeBool, TypeString, TypeTime, TypeDuration, TypeTuple, TypeObject:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 		}
 		panic("unreachable")
@@ -398,22 +398,22 @@ var FuncGreatest = execution.Function{
 		),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		switch args[0].(type) {
-		case Int:
-			var max Int = math.MinInt64
+		switch args[0].GetType() {
+		case TypeInt:
+			max := math.MinInt64
 			for _, arg := range args {
-				max = intMax(max, arg.(Int))
+				max = intMax(max, arg.AsInt())
 			}
 
-			return max, nil
-		case Float:
+			return MakeInt(max), nil
+		case TypeFloat:
 			max := math.Inf(-1)
 			for _, arg := range args {
-				max = math.Max(max, arg.(Float).AsFloat())
+				max = math.Max(max, arg.AsFloat())
 			}
 
 			return MakeFloat(max), nil
-		case Null, Phantom, Bool, String, Time, Duration, Tuple, Object:
+		case TypeNull, TypePhantom, TypeBool, TypeString, TypeTime, TypeDuration, TypeTuple, TypeObject:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 		}
 		panic("unreachable")
@@ -442,11 +442,11 @@ var FuncRandFloat = execution.Function{
 		case 0:
 			return MakeFloat(rand.Float64()), nil
 		case 1:
-			upper := float64(args[0].(Int).AsInt())
+			upper := float64(args[0].AsInt())
 			return MakeFloat(upper * rand.Float64()), nil
 		default:
-			lower := float64(args[0].(Int).AsInt())
-			upper := float64(args[1].(Int).AsInt())
+			lower := float64(args[0].AsInt())
+			upper := float64(args[1].AsInt())
 
 			return MakeFloat(lower + (upper-lower)*rand.Float64()), nil
 		}
@@ -474,18 +474,18 @@ var FuncRandInt = execution.Function{
 		case 0:
 			return MakeInt(rand.Int()), nil
 		case 1:
-			upper := args[0].(Int)
+			upper := args[0].AsInt()
 			if upper <= 0 {
-				return nil, fmt.Errorf("Upper boundary for random integer must be greater than zero")
+				return ZeroValue(), fmt.Errorf("Upper boundary for random integer must be greater than zero")
 			}
 
-			return MakeInt(rand.Intn(upper.AsInt())), nil
+			return MakeInt(rand.Intn(upper)), nil
 		default:
-			lower := args[0].(Int).AsInt()
-			upper := args[1].(Int).AsInt()
+			lower := args[0].AsInt()
+			upper := args[1].AsInt()
 
 			if upper <= lower {
-				return nil, fmt.Errorf("Upper bound for random integers must be greater than the lower bound")
+				return ZeroValue(), fmt.Errorf("Upper bound for random integers must be greater than the lower bound")
 			}
 
 			return MakeInt(lower + rand.Intn(upper-lower)), nil
@@ -504,7 +504,7 @@ var FuncPower = execution.Function{
 		AllArgs(TypeOf(ZeroFloat())),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		return MakeFloat(math.Pow(args[0].(Float).AsFloat(), args[1].(Float).AsFloat())), nil
+		return MakeFloat(math.Pow(args[0].AsFloat(), args[1].AsFloat())), nil
 	},
 }
 
@@ -1220,14 +1220,14 @@ var FuncNullIf = execution.Function{
 }
 
 /* Auxiliary functions */
-func intMin(x, y Int) Int {
+func intMin(x, y int) int {
 	if x <= y {
 		return x
 	}
 	return y
 }
 
-func intMax(x, y Int) Int {
+func intMax(x, y int) int {
 	if x <= y {
 		return y
 	}

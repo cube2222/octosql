@@ -7,6 +7,10 @@ import (
 	"github.com/dgraph-io/badger/v2"
 )
 
+type Storage interface {
+	DropAll(prefix []byte) error
+}
+
 type StateTransaction interface {
 	Set(key, value []byte) error
 	Get(key []byte) (value []byte, err error)
@@ -45,6 +49,12 @@ func (bs *BadgerStorage) BeginTransaction() *badgerTransaction {
 	bs.db.DropPrefix()
 	tx := bs.db.NewTransaction(true)
 	return &badgerTransaction{tx: tx, prefix: nil}
+}
+
+//TODO: What to do? What to do?
+func (bs *BadgerStorage) DropAll(prefix []byte) error {
+	err := bs.db.DropPrefix(prefix)
+	return err
 }
 
 type badgerTransaction struct {

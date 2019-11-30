@@ -32,7 +32,6 @@ func (agg *Sum) AddRecord(key octosql.Value, value octosql.Value) error {
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current sum out of hashmap")
 	}
-	octoSum := sum.(octosql.Value)
 
 	if octosql.AreEqual(agg.typedValue, octosql.ZeroValue()) {
 		agg.typedValue = value
@@ -47,23 +46,23 @@ func (agg *Sum) AddRecord(key octosql.Value, value octosql.Value) error {
 	switch value.GetType() {
 	case octosql.TypeInt:
 		if previousValueExists {
-			octoSum = octosql.MakeInt(octoSum.AsInt() + value.AsInt())
+			sum = octosql.MakeInt(sum.(octosql.Value).AsInt() + value.AsInt())
 		} else {
-			octoSum = value
+			sum = value
 		}
 
 	case octosql.TypeDuration:
 		if previousValueExists {
-			octoSum = octosql.MakeDuration(octoSum.AsDuration() + value.AsDuration())
+			sum = octosql.MakeDuration(sum.(octosql.Value).AsDuration() + value.AsDuration())
 		} else {
-			octoSum = value
+			sum = value
 		}
 
 	case octosql.TypeFloat:
 		if previousValueExists {
-			octoSum = octosql.MakeFloat(octoSum.AsFloat() + value.AsFloat())
+			sum = octosql.MakeFloat(sum.(octosql.Value).AsFloat() + value.AsFloat())
 		} else {
-			octoSum = value
+			sum = value
 		}
 
 	default:

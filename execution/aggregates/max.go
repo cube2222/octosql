@@ -32,25 +32,25 @@ func (agg *Max) AddRecord(key octosql.Value, value octosql.Value) error {
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current max out of hashmap")
 	}
-	octoMax := max.(octosql.Value)
 
 	if octosql.AreEqual(agg.typedValue, octosql.ZeroValue()) {
 		agg.typedValue = value
 	}
 
 	if !previousValueExists {
-		octoMax = value
+		max = value
 	} else {
+		octoMax := max.(octosql.Value)
 		cmp, err := octosql.Compare(value, octoMax)
 		if err != nil {
 			return errors.Wrap(err, "couldn't compare current max with new value")
 		}
 		if cmp == octosql.GreaterThan {
-			octoMax = value
+			max = value
 		}
 	}
 
-	err = agg.maxes.Set(key, octoMax)
+	err = agg.maxes.Set(key, max)
 	if err != nil {
 		return errors.Wrap(err, "couldn't put new max into hashmap")
 	}

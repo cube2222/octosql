@@ -15,7 +15,7 @@ const (
 	DatatypeInt     Datatype = "int"
 	DatatypeFloat64 Datatype = "float64"
 	DatatypeString  Datatype = "string"
-	DatatypeTuple   Datatype = "octosql.Tuple"
+	DatatypeTuple   Datatype = "octosql.Value"
 )
 
 // ParseType tries to parse the given string into any type it succeeds to. Returns back the string on failure.

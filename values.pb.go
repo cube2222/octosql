@@ -302,7 +302,7 @@ func (m *Object) GetFields() map[string]*Value {
 
 func init() {
 	proto.RegisterType((*Value)(nil), "octosql.Value")
-	proto.RegisterType((*Tuple)(nil), "octosql.Tuple")
+	proto.RegisterType((*Tuple)(nil), "octosql.Value")
 	proto.RegisterType((*Object)(nil), "octosql.Object")
 	proto.RegisterMapType((map[string]*Value)(nil), "octosql.Object.FieldsEntry")
 }

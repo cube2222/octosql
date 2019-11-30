@@ -32,25 +32,25 @@ func (agg *Min) AddRecord(key octosql.Value, value octosql.Value) error {
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current min out of hashmap")
 	}
-	octoMin := min.(octosql.Value)
 
 	if octosql.AreEqual(agg.typedValue, octosql.ZeroValue()) {
 		agg.typedValue = value
 	}
 
 	if !previousValueExists {
-		octoMin = value
+		min = value
 	} else {
+		octoMin := min.(octosql.Value)
 		cmp, err := octosql.Compare(value, octoMin)
 		if err != nil {
 			return errors.Wrap(err, "couldn't compare current min with new value")
 		}
-		if cmp == octosql.GreaterThan {
-			octoMin = value
+		if cmp == octosql.LessThan {
+			min = value
 		}
 	}
 
-	err = agg.mins.Set(key, octoMin)
+	err = agg.mins.Set(key, min)
 	if err != nil {
 		return errors.Wrap(err, "couldn't put new min into hashmap")
 	}

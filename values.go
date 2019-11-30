@@ -1,8 +1,10 @@
 package octosql
 
 import (
+	"fmt"
 	"log"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -319,6 +321,15 @@ func (v Value) AsSlice() []Value {
 	return out
 }
 
+func (v Value) AsMap() map[string]Value {
+	obj := v.GetObject()
+	out := make(map[string]Value)
+	for k, v := range obj.Fields {
+		out[k] = *v
+	}
+	return out
+}
+
 type Type int
 
 const (
@@ -365,4 +376,41 @@ func (v Value) GetType() Type {
 
 func (v Value) Document() docs.Documentation {
 	return nil // TODO
+}
+
+func (v Value) Show() string {
+	switch v.GetType() {
+	case TypeZero:
+		return "<zeroValue>"
+	case TypeNull:
+		return "<null>"
+	case TypePhantom:
+		return "<phantom>"
+	case TypeInt:
+		return fmt.Sprint(v.AsInt())
+	case TypeFloat:
+		return fmt.Sprint(v.AsFloat())
+	case TypeBool:
+		return fmt.Sprint(v.AsBool())
+	case TypeString:
+		return v.AsString()
+	case TypeTime:
+		return v.AsTime().Format(time.RFC3339Nano)
+	case TypeDuration:
+		return v.AsDuration().String()
+	case TypeTuple:
+		valueStrings := make([]string, len(v.AsSlice()))
+		for i, value := range v.AsSlice() {
+			valueStrings[i] = value.Show()
+		}
+		return fmt.Sprintf("(%s)", strings.Join(valueStrings, ", "))
+	case TypeObject:
+		pairStrings := make([]string, 0, len(v.AsMap()))
+		for k, v := range v.AsMap() {
+			pairStrings = append(pairStrings, fmt.Sprintf("%s: %s", k, v.Show()))
+		}
+		return fmt.Sprintf("{%s}", strings.Join(pairStrings, ", "))
+	default:
+		return "<invalidType>"
+	}
 }

@@ -6,7 +6,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/output"
 )
@@ -22,43 +21,6 @@ func NewOutput(w io.Writer) output.Output {
 		w:                  w,
 		enc:                json.NewEncoder(w),
 		firstRecordWritten: false,
-	}
-}
-
-func octosqlValueToInterface(value octosql.Value) interface{} {
-	switch value.GetType() {
-	case octosql.TypeZero:
-		return nil
-	case octosql.TypeNull:
-		return nil
-	case octosql.TypePhantom:
-		return struct{}{}
-	case octosql.TypeInt:
-		return value.AsInt()
-	case octosql.TypeFloat:
-		return value.AsFloat()
-	case octosql.TypeBool:
-		return value.AsBool()
-	case octosql.TypeString:
-		return value.AsString()
-	case octosql.TypeTime:
-		return value.AsTime()
-	case octosql.TypeDuration:
-		return value.AsDuration()
-	case octosql.TypeTuple:
-		out := make([]interface{}, len(value.AsSlice()))
-		for i, v := range value.AsSlice() {
-			out[i] = octosqlValueToInterface(v)
-		}
-		return out
-	case octosql.TypeObject:
-		out := make(map[string]interface{}, len(value.AsMap()))
-		for k, v := range value.AsMap() {
-			out[k] = octosqlValueToInterface(v)
-		}
-		return out
-	default:
-		return nil
 	}
 }
 
@@ -83,7 +45,7 @@ func (o *Output) WriteRecord(record *execution.Record) error {
 	}
 	kvs := make(map[string]interface{})
 	for _, field := range record.Fields() {
-		kvs[field.Name.String()] = octosqlValueToInterface(record.Value(field.Name))
+		kvs[field.Name.String()] = record.Value(field.Name).ToRawValue()
 	}
 	err := o.enc.Encode(kvs)
 	if err != nil {

@@ -414,3 +414,40 @@ func (v Value) Show() string {
 		return "<invalidType>"
 	}
 }
+
+func (v Value) ToRawValue() interface{} {
+	switch v.GetType() {
+	case TypeZero:
+		return nil
+	case TypeNull:
+		return nil
+	case TypePhantom:
+		return struct{}{}
+	case TypeInt:
+		return v.AsInt()
+	case TypeFloat:
+		return v.AsFloat()
+	case TypeBool:
+		return v.AsBool()
+	case TypeString:
+		return v.AsString()
+	case TypeTime:
+		return v.AsTime()
+	case TypeDuration:
+		return v.AsDuration()
+	case TypeTuple:
+		out := make([]interface{}, len(v.AsSlice()))
+		for i, v := range v.AsSlice() {
+			out[i] = v.ToRawValue()
+		}
+		return out
+	case TypeObject:
+		out := make(map[string]interface{}, len(v.AsMap()))
+		for k, v := range v.AsMap() {
+			out[k] = v.ToRawValue()
+		}
+		return out
+	default:
+		return nil
+	}
+}

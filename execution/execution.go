@@ -2,15 +2,18 @@ package execution
 
 import (
 	"github.com/cube2222/octosql"
+
+	"context"
+
 	"github.com/pkg/errors"
 )
 
 type Node interface {
-	Get(variables octosql.Variables) (RecordStream, error)
+	Get(ctx context.Context, variables octosql.Variables) (RecordStream, error)
 }
 
 type Expression interface {
-	ExpressionValue(variables octosql.Variables) (octosql.Value, error)
+	ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error)
 }
 
 type NamedExpression interface {
@@ -26,7 +29,7 @@ func NewVariable(name octosql.VariableName) *Variable {
 	return &Variable{name: name}
 }
 
-func (v *Variable) ExpressionValue(variables octosql.Variables) (octosql.Value, error) {
+func (v *Variable) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
 	val, err := variables.Get(v.name)
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't get variable %+v, available variables %+v", v.name, variables)
@@ -46,10 +49,10 @@ func NewTuple(expressions []Expression) *TupleExpression {
 	return &TupleExpression{expressions: expressions}
 }
 
-func (tup *TupleExpression) ExpressionValue(variables octosql.Variables) (octosql.Value, error) {
+func (tup *TupleExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
 	outValues := make(octosql.Tuple, len(tup.expressions))
 	for i, expr := range tup.expressions {
-		value, err := expr.ExpressionValue(variables)
+		value, err := expr.ExpressionValue(ctx, variables)
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't get tuple subexpression with index %v", i)
 		}
@@ -67,8 +70,8 @@ func NewNodeExpression(node Node) *NodeExpression {
 	return &NodeExpression{node: node}
 }
 
-func (ne *NodeExpression) ExpressionValue(variables octosql.Variables) (octosql.Value, error) {
-	records, err := ne.node.Get(variables)
+func (ne *NodeExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
+	records, err := ne.node.Get(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get record stream")
 	}
@@ -77,7 +80,7 @@ func (ne *NodeExpression) ExpressionValue(variables octosql.Variables) (octosql.
 	outRecords := make(octosql.Tuple, 0)
 
 	var curRecord *Record
-	for curRecord, err = records.Next(); err == nil; curRecord, err = records.Next() {
+	for curRecord, err = records.Next(ctx); err == nil; curRecord, err = records.Next(ctx) {
 		if firstRecord == nil {
 			firstRecord = curRecord.AsTuple()
 		}
@@ -116,8 +119,8 @@ func NewLogicExpression(formula Formula) *LogicExpression {
 	}
 }
 
-func (le *LogicExpression) ExpressionValue(variables octosql.Variables) (octosql.Value, error) {
-	out, err := le.formula.Evaluate(variables)
+func (le *LogicExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
+	out, err := le.formula.Evaluate(ctx, variables)
 	return octosql.MakeBool(out), err
 }
 
@@ -130,8 +133,8 @@ func NewAliasedExpression(name octosql.VariableName, expr Expression) *AliasedEx
 	return &AliasedExpression{name: name, expr: expr}
 }
 
-func (alExpr *AliasedExpression) ExpressionValue(variables octosql.Variables) (octosql.Value, error) {
-	return alExpr.expr.ExpressionValue(variables)
+func (alExpr *AliasedExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
+	return alExpr.expr.ExpressionValue(ctx, variables)
 }
 
 func (alExpr *AliasedExpression) Name() octosql.VariableName {

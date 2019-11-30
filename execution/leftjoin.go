@@ -2,6 +2,9 @@ package execution
 
 import (
 	"github.com/cube2222/octosql"
+
+	"context"
+
 	"github.com/pkg/errors"
 )
 
@@ -16,8 +19,8 @@ func NewLeftJoin(prefetchCount int, source Node, joined Node) *LeftJoin {
 	return &LeftJoin{prefetchCount: prefetchCount, source: source, joined: joined}
 }
 
-func (node *LeftJoin) Get(variables octosql.Variables) (RecordStream, error) {
-	recordStream, err := node.source.Get(variables)
+func (node *LeftJoin) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
+	recordStream, err := node.source.Get(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get record stream")
 	}
@@ -51,11 +54,11 @@ func (stream *LeftJoinedStream) Close() error {
 	return nil
 }
 
-func (stream *LeftJoinedStream) Next() (*Record, error) {
+func (stream *LeftJoinedStream) Next(ctx context.Context) (*Record, error) {
 	for {
 		if stream.curRecord == nil {
 			var err error
-			stream.curRecord, stream.curJoinedStream, err = stream.joiner.GetNextRecord()
+			stream.curRecord, stream.curJoinedStream, err = stream.joiner.GetNextRecord(ctx)
 			if err != nil {
 				if err == ErrEndOfStream {
 					return nil, ErrEndOfStream
@@ -66,7 +69,7 @@ func (stream *LeftJoinedStream) Next() (*Record, error) {
 			stream.joinedAnyRecord = false
 		}
 
-		joinedRecord, err := stream.curJoinedStream.Next()
+		joinedRecord, err := stream.curJoinedStream.Next(ctx)
 		if err != nil {
 			if err == ErrEndOfStream {
 				if !stream.joinedAnyRecord {

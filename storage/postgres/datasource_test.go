@@ -17,6 +17,7 @@ import (
 )
 
 func TestDataSource_Get(t *testing.T) {
+	ctx := context.Background()
 	host := "localhost"
 	port := 5432
 	user := "root"
@@ -314,13 +315,13 @@ func TestDataSource_Get(t *testing.T) {
 				return
 			}
 
-			stream, err := execNode.Get(args.variables)
+			stream, err := execNode.Get(ctx, args.variables)
 			if err != nil {
 				t.Errorf("Couldn't get stream: %v", err)
 				return
 			}
 
-			equal, err := execution.AreStreamsEqualNoOrdering(stream, tt.want)
+			equal, err := execution.AreStreamsEqualNoOrdering(context.Background(), stream, tt.want)
 			if err != nil {
 				t.Errorf("Error in AreStreamsEqual(): %v", err)
 				return

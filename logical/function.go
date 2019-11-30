@@ -3,8 +3,10 @@ package logical
 import (
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/physical"
+
+	"context"
+
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 )
 
 type FunctionExpression struct {

@@ -2,6 +2,9 @@ package execution
 
 import (
 	"github.com/cube2222/octosql"
+
+	"context"
+
 	"github.com/pkg/errors"
 )
 
@@ -13,12 +16,12 @@ func NewUnionAll(first, second Node) *UnionAll {
 	return &UnionAll{first: first, second: second}
 }
 
-func (node *UnionAll) Get(variables octosql.Variables) (RecordStream, error) {
-	firstRecordStream, err := node.first.Get(variables)
+func (node *UnionAll) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
+	firstRecordStream, err := node.first.Get(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get first record stream")
 	}
-	secondRecordStream, err := node.second.Get(variables)
+	secondRecordStream, err := node.second.Get(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get second record stream")
 	}
@@ -47,9 +50,9 @@ func (node *UnifiedStream) Close() error {
 	return nil
 }
 
-func (node *UnifiedStream) Next() (*Record, error) {
+func (node *UnifiedStream) Next(ctx context.Context) (*Record, error) {
 	for {
-		firstRecord, err := node.first.Next()
+		firstRecord, err := node.first.Next(ctx)
 		if err != nil {
 			if err == ErrEndOfStream {
 				break
@@ -59,7 +62,7 @@ func (node *UnifiedStream) Next() (*Record, error) {
 		return firstRecord, nil
 	}
 	for {
-		secondRecord, err := node.second.Next()
+		secondRecord, err := node.second.Next(ctx)
 		if err != nil {
 			if err == ErrEndOfStream {
 				return nil, ErrEndOfStream

@@ -1,9 +1,10 @@
 package excel
 
 import (
+	"context"
+
 	"github.com/360EntSecGroup-Skylar/excelize"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
@@ -81,7 +82,7 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 	return NewDataSourceBuilderFactory(), nil
 }
 
-func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, error) {
+func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables) (execution.RecordStream, error) {
 	file, err := excelize.OpenFile(ds.path)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't open file")
@@ -136,7 +137,7 @@ func (rs *RecordStream) Close() error {
 	return nil
 }
 
-func (rs *RecordStream) Next() (*execution.Record, error) {
+func (rs *RecordStream) Next(context.Context) (*execution.Record, error) {
 	if rs.isDone {
 		return nil, execution.ErrEndOfStream
 	}

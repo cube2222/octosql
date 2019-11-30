@@ -39,13 +39,13 @@ func (app *App) RunPlan(ctx context.Context, plan logical.Node) error {
 		return errors.Wrap(err, "couldn't materialize the physical plan into an execution plan")
 	}
 
-	stream, err := exec.Get(variables)
+	stream, err := exec.Get(ctx, variables)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get record stream from execution plan")
 	}
 
 	var rec *execution.Record
-	for rec, err = stream.Next(); err == nil; rec, err = stream.Next() {
+	for rec, err = stream.Next(ctx); err == nil; rec, err = stream.Next(ctx) {
 		err := app.out.WriteRecord(rec)
 		if err != nil {
 			return errors.Wrap(err, "couldn't write record")

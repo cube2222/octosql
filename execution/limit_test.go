@@ -1,11 +1,14 @@
 package execution
 
 import (
-	"github.com/cube2222/octosql"
+	"context"
 	"testing"
+
+	"github.com/cube2222/octosql"
 )
 
 func TestLimit_Get(t *testing.T) {
+	ctx := context.Background()
 	const NO_ERROR = ""
 
 	tests := []struct {
@@ -110,7 +113,7 @@ func TestLimit_Get(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rs, err := tt.node.Get(tt.vars)
+			rs, err := tt.node.Get(ctx, tt.vars)
 
 			if (err == nil) != (tt.wantError == NO_ERROR) {
 				t.Errorf("exactly one of test.wantError, tt.node.Get() is not nil")
@@ -124,7 +127,7 @@ func TestLimit_Get(t *testing.T) {
 				return
 			}
 
-			equal, err := AreStreamsEqual(rs, tt.wantStream)
+			equal, err := AreStreamsEqual(ctx, rs, tt.wantStream)
 			if !equal {
 				t.Errorf("limitedStream doesn't work as expected")
 			}
@@ -176,7 +179,7 @@ func TestLimitedStream_Next(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			equal, err := AreStreamsEqual(tt.stream, tt.wantStream)
+			equal, err := AreStreamsEqual(context.Background(), tt.stream, tt.wantStream)
 			if !equal {
 				t.Errorf("limitedStream doesn't work as intended")
 			}

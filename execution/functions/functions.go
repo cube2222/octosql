@@ -231,13 +231,14 @@ var FuncFloor = execution.Function{
 		),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		switch arg := args[0].(type) {
-		case Int:
+		arg := args[0]
+		switch arg.GetType() {
+		case TypeInt:
 			return MakeFloat(float64(arg.AsInt())), nil
-		case Float:
+		case TypeFloat:
 			return MakeFloat(math.Floor(arg.AsFloat())), nil
-		case Null, Phantom, Bool, String, Time, Duration, Tuple, Object:
-			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+		case TypeNull, TypePhantom, TypeBool, TypeString, TypeTime, TypeDuration, TypeTuple, TypeObject:
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(arg).String())
 		}
 		panic("unreachable")
 	},
@@ -259,13 +260,14 @@ var FuncCeil = execution.Function{
 		),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		switch arg := args[0].(type) {
-		case Int:
+		arg := args[0]
+		switch arg.GetType {
+		case TypeInt:
 			return MakeFloat(float64(arg.AsInt())), nil
-		case Float:
+		case TypeFloat:
 			return MakeFloat(math.Ceil(arg.AsFloat())), nil
-		case Null, Phantom, Bool, String, Time, Duration, Tuple, Object:
-			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+		case TypeNull, TypePhantom, TypeBool, TypeString, TypeTime, TypeDuration, TypeTuple, TypeObject:
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(arg).String())
 		}
 		panic("unreachable")
 	},
@@ -287,18 +289,21 @@ var FuncLog2 = execution.Function{
 		),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		switch arg := args[0].(type) {
-		case Int:
-			if arg <= 0 {
-				return nil, fmt.Errorf("can't take log of value %v", arg)
+		arg := args[0]
+		switch arg.GetType() {
+		case TypeInt:
+			asInt := arg.AsInt()
+			if asInt <= 0 {
+				return ZeroValue(), fmt.Errorf("can't take log of value %v", arg)
 			}
-			return MakeFloat(math.Log2(float64(arg.AsInt()))), nil
-		case Float:
-			if arg <= 0 {
-				return nil, fmt.Errorf("can't take log of value %v", arg)
+			return MakeFloat(math.Log2(float64(asInt))), nil
+		case TypeFloat:
+			asFloat := arg.AsFloat()
+			if asFloat <= 0.0 {
+				return ZeroValue(), fmt.Errorf("can't take log of value %v", arg)
 			}
-			return MakeFloat(math.Log2(arg.AsFloat())), nil
-		case Null, Phantom, Bool, String, Time, Duration, Tuple, Object:
+			return MakeFloat(math.Log2(asFloat)), nil
+		case TypeNull, TypePhantom, TypeBool, TypeString, TypeTime, TypeDuration, TypeTuple, TypeObject:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 		}
 		panic("unreachable")
@@ -321,18 +326,21 @@ var FuncLn = execution.Function{
 		),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		switch arg := args[0].(type) {
-		case Int:
-			if arg <= 0 {
-				return nil, fmt.Errorf("can't take ln of value %v", arg)
+		arg := args[0]
+		switch arg.GetType() {
+		case TypeInt:
+			asInt := arg.AsInt()
+			if asInt <= 0 {
+				return ZeroValue(), fmt.Errorf("can't take ln of value %v", arg)
 			}
-			return MakeFloat(math.Log1p(float64(arg.AsInt())) - 1), nil
-		case Float:
-			if arg <= 0 {
-				return nil, fmt.Errorf("can't take ln of value %v", arg)
+			return MakeFloat(math.Log1p(float64(asInt)) - 1), nil
+		case TypeFloat:
+			asFloat := arg.AsFloat()
+			if asFloat <= 0.0 {
+				return ZeroValue(), fmt.Errorf("can't take ln of value %v", arg)
 			}
-			return MakeFloat(math.Log1p(arg.AsFloat()) - 1), nil
-		case Null, Phantom, Bool, String, Time, Duration, Tuple, Object:
+			return MakeFloat(math.Log1p(asFloat) - 1), nil
+		case TypeNull, TypePhantom, TypeBool, TypeString, TypeTime, TypeDuration, TypeTuple, TypeObject:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 		}
 		panic("unreachable")

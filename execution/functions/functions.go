@@ -261,7 +261,7 @@ var FuncCeil = execution.Function{
 	),
 	Logic: func(args ...Value) (Value, error) {
 		arg := args[0]
-		switch arg.GetType {
+		switch arg.GetType() {
 		case TypeInt:
 			return MakeFloat(float64(arg.AsInt())), nil
 		case TypeFloat:
@@ -521,7 +521,7 @@ var FuncLower = execution.Function{
 		Arg(0, TypeOf(ZeroString())),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		return MakeString(strings.ToLower(args[0].(String).AsString())), nil
+		return MakeString(strings.ToLower(args[0].AsString())), nil
 	},
 }
 
@@ -536,7 +536,7 @@ var FuncUpper = execution.Function{
 		Arg(0, TypeOf(ZeroString())),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		return MakeString(strings.ToUpper(args[0].(String).AsString())), nil
+		return MakeString(strings.ToUpper(args[0].AsString())), nil
 	},
 }
 
@@ -551,9 +551,10 @@ var FuncCapitalize = execution.Function{
 		Arg(0, TypeOf(ZeroString())),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		arg := args[0].(String)
-		arg = MakeString(strings.ToLower(arg.AsString()))
-		return MakeString(strings.Title(arg.AsString())), nil
+		arg := args[0].AsString()
+		arg = strings.ToLower(arg)
+		arg = strings.Title(arg)
+		return MakeString(arg), nil
 	},
 }
 
@@ -576,20 +577,21 @@ var FuncReverse = execution.Function{
 		),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		switch arg := args[0].(type) {
-		case String:
-			out := make([]rune, len(arg))
+		arg := args[0]
+		switch arg.GetType() {
+		case TypeString:
+			out := make([]rune, len(arg.AsString()))
 			for i, el := range arg.AsString() {
 				out[len(out)-i-1] = el
 			}
 			return MakeString(string(out)), nil
-		case Tuple:
-			out := make([]Value, len(arg))
+		case TypeTuple:
+			out := make([]Value, len(arg.AsSlice()))
 			for i, el := range arg.AsSlice() {
 				out[len(out)-i-1] = el
 			}
 			return MakeTuple(out), nil
-		case Null, Phantom, Int, Float, Bool, Time, Duration, Object:
+		case TypeNull, TypePhantom, TypeInt, TypeFloat, TypeBool, TypeTime, TypeDuration, TypeObject:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 		}
 		panic("unreachable")
@@ -614,15 +616,15 @@ var FuncSubstring = execution.Function{
 		IfArgPresent(2, Arg(2, TypeOf(ZeroInt()))),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		str := args[0].(String)
-		start := args[1].(Int)
-		end := MakeInt(len(str))
+		str := args[0].AsString()
+		start := args[1].AsInt()
+		end := len(str)
 
 		if len(args) == 3 {
-			end = args[2].(Int)
+			end = args[2].AsInt()
 		}
 
-		return str[start:end], nil
+		return MakeString(str[start:end]), nil
 	},
 }
 
@@ -637,14 +639,14 @@ var FuncMatchRegexp = execution.Function{
 		AllArgs(TypeOf(ZeroString())),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		re, err := regexp.Compile(args[0].(String).AsString())
+		re, err := regexp.Compile(args[0].AsString())
 		if err != nil {
-			return nil, fmt.Errorf("couldn't compile regular expression")
+			return ZeroValue(), fmt.Errorf("couldn't compile regular expression")
 		}
 
-		match := re.FindString(args[1].(String).AsString())
+		match := re.FindString(args[1].AsString())
 		if match == "" {
-			return nil, nil
+			return ZeroValue(), nil
 		}
 
 		return MakeString(match), nil
@@ -664,9 +666,9 @@ var FuncReplace = execution.Function{
 	Logic: func(args ...Value) (Value, error) {
 		return MakeString(
 			strings.Replace(
-				args[2].(String).AsString(),
-				args[0].(String).AsString(),
-				args[1].(String).AsString(),
+				args[2].AsString(),
+				args[0].AsString(),
+				args[1].AsString(),
 				-1),
 		), nil
 	},
@@ -685,8 +687,8 @@ var FuncHasPrefix = execution.Function{
 	Logic: func(args ...Value) (Value, error) {
 		return MakeBool(
 			strings.HasPrefix(
-				args[1].(String).AsString(),
-				args[0].(String).AsString(),
+				args[1].AsString(),
+				args[0].AsString(),
 			),
 		), nil
 	},
@@ -705,8 +707,8 @@ var FuncHasSuffix = execution.Function{
 	Logic: func(args ...Value) (Value, error) {
 		return MakeBool(
 			strings.HasSuffix(
-				args[1].(String).AsString(),
-				args[0].(String).AsString(),
+				args[1].AsString(),
+				args[0].AsString(),
 			),
 		), nil
 	},
@@ -730,22 +732,23 @@ var FuncContains = execution.Function{
 		),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		switch arg := args[1].(type) {
-		case String:
+		arg := args[1]
+		switch arg.GetType() {
+		case TypeString:
 			return MakeBool(
 				strings.Contains(
-					args[1].(String).AsString(),
-					args[0].(String).AsString(),
+					args[1].AsString(),
+					args[0].AsString(),
 				),
 			), nil
-		case Tuple:
+		case TypeTuple:
 			for _, el := range arg.AsSlice() {
 				if AreEqual(el, args[0]) {
 					return MakeBool(true), nil
 				}
 			}
 			return MakeBool(false), nil
-		case Null, Phantom, Int, Float, Bool, Time, Duration, Object:
+		case TypeNull, TypePhantom, TypeInt, TypeFloat, TypeBool, TypeTime, TypeDuration, TypeObject:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 		}
 		panic("unreachable")
@@ -770,22 +773,23 @@ var FuncIndex = execution.Function{
 		),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		switch arg := args[1].(type) {
-		case String:
+		arg := args[1]
+		switch arg.GetType() {
+		case TypeString:
 			return MakeInt(
 				strings.Index(
-					args[1].(String).AsString(),
-					args[0].(String).AsString(),
+					args[1].AsString(),
+					args[0].AsString(),
 				),
 			), nil
-		case Tuple:
+		case TypeTuple:
 			for i, el := range arg.AsSlice() {
 				if AreEqual(el, args[0]) {
 					return MakeInt(i), nil
 				}
 			}
 			return MakeInt(-1), nil
-		case Null, Phantom, Int, Float, Bool, Time, Duration, Object:
+		case TypeNull, TypePhantom, TypeInt, TypeFloat, TypeBool, TypeTime, TypeDuration, TypeObject:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 		}
 		panic("unreachable")
@@ -804,14 +808,14 @@ var FuncNth = execution.Function{
 		Arg(1, TypeOf(ZeroTuple())),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		if args[0].(Int).AsInt() > len(args[1].(Tuple).AsSlice()) {
-			return nil, fmt.Errorf(
+		if args[0].AsInt() > len(args[1].AsSlice()) {
+			return ZeroValue(), fmt.Errorf(
 				"tried to access element with index %v in tuple with length %v",
-				args[0].(Int).AsInt(),
-				len(args[1].(Tuple).AsSlice()),
+				args[0].AsInt(),
+				len(args[1].AsSlice()),
 			)
 		}
-		return args[1].(Tuple).AsSlice()[args[0].(Int).AsInt()], nil
+		return args[1].AsSlice()[args[0].AsInt()], nil
 	},
 }
 
@@ -831,12 +835,13 @@ var FuncLength = execution.Function{
 		),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		switch arg := args[0].(type) {
-		case String:
-			return MakeInt(len(arg)), nil
-		case Tuple:
-			return MakeInt(len(arg)), nil
-		case Null, Phantom, Int, Float, Bool, Time, Duration, Object:
+		arg := args[0]
+		switch arg.GetType() {
+		case TypeString:
+			return MakeInt(len(arg.AsString())), nil
+		case TypeTuple:
+			return MakeInt(len(arg.AsSlice())), nil
+		case TypeNull, TypePhantom, TypeInt, TypeFloat, TypeBool, TypeTime, TypeDuration, TypeObject:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 		}
 		panic("unreachable")
@@ -867,16 +872,15 @@ var FuncStringJoin = execution.Function{
 		Arg(1, TypeOf(ZeroTuple())),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		tup := args[1].(Tuple)
+		tup := args[1].AsSlice()
 		out := make([]string, len(tup))
 		for i := range tup {
-			str, ok := tup[i].(String)
-			if !ok {
-				return nil, fmt.Errorf("tuple element with index %v not string, got %v", i, tup[i])
+			if tup[i].GetType() != TypeString {
+				return ZeroValue(), fmt.Errorf("tuple element with index %v not string, got %v", i, tup[i])
 			}
-			out[i] = str.AsString()
+			out[i] = tup[i].AsString()
 		}
-		return MakeString(strings.Join(out, args[0].(String).AsString())), nil
+		return MakeString(strings.Join(out, args[0].AsString())), nil
 	},
 }
 
@@ -907,25 +911,25 @@ var FuncAdd = execution.Function{
 	Logic: func(args ...Value) (Value, error) {
 		switch len(args) {
 		case 1:
-			switch args[0].(type) {
-			case Int, Float, Duration:
+			switch args[0].GetType() {
+			case TypeInt, TypeFloat, TypeDuration:
 				return args[0], nil
-			case Null, Phantom, Bool, String, Time, Tuple, Object:
+			case TypeNull, TypePhantom, TypeBool, TypeString, TypeTime, TypeTuple, TypeObject:
 				log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 			}
 			panic("unreachable")
 
 		case 2:
-			switch arg := args[0].(type) {
-			case Int:
-				return arg + args[1].(Int), nil
-			case Float:
-				return arg + args[1].(Float), nil
-			case Duration:
-				return arg + args[1].(Duration), nil
-			case Time:
-				return MakeTime(arg.AsTime().Add(args[1].(Duration).AsDuration())), nil
-			case Null, Phantom, Bool, String, Tuple, Object:
+			switch args[0].GetType() {
+			case TypeInt:
+				return MakeInt(args[0].AsInt() + args[1].AsInt()), nil
+			case TypeFloat:
+				return MakeFloat(args[0].AsFloat() + args[1].AsFloat()), nil
+			case TypeDuration:
+				return MakeDuration(args[0].AsDuration() + args[1].AsDuration()), nil
+			case TypeTime:
+				return MakeTime(args[0].AsTime().Add(args[1].AsDuration())), nil
+			case TypeNull, TypePhantom, TypeBool, TypeString, TypeTuple, TypeObject:
 				log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 			}
 			panic("unreachable")
@@ -962,29 +966,29 @@ var FuncSubtract = execution.Function{
 	Logic: func(args ...Value) (Value, error) {
 		switch len(args) {
 		case 1:
-			switch arg := args[0].(type) {
-			case Int:
-				return arg * -1, nil
-			case Float:
-				return arg * -1, nil
-			case Duration:
-				return arg * -1, nil
-			case Null, Phantom, Bool, String, Time, Tuple, Object:
+			switch args[0].GetType() {
+			case TypeInt:
+				return MakeInt(args[0].AsInt() * -1), nil
+			case TypeFloat:
+				return MakeFloat(args[0].AsFloat() * -1), nil
+			case TypeDuration:
+				return MakeDuration(args[0].AsDuration() * -1), nil
+			case TypeNull, TypePhantom, TypeBool, TypeString, TypeTime, TypeTuple, TypeObject:
 				log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 			}
 			panic("unreachable")
 
 		case 2:
-			switch arg := args[0].(type) {
-			case Int:
-				return arg - args[1].(Int), nil
-			case Float:
-				return arg - args[1].(Float), nil
-			case Duration:
-				return arg - args[1].(Duration), nil
-			case Time:
-				return MakeTime(arg.AsTime().Add(-1 * args[1].(Duration).AsDuration())), nil
-			case Null, Phantom, Bool, String, Tuple, Object:
+			switch args[0].GetType() {
+			case TypeInt:
+				return MakeInt(args[0].AsInt() - args[1].AsInt()), nil
+			case TypeFloat:
+				return MakeFloat(args[0].AsFloat() - args[1].AsFloat()), nil
+			case TypeDuration:
+				return MakeDuration(args[0].AsDuration() - args[1].AsDuration()), nil
+			case TypeTime:
+				return MakeTime(args[0].AsTime().Add(-1 * args[1].AsDuration())), nil
+			case TypeNull, TypePhantom, TypeBool, TypeString, TypeTuple, TypeObject:
 				log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 			}
 			panic("unreachable")
@@ -1018,22 +1022,22 @@ var FuncMultiply = execution.Function{
 		),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		switch arg := args[0].(type) {
-		case Int:
-			return arg * args[1].(Int), nil
-		case Float:
-			return arg * args[1].(Float), nil
-		case Duration:
-			switch arg2 := args[1].(type) {
-			case Int:
-				return MakeDuration(arg.AsDuration() * time.Duration(arg2.AsInt())), nil
-			case Float:
-				return MakeDuration(time.Duration(float64(arg.AsDuration()) * arg2.AsFloat())), nil
-			case Null, Phantom, Bool, String, Time, Duration, Tuple, Object:
+		switch args[0].GetType() {
+		case TypeInt:
+			return MakeInt(args[0].AsInt() * args[1].AsInt()), nil
+		case TypeFloat:
+			return MakeFloat(args[0].AsFloat() * args[1].AsFloat()), nil
+		case TypeDuration:
+			switch args[1].GetType() {
+			case TypeInt:
+				return MakeDuration(args[0].AsDuration() * time.Duration(args[1].AsInt())), nil
+			case TypeFloat:
+				return MakeDuration(time.Duration(float64(args[0].AsDuration()) * args[1].AsFloat())), nil
+			case TypeNull, TypePhantom, TypeBool, TypeString, TypeTime, TypeDuration, TypeTuple, TypeObject:
 				log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[1]).String())
 			}
 			panic("unreachable")
-		case Null, Phantom, Bool, String, Time, Tuple, Object:
+		case TypeNull, TypePhantom, TypeBool, TypeString, TypeTime, TypeTuple, TypeObject:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 		}
 		panic("unreachable")
@@ -1066,34 +1070,34 @@ var FuncDivide = execution.Function{
 		),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		switch arg := args[0].(type) {
-		case Int:
-			if args[1].(Int) == 0 {
-				return nil, fmt.Errorf("division by zero")
+		switch args[0].GetType() {
+		case TypeInt:
+			if args[1].AsInt() == 0 {
+				return ZeroValue(), fmt.Errorf("division by zero")
 			}
-			return arg / args[1].(Int), nil
-		case Float:
-			return arg / args[1].(Float), nil
-		case Duration:
-			switch arg2 := args[1].(type) {
-			case Int:
-				if arg2 == 0 {
-					return nil, fmt.Errorf("division by zero")
+			return MakeInt(args[0].AsInt() / args[1].AsInt()), nil
+		case TypeFloat:
+			return MakeFloat(args[0].AsFloat() / args[1].AsFloat()), nil
+		case TypeDuration:
+			switch args[1].GetType() {
+			case TypeInt:
+				if args[1].AsInt() == 0 {
+					return ZeroValue(), fmt.Errorf("division by zero")
 				}
-				return MakeDuration(arg.AsDuration() / time.Duration(arg2.AsInt())), nil
+				return MakeDuration(args[0].AsDuration() / time.Duration(args[1].AsInt())), nil
 
-			case Float:
-				return MakeDuration(arg.AsDuration() / time.Duration(arg2.AsFloat())), nil
+			case TypeFloat:
+				return MakeDuration(args[0].AsDuration() / time.Duration(args[1].AsFloat())), nil
 
-			case Duration:
-				return MakeFloat(float64(arg.AsDuration()) / float64(arg2.AsDuration())), nil
+			case TypeDuration:
+				return MakeFloat(float64(args[0].AsDuration()) / float64(args[1].AsDuration())), nil
 
-			case Null, Phantom, Bool, String, Time, Tuple, Object:
+			case TypeNull, TypePhantom, TypeBool, TypeString, TypeTime, TypeTuple, TypeObject:
 				log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[1]).String())
 			}
 			panic("unreachable")
 
-		case Null, Phantom, Bool, String, Time, Tuple, Object:
+		case TypeNull, TypePhantom, TypeBool, TypeString, TypeTime, TypeTuple, TypeObject:
 			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
 		}
 		panic("unreachable")
@@ -1138,15 +1142,15 @@ var FuncDuration = execution.Function{
 	Logic: func(args ...Value) (Value, error) {
 		switch len(args) {
 		case 1:
-			dur, err := time.ParseDuration(args[0].(String).AsString())
+			dur, err := time.ParseDuration(args[0].AsString())
 			if err != nil {
-				return nil, errors.Wrap(err, "couldn't parse duration")
+				return ZeroValue(), errors.Wrap(err, "couldn't parse duration")
 			}
 			return MakeDuration(dur), nil
 
 		case 2:
-			count := time.Duration(args[0].(Int))
-			switch args[1].(String) {
+			count := time.Duration(args[0].AsInt())
+			switch args[1].AsString() {
 			case "nanosecond":
 				return MakeDuration(count), nil
 			case "microsecond":
@@ -1186,11 +1190,11 @@ var FuncCoalesce = execution.Function{
 	),
 	Logic: func(args ...Value) (Value, error) {
 		for i := range args {
-			switch arg := args[i].(type) {
-			case Null:
+			switch args[i].GetType() {
+			case TypeNull:
 				continue
-			case Phantom, Int, Float, Bool, String, Time, Duration, Tuple, Object:
-				return arg, nil
+			case TypePhantom, TypeInt, TypeFloat, TypeBool, TypeString, TypeTime, TypeDuration, TypeTuple, TypeObject:
+				return args[i], nil
 			}
 			panic("unreachable")
 		}

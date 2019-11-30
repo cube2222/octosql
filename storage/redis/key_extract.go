@@ -154,8 +154,8 @@ func (f *Equal) getAllKeys(ctx context.Context, variables octosql.Variables) (*r
 		return nil, errors.Wrap(err, "couldn't get child expression value")
 	}
 
-	switch exprValue := exprValue.(type) {
-	case octosql.String:
+	switch exprValue.GetType() {
+	case octosql.TypeString:
 		return newRedisKeys(
 			map[string]interface{}{
 				exprValue.AsString(): nil,
@@ -182,22 +182,21 @@ func (f *In) getAllKeys(ctx context.Context, variables octosql.Variables) (*redi
 		return nil, errors.Wrap(err, "couldn't get child expression value")
 	}
 
-	switch exprValue := exprValue.(type) {
-	case octosql.String:
+	switch exprValue.GetType() {
+	case octosql.TypeString:
 		return newRedisKeys(
 			map[string]interface{}{
 				exprValue.AsString(): nil,
 			}, DefaultKeys), nil
-	case octosql.Tuple:
+	case octosql.TypeTuple:
 		out := make(map[string]interface{})
 
 		for _, element := range exprValue.AsSlice() {
-			str, ok := element.(octosql.String)
-			if !ok {
+			if element.GetType() != octosql.TypeString {
 				return nil, errors.Errorf("wrong expression value for a key in redis database: %v", element)
 			}
 
-			out[str.AsString()] = nil
+			out[element.AsString()] = nil
 		}
 
 		return newRedisKeys(out, DefaultKeys), nil

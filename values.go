@@ -10,6 +10,8 @@ import (
 	"github.com/golang/protobuf/ptypes/duration"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql/docs"
 )
 
 // go-sumtype:decl Value
@@ -359,4 +361,8 @@ func (v Value) GetType() Type {
 	default:
 		return TypeZero
 	}
+}
+
+func (v Value) Document() docs.Documentation {
+	return nil // TODO
 }

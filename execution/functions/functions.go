@@ -64,7 +64,7 @@ var FuncInt = execution.Function{
 			}
 			return MakeInt(number), nil
 		case TypeNull, TypePhantom, TypeTime, TypeDuration, TypeTuple, TypeObject:
-			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(arg).String())
 		}
 		panic("unreachable")
 	},
@@ -88,24 +88,25 @@ var FuncFloat = execution.Function{
 		),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		switch arg := args[0].(type) {
-		case Int:
+		arg := args[0]
+		switch arg.GetType() {
+		case TypeInt:
 			return MakeFloat(float64(arg.AsInt())), nil
-		case Float:
+		case TypeFloat:
 			return arg, nil
-		case Bool:
-			if arg {
+		case TypeBool:
+			if arg.AsBool() {
 				return MakeFloat(1.0), nil
 			}
 			return MakeFloat(0.0), nil
-		case String:
+		case TypeString:
 			number, err := strconv.ParseFloat(arg.AsString(), 64)
 			if err != nil {
-				return nil, err
+				return ZeroValue(), err
 			}
 			return MakeFloat(number), nil
-		case Null, Phantom, Time, Duration, Tuple, Object:
-			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+		case TypeNull, TypePhantom, TypeTime, TypeDuration, TypeTuple, TypeObject:
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(arg).String())
 		}
 		panic("unreachable")
 	},
@@ -127,13 +128,14 @@ var FuncNegate = execution.Function{
 		),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		switch arg := args[0].(type) {
-		case Int:
-			return -1 * arg, nil
-		case Float:
-			return -1 * arg, nil
-		case Null, Phantom, Bool, String, Time, Duration, Tuple, Object:
-			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+		arg := args[0]
+		switch arg.GetType() {
+		case TypeInt:
+			return MakeInt(-1 * arg.AsInt()), nil
+		case TypeFloat:
+			return MakeFloat(-1.0 * arg.AsFloat()), nil
+		case TypeNull, TypePhantom, TypeBool, TypeString, TypeTime, TypeDuration, TypeTuple, TypeObject:
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(arg).String())
 		}
 		panic("unreachable")
 	},
@@ -155,19 +157,22 @@ var FuncAbs = execution.Function{
 		),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		switch arg := args[0].(type) {
-		case Int:
-			if arg < 0 {
-				return -1 * arg, nil
+		arg := args[0]
+		switch arg.GetType() {
+		case TypeInt:
+			asInt := arg.AsInt()
+			if asInt < 0 {
+				return MakeInt(-1 * asInt), nil
 			}
 			return arg, nil
-		case Float:
-			if arg < 0 {
-				return -1 * arg, nil
+		case TypeFloat:
+			asFloat := arg.AsFloat()
+			if asFloat < 0.0 {
+				return MakeFloat(-1.0 * asFloat), nil
 			}
 			return arg, nil
-		case Null, Phantom, Bool, String, Time, Duration, Tuple, Object:
-			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+		case TypeNull, TypePhantom, TypeBool, TypeString, TypeTime, TypeDuration, TypeTuple, TypeObject:
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(arg).String())
 		}
 		panic("unreachable")
 	},
@@ -189,19 +194,22 @@ var FuncSqrt = execution.Function{
 		),
 	),
 	Logic: func(args ...Value) (Value, error) {
-		switch arg := args[0].(type) {
-		case Int:
-			if arg < 0 {
-				return nil, fmt.Errorf("can't take square root of value %v", arg)
+		arg := args[0]
+		switch arg.GetType() {
+		case TypeInt:
+			asInt := arg.AsInt()
+			if asInt < 0 {
+				return ZeroValue(), fmt.Errorf("can't take square root of value %v", arg)
 			}
-			return MakeFloat(math.Sqrt(float64(arg.AsInt()))), nil
-		case Float:
-			if arg < 0 {
-				return nil, fmt.Errorf("can't take square root of value %v", arg)
+			return MakeFloat(math.Sqrt(float64(asInt))), nil
+		case TypeFloat:
+			asFloat := arg.AsFloat()
+			if asFloat < 0 {
+				return ZeroValue(), fmt.Errorf("can't take square root of value %v", arg)
 			}
-			return MakeFloat(math.Sqrt(arg.AsFloat())), nil
-		case Null, Phantom, Bool, String, Time, Duration, Tuple, Object:
-			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(args[0]).String())
+			return MakeFloat(math.Sqrt(asFloat)), nil
+		case TypeNull, TypePhantom, TypeBool, TypeString, TypeTime, TypeDuration, TypeTuple, TypeObject:
+			log.Fatalf("unexpected type in function: %v", reflect.TypeOf(arg).String())
 		}
 		panic("unreachable")
 	},

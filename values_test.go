@@ -1,8 +1,11 @@
 package octosql
 
 import (
+	"math"
 	"testing"
 	"time"
+
+	"github.com/golang/protobuf/proto"
 )
 
 func TestNormalizeType(t *testing.T) {
@@ -179,6 +182,250 @@ func TestAreEqual(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := AreEqual(tt.args.left, tt.args.right); got != tt.want {
 				t.Errorf("AreEqual() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSerialize(t *testing.T) {
+	tests := []struct {
+		value Value
+	}{
+		{
+			value: MakeObject(map[string]Value{
+				"name":      MakeString("red"),
+				"age":       MakeInt(3),
+				"countries": MakeTuple([]Value{MakeString("blue"), MakeString("gren")}),
+				"address": MakeObject(map[string]Value{
+					"city":   MakeString("purple"),
+					"street": MakeString("fuchsia"),
+				}),
+				"time":     MakeTime(time.Now()),
+				"duration": MakeDuration(time.Hour * 3),
+				"phantom":  MakePhantom(),
+				"null":     MakeNull(),
+				"bool":     MakeBool(true),
+				"float":    MakeFloat(math.Pi),
+			}),
+		},
+		{
+			value: MakeObject(map[string]Value{
+				"name":      MakeString("red"),
+				"age":       MakeInt(3),
+				"countries": MakeTuple([]Value{MakeString("blue"), MakeString("gren")}),
+				"address": MakeObject(map[string]Value{
+					"city":   MakeString("purple"),
+					"street": MakeString("fuchsia"),
+				}),
+				"time":     MakeTime(time.Now()),
+				"duration": MakeDuration(time.Hour * 3),
+				"phantom":  MakePhantom(),
+				"null":     MakeNull(),
+				"bool":     MakeBool(true),
+				"float":    MakeFloat(math.Pi),
+				"nested": MakeObject(map[string]Value{
+					"name":      MakeString("red"),
+					"age":       MakeInt(3),
+					"countries": MakeTuple([]Value{MakeString("blue"), MakeString("gren")}),
+					"address": MakeObject(map[string]Value{
+						"city":   MakeString("purple"),
+						"street": MakeString("fuchsia"),
+					}),
+					"time":     MakeTime(time.Now()),
+					"duration": MakeDuration(time.Hour * 3),
+					"phantom":  MakePhantom(),
+					"null":     MakeNull(),
+					"bool":     MakeBool(true),
+					"float":    MakeFloat(math.Pi),
+					"nested": MakeObject(map[string]Value{
+						"name":      MakeString("red"),
+						"age":       MakeInt(3),
+						"countries": MakeTuple([]Value{MakeString("blue"), MakeString("gren")}),
+						"address": MakeObject(map[string]Value{
+							"city":   MakeString("purple"),
+							"street": MakeString("fuchsia"),
+						}),
+						"time":     MakeTime(time.Now()),
+						"duration": MakeDuration(time.Hour * 3),
+						"phantom":  MakePhantom(),
+						"null":     MakeNull(),
+						"bool":     MakeBool(true),
+						"float":    MakeFloat(math.Pi),
+						"nested": MakeObject(map[string]Value{
+							"name":      MakeString("red"),
+							"age":       MakeInt(3),
+							"countries": MakeTuple([]Value{MakeString("blue"), MakeString("gren")}),
+							"address": MakeObject(map[string]Value{
+								"city":   MakeString("purple"),
+								"street": MakeString("fuchsia"),
+							}),
+							"time":     MakeTime(time.Now()),
+							"duration": MakeDuration(time.Hour * 3),
+							"phantom":  MakePhantom(),
+							"null":     MakeNull(),
+							"bool":     MakeBool(true),
+							"float":    MakeFloat(math.Pi),
+							"nested": MakeObject(map[string]Value{
+								"name":      MakeString("red"),
+								"age":       MakeInt(3),
+								"countries": MakeTuple([]Value{MakeString("blue"), MakeString("gren")}),
+								"address": MakeObject(map[string]Value{
+									"city":   MakeString("purple"),
+									"street": MakeString("fuchsia"),
+								}),
+								"time":     MakeTime(time.Now()),
+								"duration": MakeDuration(time.Hour * 3),
+								"phantom":  MakePhantom(),
+								"null":     MakeNull(),
+								"bool":     MakeBool(true),
+								"float":    MakeFloat(math.Pi),
+								"nested": MakeObject(map[string]Value{
+									"name":      MakeString("red"),
+									"age":       MakeInt(3),
+									"countries": MakeTuple([]Value{MakeString("blue"), MakeString("gren")}),
+									"address": MakeObject(map[string]Value{
+										"city":   MakeString("purple"),
+										"street": MakeString("fuchsia"),
+									}),
+									"time":     MakeTime(time.Now()),
+									"duration": MakeDuration(time.Hour * 3),
+									"phantom":  MakePhantom(),
+									"null":     MakeNull(),
+									"bool":     MakeBool(true),
+									"float":    MakeFloat(math.Pi),
+								}),
+							}),
+						}),
+					}),
+				}),
+			}),
+		},
+		{
+			value: MakeObject(map[string]Value{
+				"name": MakeString("red"),
+				"age":  MakeInt(3),
+				"countries": MakeTuple([]Value{
+					MakeString("blue"),
+					MakeString("gren"),
+					MakeObject(map[string]Value{
+						"name": MakeString("red"),
+						"age":  MakeInt(3),
+						"countries": MakeTuple([]Value{
+							MakeString("blue"),
+							MakeString("gren"),
+							MakeObject(map[string]Value{
+								"name": MakeString("red"),
+								"age":  MakeInt(3),
+								"countries": MakeTuple([]Value{
+									MakeString("blue"),
+									MakeString("gren"),
+									MakeObject(map[string]Value{
+										"name": MakeString("red"),
+										"age":  MakeInt(3),
+										"countries": MakeTuple([]Value{
+											MakeString("blue"),
+											MakeString("gren"),
+											MakeObject(map[string]Value{
+												"name": MakeString("red"),
+												"age":  MakeInt(3),
+												"countries": MakeTuple([]Value{
+													MakeString("blue"),
+													MakeString("gren"),
+													MakeObject(map[string]Value{
+														"name": MakeString("red"),
+														"age":  MakeInt(3),
+														"countries": MakeTuple([]Value{
+															MakeString("blue"),
+															MakeString("gren"),
+														}),
+														"address": MakeObject(map[string]Value{
+															"city":   MakeString("purple"),
+															"street": MakeString("fuchsia"),
+														}),
+														"time":     MakeTime(time.Now()),
+														"duration": MakeDuration(time.Hour * 3),
+														"phantom":  MakePhantom(),
+														"null":     MakeNull(),
+														"bool":     MakeBool(true),
+														"float":    MakeFloat(math.Pi),
+													}),
+												}),
+												"address": MakeObject(map[string]Value{
+													"city":   MakeString("purple"),
+													"street": MakeString("fuchsia"),
+												}),
+												"time":     MakeTime(time.Now()),
+												"duration": MakeDuration(time.Hour * 3),
+												"phantom":  MakePhantom(),
+												"null":     MakeNull(),
+												"bool":     MakeBool(true),
+												"float":    MakeFloat(math.Pi),
+											}),
+										}),
+										"address": MakeObject(map[string]Value{
+											"city":   MakeString("purple"),
+											"street": MakeString("fuchsia"),
+										}),
+										"time":     MakeTime(time.Now()),
+										"duration": MakeDuration(time.Hour * 3),
+										"phantom":  MakePhantom(),
+										"null":     MakeNull(),
+										"bool":     MakeBool(true),
+										"float":    MakeFloat(math.Pi),
+									}),
+								}),
+								"address": MakeObject(map[string]Value{
+									"city":   MakeString("purple"),
+									"street": MakeString("fuchsia"),
+								}),
+								"time":     MakeTime(time.Now()),
+								"duration": MakeDuration(time.Hour * 3),
+								"phantom":  MakePhantom(),
+								"null":     MakeNull(),
+								"bool":     MakeBool(true),
+								"float":    MakeFloat(math.Pi),
+							}),
+						}),
+						"address": MakeObject(map[string]Value{
+							"city":   MakeString("purple"),
+							"street": MakeString("fuchsia"),
+						}),
+						"time":     MakeTime(time.Now()),
+						"duration": MakeDuration(time.Hour * 3),
+						"phantom":  MakePhantom(),
+						"null":     MakeNull(),
+						"bool":     MakeBool(true),
+						"float":    MakeFloat(math.Pi),
+					}),
+				}),
+				"address": MakeObject(map[string]Value{
+					"city":   MakeString("purple"),
+					"street": MakeString("fuchsia"),
+				}),
+				"time":     MakeTime(time.Now()),
+				"duration": MakeDuration(time.Hour * 3),
+				"phantom":  MakePhantom(),
+				"null":     MakeNull(),
+				"bool":     MakeBool(true),
+				"float":    MakeFloat(math.Pi),
+			}),
+		},
+	}
+	for _, tt := range tests {
+		t.Run("serialization", func(t *testing.T) {
+			data, err := proto.Marshal(&tt.value)
+			if err != nil {
+				t.Error("error serializing proto: ", err)
+			}
+
+			var value Value
+			err = proto.Unmarshal(data, &value)
+			if err != nil {
+				t.Error("error deserializing proto: ", err)
+			}
+
+			if !AreEqual(value, tt.value) {
+				t.Errorf("Serialize() = %v, want %v", value, tt.value)
 			}
 		})
 	}

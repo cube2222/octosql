@@ -7,6 +7,7 @@ require (
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible // indirect
 	github.com/bradleyjkemp/memmap v0.2.2 // indirect
 	github.com/bradleyjkemp/memviz v0.2.2
+	github.com/fatih/structs v1.1.0
 	github.com/go-redis/redis v6.15.2+incompatible
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/golang/protobuf v1.3.1

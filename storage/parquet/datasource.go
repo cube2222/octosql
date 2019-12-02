@@ -2,17 +2,22 @@ package parquet
 
 import (
 	"context"
+	"io"
+	"log"
+	"reflect"
+
+	"github.com/pkg/errors"
+	"github.com/xitongsys/parquet-go-source/local"
+	"github.com/xitongsys/parquet-go/reader"
+	"github.com/xitongsys/parquet-go/source"
+
+	"github.com/fatih/structs"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/metadata"
-	"github.com/pkg/errors"
-	"github.com/xitongsys/parquet-go-source/local"
-	"github.com/xitongsys/parquet-go/reader"
-	"github.com/xitongsys/parquet-go/source"
-	"io"
-	"log"
 )
 
 var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
@@ -21,8 +26,8 @@ var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 }
 
 type DataSource struct {
-	path        string
-	alias       string
+	path  string
+	alias string
 }
 
 func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
@@ -34,8 +39,8 @@ func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 			}
 
 			return &DataSource{
-				path:        path,
-				alias:       alias,
+				path:  path,
+				alias: alias,
 			}, nil
 		},
 		nil,
@@ -59,18 +64,18 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables) (exe
 		return nil, errors.Wrap(err, "couldn't create parquet reader")
 	}
 	return &RecordStream{
-		file:                          file,
-		isDone:                        false,
-		parquetReader: 				   reader,
-		alias:                         ds.alias,
+		file:          file,
+		isDone:        false,
+		parquetReader: reader,
+		alias:         ds.alias,
 	}, nil
 }
 
 type RecordStream struct {
-	file                          source.ParquetFile
-	parquetReader				  *reader.ParquetReader
-	isDone                        bool
-	alias                         string
+	file          source.ParquetFile
+	parquetReader *reader.ParquetReader
+	isDone        bool
+	alias         string
 }
 
 func (rs *RecordStream) Close() error {
@@ -93,15 +98,19 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 		rs.file.Close()
 		return nil, execution.ErrEndOfStream
 	}
-	log.Println(res)
+	m := structs.Map(res[0])
+	for k, v := range m {
+		log.Printf("%s: %v of type %+v", k, v, reflect.TypeOf(v).String())
+	}
+	log.Printf("%+v", m)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't read record")
 	}
 
 	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
 	for i := range res {
-		_ = i //res is unreadable pls help
-		//aliasedRecord[rs.aliasedFields[i]] = execution.ParseType(v)
+		_ = i // res is unreadable pls help
+		// aliasedRecord[rs.aliasedFields[i]] = execution.ParseType(v)
 	}
 
 	return execution.NewRecord(nil, aliasedRecord), nil

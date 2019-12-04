@@ -189,7 +189,7 @@ type Comparison int
 const (
 	LessThan    Comparison = -1
 	Equal       Comparison = 0
-	GreaterThan            = 1
+	GreaterThan Comparison = 1
 )
 
 func Compare(x, y Value) (Comparison, error) {

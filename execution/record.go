@@ -17,8 +17,23 @@ type Field struct {
 }
 
 type metadata struct {
+	id        ID
 	undo      bool
 	eventTime time.Time
+}
+
+type ID struct {
+	id string
+}
+
+func NewID(id string) ID {
+	return ID{
+		id: id,
+	}
+}
+
+func (id ID) String() string {
+	return id.id
 }
 
 type Record struct {
@@ -44,6 +59,12 @@ func WithEventTime(eventTime time.Time) RecordOption {
 func WithMetadataFrom(base *Record) RecordOption {
 	return func(r *Record) {
 		r.metadata = base.metadata
+	}
+}
+
+func WithID(id ID) RecordOption {
+	return func(rec *Record) {
+		rec.metadata.id = id
 	}
 }
 
@@ -117,7 +138,7 @@ func (r *Record) AsVariables() octosql.Variables {
 	return out
 }
 
-func (r *Record) AsTuple() octosql.Tuple {
+func (r *Record) AsTuple() octosql.Value {
 	return octosql.MakeTuple(r.data)
 }
 
@@ -163,6 +184,10 @@ func (r *Record) IsUndo() bool {
 
 func (r *Record) EventTime() octosql.Value {
 	return octosql.MakeTime(r.metadata.eventTime)
+}
+
+func (r *Record) ID() ID {
+	return r.metadata.id
 }
 
 type RecordStream interface {

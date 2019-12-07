@@ -13,13 +13,13 @@ func TestMax(t *testing.T) {
 	now := time.Now().Add(time.Hour - 1)
 
 	type kv struct {
-		key   octosql.Tuple
+		key   octosql.Value
 		value octosql.Value
 	}
 	tests := []struct {
 		name    string
 		args    []kv
-		key     octosql.Tuple
+		key     octosql.Value
 		want    octosql.Value
 		wantErr bool
 	}{

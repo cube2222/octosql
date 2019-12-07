@@ -13,8 +13,8 @@ type AggregatePrototype func() Aggregate
 
 type Aggregate interface {
 	docs.Documented
-	AddRecord(key octosql.Tuple, value octosql.Value) error
-	GetAggregated(key octosql.Tuple) (octosql.Value, error)
+	AddRecord(key octosql.Value, value octosql.Value) error
+	GetAggregated(key octosql.Value) (octosql.Value, error)
 	String() string
 }
 
@@ -104,7 +104,7 @@ func (stream *GroupByStream) Next(ctx context.Context) (*Record, error) {
 				return nil, errors.Wrap(err, "couldn't merge stream variables with record")
 			}
 
-			key := make(octosql.Tuple, len(stream.key))
+			key := make([]octosql.Value, len(stream.key))
 			for i := range stream.key {
 				key[i], err = stream.key[i].ExpressionValue(ctx, variables)
 				if err != nil {
@@ -113,10 +113,10 @@ func (stream *GroupByStream) Next(ctx context.Context) (*Record, error) {
 			}
 
 			if len(key) == 0 {
-				key = append(key, octosql.Phantom{})
+				key = append(key, octosql.MakePhantom())
 			}
 
-			err = stream.groups.Set(key, octosql.Phantom{})
+			err = stream.groups.Set(octosql.MakeTuple(key), octosql.Phantom{})
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't put group key into hashmap")
 			}
@@ -124,16 +124,16 @@ func (stream *GroupByStream) Next(ctx context.Context) (*Record, error) {
 			for i := range stream.aggregates {
 				var value octosql.Value
 				if stream.fields[i] == "*star*" {
-					mapping := make(octosql.Object, len(record.Fields()))
+					mapping := make(map[string]octosql.Value, len(record.Fields()))
 					for _, field := range record.Fields() {
 						mapping[field.Name.String()] = record.Value(field.Name)
 					}
-					value = mapping
+					value = octosql.MakeObject(mapping)
 
 				} else {
 					value = record.Value(stream.fields[i])
 				}
-				err := stream.aggregates[i].AddRecord(key, value)
+				err := stream.aggregates[i].AddRecord(octosql.MakeTuple(key), value)
 				if err != nil {
 					return nil, errors.Wrapf(
 						err,
@@ -150,12 +150,11 @@ func (stream *GroupByStream) Next(ctx context.Context) (*Record, error) {
 	if !ok {
 		return nil, ErrEndOfStream
 	}
-	typedKey := key.(octosql.Tuple)
 
 	values := make([]octosql.Value, len(stream.aggregates))
 	for i := range stream.aggregates {
 		var err error
-		values[i], err = stream.aggregates[i].GetAggregated(typedKey)
+		values[i], err = stream.aggregates[i].GetAggregated(key)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't get aggregate value")
 		}

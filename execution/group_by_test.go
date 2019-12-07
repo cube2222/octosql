@@ -5,27 +5,39 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/golang/protobuf/proto"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/docs"
 )
 
 type AggregateMock struct {
 	addI      int
-	addKeys   []octosql.Tuple
+	addKeys   []octosql.Value
 	addValues []octosql.Value
 
 	getI      int
-	getKeySet map[octosql.Value]struct{}
+	getKeySet map[string]struct{}
 	getValues []octosql.Value
 
 	t *testing.T
+}
+
+func getHash(value octosql.Value) string {
+	buf := proto.NewBuffer(nil)
+	buf.SetDeterministic(true)
+	err := buf.Marshal(&value)
+	if err != nil {
+		panic(err)
+	}
+	return string(buf.Bytes())
 }
 
 func (mock *AggregateMock) Document() docs.Documentation {
 	panic("implement me")
 }
 
-func (mock *AggregateMock) AddRecord(key octosql.Tuple, value octosql.Value) error {
+func (mock *AggregateMock) AddRecord(key octosql.Value, value octosql.Value) error {
 	if !reflect.DeepEqual(mock.addKeys[mock.addI], key) {
 		mock.t.Errorf("invalid %v call key: got %v wanted %v", mock.addI, key, mock.addKeys[mock.addI])
 	}
@@ -36,12 +48,12 @@ func (mock *AggregateMock) AddRecord(key octosql.Tuple, value octosql.Value) err
 	return nil
 }
 
-func (mock *AggregateMock) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
-	_, ok := mock.getKeySet[key[0]]
+func (mock *AggregateMock) GetAggregated(key octosql.Value) (octosql.Value, error) {
+	_, ok := mock.getKeySet[getHash(key.AsSlice()[0])]
 	if !ok {
 		mock.t.Errorf("invalid %v call key: got %v wanted one of %v", mock.getI, key, mock.getKeySet)
 	}
-	delete(mock.getKeySet, key[0])
+	delete(mock.getKeySet, getHash(key.AsSlice()[0]))
 	mock.getI++
 	return mock.getValues[mock.getI-1], nil
 }
@@ -55,12 +67,12 @@ func TestGroupBy_AggregateCalling(t *testing.T) {
 	fields := []octosql.VariableName{"cat", "livesleft", "ownerid"}
 
 	firstAggregate := &AggregateMock{
-		addKeys: []octosql.Tuple{
-			{octosql.MakeInt(5)},
-			{octosql.MakeInt(4)},
-			{octosql.MakeInt(3)},
-			{octosql.MakeInt(3)},
-			{octosql.MakeInt(3)},
+		addKeys: []octosql.Value{
+			octosql.MakeTuple([]octosql.Value{octosql.MakeInt(5)}),
+			octosql.MakeTuple([]octosql.Value{octosql.MakeInt(4)}),
+			octosql.MakeTuple([]octosql.Value{octosql.MakeInt(3)}),
+			octosql.MakeTuple([]octosql.Value{octosql.MakeInt(3)}),
+			octosql.MakeTuple([]octosql.Value{octosql.MakeInt(3)}),
 		},
 		addValues: []octosql.Value{
 			octosql.MakeString("Buster"),
@@ -70,10 +82,10 @@ func TestGroupBy_AggregateCalling(t *testing.T) {
 			octosql.MakeString("Lucy"),
 		},
 
-		getKeySet: map[octosql.Value]struct{}{
-			octosql.MakeInt(5): {},
-			octosql.MakeInt(4): {},
-			octosql.MakeInt(3): {},
+		getKeySet: map[string]struct{}{
+			getHash(octosql.MakeInt(5)): {},
+			getHash(octosql.MakeInt(4)): {},
+			getHash(octosql.MakeInt(3)): {},
 		},
 		getValues: []octosql.Value{
 			octosql.MakeString("Buster"),
@@ -84,12 +96,12 @@ func TestGroupBy_AggregateCalling(t *testing.T) {
 		t: t,
 	}
 	secondAggregate := &AggregateMock{
-		addKeys: []octosql.Tuple{
-			{octosql.MakeInt(5)},
-			{octosql.MakeInt(4)},
-			{octosql.MakeInt(3)},
-			{octosql.MakeInt(3)},
-			{octosql.MakeInt(3)},
+		addKeys: []octosql.Value{
+			octosql.MakeTuple([]octosql.Value{octosql.MakeInt(5)}),
+			octosql.MakeTuple([]octosql.Value{octosql.MakeInt(4)}),
+			octosql.MakeTuple([]octosql.Value{octosql.MakeInt(3)}),
+			octosql.MakeTuple([]octosql.Value{octosql.MakeInt(3)}),
+			octosql.MakeTuple([]octosql.Value{octosql.MakeInt(3)}),
 		},
 		addValues: []octosql.Value{
 			octosql.MakeInt(9),
@@ -99,10 +111,10 @@ func TestGroupBy_AggregateCalling(t *testing.T) {
 			octosql.MakeInt(3),
 		},
 
-		getKeySet: map[octosql.Value]struct{}{
-			octosql.MakeInt(5): {},
-			octosql.MakeInt(4): {},
-			octosql.MakeInt(3): {},
+		getKeySet: map[string]struct{}{
+			getHash(octosql.MakeInt(5)): {},
+			getHash(octosql.MakeInt(4)): {},
+			getHash(octosql.MakeInt(3)): {},
 		},
 		getValues: []octosql.Value{
 			octosql.MakeInt(9),

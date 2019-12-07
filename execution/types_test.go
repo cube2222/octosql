@@ -74,10 +74,10 @@ func TestParseType(t *testing.T) {
 					"name":       octosql.MakeString("warsaw"),
 					"population": octosql.MakeFloat(1700000.0),
 				}),
-				"array": octosql.Tuple{
+				"array": octosql.MakeTuple([]octosql.Value{
 					octosql.MakeString("value1"),
 					octosql.MakeString("value2"),
-				},
+				}),
 			}),
 		},
 		{
@@ -93,8 +93,8 @@ func TestParseType(t *testing.T) {
 				t.Fatalf("ParseType() = type %v, want type %v",
 					reflect.TypeOf(got), reflect.TypeOf(tt.want))
 			}
-			if wantTime, ok := tt.want.(octosql.Time); ok {
-				if !wantTime.AsTime().Equal(got.(octosql.Time).AsTime()) {
+			if tt.want.GetType() == octosql.TypeTime {
+				if !tt.want.AsTime().Equal(got.AsTime()) {
 					t.Fatalf("ParseType() = %+v, want %+v", got, tt.want)
 				}
 				return

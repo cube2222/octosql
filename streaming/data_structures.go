@@ -101,13 +101,18 @@ func NewMap(tx *badgerTransaction) *Map {
 	}
 }
 
-func (hm *Map) Set(key []byte, value proto.Message) error {
-	data, err := proto.Marshal(value)
+func (hm *Map) Set(key, value proto.Message) error {
+	byteKey, err := proto.Marshal(key)
+	if err != nil {
+		return errors.Wrap(err, "couldn't marshal key")
+	}
+
+	byteValue, err := proto.Marshal(value)
 	if err != nil {
 		return errors.Wrap(err, "couldn't marshal value")
 	}
 
-	err = hm.tx.Set(key, data)
+	err = hm.tx.Set(byteKey, byteValue)
 	if err != nil {
 		return errors.Wrap(err, "couldn't add element to dictionary")
 	}
@@ -115,8 +120,13 @@ func (hm *Map) Set(key []byte, value proto.Message) error {
 	return nil
 }
 
-func (hm *Map) Get(key []byte, value proto.Message) error {
-	data, err := hm.tx.Get(key)
+func (hm *Map) Get(key, value proto.Message) error {
+	byteKey, err := proto.Marshal(key)
+	if err != nil {
+		return errors.Wrap(err, "couldn't marshal key")
+	}
+
+	data, err := hm.tx.Get(byteKey)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get element from dictionary")
 	}
@@ -174,4 +184,41 @@ func (mi *MapIterator) Next(value proto.Message) error {
 
 func (mi *MapIterator) Close() {
 	mi.it.Close()
+}
+
+/* ValueState */
+type ValueState struct {
+	tx  *badgerTransaction
+	key []byte
+}
+
+func NewValueState(tx *badgerTransaction) *ValueState {
+	return &ValueState{
+		tx:  tx,
+		key: tx.getKeyWithPrefix(nil),
+	}
+}
+
+func (vs *ValueState) Set(value proto.Message) error {
+	byteValue, err := proto.Marshal(value)
+	if err != nil {
+		return errors.Wrap(err, "couldn't marshal value")
+	}
+
+	err = vs.tx.Set(vs.key, byteValue)
+	if err != nil {
+		return errors.Wrap(err, "couldn't set value")
+	}
+
+	return nil
+}
+
+func (vs *ValueState) Get(value proto.Message) error {
+	data, err := vs.tx.Get(vs.key)
+	if err != nil {
+		return errors.Wrap(err, "couldn't get element from dictionary")
+	}
+
+	err = proto.Unmarshal(data, value)
+	return err
 }

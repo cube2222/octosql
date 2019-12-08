@@ -43,55 +43,47 @@ func (ll *LinkedList) Append(value proto.Message) error {
 	return nil
 }
 
-func (ll *LinkedList) GetAll() (*LinkedListIterator, error) {
-	data := make([][]byte, ll.elementCount)
+func (ll *LinkedList) GetAll() *LinkedListIterator {
+	options := badger.DefaultIteratorOptions
 
-	for i := 0; i < ll.elementCount; i++ {
-		el, err := ll.tx.Get(intToByteSlice(i))
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't read data from linked list")
-		}
+	it := ll.tx.tx.NewIterator(options)
 
-		data[i] = el
-	}
-
-	return newLinkedListIterator(data), nil
+	return newLinkedListIterator(it)
 }
 
 type LinkedListIterator struct {
-	data   [][]byte
-	index  int
+	it     *badger.Iterator
 	closed bool
 }
 
-func newLinkedListIterator(data [][]byte) *LinkedListIterator {
+func newLinkedListIterator(it *badger.Iterator) *LinkedListIterator {
 	return &LinkedListIterator{
-		data:   data,
-		index:  0,
-		closed: false,
+		it: it,
 	}
 }
 
 func (lli *LinkedListIterator) Next(value proto.Message) error {
-	if lli.closed {
+	if !lli.it.Valid() {
 		return ErrEndOfIterator
 	}
 
-	err := proto.Unmarshal(lli.data[lli.index], value)
+	lli.it.Next()
+	item := lli.it.Item()
+
+	err := item.Value(func(val []byte) error {
+		err := proto.Unmarshal(val, value)
+		return err
+	})
+
 	if err != nil {
 		return errors.Wrap(err, "couldn't unmarshal data")
-	}
-
-	lli.index += 1
-	if lli.index == len(lli.data) {
-		lli.Close()
 	}
 
 	return nil
 }
 
 func (lli *LinkedListIterator) Close() {
-	lli.closed = true
+	lli.it.Close()
 }
 
 func intToByteSlice(x int) []byte {
@@ -109,13 +101,18 @@ func NewMap(tx *badgerTransaction) *Map {
 	}
 }
 
-func (hm *Map) Set(key []byte, value proto.Message) error {
-	data, err := proto.Marshal(value)
+func (hm *Map) Set(key, value proto.Message) error {
+	byteKey, err := proto.Marshal(key)
+	if err != nil {
+		return errors.Wrap(err, "couldn't marshal key")
+	}
+
+	byteValue, err := proto.Marshal(value)
 	if err != nil {
 		return errors.Wrap(err, "couldn't marshal value")
 	}
 
-	err = hm.tx.Set(key, data)
+	err = hm.tx.Set(byteKey, byteValue)
 	if err != nil {
 		return errors.Wrap(err, "couldn't add element to dictionary")
 	}
@@ -123,8 +120,13 @@ func (hm *Map) Set(key []byte, value proto.Message) error {
 	return nil
 }
 
-func (hm *Map) Get(key []byte, value proto.Message) error {
-	data, err := hm.tx.Get(key)
+func (hm *Map) Get(key, value proto.Message) error {
+	byteKey, err := proto.Marshal(key)
+	if err != nil {
+		return errors.Wrap(err, "couldn't marshal key")
+	}
+
+	data, err := hm.tx.Get(byteKey)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get element from dictionary")
 	}
@@ -160,7 +162,7 @@ func newMapIterator(it *badger.Iterator) *MapIterator {
 	}
 }
 
-func (mi *MapIterator) Next(message proto.Message) error {
+func (mi *MapIterator) Next(value proto.Message) error {
 	if !mi.it.Valid() {
 		return ErrEndOfIterator
 	}
@@ -169,7 +171,7 @@ func (mi *MapIterator) Next(message proto.Message) error {
 	item := mi.it.Item()
 
 	err := item.Value(func(val []byte) error {
-		err := proto.Unmarshal(val, message)
+		err := proto.Unmarshal(val, value)
 		return err
 	})
 
@@ -182,4 +184,41 @@ func (mi *MapIterator) Next(message proto.Message) error {
 
 func (mi *MapIterator) Close() {
 	mi.it.Close()
+}
+
+/* ValueState */
+type ValueState struct {
+	tx  *badgerTransaction
+	key []byte
+}
+
+func NewValueState(tx *badgerTransaction) *ValueState {
+	return &ValueState{
+		tx:  tx,
+		key: tx.getKeyWithPrefix(nil),
+	}
+}
+
+func (vs *ValueState) Set(value proto.Message) error {
+	byteValue, err := proto.Marshal(value)
+	if err != nil {
+		return errors.Wrap(err, "couldn't marshal value")
+	}
+
+	err = vs.tx.Set(vs.key, byteValue)
+	if err != nil {
+		return errors.Wrap(err, "couldn't set value")
+	}
+
+	return nil
+}
+
+func (vs *ValueState) Get(value proto.Message) error {
+	data, err := vs.tx.Get(vs.key)
+	if err != nil {
+		return errors.Wrap(err, "couldn't get element from dictionary")
+	}
+
+	err = proto.Unmarshal(data, value)
+	return err
 }

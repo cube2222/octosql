@@ -10,13 +10,13 @@ import (
 
 func TestLast(t *testing.T) {
 	type kv struct {
-		key   octosql.Tuple
+		key   octosql.Value
 		value octosql.Value
 	}
 	tests := []struct {
 		name    string
 		args    []kv
-		key     octosql.Tuple
+		key     octosql.Value
 		want    octosql.Value
 		wantErr bool
 	}{

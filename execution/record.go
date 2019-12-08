@@ -26,6 +26,16 @@ type ID struct {
 	id string
 }
 
+func NewID(id string) ID {
+	return ID{
+		id: id,
+	}
+}
+
+func (id ID) String() string {
+	return id.id
+}
+
 type Record struct {
 	metadata   metadata
 	fieldNames []octosql.VariableName
@@ -128,7 +138,7 @@ func (r *Record) AsVariables() octosql.Variables {
 	return out
 }
 
-func (r *Record) AsTuple() octosql.Tuple {
+func (r *Record) AsTuple() octosql.Value {
 	return octosql.MakeTuple(r.data)
 }
 

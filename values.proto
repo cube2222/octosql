@@ -1,5 +1,5 @@
 syntax = "proto3";
-package internal;
+package octosql;
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/duration.proto";
 

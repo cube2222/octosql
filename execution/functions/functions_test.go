@@ -39,19 +39,19 @@ func Test_parseInt(t *testing.T) {
 		{
 			name:    "FuncInt - invalid string",
 			args:    []Value{MakeString("17a")},
-			want:    nil,
+			want:    ZeroValue(),
 			wantErr: true,
 		},
 		{
 			name:    "FuncInt - no args",
 			args:    []Value{},
-			want:    nil,
+			want:    ZeroValue(),
 			wantErr: true,
 		},
 		{
 			name:    "FuncInt - too many args",
 			args:    []Value{MakeFloat(7.0), MakeString("1")},
-			want:    nil,
+			want:    ZeroValue(),
 			wantErr: true,
 		},
 	}
@@ -96,7 +96,7 @@ func Test_stringFunctions(t *testing.T) {
 				fun:  FuncUpper,
 				args: []Value{MakeString("aLa MA kotA i PSA"), MakeString("a co to jest?")},
 			},
-			want:    nil,
+			want:    ZeroValue(),
 			wantErr: true,
 		},
 		{
@@ -105,7 +105,7 @@ func Test_stringFunctions(t *testing.T) {
 				fun:  FuncUpper,
 				args: []Value{MakeInt(17)},
 			},
-			want:    nil,
+			want:    ZeroValue(),
 			wantErr: true,
 		},
 		/* lowercase tests */
@@ -124,7 +124,7 @@ func Test_stringFunctions(t *testing.T) {
 				fun:  FuncLower,
 				args: []Value{},
 			},
-			want:    nil,
+			want:    ZeroValue(),
 			wantErr: true,
 		},
 		{
@@ -133,7 +133,7 @@ func Test_stringFunctions(t *testing.T) {
 				fun:  FuncLower,
 				args: []Value{MakeFloat(17.16)},
 			},
-			want:    nil,
+			want:    ZeroValue(),
 			wantErr: true,
 		},
 		/* capitalize tests */
@@ -161,7 +161,7 @@ func Test_stringFunctions(t *testing.T) {
 				fun:  FuncCapitalize,
 				args: []Value{},
 			},
-			want:    nil,
+			want:    ZeroValue(),
 			wantErr: true,
 		},
 		{
@@ -170,7 +170,7 @@ func Test_stringFunctions(t *testing.T) {
 				fun:  FuncCapitalize,
 				args: []Value{MakeFloat(17.16)},
 			},
-			want:    nil,
+			want:    ZeroValue(),
 			wantErr: true,
 		},
 		/* reverse tests */
@@ -198,7 +198,7 @@ func Test_stringFunctions(t *testing.T) {
 				fun:  FuncReverse,
 				args: []Value{},
 			},
-			want:    nil,
+			want:    ZeroValue(),
 			wantErr: true,
 		},
 		{
@@ -207,7 +207,7 @@ func Test_stringFunctions(t *testing.T) {
 				fun:  FuncReverse,
 				args: []Value{MakeBool(true)},
 			},
-			want:    nil,
+			want:    ZeroValue(),
 			wantErr: true,
 		},
 		{
@@ -216,7 +216,7 @@ func Test_stringFunctions(t *testing.T) {
 				fun:  FuncReverse,
 				args: []Value{MakeString("aa"), MakeString("bb")},
 			},
-			want:    nil,
+			want:    ZeroValue(),
 			wantErr: true,
 		},
 
@@ -335,7 +335,7 @@ func Test_various(t *testing.T) {
 				args: []Value{MakeInt(-1)},
 				fun:  FuncSqrt,
 			},
-			want:    nil,
+			want:    ZeroValue(),
 			wantErr: true,
 		},
 
@@ -364,7 +364,7 @@ func Test_various(t *testing.T) {
 				args: []Value{MakeInt(0)},
 				fun:  FuncLog2,
 			},
-			want:    nil,
+			want:    ZeroValue(),
 			wantErr: true,
 		},
 
@@ -827,7 +827,7 @@ func Test_various(t *testing.T) {
 				},
 				fun: FuncMultiply,
 			},
-			want:    nil,
+			want:    ZeroValue(),
 			wantErr: true,
 		},
 		{

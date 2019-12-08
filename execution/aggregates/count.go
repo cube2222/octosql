@@ -26,15 +26,15 @@ func (agg *Count) Document() docs.Documentation {
 	)
 }
 
-func (agg *Count) AddRecord(key octosql.Tuple, value octosql.Value) error {
+func (agg *Count) AddRecord(key octosql.Value, value octosql.Value) error {
 	count, previousValueExists, err := agg.counts.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current count out of hashmap")
 	}
 
-	var newCount octosql.Int
+	var newCount int
 	if previousValueExists {
-		newCount = count.(octosql.Int) + 1
+		newCount = count.(int) + 1
 	} else {
 		newCount = 1
 	}
@@ -47,17 +47,17 @@ func (agg *Count) AddRecord(key octosql.Tuple, value octosql.Value) error {
 	return nil
 }
 
-func (agg *Count) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
+func (agg *Count) GetAggregated(key octosql.Value) (octosql.Value, error) {
 	count, ok, err := agg.counts.Get(key)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get count out of hashmap")
+		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get count out of hashmap")
 	}
 
 	if !ok {
-		return nil, errors.Errorf("count for key not found")
+		return octosql.ZeroValue(), errors.Errorf("count for key not found")
 	}
 
-	return count.(octosql.Int), nil
+	return octosql.MakeInt(count.(int)), nil
 }
 
 func (agg *Count) String() string {

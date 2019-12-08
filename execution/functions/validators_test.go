@@ -288,7 +288,7 @@ func Test_wantedType(t *testing.T) {
 			name: "tuple - tuple - pass",
 			args: args{
 				octosql.ZeroTuple(),
-				octosql.MakeTuple(octosql.Tuple{octosql.MakeInt(1), octosql.MakeInt(2), octosql.MakeInt(3)}),
+				octosql.MakeTuple([]octosql.Value{octosql.MakeInt(1), octosql.MakeInt(2), octosql.MakeInt(3)}),
 			},
 			wantErr: false,
 		},

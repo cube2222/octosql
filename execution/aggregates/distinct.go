@@ -30,7 +30,7 @@ func (agg *Distinct) Document() docs.Documentation {
 	)
 }
 
-func (agg *Distinct) AddRecord(key octosql.Tuple, value octosql.Value) error {
+func (agg *Distinct) AddRecord(key octosql.Value, value octosql.Value) error {
 	groupSet, previousValueExists, err := agg.groupSets.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get distinct value set for group key")
@@ -71,7 +71,7 @@ func (agg *Distinct) AddRecord(key octosql.Tuple, value octosql.Value) error {
 	return nil
 }
 
-func (agg *Distinct) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
+func (agg *Distinct) GetAggregated(key octosql.Value) (octosql.Value, error) {
 	return agg.underlying.GetAggregated(key)
 }
 

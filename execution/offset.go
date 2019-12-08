@@ -28,10 +28,11 @@ func (node *Offset) Get(ctx context.Context, variables octosql.Variables) (Recor
 		return nil, errors.Wrap(err, "couldn't extract value from offset subexpression")
 	}
 
-	offsetVal, ok := exprVal.(octosql.Int)
-	if !ok {
+	if exprVal.GetType() != octosql.TypeInt {
 		return nil, errors.New("offset value not int")
+
 	}
+	offsetVal := exprVal.AsInt()
 	if offsetVal < 0 {
 		return nil, errors.New("negative offset value")
 	}

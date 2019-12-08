@@ -81,7 +81,7 @@ type Iterator struct {
 // Next returns next key, value, exists
 func (iter *Iterator) Next() (octosql.Value, interface{}, bool) {
 	if iter.hashesPosition == len(iter.hashes) {
-		return nil, nil, false
+		return octosql.ZeroValue(), nil, false
 	}
 
 	// Save current item location

@@ -2,13 +2,13 @@ package csv
 
 import (
 	"encoding/csv"
-	"fmt"
 	"io"
+
+	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/output"
-	"github.com/pkg/errors"
 )
 
 type Output struct {
@@ -56,7 +56,7 @@ func (o *Output) Close() error {
 		var row []string
 		for _, field := range fields {
 			value := record.Value(octosql.NewVariableName(field))
-			row = append(row, fmt.Sprint(value))
+			row = append(row, value.Show())
 		}
 		err := out.Write(row)
 		if err != nil {

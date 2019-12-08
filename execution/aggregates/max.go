@@ -27,89 +27,27 @@ func (agg *Max) Document() docs.Documentation {
 	)
 }
 
-func (agg *Max) AddRecord(key octosql.Tuple, value octosql.Value) error {
+func (agg *Max) AddRecord(key octosql.Value, value octosql.Value) error {
 	max, previousValueExists, err := agg.maxes.Get(key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current max out of hashmap")
 	}
 
-	if agg.typedValue == nil {
+	if octosql.AreEqual(agg.typedValue, octosql.ZeroValue()) {
 		agg.typedValue = value
 	}
-	switch value := value.(type) {
-	case octosql.Int:
-		_, typeOk := agg.typedValue.(octosql.Int)
-		if !typeOk {
-			return errors.Errorf("mixed types in max: %v and %v with values %v and %v",
-				execution.GetType(value), execution.GetType(agg.typedValue),
-				value, agg.typedValue)
-		}
 
-		if !previousValueExists || value > max.(octosql.Int) {
+	if !previousValueExists {
+		max = value
+	} else {
+		octoMax := max.(octosql.Value)
+		cmp, err := octosql.Compare(value, octoMax)
+		if err != nil {
+			return errors.Wrap(err, "couldn't compare current max with new value")
+		}
+		if cmp == octosql.GreaterThan {
 			max = value
 		}
-
-	case octosql.Float:
-		_, typeOk := agg.typedValue.(octosql.Float)
-		if !typeOk {
-			return errors.Errorf("mixed types in max: %v and %v with values %v and %v",
-				execution.GetType(value), execution.GetType(agg.typedValue),
-				value, agg.typedValue)
-		}
-
-		if !previousValueExists || value > max.(octosql.Float) {
-			max = value
-		}
-
-	case octosql.String:
-		_, typeOk := agg.typedValue.(octosql.String)
-		if !typeOk {
-			return errors.Errorf("mixed types in max: %v and %v with values %v and %v",
-				execution.GetType(value), execution.GetType(agg.typedValue),
-				value, agg.typedValue)
-		}
-
-		if !previousValueExists || value > max.(octosql.String) {
-			max = value
-		}
-
-	case octosql.Bool:
-		_, typeOk := agg.typedValue.(octosql.Bool)
-		if !typeOk {
-			return errors.Errorf("mixed types in max: %v and %v with values %v and %v",
-				execution.GetType(value), execution.GetType(agg.typedValue),
-				value, agg.typedValue)
-		}
-
-		if !previousValueExists || value.AsBool() {
-			max = value
-		}
-
-	case octosql.Duration:
-		_, typeOk := agg.typedValue.(octosql.Duration)
-		if !typeOk {
-			return errors.Errorf("mixed types in max: %v and %v with values %v and %v",
-				execution.GetType(value), execution.GetType(agg.typedValue),
-				value, agg.typedValue)
-		}
-
-		if !previousValueExists || value > max.(octosql.Duration) {
-			max = value
-		}
-
-	case octosql.Time:
-		_, typeOk := agg.typedValue.(octosql.Time)
-		if !typeOk {
-			return errors.Errorf("mixed types in max: %v and %v with values %v and %v",
-				execution.GetType(value), execution.GetType(agg.typedValue),
-				value, agg.typedValue)
-		}
-
-		if !previousValueExists || value.AsTime().After(max.(octosql.Time).AsTime()) {
-			max = value
-		}
-	default:
-		return errors.Errorf("invalid type in max: %v with value %v", execution.GetType(value), value)
 	}
 
 	err = agg.maxes.Set(key, max)
@@ -120,14 +58,14 @@ func (agg *Max) AddRecord(key octosql.Tuple, value octosql.Value) error {
 	return nil
 }
 
-func (agg *Max) GetAggregated(key octosql.Tuple) (octosql.Value, error) {
+func (agg *Max) GetAggregated(key octosql.Value) (octosql.Value, error) {
 	max, ok, err := agg.maxes.Get(key)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get max out of hashmap")
+		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get max out of hashmap")
 	}
 
 	if !ok {
-		return nil, errors.Errorf("max for key not found")
+		return octosql.ZeroValue(), errors.Errorf("max for key not found")
 	}
 
 	return max.(octosql.Value), nil

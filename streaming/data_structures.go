@@ -43,12 +43,12 @@ func (ll *LinkedList) Append(value proto.Message) error {
 	return nil
 }
 
-func (ll *LinkedList) GetAll() (*LinkedListIterator, error) {
+func (ll *LinkedList) GetAll() *LinkedListIterator {
 	options := badger.DefaultIteratorOptions
 
 	it := ll.tx.tx.NewIterator(options)
 
-	return newLinkedListIterator(it), nil
+	return newLinkedListIterator(it)
 }
 
 type LinkedListIterator struct {

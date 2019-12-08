@@ -44,54 +44,46 @@ func (ll *LinkedList) Append(value proto.Message) error {
 }
 
 func (ll *LinkedList) GetAll() (*LinkedListIterator, error) {
-	data := make([][]byte, ll.elementCount)
+	options := badger.DefaultIteratorOptions
 
-	for i := 0; i < ll.elementCount; i++ {
-		el, err := ll.tx.Get(intToByteSlice(i))
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't read data from linked list")
-		}
+	it := ll.tx.tx.NewIterator(options)
 
-		data[i] = el
-	}
-
-	return newLinkedListIterator(data), nil
+	return newLinkedListIterator(it), nil
 }
 
 type LinkedListIterator struct {
-	data   [][]byte
-	index  int
+	it     *badger.Iterator
 	closed bool
 }
 
-func newLinkedListIterator(data [][]byte) *LinkedListIterator {
+func newLinkedListIterator(it *badger.Iterator) *LinkedListIterator {
 	return &LinkedListIterator{
-		data:   data,
-		index:  0,
-		closed: false,
+		it: it,
 	}
 }
 
 func (lli *LinkedListIterator) Next(value proto.Message) error {
-	if lli.closed {
+	if !lli.it.Valid() {
 		return ErrEndOfIterator
 	}
 
-	err := proto.Unmarshal(lli.data[lli.index], value)
+	lli.it.Next()
+	item := lli.it.Item()
+
+	err := item.Value(func(val []byte) error {
+		err := proto.Unmarshal(val, value)
+		return err
+	})
+
 	if err != nil {
 		return errors.Wrap(err, "couldn't unmarshal data")
-	}
-
-	lli.index += 1
-	if lli.index == len(lli.data) {
-		lli.Close()
 	}
 
 	return nil
 }
 
 func (lli *LinkedListIterator) Close() {
-	lli.closed = true
+	lli.it.Close()
 }
 
 func intToByteSlice(x int) []byte {
@@ -160,7 +152,7 @@ func newMapIterator(it *badger.Iterator) *MapIterator {
 	}
 }
 
-func (mi *MapIterator) Next(message proto.Message) error {
+func (mi *MapIterator) Next(value proto.Message) error {
 	if !mi.it.Valid() {
 		return ErrEndOfIterator
 	}
@@ -169,7 +161,7 @@ func (mi *MapIterator) Next(message proto.Message) error {
 	item := mi.it.Item()
 
 	err := item.Value(func(val []byte) error {
-		err := proto.Unmarshal(val, message)
+		err := proto.Unmarshal(val, value)
 		return err
 	})
 

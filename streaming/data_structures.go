@@ -3,6 +3,7 @@ package streaming
 import (
 	"io"
 
+	"github.com/cube2222/octosql"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
@@ -17,11 +18,11 @@ type Iterator interface {
 
 /* LinkedList */
 type LinkedList struct {
-	tx           *badgerTransaction
+	tx           StateTransaction
 	elementCount int
 }
 
-func NewLinkedList(tx *badgerTransaction) *LinkedList {
+func NewLinkedList(tx StateTransaction) *LinkedList {
 	return &LinkedList{
 		tx:           tx,
 		elementCount: 0,
@@ -34,7 +35,13 @@ func (ll *LinkedList) Append(value proto.Message) error {
 		return errors.Wrap(err, "couldn't serialize given value")
 	}
 
-	err = ll.tx.Set(intToByteSlice(ll.elementCount), data)
+	key := octosql.MakeInt(ll.elementCount)
+	byteKey, err := proto.Marshal(&key)
+	if err != nil {
+		return errors.Wrap(err, "couldn't translate key to bytes")
+	}
+
+	err = ll.tx.Set(byteKey, data)
 	if err != nil {
 		return errors.Wrap(err, "couldn't add the element to linked list")
 	}
@@ -45,15 +52,14 @@ func (ll *LinkedList) Append(value proto.Message) error {
 
 func (ll *LinkedList) GetAll() *LinkedListIterator {
 	options := badger.DefaultIteratorOptions
-
-	it := ll.tx.tx.NewIterator(options)
+	it := ll.tx.Iterator(options)
+	it.Rewind()
 
 	return newLinkedListIterator(it)
 }
 
 type LinkedListIterator struct {
-	it     *badger.Iterator
-	closed bool
+	it *badger.Iterator
 }
 
 func newLinkedListIterator(it *badger.Iterator) *LinkedListIterator {
@@ -67,8 +73,8 @@ func (lli *LinkedListIterator) Next(value proto.Message) error {
 		return ErrEndOfIterator
 	}
 
-	lli.it.Next()
 	item := lli.it.Item()
+	defer lli.it.Next()
 
 	err := item.Value(func(val []byte) error {
 		err := proto.Unmarshal(val, value)
@@ -86,16 +92,12 @@ func (lli *LinkedListIterator) Close() {
 	lli.it.Close()
 }
 
-func intToByteSlice(x int) []byte {
-	return []byte(string(x))
-}
-
 /* Map */
 type Map struct {
-	tx *badgerTransaction
+	tx StateTransaction
 }
 
-func NewMap(tx *badgerTransaction) *Map {
+func NewMap(tx StateTransaction) *Map {
 	return &Map{
 		tx: tx,
 	}
@@ -139,7 +141,7 @@ func (hm *Map) GetAllWithPrefix(prefix []byte) *MapIterator {
 	options := badger.DefaultIteratorOptions
 	options.Prefix = prefix
 
-	it := hm.tx.tx.NewIterator(options)
+	it := hm.tx.Iterator(options)
 
 	return newMapIterator(it)
 }
@@ -147,7 +149,7 @@ func (hm *Map) GetAllWithPrefix(prefix []byte) *MapIterator {
 func (hm *Map) GetAll() *MapIterator {
 	options := badger.DefaultIteratorOptions
 
-	it := hm.tx.tx.NewIterator(options)
+	it := hm.tx.Iterator(options)
 
 	return newMapIterator(it)
 }
@@ -167,8 +169,8 @@ func (mi *MapIterator) Next(value proto.Message) error {
 		return ErrEndOfIterator
 	}
 
-	mi.it.Next()
 	item := mi.it.Item()
+	defer mi.it.Next()
 
 	err := item.Value(func(val []byte) error {
 		err := proto.Unmarshal(val, value)

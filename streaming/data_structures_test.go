@@ -13,6 +13,7 @@ func TestLinkedList(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	defer db.Close()
 
 	store := NewBadgerStorage(db)

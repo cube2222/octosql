@@ -14,12 +14,12 @@ func TestLinkedList(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	defer db.Close()
+	defer db.DropAll()
 
 	store := NewBadgerStorage(db)
 	txn := store.BeginTransaction()
 
-	linkedList := NewLinkedList(txn.WithPrefix([]byte("test linked listy")).(*badgerTransaction))
+	linkedList := NewLinkedList(txn.WithPrefix([]byte("test linked list")))
 
 	value1 := octosql.MakeInt(1)
 	value2 := octosql.MakeInt(2)

@@ -18,11 +18,11 @@ type Iterator interface {
 
 /* LinkedList */
 type LinkedList struct {
-	tx           *badgerTransaction
+	tx           StateTransaction
 	elementCount int
 }
 
-func NewLinkedList(tx *badgerTransaction) *LinkedList {
+func NewLinkedList(tx StateTransaction) *LinkedList {
 	return &LinkedList{
 		tx:           tx,
 		elementCount: 0,
@@ -52,7 +52,7 @@ func (ll *LinkedList) Append(value proto.Message) error {
 
 func (ll *LinkedList) GetAll() *LinkedListIterator {
 	options := badger.DefaultIteratorOptions
-	it := ll.tx.tx.NewIterator(options)
+	it := ll.tx.Iterator(options)
 	it.Rewind()
 
 	return newLinkedListIterator(it)
@@ -94,10 +94,10 @@ func (lli *LinkedListIterator) Close() {
 
 /* Map */
 type Map struct {
-	tx *badgerTransaction
+	tx StateTransaction
 }
 
-func NewMap(tx *badgerTransaction) *Map {
+func NewMap(tx StateTransaction) *Map {
 	return &Map{
 		tx: tx,
 	}
@@ -141,7 +141,7 @@ func (hm *Map) GetAllWithPrefix(prefix []byte) *MapIterator {
 	options := badger.DefaultIteratorOptions
 	options.Prefix = prefix
 
-	it := hm.tx.tx.NewIterator(options)
+	it := hm.tx.Iterator(options)
 
 	return newMapIterator(it)
 }
@@ -149,7 +149,7 @@ func (hm *Map) GetAllWithPrefix(prefix []byte) *MapIterator {
 func (hm *Map) GetAll() *MapIterator {
 	options := badger.DefaultIteratorOptions
 
-	it := hm.tx.tx.NewIterator(options)
+	it := hm.tx.Iterator(options)
 
 	return newMapIterator(it)
 }

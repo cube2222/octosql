@@ -15,6 +15,7 @@ type StateTransaction interface {
 	Set(key, value []byte) error
 	Get(key []byte) (value []byte, err error)
 	WithPrefix(prefix []byte) StateTransaction
+	Iterator(opts badger.IteratorOptions) *badger.Iterator
 	Commit() error
 	Abort()
 }
@@ -46,7 +47,7 @@ func NewBadgerStorage(db *badger.DB) *BadgerStorage {
 }
 
 func (bs *BadgerStorage) BeginTransaction() *badgerTransaction {
-	bs.db.DropPrefix()
+	//bs.db.DropPrefix()
 	tx := bs.db.NewTransaction(true)
 	return &badgerTransaction{tx: tx, prefix: nil}
 }
@@ -86,11 +87,16 @@ func (tx *badgerTransaction) Get(key []byte) ([]byte, error) {
 	return value, err
 }
 
+//TODO: This should return *badgerTransaction, not StateTransaction
 func (tx *badgerTransaction) WithPrefix(prefix []byte) StateTransaction {
 	return &badgerTransaction{
 		tx:     tx.tx,
 		prefix: tx.getKeyWithPrefix(prefix),
 	}
+}
+
+func (tx *badgerTransaction) Iterator(opts badger.IteratorOptions) *badger.Iterator {
+	return tx.tx.NewIterator(opts)
 }
 
 func (tx *badgerTransaction) Commit() error {

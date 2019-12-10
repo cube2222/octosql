@@ -15,7 +15,7 @@ type StateTransaction interface {
 	Set(key, value []byte) error
 	Get(key []byte) (value []byte, err error)
 	WithPrefix(prefix []byte) StateTransaction
-	Iterator(opts badger.IteratorOptions) *badger.Iterator
+	Iterator(opts badger.IteratorOptions) Iterator
 	Commit() error
 	Abort()
 }
@@ -87,7 +87,6 @@ func (tx *badgerTransaction) Get(key []byte) ([]byte, error) {
 	return value, err
 }
 
-//TODO: This should return *badgerTransaction, not StateTransaction
 func (tx *badgerTransaction) WithPrefix(prefix []byte) StateTransaction {
 	return &badgerTransaction{
 		tx:     tx.tx,
@@ -95,8 +94,9 @@ func (tx *badgerTransaction) WithPrefix(prefix []byte) StateTransaction {
 	}
 }
 
-func (tx *badgerTransaction) Iterator(opts badger.IteratorOptions) *badger.Iterator {
-	return tx.tx.NewIterator(opts)
+func (tx *badgerTransaction) Iterator(opts badger.IteratorOptions) Iterator {
+	it := tx.tx.NewIterator(opts)
+	return NewBadgerIterator(it)
 }
 
 func (tx *badgerTransaction) Commit() error {

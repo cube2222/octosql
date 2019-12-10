@@ -1,20 +1,11 @@
 package streaming
 
 import (
-	"io"
-
 	"github.com/cube2222/octosql"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 )
-
-var ErrEndOfIterator = errors.New("end of iterator")
-
-type Iterator interface {
-	Next(proto.Message) error
-	io.Closer
-}
 
 /* LinkedList */
 type LinkedList struct {
@@ -50,46 +41,11 @@ func (ll *LinkedList) Append(value proto.Message) error {
 	return nil
 }
 
-func (ll *LinkedList) GetAll() *LinkedListIterator {
-	options := badger.DefaultIteratorOptions
-	it := ll.tx.Iterator(options)
+func (ll *LinkedList) GetAll() Iterator {
+	it := ll.tx.Iterator(badger.DefaultIteratorOptions)
 	it.Rewind()
 
-	return newLinkedListIterator(it)
-}
-
-type LinkedListIterator struct {
-	it *badger.Iterator
-}
-
-func newLinkedListIterator(it *badger.Iterator) *LinkedListIterator {
-	return &LinkedListIterator{
-		it: it,
-	}
-}
-
-func (lli *LinkedListIterator) Next(value proto.Message) error {
-	if !lli.it.Valid() {
-		return ErrEndOfIterator
-	}
-
-	item := lli.it.Item()
-	defer lli.it.Next()
-
-	err := item.Value(func(val []byte) error {
-		err := proto.Unmarshal(val, value)
-		return err
-	})
-
-	if err != nil {
-		return errors.Wrap(err, "couldn't unmarshal data")
-	}
-
-	return nil
-}
-
-func (lli *LinkedListIterator) Close() {
-	lli.it.Close()
+	return it
 }
 
 /* Map */
@@ -137,67 +93,29 @@ func (hm *Map) Get(key, value proto.Message) error {
 	return err
 }
 
-func (hm *Map) GetAllWithPrefix(prefix []byte) *MapIterator {
+func (hm *Map) GetAllWithPrefix(prefix []byte) Iterator {
 	options := badger.DefaultIteratorOptions
 	options.Prefix = prefix
 
 	it := hm.tx.Iterator(options)
 
-	return newMapIterator(it)
+	return it
 }
 
-func (hm *Map) GetAll() *MapIterator {
+func (hm *Map) GetAll() Iterator {
 	options := badger.DefaultIteratorOptions
-
 	it := hm.tx.Iterator(options)
-
-	return newMapIterator(it)
-}
-
-type MapIterator struct {
-	it *badger.Iterator
-}
-
-func newMapIterator(it *badger.Iterator) *MapIterator {
-	return &MapIterator{
-		it: it,
-	}
-}
-
-func (mi *MapIterator) Next(value proto.Message) error {
-	if !mi.it.Valid() {
-		return ErrEndOfIterator
-	}
-
-	item := mi.it.Item()
-	defer mi.it.Next()
-
-	err := item.Value(func(val []byte) error {
-		err := proto.Unmarshal(val, value)
-		return err
-	})
-
-	if err != nil {
-		return errors.Wrap(err, "couldn't unmarshal data")
-	}
-
-	return nil
-}
-
-func (mi *MapIterator) Close() {
-	mi.it.Close()
+	return it
 }
 
 /* ValueState */
 type ValueState struct {
-	tx  *badgerTransaction
-	key []byte
+	tx StateTransaction
 }
 
-func NewValueState(tx *badgerTransaction) *ValueState {
+func NewValueState(tx StateTransaction) *ValueState {
 	return &ValueState{
-		tx:  tx,
-		key: tx.getKeyWithPrefix(nil),
+		tx: tx,
 	}
 }
 
@@ -207,7 +125,7 @@ func (vs *ValueState) Set(value proto.Message) error {
 		return errors.Wrap(err, "couldn't marshal value")
 	}
 
-	err = vs.tx.Set(vs.key, byteValue)
+	err = vs.tx.Set(nil, byteValue)
 	if err != nil {
 		return errors.Wrap(err, "couldn't set value")
 	}
@@ -216,7 +134,7 @@ func (vs *ValueState) Set(value proto.Message) error {
 }
 
 func (vs *ValueState) Get(value proto.Message) error {
-	data, err := vs.tx.Get(vs.key)
+	data, err := vs.tx.Get(nil)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get element from dictionary")
 	}

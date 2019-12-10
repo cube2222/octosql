@@ -15,7 +15,7 @@ type StateTransaction interface {
 	Set(key, value []byte) error
 	Get(key []byte) (value []byte, err error)
 	WithPrefix(prefix []byte) StateTransaction
-	Iterator(opts badger.IteratorOptions) Iterator
+	Iterator(opts badger.IteratorOptions) Iterator //TODO: opts should be some other structure/interface
 	Commit() error
 	Abort()
 }

@@ -55,7 +55,7 @@ func SortedUnmarshal(b []byte, v *octosql.Value) error {
 			return err
 		}
 
-		*v = octosql.MakeTime(u) /**/
+		*v = octosql.MakeTime(u)
 	default: //TODO: add other types
 		return nil
 	}

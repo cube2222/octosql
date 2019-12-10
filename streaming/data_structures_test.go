@@ -40,7 +40,7 @@ func TestLinkedList(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	iter := linkedList.GetAll()
+	iter := linkedList.GetIterator()
 
 	var result octosql.Value
 

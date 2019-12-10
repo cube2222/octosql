@@ -41,7 +41,7 @@ func (ll *LinkedList) Append(value proto.Message) error {
 	return nil
 }
 
-func (ll *LinkedList) GetAll() Iterator {
+func (ll *LinkedList) GetIterator() Iterator {
 	it := ll.tx.Iterator(badger.DefaultIteratorOptions)
 	it.Rewind()
 
@@ -93,7 +93,7 @@ func (hm *Map) Get(key, value proto.Message) error {
 	return err
 }
 
-func (hm *Map) GetAllWithPrefix(prefix []byte) Iterator {
+func (hm *Map) GetIteratorWithPrefix(prefix []byte) Iterator {
 	options := badger.DefaultIteratorOptions
 	options.Prefix = prefix
 
@@ -102,7 +102,7 @@ func (hm *Map) GetAllWithPrefix(prefix []byte) Iterator {
 	return it
 }
 
-func (hm *Map) GetAll() Iterator {
+func (hm *Map) GetIterator() Iterator {
 	options := badger.DefaultIteratorOptions
 	it := hm.tx.Iterator(options)
 	return it

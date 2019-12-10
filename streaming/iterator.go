@@ -37,7 +37,7 @@ func (bi *BadgerIterator) Next(value proto.Message) error {
 	}
 
 	item := bi.it.Item()
-	defer bi.it.Next()
+	defer bi.it.Next() //important: item is valid until Next() is called
 
 	err := item.Value(func(val []byte) error {
 		err := proto.Unmarshal(val, value)

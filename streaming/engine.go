@@ -10,8 +10,8 @@ import (
 )
 
 type RecordSink interface {
-	AddRecord(record *execution.Record, tx StateTransaction)
-	MarkEndOfStream() error
+	AddRecord(ctx context.Context, record *execution.Record, tx StateTransaction)
+	MarkEndOfStream(ctx context.Context) error
 }
 
 type PullEngine struct {
@@ -42,6 +42,8 @@ func (engine *PullEngine) Run(ctx context.Context) {
 }
 
 func (engine *PullEngine) loop(ctx context.Context) error {
+	// TODO: Have trigger manager here with tx.WithPrefix(triggerManager) passed
+
 	tx := engine.storage.BeginTransaction()
 	r, err := engine.source.Next(InjectStateTransaction(ctx, tx))
 	if err != nil {

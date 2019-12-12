@@ -99,6 +99,7 @@ func (t *DelayTrigger) RecordReceived(ctx context.Context, tx StateTransaction, 
 
 	newTimeToSend := eventTime.Add(t.delay)
 
+	// todo: czyszczenie starej wartosci
 	if currentWatermark.After(newTimeToSend) {
 		return errors.Wrap(t.addKeyToSend(ctx, tx, key), "couldn't add key for immediate send")
 	}
@@ -137,7 +138,7 @@ func (t *DelayTrigger) PollKeyToFire(ctx context.Context, tx StateTransaction) (
 
 	var out octosql.Value
 	err := toSend.Pop(0, &out) // Get and delete.
-	if ErrNotFound != nil {
+	if err != nil {
 		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get value to send")
 	}
 

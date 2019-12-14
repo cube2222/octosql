@@ -14,6 +14,7 @@ type Storage interface {
 type StateTransaction interface {
 	Set(key, value []byte) error
 	Get(key []byte) (value []byte, err error)
+	Delete(key []byte) error
 	WithPrefix(prefix []byte) StateTransaction
 	Iterator(opts badger.IteratorOptions) Iterator //TODO: opts should be some other structure/interface
 	Commit() error
@@ -85,6 +86,10 @@ func (tx *badgerTransaction) Get(key []byte) ([]byte, error) {
 		return nil, err
 	}
 	return value, err
+}
+
+func (tx *badgerTransaction) Delete(key []byte) error {
+	return tx.tx.Delete(tx.getKeyWithPrefix(key))
 }
 
 func (tx *badgerTransaction) WithPrefix(prefix []byte) StateTransaction {

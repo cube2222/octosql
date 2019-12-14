@@ -2,6 +2,7 @@ package streaming
 
 import (
 	"encoding/binary"
+	"math"
 	"time"
 
 	"github.com/cube2222/octosql"
@@ -15,11 +16,15 @@ func SortedMarshal(v *octosql.Value) ([]byte, error) {
 		return SortedMarshalString(v.AsString())
 	case octosql.TypeInt:
 		return SortedMarshalInt(v.AsInt())
-	case octosql.TypeBool:
+	case octosql.TypeBool, octosql.TypePhantom, octosql.TypeNull:
 		return SortedMarshalBool(v.AsBool())
 	case octosql.TypeTime:
 		return SortedMarshalTime(v.AsTime())
-	default: //TODO: add other types
+	case octosql.TypeDuration:
+		return SortedMarshalDuration(v.AsDuration())
+	case octosql.TypeFloat:
+		return SortedMarshalFloat(v.AsFloat())
+	default: //TODO: add other types - tuple/object
 		return nil, nil
 	}
 }
@@ -42,7 +47,7 @@ func SortedUnmarshal(b []byte, v *octosql.Value) error {
 
 		*v = octosql.MakeInt(u)
 		return nil
-	case octosql.TypeBool:
+	case octosql.TypeBool, octosql.TypePhantom, octosql.TypeNull:
 		u, err := SortedUnmarshalBool(b)
 		if err != nil {
 			return err
@@ -56,6 +61,20 @@ func SortedUnmarshal(b []byte, v *octosql.Value) error {
 		}
 
 		*v = octosql.MakeTime(u)
+	case octosql.TypeDuration:
+		u, err := SortedUnmarshalDuration(b)
+		if err != nil {
+			return err
+		}
+
+		*v = octosql.MakeDuration(u)
+	case octosql.TypeFloat:
+		u, err := SortedUnmarshalFloat(b)
+		if err != nil {
+			return err
+		}
+
+		*v = octosql.MakeFloat(u)
 	default: //TODO: add other types
 		return nil
 	}
@@ -73,22 +92,26 @@ func SortedUnmarshalString(b []byte) (string, error) {
 }
 
 /* Marshal int and int64 */
-
 func SortedMarshalInt(i int) ([]byte, error) {
 	return SortedMarshalInt64(int64(i))
 }
 
 func SortedMarshalInt64(i int64) ([]byte, error) {
-	b := make([]byte, 9)
-	binary.LittleEndian.PutUint64(b, uint64(i))
+	return SortedMarshalUint64(uint64(i), i >= 0), nil
+}
 
-	if i >= 0 {
+func SortedMarshalUint64(ui uint64, sign bool) []byte {
+	b := make([]byte, 9)
+
+	binary.LittleEndian.PutUint64(b, ui)
+
+	if sign {
 		b[8] = 1
 	} else {
 		b[8] = 0
 	}
 
-	return reverseByteSlice(b), nil
+	return reverseByteSlice(b)
 }
 
 func SortedUnmarshalInt(b []byte) (int, error) {
@@ -96,7 +119,11 @@ func SortedUnmarshalInt(b []byte) (int, error) {
 }
 
 func SortedUnmarshalInt64(b []byte) (int64, error) {
-	return int64(binary.LittleEndian.Uint64(reverseByteSlice(b[1:]))), nil
+	return int64(SortedUnmarshalUint64(b)), nil
+}
+
+func SortedUnmarshalUint64(b []byte) uint64 {
+	return binary.LittleEndian.Uint64(reverseByteSlice(b[1:]))
 }
 
 func reverseByteSlice(b []byte) []byte {
@@ -139,4 +166,31 @@ func SortedUnmarshalTime(b []byte) (time.Time, error) {
 	}
 
 	return time.Unix(value/int64(time.Second), value%int64(time.Second)), nil
+}
+
+/* Marshal Duration */
+func SortedMarshalDuration(d time.Duration) ([]byte, error) {
+	return SortedMarshalInt64(d.Nanoseconds())
+}
+
+func SortedUnmarshalDuration(b []byte) (time.Duration, error) {
+	value, err := SortedUnmarshalInt64(b)
+	if err != nil {
+		return time.Duration(0), err
+	}
+
+	return time.Duration(value), nil
+}
+
+/* Marshal float */
+func SortedMarshalFloat(f float64) ([]byte, error) {
+	val := math.Float64bits(f)
+
+	return SortedMarshalUint64(val, f >= 0.0), nil
+}
+
+func SortedUnmarshalFloat(b []byte) (float64, error) {
+	value := SortedUnmarshalUint64(b)
+
+	return math.Float64frombits(value), nil
 }

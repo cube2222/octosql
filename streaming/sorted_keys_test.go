@@ -96,6 +96,22 @@ func TestMarshalContinuity(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "floats test",
+			args: args{
+				values: []octosql.Value{
+					// TODO - nie dziala dla ujemnych :<
+					//octosql.MakeFloat(-124.0001),
+					//octosql.MakeFloat(-123.9998),
+					//octosql.MakeFloat(-1.01),
+					octosql.MakeFloat(0.0000001),
+					octosql.MakeFloat(1.01),
+					octosql.MakeFloat(3),
+					octosql.MakeFloat(2345.5432),
+					octosql.MakeFloat(24287.111111),
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

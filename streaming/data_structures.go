@@ -7,12 +7,24 @@ import (
 	"github.com/pkg/errors"
 )
 
+/*
+	We want the keys used in badger to be sorted.
+*/
+type SortableSerialization interface {
+	SortedMarshal() []byte
+	SortedUnmarshal([]byte) error
+}
+
 var ErrKeyNotFound = errors.New("couldn't find key")
 
 /* LinkedList */
 type LinkedList struct {
 	tx           StateTransaction
 	elementCount int
+}
+
+type LinkedListIterator struct {
+	it Iterator
 }
 
 func NewLinkedList(tx StateTransaction) *LinkedList {
@@ -22,17 +34,19 @@ func NewLinkedList(tx StateTransaction) *LinkedList {
 	}
 }
 
+func NewLinkedListIterator(it Iterator) *LinkedListIterator {
+	return &LinkedListIterator{
+		it: it,
+	}
+}
+
 func (ll *LinkedList) Append(value proto.Message) error {
 	data, err := proto.Marshal(value)
 	if err != nil {
 		return errors.Wrap(err, "couldn't serialize given value")
 	}
 
-	key := octosql.MakeInt(ll.elementCount)
-	byteKey, err := proto.Marshal(&key)
-	if err != nil {
-		return errors.Wrap(err, "couldn't translate key to bytes")
-	}
+	byteKey := SortedMarshalInt(ll.elementCount)
 
 	err = ll.tx.Set(byteKey, data)
 	if err != nil {
@@ -43,16 +57,37 @@ func (ll *LinkedList) Append(value proto.Message) error {
 	return nil
 }
 
-func (ll *LinkedList) GetIterator() Iterator {
+func (ll *LinkedList) GetIterator() *LinkedListIterator {
 	it := ll.tx.Iterator(badger.DefaultIteratorOptions)
 	it.Rewind()
 
-	return it
+	return NewLinkedListIterator(it)
+}
+
+func (lli *LinkedListIterator) Next(value proto.Message) error {
+	err := lli.it.Next(value)
+	if err != nil {
+		return errors.Wrap(err, "couldn't get next element from linked list")
+	}
+
+	return nil
+}
+
+func (lli *LinkedListIterator) Close() error {
+	return lli.it.Close()
+}
+
+func (lli *LinkedListIterator) Rewind() {
+	lli.it.Rewind()
 }
 
 /* Map */
 type Map struct {
 	tx StateTransaction
+}
+
+type MapIterator struct {
+	it Iterator
 }
 
 func NewMap(tx StateTransaction) *Map {
@@ -61,11 +96,14 @@ func NewMap(tx StateTransaction) *Map {
 	}
 }
 
-func (hm *Map) Set(key, value proto.Message) error {
-	byteKey, err := proto.Marshal(key)
-	if err != nil {
-		return errors.Wrap(err, "couldn't marshal key")
+func NewMapIterator(it Iterator) *MapIterator {
+	return &MapIterator{
+		it: it,
 	}
+}
+
+func (hm *Map) Set(key octosql.Value, value proto.Message) error {
+	byteKey := SortedMarshal(key)
 
 	byteValue, err := proto.Marshal(value)
 	if err != nil {
@@ -80,11 +118,8 @@ func (hm *Map) Set(key, value proto.Message) error {
 	return nil
 }
 
-func (hm *Map) Get(key, value proto.Message) error {
-	byteKey, err := proto.Marshal(key)
-	if err != nil {
-		return errors.Wrap(err, "couldn't marshal key")
-	}
+func (hm *Map) Get(key octosql.Value, value proto.Message) error {
+	byteKey := SortedMarshal(key)
 
 	data, err := hm.tx.Get(byteKey)
 	if err != nil {
@@ -95,19 +130,27 @@ func (hm *Map) Get(key, value proto.Message) error {
 	return err
 }
 
-func (hm *Map) GetIteratorWithPrefix(prefix []byte) Iterator {
+func (hm *Map) GetIteratorWithPrefix(prefix []byte) *MapIterator {
 	options := badger.DefaultIteratorOptions
 	options.Prefix = prefix
 
 	it := hm.tx.Iterator(options)
 
-	return it
+	return NewMapIterator(it)
 }
 
-func (hm *Map) GetIterator() Iterator {
+func (hm *Map) GetIterator() *MapIterator {
 	options := badger.DefaultIteratorOptions
 	it := hm.tx.Iterator(options)
-	return it
+	return NewMapIterator(it)
+}
+
+func (mi *MapIterator) Next(key octosql.Value, value proto.Message) error {
+
+}
+
+func (mi *MapIterator) Close() error {
+	return mi.it.Close()
 }
 
 /* ValueState */

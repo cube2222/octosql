@@ -9,10 +9,11 @@ import (
 
 /*
 	A type that implements this interface must have a SortedMarshal method,
-	that holds the property, that if x <= y (where <= is the less-equal relation
+	that has the property, that if x <= y (where <= is the less-equal relation
 	defined on a certain type, for example lexicographical order on strings) then
 	SortedMarshal(x) <= SortedMarshal(y) (where <= is the lexicographical order on
 	[]byte). Since in mathematics such a function is called Monotonous, thus the name.
+	A SortedUnmarshal which is the inverse of SortedMarshal is also required.
 */
 type MonotonicallySerializable interface {
 	SortedMarshal() []byte

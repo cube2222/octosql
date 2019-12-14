@@ -8,9 +8,13 @@ import (
 )
 
 /*
-	We want the keys used in badger to be sorted.
+	A type that implements this interface must have a SortedMarshal method,
+	that holds the property, that if x <= y (where <= is the less-equal relation
+	defined on a certain type, for example lexicographical order on strings) then
+	SortedMarshal(x) <= SortedMarshal(y) (where <= is the lexicographical order on
+	[]byte). Since in mathematics such a function is called Monotonous, thus the name.
 */
-type SortableSerialization interface {
+type MonotonicallySerializable interface {
 	SortedMarshal() []byte
 	SortedUnmarshal([]byte) error
 }
@@ -134,7 +138,7 @@ func NewMapIterator(it Iterator) *MapIterator {
 	}
 }
 
-func (hm *Map) Set(key SortableSerialization, value proto.Message) error {
+func (hm *Map) Set(key MonotonicallySerializable, value proto.Message) error {
 	byteKey := key.SortedMarshal()
 
 	byteValue, err := proto.Marshal(value)
@@ -150,7 +154,7 @@ func (hm *Map) Set(key SortableSerialization, value proto.Message) error {
 	return nil
 }
 
-func (hm *Map) Get(key SortableSerialization, value proto.Message) error {
+func (hm *Map) Get(key MonotonicallySerializable, value proto.Message) error {
 	byteKey := key.SortedMarshal()
 
 	data, err := hm.tx.Get(byteKey)
@@ -177,7 +181,7 @@ func (hm *Map) GetIterator() *MapIterator {
 	return NewMapIterator(it)
 }
 
-func (mi *MapIterator) Next(key SortableSerialization, value proto.Message) error {
+func (mi *MapIterator) Next(key MonotonicallySerializable, value proto.Message) error {
 	err := mi.it.NextWithKey(key, value)
 	return err
 }

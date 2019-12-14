@@ -42,13 +42,9 @@ func TestMarshal(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bytes, err := SortedMarshal(&tt.args.v)
-			if err != nil {
-				t.Errorf("SortedMarshal() error = %v, wantErr false", err)
-				return
-			}
+			bytes := SortedMarshal(&tt.args.v)
 
-			err = SortedUnmarshal(bytes, &tt.args.b)
+			err := SortedUnmarshal(bytes, &tt.args.b)
 			if err != nil {
 				t.Errorf("SortedMarshal() error = %v, wantErr false", err)
 				return
@@ -120,12 +116,7 @@ func TestMarshalContinuity(t *testing.T) {
 			marshaled := make([][]byte, argCount)
 
 			for i := 0; i < argCount; i++ {
-				bytes, err := SortedMarshal(&tt.args.values[i])
-				if err != nil {
-					t.Errorf("SortedMarshal() error = %v, wantErr false", err)
-					return
-				}
-
+				bytes := SortedMarshal(&tt.args.values[i])
 				marshaled[i] = bytes
 			}
 

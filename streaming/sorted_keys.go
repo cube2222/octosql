@@ -6,11 +6,12 @@ import (
 	"time"
 
 	"github.com/cube2222/octosql"
+	"github.com/pkg/errors"
 )
 
 //TODO: Should these (especially marshals) throw errors?
 
-func SortedMarshal(v *octosql.Value) ([]byte, error) {
+func SortedMarshal(v *octosql.Value) []byte {
 	switch v.GetType() {
 	case octosql.TypeString:
 		return SortedMarshalString(v.AsString())
@@ -25,7 +26,7 @@ func SortedMarshal(v *octosql.Value) ([]byte, error) {
 	case octosql.TypeFloat:
 		return SortedMarshalFloat(v.AsFloat())
 	default: //TODO: add other types - tuple/object
-		return nil, nil
+		return nil
 	}
 }
 
@@ -83,8 +84,8 @@ func SortedUnmarshal(b []byte, v *octosql.Value) error {
 }
 
 /* Marshal string */
-func SortedMarshalString(s string) ([]byte, error) {
-	return []byte(s), nil
+func SortedMarshalString(s string) []byte {
+	return []byte(s)
 }
 
 func SortedUnmarshalString(b []byte) (string, error) {
@@ -92,12 +93,12 @@ func SortedUnmarshalString(b []byte) (string, error) {
 }
 
 /* Marshal int and int64 */
-func SortedMarshalInt(i int) ([]byte, error) {
+func SortedMarshalInt(i int) []byte {
 	return SortedMarshalInt64(int64(i))
 }
 
-func SortedMarshalInt64(i int64) ([]byte, error) {
-	return SortedMarshalUint64(uint64(i), i >= 0), nil
+func SortedMarshalInt64(i int64) []byte {
+	return SortedMarshalUint64(uint64(i), i >= 0)
 }
 
 func SortedMarshalUint64(ui uint64, sign bool) []byte {
@@ -115,15 +116,26 @@ func SortedMarshalUint64(ui uint64, sign bool) []byte {
 }
 
 func SortedUnmarshalInt(b []byte) (int, error) {
+	if len(b) != 9 {
+		return 0, errors.New("incorrect int key size")
+	}
 	return int(binary.LittleEndian.Uint64(reverseByteSlice(b[1:]))), nil
 }
 
 func SortedUnmarshalInt64(b []byte) (int64, error) {
-	return int64(SortedUnmarshalUint64(b)), nil
+	value, err := SortedUnmarshalUint64(b)
+	if err != nil {
+		return 0, errors.Wrap(err, "incorrect int64 key size")
+	}
+
+	return int64(value), nil
 }
 
-func SortedUnmarshalUint64(b []byte) uint64 {
-	return binary.LittleEndian.Uint64(reverseByteSlice(b[1:]))
+func SortedUnmarshalUint64(b []byte) (uint64, error) {
+	if len(b) != 9 {
+		return 0, errors.New("incorrect uint64 key size")
+	}
+	return binary.LittleEndian.Uint64(reverseByteSlice(b[1:])), nil
 }
 
 func reverseByteSlice(b []byte) []byte {
@@ -138,59 +150,69 @@ func reverseByteSlice(b []byte) []byte {
 }
 
 /* Marshal bool */
-func SortedMarshalBool(b bool) ([]byte, error) {
+func SortedMarshalBool(b bool) []byte {
 	if b {
-		return []byte{1}, nil
+		return []byte{1}
 	}
 
-	return []byte{0}, nil
+	return []byte{0}
 }
 
 func SortedUnmarshalBool(b []byte) (bool, error) {
-	if b[0] == 0 {
-		return false, nil
+	if len(b) != 1 {
+		return false, errors.New("incorrect bool key size")
 	}
 
-	return true, nil
+	switch b[0] {
+	case 0:
+		return false, nil
+	case 1:
+		return true, nil
+	default:
+		return false, errors.New("incorrect bool key value")
+	}
 }
 
 /* Marshal Timestamp */
-func SortedMarshalTime(t time.Time) ([]byte, error) {
+func SortedMarshalTime(t time.Time) []byte {
 	return SortedMarshalInt64(t.UnixNano())
 }
 
 func SortedUnmarshalTime(b []byte) (time.Time, error) {
 	value, err := SortedUnmarshalInt64(b)
 	if err != nil {
-		return time.Now(), err
+		return time.Now(), errors.Wrap(err, "incorrect time key representation")
 	}
 
 	return time.Unix(value/int64(time.Second), value%int64(time.Second)), nil
 }
 
 /* Marshal Duration */
-func SortedMarshalDuration(d time.Duration) ([]byte, error) {
+func SortedMarshalDuration(d time.Duration) []byte {
 	return SortedMarshalInt64(d.Nanoseconds())
 }
 
 func SortedUnmarshalDuration(b []byte) (time.Duration, error) {
 	value, err := SortedUnmarshalInt64(b)
 	if err != nil {
-		return time.Duration(0), err
+		return time.Duration(0), errors.Wrap(err, "incorrect duration key representation")
 	}
 
 	return time.Duration(value), nil
 }
 
 /* Marshal float */
-func SortedMarshalFloat(f float64) ([]byte, error) {
+func SortedMarshalFloat(f float64) []byte {
 	val := math.Float64bits(f)
 
-	return SortedMarshalUint64(val, f >= 0.0), nil
+	return SortedMarshalUint64(val, f >= 0.0)
 }
 
 func SortedUnmarshalFloat(b []byte) (float64, error) {
-	value := SortedUnmarshalUint64(b)
+	value, err := SortedUnmarshalUint64(b)
+	if err != nil {
+		return 0.0, errors.Wrap(err, "incorrect float key representation")
+	}
 
 	return math.Float64frombits(value), nil
 }

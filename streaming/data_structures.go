@@ -46,7 +46,7 @@ func (ll *LinkedList) Append(value proto.Message) error {
 		return errors.Wrap(err, "couldn't serialize given value")
 	}
 
-	byteKey := SortedMarshalInt(ll.elementCount)
+	byteKey := octosql.SortedMarshalInt(ll.elementCount)
 
 	err = ll.tx.Set(byteKey, data)
 	if err != nil {
@@ -102,8 +102,8 @@ func NewMapIterator(it Iterator) *MapIterator {
 	}
 }
 
-func (hm *Map) Set(key octosql.Value, value proto.Message) error {
-	byteKey := SortedMarshal(key)
+func (hm *Map) Set(key SortableSerialization, value proto.Message) error {
+	byteKey := key.SortedMarshal()
 
 	byteValue, err := proto.Marshal(value)
 	if err != nil {
@@ -118,8 +118,8 @@ func (hm *Map) Set(key octosql.Value, value proto.Message) error {
 	return nil
 }
 
-func (hm *Map) Get(key octosql.Value, value proto.Message) error {
-	byteKey := SortedMarshal(key)
+func (hm *Map) Get(key SortableSerialization, value proto.Message) error {
+	byteKey := key.SortedMarshal()
 
 	data, err := hm.tx.Get(byteKey)
 	if err != nil {

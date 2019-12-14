@@ -9,8 +9,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-//TODO: Should these (especially marshals) throw errors?
-
 func SortedMarshal(v *octosql.Value) []byte {
 	switch v.GetType() {
 	case octosql.TypeString:
@@ -23,7 +21,7 @@ func SortedMarshal(v *octosql.Value) []byte {
 		return SortedMarshalTime(v.AsTime())
 	case octosql.TypeDuration:
 		return SortedMarshalDuration(v.AsDuration())
-	case octosql.TypeFloat:
+	case octosql.TypeFloat: // TODO - fix
 		return SortedMarshalFloat(v.AsFloat())
 	default: //TODO: add other types - tuple/object
 		return nil
@@ -69,7 +67,7 @@ func SortedUnmarshal(b []byte, v *octosql.Value) error {
 		}
 
 		*v = octosql.MakeDuration(u)
-	case octosql.TypeFloat:
+	case octosql.TypeFloat: // TODO - fix
 		u, err := SortedUnmarshalFloat(b)
 		if err != nil {
 			return err

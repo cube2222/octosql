@@ -145,8 +145,13 @@ func (hm *Map) GetIterator() *MapIterator {
 	return NewMapIterator(it)
 }
 
-func (mi *MapIterator) Next(key octosql.Value, value proto.Message) error {
+func (mi *MapIterator) Next(key SortableSerialization, value proto.Message) error {
+	err := mi.it.NextWithKey(key, value)
+	return err
+}
 
+func (mi *MapIterator) Rewind() {
+	mi.it.Rewind()
 }
 
 func (mi *MapIterator) Close() error {

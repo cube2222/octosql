@@ -52,7 +52,7 @@ func SortedUnmarshal(b []byte, v *octosql.Value) error {
 			return err
 		}
 
-		*v = octosql.MakeBool(u)
+		*v = octosql.MakeBool(u) // TODO - what about Phantom and Null? They don't need an argument
 	case octosql.TypeTime:
 		u, err := SortedUnmarshalTime(b)
 		if err != nil {

@@ -1,17 +1,15 @@
-package streaming
+package octosql
 
 import (
 	"math"
 	"reflect"
 	"testing"
-
-	"github.com/cube2222/octosql"
 )
 
 func TestMarshal(t *testing.T) {
 	type args struct {
-		v octosql.Value
-		b octosql.Value
+		v Value
+		b Value
 	}
 	tests := []struct {
 		name string
@@ -20,31 +18,31 @@ func TestMarshal(t *testing.T) {
 		{
 			name: "string test",
 			args: args{
-				v: octosql.MakeString("ala ma kota i psa"),
-				b: octosql.ZeroString(),
+				v: MakeString("ala ma kota i psa"),
+				b: ZeroString(),
 			},
 		},
 		{
 			name: "negative int test",
 			args: args{
-				v: octosql.MakeInt(-18249),
-				b: octosql.ZeroInt(),
+				v: MakeInt(-18249),
+				b: ZeroInt(),
 			},
 		},
 		{
 			name: "positive int test",
 			args: args{
-				v: octosql.MakeInt(1587129),
-				b: octosql.ZeroInt(),
+				v: MakeInt(1587129),
+				b: ZeroInt(),
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bytes := SortedMarshal(&tt.args.v)
+			bytes := sortedMarshal(&tt.args.v)
 
-			err := SortedUnmarshal(bytes, &tt.args.b)
+			err := sortedUnmarshal(bytes, &tt.args.b)
 			if err != nil {
 				t.Errorf("SortedMarshal() error = %v, wantErr false", err)
 				return
@@ -59,7 +57,7 @@ func TestMarshal(t *testing.T) {
 
 func TestMarshalContinuity(t *testing.T) {
 	type args struct {
-		values []octosql.Value
+		values []Value
 	}
 	tests := []struct {
 		name string
@@ -68,43 +66,43 @@ func TestMarshalContinuity(t *testing.T) {
 		{
 			name: "strings test",
 			args: args{
-				values: []octosql.Value{
-					octosql.MakeString("ala ma kota"),
-					octosql.MakeString("ala ma psa"),
-					octosql.MakeString("bartek ma papugi"),
+				values: []Value{
+					MakeString("ala ma kota"),
+					MakeString("ala ma psa"),
+					MakeString("bartek ma papugi"),
 				},
 			},
 		},
 		{
 			name: "ints test",
 			args: args{
-				values: []octosql.Value{
-					octosql.MakeInt(math.MinInt64),
-					octosql.MakeInt(-456),
-					octosql.MakeInt(-189),
-					octosql.MakeInt(-10),
-					octosql.MakeInt(0),
-					octosql.MakeInt(1),
-					octosql.MakeInt(3),
-					octosql.MakeInt(17),
-					octosql.MakeInt(24287),
-					octosql.MakeInt(math.MaxInt64),
+				values: []Value{
+					MakeInt(math.MinInt64),
+					MakeInt(-456),
+					MakeInt(-189),
+					MakeInt(-10),
+					MakeInt(0),
+					MakeInt(1),
+					MakeInt(3),
+					MakeInt(17),
+					MakeInt(24287),
+					MakeInt(math.MaxInt64),
 				},
 			},
 		},
 		{
 			name: "floats test",
 			args: args{
-				values: []octosql.Value{
+				values: []Value{
 					// TODO - nie dziala dla ujemnych :<
 					//octosql.MakeFloat(-124.0001),
 					//octosql.MakeFloat(-123.9998),
 					//octosql.MakeFloat(-1.01),
-					octosql.MakeFloat(0.0000001),
-					octosql.MakeFloat(1.01),
-					octosql.MakeFloat(3),
-					octosql.MakeFloat(2345.5432),
-					octosql.MakeFloat(24287.111111),
+					MakeFloat(0.0000001),
+					MakeFloat(1.01),
+					MakeFloat(3),
+					MakeFloat(2345.5432),
+					MakeFloat(24287.111111),
 				},
 			},
 		},
@@ -116,7 +114,7 @@ func TestMarshalContinuity(t *testing.T) {
 			marshaled := make([][]byte, argCount)
 
 			for i := 0; i < argCount; i++ {
-				bytes := SortedMarshal(&tt.args.values[i])
+				bytes := sortedMarshal(&tt.args.values[i])
 				marshaled[i] = bytes
 			}
 

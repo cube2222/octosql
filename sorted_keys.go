@@ -1,79 +1,87 @@
-package streaming
+package octosql
 
 import (
 	"encoding/binary"
 	"math"
 	"time"
 
-	"github.com/cube2222/octosql"
 	"github.com/pkg/errors"
 )
 
-func SortedMarshal(v *octosql.Value) []byte {
+func (v *Value) SortedMarshal() []byte {
+	return sortedMarshal(v)
+}
+
+func (v *Value) SortedUnmarshal(b []byte) error {
+	err := sortedUnmarshal(b, v)
+	return err
+}
+
+func sortedMarshal(v *Value) []byte {
 	switch v.GetType() {
-	case octosql.TypeString:
+	case TypeString:
 		return SortedMarshalString(v.AsString())
-	case octosql.TypeInt:
+	case TypeInt:
 		return SortedMarshalInt(v.AsInt())
-	case octosql.TypeBool, octosql.TypePhantom, octosql.TypeNull:
+	case TypeBool, TypePhantom, TypeNull:
 		return SortedMarshalBool(v.AsBool())
-	case octosql.TypeTime:
+	case TypeTime:
 		return SortedMarshalTime(v.AsTime())
-	case octosql.TypeDuration:
+	case TypeDuration:
 		return SortedMarshalDuration(v.AsDuration())
-	case octosql.TypeFloat: // TODO - fix
+	case TypeFloat: // TODO - fix
 		return SortedMarshalFloat(v.AsFloat())
 	default: //TODO: add other types - tuple/object
 		return nil
 	}
 }
 
-func SortedUnmarshal(b []byte, v *octosql.Value) error {
+func sortedUnmarshal(b []byte, v *Value) error {
 	switch v.GetType() {
-	case octosql.TypeString:
+	case TypeString:
 		u, err := SortedUnmarshalString(b)
 		if err != nil {
 			return err
 		}
 
-		*v = octosql.MakeString(u)
+		*v = MakeString(u)
 		return nil
-	case octosql.TypeInt:
+	case TypeInt:
 		u, err := SortedUnmarshalInt(b)
 		if err != nil {
 			return err
 		}
 
-		*v = octosql.MakeInt(u)
+		*v = MakeInt(u)
 		return nil
-	case octosql.TypeBool, octosql.TypePhantom, octosql.TypeNull:
+	case TypeBool, TypePhantom, TypeNull:
 		u, err := SortedUnmarshalBool(b)
 		if err != nil {
 			return err
 		}
 
-		*v = octosql.MakeBool(u) // TODO - what about Phantom and Null? They don't need an argument
-	case octosql.TypeTime:
+		*v = MakeBool(u) // TODO - what about Phantom and Null? They don't need an argument
+	case TypeTime:
 		u, err := SortedUnmarshalTime(b)
 		if err != nil {
 			return err
 		}
 
-		*v = octosql.MakeTime(u)
-	case octosql.TypeDuration:
+		*v = MakeTime(u)
+	case TypeDuration:
 		u, err := SortedUnmarshalDuration(b)
 		if err != nil {
 			return err
 		}
 
-		*v = octosql.MakeDuration(u)
-	case octosql.TypeFloat: // TODO - fix
+		*v = MakeDuration(u)
+	case TypeFloat: // TODO - fix
 		u, err := SortedUnmarshalFloat(b)
 		if err != nil {
 			return err
 		}
 
-		*v = octosql.MakeFloat(u)
+		*v = MakeFloat(u)
 	default: //TODO: add other types
 		return nil
 	}

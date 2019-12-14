@@ -123,7 +123,7 @@ func SortedUnmarshalInt(b []byte) (int, error) {
 func SortedUnmarshalInt64(b []byte) (int64, error) {
 	value, err := SortedUnmarshalUint64(b)
 	if err != nil {
-		return 0, errors.Wrap(err, "incorrect int64 key size")
+		return 0, errors.New("incorrect int64 key size")
 	}
 
 	return int64(value), nil

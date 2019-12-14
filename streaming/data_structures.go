@@ -7,6 +7,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+var ErrKeyNotFound = errors.New("couldn't find key")
+
 /* LinkedList */
 type LinkedList struct {
 	tx           StateTransaction
@@ -86,7 +88,7 @@ func (hm *Map) Get(key, value proto.Message) error {
 
 	data, err := hm.tx.Get(byteKey)
 	if err != nil {
-		return errors.Wrap(err, "couldn't get element from dictionary")
+		return ErrKeyNotFound
 	}
 
 	err = proto.Unmarshal(data, value)
@@ -136,7 +138,7 @@ func (vs *ValueState) Set(value proto.Message) error {
 func (vs *ValueState) Get(value proto.Message) error {
 	data, err := vs.tx.Get(nil)
 	if err != nil {
-		return errors.Wrap(err, "couldn't get element from dictionary")
+		return ErrKeyNotFound
 	}
 
 	err = proto.Unmarshal(data, value)

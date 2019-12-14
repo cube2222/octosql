@@ -21,6 +21,7 @@ var ErrKeyNotFound = errors.New("couldn't find key")
 type LinkedList struct {
 	tx           StateTransaction
 	elementCount int
+	firstElement int
 }
 
 type LinkedListIterator struct {
@@ -31,6 +32,7 @@ func NewLinkedList(tx StateTransaction) *LinkedList {
 	return &LinkedList{
 		tx:           tx,
 		elementCount: 0,
+		firstElement: 0,
 	}
 }
 
@@ -54,6 +56,36 @@ func (ll *LinkedList) Append(value proto.Message) error {
 	}
 
 	ll.elementCount += 1
+	return nil
+}
+
+func (ll *LinkedList) Peek(value proto.Message) error {
+	firstKey := octosql.SortedMarshalInt(ll.firstElement)
+
+	data, err := ll.tx.Get(firstKey)
+	if err != nil {
+		return errors.New("couldn't get the value of first element of list")
+	}
+
+	err = proto.Unmarshal(data, value)
+	return err //TODO: wrap this?
+}
+
+//TODO: this is suboptimal since it calculates the firstKey twice, but meh...
+func (ll *LinkedList) Pop(value proto.Message) error {
+	err := ll.Peek(value)
+	if err != nil {
+		return err
+	}
+
+	firstKey := octosql.SortedMarshalInt(ll.firstElement)
+
+	err = ll.tx.Delete(firstKey)
+	if err != nil {
+		return errors.New("couldn't delete first element of list")
+	}
+
+	ll.firstElement++
 	return nil
 }
 

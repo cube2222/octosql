@@ -346,6 +346,35 @@ const (
 	TypeObject
 )
 
+func (t Type) String() string {
+	switch t {
+	case TypeZero:
+		return "Zero"
+	case TypeNull:
+		return "Null"
+	case TypePhantom:
+		return "Phantom"
+	case TypeInt:
+		return "Int"
+	case TypeFloat:
+		return "Float"
+	case TypeBool:
+		return "Bool"
+	case TypeString:
+		return "String"
+	case TypeTime:
+		return "Time"
+	case TypeDuration:
+		return "Duration"
+	case TypeTuple:
+		return "Tuple"
+	case TypeObject:
+		return "Object"
+	default:
+		panic("invalid type")
+	}
+}
+
 // Można na tych Value pod spodem zdefiniowac GetType i użyć wirtualnych metod, a nie type switch
 func (v Value) GetType() Type {
 	switch v.Value.(type) {

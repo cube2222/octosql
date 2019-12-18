@@ -33,7 +33,7 @@ func (rel *Equal) Apply(ctx context.Context, variables octosql.Variables, left, 
 	if leftValue.GetType() != rightValue.GetType() {
 		return false, errors.Errorf(
 			"invalid operands to equal %v and %v with types %v and %v",
-			leftValue, rightValue, leftValue.GetType(), rightValue.GetType())
+			leftValue.Show(), rightValue.Show(), leftValue.GetType(), rightValue.GetType())
 	}
 
 	return octosql.AreEqual(leftValue, rightValue), nil
@@ -73,7 +73,7 @@ func (rel *MoreThan) Apply(ctx context.Context, variables octosql.Variables, lef
 	if leftValue.GetType() != rightValue.GetType() {
 		return false, errors.Errorf(
 			"invalid operands to more_than %v and %v with types %v and %v",
-			leftValue, rightValue, leftValue.GetType(), rightValue.GetType())
+			leftValue.Show(), rightValue.Show(), leftValue.GetType(), rightValue.GetType())
 	}
 
 	switch leftValue.GetType() {
@@ -88,7 +88,7 @@ func (rel *MoreThan) Apply(ctx context.Context, variables octosql.Variables, lef
 	case octosql.TypeNull, octosql.TypePhantom, octosql.TypeBool, octosql.TypeDuration, octosql.TypeTuple, octosql.TypeObject:
 		return false, errors.Errorf(
 			"invalid operands to more_than %v and %v with types %v and %v, only int, float, string and time allowed",
-			leftValue, rightValue, leftValue.GetType(), rightValue.GetType())
+			leftValue.Show(), rightValue.Show(), leftValue.GetType(), rightValue.GetType())
 	}
 
 	panic("unreachable")
@@ -160,12 +160,12 @@ func (rel *Like) Apply(ctx context.Context, variables octosql.Variables, left, r
 	if leftValue.GetType() != octosql.TypeString {
 		return false, errors.Errorf(
 			"invalid operands to like %v and %v with types %v and %v, only string allowed",
-			leftValue, rightValue, leftValue.GetType(), rightValue.GetType())
+			leftValue.Show(), rightValue.Show(), leftValue.GetType(), rightValue.GetType())
 	}
 	if rightValue.GetType() != octosql.TypeString {
 		return false, errors.Errorf(
 			"invalid operands to like %v and %v with types %v and %v, only string allowed",
-			leftValue, rightValue, leftValue.GetType(), rightValue.GetType())
+			leftValue.Show(), rightValue.Show(), leftValue.GetType(), rightValue.GetType())
 	}
 
 	match, err := regexp.MatchString(rightValue.AsString(), leftValue.AsString())

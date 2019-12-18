@@ -355,10 +355,6 @@ func SortedMarshalTuple(vs []*Value) []byte {
 	return result
 }
 
-func SortedUnmarshalTuple(b []byte) ([]*Value, error) {
-
-}
-
 func log256(x int) int {
 	return int(math.Ceil(8.0 * float64(x)))
 }

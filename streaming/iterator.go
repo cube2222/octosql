@@ -12,7 +12,7 @@ var ErrEndOfIterator = errors.New("end of iterator")
 
 type Iterator interface {
 	Next(proto.Message) error
-	NextWithKey(key SortableSerialization, value proto.Message) error
+	NextWithKey(key MonotonicallySerializable, value proto.Message) error
 	Rewind()
 	io.Closer
 }
@@ -51,7 +51,7 @@ func (bi *BadgerIterator) currentValue(value proto.Message) error {
 	return nil
 }
 
-func (bi *BadgerIterator) currentKey(key SortableSerialization) error {
+func (bi *BadgerIterator) currentKey(key MonotonicallySerializable) error {
 	if !bi.it.Valid() {
 		return ErrEndOfIterator
 	}
@@ -74,7 +74,7 @@ func (bi *BadgerIterator) Next(value proto.Message) error {
 	return nil
 }
 
-func (bi *BadgerIterator) NextWithKey(key SortableSerialization, value proto.Message) error {
+func (bi *BadgerIterator) NextWithKey(key MonotonicallySerializable, value proto.Message) error {
 	err := bi.currentKey(key)
 	if err != nil {
 		return err

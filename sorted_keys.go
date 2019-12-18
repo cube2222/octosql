@@ -285,12 +285,13 @@ func SortedMarshalString(s string) []byte {
 	bytes := make([]byte, 1)
 	bytes[0] = StringIdentifier
 	bytes = append(bytes, []byte(s)...)
+	bytes = append(bytes, 0) /* we assume that no zero bytes will appear */
 
 	return bytes
 }
 
 func SortedUnmarshalString(b []byte) (string, error) {
-	return string(b[1:]), nil
+	return string(b[1 : len(b)-1]), nil
 }
 
 /* Marshal Timestamp */

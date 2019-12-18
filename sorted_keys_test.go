@@ -9,7 +9,6 @@ import (
 func TestMarshal(t *testing.T) {
 	type args struct {
 		v Value
-		b Value
 	}
 	tests := []struct {
 		name string
@@ -19,36 +18,38 @@ func TestMarshal(t *testing.T) {
 			name: "string test",
 			args: args{
 				v: MakeString("ala ma kota i psa"),
-				b: ZeroString(),
 			},
 		},
 		{
 			name: "negative int test",
 			args: args{
 				v: MakeInt(-18249),
-				b: ZeroInt(),
 			},
 		},
 		{
 			name: "positive int test",
 			args: args{
 				v: MakeInt(1587129),
-				b: ZeroInt(),
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bytes := sortedMarshal(&tt.args.v)
+			var b *Value
 
-			err := sortedUnmarshal(bytes, &tt.args.b)
+			vType := tt.args.v.GetType()
+			println(vType)
+
+			bytes := (&tt.args.v).SortedMarshal()
+
+			err := b.SortedUnmarshal(bytes)
 			if err != nil {
 				t.Errorf("SortedMarshal() error = %v, wantErr false", err)
 				return
 			}
 
-			if !reflect.DeepEqual(tt.args.v, tt.args.b) {
+			if !reflect.DeepEqual(tt.args.v, b) {
 				t.Errorf("Values are not equal!")
 			}
 		})

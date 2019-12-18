@@ -8,13 +8,106 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	NullIdentifier      = 1
+	PhantomIdentifier   = 2
+	IntIdentifier       = 3
+	FloatIdentifier     = 4
+	BoolIdentifier      = 5
+	StringIdentifier    = 6
+	TimestampIdentifier = 7
+	DurationIdentifier  = 8
+	TupleIdentifier     = 9
+	ObjectIdentifier    = 10
+)
+
+const (
+	NumberMarshalLength      = 1 + 1 + 8 // b[0] = type, b[1] = sign, b[2:] = marshal
+	BoolMarshalLength        = 1 + 1     // b[0] = type, b[1] = 0/1
+	NonexistentMarshalLength = 1         // null and phantom
+)
+
 func (v *Value) SortedMarshal() []byte {
 	return sortedMarshal(v)
 }
 
-func (v *Value) SortedUnmarshal(b []byte) error {
-	err := sortedUnmarshal(b, v)
-	return err
+func (v *Value) SortedUnmarshal(bytes []byte) error {
+	if len(bytes) == 0 {
+		return errors.New("empty byte slice given to unmarshal")
+	}
+
+	identifier := int(bytes[0])
+
+	var finalValue Value
+
+	switch identifier {
+	case NullIdentifier:
+		err := SortedUnmarshalNull(bytes)
+		if err != nil {
+			return err
+		}
+
+		finalValue = MakeNull()
+	case PhantomIdentifier:
+		err := SortedUnmarshalPhantom(bytes)
+		if err != nil {
+			return err
+		}
+
+		finalValue = MakePhantom()
+	case IntIdentifier:
+		result, err := SortedUnmarshalInt(bytes)
+		if err != nil {
+			return err
+		}
+
+		finalValue = MakeInt(result)
+	case FloatIdentifier:
+		result, err := SortedUnmarshalFloat(bytes)
+		if err != nil {
+			return err
+		}
+
+		finalValue = MakeFloat(result)
+	case BoolIdentifier:
+		result, err := SortedUnmarshalBool(bytes)
+		if err != nil {
+			return err
+		}
+
+		finalValue = MakeBool(result)
+	case StringIdentifier:
+		result, err := SortedUnmarshalString(bytes)
+		if err != nil {
+			return err
+		}
+
+		finalValue = MakeString(result)
+	case TimestampIdentifier:
+		result, err := SortedUnmarshalTime(bytes)
+		if err != nil {
+			return err
+		}
+
+		finalValue = MakeTime(result)
+	case DurationIdentifier:
+		result, err := SortedUnmarshalDuration(bytes)
+		if err != nil {
+			return err
+		}
+
+		finalValue = MakeDuration(result)
+	case TupleIdentifier:
+		panic("implement me!")
+	case ObjectIdentifier:
+		panic("implement me!")
+
+	default:
+		panic("unsupported type")
+	}
+
+	v = &finalValue
+	return nil
 }
 
 func sortedMarshal(v *Value) []byte {
@@ -23,8 +116,12 @@ func sortedMarshal(v *Value) []byte {
 		return SortedMarshalString(v.AsString())
 	case TypeInt:
 		return SortedMarshalInt(v.AsInt())
-	case TypeBool, TypePhantom, TypeNull:
+	case TypeBool:
 		return SortedMarshalBool(v.AsBool())
+	case TypeNull:
+		return SortedMarshalNull()
+	case TypePhantom:
+		return SortedMarshalPhantom()
 	case TypeTime:
 		return SortedMarshalTime(v.AsTime())
 	case TypeDuration:
@@ -36,112 +133,90 @@ func sortedMarshal(v *Value) []byte {
 	}
 }
 
-func sortedUnmarshal(b []byte, v *Value) error {
-	switch v.GetType() {
-	case TypeString:
-		u, err := SortedUnmarshalString(b)
-		if err != nil {
-			return err
-		}
+/* Marshal null */
+func SortedMarshalNull() []byte {
+	return []byte{NullIdentifier}
+}
 
-		*v = MakeString(u)
-		return nil
-	case TypeInt:
-		u, err := SortedUnmarshalInt(b)
-		if err != nil {
-			return err
-		}
-
-		*v = MakeInt(u)
-		return nil
-	case TypeBool, TypePhantom, TypeNull:
-		u, err := SortedUnmarshalBool(b)
-		if err != nil {
-			return err
-		}
-
-		*v = MakeBool(u) // TODO - what about Phantom and Null? They don't need an argument
-	case TypeTime:
-		u, err := SortedUnmarshalTime(b)
-		if err != nil {
-			return err
-		}
-
-		*v = MakeTime(u)
-	case TypeDuration:
-		u, err := SortedUnmarshalDuration(b)
-		if err != nil {
-			return err
-		}
-
-		*v = MakeDuration(u)
-	case TypeFloat: // TODO - fix
-		u, err := SortedUnmarshalFloat(b)
-		if err != nil {
-			return err
-		}
-
-		*v = MakeFloat(u)
-	default: //TODO: add other types
-		return nil
+func SortedUnmarshalNull(b []byte) error {
+	if len(b) != NonexistentMarshalLength {
+		return errors.New("incorrect null key size")
 	}
 
-	panic("unreachable")
+	if b[0] != NullIdentifier {
+		return errors.New("incorrect null key value")
+	}
+
+	return nil
+}
+
+/* Marshal phantom */
+func SortedMarshalPhantom() []byte {
+	return []byte{PhantomIdentifier}
+}
+
+func SortedUnmarshalPhantom(b []byte) error {
+	if len(b) != NonexistentMarshalLength {
+		return errors.New("incorrect null key size")
+	}
+
+	if b[0] != PhantomIdentifier {
+		return errors.New("incorrect null key value")
+	}
+
+	return nil
 }
 
 /* Marshal string */
 func SortedMarshalString(s string) []byte {
-	return []byte(s)
+	bytes := make([]byte, 1)
+	bytes[0] = StringIdentifier
+	bytes = append(bytes, []byte(s)...)
+
+	return bytes
 }
 
 func SortedUnmarshalString(b []byte) (string, error) {
-	return string(b), nil
+	return string(b[1:]), nil
 }
 
 /* Marshal int and int64 */
 func SortedMarshalInt(i int) []byte {
-	return SortedMarshalInt64(int64(i))
-}
-
-func SortedMarshalInt64(i int64) []byte {
 	return SortedMarshalUint64(uint64(i), i >= 0)
 }
 
 func SortedMarshalUint64(ui uint64, sign bool) []byte {
-	b := make([]byte, 9)
+	b := make([]byte, NumberMarshalLength)
 
 	binary.LittleEndian.PutUint64(b, ui)
 
+	/* store sign of the number */
 	if sign {
-		b[8] = 1
+		b[NumberMarshalLength-2] = 1
 	} else {
-		b[8] = 0
+		b[NumberMarshalLength-2] = 0
 	}
+
+	/* store type */
+	b[NumberMarshalLength-1] = IntIdentifier
 
 	return reverseByteSlice(b)
 }
 
 func SortedUnmarshalInt(b []byte) (int, error) {
-	if len(b) != 9 {
-		return 0, errors.New("incorrect int key size")
-	}
-	return int(binary.LittleEndian.Uint64(reverseByteSlice(b[1:]))), nil
-}
-
-func SortedUnmarshalInt64(b []byte) (int64, error) {
 	value, err := SortedUnmarshalUint64(b)
 	if err != nil {
 		return 0, errors.New("incorrect int64 key size")
 	}
 
-	return int64(value), nil
+	return int(value), nil
 }
 
 func SortedUnmarshalUint64(b []byte) (uint64, error) {
-	if len(b) != 9 {
+	if len(b) != NumberMarshalLength {
 		return 0, errors.New("incorrect uint64 key size")
 	}
-	return binary.LittleEndian.Uint64(reverseByteSlice(b[1:])), nil
+	return binary.LittleEndian.Uint64(reverseByteSlice(b[2:])), nil
 }
 
 func reverseByteSlice(b []byte) []byte {
@@ -157,19 +232,24 @@ func reverseByteSlice(b []byte) []byte {
 
 /* Marshal bool */
 func SortedMarshalBool(b bool) []byte {
+	bytes := make([]byte, BoolMarshalLength)
+	bytes[0] = byte(BoolIdentifier)
+
 	if b {
-		return []byte{1}
+		bytes[1] = 1
+	} else {
+		bytes[1] = 0
 	}
 
-	return []byte{0}
+	return bytes
 }
 
 func SortedUnmarshalBool(b []byte) (bool, error) {
-	if len(b) != 1 {
+	if len(b) != BoolMarshalLength {
 		return false, errors.New("incorrect bool key size")
 	}
 
-	switch b[0] {
+	switch b[1] {
 	case 0:
 		return false, nil
 	case 1:
@@ -181,25 +261,33 @@ func SortedUnmarshalBool(b []byte) (bool, error) {
 
 /* Marshal Timestamp */
 func SortedMarshalTime(t time.Time) []byte {
-	return SortedMarshalInt64(t.UnixNano())
+	bytes := SortedMarshalUint64(uint64(t.UnixNano()), true)
+	bytes[0] = TimestampIdentifier
+
+	return bytes
 }
 
 func SortedUnmarshalTime(b []byte) (time.Time, error) {
-	value, err := SortedUnmarshalInt64(b)
+	value, err := SortedUnmarshalUint64(b)
 	if err != nil {
 		return time.Now(), errors.Wrap(err, "incorrect time key representation")
 	}
 
-	return time.Unix(value/int64(time.Second), value%int64(time.Second)), nil
+	int64Value := int64(value)
+
+	seconds := int64Value / int64(time.Second)
+	nanoseconds := int64Value % int64(time.Second)
+
+	return time.Unix(seconds, nanoseconds), nil
 }
 
 /* Marshal Duration */
 func SortedMarshalDuration(d time.Duration) []byte {
-	return SortedMarshalInt64(d.Nanoseconds())
+	return SortedMarshalUint64(uint64(d.Nanoseconds()), true)
 }
 
 func SortedUnmarshalDuration(b []byte) (time.Duration, error) {
-	value, err := SortedUnmarshalInt64(b)
+	value, err := SortedUnmarshalUint64(b)
 	if err != nil {
 		return time.Duration(0), errors.Wrap(err, "incorrect duration key representation")
 	}
@@ -209,9 +297,20 @@ func SortedUnmarshalDuration(b []byte) (time.Duration, error) {
 
 /* Marshal float */
 func SortedMarshalFloat(f float64) []byte {
-	val := math.Float64bits(f)
+	sign := f >= 0.0
 
-	return SortedMarshalUint64(val, f >= 0.0)
+	var val uint64
+
+	if sign {
+		val = math.Float64bits(f)
+	} else {
+		val = math.Float64bits(math.MaxFloat64 + f)
+	}
+
+	bytes := SortedMarshalUint64(val, sign)
+	bytes[0] = FloatIdentifier
+
+	return bytes
 }
 
 func SortedUnmarshalFloat(b []byte) (float64, error) {
@@ -220,5 +319,12 @@ func SortedUnmarshalFloat(b []byte) (float64, error) {
 		return 0.0, errors.Wrap(err, "incorrect float key representation")
 	}
 
-	return math.Float64frombits(value), nil
+	floatValue := math.Float64frombits(value)
+	sign := b[1]
+
+	if sign == 0 {
+		return floatValue - math.MaxFloat64, nil
+	}
+
+	return floatValue, nil
 }

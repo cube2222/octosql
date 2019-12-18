@@ -329,3 +329,36 @@ func SortedUnmarshalDuration(b []byte) (time.Duration, error) {
 
 	return time.Duration(value), nil
 }
+
+/* Marshal Tuple */
+func SortedMarshalTuple(vs []*Value) []byte {
+	marshaledElements := make([]byte, 0)
+
+	for _, value := range vs {
+		bytes := sortedMarshal(value)
+		marshaledElements = append(marshaledElements, bytes...)
+	}
+
+	numberLength := log256(len(marshaledElements))
+
+	result := make([]byte, 1)
+	result[0] = TupleIdentifier
+
+	numberMarshal := SortedMarshalInt(numberLength)[2:] /* we omit the sign and identifier */
+	for i := 0; i < numberLength; i++ {
+		result = append(result, numberMarshal[i])
+	}
+
+	result = append(result, 0)
+	result = append(result, marshaledElements...)
+
+	return result
+}
+
+func SortedUnmarshalTuple(b []byte) ([]*Value, error) {
+
+}
+
+func log256(x int) int {
+	return int(math.Ceil(8.0 * float64(x)))
+}

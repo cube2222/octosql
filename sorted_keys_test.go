@@ -32,14 +32,23 @@ func TestMarshal(t *testing.T) {
 				v: MakeInt(1587129),
 			},
 		},
+		{
+			name: "negative float test",
+			args: args{
+				v: MakeFloat(-125721.127521),
+			},
+		},
+		{
+			name: "positive float test",
+			args: args{
+				v: MakeFloat(92881712.19291258),
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var b *Value
-
-			vType := tt.args.v.GetType()
-			println(vType)
+			var b Value
 
 			bytes := (&tt.args.v).SortedMarshal()
 
@@ -96,9 +105,9 @@ func TestMarshalContinuity(t *testing.T) {
 			args: args{
 				values: []Value{
 					// TODO - nie dziala dla ujemnych :<
-					//octosql.MakeFloat(-124.0001),
-					//octosql.MakeFloat(-123.9998),
-					//octosql.MakeFloat(-1.01),
+					MakeFloat(-124.0001),
+					MakeFloat(-123.9998),
+					MakeFloat(-1.01),
 					MakeFloat(0.0000001),
 					MakeFloat(1.01),
 					MakeFloat(3),

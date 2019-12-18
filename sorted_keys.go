@@ -106,7 +106,7 @@ func (v *Value) SortedUnmarshal(bytes []byte) error {
 		panic("unsupported type")
 	}
 
-	v = &finalValue
+	*v = finalValue
 	return nil
 }
 
@@ -167,19 +167,6 @@ func SortedUnmarshalPhantom(b []byte) error {
 	return nil
 }
 
-/* Marshal string */
-func SortedMarshalString(s string) []byte {
-	bytes := make([]byte, 1)
-	bytes[0] = StringIdentifier
-	bytes = append(bytes, []byte(s)...)
-
-	return bytes
-}
-
-func SortedUnmarshalString(b []byte) (string, error) {
-	return string(b[1:]), nil
-}
-
 /* Marshal int and int64 */
 func SortedMarshalInt(i int) []byte {
 	return SortedMarshalUint64(uint64(i), i >= 0)
@@ -230,6 +217,40 @@ func reverseByteSlice(b []byte) []byte {
 	return c
 }
 
+/* Marshal float */
+func SortedMarshalFloat(f float64) []byte {
+	sign := f >= 0.0
+
+	var val uint64
+
+	if sign {
+		val = math.Float64bits(f)
+	} else {
+		val = math.Float64bits(math.MaxFloat64 + f)
+	}
+
+	bytes := SortedMarshalUint64(val, sign)
+	bytes[0] = FloatIdentifier
+
+	return bytes
+}
+
+func SortedUnmarshalFloat(b []byte) (float64, error) {
+	value, err := SortedUnmarshalUint64(b)
+	if err != nil {
+		return 0.0, errors.Wrap(err, "incorrect float key representation")
+	}
+
+	floatValue := math.Float64frombits(value)
+	sign := b[1]
+
+	if sign == 0 {
+		return floatValue - math.MaxFloat64, nil
+	}
+
+	return floatValue, nil
+}
+
 /* Marshal bool */
 func SortedMarshalBool(b bool) []byte {
 	bytes := make([]byte, BoolMarshalLength)
@@ -257,6 +278,19 @@ func SortedUnmarshalBool(b []byte) (bool, error) {
 	default:
 		return false, errors.New("incorrect bool key value")
 	}
+}
+
+/* Marshal string */
+func SortedMarshalString(s string) []byte {
+	bytes := make([]byte, 1)
+	bytes[0] = StringIdentifier
+	bytes = append(bytes, []byte(s)...)
+
+	return bytes
+}
+
+func SortedUnmarshalString(b []byte) (string, error) {
+	return string(b[1:]), nil
 }
 
 /* Marshal Timestamp */
@@ -293,38 +327,4 @@ func SortedUnmarshalDuration(b []byte) (time.Duration, error) {
 	}
 
 	return time.Duration(value), nil
-}
-
-/* Marshal float */
-func SortedMarshalFloat(f float64) []byte {
-	sign := f >= 0.0
-
-	var val uint64
-
-	if sign {
-		val = math.Float64bits(f)
-	} else {
-		val = math.Float64bits(math.MaxFloat64 + f)
-	}
-
-	bytes := SortedMarshalUint64(val, sign)
-	bytes[0] = FloatIdentifier
-
-	return bytes
-}
-
-func SortedUnmarshalFloat(b []byte) (float64, error) {
-	value, err := SortedUnmarshalUint64(b)
-	if err != nil {
-		return 0.0, errors.Wrap(err, "incorrect float key representation")
-	}
-
-	floatValue := math.Float64frombits(value)
-	sign := b[1]
-
-	if sign == 0 {
-		return floatValue - math.MaxFloat64, nil
-	}
-
-	return floatValue, nil
 }

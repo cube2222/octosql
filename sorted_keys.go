@@ -33,8 +33,9 @@ const (
 )
 
 const (
-	StringDelimiter = 128
-	TupleDelimiter  = 129
+	StringDelimiter = 0
+	TupleDelimiter  = 1
+	BYTE_OFFSET     = 128
 )
 
 func (v *Value) SortedMarshal() []byte {
@@ -345,7 +346,10 @@ func SortedUnmarshalTime(b []byte) (time.Time, error) {
 
 /* Marshal Duration */
 func SortedMarshalDuration(d time.Duration) []byte {
-	return SortedMarshalUint64(uint64(d.Nanoseconds()), true)
+	bytes := SortedMarshalUint64(uint64(d.Nanoseconds()), true)
+	bytes[0] = DurationIdentifier
+
+	return bytes
 }
 
 func SortedUnmarshalDuration(b []byte) (time.Duration, error) {
@@ -416,13 +420,11 @@ func reverseByteSlice(b []byte) []byte {
 }
 
 func byteToTwoBytes(b byte) []byte {
-	/* b = x * 128 + y 0 <= y < 128 */
-
-	return []byte{b / 128, b % 128}
+	return []byte{BYTE_OFFSET + b/BYTE_OFFSET, BYTE_OFFSET + b%BYTE_OFFSET}
 }
 
 func twoBytesToByte(x, y byte) byte {
-	return 128*x + y
+	return BYTE_OFFSET*(x-BYTE_OFFSET) + (y - BYTE_OFFSET)
 }
 
 func findLengthOfUnmarshal(b []byte, startIndex, identifier int) int {

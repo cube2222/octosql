@@ -4,6 +4,7 @@ import (
 	"math"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestMarshal(t *testing.T) {
@@ -14,6 +15,22 @@ func TestMarshal(t *testing.T) {
 		name string
 		args args
 	}{
+		/* null test */
+		{
+			name: "null test",
+			args: args{
+				v: MakeNull(),
+			},
+		},
+		/* phantom test */
+		{
+			name: "phantom test",
+			args: args{
+				v: MakePhantom(),
+			},
+		},
+
+		/* int tests */
 		{
 			name: "int test with a negative number",
 			args: args{
@@ -32,6 +49,20 @@ func TestMarshal(t *testing.T) {
 				v: MakeInt(0),
 			},
 		},
+		/* bool tests */
+		{
+			name: "bool test - false",
+			args: args{
+				v: MakeBool(false),
+			},
+		},
+		{
+			name: "bool test - true",
+			args: args{
+				v: MakeBool(true),
+			},
+		},
+		/* string tests */
 		{
 			name: "string test",
 			args: args{
@@ -44,10 +75,59 @@ func TestMarshal(t *testing.T) {
 				v: MakeString(string([]byte{28, 192, 0, 123, 11, 99, 243, 172, 111, 3, 4, 5})),
 			},
 		},
+		/* timestamp tests */
 		{
-			name: "tuple test 1",
+			name: "time test - now",
+			args: args{
+				v: MakeTime(time.Now()),
+			},
+		},
+		{
+			name: "time test - fixed date",
+			args: args{
+				v: MakeTime(time.Date(2019, 19, 12, 18, 05, 14, 28183, time.UTC)),
+			},
+		},
+		/* duration tests */
+		{
+			name: "duration test - some positive value",
+			args: args{
+				v: MakeDuration(1888),
+			},
+		},
+		{
+			name: "duration test - zero",
+			args: args{
+				v: MakeDuration(0),
+			},
+		},
+		/* tuple tests */
+		{
+			name: "tuple test - basic types",
 			args: args{
 				v: MakeTuple([]Value{MakeString("ala"), MakeInt(17), MakeInt(99)}),
+			},
+		},
+		{
+			name: "tuple test - multiple strings inside",
+			args: args{
+				v: MakeTuple([]Value{MakeString("ala"), MakeString("ma"), MakeInt(1823792), MakeString("kotów")}),
+			},
+		},
+		{
+			name: "tuple test - tuple inside a tuple",
+			args: args{
+				v: MakeTuple([]Value{
+					MakeString("a"),
+					MakeTuple([]Value{
+						MakeString("b"),
+						MakeString("c"),
+						MakeInt(TupleDelimiter),
+						MakeInt(StringDelimiter),
+						MakeString("d"),
+					}),
+					MakeInt(5),
+				}),
 			},
 		},
 	}

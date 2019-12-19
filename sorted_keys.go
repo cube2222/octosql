@@ -9,15 +9,15 @@ import (
 )
 
 const (
-	NullIdentifier      = 1
-	PhantomIdentifier   = 2
-	IntIdentifier       = 3
-	FloatIdentifier     = 4
-	BoolIdentifier      = 5
-	StringIdentifier    = 6
-	TimestampIdentifier = 7
-	DurationIdentifier  = 8
-	TupleIdentifier     = 9
+	NullIdentifier      = 1 /* Nonexistent */
+	PhantomIdentifier   = 2 /* Nonexsitent */
+	IntIdentifier       = 3 /* Number */
+	FloatIdentifier     = 4 /* Number??? */
+	BoolIdentifier      = 5 /* Bool */
+	StringIdentifier    = 6 /* Until StringDelimiter */
+	TimestampIdentifier = 7 /* Number */
+	DurationIdentifier  = 8 /* Number */
+	TupleIdentifier     = 9 /* Until TupleDelimiter */
 	ObjectIdentifier    = 10
 )
 
@@ -211,17 +211,6 @@ func SortedUnmarshalUint64(b []byte) (uint64, error) {
 	return binary.LittleEndian.Uint64(reverseByteSlice(b[2:])), nil
 }
 
-func reverseByteSlice(b []byte) []byte {
-	c := make([]byte, len(b))
-
-	for i, j := 0, len(b)-1; i <= j; i, j = i+1, j-1 {
-		c[i] = b[j]
-		c[j] = b[i]
-	}
-
-	return c
-}
-
 /* Marshal float */
 func SortedMarshalFloat(f float64) []byte {
 	sign := f >= 0.0
@@ -358,34 +347,57 @@ func SortedUnmarshalDuration(b []byte) (time.Duration, error) {
 
 /* Marshal Tuple */
 func SortedMarshalTuple(vs []*Value) []byte {
-	marshaledElements := make([]byte, 0)
-
-	for _, value := range vs {
-		bytes := sortedMarshal(value)
-		marshaledElements = append(marshaledElements, bytes...)
-	}
-
-	numberLength := log256(len(marshaledElements))
-
 	result := make([]byte, 1)
 	result[0] = TupleIdentifier
 
-	numberMarshal := SortedMarshalInt(numberLength)[2:] /* we omit the sign and identifier */
-	for i := 0; i < numberLength; i++ {
-		result = append(result, numberMarshal[i])
+	for _, v := range vs {
+		vBytes := sortedMarshal(v)
+		result = append(result, vBytes...)
 	}
 
-	result = append(result, 0)
-	result = append(result, marshaledElements...)
+	result = append(result, TupleDelimiter)
 
 	return result
 }
 
-func log256(x int) int {
-	return int(math.Ceil(8.0 * float64(x)))
+func SortedUnmarshalTuple(b []byte) ([]*Value, error) {
+	values := make([]*Value, 0)
+	var value Value
+
+	length := len(b)
+	startIndex := 1
+
+	for startIndex < length {
+		endIndex := findLengthOfUnmarshal(b, startIndex, int(b[startIndex]))
+
+		if endIndex <= startIndex || endIndex >= length {
+			return nil, errors.New("something went wrong") //TODO: write legit error message
+		}
+
+		err := value.SortedUnmarshal(b[startIndex:endIndex])
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't unmarshal an element of the tuple")
+		}
+
+		values = append(values, &value)
+	}
+
+	return values, nil
 }
 
 /* Auxiliary functions */
+
+func reverseByteSlice(b []byte) []byte {
+	c := make([]byte, len(b))
+
+	for i, j := 0, len(b)-1; i <= j; i, j = i+1, j-1 {
+		c[i] = b[j]
+		c[j] = b[i]
+	}
+
+	return c
+}
+
 func byteToTwoBytes(b byte) []byte {
 	/* b = x * 128 + y 0 <= y < 128 */
 
@@ -394,4 +406,31 @@ func byteToTwoBytes(b byte) []byte {
 
 func twoBytesToByte(x, y byte) byte {
 	return 128*x + y
+}
+
+func findLengthOfUnmarshal(b []byte, startIndex, identifier int) int {
+	switch identifier {
+	case NullIdentifier, PhantomIdentifier:
+		return startIndex + NonexistentMarshalLength
+	case IntIdentifier, FloatIdentifier, TimestampIdentifier, DurationIdentifier:
+		return startIndex + NumberMarshalLength
+	case BoolIdentifier:
+		return startIndex + BoolIdentifier
+	case StringIdentifier:
+		return startIndex + findPositionInByteArray(b[startIndex+1:], StringDelimiter)
+	case TupleIdentifier:
+		return startIndex + findPositionInByteArray(b[startIndex+1:], TupleDelimiter)
+	default: //TODO: add Object
+		panic("Unknown type")
+	}
+}
+
+func findPositionInByteArray(b []byte, value byte) int {
+	for i := 0; i < len(b); i++ {
+		if b[i] == value {
+			return i
+		}
+	}
+
+	return -1
 }

@@ -15,18 +15,6 @@ func TestMarshal(t *testing.T) {
 		args args
 	}{
 		{
-			name: "string test",
-			args: args{
-				v: MakeString("ala ma kota i psa"),
-			},
-		},
-		{
-			name: "string test with weird values",
-			args: args{
-				v: MakeString(string([]byte{28, 192, 0, 123, 11, 99, 243, 172, 111, 3, 4, 5})),
-			},
-		},
-		{
 			name: "int test with a negative number",
 			args: args{
 				v: MakeInt(-18249),
@@ -42,6 +30,24 @@ func TestMarshal(t *testing.T) {
 			name: "int test with a zero",
 			args: args{
 				v: MakeInt(0),
+			},
+		},
+		{
+			name: "string test",
+			args: args{
+				v: MakeString("ala ma kota i psa"),
+			},
+		},
+		{
+			name: "string test with weird values",
+			args: args{
+				v: MakeString(string([]byte{28, 192, 0, 123, 11, 99, 243, 172, 111, 3, 4, 5})),
+			},
+		},
+		{
+			name: "tuple test 1",
+			args: args{
+				v: MakeTuple([]Value{MakeString("ala"), MakeInt(17), MakeInt(99)}),
 			},
 		},
 	}

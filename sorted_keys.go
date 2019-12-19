@@ -8,6 +8,11 @@ import (
 	"github.com/pkg/errors"
 )
 
+/* TODO
+1) String delimiter must be something smaller than any string
+2) Tuple delimiter probably as well
+*/
+
 const (
 	NullIdentifier      = 1 /* Nonexistent */
 	PhantomIdentifier   = 2 /* Nonexsitent */
@@ -103,7 +108,12 @@ func (v *Value) SortedUnmarshal(bytes []byte) error {
 
 		finalValue = MakeDuration(result)
 	case TupleIdentifier:
-		panic("implement me!")
+		result, err := SortedUnmarshalTuple(bytes)
+		if err != nil {
+			return err
+		}
+
+		finalValue = MakeTuple(result)
 	case ObjectIdentifier:
 		panic("implement me!")
 
@@ -133,7 +143,9 @@ func sortedMarshal(v *Value) []byte {
 		return SortedMarshalDuration(v.AsDuration())
 	case TypeFloat: // TODO - fix
 		return SortedMarshalFloat(v.AsFloat())
-	default: //TODO: add other types - tuple/object
+	case TypeTuple:
+		return SortedMarshalTuple(v.AsSlice())
+	default:
 		return nil
 	}
 }
@@ -346,12 +358,12 @@ func SortedUnmarshalDuration(b []byte) (time.Duration, error) {
 }
 
 /* Marshal Tuple */
-func SortedMarshalTuple(vs []*Value) []byte {
+func SortedMarshalTuple(vs []Value) []byte {
 	result := make([]byte, 1)
 	result[0] = TupleIdentifier
 
 	for _, v := range vs {
-		vBytes := sortedMarshal(v)
+		vBytes := sortedMarshal(&v)
 		result = append(result, vBytes...)
 	}
 
@@ -360,14 +372,18 @@ func SortedMarshalTuple(vs []*Value) []byte {
 	return result
 }
 
-func SortedUnmarshalTuple(b []byte) ([]*Value, error) {
-	values := make([]*Value, 0)
-	var value Value
-
+func SortedUnmarshalTuple(b []byte) ([]Value, error) {
 	length := len(b)
 	startIndex := 1
 
-	for startIndex < length {
+	if b[length-1] != TupleDelimiter {
+		return nil, errors.New("Invalid byte instead of TupleDelimiter at the end of tuple")
+	}
+
+	values := make([]Value, 0)
+	var value Value
+
+	for startIndex < length-1 {
 		endIndex := findLengthOfUnmarshal(b, startIndex, int(b[startIndex]))
 
 		if endIndex <= startIndex || endIndex >= length {
@@ -379,7 +395,8 @@ func SortedUnmarshalTuple(b []byte) ([]*Value, error) {
 			return nil, errors.Wrap(err, "couldn't unmarshal an element of the tuple")
 		}
 
-		values = append(values, &value)
+		values = append(values, value)
+		startIndex = endIndex
 	}
 
 	return values, nil
@@ -417,9 +434,9 @@ func findLengthOfUnmarshal(b []byte, startIndex, identifier int) int {
 	case BoolIdentifier:
 		return startIndex + BoolIdentifier
 	case StringIdentifier:
-		return startIndex + findPositionInByteArray(b[startIndex+1:], StringDelimiter)
+		return startIndex + findPositionInByteArray(b[startIndex:], StringDelimiter) + 1
 	case TupleIdentifier:
-		return startIndex + findPositionInByteArray(b[startIndex+1:], TupleDelimiter)
+		return startIndex + findPositionInByteArray(b[startIndex:], TupleDelimiter) + 1
 	default: //TODO: add Object
 		panic("Unknown type")
 	}

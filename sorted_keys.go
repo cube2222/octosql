@@ -27,6 +27,11 @@ const (
 	NonexistentMarshalLength = 1         // null and phantom
 )
 
+const (
+	StringDelimiter = 128
+	TupleDelimiter  = 129
+)
+
 func (v *Value) SortedMarshal() []byte {
 	return sortedMarshal(v)
 }
@@ -284,14 +289,35 @@ func SortedUnmarshalBool(b []byte) (bool, error) {
 func SortedMarshalString(s string) []byte {
 	bytes := make([]byte, 1)
 	bytes[0] = StringIdentifier
-	bytes = append(bytes, []byte(s)...)
-	bytes = append(bytes, 0) /* we assume that no zero bytes will appear */
+
+	fullBytes := []byte(s)
+	for _, b := range fullBytes {
+		bytes = append(bytes, byteToTwoBytes(b)...)
+	}
+
+	bytes = append(bytes, StringDelimiter)
 
 	return bytes
 }
 
+//TODO: fix error messages
 func SortedUnmarshalString(b []byte) (string, error) {
-	return string(b[1 : len(b)-1]), nil
+	length := len(b)
+
+	if length%2 != 0 || length < 2 {
+		return "", errors.New("Invalid string key size")
+	}
+
+	if b[length-1] != StringDelimiter {
+		return "", errors.New("Invalid byte instead of StringDelimiter at the end of string")
+	}
+
+	packedBytes := make([]byte, 0)
+	for i := 1; i < length-1; i += 2 {
+		packedBytes = append(packedBytes, twoBytesToByte(b[i], b[i+1]))
+	}
+
+	return string(packedBytes), nil
 }
 
 /* Marshal Timestamp */
@@ -357,4 +383,15 @@ func SortedMarshalTuple(vs []*Value) []byte {
 
 func log256(x int) int {
 	return int(math.Ceil(8.0 * float64(x)))
+}
+
+/* Auxiliary functions */
+func byteToTwoBytes(b byte) []byte {
+	/* b = x * 128 + y 0 <= y < 128 */
+
+	return []byte{b / 128, b % 128}
+}
+
+func twoBytesToByte(x, y byte) byte {
+	return 128*x + y
 }

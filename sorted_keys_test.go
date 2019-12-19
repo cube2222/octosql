@@ -21,27 +21,27 @@ func TestMarshal(t *testing.T) {
 			},
 		},
 		{
-			name: "negative int test",
+			name: "string test with weird values",
+			args: args{
+				v: MakeString(string([]byte{28, 192, 0, 123, 11, 99, 243, 172, 111, 3, 4, 5})),
+			},
+		},
+		{
+			name: "int test with a negative number",
 			args: args{
 				v: MakeInt(-18249),
 			},
 		},
 		{
-			name: "positive int test",
+			name: "int test with a positive number",
 			args: args{
 				v: MakeInt(1587129),
 			},
 		},
 		{
-			name: "negative float test",
+			name: "int test with a zero",
 			args: args{
-				v: MakeFloat(-125721.127521),
-			},
-		},
-		{
-			name: "positive float test",
-			args: args{
-				v: MakeFloat(92881712.19291258),
+				v: MakeInt(0),
 			},
 		},
 	}

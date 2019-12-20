@@ -223,7 +223,7 @@ func (hm *Map) Set(key MonotonicallySerializable, value proto.Message) error {
 func (hm *Map) Get(key MonotonicallySerializable, value proto.Message) error {
 	byteKey := key.SortedMarshal()
 
-	data, err := hm.tx.Get(byteKey)
+	data, err := hm.tx.Get(byteKey) //remove prefix from data
 	if err != nil {
 		return ErrKeyNotFound
 	}
@@ -244,6 +244,8 @@ func (hm *Map) GetIteratorWithPrefix(prefix []byte) *MapIterator {
 func (hm *Map) GetIterator() *MapIterator {
 	options := badger.DefaultIteratorOptions
 	it := hm.tx.Iterator(options)
+	it.Rewind()
+
 	return NewMapIterator(it)
 }
 

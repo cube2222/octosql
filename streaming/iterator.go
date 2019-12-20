@@ -18,12 +18,14 @@ type Iterator interface {
 }
 
 type BadgerIterator struct {
-	it *badger.Iterator
+	it           *badger.Iterator
+	prefixLength int
 }
 
-func NewBadgerIterator(it *badger.Iterator) *BadgerIterator {
+func NewBadgerIterator(it *badger.Iterator, prefixLength int) *BadgerIterator {
 	return &BadgerIterator{
-		it: it,
+		it:           it,
+		prefixLength: prefixLength,
 	}
 }
 
@@ -59,8 +61,9 @@ func (bi *BadgerIterator) currentKey(key MonotonicallySerializable) error {
 	item := bi.it.Item() //important: this doesn't call Next()
 
 	byteKey := item.Key()
+	strippedKey := byteKey[bi.prefixLength:] //TODO: maybe add function to do that
 
-	err := key.SortedUnmarshal(byteKey)
+	err := key.SortedUnmarshal(strippedKey)
 	return err
 }
 

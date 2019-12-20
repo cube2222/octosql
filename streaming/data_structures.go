@@ -77,7 +77,7 @@ func (ll *LinkedList) getFirst() (int, error) {
 func (ll *LinkedList) getAttribute(attr []byte) (int, error) {
 	value, err := ll.tx.Get(attr)
 	switch err {
-	case ErrKeyNotFound:
+	case badger.ErrKeyNotFound:
 		err2 := ll.tx.Set(attr, octosql.SortedMarshalInt(0))
 		if err2 != nil {
 			return 0, errors.Wrapf(err2, "couldn't initialize linked list %s field", string(attr))
@@ -110,14 +110,14 @@ func (ll *LinkedList) Append(value proto.Message) error {
 		return errors.Wrap(err, "couldn't serialize given value")
 	}
 
-	byteKey := octosql.SortedMarshalInt(ll.elementCount)
+	byteKey := getIndexKey(ll.elementCount)
 
 	err = ll.tx.Set(byteKey, data)
 	if err != nil {
 		return errors.Wrap(err, "couldn't add the element to linked list")
 	}
 
-	ll.elementCount += 1
+	ll.elementCount += 1 //TODO: store this in badger
 	return nil
 }
 
@@ -129,7 +129,7 @@ func (ll *LinkedList) Peek(value proto.Message) error {
 		}
 	}
 
-	firstKey := octosql.SortedMarshalInt(ll.firstElement)
+	firstKey := getIndexKey(ll.firstElement)
 
 	data, err := ll.tx.Get(firstKey)
 	if err != nil {
@@ -148,7 +148,7 @@ func (ll *LinkedList) Pop(value proto.Message) error {
 		return err
 	}
 
-	firstKey := octosql.SortedMarshalInt(ll.firstElement)
+	firstKey := getIndexKey(ll.firstElement)
 
 	err = ll.tx.Delete(firstKey)
 	if err != nil {
@@ -160,10 +160,18 @@ func (ll *LinkedList) Pop(value proto.Message) error {
 }
 
 func (ll *LinkedList) GetIterator() *LinkedListIterator {
-	it := ll.tx.Iterator(badger.DefaultIteratorOptions)
+	it := ll.tx.WithPrefix([]byte("v")).Iterator(badger.DefaultIteratorOptions)
 	it.Rewind()
 
 	return NewLinkedListIterator(it)
+}
+
+func getIndexKey(index int) []byte {
+	bytes := make([]byte, 0)
+	bytes = append(bytes, byte('v'))
+	bytes = append(bytes, octosql.SortedMarshalInt(index)...)
+
+	return bytes
 }
 
 func (lli *LinkedListIterator) Next(value proto.Message) error {

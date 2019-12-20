@@ -32,10 +32,13 @@ const (
 	NonexistentMarshalLength = 1         // null and phantom
 )
 
+//Delimiters must be less than 128 and different from identifiers
 const (
-	StringDelimiter = 0
-	TupleDelimiter  = 1
-	BYTE_OFFSET     = 128
+	StringDelimiter     = 11
+	TupleDelimiter      = 12
+	BYTE_OFFSET         = 128
+	MinimalTupleLength  = 1 + 1 + 1 //b[0] = type, b[1] = element, b[2] = end of tuple
+	MinimalStringLength = 1 + 1     // b[0] = type, b[1] = end of string
 )
 
 func (v *Value) SortedMarshal() []byte {
@@ -377,7 +380,9 @@ func SortedMarshalTuple(vs []Value) []byte {
 }
 
 func SortedUnmarshalTuple(b []byte) ([]Value, error) {
-	length := len(b)
+	return nil, nil
+
+	/*length := len(b)
 	startIndex := 1
 
 	if b[length-1] != TupleDelimiter {
@@ -391,7 +396,7 @@ func SortedUnmarshalTuple(b []byte) ([]Value, error) {
 		endIndex := findLengthOfUnmarshal(b, startIndex, int(b[startIndex]))
 
 		if endIndex <= startIndex || endIndex >= length {
-			return nil, errors.New("something went wrong") //TODO: write legit error message
+			return nil, errors.New("an offset error ocurred")
 		}
 
 		err := value.SortedUnmarshal(b[startIndex:endIndex])
@@ -403,7 +408,7 @@ func SortedUnmarshalTuple(b []byte) ([]Value, error) {
 		startIndex = endIndex
 	}
 
-	return values, nil
+	return values, nil*/
 }
 
 /* Auxiliary functions */
@@ -427,29 +432,81 @@ func twoBytesToByte(x, y byte) byte {
 	return BYTE_OFFSET*(x-BYTE_OFFSET) + (y - BYTE_OFFSET)
 }
 
-func findLengthOfUnmarshal(b []byte, startIndex, identifier int) int {
-	switch identifier {
-	case NullIdentifier, PhantomIdentifier:
-		return startIndex + NonexistentMarshalLength
-	case IntIdentifier, FloatIdentifier, TimestampIdentifier, DurationIdentifier:
-		return startIndex + NumberMarshalLength
-	case BoolIdentifier:
-		return startIndex + BoolIdentifier
-	case StringIdentifier:
-		return startIndex + findPositionInByteArray(b[startIndex:], StringDelimiter) + 1
-	case TupleIdentifier:
-		return startIndex + findPositionInByteArray(b[startIndex:], TupleDelimiter) + 1
-	default: //TODO: add Object
-		panic("Unknown type")
+/*
+func getTupleMarshalLength(b []byte) (int, error) {
+	length := len(b)
+	if length < MinimalTupleLength {
+		return -1, errors.New("invalid tuple size")
+	}
+
+	if b[0] != TupleIdentifier {
+		return -1, errors.New("expected a tuple, but the first element isn't the TupleDelimiter")
+	}
+
+	startIndex := 1
+	var err error
+	var elementLength int
+
+	for startIndex < length {
+		identifier := b[startIndex]
+		if identifier == TupleDelimiter {
+			return startIndex, nil
+		}
+
+		if identifier == Tupl {
+			coś, len = auxTuple(...)
+
+		} else {
+			val = SortedUnmarshal
+
+		if isConstantLengthIdentifier(identifier) {
+			elementLength, err = getConstantMarshalLength(identifier)
+		} else if identifier == StringIdentifier {
+			elementLength, err = getStringMarshalLength(b[startIndex:])
+		} else if identifier == TupleIdentifier {
+
+		}
 	}
 }
+*/
+func getConstantMarshalLength(identifier byte) (int, error) {
+	switch identifier {
+	case NullIdentifier, PhantomIdentifier:
+		return NonexistentMarshalLength, nil
+	case IntIdentifier, FloatIdentifier, TimestampIdentifier, DurationIdentifier:
+		return NumberMarshalLength, nil
+	case BoolIdentifier:
+		return BoolMarshalLength, nil
+	}
 
-func findPositionInByteArray(b []byte, value byte) int {
-	for i := 0; i < len(b); i++ {
-		if b[i] == value {
-			return i
+	return -1, errors.New("given identifier doesn't represent a constant length type")
+}
+
+func getStringMarshalLength(b []byte) (int, error) {
+	length := len(b)
+
+	if length < MinimalStringLength {
+		return -1, errors.New("invalid marshal string length")
+	}
+
+	if b[0] != StringIdentifier {
+		return -1, errors.New("expected a string, but got some other identifier")
+	}
+
+	for index := 1; index < length; index++ {
+		if b[index] == StringDelimiter {
+			return index, nil
 		}
 	}
 
-	return -1
+	return -1, errors.New("didn't find the StringDelimiter in string marshal")
+}
+
+func isConstantLengthIdentifier(identifier byte) bool {
+	switch identifier {
+	case NullIdentifier, PhantomIdentifier, IntIdentifier, BoolIdentifier, FloatIdentifier, TimestampIdentifier, DurationIdentifier:
+		return true
+	}
+
+	return false
 }

@@ -12,6 +12,7 @@ var ErrEndOfIterator = errors.New("end of iterator")
 
 type Iterator interface {
 	Next(proto.Message) error
+	NextWithKey(key MonotonicallySerializable, value proto.Message) error
 	Rewind()
 	io.Closer
 }
@@ -31,13 +32,12 @@ func (bi *BadgerIterator) Close() error {
 	return nil
 }
 
-func (bi *BadgerIterator) Next(value proto.Message) error {
+func (bi *BadgerIterator) currentValue(value proto.Message) error {
 	if !bi.it.Valid() {
 		return ErrEndOfIterator
 	}
 
-	item := bi.it.Item()
-	defer bi.it.Next() //important: item is valid until Next() is called
+	item := bi.it.Item() //important: this doesn't call Next()
 
 	err := item.Value(func(val []byte) error {
 		err := proto.Unmarshal(val, value)
@@ -48,6 +48,44 @@ func (bi *BadgerIterator) Next(value proto.Message) error {
 		return errors.Wrap(err, "couldn't unmarshal data")
 	}
 
+	return nil
+}
+
+func (bi *BadgerIterator) currentKey(key MonotonicallySerializable) error {
+	if !bi.it.Valid() {
+		return ErrEndOfIterator
+	}
+
+	item := bi.it.Item() //important: this doesn't call Next()
+
+	byteKey := item.Key()
+
+	err := key.SortedUnmarshal(byteKey)
+	return err
+}
+
+func (bi *BadgerIterator) Next(value proto.Message) error {
+	err := bi.currentValue(value)
+	if err != nil {
+		return err
+	}
+
+	bi.it.Next()
+	return nil
+}
+
+func (bi *BadgerIterator) NextWithKey(key MonotonicallySerializable, value proto.Message) error {
+	err := bi.currentKey(key)
+	if err != nil {
+		return err
+	}
+
+	err = bi.currentValue(value)
+	if err != nil {
+		return err
+	}
+
+	bi.it.Next()
 	return nil
 }
 

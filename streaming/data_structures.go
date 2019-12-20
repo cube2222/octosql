@@ -7,6 +7,13 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	linkedListLengthKey       = []byte("length")
+	linkedListFirstElementKey = []byte("first")
+)
+
+var ErrKeyNotFound = errors.New("couldn't find key")
+
 /*
 	A type that implements this interface must have a SortedMarshal method,
 	that has the property, that if x <= y (where <= is the less-equal relation
@@ -20,11 +27,10 @@ type MonotonicallySerializable interface {
 	SortedUnmarshal([]byte) error
 }
 
-var ErrKeyNotFound = errors.New("couldn't find key")
-
 /* LinkedList */
 type LinkedList struct {
 	tx           StateTransaction
+	initialized  bool
 	elementCount int
 	firstElement int
 }
@@ -36,8 +42,52 @@ type LinkedListIterator struct {
 func NewLinkedList(tx StateTransaction) *LinkedList {
 	return &LinkedList{
 		tx:           tx,
+		initialized:  false,
 		elementCount: 0,
 		firstElement: 0,
+	}
+}
+
+func (ll *LinkedList) initialize() error {
+	length, err := ll.getLength()
+	if err != nil {
+		return errors.Wrap(err, "couldn't initialize linked list")
+	}
+
+	first, err := ll.getFirst()
+	if err != nil {
+		return errors.Wrap(err, "couldn't initialize linked list")
+	}
+
+	ll.elementCount = length
+	ll.firstElement = first
+	ll.initialized = true
+
+	return nil
+}
+
+func (ll *LinkedList) getLength() (int, error) {
+	return ll.getAttribute(linkedListLengthKey)
+}
+
+func (ll *LinkedList) getFirst() (int, error) {
+	return ll.getAttribute(linkedListFirstElementKey)
+}
+
+func (ll *LinkedList) getAttribute(attr []byte) (int, error) {
+	value, err := ll.tx.Get(attr)
+	switch err {
+	case ErrKeyNotFound:
+		err2 := ll.tx.Set(attr, octosql.SortedMarshalInt(0))
+		if err2 != nil {
+			return 0, errors.Wrapf(err2, "couldn't initialize linked list %s field", string(attr))
+		}
+
+		return 0, nil
+	case nil:
+		return octosql.SortedUnmarshalInt(value)
+	default:
+		return 0, errors.Wrapf(err, "couldn't read %s of linked list", string(attr))
 	}
 }
 
@@ -48,6 +98,13 @@ func NewLinkedListIterator(it Iterator) *LinkedListIterator {
 }
 
 func (ll *LinkedList) Append(value proto.Message) error {
+	if !ll.initialized {
+		err := ll.initialize()
+		if err != nil {
+			return errors.Wrap(err, "failed to initialize linked list in append")
+		}
+	}
+
 	data, err := proto.Marshal(value)
 	if err != nil {
 		return errors.Wrap(err, "couldn't serialize given value")
@@ -65,6 +122,13 @@ func (ll *LinkedList) Append(value proto.Message) error {
 }
 
 func (ll *LinkedList) Peek(value proto.Message) error {
+	if !ll.initialized {
+		err := ll.initialize()
+		if err != nil {
+			return errors.Wrap(err, "failed to initialize linked list in append")
+		}
+	}
+
 	firstKey := octosql.SortedMarshalInt(ll.firstElement)
 
 	data, err := ll.tx.Get(firstKey)
@@ -73,11 +137,12 @@ func (ll *LinkedList) Peek(value proto.Message) error {
 	}
 
 	err = proto.Unmarshal(data, value)
-	return err //TODO: wrap this?
+	return errors.Wrap(err, "couldn't unmarshal the first element")
 }
 
-//TODO: this is suboptimal since it calculates the firstKey twice, but meh...
 func (ll *LinkedList) Pop(value proto.Message) error {
+	//there is no need to call initialize here, since Peek calls initialize
+
 	err := ll.Peek(value)
 	if err != nil {
 		return err

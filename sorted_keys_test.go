@@ -156,6 +156,7 @@ func TestMarshal(t *testing.T) {
 							MakeInt(-19252),
 							MakeTuple([]Value{
 								MakeBool(false),
+								MakeFloat(284.12828),
 								MakeBool(true),
 								MakeString(string([]byte{byte(TupleIdentifier), byte(TupleDelimiter)})),
 								MakeString("ale tupelki"),
@@ -165,11 +166,18 @@ func TestMarshal(t *testing.T) {
 									MakeDuration(TupleIdentifier),
 									MakeDuration(StringIdentifier),
 									MakeDuration(StringDelimiter),
+									MakeFloat(-1.284),
 									MakeTuple(nil),
 								}),
 							}),
 							MakeBool(false),
 							MakePhantom(),
+							MakeObject(map[string]Value{
+								"a": MakeInt(17),
+								"b": MakeString("ala ma kota"),
+								"c": MakePhantom(),
+							}),
+							MakeString("tutaj też coś"),
 						}),
 						MakeInt(TupleDelimiter),
 						MakeString("pa tera"),
@@ -191,7 +199,28 @@ func TestMarshal(t *testing.T) {
 					"ale":     MakeFloat(17.17283),
 					"nie":     MakeTime(time.Now()),
 					"posiada": MakeNull(),
-					"papugi":  MakeTuple([]Value{MakeInt(11), MakeString("no i cześć")}),
+					"papugi": MakeTuple([]Value{
+						MakeInt(11),
+						MakeString("no i cześć"),
+					}),
+				}),
+			},
+		},
+		{
+			name: "complex object",
+			args: args{
+				v: MakeObject(map[string]Value{
+					"object": MakeObject(map[string]Value{
+						"a": MakePhantom(),
+						"b": MakeString("ma kota"),
+						"c": MakeInt(1283),
+					}),
+					"other": MakeTime(time.Now()),
+					"another": MakeTuple([]Value{
+						MakeString("xD"),
+						MakeInt(18),
+						MakeFloat(19.19238),
+					}),
 				}),
 			},
 		},

@@ -393,6 +393,19 @@ func recursiveMonotonicUnmarshalTuple(b []byte) ([]Value, int, error) {
 
 			values = append(values, MakeTuple(tupleValues))
 			index += tupleLength
+		} else if identifier == ObjectIdentifier {
+			tupleValues, tupleLength, err := recursiveMonotonicUnmarshalTuple(b[index+1:])
+			if err != nil {
+				return nil, 0, err
+			}
+
+			object, err := tupleToObject(tupleValues)
+			if err != nil {
+				return nil, 0, err
+			}
+
+			values = append(values, MakeObject(object))
+			index += tupleLength + 1 //+1 here because of ObjectIdentifier
 		} else {
 			elementLength, err := getMarshalLength(b[index:])
 			if err != nil {
@@ -437,6 +450,11 @@ func UnmarshalObject(b []byte) (map[string]Value, error) {
 		return nil, errors.Wrap(err, "couldn't unmarshal object")
 	}
 
+	return tupleToObject(tuple)
+}
+
+/* Auxiliary functions */
+func tupleToObject(tuple []Value) (map[string]Value, error) {
 	if len(tuple) < 2 || len(tuple)%2 == 1 {
 		return nil, errors.New("invalid object length")
 	}
@@ -450,8 +468,6 @@ func UnmarshalObject(b []byte) (map[string]Value, error) {
 
 	return result, nil
 }
-
-/* Auxiliary functions */
 
 func sortedMapKeys(m map[string]Value) []string {
 	keys := make([]string, len(m))

@@ -10,7 +10,7 @@ import (
 var (
 	linkedListLengthKey       = []byte("length")
 	linkedListFirstElementKey = []byte("first")
-	linkedListValueKeyPrefix  = []byte("value")
+	linkedListValueKeyPrefix  = []byte("aaa")
 )
 
 var ErrKeyNotFound = errors.New("couldn't find key")
@@ -211,11 +211,11 @@ func getIndexKey(index int) []byte {
 
 func (lli *LinkedListIterator) Next(value proto.Message) error {
 	err := lli.it.Next(value)
-	if err != nil {
-		return errors.Wrap(err, "couldn't get next element from linked list")
+	if err == ErrEndOfIterator || err == nil {
+		return err
 	}
 
-	return nil
+	return errors.Wrap(err, "couldn't read next element")
 }
 
 func (lli *LinkedListIterator) Close() error {

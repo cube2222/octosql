@@ -24,7 +24,7 @@ var ErrKeyNotFound = errors.New("couldn't find key")
 	[]byte). Since in mathematics such a function is called Monotonous, thus the name.
 	A MonotonicUnmarshal which is the inverse of MonotonicMarshal is also required.
 
-	WARNING: Float and Object is Serializable, but the serialization is not Monotonic!
+	WARNING: Float and Object are Serializable, but the serialization is not Monotonic!
 */
 type MonotonicallySerializable interface {
 	MonotonicMarshal() []byte

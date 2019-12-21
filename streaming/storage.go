@@ -16,6 +16,7 @@ type StateTransaction interface {
 	Get(key []byte) (value []byte, err error)
 	Delete(key []byte) error
 	WithPrefix(prefix []byte) StateTransaction
+	GetPrefixLength() int
 	Iterator(opts badger.IteratorOptions) Iterator //TODO: opts should be some other structure/interface
 	Commit() error
 	Abort()
@@ -92,6 +93,10 @@ func (tx *badgerTransaction) Delete(key []byte) error {
 	return tx.tx.Delete(tx.getKeyWithPrefix(key))
 }
 
+func (tx *badgerTransaction) GetPrefixLength() int {
+	return len(tx.prefix)
+}
+
 func (tx *badgerTransaction) WithPrefix(prefix []byte) StateTransaction {
 	return &badgerTransaction{
 		tx:     tx.tx,
@@ -101,7 +106,7 @@ func (tx *badgerTransaction) WithPrefix(prefix []byte) StateTransaction {
 
 func (tx *badgerTransaction) Iterator(opts badger.IteratorOptions) Iterator {
 	it := tx.tx.NewIterator(opts)
-	return NewBadgerIterator(it)
+	return NewBadgerIterator(it, tx.GetPrefixLength())
 }
 
 func (tx *badgerTransaction) Commit() error {

@@ -7,6 +7,14 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	linkedListLengthKey       = []byte("length")
+	linkedListFirstElementKey = []byte("first")
+	linkedListValueKeyPrefix  = []byte("aaa")
+)
+
+var ErrKeyNotFound = errors.New("couldn't find key")
+
 /*
 	A type that implements this interface must have a SortedMarshal method,
 	that has the property, that if x <= y (where <= is the less-equal relation
@@ -20,11 +28,10 @@ type MonotonicallySerializable interface {
 	SortedUnmarshal([]byte) error
 }
 
-var ErrKeyNotFound = errors.New("couldn't find key")
-
 /* LinkedList */
 type LinkedList struct {
 	tx           StateTransaction
+	initialized  bool
 	elementCount int
 	firstElement int
 }
@@ -36,9 +43,77 @@ type LinkedListIterator struct {
 func NewLinkedList(tx StateTransaction) *LinkedList {
 	return &LinkedList{
 		tx:           tx,
+		initialized:  false,
 		elementCount: 0,
 		firstElement: 0,
 	}
+}
+
+func (ll *LinkedList) initialize() error {
+	length, err := ll.getLength()
+	if err != nil {
+		return errors.Wrap(err, "couldn't initialize linked list")
+	}
+
+	first, err := ll.getFirst()
+	if err != nil {
+		return errors.Wrap(err, "couldn't initialize linked list")
+	}
+
+	ll.elementCount = length
+	ll.firstElement = first
+	ll.initialized = true
+
+	return nil
+}
+
+func (ll *LinkedList) getLength() (int, error) {
+	return ll.getAttribute(linkedListLengthKey)
+}
+
+func (ll *LinkedList) getFirst() (int, error) {
+	return ll.getAttribute(linkedListFirstElementKey)
+}
+
+func (ll *LinkedList) getAttribute(attr []byte) (int, error) {
+	value, err := ll.tx.Get(attr)
+	switch err {
+	case badger.ErrKeyNotFound:
+		err2 := ll.tx.Set(attr, octosql.SortedMarshalInt(0))
+		if err2 != nil {
+			return 0, errors.Wrapf(err2, "couldn't initialize linked list %s field", string(attr))
+		}
+
+		return 0, nil
+	case nil:
+		return octosql.SortedUnmarshalInt(value)
+	default:
+		return 0, errors.Wrapf(err, "couldn't read %s of linked list", string(attr))
+	}
+}
+
+func (ll *LinkedList) incLength() error {
+	return ll.incAttribute(linkedListLengthKey)
+}
+
+func (ll *LinkedList) incFirst() error {
+	return ll.incAttribute(linkedListFirstElementKey)
+}
+
+func (ll *LinkedList) incAttribute(attr []byte) error {
+	value, err := ll.getAttribute(attr)
+	if err != nil {
+		return err
+	}
+
+	newValue := octosql.SortedMarshalInt(value + 1)
+
+	err = ll.tx.Set(attr, newValue)
+	if err != nil {
+		return errors.Wrap(err, "failed to set new value")
+	}
+
+	return nil
 }
 
 func NewLinkedListIterator(it Iterator) *LinkedListIterator {
@@ -48,16 +123,28 @@ func NewLinkedListIterator(it Iterator) *LinkedListIterator {
 }
 
 func (ll *LinkedList) Append(value proto.Message) error {
+	if !ll.initialized {
+		err := ll.initialize()
+		if err != nil {
+			return errors.Wrap(err, "failed to initialize linked list in append")
+		}
+	}
+
 	data, err := proto.Marshal(value)
 	if err != nil {
 		return errors.Wrap(err, "couldn't serialize given value")
 	}
 
-	byteKey := octosql.SortedMarshalInt(ll.elementCount)
+	byteKey := getIndexKey(ll.elementCount)
 
 	err = ll.tx.Set(byteKey, data)
 	if err != nil {
 		return errors.Wrap(err, "couldn't add the element to linked list")
+	}
+
+	err = ll.incLength()
+	if err != nil {
+		return errors.Wrap(err, "failed to increase linked list length attribute")
 	}
 
 	ll.elementCount += 1
@@ -65,7 +152,14 @@ func (ll *LinkedList) Append(value proto.Message) error {
 }
 
 func (ll *LinkedList) Peek(value proto.Message) error {
-	firstKey := octosql.SortedMarshalInt(ll.firstElement)
+	if !ll.initialized {
+		err := ll.initialize()
+		if err != nil {
+			return errors.Wrap(err, "failed to initialize linked list in append")
+		}
+	}
+
+	firstKey := getIndexKey(ll.firstElement)
 
 	data, err := ll.tx.Get(firstKey)
 	if err != nil {
@@ -73,21 +167,27 @@ func (ll *LinkedList) Peek(value proto.Message) error {
 	}
 
 	err = proto.Unmarshal(data, value)
-	return err //TODO: wrap this?
+	return errors.Wrap(err, "couldn't unmarshal the first element")
 }
 
-//TODO: this is suboptimal since it calculates the firstKey twice, but meh...
 func (ll *LinkedList) Pop(value proto.Message) error {
+	//there is no need to call initialize here, since Peek calls initialize
+
 	err := ll.Peek(value)
 	if err != nil {
 		return err
 	}
 
-	firstKey := octosql.SortedMarshalInt(ll.firstElement)
+	firstKey := getIndexKey(ll.firstElement)
 
 	err = ll.tx.Delete(firstKey)
 	if err != nil {
 		return errors.New("couldn't delete first element of list")
+	}
+
+	err = ll.incFirst()
+	if err != nil {
+		return errors.Wrap(err, "failed to increase linked list first attribute")
 	}
 
 	ll.firstElement++
@@ -95,19 +195,27 @@ func (ll *LinkedList) Pop(value proto.Message) error {
 }
 
 func (ll *LinkedList) GetIterator() *LinkedListIterator {
-	it := ll.tx.Iterator(badger.DefaultIteratorOptions)
+	it := ll.tx.WithPrefix(linkedListValueKeyPrefix).Iterator(badger.DefaultIteratorOptions)
 	it.Rewind()
 
 	return NewLinkedListIterator(it)
 }
 
+func getIndexKey(index int) []byte {
+	bytes := make([]byte, 0)
+	bytes = append(bytes, linkedListValueKeyPrefix...)
+	bytes = append(bytes, octosql.SortedMarshalInt(index)...)
+
+	return bytes
+}
+
 func (lli *LinkedListIterator) Next(value proto.Message) error {
 	err := lli.it.Next(value)
-	if err != nil {
-		return errors.Wrap(err, "couldn't get next element from linked list")
+	if err == ErrEndOfIterator || err == nil {
+		return err
 	}
 
-	return nil
+	return errors.Wrap(err, "couldn't read next element")
 }
 
 func (lli *LinkedListIterator) Close() error {
@@ -158,7 +266,7 @@ func (hm *Map) Set(key MonotonicallySerializable, value proto.Message) error {
 func (hm *Map) Get(key MonotonicallySerializable, value proto.Message) error {
 	byteKey := key.SortedMarshal()
 
-	data, err := hm.tx.Get(byteKey)
+	data, err := hm.tx.Get(byteKey) //remove prefix from data
 	if err != nil {
 		return ErrKeyNotFound
 	}
@@ -179,6 +287,8 @@ func (hm *Map) GetIteratorWithPrefix(prefix []byte) *MapIterator {
 func (hm *Map) GetIterator() *MapIterator {
 	options := badger.DefaultIteratorOptions
 	it := hm.tx.Iterator(options)
+	it.Rewind()
+
 	return NewMapIterator(it)
 }
 

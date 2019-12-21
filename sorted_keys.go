@@ -380,35 +380,49 @@ func SortedMarshalTuple(vs []Value) []byte {
 }
 
 func SortedUnmarshalTuple(b []byte) ([]Value, error) {
-	return nil, nil
+	values, _, err := recursiveSortedUnmarshalTuple(b)
+	return values, err
+}
 
-	/*length := len(b)
-	startIndex := 1
-
-	if b[length-1] != TupleDelimiter {
-		return nil, errors.New("Invalid byte instead of TupleDelimiter at the end of tuple")
-	}
-
+func recursiveSortedUnmarshalTuple(b []byte) ([]Value, int, error) {
 	values := make([]Value, 0)
+	index := 1
+	length := len(b)
 	var value Value
 
-	for startIndex < length-1 {
-		endIndex := findLengthOfUnmarshal(b, startIndex, int(b[startIndex]))
+	for index < length {
+		identifier := b[index]
 
-		if endIndex <= startIndex || endIndex >= length {
-			return nil, errors.New("an offset error ocurred")
+		if identifier == TupleDelimiter {
+			return values, index + 1, nil //this is +1 because we return length and index starts at 0
 		}
 
-		err := value.SortedUnmarshal(b[startIndex:endIndex])
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't unmarshal an element of the tuple")
-		}
+		if identifier == TupleIdentifier {
+			tupleValues, tupleLength, err := recursiveSortedUnmarshalTuple(b[index:])
+			if err != nil {
+				return nil, 0, err
+			}
 
-		values = append(values, value)
-		startIndex = endIndex
+			values = append(values, MakeTuple(tupleValues))
+			index += tupleLength
+		} else {
+			elementLength, err := getMarshalLength(b[index:])
+			if err != nil {
+				return nil, 0, errors.Wrap(err, "couldn't find length of next element to unmarshal")
+			}
+
+			err = value.SortedUnmarshal(b[index : index+elementLength])
+			if err != nil {
+				return nil, 0, errors.Wrap(err, "couldn't unmarshal next element in tuple")
+			}
+
+			values = append(values, value)
+
+			index += elementLength
+		}
 	}
 
-	return values, nil*/
+	return nil, 0, errors.New("the last element of the tuple wasn't a delimiter")
 }
 
 /* Auxiliary functions */
@@ -432,43 +446,18 @@ func twoBytesToByte(x, y byte) byte {
 	return BYTE_OFFSET*(x-BYTE_OFFSET) + (y - BYTE_OFFSET)
 }
 
-/*
-func getTupleMarshalLength(b []byte) (int, error) {
-	length := len(b)
-	if length < MinimalTupleLength {
-		return -1, errors.New("invalid tuple size")
+func getMarshalLength(b []byte) (int, error) {
+	identifier := b[0]
+
+	if isConstantLengthIdentifier(identifier) {
+		return getConstantMarshalLength(identifier)
+	} else if identifier == StringIdentifier {
+		return getStringMarshalLength(b)
 	}
 
-	if b[0] != TupleIdentifier {
-		return -1, errors.New("expected a tuple, but the first element isn't the TupleDelimiter")
-	}
-
-	startIndex := 1
-	var err error
-	var elementLength int
-
-	for startIndex < length {
-		identifier := b[startIndex]
-		if identifier == TupleDelimiter {
-			return startIndex, nil
-		}
-
-		if identifier == Tupl {
-			coś, len = auxTuple(...)
-
-		} else {
-			val = SortedUnmarshal
-
-		if isConstantLengthIdentifier(identifier) {
-			elementLength, err = getConstantMarshalLength(identifier)
-		} else if identifier == StringIdentifier {
-			elementLength, err = getStringMarshalLength(b[startIndex:])
-		} else if identifier == TupleIdentifier {
-
-		}
-	}
+	return -1, errors.New("unknown type")
 }
-*/
+
 func getConstantMarshalLength(identifier byte) (int, error) {
 	switch identifier {
 	case NullIdentifier, PhantomIdentifier:
@@ -495,7 +484,7 @@ func getStringMarshalLength(b []byte) (int, error) {
 
 	for index := 1; index < length; index++ {
 		if b[index] == StringDelimiter {
-			return index, nil
+			return index + 1, nil //this is +1 because we return length and index starts at 0
 		}
 	}
 

@@ -130,6 +130,42 @@ func TestMarshal(t *testing.T) {
 				}),
 			},
 		},
+		{
+			name: "yo dawg I heard you like tuples inside your tuples, so I put a tuple inside your tuple inside your tuple...",
+			args: args{
+				v: MakeTuple([]Value{
+					MakeTuple([]Value{
+						MakeNull(),
+						MakePhantom(),
+						MakeTuple([]Value{
+							MakeInt(TupleDelimiter),
+							MakeInt(TupleIdentifier),
+							MakeInt(-19252),
+							MakeTuple([]Value{
+								MakeBool(false),
+								MakeBool(true),
+								MakeString(string([]byte{byte(TupleIdentifier), byte(TupleDelimiter)})),
+								MakeString("ale tupelki"),
+								MakeTuple([]Value{
+									MakeTime(time.Now()),
+									MakeDuration(TupleDelimiter),
+									MakeDuration(TupleIdentifier),
+									MakeDuration(StringIdentifier),
+									MakeDuration(StringDelimiter),
+									MakeTuple(nil),
+								}),
+							}),
+							MakeBool(false),
+							MakePhantom(),
+						}),
+						MakeInt(TupleDelimiter),
+						MakeString("pa tera"),
+					}),
+					MakeInt(TupleDelimiter),
+					MakeString("XD"),
+				}),
+			},
+		},
 	}
 
 	for _, tt := range tests {

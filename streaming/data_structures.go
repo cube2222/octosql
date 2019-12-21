@@ -10,6 +10,7 @@ import (
 var (
 	linkedListLengthKey       = []byte("length")
 	linkedListFirstElementKey = []byte("first")
+	linkedListValueKeyPrefix  = []byte("value")
 )
 
 var ErrKeyNotFound = errors.New("couldn't find key")
@@ -91,6 +92,30 @@ func (ll *LinkedList) getAttribute(attr []byte) (int, error) {
 	}
 }
 
+func (ll *LinkedList) incLength() error {
+	return ll.incAttribute(linkedListLengthKey)
+}
+
+func (ll *LinkedList) incFirst() error {
+	return ll.incAttribute(linkedListFirstElementKey)
+}
+
+func (ll *LinkedList) incAttribute(attr []byte) error {
+	value, err := ll.getAttribute(attr)
+	if err != nil {
+		return err
+	}
+
+	newValue := octosql.SortedMarshalInt(value + 1)
+
+	err = ll.tx.Set(attr, newValue)
+	if err != nil {
+		return errors.Wrap(err, "failed to set new value")
+	}
+
+	return nil
+}
+
 func NewLinkedListIterator(it Iterator) *LinkedListIterator {
 	return &LinkedListIterator{
 		it: it,
@@ -117,7 +142,12 @@ func (ll *LinkedList) Append(value proto.Message) error {
 		return errors.Wrap(err, "couldn't add the element to linked list")
 	}
 
-	ll.elementCount += 1 //TODO: store this in badger
+	err = ll.incLength()
+	if err != nil {
+		return errors.Wrap(err, "failed to increase linked list length attribute")
+	}
+
+	ll.elementCount += 1
 	return nil
 }
 
@@ -155,12 +185,17 @@ func (ll *LinkedList) Pop(value proto.Message) error {
 		return errors.New("couldn't delete first element of list")
 	}
 
+	err = ll.incFirst()
+	if err != nil {
+		return errors.Wrap(err, "failed to increase linked list first attribute")
+	}
+
 	ll.firstElement++
 	return nil
 }
 
 func (ll *LinkedList) GetIterator() *LinkedListIterator {
-	it := ll.tx.WithPrefix([]byte("v")).Iterator(badger.DefaultIteratorOptions)
+	it := ll.tx.WithPrefix(linkedListValueKeyPrefix).Iterator(badger.DefaultIteratorOptions)
 	it.Rewind()
 
 	return NewLinkedListIterator(it)
@@ -168,7 +203,7 @@ func (ll *LinkedList) GetIterator() *LinkedListIterator {
 
 func getIndexKey(index int) []byte {
 	bytes := make([]byte, 0)
-	bytes = append(bytes, byte('v'))
+	bytes = append(bytes, linkedListValueKeyPrefix...)
 	bytes = append(bytes, octosql.SortedMarshalInt(index)...)
 
 	return bytes

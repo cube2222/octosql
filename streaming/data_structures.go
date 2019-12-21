@@ -136,10 +136,10 @@ func (ll *LinkedList) Append(value proto.Message) error {
 		return errors.Wrap(err, "couldn't serialize given value")
 	}
 
-	return ll.AppendBytes(data)
+	return ll.appendBytes(data)
 }
 
-func (ll *LinkedList) AppendBytes(data []byte) error {
+func (ll *LinkedList) appendBytes(data []byte) error {
 	byteKey := getIndexKey(ll.elementCount)
 
 	err := ll.tx.Set(byteKey, data)

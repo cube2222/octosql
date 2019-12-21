@@ -3,6 +3,7 @@ package octosql
 import (
 	"encoding/binary"
 	"math"
+	"sort"
 	"time"
 
 	"github.com/pkg/errors"
@@ -12,7 +13,7 @@ const (
 	NullIdentifier      = 1 /* Nonexistent */
 	PhantomIdentifier   = 2 /* Nonexsitent */
 	IntIdentifier       = 3 /* Number */
-	FloatIdentifier     = 4 /* Number??? */
+	FloatIdentifier     = 4 /* Number */
 	BoolIdentifier      = 5 /* Bool */
 	StringIdentifier    = 6 /* Until StringDelimiter */
 	TimestampIdentifier = 7 /* Number */
@@ -72,7 +73,7 @@ func (v *Value) MonotonicUnmarshal(bytes []byte) error {
 
 		finalValue = MakeInt(result)
 	case FloatIdentifier:
-		result, err := MonotonicUnmarshalFloat(bytes)
+		result, err := UnmarshalFloat(bytes)
 		if err != nil {
 			return err
 		}
@@ -114,8 +115,12 @@ func (v *Value) MonotonicUnmarshal(bytes []byte) error {
 
 		finalValue = MakeTuple(result)
 	case ObjectIdentifier:
-		panic("implement me!")
+		result, err := UnmarshalObject(bytes)
+		if err != nil {
+			return err
+		}
 
+		finalValue = MakeObject(result)
 	default:
 		panic("unsupported type")
 	}
@@ -140,12 +145,14 @@ func monotonicMarshal(v *Value) []byte {
 		return MonotonicMarshalTime(v.AsTime())
 	case TypeDuration:
 		return MonotonicMarshalDuration(v.AsDuration())
-	case TypeFloat: // TODO - fix
-		return MonotonicMarshalFloat(v.AsFloat())
+	case TypeFloat:
+		return MarshalFloat(v.AsFloat())
 	case TypeTuple:
 		return MonotonicMarshalTuple(v.AsSlice())
+	case TypeObject:
+		return MarshalObject(v.AsMap())
 	default:
-		return nil
+		panic("unknown type!")
 	}
 }
 
@@ -223,35 +230,22 @@ func MonotonicUnmarshalUint64(b []byte) (uint64, error) {
 }
 
 /* Marshal float */
-func MonotonicMarshalFloat(f float64) []byte {
-	sign := f >= 0.0
+func MarshalFloat(f float64) []byte {
+	val := math.Float64bits(f)
 
-	var val uint64
-
-	if sign {
-		val = math.Float64bits(f)
-	} else {
-		val = math.Float64bits(math.MaxFloat64 + f)
-	}
-
-	bytes := MonotonicMarshalUint64(val, sign)
+	bytes := MonotonicMarshalUint64(val, f >= 0.0)
 	bytes[0] = FloatIdentifier
 
 	return bytes
 }
 
-func MonotonicUnmarshalFloat(b []byte) (float64, error) {
+func UnmarshalFloat(b []byte) (float64, error) {
 	value, err := MonotonicUnmarshalUint64(b)
 	if err != nil {
 		return 0.0, errors.Wrap(err, "incorrect float key representation")
 	}
 
 	floatValue := math.Float64frombits(value)
-	sign := b[1]
-
-	if sign == 0 {
-		return floatValue - math.MaxFloat64, nil
-	}
 
 	return floatValue, nil
 }
@@ -419,7 +413,59 @@ func recursiveMonotonicUnmarshalTuple(b []byte) ([]Value, int, error) {
 	return nil, 0, errors.New("the last element of the tuple wasn't a delimiter")
 }
 
+/* Marshal Object */
+
+func MarshalObject(o map[string]Value) []byte {
+	values := make([]Value, 0)
+	keys := sortedMapKeys(o)
+
+	for _, key := range keys {
+		values = append(values, MakeString(key))
+		values = append(values, o[key])
+	}
+
+	bytes := make([]byte, 1)
+	bytes[0] = ObjectIdentifier
+	bytes = append(bytes, MonotonicMarshalTuple(values)...)
+
+	return bytes
+}
+
+func UnmarshalObject(b []byte) (map[string]Value, error) {
+	tuple, err := MonotonicUnmarshalTuple(b[1:])
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't unmarshal object")
+	}
+
+	if len(tuple) < 2 || len(tuple)%2 == 1 {
+		return nil, errors.New("invalid object length")
+	}
+
+	result := make(map[string]Value)
+
+	for i := 0; i < len(tuple); i += 2 {
+		key := tuple[i].AsString()
+		result[key] = tuple[i+1]
+	}
+
+	return result, nil
+}
+
 /* Auxiliary functions */
+
+func sortedMapKeys(m map[string]Value) []string {
+	keys := make([]string, len(m))
+
+	index := 0
+	for key := range m {
+		keys[index] = key
+		index++
+	}
+
+	sort.Strings(keys)
+
+	return keys
+}
 
 func reverseByteSlice(b []byte) []byte {
 	c := make([]byte, len(b))

@@ -49,6 +49,19 @@ func TestMarshal(t *testing.T) {
 				v: MakeInt(0),
 			},
 		},
+		/* float tests */
+		{
+			name: "float test - positive float",
+			args: args{
+				v: MakeFloat(1827.128852),
+			},
+		},
+		{
+			name: "float test - negative float",
+			args: args{
+				v: MakeFloat(-192.11239),
+			},
+		},
 		/* bool tests */
 		{
 			name: "bool test - false",
@@ -163,6 +176,22 @@ func TestMarshal(t *testing.T) {
 					}),
 					MakeInt(TupleDelimiter),
 					MakeString("XD"),
+				}),
+			},
+		},
+		/* objects test */
+		{
+			name: "simple object",
+			args: args{
+				v: MakeObject(map[string]Value{
+					"ala":     MakeInt(17),
+					"ma":      MakePhantom(),
+					"kota":    MakeBool(false),
+					"i":       MakeString("psa"),
+					"ale":     MakeFloat(17.17283),
+					"nie":     MakeTime(time.Now()),
+					"posiada": MakeNull(),
+					"papugi":  MakeTuple([]Value{MakeInt(11), MakeString("no i cześć")}),
 				}),
 			},
 		},

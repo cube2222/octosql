@@ -7,10 +7,11 @@ import (
 	"github.com/pkg/errors"
 )
 
+//TODO: these values might be reduced to "l", "f", and "v" to shorten the keys
 var (
 	linkedListLengthKey       = []byte("length")
 	linkedListFirstElementKey = []byte("first")
-	linkedListValueKeyPrefix  = []byte("aaa")
+	linkedListValueKeyPrefix  = []byte("value")
 )
 
 var ErrKeyNotFound = errors.New("couldn't find key")

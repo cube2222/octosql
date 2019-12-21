@@ -8,11 +8,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-/* TODO
-1) String delimiter must be something smaller than any string
-2) Tuple delimiter probably as well
-*/
-
 const (
 	NullIdentifier      = 1 /* Nonexistent */
 	PhantomIdentifier   = 2 /* Nonexsitent */
@@ -41,11 +36,11 @@ const (
 	MinimalStringLength = 1 + 1     // b[0] = type, b[1] = end of string
 )
 
-func (v *Value) SortedMarshal() []byte {
-	return sortedMarshal(v)
+func (v *Value) MonotonicMarshal() []byte {
+	return monotonicMarshal(v)
 }
 
-func (v *Value) SortedUnmarshal(bytes []byte) error {
+func (v *Value) MonotonicUnmarshal(bytes []byte) error {
 	if len(bytes) == 0 {
 		return errors.New("empty byte slice given to unmarshal")
 	}
@@ -56,63 +51,63 @@ func (v *Value) SortedUnmarshal(bytes []byte) error {
 
 	switch identifier {
 	case NullIdentifier:
-		err := SortedUnmarshalNull(bytes)
+		err := MonotonicUnmarshalNull(bytes)
 		if err != nil {
 			return err
 		}
 
 		finalValue = MakeNull()
 	case PhantomIdentifier:
-		err := SortedUnmarshalPhantom(bytes)
+		err := MonotonicUnmarshalPhantom(bytes)
 		if err != nil {
 			return err
 		}
 
 		finalValue = MakePhantom()
 	case IntIdentifier:
-		result, err := SortedUnmarshalInt(bytes)
+		result, err := MonotonicUnmarshalInt(bytes)
 		if err != nil {
 			return err
 		}
 
 		finalValue = MakeInt(result)
 	case FloatIdentifier:
-		result, err := SortedUnmarshalFloat(bytes)
+		result, err := MonotonicUnmarshalFloat(bytes)
 		if err != nil {
 			return err
 		}
 
 		finalValue = MakeFloat(result)
 	case BoolIdentifier:
-		result, err := SortedUnmarshalBool(bytes)
+		result, err := MonotonicUnmarshalBool(bytes)
 		if err != nil {
 			return err
 		}
 
 		finalValue = MakeBool(result)
 	case StringIdentifier:
-		result, err := SortedUnmarshalString(bytes)
+		result, err := MonotonicUnmarshalString(bytes)
 		if err != nil {
 			return err
 		}
 
 		finalValue = MakeString(result)
 	case TimestampIdentifier:
-		result, err := SortedUnmarshalTime(bytes)
+		result, err := MonotonicUnmarshalTime(bytes)
 		if err != nil {
 			return err
 		}
 
 		finalValue = MakeTime(result)
 	case DurationIdentifier:
-		result, err := SortedUnmarshalDuration(bytes)
+		result, err := MonotonicUnmarshalDuration(bytes)
 		if err != nil {
 			return err
 		}
 
 		finalValue = MakeDuration(result)
 	case TupleIdentifier:
-		result, err := SortedUnmarshalTuple(bytes)
+		result, err := MonotonicUnmarshalTuple(bytes)
 		if err != nil {
 			return err
 		}
@@ -129,37 +124,37 @@ func (v *Value) SortedUnmarshal(bytes []byte) error {
 	return nil
 }
 
-func sortedMarshal(v *Value) []byte {
+func monotonicMarshal(v *Value) []byte {
 	switch v.GetType() {
 	case TypeString:
-		return SortedMarshalString(v.AsString())
+		return MonotonicMarshalString(v.AsString())
 	case TypeInt:
-		return SortedMarshalInt(v.AsInt())
+		return MonotonicMarshalInt(v.AsInt())
 	case TypeBool:
-		return SortedMarshalBool(v.AsBool())
+		return MonotonicMarshalBool(v.AsBool())
 	case TypeNull:
-		return SortedMarshalNull()
+		return MonotonicMarshalNull()
 	case TypePhantom:
-		return SortedMarshalPhantom()
+		return MonotonicMarshalPhantom()
 	case TypeTime:
-		return SortedMarshalTime(v.AsTime())
+		return MonotonicMarshalTime(v.AsTime())
 	case TypeDuration:
-		return SortedMarshalDuration(v.AsDuration())
+		return MonotonicMarshalDuration(v.AsDuration())
 	case TypeFloat: // TODO - fix
-		return SortedMarshalFloat(v.AsFloat())
+		return MonotonicMarshalFloat(v.AsFloat())
 	case TypeTuple:
-		return SortedMarshalTuple(v.AsSlice())
+		return MonotonicMarshalTuple(v.AsSlice())
 	default:
 		return nil
 	}
 }
 
 /* Marshal null */
-func SortedMarshalNull() []byte {
+func MonotonicMarshalNull() []byte {
 	return []byte{NullIdentifier}
 }
 
-func SortedUnmarshalNull(b []byte) error {
+func MonotonicUnmarshalNull(b []byte) error {
 	if len(b) != NonexistentMarshalLength {
 		return errors.New("incorrect null key size")
 	}
@@ -172,11 +167,11 @@ func SortedUnmarshalNull(b []byte) error {
 }
 
 /* Marshal phantom */
-func SortedMarshalPhantom() []byte {
+func MonotonicMarshalPhantom() []byte {
 	return []byte{PhantomIdentifier}
 }
 
-func SortedUnmarshalPhantom(b []byte) error {
+func MonotonicUnmarshalPhantom(b []byte) error {
 	if len(b) != NonexistentMarshalLength {
 		return errors.New("incorrect null key size")
 	}
@@ -189,11 +184,11 @@ func SortedUnmarshalPhantom(b []byte) error {
 }
 
 /* Marshal int and int64 */
-func SortedMarshalInt(i int) []byte {
-	return SortedMarshalUint64(uint64(i), i >= 0)
+func MonotonicMarshalInt(i int) []byte {
+	return MonotonicMarshalUint64(uint64(i), i >= 0)
 }
 
-func SortedMarshalUint64(ui uint64, sign bool) []byte {
+func MonotonicMarshalUint64(ui uint64, sign bool) []byte {
 	b := make([]byte, NumberMarshalLength)
 
 	binary.LittleEndian.PutUint64(b, ui)
@@ -211,8 +206,8 @@ func SortedMarshalUint64(ui uint64, sign bool) []byte {
 	return reverseByteSlice(b)
 }
 
-func SortedUnmarshalInt(b []byte) (int, error) {
-	value, err := SortedUnmarshalUint64(b)
+func MonotonicUnmarshalInt(b []byte) (int, error) {
+	value, err := MonotonicUnmarshalUint64(b)
 	if err != nil {
 		return 0, errors.New("incorrect int64 key size")
 	}
@@ -220,7 +215,7 @@ func SortedUnmarshalInt(b []byte) (int, error) {
 	return int(value), nil
 }
 
-func SortedUnmarshalUint64(b []byte) (uint64, error) {
+func MonotonicUnmarshalUint64(b []byte) (uint64, error) {
 	if len(b) != NumberMarshalLength {
 		return 0, errors.New("incorrect uint64 key size")
 	}
@@ -228,7 +223,7 @@ func SortedUnmarshalUint64(b []byte) (uint64, error) {
 }
 
 /* Marshal float */
-func SortedMarshalFloat(f float64) []byte {
+func MonotonicMarshalFloat(f float64) []byte {
 	sign := f >= 0.0
 
 	var val uint64
@@ -239,14 +234,14 @@ func SortedMarshalFloat(f float64) []byte {
 		val = math.Float64bits(math.MaxFloat64 + f)
 	}
 
-	bytes := SortedMarshalUint64(val, sign)
+	bytes := MonotonicMarshalUint64(val, sign)
 	bytes[0] = FloatIdentifier
 
 	return bytes
 }
 
-func SortedUnmarshalFloat(b []byte) (float64, error) {
-	value, err := SortedUnmarshalUint64(b)
+func MonotonicUnmarshalFloat(b []byte) (float64, error) {
+	value, err := MonotonicUnmarshalUint64(b)
 	if err != nil {
 		return 0.0, errors.Wrap(err, "incorrect float key representation")
 	}
@@ -262,7 +257,7 @@ func SortedUnmarshalFloat(b []byte) (float64, error) {
 }
 
 /* Marshal bool */
-func SortedMarshalBool(b bool) []byte {
+func MonotonicMarshalBool(b bool) []byte {
 	bytes := make([]byte, BoolMarshalLength)
 	bytes[0] = byte(BoolIdentifier)
 
@@ -275,7 +270,7 @@ func SortedMarshalBool(b bool) []byte {
 	return bytes
 }
 
-func SortedUnmarshalBool(b []byte) (bool, error) {
+func MonotonicUnmarshalBool(b []byte) (bool, error) {
 	if len(b) != BoolMarshalLength {
 		return false, errors.New("incorrect bool key size")
 	}
@@ -291,7 +286,7 @@ func SortedUnmarshalBool(b []byte) (bool, error) {
 }
 
 /* Marshal string */
-func SortedMarshalString(s string) []byte {
+func MonotonicMarshalString(s string) []byte {
 	bytes := make([]byte, 1)
 	bytes[0] = StringIdentifier
 
@@ -305,8 +300,7 @@ func SortedMarshalString(s string) []byte {
 	return bytes
 }
 
-//TODO: fix error messages
-func SortedUnmarshalString(b []byte) (string, error) {
+func MonotonicUnmarshalString(b []byte) (string, error) {
 	length := len(b)
 
 	if length%2 != 0 || length < 2 {
@@ -326,15 +320,15 @@ func SortedUnmarshalString(b []byte) (string, error) {
 }
 
 /* Marshal Timestamp */
-func SortedMarshalTime(t time.Time) []byte {
-	bytes := SortedMarshalUint64(uint64(t.UnixNano()), true)
+func MonotonicMarshalTime(t time.Time) []byte {
+	bytes := MonotonicMarshalUint64(uint64(t.UnixNano()), true)
 	bytes[0] = TimestampIdentifier
 
 	return bytes
 }
 
-func SortedUnmarshalTime(b []byte) (time.Time, error) {
-	value, err := SortedUnmarshalUint64(b)
+func MonotonicUnmarshalTime(b []byte) (time.Time, error) {
+	value, err := MonotonicUnmarshalUint64(b)
 	if err != nil {
 		return time.Now(), errors.Wrap(err, "incorrect time key representation")
 	}
@@ -348,15 +342,15 @@ func SortedUnmarshalTime(b []byte) (time.Time, error) {
 }
 
 /* Marshal Duration */
-func SortedMarshalDuration(d time.Duration) []byte {
-	bytes := SortedMarshalUint64(uint64(d.Nanoseconds()), true)
+func MonotonicMarshalDuration(d time.Duration) []byte {
+	bytes := MonotonicMarshalUint64(uint64(d.Nanoseconds()), true)
 	bytes[0] = DurationIdentifier
 
 	return bytes
 }
 
-func SortedUnmarshalDuration(b []byte) (time.Duration, error) {
-	value, err := SortedUnmarshalUint64(b)
+func MonotonicUnmarshalDuration(b []byte) (time.Duration, error) {
+	value, err := MonotonicUnmarshalUint64(b)
 	if err != nil {
 		return time.Duration(0), errors.Wrap(err, "incorrect duration key representation")
 	}
@@ -365,12 +359,12 @@ func SortedUnmarshalDuration(b []byte) (time.Duration, error) {
 }
 
 /* Marshal Tuple */
-func SortedMarshalTuple(vs []Value) []byte {
+func MonotonicMarshalTuple(vs []Value) []byte {
 	result := make([]byte, 1)
 	result[0] = TupleIdentifier
 
 	for _, v := range vs {
-		vBytes := sortedMarshal(&v)
+		vBytes := monotonicMarshal(&v)
 		result = append(result, vBytes...)
 	}
 
@@ -379,12 +373,12 @@ func SortedMarshalTuple(vs []Value) []byte {
 	return result
 }
 
-func SortedUnmarshalTuple(b []byte) ([]Value, error) {
-	values, _, err := recursiveSortedUnmarshalTuple(b)
+func MonotonicUnmarshalTuple(b []byte) ([]Value, error) {
+	values, _, err := recursiveMonotonicUnmarshalTuple(b)
 	return values, err
 }
 
-func recursiveSortedUnmarshalTuple(b []byte) ([]Value, int, error) {
+func recursiveMonotonicUnmarshalTuple(b []byte) ([]Value, int, error) {
 	values := make([]Value, 0)
 	index := 1
 	length := len(b)
@@ -398,7 +392,7 @@ func recursiveSortedUnmarshalTuple(b []byte) ([]Value, int, error) {
 		}
 
 		if identifier == TupleIdentifier {
-			tupleValues, tupleLength, err := recursiveSortedUnmarshalTuple(b[index:])
+			tupleValues, tupleLength, err := recursiveMonotonicUnmarshalTuple(b[index:])
 			if err != nil {
 				return nil, 0, err
 			}
@@ -411,7 +405,7 @@ func recursiveSortedUnmarshalTuple(b []byte) ([]Value, int, error) {
 				return nil, 0, errors.Wrap(err, "couldn't find length of next element to unmarshal")
 			}
 
-			err = value.SortedUnmarshal(b[index : index+elementLength])
+			err = value.MonotonicUnmarshal(b[index : index+elementLength])
 			if err != nil {
 				return nil, 0, errors.Wrap(err, "couldn't unmarshal next element in tuple")
 			}

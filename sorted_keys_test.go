@@ -172,11 +172,11 @@ func TestMarshal(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var b Value
 
-			bytes := (&tt.args.v).SortedMarshal()
+			bytes := (&tt.args.v).MonotonicMarshal()
 
-			err := b.SortedUnmarshal(bytes)
+			err := b.MonotonicUnmarshal(bytes)
 			if err != nil {
-				t.Errorf("SortedMarshal() error = %v, wantErr false", err)
+				t.Errorf("MonotonicMarshal() error = %v, wantErr false", err)
 				return
 			}
 
@@ -246,7 +246,7 @@ func TestMarshalContinuity(t *testing.T) {
 			marshaled := make([][]byte, argCount)
 
 			for i := 0; i < argCount; i++ {
-				bytes := sortedMarshal(&tt.args.values[i])
+				bytes := monotonicMarshal(&tt.args.values[i])
 				marshaled[i] = bytes
 			}
 

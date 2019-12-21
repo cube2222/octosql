@@ -17,16 +17,18 @@ var (
 var ErrKeyNotFound = errors.New("couldn't find key")
 
 /*
-	A type that implements this interface must have a SortedMarshal method,
+	A type that implements this interface must have a MonotonicMarshal method,
 	that has the property, that if x <= y (where <= is the less-equal relation
 	defined on a certain type, for example lexicographical order on strings) then
-	SortedMarshal(x) <= SortedMarshal(y) (where <= is the lexicographical order on
+	MonotonicMarshal(x) <= MonotonicMarshal(y) (where <= is the lexicographical order on
 	[]byte). Since in mathematics such a function is called Monotonous, thus the name.
-	A SortedUnmarshal which is the inverse of SortedMarshal is also required.
+	A MonotonicUnmarshal which is the inverse of MonotonicMarshal is also required.
+
+	WARNING: Float and Object is Serializable, but the serialization is not Monotonic!
 */
 type MonotonicallySerializable interface {
-	SortedMarshal() []byte
-	SortedUnmarshal([]byte) error
+	MonotonicMarshal() []byte
+	MonotonicUnmarshal([]byte) error
 }
 
 /* LinkedList */
@@ -80,14 +82,14 @@ func (ll *LinkedList) getAttribute(attr []byte) (int, error) {
 	value, err := ll.tx.Get(attr)
 	switch err {
 	case badger.ErrKeyNotFound:
-		err2 := ll.tx.Set(attr, octosql.SortedMarshalInt(0))
+		err2 := ll.tx.Set(attr, octosql.MonotonicMarshalInt(0))
 		if err2 != nil {
 			return 0, errors.Wrapf(err2, "couldn't initialize linked list %s field", string(attr))
 		}
 
 		return 0, nil
 	case nil:
-		return octosql.SortedUnmarshalInt(value)
+		return octosql.MonotonicUnmarshalInt(value)
 	default:
 		return 0, errors.Wrapf(err, "couldn't read %s of linked list", string(attr))
 	}
@@ -107,7 +109,7 @@ func (ll *LinkedList) incAttribute(attr []byte) error {
 		return err
 	}
 
-	newValue := octosql.SortedMarshalInt(value + 1)
+	newValue := octosql.MonotonicMarshalInt(value + 1)
 
 	err = ll.tx.Set(attr, newValue)
 	if err != nil {
@@ -209,7 +211,7 @@ func (ll *LinkedList) GetIterator() *LinkedListIterator {
 func getIndexKey(index int) []byte {
 	bytes := make([]byte, 0)
 	bytes = append(bytes, linkedListValueKeyPrefix...)
-	bytes = append(bytes, octosql.SortedMarshalInt(index)...)
+	bytes = append(bytes, octosql.MonotonicMarshalInt(index)...)
 
 	return bytes
 }
@@ -253,7 +255,7 @@ func NewMapIterator(it Iterator) *MapIterator {
 }
 
 func (hm *Map) Set(key MonotonicallySerializable, value proto.Message) error {
-	byteKey := key.SortedMarshal()
+	byteKey := key.MonotonicMarshal()
 
 	byteValue, err := proto.Marshal(value)
 	if err != nil {
@@ -269,7 +271,7 @@ func (hm *Map) Set(key MonotonicallySerializable, value proto.Message) error {
 }
 
 func (hm *Map) Get(key MonotonicallySerializable, value proto.Message) error {
-	byteKey := key.SortedMarshal()
+	byteKey := key.MonotonicMarshal()
 
 	data, err := hm.tx.Get(byteKey) //remove prefix from data
 	if err != nil {

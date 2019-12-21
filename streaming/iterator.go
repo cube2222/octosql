@@ -63,7 +63,7 @@ func (bi *BadgerIterator) currentKey(key MonotonicallySerializable) error {
 	byteKey := item.Key()
 	strippedKey := byteKey[bi.prefixLength:] //TODO: maybe add function to do that
 
-	err := key.SortedUnmarshal(strippedKey)
+	err := key.MonotonicUnmarshal(strippedKey)
 	return err
 }
 

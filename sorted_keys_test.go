@@ -245,7 +245,7 @@ func TestMarshal(t *testing.T) {
 	}
 }
 
-func TestMarshalContinuity(t *testing.T) {
+func TestIfMarshalMonotonic(t *testing.T) {
 	type args struct {
 		values []Value
 	}
@@ -253,16 +253,6 @@ func TestMarshalContinuity(t *testing.T) {
 		name string
 		args args
 	}{
-		{
-			name: "strings test",
-			args: args{
-				values: []Value{
-					MakeString("ala ma kota"),
-					MakeString("ala ma psa"),
-					MakeString("bartek ma papugi"),
-				},
-			},
-		},
 		{
 			name: "ints test",
 			args: args{
@@ -281,18 +271,79 @@ func TestMarshalContinuity(t *testing.T) {
 			},
 		},
 		{
-			name: "floats test",
+			name: "bool test",
 			args: args{
 				values: []Value{
-					// TODO - nie dziala dla ujemnych :<
-					MakeFloat(-124.0001),
-					MakeFloat(-123.9998),
-					MakeFloat(-1.01),
-					MakeFloat(0.0000001),
-					MakeFloat(1.01),
-					MakeFloat(3),
-					MakeFloat(2345.5432),
-					MakeFloat(24287.111111),
+					MakeBool(false),
+					MakeBool(true),
+				},
+			},
+		},
+		{
+			name: "strings test",
+			args: args{
+				values: []Value{
+					MakeString("ala"),
+					MakeString("ala ma kota"),
+					MakeString("ala ma psa"),
+					MakeString("bartek ma papugi"),
+					MakeString("zebra"),
+				},
+			},
+		},
+		{
+			name: "timestamp test",
+			args: args{
+				values: []Value{
+					MakeTime(time.Date(2017, 11, 19, 22, 17, 38, 0, time.UTC)),
+					MakeTime(time.Date(2017, 11, 19, 22, 17, 39, 0, time.UTC)),
+					MakeTime(time.Date(2017, 11, 19, 22, 18, 0, 0, time.UTC)),
+					MakeTime(time.Now()),
+				},
+			},
+		},
+		{
+			name: "duration test",
+			args: args{
+				values: []Value{
+					MakeDuration(0),
+					MakeDuration(17),
+					MakeDuration(11923),
+					MakeDuration(192308),
+					MakeDuration(192309),
+					MakeDuration(20000000),
+				},
+			},
+		},
+		{
+			name: "tuple test",
+			args: args{
+				values: []Value{
+					MakeTuple([]Value{
+						MakeInt(17),
+						MakeString("ala ma kota"),
+						MakeBool(false),
+					}),
+					MakeTuple([]Value{
+						MakeInt(18),
+						MakeString("abcdef"),
+						MakeBool(true),
+					}),
+					MakeTuple([]Value{
+						MakeInt(18),
+						MakeString("abcdefghij"),
+						MakeBool(false),
+					}),
+					MakeTuple([]Value{
+						MakeInt(18),
+						MakeString("b"),
+						MakeBool(false),
+					}),
+					MakeTuple([]Value{
+						MakeInt(18),
+						MakeString("b"),
+						MakeBool(true),
+					}),
 				},
 			},
 		},

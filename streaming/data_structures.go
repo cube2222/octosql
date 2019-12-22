@@ -206,6 +206,42 @@ func (ll *LinkedList) Pop(value proto.Message) error {
 	return nil
 }
 
+func (ll *LinkedList) Clear() error {
+	for ll.firstElement < ll.elementCount {
+		key := getIndexKey(ll.firstElement)
+		err := ll.tx.Delete(key)
+
+		if err != nil {
+			return errors.Wrap(err, "couldn't clear the list")
+		}
+
+		err = ll.incFirst()
+		if err != nil {
+			return errors.Wrap(err, "couldn't increase first element index")
+		}
+
+		ll.firstElement++
+	}
+
+	err := ll.tx.Delete(linkedListFirstElementKey)
+	if err != nil {
+		return errors.Wrap(err, "couldn't clear first element index metadata")
+	}
+
+	err = ll.tx.Delete(linkedListLengthKey)
+	if err != nil {
+		return errors.Wrap(err, "couldn't clear length of linked list metadata")
+	}
+
+	/* Generally if someone uses Clear() on a linkedList, then they shouldn't
+	use the same one to add new values. In case they do we can set these to 0.
+	*/
+	ll.firstElement = 0
+	ll.elementCount = 0
+
+	return nil
+}
+
 func (ll *LinkedList) GetIterator() *LinkedListIterator {
 	it := ll.tx.WithPrefix(linkedListValueKeyPrefix).Iterator(badger.DefaultIteratorOptions)
 	it.Rewind()

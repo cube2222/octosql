@@ -19,9 +19,9 @@ func TestLinkedList(t *testing.T) {
 	defer db.DropAll()
 
 	store := NewBadgerStorage(db)
-	txn := store.BeginTransaction()
+	txn := store.BeginTransaction().WithPrefix([]byte(prefix))
 
-	linkedList := NewLinkedList(txn.WithPrefix([]byte(prefix)))
+	linkedList := NewLinkedList(txn)
 
 	values := []octosql.Value{
 		octosql.MakeInt(1),
@@ -80,7 +80,7 @@ func TestLinkedList(t *testing.T) {
 		log.Fatal("the value returned by Pop() isn't the first value inserted")
 	}
 
-	iter.Close() //we need to close the iterator, to be able to get the next one
+	_ = iter.Close() //we need to close the iterator, to be able to get the next one
 
 	iter = linkedList.GetIterator()
 	areEqual, err = testIterator(iter, values[1:])
@@ -93,8 +93,10 @@ func TestLinkedList(t *testing.T) {
 		log.Fatal("The iterator doesn't contain the expected values")
 	}
 
-	/* test pop again */
-	err = linkedList.Pop(&value)
+	/* test pop again but this time create a new Linked List to operate on the same data*/
+	linkedList2 := NewLinkedList(txn)
+
+	err = linkedList2.Pop(&value)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -103,10 +105,11 @@ func TestLinkedList(t *testing.T) {
 		log.Fatal("the value returned by Pop() isn't the first value inserted")
 	}
 
-	iter.Close() //we need to close the iterator, to be able to get the next one
+	_ = iter.Close() //we need to close the iterator, to be able to get the next one
 
-	iter = linkedList.GetIterator()
+	iter = linkedList2.GetIterator()
 	areEqual, err = testIterator(iter, values[2:])
+	_ = iter.Close()
 
 	if err != nil {
 		log.Fatal(err)
@@ -116,6 +119,57 @@ func TestLinkedList(t *testing.T) {
 		log.Fatal("The iterator doesn't contain the expected values")
 	}
 
+	/* test clear */
+	err = linkedList2.Clear()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	/* test if linked list is actually empty */
+	iter = linkedList2.GetIterator()
+	areEqual, err = testIterator(iter, []octosql.Value{})
+	_ = iter.Close()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if !areEqual {
+		log.Fatal("The iterator should be empty")
+	}
+
+	_, err = txn.Get(linkedListLengthKey)
+	if err != badger.ErrKeyNotFound {
+		log.Fatal("the linked list length element index should be empty")
+	}
+
+	_, err = txn.Get(linkedListFirstElementKey)
+	if err != badger.ErrKeyNotFound {
+		log.Fatal("the linked list first element should be empty")
+	}
+
+	/* we should still be able to append elements tho */
+	err = linkedList2.Append(&values[0])
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	iter = linkedList2.GetIterator()
+	areEqual, err = testIterator(iter, values[:1])
+	_ = iter.Close()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if !areEqual {
+		log.Fatal("The iterator doesn't contain the expected values")
+	}
+
+	err = linkedList2.Clear()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func TestMap(t *testing.T) {

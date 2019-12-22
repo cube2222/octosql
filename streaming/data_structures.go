@@ -15,6 +15,7 @@ var (
 )
 
 var ErrKeyNotFound = errors.New("couldn't find key")
+var ErrEmptyList = errors.New("list is empty")
 
 /*
 	A type that implements this interface must have a MonotonicMarshal method,
@@ -166,9 +167,14 @@ func (ll *LinkedList) Peek(value proto.Message) error {
 		}
 	}
 
+	if ll.firstElement >= ll.elementCount {
+		return ErrEmptyList
+	}
+
 	firstKey := getIndexKey(ll.firstElement)
 
 	data, err := ll.tx.Get(firstKey)
+
 	if err != nil {
 		return errors.New("couldn't get the value of first element of list")
 	}
@@ -179,7 +185,6 @@ func (ll *LinkedList) Peek(value proto.Message) error {
 
 func (ll *LinkedList) Pop(value proto.Message) error {
 	//there is no need to call initialize here, since Peek calls initialize
-
 	err := ll.Peek(value)
 	if err != nil {
 		return err

@@ -92,6 +92,30 @@ func TestLinkedList(t *testing.T) {
 	if !areEqual {
 		log.Fatal("The iterator doesn't contain the expected values")
 	}
+
+	/* test pop again */
+	err = linkedList.Pop(&value)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if !octosql.AreEqual(value, values[1]) {
+		log.Fatal("the value returned by Pop() isn't the first value inserted")
+	}
+
+	iter.Close() //we need to close the iterator, to be able to get the next one
+
+	iter = linkedList.GetIterator()
+	areEqual, err = testIterator(iter, values[2:])
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if !areEqual {
+		log.Fatal("The iterator doesn't contain the expected values")
+	}
+
 }
 
 func TestMap(t *testing.T) {

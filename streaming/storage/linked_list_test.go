@@ -1,4 +1,4 @@
-package streaming
+package storage
 
 import (
 	"log"
@@ -6,7 +6,6 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/dgraph-io/badger/v2"
-	"github.com/pkg/errors"
 )
 
 func TestLinkedList(t *testing.T) {
@@ -40,7 +39,7 @@ func TestLinkedList(t *testing.T) {
 
 	/* test if all values are there */
 	iter := linkedList.GetIterator()
-	areEqual, err := testIterator(iter, values)
+	areEqual, err := TestIteratorCorrectness(iter, values)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -83,7 +82,7 @@ func TestLinkedList(t *testing.T) {
 	_ = iter.Close() //we need to close the iterator, to be able to get the next one
 
 	iter = linkedList.GetIterator()
-	areEqual, err = testIterator(iter, values[1:])
+	areEqual, err = TestIteratorCorrectness(iter, values[1:])
 
 	if err != nil {
 		log.Fatal(err)
@@ -108,7 +107,7 @@ func TestLinkedList(t *testing.T) {
 	_ = iter.Close() //we need to close the iterator, to be able to get the next one
 
 	iter = linkedList2.GetIterator()
-	areEqual, err = testIterator(iter, values[2:])
+	areEqual, err = TestIteratorCorrectness(iter, values[2:])
 	_ = iter.Close()
 
 	if err != nil {
@@ -127,7 +126,7 @@ func TestLinkedList(t *testing.T) {
 
 	/* test if linked list is actually empty */
 	iter = linkedList2.GetIterator()
-	areEqual, err = testIterator(iter, []octosql.Value{})
+	areEqual, err = TestIteratorCorrectness(iter, []octosql.Value{})
 	_ = iter.Close()
 
 	if err != nil {
@@ -155,7 +154,7 @@ func TestLinkedList(t *testing.T) {
 	}
 
 	iter = linkedList2.GetIterator()
-	areEqual, err = testIterator(iter, values[:1])
+	areEqual, err = TestIteratorCorrectness(iter, values[:1])
 	_ = iter.Close()
 
 	if err != nil {
@@ -170,72 +169,4 @@ func TestLinkedList(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-}
-
-func TestMap(t *testing.T) {
-	db, err := badger.Open(badger.DefaultOptions("test"))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	defer db.DropAll()
-
-	store := NewBadgerStorage(db)
-	txn := store.BeginTransaction()
-
-	badgerMap := NewMap(txn.WithPrefix([]byte("map_prefix_")))
-
-	key1 := octosql.MakeString("aaa")
-	value1 := octosql.MakeString("siemanko")
-	err = badgerMap.Set(&key1, &value1)
-	if err != nil {
-		panic(err)
-	}
-
-	key2 := octosql.MakeString("bbb")
-	value2 := octosql.MakeString("eluwina")
-	err = badgerMap.Set(&key2, &value2)
-	if err != nil {
-		panic(err)
-	}
-
-	it := badgerMap.GetIterator()
-
-	var key octosql.Value
-	var val octosql.Value
-
-	for {
-		err = it.Next(&key, &val)
-		if err == ErrEndOfIterator {
-			return
-		} else if err != nil {
-			log.Fatal(err)
-		}
-
-		println(key.AsString(), val.AsString())
-	}
-
-}
-
-func testIterator(iter SimpleIterator, expectedValues []octosql.Value) (bool, error) {
-	var value octosql.Value
-
-	for i := 0; i < len(expectedValues); i++ {
-		err := iter.Next(&value)
-
-		if err != nil {
-			return false, errors.Wrap(err, "expected a value, got an error")
-		}
-
-		if !octosql.AreEqual(value, expectedValues[i]) {
-			return false, errors.Errorf("mismatch of values at index %d", i)
-		}
-	}
-
-	err := iter.Next(&value)
-	if err != ErrEndOfIterator {
-		return false, errors.New("expected ErrEndOfStream")
-	}
-
-	return true, nil
 }

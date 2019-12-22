@@ -39,7 +39,7 @@ func TestLinkedList(t *testing.T) {
 
 	/* test if all values are there */
 	iter := linkedList.GetIterator()
-	areEqual, err := TestIteratorCorrectness(iter, values)
+	areEqual, err := TestSimpleIteratorCorrectness(iter, values)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestLinkedList(t *testing.T) {
 	_ = iter.Close() //we need to close the iterator, to be able to get the next one
 
 	iter = linkedList.GetIterator()
-	areEqual, err = TestIteratorCorrectness(iter, values[1:])
+	areEqual, err = TestSimpleIteratorCorrectness(iter, values[1:])
 
 	if err != nil {
 		log.Fatal(err)
@@ -107,7 +107,7 @@ func TestLinkedList(t *testing.T) {
 	_ = iter.Close() //we need to close the iterator, to be able to get the next one
 
 	iter = linkedList2.GetIterator()
-	areEqual, err = TestIteratorCorrectness(iter, values[2:])
+	areEqual, err = TestSimpleIteratorCorrectness(iter, values[2:])
 	_ = iter.Close()
 
 	if err != nil {
@@ -126,7 +126,7 @@ func TestLinkedList(t *testing.T) {
 
 	/* test if linked list is actually empty */
 	iter = linkedList2.GetIterator()
-	areEqual, err = TestIteratorCorrectness(iter, []octosql.Value{})
+	areEqual, err = TestSimpleIteratorCorrectness(iter, []octosql.Value{})
 	_ = iter.Close()
 
 	if err != nil {
@@ -154,7 +154,7 @@ func TestLinkedList(t *testing.T) {
 	}
 
 	iter = linkedList2.GetIterator()
-	areEqual, err = TestIteratorCorrectness(iter, values[:1])
+	areEqual, err = TestSimpleIteratorCorrectness(iter, values[:1])
 	_ = iter.Close()
 
 	if err != nil {

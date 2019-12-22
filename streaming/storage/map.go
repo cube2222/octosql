@@ -72,13 +72,22 @@ func (hm *Map) GetIterator() *MapIterator {
 	return NewMapIterator(it)
 }
 
+func (hm *Map) Delete(key MonotonicallySerializable) error {
+	bytes := key.MonotonicMarshal()
+	return hm.tx.Delete(bytes)
+}
+
+/* Important: To call map.Clear() one must close any iterators opened from that map  */
 func (hm *Map) Clear() error {
 	it := hm.GetIterator()
+	defer it.Close()
 
 	var key octosql.Value
 	var value octosql.Value
 
-	for err := it.Next(&key, &value); err != ErrEndOfIterator; {
+	err := it.Next(&key, &value)
+
+	for err != ErrEndOfIterator {
 		if err != nil {
 			return errors.Wrap(err, "failed to get next element from map")
 		}
@@ -87,16 +96,17 @@ func (hm *Map) Clear() error {
 
 		err2 := hm.tx.Delete(bytes)
 		if err2 != nil {
-			return errors.Wrap(err2, "failed to remove element from map")
+			return errors.Wrap(err, "couldn't remove value from map")
 		}
+
+		err = it.Next(&key, &value)
 	}
 
 	return nil
 }
 
 func (mi *MapIterator) Next(key MonotonicallySerializable, value proto.Message) error {
-	err := mi.it.NextWithKey(key, value)
-	return err
+	return mi.it.NextWithKey(key, value)
 }
 
 func (mi *MapIterator) Rewind() {

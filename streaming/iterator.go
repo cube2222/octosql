@@ -10,11 +10,15 @@ import (
 
 var ErrEndOfIterator = errors.New("end of iterator")
 
-type Iterator interface {
+type SimpleIterator interface {
 	Next(proto.Message) error
-	NextWithKey(key MonotonicallySerializable, value proto.Message) error
 	Rewind()
 	io.Closer
+}
+
+type Iterator interface {
+	SimpleIterator
+	NextWithKey(key MonotonicallySerializable, value proto.Message) error
 }
 
 type BadgerIterator struct {

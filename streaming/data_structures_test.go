@@ -6,9 +6,11 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/pkg/errors"
 )
 
 func TestLinkedList(t *testing.T) {
+	prefix := "test_linked_list"
 	db, err := badger.Open(badger.DefaultOptions("test"))
 	if err != nil {
 		log.Fatal(err)
@@ -19,40 +21,76 @@ func TestLinkedList(t *testing.T) {
 	store := NewBadgerStorage(db)
 	txn := store.BeginTransaction()
 
-	linkedList := NewLinkedList(txn.WithPrefix([]byte("test linked list")))
+	linkedList := NewLinkedList(txn.WithPrefix([]byte(prefix)))
 
-	value1 := octosql.MakeInt(1)
-	value2 := octosql.MakeInt(2)
-	value3 := octosql.MakeInt(3)
-
-	err = linkedList.Append(&value1)
-	if err != nil {
-		log.Fatal(err)
+	values := []octosql.Value{
+		octosql.MakeInt(1),
+		octosql.MakeInt(2),
+		octosql.MakeInt(3),
+		octosql.MakeInt(4),
+		octosql.MakeInt(5),
 	}
 
-	err = linkedList.Append(&value2)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = linkedList.Append(&value3)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	iter := linkedList.GetIterator()
-
-	var result octosql.Value
-
-	for {
-		err = iter.Next(&result)
-		if err == ErrEndOfIterator {
-			return
-		} else if err != nil {
+	for i := 0; i < len(values); i++ {
+		err := linkedList.Append(&values[i])
+		if err != nil {
 			log.Fatal(err)
 		}
+	}
 
-		println(result.AsInt())
+	/* test if all values are there */
+	iter := linkedList.GetIterator()
+	areEqual, err := testIterator(iter, values)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if !areEqual {
+		log.Fatal("The iterator doesn't contain the expected values")
+	}
+
+	/* test peek */
+	var value octosql.Value
+
+	err = linkedList.Peek(&value)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if !octosql.AreEqual(value, values[0]) {
+		log.Fatal("the value returned by Peek() isn't the first value inserted")
+	}
+
+	err = linkedList.Peek(&value) //Peek shouldn't modify the linkedList in any way
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if !octosql.AreEqual(value, values[0]) {
+		log.Fatal("the value returned by Peek() the second time isn't the first value inserted")
+	}
+
+	/* test pop */
+	err = linkedList.Pop(&value)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if !octosql.AreEqual(value, values[0]) {
+		log.Fatal("the value returned by Pop() isn't the first value inserted")
+	}
+
+	iter.Close() //we need to close the iterator, to be able to get the next one
+
+	iter = linkedList.GetIterator()
+	areEqual, err = testIterator(iter, values[1:])
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if !areEqual {
+		log.Fatal("The iterator doesn't contain the expected values")
 	}
 }
 
@@ -99,4 +137,27 @@ func TestMap(t *testing.T) {
 		println(key.AsString(), val.AsString())
 	}
 
+}
+
+func testIterator(iter SimpleIterator, expectedValues []octosql.Value) (bool, error) {
+	var value octosql.Value
+
+	for i := 0; i < len(expectedValues); i++ {
+		err := iter.Next(&value)
+
+		if err != nil {
+			return false, errors.Wrap(err, "expected a value, got an error")
+		}
+
+		if !octosql.AreEqual(value, expectedValues[i]) {
+			return false, errors.Errorf("mismatch of values at index %d", i)
+		}
+	}
+
+	err := iter.Next(&value)
+	if err != ErrEndOfIterator {
+		return false, errors.New("expected ErrEndOfStream")
+	}
+
+	return true, nil
 }

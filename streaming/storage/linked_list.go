@@ -57,6 +57,23 @@ func (ll *LinkedList) Append(value proto.Message) error {
 	return ll.appendBytes(data)
 }
 
+func (ll *LinkedList) appendBytes(data []byte) error {
+	byteKey := getIndexKey(ll.elementCount)
+
+	err := ll.tx.Set(byteKey, data)
+	if err != nil {
+		return errors.Wrap(err, "couldn't add the element to linked list")
+	}
+
+	err = ll.incLength()
+	if err != nil {
+		return errors.Wrap(err, "failed to increase linked list length attribute")
+	}
+
+	ll.elementCount += 1
+	return nil
+}
+
 func (ll *LinkedList) Peek(value proto.Message) error {
 	if !ll.initialized {
 		err := ll.initialize()
@@ -170,23 +187,6 @@ func getIndexKey(index int) []byte {
 	bytes = append(bytes, octosql.MonotonicMarshalInt(index)...)
 
 	return bytes
-}
-
-func (ll *LinkedList) appendBytes(data []byte) error {
-	byteKey := getIndexKey(ll.elementCount)
-
-	err := ll.tx.Set(byteKey, data)
-	if err != nil {
-		return errors.Wrap(err, "couldn't add the element to linked list")
-	}
-
-	err = ll.incLength()
-	if err != nil {
-		return errors.Wrap(err, "failed to increase linked list length attribute")
-	}
-
-	ll.elementCount += 1
-	return nil
 }
 
 func (ll *LinkedList) initialize() error {

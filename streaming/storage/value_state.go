@@ -22,7 +22,11 @@ func (vs *ValueState) Set(value proto.Message) error {
 		return errors.Wrap(err, "couldn't marshal value")
 	}
 
-	err = vs.tx.Set(nil, byteValue)
+	return vs.setBytes(byteValue)
+}
+
+func (vs *ValueState) setBytes(b []byte) error {
+	err := vs.tx.Set(nil, b)
 	if err != nil {
 		return errors.Wrap(err, "couldn't set value")
 	}
@@ -40,6 +44,15 @@ func (vs *ValueState) Get(value proto.Message) error {
 
 	err = proto.Unmarshal(data, value)
 	return err
+}
+
+func (vs *ValueState) getBytes() ([]byte, error) {
+	bytes, err := vs.tx.Get(nil)
+	if err == badger.ErrKeyNotFound {
+		return nil, ErrKeyNotFound
+	}
+
+	return bytes, err
 }
 
 func (vs *ValueState) Clear() error {

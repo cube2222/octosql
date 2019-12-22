@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"github.com/cube2222/octosql"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
@@ -69,6 +70,28 @@ func (hm *Map) GetIterator() *MapIterator {
 	it.Rewind()
 
 	return NewMapIterator(it)
+}
+
+func (hm *Map) Clear() error {
+	it := hm.GetIterator()
+
+	var key octosql.Value
+	var value octosql.Value
+
+	for err := it.Next(&key, &value); err != ErrEndOfIterator; {
+		if err != nil {
+			return errors.Wrap(err, "failed to get next element from map")
+		}
+
+		bytes := key.MonotonicMarshal()
+
+		err2 := hm.tx.Delete(bytes)
+		if err2 != nil {
+			return errors.Wrap(err2, "failed to remove element from map")
+		}
+	}
+
+	return nil
 }
 
 func (mi *MapIterator) Next(key MonotonicallySerializable, value proto.Message) error {

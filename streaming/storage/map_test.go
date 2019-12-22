@@ -9,17 +9,19 @@ import (
 )
 
 func TestMap(t *testing.T) {
-	db, err := badger.Open(badger.DefaultOptions("test"))
+	db, err := badger.Open(badger.DefaultOptions("test_map"))
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	prefix := []byte("map_prefix_")
+
 	defer db.DropAll()
 
 	store := NewBadgerStorage(db)
-	txn := store.BeginTransaction()
+	txn := store.BeginTransaction().WithPrefix(prefix)
 
-	badgerMap := NewMap(txn.WithPrefix([]byte("map_prefix_")))
+	badgerMap := NewMap(txn)
 
 	key1 := octosql.MakeString("aaa")
 	value1 := octosql.MakeString("siemanko")

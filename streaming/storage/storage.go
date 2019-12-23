@@ -1,4 +1,4 @@
-package streaming
+package storage
 
 import (
 	"bytes"
@@ -105,6 +105,7 @@ func (tx *badgerTransaction) WithPrefix(prefix []byte) StateTransaction {
 }
 
 func (tx *badgerTransaction) Iterator(opts badger.IteratorOptions) Iterator {
+	opts.Prefix = tx.getKeyWithPrefix(opts.Prefix)
 	it := tx.tx.NewIterator(opts)
 	return NewBadgerIterator(it, tx.GetPrefixLength())
 }

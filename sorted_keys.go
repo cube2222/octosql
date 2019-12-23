@@ -3,21 +3,17 @@ package octosql
 import (
 	"encoding/binary"
 	"math"
+	"sort"
 	"time"
 
 	"github.com/pkg/errors"
 )
 
-/* TODO
-1) String delimiter must be something smaller than any string
-2) Tuple delimiter probably as well
-*/
-
 const (
 	NullIdentifier      = 1 /* Nonexistent */
 	PhantomIdentifier   = 2 /* Nonexsitent */
 	IntIdentifier       = 3 /* Number */
-	FloatIdentifier     = 4 /* Number??? */
+	FloatIdentifier     = 4 /* Number */
 	BoolIdentifier      = 5 /* Bool */
 	StringIdentifier    = 6 /* Until StringDelimiter */
 	TimestampIdentifier = 7 /* Number */
@@ -41,11 +37,11 @@ const (
 	MinimalStringLength = 1 + 1     // b[0] = type, b[1] = end of string
 )
 
-func (v *Value) SortedMarshal() []byte {
-	return sortedMarshal(v)
+func (v *Value) MonotonicMarshal() []byte {
+	return monotonicMarshal(v)
 }
 
-func (v *Value) SortedUnmarshal(bytes []byte) error {
+func (v *Value) MonotonicUnmarshal(bytes []byte) error {
 	if len(bytes) == 0 {
 		return errors.New("empty byte slice given to unmarshal")
 	}
@@ -56,71 +52,75 @@ func (v *Value) SortedUnmarshal(bytes []byte) error {
 
 	switch identifier {
 	case NullIdentifier:
-		err := SortedUnmarshalNull(bytes)
+		err := MonotonicUnmarshalNull(bytes)
 		if err != nil {
 			return err
 		}
 
 		finalValue = MakeNull()
 	case PhantomIdentifier:
-		err := SortedUnmarshalPhantom(bytes)
+		err := MonotonicUnmarshalPhantom(bytes)
 		if err != nil {
 			return err
 		}
 
 		finalValue = MakePhantom()
 	case IntIdentifier:
-		result, err := SortedUnmarshalInt(bytes)
+		result, err := MonotonicUnmarshalInt(bytes)
 		if err != nil {
 			return err
 		}
 
 		finalValue = MakeInt(result)
 	case FloatIdentifier:
-		result, err := SortedUnmarshalFloat(bytes)
+		result, err := UnmarshalFloat(bytes)
 		if err != nil {
 			return err
 		}
 
 		finalValue = MakeFloat(result)
 	case BoolIdentifier:
-		result, err := SortedUnmarshalBool(bytes)
+		result, err := MonotonicUnmarshalBool(bytes)
 		if err != nil {
 			return err
 		}
 
 		finalValue = MakeBool(result)
 	case StringIdentifier:
-		result, err := SortedUnmarshalString(bytes)
+		result, err := MonotonicUnmarshalString(bytes)
 		if err != nil {
 			return err
 		}
 
 		finalValue = MakeString(result)
 	case TimestampIdentifier:
-		result, err := SortedUnmarshalTime(bytes)
+		result, err := MonotonicUnmarshalTime(bytes)
 		if err != nil {
 			return err
 		}
 
 		finalValue = MakeTime(result)
 	case DurationIdentifier:
-		result, err := SortedUnmarshalDuration(bytes)
+		result, err := MonotonicUnmarshalDuration(bytes)
 		if err != nil {
 			return err
 		}
 
 		finalValue = MakeDuration(result)
 	case TupleIdentifier:
-		result, err := SortedUnmarshalTuple(bytes)
+		result, err := MonotonicUnmarshalTuple(bytes)
 		if err != nil {
 			return err
 		}
 
 		finalValue = MakeTuple(result)
 	case ObjectIdentifier:
-		panic("implement me!")
+		result, err := UnmarshalObject(bytes)
+		if err != nil {
+			return err
+		}
 
+		finalValue = MakeObject(result)
 	default:
 		panic("unsupported type")
 	}
@@ -129,37 +129,39 @@ func (v *Value) SortedUnmarshal(bytes []byte) error {
 	return nil
 }
 
-func sortedMarshal(v *Value) []byte {
+func monotonicMarshal(v *Value) []byte {
 	switch v.GetType() {
 	case TypeString:
-		return SortedMarshalString(v.AsString())
+		return MonotonicMarshalString(v.AsString())
 	case TypeInt:
-		return SortedMarshalInt(v.AsInt())
+		return MonotonicMarshalInt(v.AsInt())
 	case TypeBool:
-		return SortedMarshalBool(v.AsBool())
+		return MonotonicMarshalBool(v.AsBool())
 	case TypeNull:
-		return SortedMarshalNull()
+		return MonotonicMarshalNull()
 	case TypePhantom:
-		return SortedMarshalPhantom()
+		return MonotonicMarshalPhantom()
 	case TypeTime:
-		return SortedMarshalTime(v.AsTime())
+		return MonotonicMarshalTime(v.AsTime())
 	case TypeDuration:
-		return SortedMarshalDuration(v.AsDuration())
-	case TypeFloat: // TODO - fix
-		return SortedMarshalFloat(v.AsFloat())
+		return MonotonicMarshalDuration(v.AsDuration())
+	case TypeFloat:
+		return MarshalFloat(v.AsFloat())
 	case TypeTuple:
-		return SortedMarshalTuple(v.AsSlice())
+		return MonotonicMarshalTuple(v.AsSlice())
+	case TypeObject:
+		return MarshalObject(v.AsMap())
 	default:
-		return nil
+		panic("unknown type!")
 	}
 }
 
 /* Marshal null */
-func SortedMarshalNull() []byte {
+func MonotonicMarshalNull() []byte {
 	return []byte{NullIdentifier}
 }
 
-func SortedUnmarshalNull(b []byte) error {
+func MonotonicUnmarshalNull(b []byte) error {
 	if len(b) != NonexistentMarshalLength {
 		return errors.New("incorrect null key size")
 	}
@@ -172,11 +174,11 @@ func SortedUnmarshalNull(b []byte) error {
 }
 
 /* Marshal phantom */
-func SortedMarshalPhantom() []byte {
+func MonotonicMarshalPhantom() []byte {
 	return []byte{PhantomIdentifier}
 }
 
-func SortedUnmarshalPhantom(b []byte) error {
+func MonotonicUnmarshalPhantom(b []byte) error {
 	if len(b) != NonexistentMarshalLength {
 		return errors.New("incorrect null key size")
 	}
@@ -189,11 +191,11 @@ func SortedUnmarshalPhantom(b []byte) error {
 }
 
 /* Marshal int and int64 */
-func SortedMarshalInt(i int) []byte {
-	return SortedMarshalUint64(uint64(i), i >= 0)
+func MonotonicMarshalInt(i int) []byte {
+	return MonotonicMarshalUint64(uint64(i), i >= 0)
 }
 
-func SortedMarshalUint64(ui uint64, sign bool) []byte {
+func MonotonicMarshalUint64(ui uint64, sign bool) []byte {
 	b := make([]byte, NumberMarshalLength)
 
 	binary.LittleEndian.PutUint64(b, ui)
@@ -211,8 +213,8 @@ func SortedMarshalUint64(ui uint64, sign bool) []byte {
 	return reverseByteSlice(b)
 }
 
-func SortedUnmarshalInt(b []byte) (int, error) {
-	value, err := SortedUnmarshalUint64(b)
+func MonotonicUnmarshalInt(b []byte) (int, error) {
+	value, err := MonotonicUnmarshalUint64(b)
 	if err != nil {
 		return 0, errors.New("incorrect int64 key size")
 	}
@@ -220,7 +222,7 @@ func SortedUnmarshalInt(b []byte) (int, error) {
 	return int(value), nil
 }
 
-func SortedUnmarshalUint64(b []byte) (uint64, error) {
+func MonotonicUnmarshalUint64(b []byte) (uint64, error) {
 	if len(b) != NumberMarshalLength {
 		return 0, errors.New("incorrect uint64 key size")
 	}
@@ -228,41 +230,28 @@ func SortedUnmarshalUint64(b []byte) (uint64, error) {
 }
 
 /* Marshal float */
-func SortedMarshalFloat(f float64) []byte {
-	sign := f >= 0.0
+func MarshalFloat(f float64) []byte {
+	val := math.Float64bits(f)
 
-	var val uint64
-
-	if sign {
-		val = math.Float64bits(f)
-	} else {
-		val = math.Float64bits(math.MaxFloat64 + f)
-	}
-
-	bytes := SortedMarshalUint64(val, sign)
+	bytes := MonotonicMarshalUint64(val, f >= 0.0)
 	bytes[0] = FloatIdentifier
 
 	return bytes
 }
 
-func SortedUnmarshalFloat(b []byte) (float64, error) {
-	value, err := SortedUnmarshalUint64(b)
+func UnmarshalFloat(b []byte) (float64, error) {
+	value, err := MonotonicUnmarshalUint64(b)
 	if err != nil {
 		return 0.0, errors.Wrap(err, "incorrect float key representation")
 	}
 
 	floatValue := math.Float64frombits(value)
-	sign := b[1]
-
-	if sign == 0 {
-		return floatValue - math.MaxFloat64, nil
-	}
 
 	return floatValue, nil
 }
 
 /* Marshal bool */
-func SortedMarshalBool(b bool) []byte {
+func MonotonicMarshalBool(b bool) []byte {
 	bytes := make([]byte, BoolMarshalLength)
 	bytes[0] = byte(BoolIdentifier)
 
@@ -275,7 +264,7 @@ func SortedMarshalBool(b bool) []byte {
 	return bytes
 }
 
-func SortedUnmarshalBool(b []byte) (bool, error) {
+func MonotonicUnmarshalBool(b []byte) (bool, error) {
 	if len(b) != BoolMarshalLength {
 		return false, errors.New("incorrect bool key size")
 	}
@@ -291,7 +280,7 @@ func SortedUnmarshalBool(b []byte) (bool, error) {
 }
 
 /* Marshal string */
-func SortedMarshalString(s string) []byte {
+func MonotonicMarshalString(s string) []byte {
 	bytes := make([]byte, 1)
 	bytes[0] = StringIdentifier
 
@@ -305,8 +294,7 @@ func SortedMarshalString(s string) []byte {
 	return bytes
 }
 
-//TODO: fix error messages
-func SortedUnmarshalString(b []byte) (string, error) {
+func MonotonicUnmarshalString(b []byte) (string, error) {
 	length := len(b)
 
 	if length%2 != 0 || length < 2 {
@@ -326,15 +314,15 @@ func SortedUnmarshalString(b []byte) (string, error) {
 }
 
 /* Marshal Timestamp */
-func SortedMarshalTime(t time.Time) []byte {
-	bytes := SortedMarshalUint64(uint64(t.UnixNano()), true)
+func MonotonicMarshalTime(t time.Time) []byte {
+	bytes := MonotonicMarshalUint64(uint64(t.UnixNano()), true)
 	bytes[0] = TimestampIdentifier
 
 	return bytes
 }
 
-func SortedUnmarshalTime(b []byte) (time.Time, error) {
-	value, err := SortedUnmarshalUint64(b)
+func MonotonicUnmarshalTime(b []byte) (time.Time, error) {
+	value, err := MonotonicUnmarshalUint64(b)
 	if err != nil {
 		return time.Now(), errors.Wrap(err, "incorrect time key representation")
 	}
@@ -348,15 +336,15 @@ func SortedUnmarshalTime(b []byte) (time.Time, error) {
 }
 
 /* Marshal Duration */
-func SortedMarshalDuration(d time.Duration) []byte {
-	bytes := SortedMarshalUint64(uint64(d.Nanoseconds()), true)
+func MonotonicMarshalDuration(d time.Duration) []byte {
+	bytes := MonotonicMarshalUint64(uint64(d.Nanoseconds()), true)
 	bytes[0] = DurationIdentifier
 
 	return bytes
 }
 
-func SortedUnmarshalDuration(b []byte) (time.Duration, error) {
-	value, err := SortedUnmarshalUint64(b)
+func MonotonicUnmarshalDuration(b []byte) (time.Duration, error) {
+	value, err := MonotonicUnmarshalUint64(b)
 	if err != nil {
 		return time.Duration(0), errors.Wrap(err, "incorrect duration key representation")
 	}
@@ -365,12 +353,12 @@ func SortedUnmarshalDuration(b []byte) (time.Duration, error) {
 }
 
 /* Marshal Tuple */
-func SortedMarshalTuple(vs []Value) []byte {
+func MonotonicMarshalTuple(vs []Value) []byte {
 	result := make([]byte, 1)
 	result[0] = TupleIdentifier
 
 	for _, v := range vs {
-		vBytes := sortedMarshal(&v)
+		vBytes := monotonicMarshal(&v)
 		result = append(result, vBytes...)
 	}
 
@@ -379,39 +367,121 @@ func SortedMarshalTuple(vs []Value) []byte {
 	return result
 }
 
-func SortedUnmarshalTuple(b []byte) ([]Value, error) {
-	return nil, nil
+func MonotonicUnmarshalTuple(b []byte) ([]Value, error) {
+	values, _, err := recursiveMonotonicUnmarshalTuple(b)
+	return values, err
+}
 
-	/*length := len(b)
-	startIndex := 1
-
-	if b[length-1] != TupleDelimiter {
-		return nil, errors.New("Invalid byte instead of TupleDelimiter at the end of tuple")
-	}
-
+func recursiveMonotonicUnmarshalTuple(b []byte) ([]Value, int, error) {
 	values := make([]Value, 0)
+	index := 1
+	length := len(b)
 	var value Value
 
-	for startIndex < length-1 {
-		endIndex := findLengthOfUnmarshal(b, startIndex, int(b[startIndex]))
+	for index < length {
+		identifier := b[index]
 
-		if endIndex <= startIndex || endIndex >= length {
-			return nil, errors.New("an offset error ocurred")
+		if identifier == TupleDelimiter {
+			return values, index + 1, nil //this is +1 because we return length and index starts at 0
 		}
 
-		err := value.SortedUnmarshal(b[startIndex:endIndex])
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't unmarshal an element of the tuple")
-		}
+		if identifier == TupleIdentifier {
+			tupleValues, tupleLength, err := recursiveMonotonicUnmarshalTuple(b[index:])
+			if err != nil {
+				return nil, 0, err
+			}
 
-		values = append(values, value)
-		startIndex = endIndex
+			values = append(values, MakeTuple(tupleValues))
+			index += tupleLength
+		} else if identifier == ObjectIdentifier {
+			tupleValues, tupleLength, err := recursiveMonotonicUnmarshalTuple(b[index+1:])
+			if err != nil {
+				return nil, 0, err
+			}
+
+			object, err := tupleToObject(tupleValues)
+			if err != nil {
+				return nil, 0, err
+			}
+
+			values = append(values, MakeObject(object))
+			index += tupleLength + 1 //+1 here because of ObjectIdentifier
+		} else {
+			elementLength, err := getMarshalLength(b[index:])
+			if err != nil {
+				return nil, 0, errors.Wrap(err, "couldn't find length of next element to unmarshal")
+			}
+
+			err = value.MonotonicUnmarshal(b[index : index+elementLength])
+			if err != nil {
+				return nil, 0, errors.Wrap(err, "couldn't unmarshal next element in tuple")
+			}
+
+			values = append(values, value)
+
+			index += elementLength
+		}
 	}
 
-	return values, nil*/
+	return nil, 0, errors.New("the last element of the tuple wasn't a delimiter")
+}
+
+/* Marshal Object */
+
+func MarshalObject(o map[string]Value) []byte {
+	values := make([]Value, 0)
+	keys := sortedMapKeys(o)
+
+	for _, key := range keys {
+		values = append(values, MakeString(key))
+		values = append(values, o[key])
+	}
+
+	bytes := make([]byte, 1)
+	bytes[0] = ObjectIdentifier
+	bytes = append(bytes, MonotonicMarshalTuple(values)...)
+
+	return bytes
+}
+
+func UnmarshalObject(b []byte) (map[string]Value, error) {
+	tuple, err := MonotonicUnmarshalTuple(b[1:])
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't unmarshal object")
+	}
+
+	return tupleToObject(tuple)
 }
 
 /* Auxiliary functions */
+func tupleToObject(tuple []Value) (map[string]Value, error) {
+	if len(tuple) < 2 || len(tuple)%2 == 1 {
+		return nil, errors.New("invalid object length")
+	}
+
+	result := make(map[string]Value)
+
+	for i := 0; i < len(tuple); i += 2 {
+		key := tuple[i].AsString()
+		result[key] = tuple[i+1]
+	}
+
+	return result, nil
+}
+
+func sortedMapKeys(m map[string]Value) []string {
+	keys := make([]string, len(m))
+
+	index := 0
+	for key := range m {
+		keys[index] = key
+		index++
+	}
+
+	sort.Strings(keys)
+
+	return keys
+}
 
 func reverseByteSlice(b []byte) []byte {
 	c := make([]byte, len(b))
@@ -432,43 +502,18 @@ func twoBytesToByte(x, y byte) byte {
 	return BYTE_OFFSET*(x-BYTE_OFFSET) + (y - BYTE_OFFSET)
 }
 
-/*
-func getTupleMarshalLength(b []byte) (int, error) {
-	length := len(b)
-	if length < MinimalTupleLength {
-		return -1, errors.New("invalid tuple size")
+func getMarshalLength(b []byte) (int, error) {
+	identifier := b[0]
+
+	if isConstantLengthIdentifier(identifier) {
+		return getConstantMarshalLength(identifier)
+	} else if identifier == StringIdentifier {
+		return getStringMarshalLength(b)
 	}
 
-	if b[0] != TupleIdentifier {
-		return -1, errors.New("expected a tuple, but the first element isn't the TupleDelimiter")
-	}
-
-	startIndex := 1
-	var err error
-	var elementLength int
-
-	for startIndex < length {
-		identifier := b[startIndex]
-		if identifier == TupleDelimiter {
-			return startIndex, nil
-		}
-
-		if identifier == Tupl {
-			coś, len = auxTuple(...)
-
-		} else {
-			val = SortedUnmarshal
-
-		if isConstantLengthIdentifier(identifier) {
-			elementLength, err = getConstantMarshalLength(identifier)
-		} else if identifier == StringIdentifier {
-			elementLength, err = getStringMarshalLength(b[startIndex:])
-		} else if identifier == TupleIdentifier {
-
-		}
-	}
+	return -1, errors.New("unknown type")
 }
-*/
+
 func getConstantMarshalLength(identifier byte) (int, error) {
 	switch identifier {
 	case NullIdentifier, PhantomIdentifier:
@@ -495,7 +540,7 @@ func getStringMarshalLength(b []byte) (int, error) {
 
 	for index := 1; index < length; index++ {
 		if b[index] == StringDelimiter {
-			return index, nil
+			return index + 1, nil //this is +1 because we return length and index starts at 0
 		}
 	}
 

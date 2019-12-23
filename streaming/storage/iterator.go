@@ -1,4 +1,4 @@
-package streaming
+package storage
 
 import (
 	"io"
@@ -10,11 +10,15 @@ import (
 
 var ErrEndOfIterator = errors.New("end of iterator")
 
-type Iterator interface {
+type SimpleIterator interface {
 	Next(proto.Message) error
-	NextWithKey(key MonotonicallySerializable, value proto.Message) error
 	Rewind()
 	io.Closer
+}
+
+type Iterator interface {
+	SimpleIterator
+	NextWithKey(key MonotonicallySerializable, value proto.Message) error
 }
 
 type BadgerIterator struct {
@@ -63,7 +67,7 @@ func (bi *BadgerIterator) currentKey(key MonotonicallySerializable) error {
 	byteKey := item.Key()
 	strippedKey := byteKey[bi.prefixLength:] //TODO: maybe add function to do that
 
-	err := key.SortedUnmarshal(strippedKey)
+	err := key.MonotonicUnmarshal(strippedKey)
 	return err
 }
 

@@ -49,6 +49,19 @@ func TestMarshal(t *testing.T) {
 				v: MakeInt(0),
 			},
 		},
+		/* float tests */
+		{
+			name: "float test - positive float",
+			args: args{
+				v: MakeFloat(1827.128852),
+			},
+		},
+		{
+			name: "float test - negative float",
+			args: args{
+				v: MakeFloat(-192.11239),
+			},
+		},
 		/* bool tests */
 		{
 			name: "bool test - false",
@@ -130,17 +143,98 @@ func TestMarshal(t *testing.T) {
 				}),
 			},
 		},
+		{
+			name: "yo dawg I heard you like tuples inside your tuples, so I put a tuple inside your tuple inside your tuple...",
+			args: args{
+				v: MakeTuple([]Value{
+					MakeTuple([]Value{
+						MakeNull(),
+						MakePhantom(),
+						MakeTuple([]Value{
+							MakeInt(TupleDelimiter),
+							MakeInt(TupleIdentifier),
+							MakeInt(-19252),
+							MakeTuple([]Value{
+								MakeBool(false),
+								MakeFloat(284.12828),
+								MakeBool(true),
+								MakeString(string([]byte{byte(TupleIdentifier), byte(TupleDelimiter)})),
+								MakeString("ale tupelki"),
+								MakeTuple([]Value{
+									MakeTime(time.Now()),
+									MakeDuration(TupleDelimiter),
+									MakeDuration(TupleIdentifier),
+									MakeDuration(StringIdentifier),
+									MakeDuration(StringDelimiter),
+									MakeFloat(-1.284),
+									MakeTuple(nil),
+								}),
+							}),
+							MakeBool(false),
+							MakePhantom(),
+							MakeObject(map[string]Value{
+								"a": MakeInt(17),
+								"b": MakeString("ala ma kota"),
+								"c": MakePhantom(),
+							}),
+							MakeString("tutaj też coś"),
+						}),
+						MakeInt(TupleDelimiter),
+						MakeString("pa tera"),
+					}),
+					MakeInt(TupleDelimiter),
+					MakeString("XD"),
+				}),
+			},
+		},
+		/* objects test */
+		{
+			name: "simple object",
+			args: args{
+				v: MakeObject(map[string]Value{
+					"ala":     MakeInt(17),
+					"ma":      MakePhantom(),
+					"kota":    MakeBool(false),
+					"i":       MakeString("psa"),
+					"ale":     MakeFloat(17.17283),
+					"nie":     MakeTime(time.Now()),
+					"posiada": MakeNull(),
+					"papugi": MakeTuple([]Value{
+						MakeInt(11),
+						MakeString("no i cześć"),
+					}),
+				}),
+			},
+		},
+		{
+			name: "complex object",
+			args: args{
+				v: MakeObject(map[string]Value{
+					"object": MakeObject(map[string]Value{
+						"a": MakePhantom(),
+						"b": MakeString("ma kota"),
+						"c": MakeInt(1283),
+					}),
+					"other": MakeTime(time.Now()),
+					"another": MakeTuple([]Value{
+						MakeString("xD"),
+						MakeInt(18),
+						MakeFloat(19.19238),
+					}),
+				}),
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var b Value
 
-			bytes := (&tt.args.v).SortedMarshal()
+			bytes := (&tt.args.v).MonotonicMarshal()
 
-			err := b.SortedUnmarshal(bytes)
+			err := b.MonotonicUnmarshal(bytes)
 			if err != nil {
-				t.Errorf("SortedMarshal() error = %v, wantErr false", err)
+				t.Errorf("MonotonicMarshal() error = %v, wantErr false", err)
 				return
 			}
 
@@ -151,7 +245,7 @@ func TestMarshal(t *testing.T) {
 	}
 }
 
-func TestMarshalContinuity(t *testing.T) {
+func TestIfMarshalMonotonic(t *testing.T) {
 	type args struct {
 		values []Value
 	}
@@ -160,45 +254,107 @@ func TestMarshalContinuity(t *testing.T) {
 		args args
 	}{
 		{
-			name: "strings test",
-			args: args{
-				values: []Value{
-					MakeString("ala ma kota"),
-					MakeString("ala ma psa"),
-					MakeString("bartek ma papugi"),
-				},
-			},
-		},
-		{
 			name: "ints test",
 			args: args{
 				values: []Value{
 					MakeInt(math.MinInt64),
 					MakeInt(-456),
+					MakeInt(-256),
+					MakeInt(-255),
+					MakeInt(-254),
+					MakeInt(-253),
 					MakeInt(-189),
 					MakeInt(-10),
 					MakeInt(0),
 					MakeInt(1),
 					MakeInt(3),
 					MakeInt(17),
+					MakeInt(254),
+					MakeInt(255),
+					MakeInt(256),
+					MakeInt(257),
 					MakeInt(24287),
 					MakeInt(math.MaxInt64),
 				},
 			},
 		},
 		{
-			name: "floats test",
+			name: "bool test",
 			args: args{
 				values: []Value{
-					// TODO - nie dziala dla ujemnych :<
-					MakeFloat(-124.0001),
-					MakeFloat(-123.9998),
-					MakeFloat(-1.01),
-					MakeFloat(0.0000001),
-					MakeFloat(1.01),
-					MakeFloat(3),
-					MakeFloat(2345.5432),
-					MakeFloat(24287.111111),
+					MakeBool(false),
+					MakeBool(true),
+				},
+			},
+		},
+		{
+			name: "strings test",
+			args: args{
+				values: []Value{
+					MakeString("ala"),
+					MakeString("ala ma kota"),
+					MakeString("ala ma psa"),
+					MakeString("bartek ma papugi"),
+					MakeString("zebra"),
+				},
+			},
+		},
+		{
+			name: "timestamp test",
+			args: args{
+				values: []Value{
+					MakeTime(time.Date(2017, 11, 19, 22, 17, 38, 0, time.UTC)),
+					MakeTime(time.Date(2017, 11, 19, 22, 17, 39, 0, time.UTC)),
+					MakeTime(time.Date(2017, 11, 19, 22, 18, 0, 0, time.UTC)),
+					MakeTime(time.Now()),
+				},
+			},
+		},
+		{
+			name: "duration test",
+			args: args{
+				values: []Value{
+					MakeDuration(0),
+					MakeDuration(17),
+					MakeDuration(254),
+					MakeDuration(255),
+					MakeDuration(256),
+					MakeDuration(11923),
+					MakeDuration(192308),
+					MakeDuration(192309),
+					MakeDuration(20000000),
+				},
+			},
+		},
+		{
+			name: "tuple test",
+			args: args{
+				values: []Value{
+					MakeTuple([]Value{
+						MakeInt(17),
+						MakeString("ala ma kota"),
+						MakeBool(false),
+					}),
+					MakeTuple([]Value{
+						MakeInt(18),
+						MakeString("abcdef"),
+						MakeBool(true),
+					}),
+					MakeTuple([]Value{
+						MakeInt(18),
+						MakeString("abcdefghij"),
+						MakeBool(false),
+					}),
+					MakeTuple([]Value{
+						MakeInt(18),
+						MakeString("b"),
+						MakeBool(false),
+					}),
+					MakeTuple([]Value{
+						MakeInt(18),
+						MakeString("b"),
+						MakeBool(true),
+					}),
 				},
 			},
 		},
@@ -210,7 +366,7 @@ func TestMarshalContinuity(t *testing.T) {
 			marshaled := make([][]byte, argCount)
 
 			for i := 0; i < argCount; i++ {
-				bytes := sortedMarshal(&tt.args.values[i])
+				bytes := monotonicMarshal(&tt.args.values[i])
 				marshaled[i] = bytes
 			}
 

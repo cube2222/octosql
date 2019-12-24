@@ -85,7 +85,7 @@ func (hm *Map) Delete(key MonotonicallySerializable) error {
 	return nil
 }
 
-/* Important: To call map.Clear() one must close any iterators opened from that map  */
+// Important: To call map.Clear() one must close any iterators opened from that map
 func (hm *Map) Clear() error {
 	it := hm.GetIterator()
 	defer it.Close()

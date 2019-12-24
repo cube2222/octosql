@@ -1,5 +1,6 @@
 package streaming
 
+/*
 import (
 	"context"
 	"fmt"
@@ -76,3 +77,4 @@ func TestReader(t *testing.T) {
 	})
 	log.Fatal(http.ListenAndServe(":3000", m))
 }
+*/

@@ -90,6 +90,7 @@ func TestMap(t *testing.T) {
 
 	it = badgerMap.GetIterator()
 	areEqual, err = TestMapIteratorCorrectness(it, []octosql.Value{}, []octosql.Value{})
+	_ = it.Close()
 
 	if err != nil {
 		log.Fatal(err)
@@ -98,4 +99,42 @@ func TestMap(t *testing.T) {
 	if !areEqual {
 		log.Fatal(errors.Wrap(err, "the iterator is not empty"))
 	}
+
+	/* test if accessing a missing key returns ErrKeyNotFound */
+	missingKey := octosql.MakeString("invalid key")
+	var value octosql.Value
+
+	err = badgerMap.Get(&missingKey, &value)
+	if err != ErrKeyNotFound {
+		log.Fatal("Accessing a nonexistent key should return ErrKeyNotFound")
+	}
+
+	/* although map doesn't store any metadata to load, check if
+	it will operate normally when we create some other instance
+	to insert data, and then some other instance to read the data
+	*/
+
+	bMap2 := NewMap(txn)
+	bMap3 := NewMap(txn)
+
+	for i := 0; i < len(keys); i++ {
+		err := bMap2.Set(&keys[i], &values[i])
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	it = bMap3.GetIterator()
+	areEqual, err = TestMapIteratorCorrectness(it, keys, values)
+	_ = it.Close()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if !areEqual {
+		log.Fatal(errors.Wrap(err, "the iterator isn't correct"))
+	}
+
+	_ = bMap3.Clear()
 }

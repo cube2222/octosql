@@ -37,7 +37,7 @@ func (hm *Map) Set(key MonotonicallySerializable, value proto.Message) error {
 
 	err = hm.tx.Set(byteKey, byteValue)
 	if err != nil {
-		return errors.Wrap(err, "couldn't add element to dictionary")
+		return errors.Wrap(err, "couldn't add element to map")
 	}
 
 	return nil
@@ -47,8 +47,10 @@ func (hm *Map) Get(key MonotonicallySerializable, value proto.Message) error {
 	byteKey := key.MonotonicMarshal()
 
 	data, err := hm.tx.Get(byteKey) //remove prefix from data
-	if err != nil {
+	if err == badger.ErrKeyNotFound {
 		return ErrKeyNotFound
+	} else if err != nil {
+		return errors.Wrap(err, "something went wrong during the key look-up")
 	}
 
 	err = proto.Unmarshal(data, value)
@@ -74,7 +76,13 @@ func (hm *Map) GetIterator() *MapIterator {
 
 func (hm *Map) Delete(key MonotonicallySerializable) error {
 	bytes := key.MonotonicMarshal()
-	return hm.tx.Delete(bytes)
+
+	err := hm.tx.Delete(bytes)
+	if err != nil { //if errors.Wrap(nil, ...) returns nil should this be just errors.Wrap(err, ...)
+		return errors.Wrap(err, "couldn't delete key from badger storage")
+	}
+
+	return nil
 }
 
 /* Important: To call map.Clear() one must close any iterators opened from that map  */

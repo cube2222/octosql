@@ -91,6 +91,8 @@ func (t *CountingTrigger) PollKeyToFire(ctx context.Context, tx storage.StateTra
 	return out, nil
 }
 
+var timeSortedKeys = []byte("$time_sorted_keys$")
+
 type DelayTrigger struct {
 	delay time.Duration
 	clock func() time.Time
@@ -103,95 +105,140 @@ func NewDelayTrigger(delay time.Duration, clock func() time.Time) *DelayTrigger 
 	}
 }
 
-var timeToSendPrefix = []byte("$time_time_to_send$")
-var whatTimeDoesKeyHavePrefix = []byte("$key_time_to_send$")
+func (dt *DelayTrigger) RecordReceived(ctx context.Context, tx storage.StateTransaction, key octosql.Value, eventTime time.Time) error {
+	timeKeys := NewTimeSortedKeys(tx.WithPrefix(timeSortedKeys))
 
-func (t *DelayTrigger) RecordReceived(ctx context.Context, tx storage.StateTransaction, key octosql.Value, eventTime time.Time) error {
-	keyTimesToSend := storage.NewMap(tx.WithPrefix(timeToSendPrefix))
-	whatTimesDoKeysHave := storage.NewMap(tx.WithPrefix(whatTimeDoesKeyHavePrefix))
+	now := dt.clock()
+	sendTime := now.Add(dt.delay)
 
-	var oldSendTime octosql.Value
-	err := whatTimesDoKeysHave.Get(&key, &oldSendTime)
+	err := timeKeys.Update(key, sendTime)
+
+	return errors.Wrap(err, "couldn't update trigger time for key")
+}
+
+func (dt *DelayTrigger) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
+	return nil
+}
+
+func (dt *DelayTrigger) PollKeyToFire(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error) {
+	timeKeys := NewTimeSortedKeys(tx.WithPrefix(timeSortedKeys))
+
+	key, sendTime, err := timeKeys.GetFirst()
+	if err != nil {
+		if err == storage.ErrKeyNotFound {
+			return octosql.ZeroValue(), ErrNoKeyToFire
+		}
+		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get first key by time")
+	}
+
+	if dt.clock().Before(sendTime) {
+		return octosql.ZeroValue(), ErrNoKeyToFire
+	}
+
+	err = timeKeys.Delete(key, sendTime)
+	if err != nil {
+		return octosql.ZeroValue(), errors.Wrap(err, "couldn't delete key")
+	}
+
+	return key, nil
+}
+
+var byTimeAndKeyPrefix = []byte("$by_time_and_key$")
+var byKeyToTimePrefix = []byte("$by_key_to_time$")
+
+type TimeSortedKeys struct {
+	tx storage.StateTransaction
+}
+
+func NewTimeSortedKeys(tx storage.StateTransaction) *TimeSortedKeys {
+	return &TimeSortedKeys{
+		tx: tx,
+	}
+}
+
+func (tsk *TimeSortedKeys) Update(key octosql.Value, t time.Time) error {
+	byTimeAndKey := storage.NewMap(tsk.tx.WithPrefix(byTimeAndKeyPrefix))
+	byKeyToTime := storage.NewMap(tsk.tx.WithPrefix(byKeyToTimePrefix))
+
+	var oldTime octosql.Value
+	err := byKeyToTime.Get(&key, &oldTime)
 	if err == nil {
-		oldTimeToSendKey := octosql.MakeTuple([]octosql.Value{oldSendTime, key})
-		err := keyTimesToSend.Delete(&oldTimeToSendKey)
+		oldTimeKey := octosql.MakeTuple([]octosql.Value{oldTime, key})
+		err := byTimeAndKey.Delete(&oldTimeKey)
 		if err != nil {
-			return errors.Wrap(err, "couldn't delete old time to send for key")
+			return errors.Wrap(err, "couldn't delete old time for key")
 		}
 	} else if err == storage.ErrKeyNotFound {
 	} else {
-		return errors.Wrap(err, "couldn't get old time to send for key")
+		return errors.Wrap(err, "couldn't get old time for key")
 	}
 
-	now := t.clock()
-	sendTime := now.Add(t.delay)
-	octoSendTime := octosql.MakeTime(sendTime)
+	octoTime := octosql.MakeTime(t)
 
-	timeToSendKey := octosql.MakeTuple([]octosql.Value{octoSendTime, key})
+	newTimeKey := octosql.MakeTuple([]octosql.Value{octoTime, key})
 	null := octosql.MakeNull()
-	err = keyTimesToSend.Set(&timeToSendKey, &null)
+	err = byTimeAndKey.Set(&newTimeKey, &null)
 	if err != nil {
-		return errors.Wrap(err, "couldn't set new time to send")
+		return errors.Wrap(err, "couldn't set new time key")
 	}
 
-	err = whatTimesDoKeysHave.Set(&key, &octoSendTime)
+	err = byKeyToTime.Set(&key, &octoTime)
 	if err != nil {
-		return errors.Wrap(err, "couldn't set key time to send")
+		return errors.Wrap(err, "couldn't set new time for key")
 	}
 
 	return nil
 }
 
-func (t *DelayTrigger) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
-	return nil
-}
+func (tsk *TimeSortedKeys) GetFirst() (octosql.Value, time.Time, error) {
+	byTimeAndKey := storage.NewMap(tsk.tx.WithPrefix(byTimeAndKeyPrefix))
 
-func (t *DelayTrigger) PollKeyToFire(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error) {
-	keyTimesToSend := storage.NewMap(tx.WithPrefix(timeToSendPrefix))
-	whatTimesDoKeysHave := storage.NewMap(tx.WithPrefix(whatTimeDoesKeyHavePrefix))
-
-	iter := keyTimesToSend.GetIterator()
+	iter := byTimeAndKey.GetIterator()
 	var key octosql.Value
 	var value octosql.Value
 	err := iter.Next(&key, &value)
 	if err := iter.Close(); err != nil {
-		return octosql.ZeroValue(), errors.Wrap(err, "couldn't close iterator")
+		return octosql.ZeroValue(), time.Time{}, errors.Wrap(err, "couldn't close iterator")
 	}
 	if err != nil {
 		if err == storage.ErrEndOfIterator {
-			return octosql.ZeroValue(), ErrNoKeyToFire
+			return octosql.ZeroValue(), time.Time{}, storage.ErrKeyNotFound
 		}
-		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get first element from iterator")
+		return octosql.ZeroValue(), time.Time{}, errors.Wrap(err, "couldn't get first element from iterator")
 	}
 
 	if key.GetType() != octosql.TypeTuple {
-		return octosql.ZeroValue(), fmt.Errorf("storage corruption, expected tuple key, got %v", key.GetType())
+		return octosql.ZeroValue(), time.Time{}, fmt.Errorf("storage corruption, expected tuple key, got %v", key.GetType())
 	}
 
 	tuple := key.AsSlice()
 
 	if len(tuple) != 2 {
-		return octosql.ZeroValue(), fmt.Errorf("storage corruption, expected tuple of length 2, got %v", len(tuple))
+		return octosql.ZeroValue(), time.Time{}, fmt.Errorf("storage corruption, expected tuple of length 2, got %v", len(tuple))
 	}
 
 	if tuple[0].GetType() != octosql.TypeTime {
-		return octosql.ZeroValue(), fmt.Errorf("storage corruption, expected time in first element of tuple, got %v", tuple[0].GetType())
+		return octosql.ZeroValue(), time.Time{}, fmt.Errorf("storage corruption, expected time in first element of tuple, got %v", tuple[0].GetType())
 	}
 
-	keyTime := tuple[0].AsTime()
+	t := tuple[0].AsTime()
 
-	if keyTime.After(t.clock()) {
-		return octosql.ZeroValue(), ErrNoKeyToFire
-	}
+	return tuple[1], t, nil
+}
 
-	err = keyTimesToSend.Delete(&key)
+func (tsk *TimeSortedKeys) Delete(key octosql.Value, t time.Time) error {
+	byTimeAndKey := storage.NewMap(tsk.tx.WithPrefix(byTimeAndKeyPrefix))
+	byKeyToTime := storage.NewMap(tsk.tx.WithPrefix(byKeyToTimePrefix))
+
+	newTimeKey := octosql.MakeTuple([]octosql.Value{octosql.MakeTime(t), key})
+	err := byTimeAndKey.Delete(&newTimeKey)
 	if err != nil {
-		return octosql.ZeroValue(), errors.Wrap(err, "couldn't delete old time to send key")
+		return errors.Wrap(err, "couldn't delete old time to send key")
 	}
-	err = whatTimesDoKeysHave.Delete(&tuple[1])
+	err = byKeyToTime.Delete(&key)
 	if err != nil {
-		return octosql.ZeroValue(), errors.Wrap(err, "couldn't delete time to send for key")
+		return errors.Wrap(err, "couldn't delete time to send for key")
 	}
 
-	return tuple[1], nil
+	return nil
 }

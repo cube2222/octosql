@@ -11,9 +11,7 @@ import (
 )
 
 type RecordSink interface {
-	AddRecord(record *execution.Record, tx storage.StateTransaction)
-	MarkEndOfStream() error
-	AddRecord(ctx context.Context, record *execution.Record, tx StateTransaction)
+	AddRecord(ctx context.Context, record *execution.Record, tx storage.StateTransaction)
 	MarkEndOfStream(ctx context.Context) error
 }
 
@@ -51,7 +49,7 @@ func (engine *PullEngine) loop(ctx context.Context) error {
 	r, err := engine.source.Next(storage.InjectStateTransaction(ctx, tx))
 	if err != nil {
 		if err == execution.ErrEndOfStream {
-			err := engine.recordSink.MarkEndOfStream()
+			err := engine.recordSink.MarkEndOfStream(ctx)
 			if err != nil {
 				return errors.Wrap(err, "couldn't mark end of stream")
 			}
@@ -59,7 +57,7 @@ func (engine *PullEngine) loop(ctx context.Context) error {
 		}
 		return errors.Wrap(err, "couldn't get next record")
 	}
-	engine.recordSink.AddRecord(r, tx)
+	engine.recordSink.AddRecord(ctx, r, tx)
 
 	return nil
 }

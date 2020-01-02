@@ -2,33 +2,43 @@ package streaming
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/streaming/storage"
 )
 
+var ErrNoKeyToFire = errors.New("no record to send")
+
 type Trigger interface {
-	RecordReceived(ctx context.Context, tx StateTransaction, key octosql.Value, eventTime time.Time) error
-	UpdateWatermark(ctx context.Context, tx StateTransaction, watermark time.Time) error
-	PollKeyToFire(ctx context.Context, tx StateTransaction) (octosql.Value, error)
+	RecordReceived(ctx context.Context, tx storage.StateTransaction, key octosql.Value, eventTime time.Time) error
+	UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error
+	PollKeyToFire(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error)
 }
 
 type CountingTrigger struct {
 	fireEvery int
 }
 
+func NewCountingTrigger(fireEvery int) *CountingTrigger {
+	return &CountingTrigger{
+		fireEvery: fireEvery,
+	}
+}
+
 var toSendPrefix = []byte("$to_send$")
 var keyCountsPrefix = []byte("$key_counts$")
 
-func (t *CountingTrigger) RecordReceived(ctx context.Context, tx StateTransaction, key octosql.Value, eventTime time.Time) error {
-	keyCounts := NewMap(tx.WithPrefix(keyCountsPrefix))
+func (t *CountingTrigger) RecordReceived(ctx context.Context, tx storage.StateTransaction, key octosql.Value, eventTime time.Time) error {
+	keyCounts := storage.NewMap(tx.WithPrefix(keyCountsPrefix))
 
 	var countValue octosql.Value
 	err := keyCounts.Get(&key, &countValue)
 	if err != nil {
-		if err == ErrNotFound {
+		if err == storage.ErrKeyNotFound {
 			countValue = octosql.MakeInt(0)
 		} else {
 			return errors.Wrap(err, "couldn't get current count for key")
@@ -43,29 +53,32 @@ func (t *CountingTrigger) RecordReceived(ctx context.Context, tx StateTransactio
 			return errors.Wrap(err, "couldn't delete current count for key")
 		}
 
-		toSend := NewValueState(tx.WithPrefix(toSendPrefix))
+		toSend := storage.NewValueState(tx.WithPrefix(toSendPrefix))
 		err = toSend.Set(&key)
 		if err != nil {
 			return errors.Wrap(err, "couldn't append to outbox list")
+		}
+	} else {
+		countValue = octosql.MakeInt(count)
+		err := keyCounts.Set(&key, &countValue)
+		if err != nil {
+			return errors.Wrap(err, "couldn't set new count for key")
 		}
 	}
 
 	return nil
 }
 
-func (t *CountingTrigger) UpdateWatermark(ctx context.Context, tx StateTransaction, watermark time.Time) error {
+func (t *CountingTrigger) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
 	return nil
 }
 
-var ErrNotFound = errors.New("value not found")
-var ErrNoKeyToFire = errors.New("no record to send")
-
-func (t *CountingTrigger) PollKeyToFire(ctx context.Context, tx StateTransaction) (octosql.Value, error) {
-	toSend := NewValueState(tx.WithPrefix(toSendPrefix))
+func (t *CountingTrigger) PollKeyToFire(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error) {
+	toSend := storage.NewValueState(tx.WithPrefix(toSendPrefix))
 	var out octosql.Value
 	err := toSend.Get(&out)
 	if err != nil {
-		if err == ErrNotFound {
+		if err == storage.ErrKeyNotFound {
 			return octosql.ZeroValue(), ErrNoKeyToFire
 		}
 		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get value to send")
@@ -80,74 +93,105 @@ func (t *CountingTrigger) PollKeyToFire(ctx context.Context, tx StateTransaction
 
 type DelayTrigger struct {
 	delay time.Duration
+	clock func() time.Time
+}
+
+func NewDelayTrigger(delay time.Duration, clock func() time.Time) *DelayTrigger {
+	return &DelayTrigger{
+		delay: delay,
+		clock: clock,
+	}
 }
 
 var timeToSendPrefix = []byte("$time_time_to_send$")
 var whatTimeDoesKeyHavePrefix = []byte("$key_time_to_send$")
-var currentWatermarkPrefix = []byte("$currentWatermark$")
 
-func (t *DelayTrigger) RecordReceived(ctx context.Context, tx StateTransaction, key octosql.Value, eventTime time.Time) error {
-	keyTimesToSend := NewMap(tx.WithPrefix(timeToSendPrefix))
-	whatTimesDoKeysHave := NewMap(tx.WithPrefix(whatTimeDoesKeyHavePrefix))
+func (t *DelayTrigger) RecordReceived(ctx context.Context, tx storage.StateTransaction, key octosql.Value, eventTime time.Time) error {
+	keyTimesToSend := storage.NewMap(tx.WithPrefix(timeToSendPrefix))
+	whatTimesDoKeysHave := storage.NewMap(tx.WithPrefix(whatTimeDoesKeyHavePrefix))
 
-	var currentWatermarkValue octosql.Value
-	err := NewValueState(tx.WithPrefix(currentWatermarkPrefix)).Get(&currentWatermarkValue)
-	if err != nil {
-		return errors.Wrap(err, "couldn't get current watermark")
-	}
-	currentWatermark := currentWatermarkValue.AsTime()
-
-	newTimeToSend := eventTime.Add(t.delay)
-
-	// todo: czyszczenie starej wartosci
-	if currentWatermark.After(newTimeToSend) {
-		return errors.Wrap(t.addKeyToSend(ctx, tx, key), "couldn't add key for immediate send")
+	var oldSendTime octosql.Value
+	err := whatTimesDoKeysHave.Get(&key, &oldSendTime)
+	if err == nil {
+		oldTimeToSendKey := octosql.MakeTuple([]octosql.Value{oldSendTime, key})
+		err := keyTimesToSend.Delete(&oldTimeToSendKey)
+		if err != nil {
+			return errors.Wrap(err, "couldn't delete old time to send for key")
+		}
+	} else if err == storage.ErrKeyNotFound {
+	} else {
+		return errors.Wrap(err, "couldn't get old time to send for key")
 	}
 
-	newTimeToSendValue := octosql.MakeTime(newTimeToSend)
+	now := t.clock()
+	sendTime := now.Add(t.delay)
+	octoSendTime := octosql.MakeTime(sendTime)
 
-	timeToSendKey := octosql.MakeTuple([]octosql.Value{newTimeToSendValue, key})
+	timeToSendKey := octosql.MakeTuple([]octosql.Value{octoSendTime, key})
 	null := octosql.MakeNull()
 	err = keyTimesToSend.Set(&timeToSendKey, &null)
 	if err != nil {
 		return errors.Wrap(err, "couldn't set new time to send")
 	}
 
-	err = whatTimesDoKeysHave.Set(&key, &newTimeToSendValue)
+	err = whatTimesDoKeysHave.Set(&key, &octoSendTime)
 	if err != nil {
-		return errors.Wrap(err, "couldn't set key time to send info")
+		return errors.Wrap(err, "couldn't set key time to send")
 	}
 
 	return nil
 }
 
-func (t *DelayTrigger) addKeyToSend(ctx context.Context, tx StateTransaction, key octosql.Value) error {
-	toSend := NewLinkedList(tx.WithPrefix(toSendPrefix))
-	return toSend.Append(&key)
+func (t *DelayTrigger) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
+	return nil
 }
 
-func (t *DelayTrigger) UpdateWatermark(ctx context.Context, watermark time.Time) error {
-	// TODO: with sorted maps
-}
+func (t *DelayTrigger) PollKeyToFire(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error) {
+	keyTimesToSend := storage.NewMap(tx.WithPrefix(timeToSendPrefix))
+	whatTimesDoKeysHave := storage.NewMap(tx.WithPrefix(whatTimeDoesKeyHavePrefix))
 
-func (t *DelayTrigger) PollKeyToFire(ctx context.Context, tx StateTransaction) (octosql.Value, error) {
-	toSend := NewLinkedList(tx.WithPrefix(toSendPrefix))
-	if toSend.Length() == 0 {
+	iter := keyTimesToSend.GetIterator()
+	var key octosql.Value
+	var value octosql.Value
+	err := iter.Next(&key, &value)
+	if err := iter.Close(); err != nil {
+		return octosql.ZeroValue(), errors.Wrap(err, "couldn't close iterator")
+	}
+	if err != nil {
+		if err == storage.ErrEndOfIterator {
+			return octosql.ZeroValue(), ErrNoKeyToFire
+		}
+		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get first element from iterator")
+	}
+
+	if key.GetType() != octosql.TypeTuple {
+		return octosql.ZeroValue(), fmt.Errorf("storage corruption, expected tuple key, got %v", key.GetType())
+	}
+
+	tuple := key.AsSlice()
+
+	if len(tuple) != 2 {
+		return octosql.ZeroValue(), fmt.Errorf("storage corruption, expected tuple of length 2, got %v", len(tuple))
+	}
+
+	if tuple[0].GetType() != octosql.TypeTime {
+		return octosql.ZeroValue(), fmt.Errorf("storage corruption, expected time in first element of tuple, got %v", tuple[0].GetType())
+	}
+
+	keyTime := tuple[0].AsTime()
+
+	if keyTime.After(t.clock()) {
 		return octosql.ZeroValue(), ErrNoKeyToFire
 	}
 
-	var out octosql.Value
-	err := toSend.Pop(0, &out) // Get and delete.
+	err = keyTimesToSend.Delete(&key)
 	if err != nil {
-		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get value to send")
+		return octosql.ZeroValue(), errors.Wrap(err, "couldn't delete old time to send key")
+	}
+	err = whatTimesDoKeysHave.Delete(&tuple[1])
+	if err != nil {
+		return octosql.ZeroValue(), errors.Wrap(err, "couldn't delete time to send for key")
 	}
 
-	return out, nil
-}
-
-// TODO: Chyba jednak pull engine powinien to wywoływac. Inaczej flow staje się strasznie dziwne.
-
-// Tutaj read musi dotknąc storageu, zeby konflikty transakcji dobrze przechodziły.
-// Może lepiej po prostu lock na transaction managerze? (tylko w kontekście watermarkow)
-type WatermarkStore struct {
+	return tuple[1], nil
 }

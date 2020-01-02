@@ -41,6 +41,7 @@ func NewLinkedListIterator(it Iterator) *LinkedListIterator {
 	}
 }
 
+//Adds new element to the list
 func (ll *LinkedList) Append(value proto.Message) error {
 	if !ll.initialized {
 		err := ll.initialize()
@@ -74,6 +75,8 @@ func (ll *LinkedList) appendBytes(data []byte) error {
 	return nil
 }
 
+//Returns the first element of the list without removing it
+//Returns ErrEmptyList if the list is empty
 func (ll *LinkedList) Peek(value proto.Message) error {
 	if !ll.initialized {
 		err := ll.initialize()
@@ -98,6 +101,8 @@ func (ll *LinkedList) Peek(value proto.Message) error {
 	return errors.Wrap(err, "couldn't unmarshal the first element")
 }
 
+//Removes the first element from the list and returns it
+//Returns ErrEmptyList if the list is empty
 func (ll *LinkedList) Pop(value proto.Message) error {
 	//there is no need to call initialize here, since Peek calls initialize
 	err := ll.Peek(value)
@@ -121,6 +126,7 @@ func (ll *LinkedList) Pop(value proto.Message) error {
 	return nil
 }
 
+//Clears all contents of the linked list including the metadata
 func (ll *LinkedList) Clear() error {
 	for ll.firstElement < ll.elementCount {
 		key := getIndexKey(ll.firstElement)

@@ -4,6 +4,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+//TODO: this file should probably have it's name changed, or have it's contents moved to some other file
+
 var ErrKeyNotFound = errors.New("couldn't find key")
 
 /*

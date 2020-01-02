@@ -4,12 +4,15 @@ import (
 	"context"
 	"log"
 
+	"github.com/cube2222/octosql/streaming/storage"
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql/execution"
 )
 
 type RecordSink interface {
+	AddRecord(record *execution.Record, tx storage.StateTransaction)
+	MarkEndOfStream() error
 	AddRecord(ctx context.Context, record *execution.Record, tx StateTransaction)
 	MarkEndOfStream(ctx context.Context) error
 }
@@ -17,10 +20,10 @@ type RecordSink interface {
 type PullEngine struct {
 	recordSink RecordSink
 	source     execution.RecordStream
-	storage    *BadgerStorage
+	storage    *storage.BadgerStorage
 }
 
-func NewPullEngine(sink RecordSink, storage *BadgerStorage, source execution.RecordStream) *PullEngine {
+func NewPullEngine(sink RecordSink, storage *storage.BadgerStorage, source execution.RecordStream) *PullEngine {
 	return &PullEngine{
 		recordSink: sink,
 		storage:    storage,
@@ -45,7 +48,7 @@ func (engine *PullEngine) loop(ctx context.Context) error {
 	// TODO: Have trigger manager here with tx.WithPrefix(triggerManager) passed
 
 	tx := engine.storage.BeginTransaction()
-	r, err := engine.source.Next(InjectStateTransaction(ctx, tx))
+	r, err := engine.source.Next(storage.InjectStateTransaction(ctx, tx))
 	if err != nil {
 		if err == execution.ErrEndOfStream {
 			err := engine.recordSink.MarkEndOfStream()

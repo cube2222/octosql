@@ -169,4 +169,17 @@ func TestLinkedList(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	/* check if Peek and Pop return ErrEmptyList on empty list */
+	linkedList3 := NewLinkedList(txn)
+
+	err = linkedList3.Peek(&value)
+	if err != ErrEmptyList {
+		log.Fatal("Peek on an empty list should have returned ErrEmptyList")
+	}
+
+	err = linkedList3.Pop(&value)
+	if err != ErrEmptyList {
+		log.Fatal("Pop on an empty list should have returned ErrEmptyList")
+	}
 }

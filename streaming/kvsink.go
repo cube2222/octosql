@@ -1,5 +1,6 @@
 package streaming
 
+/*
 import (
 	"log"
 
@@ -27,3 +28,4 @@ func (k *KeyValueSink) AddRecord(record *execution.Record, tx StateTransaction) 
 func (k *KeyValueSink) MarkEndOfStream() error {
 	return nil
 }
+*/

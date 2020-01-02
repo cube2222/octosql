@@ -50,4 +50,7 @@ func TestSet(t *testing.T) {
 			log.Fatal("the set should contain the value, but it doesn't")
 		}
 	}
+
+	/* test what happens during a collision */
+
 }

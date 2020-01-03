@@ -112,6 +112,36 @@ func (set *Set) eraseUsingHash(value octosql.Value, hashFunction func(octosql.Va
 	return true, nil
 }
 
+func (set *Set) Clear() error {
+	return set.clearUsingHash(hashValue)
+}
+
+func (set *Set) clearUsingHash(hashFunction func(octosql.Value) ([]byte, error)) error {
+	it := set.GetIterator()
+	defer it.Close()
+
+	var value octosql.Value
+
+	err := it.Next(&value)
+
+	for err != ErrEndOfIterator {
+		hash, hashErr := hashFunction(value)
+
+		if hashErr != nil {
+			return errors.Wrap(hashErr, "failed to hash value")
+		}
+
+		deleteErr := set.tx.Delete(hash)
+		if deleteErr != nil {
+			return errors.Wrap(deleteErr, "failed to delete value")
+		}
+
+		err = it.Next(&value)
+	}
+
+	return nil
+}
+
 func (set *Set) GetIterator() *SetIterator {
 	options := badger.DefaultIteratorOptions
 	it := set.tx.Iterator(options)

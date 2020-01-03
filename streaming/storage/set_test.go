@@ -119,7 +119,7 @@ func TestSetWithCollisions(t *testing.T) {
 	}
 
 	for _, value := range values {
-		inserted, err := set.fakeInsert(value)
+		inserted, err := set.collisionInsert(value)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -128,7 +128,7 @@ func TestSetWithCollisions(t *testing.T) {
 			log.Fatal("the value wasn't inserted, although it should've been")
 		}
 
-		contains, err := set.fakeContains(value)
+		contains, err := set.collisionContains(value)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -139,7 +139,7 @@ func TestSetWithCollisions(t *testing.T) {
 	}
 
 	/* test erase */
-	wasErased, err := set.fakeErase(values[0])
+	wasErased, err := set.collisionErase(values[0])
 
 	if !wasErased {
 		log.Fatal("the value should've been erased, but it wasn't")
@@ -149,7 +149,7 @@ func TestSetWithCollisions(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	contains, err := set.fakeContains(values[0])
+	contains, err := set.collisionContains(values[0])
 	if contains {
 		log.Fatal("the value should've been erased, but it wasn't")
 	}
@@ -158,7 +158,7 @@ func TestSetWithCollisions(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	wasErased, err = set.fakeErase(values[0])
+	wasErased, err = set.collisionErase(values[0])
 
 	if wasErased {
 		log.Fatal("the value should not have been erased, but it was")
@@ -183,18 +183,22 @@ func TestSetWithCollisions(t *testing.T) {
 	}
 }
 
-func (set *Set) fakeInsert(value octosql.Value) (bool, error) {
-	return set.insertUsingHash(value, fakeHash)
+func (set *Set) collisionInsert(value octosql.Value) (bool, error) {
+	return set.insertUsingHash(value, collisionHash)
 }
 
-func (set *Set) fakeErase(value octosql.Value) (bool, error) {
-	return set.eraseUsingHash(value, fakeHash)
+func (set *Set) collisionErase(value octosql.Value) (bool, error) {
+	return set.eraseUsingHash(value, collisionHash)
 }
 
-func (set *Set) fakeContains(value octosql.Value) (bool, error) {
-	return set.containsUsingHash(value, fakeHash)
+func (set *Set) collisionContains(value octosql.Value) (bool, error) {
+	return set.containsUsingHash(value, collisionHash)
 }
 
-func fakeHash(value octosql.Value) ([]byte, error) {
+func (set *Set) fakeClear() error {
+	return set.clearUsingHash(collisionHash)
+}
+
+func collisionHash(value octosql.Value) ([]byte, error) {
 	return []byte{0, 0, 0, 0, 0, 0, 0, 0}, nil
 }

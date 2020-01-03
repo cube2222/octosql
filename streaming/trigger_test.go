@@ -13,6 +13,37 @@ import (
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
+func RecordReceived(t *testing.T, ctx context.Context, trigger Trigger, badgerStorage *storage.BadgerStorage, key octosql.Value, eventTime time.Time) {
+	tx := badgerStorage.BeginTransaction()
+	_, err := trigger.PollKeyToFire(ctx, tx)
+	assert.Equal(t, ErrNoKeyToFire, err)
+	err = trigger.RecordReceived(ctx, tx, key, eventTime)
+	assert.Nil(t, err)
+	assert.Nil(t, tx.Commit())
+}
+
+func ExpectFire(t *testing.T, ctx context.Context, trigger Trigger, badgerStorage *storage.BadgerStorage, key octosql.Value) {
+	tx := badgerStorage.BeginTransaction()
+	k, err := trigger.PollKeyToFire(ctx, tx)
+	assert.Equal(t, key, k)
+	assert.Nil(t, err)
+	assert.Nil(t, tx.Commit())
+}
+
+func ExpectNoFire(t *testing.T, ctx context.Context, trigger Trigger, badgerStorage *storage.BadgerStorage) {
+	tx := badgerStorage.BeginTransaction()
+	_, err := trigger.PollKeyToFire(ctx, tx)
+	assert.Equal(t, ErrNoKeyToFire, err)
+	assert.Nil(t, tx.Commit())
+}
+
+func UpdateWatermark(t *testing.T, ctx context.Context, trigger Trigger, badgerStorage *storage.BadgerStorage, watermark time.Time) {
+	tx := badgerStorage.BeginTransaction()
+	err := trigger.UpdateWatermark(ctx, tx, watermark)
+	assert.Nil(t, err)
+	assert.Nil(t, tx.Commit())
+}
+
 func TestCountingTrigger(t *testing.T) {
 	ctx := context.Background()
 	db, err := badger.Open(badger.DefaultOptions("test"))
@@ -186,26 +217,125 @@ func TestDelayTrigger(t *testing.T) {
 	ExpectNoFire(t, ctx, dt, badgerStorage)
 }
 
-func RecordReceived(t *testing.T, ctx context.Context, trigger Trigger, badgerStorage *storage.BadgerStorage, key octosql.Value, eventTime time.Time) {
-	tx := badgerStorage.BeginTransaction()
-	_, err := trigger.PollKeyToFire(ctx, tx)
-	assert.Equal(t, ErrNoKeyToFire, err)
-	err = trigger.RecordReceived(ctx, tx, key, eventTime)
-	assert.Nil(t, err)
-	assert.Nil(t, tx.Commit())
-}
+func TestWatermarkTrigger(t *testing.T) {
+	ctx := context.Background()
+	db, err := badger.Open(badger.DefaultOptions("test"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		db.Close()
+		os.RemoveAll("test")
+	}()
 
-func ExpectFire(t *testing.T, ctx context.Context, trigger Trigger, badgerStorage *storage.BadgerStorage, key octosql.Value) {
-	tx := badgerStorage.BeginTransaction()
-	k, err := trigger.PollKeyToFire(ctx, tx)
-	assert.Equal(t, key, k)
-	assert.Nil(t, err)
-	assert.Nil(t, tx.Commit())
-}
+	badgerStorage := storage.NewBadgerStorage(db)
+	watermark := time.Now()
+	wt := NewWatermarkTrigger()
 
-func ExpectNoFire(t *testing.T, ctx context.Context, trigger Trigger, badgerStorage *storage.BadgerStorage) {
-	tx := badgerStorage.BeginTransaction()
-	_, err := trigger.PollKeyToFire(ctx, tx)
-	assert.Equal(t, ErrNoKeyToFire, err)
-	assert.Nil(t, tx.Commit())
+	// Simple
+
+	RecordReceived(t, ctx, wt, badgerStorage, octosql.MakeInt(2), watermark.Add(time.Minute))
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	watermark = watermark.Add(time.Second * 30)
+	UpdateWatermark(t, ctx, wt, badgerStorage, watermark)
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	watermark = watermark.Add(time.Minute)
+	UpdateWatermark(t, ctx, wt, badgerStorage, watermark)
+
+	ExpectFire(t, ctx, wt, badgerStorage, octosql.MakeInt(2))
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	// Key update
+
+	RecordReceived(t, ctx, wt, badgerStorage, octosql.MakeInt(2), watermark.Add(time.Minute))
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	watermark = watermark.Add(time.Second * 45)
+	UpdateWatermark(t, ctx, wt, badgerStorage, watermark)
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	RecordReceived(t, ctx, wt, badgerStorage, octosql.MakeInt(2), watermark.Add(time.Minute))
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	watermark = watermark.Add(time.Second * 45)
+	UpdateWatermark(t, ctx, wt, badgerStorage, watermark)
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	watermark = watermark.Add(time.Second * 45)
+	UpdateWatermark(t, ctx, wt, badgerStorage, watermark)
+
+	ExpectFire(t, ctx, wt, badgerStorage, octosql.MakeInt(2))
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	// Two keys
+
+	RecordReceived(t, ctx, wt, badgerStorage, octosql.MakeInt(2), watermark.Add(time.Minute))
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	watermark = watermark.Add(time.Second * 30)
+	UpdateWatermark(t, ctx, wt, badgerStorage, watermark)
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	RecordReceived(t, ctx, wt, badgerStorage, octosql.MakeInt(3), watermark.Add(time.Minute))
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	watermark = watermark.Add(time.Second * 15)
+	UpdateWatermark(t, ctx, wt, badgerStorage, watermark)
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	RecordReceived(t, ctx, wt, badgerStorage, octosql.MakeInt(2), watermark.Add(time.Minute))
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	watermark = watermark.Add(time.Second * 50)
+	UpdateWatermark(t, ctx, wt, badgerStorage, watermark)
+
+	ExpectFire(t, ctx, wt, badgerStorage, octosql.MakeInt(3))
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	watermark = watermark.Add(time.Second * 20)
+	UpdateWatermark(t, ctx, wt, badgerStorage, watermark)
+
+	ExpectFire(t, ctx, wt, badgerStorage, octosql.MakeInt(2))
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	// Two keys trigger at once
+
+	RecordReceived(t, ctx, wt, badgerStorage, octosql.MakeInt(2), watermark.Add(time.Minute))
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	watermark = watermark.Add(time.Second * 10)
+	UpdateWatermark(t, ctx, wt, badgerStorage, watermark)
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	RecordReceived(t, ctx, wt, badgerStorage, octosql.MakeInt(3), watermark.Add(time.Minute))
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	watermark = watermark.Add(time.Minute * 2)
+	UpdateWatermark(t, ctx, wt, badgerStorage, watermark)
+
+	ExpectFire(t, ctx, wt, badgerStorage, octosql.MakeInt(2))
+
+	ExpectFire(t, ctx, wt, badgerStorage, octosql.MakeInt(3))
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
 }

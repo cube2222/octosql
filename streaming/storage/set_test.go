@@ -94,6 +94,20 @@ func TestSet(t *testing.T) {
 			log.Fatal(err)
 		}
 	}
+
+	_ = iter.Close()
+
+	err = set.Clear()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	iter2 := set.GetIterator()
+	err = iter2.Next(&value)
+
+	if err != ErrEndOfIterator {
+		log.Fatal("expected end of iterator")
+	}
 }
 
 func TestSetWithCollisions(t *testing.T) {
@@ -181,6 +195,21 @@ func TestSetWithCollisions(t *testing.T) {
 			log.Fatal(err)
 		}
 	}
+
+	_ = iter.Close()
+
+	err = set.collisionClear()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	iter2 := set.GetIterator()
+
+	err = iter2.Next(&value)
+	if err != ErrEndOfIterator {
+		log.Fatal("expected end of iterator")
+	}
+
 }
 
 func (set *Set) collisionInsert(value octosql.Value) (bool, error) {
@@ -195,7 +224,7 @@ func (set *Set) collisionContains(value octosql.Value) (bool, error) {
 	return set.containsUsingHash(value, collisionHash)
 }
 
-func (set *Set) fakeClear() error {
+func (set *Set) collisionClear() error {
 	return set.clearUsingHash(collisionHash)
 }
 

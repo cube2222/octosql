@@ -1,7 +1,5 @@
 package storage
 
-//TODO: this code is of questionable quality. It might be useful to change it later
-
 import (
 	"github.com/cube2222/octosql"
 	"github.com/dgraph-io/badger/v2"

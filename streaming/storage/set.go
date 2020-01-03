@@ -5,6 +5,7 @@ package storage
 import (
 	"github.com/cube2222/octosql"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/golang/protobuf/proto"
 	"github.com/mitchellh/hashstructure"
 	"github.com/pkg/errors"
 )
@@ -14,7 +15,9 @@ type Set struct {
 }
 
 type SetIterator struct {
-	it Iterator
+	it               Iterator
+	currentHashTuple []octosql.Value
+	currentCounter   int
 }
 
 func NewSet(tx StateTransaction) *Set {
@@ -24,16 +27,24 @@ func NewSet(tx StateTransaction) *Set {
 }
 
 func (set *Set) Insert(value octosql.Value) (bool, error) {
-	hash, bytes, err := getHashAndBytes(value)
+	return set.insertUsingHash(value, hashValue)
+}
+
+func (set *Set) insertUsingHash(value octosql.Value, hashFunction func(octosql.Value) ([]byte, error)) (bool, error) {
+	hash, err := hashFunction(value)
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't parse given value in insert")
 	}
 
-	return set.insertWithGivenHash(value, bytes, hash)
+	return set.insertValueWithGivenHash(value, hash)
 }
 
 func (set *Set) Contains(value octosql.Value) (bool, error) {
-	hash, _, err := getHashAndBytes(value)
+	return set.containsUsingHash(value, hashValue)
+}
+
+func (set *Set) containsUsingHash(value octosql.Value, hashFunction func(octosql.Value) ([]byte, error)) (bool, error) {
+	hash, err := hashFunction(value)
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't parse given value in contains")
 	}
@@ -42,7 +53,7 @@ func (set *Set) Contains(value octosql.Value) (bool, error) {
 	state := NewValueState(hashedTxn)
 
 	var tuple octosql.Value
-	tupleBytes, err := state.getBytes()
+	err = state.Get(&tuple)
 
 	if err == ErrKeyNotFound {
 		return false, nil
@@ -50,13 +61,57 @@ func (set *Set) Contains(value octosql.Value) (bool, error) {
 		return false, errors.Wrap(err, "failed to read set")
 	}
 
-	err = tuple.MonotonicUnmarshal(tupleBytes)
+	values := tuple.AsSlice()
+	return getPositionInTuple(values, value) != -1, nil
+}
+
+func (set *Set) Erase(value octosql.Value) (bool, error) {
+	return set.eraseUsingHash(value, hashValue)
+}
+
+func (set *Set) eraseUsingHash(value octosql.Value, hashFunction func(octosql.Value) ([]byte, error)) (bool, error) {
+	hash, err := hashFunction(value)
 	if err != nil {
-		return false, errors.Wrap(err, "failed to parse set element")
+		return false, errors.Wrap(err, "couldn't parse given value in erase")
 	}
 
-	values := tuple.AsSlice()
-	return isMemberOfTuple(values, value), nil
+	hashedTxn := set.tx.WithPrefix(hash)
+	state := NewValueState(hashedTxn)
+
+	var tuple octosql.Value
+	err = state.Get(&tuple)
+
+	if err == ErrKeyNotFound {
+		return false, nil //the element wasn't present in the set
+	} else if err != nil {
+		return false, errors.Wrap(err, "failed to read set elements")
+	}
+
+	tupleSlice := tuple.AsSlice()
+	index := getPositionInTuple(tupleSlice, value)
+
+	if index == -1 {
+		return false, nil
+	}
+
+	newTuple := removeElementFromTuple(index, tupleSlice)
+
+	//if the removed value is last of it's hash we clear it
+	if len(newTuple.AsSlice()) == 0 {
+		err := set.tx.Delete(hash)
+		if err != nil {
+			return false, errors.Wrap(err, "couldn't clear set value")
+		}
+
+		return true, nil
+	}
+
+	err = state.Set(&newTuple)
+	if err != nil {
+		return false, errors.Wrap(err, "failed to actualize value of set")
+	}
+
+	return true, nil
 }
 
 func (set *Set) GetIterator() *SetIterator {
@@ -69,12 +124,31 @@ func (set *Set) GetIterator() *SetIterator {
 
 func NewSetIterator(it Iterator) *SetIterator {
 	return &SetIterator{
-		it: it,
+		it:               it,
+		currentHashTuple: []octosql.Value{},
+		currentCounter:   0,
 	}
 }
 
-func (si *SetIterator) Next(value octosql.Value) error {
-	return si.it.Next(&value)
+func (si *SetIterator) Next(value *octosql.Value) error {
+	var tuple octosql.Value
+
+	if si.currentCounter == len(si.currentHashTuple) {
+		err := si.it.Next(&tuple)
+		if err == ErrEndOfIterator {
+			return ErrEndOfIterator
+		} else if err != nil {
+			return errors.Wrap(err, "failed to read next tuple from underlying iterator")
+		}
+
+		si.currentHashTuple = tuple.AsSlice()
+		si.currentCounter = 0
+	}
+
+	*value = si.currentHashTuple[si.currentCounter]
+	si.currentCounter++
+
+	return nil
 }
 
 func (si *SetIterator) Close() error {
@@ -86,68 +160,76 @@ func (si *SetIterator) Rewind() {
 }
 
 // Auxiliary functions
-func getHashAndBytes(value octosql.Value) ([]byte, []byte, error) {
-	valueBytes := value.MonotonicMarshal()
+func hashValue(value octosql.Value) ([]byte, error) {
+	valueBytes, err := proto.Marshal(&value)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't marshal value")
+	}
 
 	hashValue, err := hashstructure.Hash(valueBytes, nil)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't hash value")
+		return nil, errors.Wrap(err, "couldn't hash value")
 	}
 
 	hashKey := octosql.MonotonicMarshalUint64(hashValue, true)
 
-	return hashKey, valueBytes, nil
+	return hashKey, nil
 }
 
-func addValueBytesToTupleBytes(tuple, newBytes []byte) []byte {
-	newTuple := tuple[:len(tuple)-1]
-	newTuple = append(newTuple, newBytes...)
-	newTuple = append(newTuple, octosql.TupleDelimiter)
-
-	return newTuple
-}
-
-func isMemberOfTuple(values []octosql.Value, value octosql.Value) bool {
-	for _, v := range values {
+//Returns the position of a value in a tuple if it's a member of the tuple,
+//and -1 if it's not.
+func getPositionInTuple(values []octosql.Value, value octosql.Value) int {
+	for i, v := range values {
 		if octosql.AreEqual(v, value) {
-			return true
+			return i
 		}
 	}
 
-	return false
+	return -1
 }
 
-//Warning: This is an auxiliary function used in Insert. It also serves as a testing
+//This is an auxiliary function used in Insert. It also serves as a testing
 //utility, to see if the set works properly when multiple values map to the same hash.
-func (set *Set) insertWithGivenHash(value octosql.Value, bytes, hash []byte) (bool, error) {
+func (set *Set) insertValueWithGivenHash(value octosql.Value, hash []byte) (bool, error) {
 	hashedTxn := set.tx.WithPrefix(hash)
 	state := NewValueState(hashedTxn)
 
-	var tupleValue octosql.Value
-	tupleBytes, err := state.getBytes()
+	var tuple octosql.Value
+	err := state.Get(&tuple)
 
 	if err == ErrKeyNotFound {
-		tupleValue = octosql.ZeroTuple()
-		tupleBytes = tupleValue.MonotonicMarshal()
-	} else if err == nil {
-		err := tupleValue.MonotonicUnmarshal(tupleBytes)
-		if err != nil {
-			return false, errors.Wrap(err, "failed to parse set element")
-		}
+		tuple = octosql.ZeroTuple()
 	} else if err != nil {
 		return false, errors.Wrap(err, "failed to read set elements")
 	}
 
-	if isMemberOfTuple(tupleValue.AsSlice(), value) {
+	tupleSlice := tuple.AsSlice()
+
+	if getPositionInTuple(tupleSlice, value) != -1 {
 		return false, nil
 	}
 
-	newTupleBytes := addValueBytesToTupleBytes(tupleBytes, bytes)
+	newTuple := addValueToTuple(value, tupleSlice)
 
-	err = state.setBytes(newTupleBytes)
+	err = state.Set(&newTuple)
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't actualize new value for set")
 	}
 
 	return true, nil
+}
+
+func removeElementFromTuple(index int, values []octosql.Value) octosql.Value {
+	length := len(values)
+	result := values[:index]
+
+	if index != length-1 {
+		result = append(result, values[index+1:]...)
+	}
+
+	return octosql.MakeTuple(result)
+}
+
+func addValueToTuple(value octosql.Value, tuple []octosql.Value) octosql.Value {
+	return octosql.MakeTuple(append(tuple, value))
 }

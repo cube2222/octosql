@@ -377,6 +377,10 @@ func recursiveMonotonicUnmarshalTuple(b []byte) ([]Value, int, error) {
 	values := make([]Value, 0)
 	index := 1
 	length := len(b)
+	if length < MinimalTupleLength {
+		return nil, 0, errors.New("incorrect tuple length")
+	}
+
 	var value Value
 
 	for index < length {

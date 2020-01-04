@@ -44,6 +44,13 @@ func UpdateWatermark(t *testing.T, ctx context.Context, trigger Trigger, badgerS
 	assert.Nil(t, tx.Commit())
 }
 
+func KeyFired(t *testing.T, ctx context.Context, trigger Trigger, badgerStorage *storage.BadgerStorage, key octosql.Value) {
+	tx := badgerStorage.BeginTransaction()
+	err := trigger.KeyFired(ctx, tx, key)
+	assert.Nil(t, err)
+	assert.Nil(t, tx.Commit())
+}
+
 func TestCountingTrigger(t *testing.T) {
 	ctx := context.Background()
 	db, err := badger.Open(badger.DefaultOptions("test"))
@@ -70,19 +77,78 @@ func TestCountingTrigger(t *testing.T) {
 
 	ExpectNoFire(t, ctx, ct, badgerStorage)
 
+	RecordReceived(t, ctx, ct, badgerStorage, octosql.MakeInt(3), time.Time{})
+
+	ExpectFire(t, ctx, ct, badgerStorage, octosql.MakeInt(3))
+
+	ExpectNoFire(t, ctx, ct, badgerStorage)
+}
+
+func TestCountingTrigger_KeyFired(t *testing.T) {
+	ctx := context.Background()
+	db, err := badger.Open(badger.DefaultOptions("test"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		db.Close()
+		os.RemoveAll("test")
+	}()
+
+	badgerStorage := storage.NewBadgerStorage(db)
+	ct := NewCountingTrigger(3)
+
 	RecordReceived(t, ctx, ct, badgerStorage, octosql.MakeInt(2), time.Time{})
 
-	ExpectFire(t, ctx, ct, badgerStorage, octosql.MakeInt(2))
+	ExpectNoFire(t, ctx, ct, badgerStorage)
+
+	RecordReceived(t, ctx, ct, badgerStorage, octosql.MakeInt(2), time.Time{})
 
 	ExpectNoFire(t, ctx, ct, badgerStorage)
 
 	RecordReceived(t, ctx, ct, badgerStorage, octosql.MakeInt(3), time.Time{})
+
+	ExpectNoFire(t, ctx, ct, badgerStorage)
+
+	RecordReceived(t, ctx, ct, badgerStorage, octosql.MakeInt(3), time.Time{})
+
+	ExpectNoFire(t, ctx, ct, badgerStorage)
+
+	KeyFired(t, ctx, ct, badgerStorage, octosql.MakeInt(2))
+
+	ExpectNoFire(t, ctx, ct, badgerStorage)
+
+	RecordReceived(t, ctx, ct, badgerStorage, octosql.MakeInt(2), time.Time{})
 
 	ExpectNoFire(t, ctx, ct, badgerStorage)
 
 	RecordReceived(t, ctx, ct, badgerStorage, octosql.MakeInt(3), time.Time{})
 
 	ExpectFire(t, ctx, ct, badgerStorage, octosql.MakeInt(3))
+
+	ExpectNoFire(t, ctx, ct, badgerStorage)
+
+	RecordReceived(t, ctx, ct, badgerStorage, octosql.MakeInt(2), time.Time{})
+
+	ExpectNoFire(t, ctx, ct, badgerStorage)
+
+	RecordReceived(t, ctx, ct, badgerStorage, octosql.MakeInt(2), time.Time{})
+
+	ExpectFire(t, ctx, ct, badgerStorage, octosql.MakeInt(2))
+
+	ExpectNoFire(t, ctx, ct, badgerStorage)
+
+	RecordReceived(t, ctx, ct, badgerStorage, octosql.MakeInt(2), time.Time{})
+
+	ExpectNoFire(t, ctx, ct, badgerStorage)
+
+	RecordReceived(t, ctx, ct, badgerStorage, octosql.MakeInt(2), time.Time{})
+
+	ExpectNoFire(t, ctx, ct, badgerStorage)
+
+	RecordReceived(t, ctx, ct, badgerStorage, octosql.MakeInt(2), time.Time{})
+
+	KeyFired(t, ctx, ct, badgerStorage, octosql.MakeInt(2))
 
 	ExpectNoFire(t, ctx, ct, badgerStorage)
 }
@@ -215,6 +281,54 @@ func TestDelayTrigger(t *testing.T) {
 	ExpectFire(t, ctx, dt, badgerStorage, octosql.MakeInt(3))
 
 	ExpectNoFire(t, ctx, dt, badgerStorage)
+
+	// Key fired
+
+	RecordReceived(t, ctx, dt, badgerStorage, octosql.MakeInt(2), time.Time{})
+
+	ExpectNoFire(t, ctx, dt, badgerStorage)
+
+	clock.Advance(time.Second * 30)
+
+	ExpectNoFire(t, ctx, dt, badgerStorage)
+
+	RecordReceived(t, ctx, dt, badgerStorage, octosql.MakeInt(3), time.Time{})
+
+	ExpectNoFire(t, ctx, dt, badgerStorage)
+
+	KeyFired(t, ctx, dt, badgerStorage, octosql.MakeInt(2))
+
+	clock.Advance(time.Second * 45)
+
+	ExpectNoFire(t, ctx, dt, badgerStorage)
+
+	clock.Advance(time.Second * 45)
+
+	ExpectFire(t, ctx, dt, badgerStorage, octosql.MakeInt(3))
+
+	// Key fired after trigger ready
+
+	RecordReceived(t, ctx, dt, badgerStorage, octosql.MakeInt(2), time.Time{})
+
+	ExpectNoFire(t, ctx, dt, badgerStorage)
+
+	clock.Advance(time.Second * 30)
+
+	ExpectNoFire(t, ctx, dt, badgerStorage)
+
+	RecordReceived(t, ctx, dt, badgerStorage, octosql.MakeInt(3), time.Time{})
+
+	ExpectNoFire(t, ctx, dt, badgerStorage)
+
+	clock.Advance(time.Second * 45)
+
+	KeyFired(t, ctx, dt, badgerStorage, octosql.MakeInt(2))
+
+	ExpectNoFire(t, ctx, dt, badgerStorage)
+
+	clock.Advance(time.Second * 45)
+
+	ExpectFire(t, ctx, dt, badgerStorage, octosql.MakeInt(3))
 }
 
 func TestWatermarkTrigger(t *testing.T) {
@@ -338,4 +452,58 @@ func TestWatermarkTrigger(t *testing.T) {
 	ExpectFire(t, ctx, wt, badgerStorage, octosql.MakeInt(3))
 
 	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	// Key fired
+
+	RecordReceived(t, ctx, wt, badgerStorage, octosql.MakeInt(2), watermark.Add(time.Minute))
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	watermark = watermark.Add(time.Second * 30)
+	UpdateWatermark(t, ctx, wt, badgerStorage, watermark)
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	RecordReceived(t, ctx, wt, badgerStorage, octosql.MakeInt(3), watermark.Add(time.Minute))
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	KeyFired(t, ctx, wt, badgerStorage, octosql.MakeInt(2))
+
+	watermark = watermark.Add(time.Second * 45)
+	UpdateWatermark(t, ctx, wt, badgerStorage, watermark)
+
+	ExpectFire(t, ctx, wt, badgerStorage, octosql.MakeInt(2))
+
+	watermark = watermark.Add(time.Second * 45)
+	UpdateWatermark(t, ctx, wt, badgerStorage, watermark)
+
+	ExpectFire(t, ctx, wt, badgerStorage, octosql.MakeInt(3))
+
+	// Key fired after trigger ready
+
+	RecordReceived(t, ctx, wt, badgerStorage, octosql.MakeInt(2), watermark.Add(time.Minute))
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	watermark = watermark.Add(time.Second * 30)
+	UpdateWatermark(t, ctx, wt, badgerStorage, watermark)
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	RecordReceived(t, ctx, wt, badgerStorage, octosql.MakeInt(3), watermark.Add(time.Minute))
+
+	ExpectNoFire(t, ctx, wt, badgerStorage)
+
+	watermark = watermark.Add(time.Second * 45)
+	UpdateWatermark(t, ctx, wt, badgerStorage, watermark)
+
+	KeyFired(t, ctx, wt, badgerStorage, octosql.MakeInt(2))
+
+	ExpectFire(t, ctx, wt, badgerStorage, octosql.MakeInt(2))
+
+	watermark = watermark.Add(time.Second * 45)
+	UpdateWatermark(t, ctx, wt, badgerStorage, watermark)
+
+	ExpectFire(t, ctx, wt, badgerStorage, octosql.MakeInt(3))
 }

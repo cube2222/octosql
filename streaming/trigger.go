@@ -18,6 +18,7 @@ type Trigger interface {
 	RecordReceived(ctx context.Context, tx storage.StateTransaction, key octosql.Value, eventTime time.Time) error
 	UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error
 	PollKeyToFire(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error)
+	KeyFired(ctx context.Context, tx storage.StateTransaction, key octosql.Value) error
 }
 
 type CountingTrigger struct {
@@ -33,7 +34,7 @@ func NewCountingTrigger(fireEvery int) *CountingTrigger {
 var toSendPrefix = []byte("$to_send$")
 var keyCountsPrefix = []byte("$key_counts$")
 
-func (t *CountingTrigger) RecordReceived(ctx context.Context, tx storage.StateTransaction, key octosql.Value, eventTime time.Time) error {
+func (ct *CountingTrigger) RecordReceived(ctx context.Context, tx storage.StateTransaction, key octosql.Value, eventTime time.Time) error {
 	keyCounts := storage.NewMap(tx.WithPrefix(keyCountsPrefix))
 
 	var countValue octosql.Value
@@ -48,7 +49,7 @@ func (t *CountingTrigger) RecordReceived(ctx context.Context, tx storage.StateTr
 	count := countValue.AsInt()
 
 	count += 1
-	if count == t.fireEvery {
+	if count == ct.fireEvery {
 		err := keyCounts.Delete(&key)
 		if err != nil {
 			return errors.Wrap(err, "couldn't delete current count for key")
@@ -70,11 +71,11 @@ func (t *CountingTrigger) RecordReceived(ctx context.Context, tx storage.StateTr
 	return nil
 }
 
-func (t *CountingTrigger) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
+func (ct *CountingTrigger) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
 	return nil
 }
 
-func (t *CountingTrigger) PollKeyToFire(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error) {
+func (ct *CountingTrigger) PollKeyToFire(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error) {
 	toSend := storage.NewValueState(tx.WithPrefix(toSendPrefix))
 	var out octosql.Value
 	err := toSend.Get(&out)
@@ -90,6 +91,38 @@ func (t *CountingTrigger) PollKeyToFire(ctx context.Context, tx storage.StateTra
 		return octosql.ZeroValue(), errors.Wrap(err, "couldn't clear value to send")
 	}
 	return out, nil
+}
+
+func (ct *CountingTrigger) KeyFired(ctx context.Context, tx storage.StateTransaction, key octosql.Value) error {
+	keyCounts := storage.NewMap(tx.WithPrefix(keyCountsPrefix))
+
+	var countValue octosql.Value
+	err := keyCounts.Get(&key, &countValue)
+	if err == nil {
+		err := keyCounts.Delete(&key)
+		if err != nil {
+			return errors.Wrap(err, "couldn't delete current count for key")
+		}
+		return nil
+	} else if err != storage.ErrKeyNotFound {
+		return errors.Wrap(err, "couldn't get current count for key")
+	}
+
+	toSend := storage.NewValueState(tx.WithPrefix(toSendPrefix))
+
+	var out octosql.Value
+	err = toSend.Get(&out)
+	if err == nil && octosql.AreEqual(key, out) {
+		err := toSend.Clear()
+		if err != nil {
+			return errors.Wrap(err, "couldn't delete key to send")
+		}
+		return nil
+	} else if err != storage.ErrKeyNotFound {
+		return errors.Wrap(err, "couldn't get value to send")
+	}
+
+	return nil
 }
 
 var timeSortedKeys = []byte("$time_sorted_keys$")
@@ -147,6 +180,17 @@ func (dt *DelayTrigger) PollKeyToFire(ctx context.Context, tx storage.StateTrans
 	return key, nil
 }
 
+func (dt *DelayTrigger) KeyFired(ctx context.Context, tx storage.StateTransaction, key octosql.Value) error {
+	timeKeys := NewTimeSortedKeys(tx.WithPrefix(timeSortedKeys))
+
+	err := timeKeys.DeleteByKey(key)
+	if err != nil && err != storage.ErrKeyNotFound {
+		return errors.Wrap(err, "couldn't delete send time for key")
+	}
+
+	return nil
+}
+
 var watermarkPrefix = []byte("$watermark$")
 
 type WatermarkTrigger struct {
@@ -156,7 +200,7 @@ func NewWatermarkTrigger() *WatermarkTrigger {
 	return &WatermarkTrigger{}
 }
 
-func (dt *WatermarkTrigger) RecordReceived(ctx context.Context, tx storage.StateTransaction, key octosql.Value, eventTime time.Time) error {
+func (wt *WatermarkTrigger) RecordReceived(ctx context.Context, tx storage.StateTransaction, key octosql.Value, eventTime time.Time) error {
 	timeKeys := NewTimeSortedKeys(tx.WithPrefix(timeSortedKeys))
 	watermarkStorage := storage.NewValueState(tx.WithPrefix(watermarkPrefix))
 
@@ -184,7 +228,7 @@ func (dt *WatermarkTrigger) RecordReceived(ctx context.Context, tx storage.State
 	return nil
 }
 
-func (dt *WatermarkTrigger) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
+func (wt *WatermarkTrigger) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
 	watermarkStorage := storage.NewValueState(tx.WithPrefix(watermarkPrefix))
 
 	octoWatermark := octosql.MakeTime(watermark)
@@ -196,7 +240,7 @@ func (dt *WatermarkTrigger) UpdateWatermark(ctx context.Context, tx storage.Stat
 	return nil
 }
 
-func (dt *WatermarkTrigger) PollKeyToFire(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error) {
+func (wt *WatermarkTrigger) PollKeyToFire(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error) {
 	timeKeys := NewTimeSortedKeys(tx.WithPrefix(timeSortedKeys))
 	watermarkStorage := storage.NewValueState(tx.WithPrefix(watermarkPrefix))
 
@@ -227,6 +271,12 @@ func (dt *WatermarkTrigger) PollKeyToFire(ctx context.Context, tx storage.StateT
 	}
 
 	return key, nil
+}
+
+func (wt *WatermarkTrigger) KeyFired(ctx context.Context, tx storage.StateTransaction, key octosql.Value) error {
+	// We don't want to clear the watermark trigger.
+	// Keys should always be triggered when the watermark surpasses their event time.
+	return nil
 }
 
 var byTimeAndKeyPrefix = []byte("$by_time_and_key$")
@@ -310,6 +360,21 @@ func (tsk *TimeSortedKeys) GetFirst() (octosql.Value, time.Time, error) {
 	t := tuple[0].AsTime()
 
 	return tuple[1], t, nil
+}
+
+func (tsk *TimeSortedKeys) DeleteByKey(key octosql.Value) error {
+	byKeyToTime := storage.NewMap(tsk.tx.WithPrefix(byKeyToTimePrefix))
+
+	var t octosql.Value
+	err := byKeyToTime.Get(&key, &t)
+	if err != nil {
+		if err == storage.ErrKeyNotFound {
+			return storage.ErrKeyNotFound
+		}
+		return errors.Wrap(err, "couldn't get send time for key")
+	}
+
+	return tsk.Delete(key, t.AsTime())
 }
 
 func (tsk *TimeSortedKeys) Delete(key octosql.Value, t time.Time) error {

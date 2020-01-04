@@ -33,7 +33,6 @@ func (wt *WatermarkTrigger) RecordReceived(ctx context.Context, tx storage.State
 		return errors.Wrap(err, "couldn't get current watermark")
 	}
 
-	// TODO: Maybe add ResetKey to triggers, for when key is triggered in one trigger.
 	if watermark.After(eventTime) {
 		// TODO: Handling late data
 		log.Printf("late data...? %v %v", key, eventTime)

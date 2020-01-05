@@ -63,7 +63,7 @@ func (gb *GroupBy) Trigger(ctx context.Context, tx storage.StateTransaction, key
 	var previouslyTriggered octosql.Value
 	err := previouslyTriggeredValues.Get(&key, &previouslyTriggered)
 	if err == nil {
-		// TODO: Add event time a layer above
+		// TODO: Add event time a layer above in ProccessByKey
 		output = append(output, execution.NewRecordFromSlice(gb.outputFieldNames, previouslyTriggered.AsSlice(), execution.WithUndo()))
 	} else if err != storage.ErrKeyNotFound {
 		return nil, errors.Wrap(err, "couldn't get previously triggered values for key")

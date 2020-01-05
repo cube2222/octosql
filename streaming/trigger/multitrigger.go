@@ -53,6 +53,14 @@ func (m *MultiTrigger) PollKeyToFire(ctx context.Context, tx storage.StateTransa
 	for i := range m.triggers {
 		key, err := m.triggers[i].PollKeyToFire(ctx, tx.WithPrefix(m.prefixes[i]))
 		if err == nil {
+			for j := range m.triggers {
+				if j != i {
+					err := m.triggers[j].KeyFired(ctx, tx.WithPrefix(m.prefixes[j]), key)
+					if err != nil {
+						return octosql.ZeroValue(), errors.Wrapf(err, "couldn't mark key fired in trigger with index %d after trigger with index %d fired", j, i)
+					}
+				}
+			}
 			return key, nil
 		} else if err != ErrNoKeyToFire {
 			return octosql.ZeroValue(), errors.Wrapf(err, "couldn't poll key to fire in trigger with index %d: %v", i, m.triggers[i])

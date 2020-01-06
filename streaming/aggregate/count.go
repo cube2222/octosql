@@ -14,7 +14,7 @@ type Count struct {
 
 var currentCountPrefix = []byte("$current_count$")
 
-func (agg *Count) AddValue(ctx context.Context, tx storage.StateTransaction, key octosql.Value, value octosql.Value) error {
+func (agg *Count) AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
 	currentCountStorage := storage.NewValueState(tx.WithPrefix(currentCountPrefix))
 
 	var currentCount octosql.Value
@@ -35,7 +35,7 @@ func (agg *Count) AddValue(ctx context.Context, tx storage.StateTransaction, key
 	return nil
 }
 
-func (agg *Count) GetValue(ctx context.Context, tx storage.StateTransaction, key octosql.Value) (octosql.Value, error) {
+func (agg *Count) GetValue(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error) {
 	currentCountStorage := storage.NewValueState(tx.WithPrefix(currentCountPrefix))
 
 	var currentCount octosql.Value

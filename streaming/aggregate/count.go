@@ -17,12 +17,9 @@ var currentCountPrefix = []byte("$current_count$")
 func (agg *Count) AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
 	currentCountStorage := storage.NewValueState(tx.WithPrefix(currentCountPrefix))
 
-	var currentCount octosql.Value
-	err := currentCountStorage.Get(&currentCount)
-	if err == storage.ErrKeyNotFound {
-		currentCount = octosql.MakeInt(0)
-	} else if err != nil {
-		return errors.Wrap(err, "couldn't get current count from storage")
+	currentCount, err := agg.GetValue(ctx, tx)
+	if err != nil {
+		return errors.Wrap(err, "couldn't get current count")
 	}
 
 	currentCount = octosql.MakeInt(currentCount.AsInt() + 1)

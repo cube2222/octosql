@@ -40,6 +40,16 @@ func TestCountingTrigger(t *testing.T) {
 
 	RecordReceived(t, ctx, ct, badgerStorage, octosql.MakeInt(3), time.Time{})
 
+	ExpectNoFire(t, ctx, ct, badgerStorage)
+
+	RecordReceived(t, ctx, ct, badgerStorage, octosql.MakeInt(2), time.Time{})
+
+	ExpectFire(t, ctx, ct, badgerStorage, octosql.MakeInt(2))
+
+	ExpectNoFire(t, ctx, ct, badgerStorage)
+
+	RecordReceived(t, ctx, ct, badgerStorage, octosql.MakeInt(3), time.Time{})
+
 	ExpectFire(t, ctx, ct, badgerStorage, octosql.MakeInt(3))
 
 	ExpectNoFire(t, ctx, ct, badgerStorage)

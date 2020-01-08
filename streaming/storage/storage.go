@@ -54,7 +54,6 @@ func (bs *BadgerStorage) BeginTransaction() *badgerTransaction {
 	return &badgerTransaction{tx: tx, prefix: nil}
 }
 
-//TODO: What to do? What to do?
 func (bs *BadgerStorage) DropAll(prefix []byte) error {
 	err := bs.db.DropPrefix(prefix)
 	return err

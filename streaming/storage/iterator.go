@@ -21,6 +21,8 @@ type Iterator interface {
 	NextWithKey(key MonotonicallySerializable, value proto.Message) error
 }
 
+//BadgerIterator is a wrapper around *badger.Iterator that implements
+//the Iterator interface
 type BadgerIterator struct {
 	it           *badger.Iterator
 	prefixLength int

@@ -55,3 +55,34 @@ func TestMapIteratorCorrectness(iter *MapIterator, expectedKeys, expectedValues 
 
 	return true, nil
 }
+
+//The iterator of a set has no determined order
+func TestSetIteratorCorrectness(iter *SetIterator, expectedValues []octosql.Value) (bool, error) {
+	var value octosql.Value
+
+	seen := make([]bool, len(expectedValues))
+
+	for i := 0; i < len(expectedValues); i++ {
+		err := iter.Next(&value)
+
+		if err == ErrEndOfIterator {
+			return false, nil
+		} else if err != nil {
+			return false, err
+		}
+
+		index := getPositionInTuple(expectedValues, value)
+		if seen[index] {
+			return false, errors.New("the set contains the same value twice")
+		}
+
+		seen[index] = true
+	}
+
+	err := iter.Next(&value)
+	if err != ErrEndOfIterator {
+		return false, errors.New("the iterator should've ended, but it didn't")
+	}
+
+	return true, nil
+}

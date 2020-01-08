@@ -2,6 +2,7 @@ package storage
 
 import (
 	"log"
+	"os"
 	"testing"
 
 	"github.com/cube2222/octosql"
@@ -10,14 +11,18 @@ import (
 )
 
 func TestMap(t *testing.T) {
-	db, err := badger.Open(badger.DefaultOptions("test_map"))
+	path := "test_map"
+	db, err := badger.Open(badger.DefaultOptions(path))
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	prefix := []byte("map_prefix_")
 
-	defer db.DropAll()
+	defer func() {
+		_ = db.Close()
+		_ = os.RemoveAll(path)
+	}()
 
 	store := NewBadgerStorage(db)
 	txn := store.BeginTransaction().WithPrefix(prefix)

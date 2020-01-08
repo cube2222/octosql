@@ -2,6 +2,7 @@ package storage
 
 import (
 	"log"
+	"os"
 	"testing"
 
 	"github.com/cube2222/octosql"
@@ -10,12 +11,17 @@ import (
 
 func TestLinkedList(t *testing.T) {
 	prefix := "test_linked_list"
-	db, err := badger.Open(badger.DefaultOptions("test"))
+	path := "test"
+
+	db, err := badger.Open(badger.DefaultOptions(path))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	defer db.DropAll()
+	defer func() {
+		_ = db.Close()
+		_ = os.RemoveAll(path)
+	}()
 
 	store := NewBadgerStorage(db)
 	txn := store.BeginTransaction().WithPrefix([]byte(prefix))

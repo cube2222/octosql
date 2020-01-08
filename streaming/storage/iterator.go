@@ -33,8 +33,37 @@ func NewBadgerIterator(it *badger.Iterator, prefixLength int) *BadgerIterator {
 	}
 }
 
+func (bi *BadgerIterator) Next(value proto.Message) error {
+	err := bi.currentValue(value)
+	if err != nil {
+		return err
+	}
+
+	bi.it.Next()
+	return nil
+}
+
+func (bi *BadgerIterator) Rewind() {
+	bi.it.Rewind()
+}
+
 func (bi *BadgerIterator) Close() error {
 	bi.it.Close()
+	return nil
+}
+
+func (bi *BadgerIterator) NextWithKey(key MonotonicallySerializable, value proto.Message) error {
+	err := bi.currentKey(key)
+	if err != nil {
+		return err
+	}
+
+	err = bi.currentValue(value)
+	if err != nil {
+		return err
+	}
+
+	bi.it.Next()
 	return nil
 }
 
@@ -69,33 +98,4 @@ func (bi *BadgerIterator) currentKey(key MonotonicallySerializable) error {
 
 	err := key.MonotonicUnmarshal(strippedKey)
 	return err
-}
-
-func (bi *BadgerIterator) Next(value proto.Message) error {
-	err := bi.currentValue(value)
-	if err != nil {
-		return err
-	}
-
-	bi.it.Next()
-	return nil
-}
-
-func (bi *BadgerIterator) NextWithKey(key MonotonicallySerializable, value proto.Message) error {
-	err := bi.currentKey(key)
-	if err != nil {
-		return err
-	}
-
-	err = bi.currentValue(value)
-	if err != nil {
-		return err
-	}
-
-	bi.it.Next()
-	return nil
-}
-
-func (bi *BadgerIterator) Rewind() {
-	bi.it.Rewind()
 }

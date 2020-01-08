@@ -164,7 +164,7 @@ func (ll *LinkedList) Clear() error {
 }
 
 func (ll *LinkedList) GetIterator() *LinkedListIterator {
-	it := ll.tx.WithPrefix(linkedListValueKeyPrefix).Iterator(badger.DefaultIteratorOptions)
+	it := ll.tx.WithPrefix(linkedListValueKeyPrefix).Iterator(WithDefault())
 	it.Rewind()
 
 	return NewLinkedListIterator(it)

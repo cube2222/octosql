@@ -2,7 +2,6 @@ package storage
 
 import (
 	"github.com/cube2222/octosql"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/golang/protobuf/proto"
 	"github.com/mitchellh/hashstructure"
 	"github.com/pkg/errors"
@@ -143,8 +142,7 @@ func (set *Set) clearUsingHash(hashFunction func(octosql.Value) ([]byte, error))
 }
 
 func (set *Set) GetIterator() *SetIterator {
-	options := badger.DefaultIteratorOptions
-	it := set.tx.Iterator(options)
+	it := set.tx.Iterator(WithDefault())
 	it.Rewind()
 
 	return NewSetIterator(it)
@@ -216,8 +214,6 @@ func getPositionInTuple(values []octosql.Value, value octosql.Value) int {
 	return -1
 }
 
-//This is an auxiliary function used in Insert. It also serves as a testing
-//utility, to see if the set works properly when multiple values map to the same hash.
 func (set *Set) insertValueWithGivenHash(value octosql.Value, hash []byte) (bool, error) {
 	hashedTxn := set.tx.WithPrefix(hash)
 	state := NewValueState(hashedTxn)

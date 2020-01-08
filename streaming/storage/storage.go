@@ -17,7 +17,7 @@ type StateTransaction interface {
 	Delete(key []byte) error
 	WithPrefix(prefix []byte) StateTransaction
 	GetPrefixLength() int
-	Iterator(opts badger.IteratorOptions) Iterator //TODO: opts should be some other structure/interface
+	Iterator(opts ...IteratorOption) Iterator
 	Commit() error
 	Abort()
 }
@@ -104,9 +104,17 @@ func (tx *badgerTransaction) WithPrefix(prefix []byte) StateTransaction {
 	}
 }
 
-func (tx *badgerTransaction) Iterator(opts badger.IteratorOptions) Iterator {
-	opts.Prefix = tx.getKeyWithPrefix(opts.Prefix)
-	it := tx.tx.NewIterator(opts)
+func (tx *badgerTransaction) Iterator(opts ...IteratorOption) Iterator {
+	options := &IteratorOptions{
+		Prefix: tx.prefix,
+	}
+
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	it := tx.tx.NewIterator(options.ToBadgerOptions())
+
 	return NewBadgerIterator(it, tx.GetPrefixLength())
 }
 
@@ -116,4 +124,41 @@ func (tx *badgerTransaction) Commit() error {
 
 func (tx *badgerTransaction) Abort() {
 	tx.tx.Discard()
+}
+
+type IteratorOptions struct {
+	PrefetchValues bool
+	PrefetchSize   int
+	Reverse        bool
+	AllVersions    bool
+	Prefix         []byte
+	InternalAccess bool
+}
+
+func (io *IteratorOptions) ToBadgerOptions() badger.IteratorOptions {
+	return badger.IteratorOptions{
+		PrefetchValues: io.PrefetchValues,
+		PrefetchSize:   io.PrefetchSize,
+		Reverse:        io.Reverse,
+		AllVersions:    io.AllVersions,
+		Prefix:         io.Prefix,
+		InternalAccess: io.InternalAccess,
+	}
+}
+
+type IteratorOption func(*IteratorOptions)
+
+func WithPrefix(prefix []byte) IteratorOption {
+	return func(opts *IteratorOptions) {
+		opts.Prefix = append(opts.Prefix, prefix...)
+	}
+}
+
+func WithDefault() IteratorOption {
+	return func(opts *IteratorOptions) {
+		opts.PrefetchValues = true
+		opts.PrefetchSize = 100
+		opts.Reverse = false
+		opts.AllVersions = false
+	}
 }

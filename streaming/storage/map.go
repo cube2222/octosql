@@ -64,17 +64,13 @@ func (hm *Map) Get(key MonotonicallySerializable, value proto.Message) error {
 //Returns an iterator with a specified prefix, that allows to iterate
 //over a specified range of keys
 func (hm *Map) GetIteratorWithPrefix(prefix []byte) *MapIterator {
-	options := badger.DefaultIteratorOptions
-	options.Prefix = prefix
-
-	it := hm.tx.Iterator(options)
+	it := hm.tx.WithPrefix(prefix).Iterator(WithDefault())
 
 	return NewMapIterator(it)
 }
 
 func (hm *Map) GetIterator() *MapIterator {
-	options := badger.DefaultIteratorOptions
-	it := hm.tx.Iterator(options)
+	it := hm.tx.Iterator(WithDefault())
 	it.Rewind()
 
 	return NewMapIterator(it)

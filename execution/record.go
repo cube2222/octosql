@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 
@@ -17,9 +16,9 @@ type Field struct {
 }
 
 type metadata struct {
-	id        ID
-	undo      bool
-	eventTime time.Time
+	id             ID
+	undo           bool
+	eventTimeField octosql.VariableName
 }
 
 type ID struct {
@@ -50,9 +49,9 @@ func WithUndo() RecordOption {
 	}
 }
 
-func WithEventTime(eventTime time.Time) RecordOption {
+func WithEventTimeField(field octosql.VariableName) RecordOption {
 	return func(r *Record) {
-		r.metadata.eventTime = eventTime
+		r.metadata.eventTimeField = field
 	}
 }
 
@@ -115,9 +114,9 @@ func (r *Record) Fields() []Field {
 			Name: fieldName,
 		})
 	}
-	if !r.metadata.eventTime.IsZero() {
+	if len(r.metadata.eventTimeField.String()) > 0 {
 		fields = append(fields, Field{
-			Name: octosql.NewVariableName("sys.event_time"),
+			Name: octosql.NewVariableName("sys.event_time_field"),
 		})
 	}
 	if r.IsUndo() {
@@ -158,7 +157,7 @@ func (r *Record) Equal(other *Record) bool {
 		}
 	}
 
-	if !r.metadata.eventTime.Equal(other.metadata.eventTime) {
+	if r.metadata.eventTimeField != other.metadata.eventTimeField {
 		return false
 	}
 
@@ -183,7 +182,7 @@ func (r *Record) IsUndo() bool {
 }
 
 func (r *Record) EventTime() octosql.Value {
-	return octosql.MakeTime(r.metadata.eventTime)
+	return r.Value(r.metadata.eventTimeField)
 }
 
 func (r *Record) ID() ID {

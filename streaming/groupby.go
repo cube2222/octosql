@@ -2,7 +2,6 @@ package streaming
 
 import (
 	"context"
-
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"

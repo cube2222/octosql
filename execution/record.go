@@ -15,55 +15,39 @@ type Field struct {
 	Name octosql.VariableName
 }
 
-type metadata struct {
-	id             ID
-	undo           bool
-	eventTimeField octosql.VariableName
-}
-
-type ID struct {
-	id string
-}
-
 func NewID(id string) ID {
 	return ID{
-		id: id,
+		ID: id,
 	}
 }
 
-func (id ID) String() string {
-	return id.id
-}
-
-type Record struct {
-	metadata   metadata
-	fieldNames []octosql.VariableName
-	data       []octosql.Value
+func (id ID) Show() string {
+	return id.ID
 }
 
 type RecordOption func(stream *Record)
 
 func WithUndo() RecordOption {
 	return func(r *Record) {
-		r.metadata.undo = true
+		r.Metadata.Undo = true
 	}
 }
 
 func WithEventTimeField(field octosql.VariableName) RecordOption {
 	return func(r *Record) {
-		r.metadata.eventTimeField = field
+		r.Metadata.EventTimeField = field.String() //TODO: change that?
 	}
 }
 
 func WithMetadataFrom(base *Record) RecordOption {
 	return func(r *Record) {
-		r.metadata = base.metadata
+		r.Metadata = base.Metadata
 	}
 }
 
 func WithID(id ID) RecordOption {
 	return func(rec *Record) {
-		rec.metadata.id = id
+		rec.Metadata.Id = &id
 	}
 }
 
@@ -76,9 +60,21 @@ func NewRecord(fields []octosql.VariableName, data map[octosql.VariableName]octo
 }
 
 func NewRecordFromSlice(fields []octosql.VariableName, data []octosql.Value, opts ...RecordOption) *Record {
+	stringFields := make([]string, len(fields))
+
+	for i, f := range fields {
+		stringFields[i] = f.String()
+	}
+
+	intData := make([]int64, len(data))
+
+	for i, d := range data {
+		intData[i] = int64(d.AsInt())
+	}
+
 	r := &Record{
-		fieldNames: fields,
-		data:       data,
+		FieldNames: stringFields,
+		Data:       intData,
 	}
 
 	for _, opt := range opts {
@@ -99,9 +95,12 @@ func (r *Record) Value(field octosql.VariableName) octosql.Value {
 			return octosql.MakeNull()
 		}
 	}
-	for i := range r.fieldNames {
-		if r.fieldNames[i] == field {
-			return r.data[i]
+
+	stringField := field.String()
+
+	for i := range r.FieldNames {
+		if r.FieldNames[i] == stringField {
+			return int64ToValue(r.Data[i])
 		}
 	}
 	return octosql.MakeNull()
@@ -109,12 +108,12 @@ func (r *Record) Value(field octosql.VariableName) octosql.Value {
 
 func (r *Record) Fields() []Field {
 	fields := make([]Field, 0)
-	for _, fieldName := range r.fieldNames {
+	for _, fieldName := range r.FieldNames {
 		fields = append(fields, Field{
-			Name: fieldName,
+			Name: octosql.NewVariableName(fieldName),
 		})
 	}
-	if len(r.metadata.eventTimeField.String()) > 0 {
+	if len(r.Metadata.EventTimeField) > 0 {
 		fields = append(fields, Field{
 			Name: octosql.NewVariableName("sys.event_time_field"),
 		})
@@ -130,15 +129,21 @@ func (r *Record) Fields() []Field {
 
 func (r *Record) AsVariables() octosql.Variables {
 	out := make(octosql.Variables)
-	for i := range r.fieldNames {
-		out[r.fieldNames[i]] = r.data[i]
+	for i := range r.FieldNames {
+		out[octosql.NewVariableName(r.FieldNames[i])] = int64ToValue(r.Data[i])
 	}
 
 	return out
 }
 
 func (r *Record) AsTuple() octosql.Value {
-	return octosql.MakeTuple(r.data)
+	valueData := make([]octosql.Value, len(r.Data))
+
+	for i, v := range r.Data {
+		valueData[i] = int64ToValue(v)
+	}
+
+	return octosql.MakeTuple(valueData)
 }
 
 func (r *Record) Equal(other *Record) bool {
@@ -157,36 +162,37 @@ func (r *Record) Equal(other *Record) bool {
 		}
 	}
 
-	if r.metadata.eventTimeField != other.metadata.eventTimeField {
+	if r.Metadata.EventTimeField != other.Metadata.EventTimeField {
 		return false
 	}
 
-	if r.metadata.undo != other.metadata.undo {
+	if r.Metadata.Undo != other.Metadata.Undo {
 		return false
 	}
 
 	return true
 }
 
-func (r *Record) String() string {
-	parts := make([]string, len(r.fieldNames))
-	for i := range r.fieldNames {
-		parts[i] = fmt.Sprintf("%s: %s", r.fieldNames[i].String(), r.data[i].String())
+func (r *Record) Show() string {
+	parts := make([]string, len(r.FieldNames))
+	for i := range r.FieldNames {
+		parts[i] = fmt.Sprintf("%s: %d", r.FieldNames[i], r.Data[i])
 	}
 
 	return fmt.Sprintf("{%s}", strings.Join(parts, ", "))
 }
 
 func (r *Record) IsUndo() bool {
-	return r.metadata.undo
+	return r.Metadata.Undo
 }
 
 func (r *Record) EventTime() octosql.Value {
-	return r.Value(r.metadata.eventTimeField)
+	eventVarName := octosql.NewVariableName(r.Metadata.EventTimeField)
+	return r.Value(eventVarName)
 }
 
 func (r *Record) ID() ID {
-	return r.metadata.id
+	return *r.Metadata.Id
 }
 
 type RecordStream interface {
@@ -197,3 +203,7 @@ type RecordStream interface {
 var ErrEndOfStream = errors.New("end of stream")
 
 var ErrNotFound = errors.New("not found")
+
+func int64ToValue(i int64) octosql.Value {
+	return octosql.MakeInt(int(i))
+}

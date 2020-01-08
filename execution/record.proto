@@ -1,0 +1,18 @@
+syntax = "proto3";
+package execution;
+
+message ID {
+    string ID = 1;
+}
+
+message Metadata {
+    ID id = 1;
+    bool undo = 2;
+    string eventTimeField = 3;
+}
+
+message Record {
+    Metadata metadata = 1;
+    repeated string fieldNames = 2;
+    repeated int64 data = 3;
+}

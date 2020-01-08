@@ -10,15 +10,11 @@ import (
 
 var ErrEndOfIterator = errors.New("end of iterator")
 
-type SimpleIterator interface {
+type Iterator interface {
 	Next(proto.Message) error
+	NextWithKey(key MonotonicallySerializable, value proto.Message) error
 	Rewind()
 	io.Closer
-}
-
-type Iterator interface {
-	SimpleIterator
-	NextWithKey(key MonotonicallySerializable, value proto.Message) error
 }
 
 //BadgerIterator is a wrapper around *badger.Iterator that implements
@@ -33,6 +29,21 @@ func NewBadgerIterator(it *badger.Iterator, prefixLength int) *BadgerIterator {
 		it:           it,
 		prefixLength: prefixLength,
 	}
+}
+
+func (bi *BadgerIterator) NextWithKey(key MonotonicallySerializable, value proto.Message) error {
+	err := bi.currentKey(key)
+	if err != nil {
+		return err
+	}
+
+	err = bi.currentValue(value)
+	if err != nil {
+		return err
+	}
+
+	bi.it.Next()
+	return nil
 }
 
 func (bi *BadgerIterator) Next(value proto.Message) error {
@@ -51,21 +62,6 @@ func (bi *BadgerIterator) Rewind() {
 
 func (bi *BadgerIterator) Close() error {
 	bi.it.Close()
-	return nil
-}
-
-func (bi *BadgerIterator) NextWithKey(key MonotonicallySerializable, value proto.Message) error {
-	err := bi.currentKey(key)
-	if err != nil {
-		return err
-	}
-
-	err = bi.currentValue(value)
-	if err != nil {
-		return err
-	}
-
-	bi.it.Next()
 	return nil
 }
 

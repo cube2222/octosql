@@ -5,7 +5,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func TestSimpleIteratorCorrectness(iter SimpleIterator, expectedValues []octosql.Value) (bool, error) {
+func TestLinkedListIterator(iter *LinkedListIterator, expectedValues []octosql.Value) (bool, error) {
 	var value octosql.Value
 
 	for i := 0; i < len(expectedValues); i++ {

@@ -12,6 +12,7 @@ import (
 
 type Aggregate interface {
 	AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error
+	RetractValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error
 	GetValue(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error)
 	String() string
 }
@@ -43,14 +44,26 @@ func (gb *GroupBy) AddRecord(ctx context.Context, tx storage.StateTransaction, i
 		} else {
 			value = record.Value(gb.inputFields[i])
 		}
-		err := gb.aggregates[i].AddValue(ctx, txByKey.WithPrefix(gb.prefixes[i]), value)
-		if err != nil {
-			return errors.Wrapf(
-				err,
-				"couldn't add record value to aggregate %s with index %v",
-				gb.aggregates[i].String(),
-				i,
-			)
+		if !record.IsUndo() {
+			err := gb.aggregates[i].AddValue(ctx, txByKey.WithPrefix(gb.prefixes[i]), value)
+			if err != nil {
+				return errors.Wrapf(
+					err,
+					"couldn't add record value to aggregate %s with index %v",
+					gb.aggregates[i].String(),
+					i,
+				)
+			}
+		} else {
+			err := gb.aggregates[i].RetractValue(ctx, txByKey.WithPrefix(gb.prefixes[i]), value)
+			if err != nil {
+				return errors.Wrapf(
+					err,
+					"couldn't retract record value from aggregate %s with index %v",
+					gb.aggregates[i].String(),
+					i,
+				)
+			}
 		}
 	}
 

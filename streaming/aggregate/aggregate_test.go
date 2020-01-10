@@ -8,18 +8,22 @@ import (
 	"testing"
 )
 
+const eps = 0.00000001
+
 func ExpectValue(t *testing.T, ctx context.Context, aggr Aggregate, tx storage.StateTransaction, expected octosql.Value) {
 	val, err := aggr.GetValue(ctx, tx)
 	assert.NotNil(t, val)
-	assert.Equal(t, val.GetType(), expected.GetType())
+	assert.Equal(t, expected.GetType(), val.GetType())
 
 	switch expected.GetType() {
 	case octosql.TypeInt:
-		assert.Equal(t, val.AsInt(), expected.AsInt())
+		assert.Equal(t, expected.AsInt(), val.AsInt())
 	case octosql.TypeFloat:
-		assert.Equal(t, val.AsFloat(), expected.AsFloat())
+		assert.Greater(t, val.AsFloat()+octosql.MakeFloat(eps).AsFloat(), expected.AsFloat())
+		assert.Less(t, val.AsFloat()-octosql.MakeFloat(eps).AsFloat(), expected.AsFloat())
+		//assert.Equal(t, expected.AsFloat(), val.AsFloat())
 	case octosql.TypeDuration:
-		assert.Equal(t, val.AsDuration(), expected.AsDuration())
+		assert.Equal(t, expected.AsDuration(), val.AsDuration())
 	default:
 		panic("unreachable")
 	}

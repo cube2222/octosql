@@ -126,12 +126,15 @@ func TestSumFloat(t *testing.T) {
 
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(2.123))
 
-	// Well, float problems...
-	//AddValue(t, ctx, aggr, tx, octosql.MakeFloat(0.111))
-	//
-	//ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(2.234))
+	AddValue(t, ctx, aggr, tx, octosql.MakeFloat(0.222))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(2.345))
 
 	RetractValue(t, ctx, aggr, tx, octosql.MakeFloat(2.123))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(0.222))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeFloat(0.222))
 
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
 }

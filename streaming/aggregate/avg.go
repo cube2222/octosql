@@ -34,14 +34,14 @@ func (agg *Average) AddValue(ctx context.Context, tx storage.StateTransaction, v
 		return errors.Wrap(err, "couldn't get current elements number for avg from storage")
 	}
 
-	newScalar := octosql.MakeFloat(float64(currentAvgNum.AsInt() / (currentAvgNum.AsInt() + 1)))
+	newScalar := octosql.MakeFloat(float64(currentAvgNum.AsInt()) / float64(currentAvgNum.AsInt()+1))
 	currentAvgValScaled := octosql.MakeFloat(currentAvgVal.AsFloat() * newScalar.AsFloat())
 
 	var newComponent octosql.Value
 
 	switch valueType := value.GetType(); valueType {
 	case octosql.TypeInt:
-		newComponent = octosql.MakeFloat(float64(value.AsInt() / (currentAvgNum.AsInt() + 1)))
+		newComponent = octosql.MakeFloat(float64(value.AsInt()) / float64(currentAvgNum.AsInt()+1))
 	case octosql.TypeFloat:
 		newComponent = octosql.MakeFloat(value.AsFloat() / float64(currentAvgNum.AsInt()+1))
 	default:
@@ -81,14 +81,14 @@ func (agg *Average) RetractValue(ctx context.Context, tx storage.StateTransactio
 		return errors.Wrap(err, "couldn't get current elements number for avg from storage")
 	}
 
-	newScalar := octosql.MakeFloat(float64(currentAvgNum.AsInt() / (currentAvgNum.AsInt() - 1)))
+	newScalar := octosql.MakeFloat(float64(currentAvgNum.AsInt()) / float64(currentAvgNum.AsInt()-1))
 	currentAvgValScaled := octosql.MakeFloat(currentAvgVal.AsFloat() * newScalar.AsFloat())
 
 	var retractedComponent octosql.Value
 
 	switch valueType := value.GetType(); valueType {
 	case octosql.TypeInt:
-		retractedComponent = octosql.MakeFloat(float64(value.AsInt() / (currentAvgNum.AsInt() - 1)))
+		retractedComponent = octosql.MakeFloat(float64(value.AsInt()) / float64(currentAvgNum.AsInt()-1))
 	case octosql.TypeFloat:
 		retractedComponent = octosql.MakeFloat(value.AsFloat() / float64(currentAvgNum.AsInt()-1))
 	default:

@@ -12,6 +12,10 @@ import (
 type Count struct {
 }
 
+func NewCountAggregate() *Count {
+	return &Count{}
+}
+
 var currentCountPrefix = []byte("$current_count$")
 
 func (agg *Count) AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {

@@ -2,6 +2,7 @@ package streaming
 
 import (
 	"context"
+	"github.com/cube2222/octosql/streaming/aggregate"
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
@@ -9,18 +10,11 @@ import (
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
-type Aggregate interface {
-	AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error
-	RetractValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error
-	GetValue(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error)
-	String() string
-}
-
 type GroupBy struct {
 	prefixes [][]byte
 
 	inputFields []octosql.VariableName
-	aggregates  []Aggregate
+	aggregates  []aggregate.Aggregate
 
 	outputFieldNames []octosql.VariableName
 }

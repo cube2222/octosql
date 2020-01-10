@@ -1,5 +1,7 @@
 syntax = "proto3";
 package execution;
+option go_package = "github.com/cube2222/octosql/execution";
+import "values.proto";
 
 message ID {
     string ID = 1;
@@ -14,5 +16,5 @@ message Metadata {
 message Record {
     Metadata metadata = 1;
     repeated string fieldNames = 2;
-    repeated int64 data = 3;
+    repeated octosql.Value data = 3;
 }

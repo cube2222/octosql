@@ -16,6 +16,10 @@ func ExpectValue(t *testing.T, ctx context.Context, aggr Aggregate, tx storage.S
 	switch expected.GetType() {
 	case octosql.TypeInt:
 		assert.Equal(t, val.AsInt(), expected.AsInt())
+	case octosql.TypeFloat:
+		assert.Equal(t, val.AsFloat(), expected.AsFloat())
+	case octosql.TypeDuration:
+		assert.Equal(t, val.AsDuration(), expected.AsDuration())
 	default:
 		panic("unreachable")
 	}

@@ -12,6 +12,10 @@ import (
 type Sum struct {
 }
 
+func NewSumAggregate() *Sum {
+	return &Sum{}
+}
+
 var currentSumPrefix = []byte("$current_sum$")
 
 func (agg *Sum) AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
@@ -28,7 +32,11 @@ func (agg *Sum) AddValue(ctx context.Context, tx storage.StateTransaction, value
 	case octosql.TypeFloat:
 		currentSum = octosql.MakeFloat(currentSum.AsFloat() + value.AsFloat())
 	case octosql.TypeDuration:
-		currentSum = octosql.MakeDuration(currentSum.AsDuration() + value.AsDuration())
+		if currentSum.GetType() == octosql.TypeInt { // No value set
+			currentSum = value
+		} else {
+			currentSum = octosql.MakeDuration(currentSum.AsDuration() + value.AsDuration())
+		}
 	default:
 		return errors.Errorf("unsupported value type passed to sum: %s", valueType)
 	}

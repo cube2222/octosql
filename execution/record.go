@@ -16,6 +16,19 @@ type Field struct {
 	Name octosql.VariableName
 }
 
+<<<<<<< HEAD
+=======
+type metadata struct {
+	id             ID
+	undo           bool
+	eventTimeField octosql.VariableName
+}
+
+type ID struct {
+	id string
+}
+
+>>>>>>> 68490d63da75eade208e09304015db606d827691
 func NewID(id string) ID {
 	return ID{
 		ID: id,
@@ -36,7 +49,11 @@ func WithUndo() RecordOption {
 
 func WithEventTimeField(field octosql.VariableName) RecordOption {
 	return func(r *Record) {
+<<<<<<< HEAD
 		r.Metadata.EventTimeField = field.String()
+=======
+		r.metadata.eventTimeField = field
+>>>>>>> 68490d63da75eade208e09304015db606d827691
 	}
 }
 
@@ -107,8 +124,12 @@ func (r *Record) Fields() []Field {
 			Name: octosql.NewVariableName(fieldName),
 		})
 	}
+<<<<<<< HEAD
 
 	if len(r.EventTimeField()) > 0 {
+=======
+	if len(r.metadata.eventTimeField.String()) > 0 {
+>>>>>>> 68490d63da75eade208e09304015db606d827691
 		fields = append(fields, Field{
 			Name: octosql.NewVariableName("sys.event_time_field"),
 		})
@@ -145,8 +166,14 @@ func (r *Record) Show() string {
 		parts[i] = fmt.Sprintf("%s: %s", r.FieldNames[i], r.Data[i].Show())
 	}
 
+<<<<<<< HEAD
 	return fmt.Sprintf("{%s}", strings.Join(parts, ", "))
 }
+=======
+	if r.metadata.eventTimeField != other.metadata.eventTimeField {
+		return false
+	}
+>>>>>>> 68490d63da75eade208e09304015db606d827691
 
 func (r *Record) IsUndo() bool {
 	if r.Metadata != nil {
@@ -174,7 +201,12 @@ func (r *Record) EventTimeField() octosql.VariableName {
 		return octosql.NewVariableName(r.Metadata.EventTimeField)
 	}
 
+<<<<<<< HEAD
 	return octosql.NewVariableName("")
+=======
+func (r *Record) EventTime() octosql.Value {
+	return r.Value(r.metadata.eventTimeField)
+>>>>>>> 68490d63da75eade208e09304015db606d827691
 }
 
 func (r *Record) GetVariableNames() []octosql.VariableName {

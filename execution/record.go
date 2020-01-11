@@ -142,7 +142,7 @@ func (r *Record) Equal(other *Record) bool {
 func (r *Record) Show() string {
 	parts := make([]string, len(r.FieldNames))
 	for i := range r.FieldNames {
-		parts[i] = fmt.Sprintf("%s: %d", r.FieldNames[i], r.Data[i])
+		parts[i] = fmt.Sprintf("%s: %s", r.FieldNames[i], r.Data[i].Show())
 	}
 
 	return fmt.Sprintf("{%s}", strings.Join(parts, ", "))

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/mitchellh/hashstructure"
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
@@ -179,6 +180,17 @@ func (r *Record) EventTimeField() octosql.VariableName {
 
 func (r *Record) GetVariableNames() []octosql.VariableName {
 	return octosql.StringsToVariableNames(r.FieldNames)
+}
+
+func (r *Record) Hash() (uint64, error) {
+	values := octosql.GetValuesFromPointers(r.Data)
+	fields := make([]octosql.Value, len(r.FieldNames))
+
+	for i, name := range r.FieldNames {
+		fields[i] = octosql.MakeString(name)
+	}
+
+	return hashstructure.Hash(append(values, fields...), nil)
 }
 
 type RecordStream interface {

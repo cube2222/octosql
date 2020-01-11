@@ -6,4 +6,21 @@ dataSources:
   - name: people
     type: json
     config:
-      path: "storage/json/fixtures/bikes.json"
+      path: "storage/json/fixtures/people.json"
+  - name: users_ids
+    type: postgres
+    config:
+      address: "localhost:5432"
+      user: root
+      password: toor
+      databaseName: mydb
+      tableName: users_ids
+      primaryKeys:
+        - "name"
+  - name: users
+    type: redis
+    config:
+      address: "localhost:6379"
+      password: ""
+      databaseIndex: 0
+      databaseKeyName: "key"

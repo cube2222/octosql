@@ -732,6 +732,20 @@ func TestLike_Apply(t *testing.T) {
 			want:    true,
 			wantErr: false,
 		},
+
+		{
+			name: "test9 - double backslash",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString(`\`),
+					"b": octosql.MakeString(`\\`),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {

@@ -193,13 +193,19 @@ func likePatternToRegexp(pattern string) (string, error) {
 	escaping := false // was the character previously seen an escaping \
 
 	for _, r := range pattern {
-		if escaping { // escaping _ and % is legal (we just write . or .*), otherwise an error occurs
-			if r != LikeAny && r != LikeAll {
+		if escaping { // escaping \, _ and % is legal (we just write . or .*), otherwise an error occurs
+			if r != LikeAny && r != LikeAll && r != LikeEscape {
 				return "", errors.Errorf("escaping invalid character in LIKE pattern: %v", r)
 			}
 
 			escaping = false
 			sb.WriteRune(r)
+
+			if r == LikeEscape {
+				// since _ and % don't need to be escaped in regexp we just replace \_ with _
+				// but \ needs to be replaced in both, so we need to write an additional \
+				sb.WriteRune(LikeEscape)
+			}
 		} else {
 			if r == LikeEscape { // if we find an escape sequence we just handle it in the next step
 				escaping = true

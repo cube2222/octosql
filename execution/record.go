@@ -69,7 +69,7 @@ func NewRecordFromSlice(fields []octosql.VariableName, data []octosql.Value, opt
 	r := &Record{
 		FieldNames: stringFields,
 		Data:       pointerData,
-		Metadata:   NewMetadata(),
+		Metadata:   &Metadata{},
 	}
 
 	for _, opt := range opts {
@@ -201,7 +201,3 @@ type RecordStream interface {
 var ErrEndOfStream = errors.New("end of stream")
 
 var ErrNotFound = errors.New("not found")
-
-func NewMetadata() *Metadata {
-	return &Metadata{}
-}

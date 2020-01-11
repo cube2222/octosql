@@ -636,11 +636,11 @@ func TestLike_Apply(t *testing.T) {
 		},
 
 		{
-			name: "test2 - usage of ?",
+			name: "test2 - usage of %",
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{
 					"a": octosql.MakeString("abcdef"),
-					"b": octosql.MakeString("a?f"),
+					"b": octosql.MakeString("a%f"),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -654,7 +654,7 @@ func TestLike_Apply(t *testing.T) {
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{
 					"a": octosql.MakeString("abcdef"),
-					"b": octosql.MakeString("a_c?f"),
+					"b": octosql.MakeString("a_c%f"),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -664,11 +664,11 @@ func TestLike_Apply(t *testing.T) {
 		},
 
 		{
-			name: "test4 - amount of dots doesn't match",
+			name: "test4 - amount of _ doesn't match",
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{
 					"a": octosql.MakeString("abcd"),
-					"b": octosql.MakeString("a.d"),
+					"b": octosql.MakeString("a_d"),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -682,7 +682,7 @@ func TestLike_Apply(t *testing.T) {
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{
 					"a": octosql.MakeString("a*{([])}$$bcd"),
-					"b": octosql.MakeString("_*{([])}$$?"),
+					"b": octosql.MakeString("_*{([])}$$%"),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -695,8 +695,8 @@ func TestLike_Apply(t *testing.T) {
 			name: "test6 - escaped characters",
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{
-					"a": octosql.MakeString("_?abc}"),
-					"b": octosql.MakeString(`\_\??}`),
+					"a": octosql.MakeString("_?%abc}"),
+					"b": octosql.MakeString(`\_\%%}`),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -723,8 +723,8 @@ func TestLike_Apply(t *testing.T) {
 			name: "test8 - all of it",
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{
-					"a": octosql.MakeString("_?{}[]()+?:xd{}[]()?._:+"),
-					"b": octosql.MakeString(`\_\?{}[]()+.:?`),
+					"a": octosql.MakeString("_%{}[]()+%?:xd{}[]()?._:+"),
+					"b": octosql.MakeString(`\_\%{}[]()+__:%`),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),

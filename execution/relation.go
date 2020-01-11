@@ -152,7 +152,7 @@ func NewLike() Relation {
 
 const LikeEscape = '\\'
 const LikeAny = '_'
-const LikeAll = '?'
+const LikeAll = '%'
 
 func (rel *Like) Apply(ctx context.Context, variables octosql.Variables, left, right Expression) (bool, error) {
 	leftValue, err := left.ExpressionValue(ctx, variables)
@@ -206,9 +206,9 @@ func likePatternToRegexp(pattern string) (string, error) {
 			} else {
 				return "", errors.Errorf("escaped illegal character %v in LIKE pattern", string(nextRune))
 			}
-		} else if r == '_' { // _ transforms to . (any character)
+		} else if r == LikeAny { // _ transforms to . (any character)
 			sb.WriteRune('.')
-		} else if r == '?' { // ? transforms to .* (any string)
+		} else if r == LikeAll { // % transforms to .* (any string)
 			sb.WriteString(".*")
 		} else if isAlphaNumeric(r) { // just rewrite alphanumerics
 			sb.WriteRune(r)

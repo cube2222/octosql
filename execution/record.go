@@ -36,7 +36,7 @@ func WithUndo() RecordOption {
 
 func WithEventTimeField(field octosql.VariableName) RecordOption {
 	return func(r *Record) {
-		r.Metadata.EventTimeField = field.String() //TODO: change that?
+		r.Metadata.EventTimeField = field.String()
 	}
 }
 
@@ -107,7 +107,8 @@ func (r *Record) Fields() []Field {
 			Name: octosql.NewVariableName(fieldName),
 		})
 	}
-	if len(r.Metadata.EventTimeField) > 0 {
+
+	if len(r.EventTimeField()) > 0 {
 		fields = append(fields, Field{
 			Name: octosql.NewVariableName("sys.event_time_field"),
 		})
@@ -148,19 +149,32 @@ func (r *Record) Show() string {
 }
 
 func (r *Record) IsUndo() bool {
-	if r.Metadata == nil {
-		return false
+	if r.Metadata != nil {
+		return r.Metadata.Undo
 	}
-	return r.Metadata.Undo
+
+	return false
 }
 
 func (r *Record) EventTime() octosql.Value {
-	eventVarName := octosql.NewVariableName(r.Metadata.EventTimeField)
+	eventVarName := r.EventTimeField()
 	return r.Value(eventVarName)
 }
 
 func (r *Record) ID() ID {
-	return *r.Metadata.Id
+	if r.Metadata != nil {
+		return *r.Metadata.Id
+	}
+
+	return ID{}
+}
+
+func (r *Record) EventTimeField() octosql.VariableName {
+	if r.Metadata != nil {
+		return octosql.NewVariableName(r.Metadata.EventTimeField)
+	}
+
+	return octosql.NewVariableName("")
 }
 
 func (r *Record) GetVariableNames() []octosql.VariableName {

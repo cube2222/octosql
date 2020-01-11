@@ -15,6 +15,10 @@ type WatermarkRecordStream struct {
 }
 
 func (w *WatermarkRecordStream) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
+	if w.index < len(w.stream) && w.stream[w.index].watermark != nil {
+		w.curWatermark = *w.stream[w.index].watermark
+		w.index++
+	}
 	return w.curWatermark, nil
 }
 

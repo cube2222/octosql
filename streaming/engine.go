@@ -13,7 +13,7 @@ import (
 )
 
 // Based on protocol buffer max timestamp value.
-var maxWatermark = time.Date(9999, 1, 1, 1, 1, 1, 1, time.UTC)
+var maxWatermark = time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
 
 type WatermarkSource interface {
 	GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error)

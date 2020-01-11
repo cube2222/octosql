@@ -2,6 +2,7 @@ package streaming
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/pkg/errors"
@@ -27,6 +28,7 @@ type ProcessByKey struct {
 }
 
 func (p *ProcessByKey) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *execution.Record) error {
+	log.Println("ProcessByKey.AddRecord")
 	variables, err := p.variables.MergeWith(record.AsVariables())
 	if err != nil {
 		return errors.Wrap(err, "couldn't merge stream variables with record")
@@ -83,6 +85,7 @@ func (p *ProcessByKey) triggerKeys(ctx context.Context, tx storage.StateTransact
 		}
 
 		for i := range records {
+			log.Printf("triggerKeys: record: %s", records[i].Show())
 			p.output <- outputEntry{record: records[i]}
 		}
 	}
@@ -139,6 +142,7 @@ func (p *ProcessByKey) UpdateWatermark(ctx context.Context, tx storage.StateTran
 		return errors.Wrap(err, "couldn't trigger keys")
 	}
 
+	log.Printf("triggerKeys: watermark: %v", watermark)
 	p.output <- outputEntry{watermark: &watermark}
 
 	return nil

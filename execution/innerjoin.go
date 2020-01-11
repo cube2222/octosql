@@ -76,7 +76,7 @@ func (stream *InnerJoinedStream) Next(ctx context.Context) (*Record, error) {
 			return nil, errors.Wrap(err, "couldn't get joined record")
 		}
 
-		fields := stream.curRecord.fieldNames
+		fields := stream.curRecord.GetVariableNames()
 		for _, field := range joinedRecord.Fields() {
 			fields = append(fields, field.Name)
 		}

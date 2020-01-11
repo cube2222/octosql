@@ -293,7 +293,7 @@ func TestRecordConstructors(t *testing.T) {
 						"d": octosql.MakeFloat(5.182),
 						"e": octosql.MakeBool(false),
 						"f": octosql.MakeString("a string of great importance"),
-						"g": octosql.MakeTime(time.Now()),
+						"g": octosql.MakeTime(time.Unix(1111111, 492)),
 						"h": octosql.MakeDuration(1823),
 					},
 				),
@@ -306,7 +306,7 @@ func TestRecordConstructors(t *testing.T) {
 						octosql.MakeFloat(5.182),
 						octosql.MakeBool(false),
 						octosql.MakeString("a string of great importance"),
-						octosql.MakeTime(time.Now()),
+						octosql.MakeTime(time.Unix(1111111, 492)),
 						octosql.MakeDuration(1823),
 					},
 				),
@@ -322,7 +322,7 @@ func TestRecordConstructors(t *testing.T) {
 						"a": octosql.MakeTuple(
 							[]octosql.Value{
 								octosql.MakeNull(),
-								octosql.MakeTime(time.Now()),
+								octosql.MakeTime(time.Unix(1111111, 492)),
 								octosql.MakeInt(7),
 								octosql.MakeFloat(11.1145678),
 							},
@@ -341,7 +341,7 @@ func TestRecordConstructors(t *testing.T) {
 						octosql.MakeTuple(
 							[]octosql.Value{
 								octosql.MakeNull(),
-								octosql.MakeTime(time.Now()),
+								octosql.MakeTime(time.Unix(1111111, 492)),
 								octosql.MakeInt(7),
 								octosql.MakeFloat(11.1145678),
 							},

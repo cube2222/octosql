@@ -66,15 +66,14 @@ func NewRecordFromSlice(fields []octosql.VariableName, data []octosql.Value, opt
 		stringFields[i] = f.String()
 	}
 
-	intData := make([]int64, len(data))
-
-	for i, d := range data {
-		intData[i] = int64(d.AsInt())
+	pointerData := make([]*octosql.Value, len(data))
+	for i, v := range data {
+		pointerData[i] = &v
 	}
 
 	r := &Record{
 		FieldNames: stringFields,
-		Data:       intData,
+		Data:       pointerData,
 	}
 
 	for _, opt := range opts {
@@ -100,7 +99,7 @@ func (r *Record) Value(field octosql.VariableName) octosql.Value {
 
 	for i := range r.FieldNames {
 		if r.FieldNames[i] == stringField {
-			return int64ToValue(r.Data[i])
+			return *r.Data[i]
 		}
 	}
 	return octosql.MakeNull()
@@ -130,7 +129,7 @@ func (r *Record) Fields() []Field {
 func (r *Record) AsVariables() octosql.Variables {
 	out := make(octosql.Variables)
 	for i := range r.FieldNames {
-		out[octosql.NewVariableName(r.FieldNames[i])] = int64ToValue(r.Data[i])
+		out[octosql.NewVariableName(r.FieldNames[i])] = *r.Data[i]
 	}
 
 	return out
@@ -140,7 +139,7 @@ func (r *Record) AsTuple() octosql.Value {
 	valueData := make([]octosql.Value, len(r.Data))
 
 	for i, v := range r.Data {
-		valueData[i] = int64ToValue(v)
+		valueData[i] = *v
 	}
 
 	return octosql.MakeTuple(valueData)
@@ -203,7 +202,3 @@ type RecordStream interface {
 var ErrEndOfStream = errors.New("end of stream")
 
 var ErrNotFound = errors.New("not found")
-
-func int64ToValue(i int64) octosql.Value {
-	return octosql.MakeInt(int(i))
-}

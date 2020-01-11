@@ -386,7 +386,7 @@ func TestRecordConstructors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if !tt.args.first.Equal(tt.args.second) {
-				log.Fatalf("The records aren't equal! %v %v", tt.args.first, tt.args.second)
+				log.Fatalf("The records aren't equal!\n %v \n %v", tt.args.first, tt.args.second)
 			}
 		})
 	}

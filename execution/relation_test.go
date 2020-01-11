@@ -1066,7 +1066,7 @@ func TestRegexp_Apply(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "simple number regex",
+			name: "test1 - simple number regex",
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{
 					"a": octosql.MakeString("123123"),
@@ -1078,18 +1078,47 @@ func TestRegexp_Apply(t *testing.T) {
 			want:    true,
 			wantErr: false,
 		},
+
 		{
-			name: "simple number regex",
+			name: "test2 - regex with letters and special signs",
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{
-					"a": octosql.MakeString("123123"),
-					"b": octosql.MakeString("^[0-9]$"),
+					"a": octosql.MakeString("123?abc-[]"),
+					"b": octosql.MakeString(`^[0-9]+\?[a-z]*-\[\]$`),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+
+		{
+			name: "test3 - no match (missing number at the front)",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("?abc-[]"),
+					"b": octosql.MakeString(`^[0-9]+\?[a-z]*-\[\]$`),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
 			},
 			want:    false,
 			wantErr: false,
+		},
+
+		{
+			name: "test4 - no compile",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("?abc-[]"),
+					"b": octosql.MakeString(`^[0-9]+\?[a-z]*-\[\][a-z\]$`),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {

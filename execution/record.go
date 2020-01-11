@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
@@ -60,15 +61,14 @@ func NewRecord(fields []octosql.VariableName, data map[octosql.VariableName]octo
 }
 
 func NewRecordFromSlice(fields []octosql.VariableName, data []octosql.Value, opts ...RecordOption) *Record {
-	stringFields := make([]string, len(fields))
+	stringFields := octosql.VariableNamesToStrings(fields)
 
-	for i, f := range fields {
-		stringFields[i] = f.String()
-	}
+	pointerData := octosql.GetPointersFromValues(data)
 
 	r := &Record{
 		FieldNames: stringFields,
-		Data:       octosql.GetPointersFromValues(data),
+		Data:       pointerData,
+		Metadata:   NewMetadata(),
 	}
 
 	for _, opt := range opts {
@@ -135,30 +135,7 @@ func (r *Record) AsTuple() octosql.Value {
 }
 
 func (r *Record) Equal(other *Record) bool {
-	myFields := r.Fields()
-	otherFields := other.Fields()
-	if len(myFields) != len(otherFields) {
-		return false
-	}
-
-	for i := range myFields {
-		if myFields[i] != otherFields[i] {
-			return false
-		}
-		if !octosql.AreEqual(r.Value(myFields[i].Name), other.Value(myFields[i].Name)) {
-			return false
-		}
-	}
-
-	if r.Metadata.EventTimeField != other.Metadata.EventTimeField {
-		return false
-	}
-
-	if r.Metadata.Undo != other.Metadata.Undo {
-		return false
-	}
-
-	return true
+	return proto.Equal(r, other)
 }
 
 func (r *Record) Show() string {
@@ -171,6 +148,9 @@ func (r *Record) Show() string {
 }
 
 func (r *Record) IsUndo() bool {
+	if r.Metadata == nil {
+		return false
+	}
 	return r.Metadata.Undo
 }
 
@@ -195,3 +175,7 @@ type RecordStream interface {
 var ErrEndOfStream = errors.New("end of stream")
 
 var ErrNotFound = errors.New("not found")
+
+func NewMetadata() *Metadata {
+	return &Metadata{}
+}

@@ -517,8 +517,8 @@ func GetValuesFromPointers(values []*Value) []Value {
 
 func GetPointersFromValues(values []Value) []*Value {
 	result := make([]*Value, len(values))
-	for i, v := range values {
-		result[i] = &v
+	for i, _ := range values {
+		result[i] = &values[i]
 	}
 
 	return result

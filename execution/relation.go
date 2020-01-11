@@ -3,6 +3,8 @@ package execution
 import (
 	"context"
 	"regexp"
+	"strings"
+	"unicode"
 
 	"github.com/pkg/errors"
 
@@ -148,6 +150,10 @@ func NewLike() Relation {
 	return &Like{}
 }
 
+const LikeEscape = '\\'
+const LikeAny = '_'
+const LikeAll = '?'
+
 func (rel *Like) Apply(ctx context.Context, variables octosql.Variables, left, right Expression) (bool, error) {
 	leftValue, err := left.ExpressionValue(ctx, variables)
 	if err != nil {
@@ -168,11 +174,72 @@ func (rel *Like) Apply(ctx context.Context, variables octosql.Variables, left, r
 			leftValue.Show(), rightValue.Show(), leftValue.GetType(), rightValue.GetType())
 	}
 
-	match, err := regexp.MatchString(rightValue.AsString(), leftValue.AsString())
+	patternString, err := likePatternToRegexp(rightValue.AsString())
+	if err != nil {
+		return false, errors.Wrapf(err, "couldn't transform LIKE pattern %v to regexp", patternString)
+	}
+
+	match, err := regexp.MatchString(patternString, leftValue.AsString())
 	if err != nil {
 		return false, errors.Wrapf(err, "couldn't match string in like relation with pattern %v", rightValue)
 	}
 	return match, nil
+}
+
+//we assume that the escape character is '\'
+func likePatternToRegexp(pattern string) (string, error) {
+	length := len(pattern)
+	if pattern[length-1] == LikeEscape {
+		return "", errors.New("the pattern cannot end with an escape character")
+	}
+
+	var sb strings.Builder
+
+	sb.WriteRune('^') // match start
+
+	for i, r := range pattern {
+		if r == LikeEscape { // if we find an escape sequence we just rewrite it
+			nextRune := pattern[i+1] // no illegal reference, because / can't be last
+
+			if nextRune == LikeAny || nextRune == LikeAll {
+				i += 1
+			} else {
+				return "", errors.Errorf("escaped illegal character %v in LIKE pattern", string(nextRune))
+			}
+		} else if r == '_' { // _ transforms to . (any character)
+			sb.WriteRune('.')
+		} else if r == '?' { // ? transforms to .* (any string)
+			sb.WriteString(".*")
+		} else if isAlphaNumeric(r) { // just rewrite alphanumerics
+			sb.WriteRune(r)
+		} else if needsEscaping(r) { // escape, because it might break the regexp
+			sb.WriteRune('\\')
+			sb.WriteRune(r)
+		} else {
+			sb.WriteRune(r)
+		}
+	}
+
+	sb.WriteRune('$') // match end
+
+	return sb.String(), nil
+}
+
+func isAlphaNumeric(r rune) bool {
+	return unicode.IsNumber(r) || unicode.IsLetter(r)
+}
+
+func needsEscaping(r rune) bool {
+	return r == '+' ||
+		r == '?' ||
+		r == '(' ||
+		r == ')' ||
+		r == '{' ||
+		r == '}' ||
+		r == '[' ||
+		r == ']' ||
+		r == '^' ||
+		r == '$'
 }
 
 type In struct {
@@ -220,4 +287,38 @@ func (rel *NotIn) Apply(ctx context.Context, variables octosql.Variables, left, 
 		return false, errors.Wrap(err, "couldn't check containment")
 	}
 	return !in, nil
+}
+
+type Regexp struct {
+}
+
+func NewRegexp() Relation {
+	return &Regexp{}
+}
+
+func (rel *Regexp) Apply(ctx context.Context, variables octosql.Variables, left, right Expression) (bool, error) {
+	leftValue, err := left.ExpressionValue(ctx, variables)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't get value of left operator in REGEXP")
+	}
+	rightValue, err := right.ExpressionValue(ctx, variables)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't get value of right operator in REGEXP")
+	}
+	if leftValue.GetType() != octosql.TypeString {
+		return false, errors.Errorf(
+			"invalid operands to regexp %v and %v with types %v and %v, only string allowed",
+			leftValue.Show(), rightValue.Show(), leftValue.GetType(), rightValue.GetType())
+	}
+	if rightValue.GetType() != octosql.TypeString {
+		return false, errors.Errorf(
+			"invalid operands to regexp %v and %v with types %v and %v, only string allowed",
+			leftValue.Show(), rightValue.Show(), leftValue.GetType(), rightValue.GetType())
+	}
+
+	match, err := regexp.MatchString(rightValue.AsString(), leftValue.AsString())
+	if err != nil {
+		return false, errors.Wrapf(err, "couldn't match string in regexp relation with pattern %v", rightValue)
+	}
+	return match, nil
 }

@@ -622,6 +622,450 @@ func TestLike_Apply(t *testing.T) {
 		wantErr bool
 	}{
 		{
+			name: "test1 - usage of _",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("abcd"),
+					"b": octosql.MakeString("a__d"),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+
+		{
+			name: "test2 - usage of ?",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("abcdef"),
+					"b": octosql.MakeString("a?f"),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+
+		{
+			name: "test3 - usage of both",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("abcdef"),
+					"b": octosql.MakeString("a_c?f"),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+
+		{
+			name: "test4 - amount of dots doesn't match",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("abcd"),
+					"b": octosql.MakeString("a.d"),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: false,
+		},
+
+		{
+			name: "test5 - weird characters",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("a*{([])}$$bcd"),
+					"b": octosql.MakeString("_*{([])}$$?"),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+
+		{
+			name: "test6 - escaped characters",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("_?abc}"),
+					"b": octosql.MakeString(`\_\??}`),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+
+		{
+			name: "test7 - illegal escape",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("_?abc}"),
+					"b": octosql.MakeString(`\*\_\??}`),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: true,
+		},
+
+		{
+			name: "test8 - all of it",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("_?{}[]()+?:xd{}[]()?._:+"),
+					"b": octosql.MakeString(`\_\?{}[]()+.:?`),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rel := tt.rel
+			got, err := rel.Apply(ctx, tt.args.variables, tt.args.left, tt.args.right)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Like.Apply() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("Like.Apply() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIn_Apply(t *testing.T) {
+	ctx := context.Background()
+	type args struct {
+		variables octosql.Variables
+		left      Expression
+		right     Expression
+	}
+	tests := []struct {
+		name    string
+		rel     *In
+		args    args
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "simple in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeString("123124"),
+							octosql.MakeString("123123"),
+						},
+					),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "simple in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeString("123124"),
+							octosql.MakeString("123125"),
+						},
+					),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: false,
+		},
+		{
+			name: "record in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeTuple([]octosql.Value{
+						octosql.MakeString("123124"),
+						octosql.MakeInt(13),
+					}),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123124"),
+								octosql.MakeInt(13),
+							}),
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123123"),
+								octosql.MakeInt(15),
+							}),
+						},
+					),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "record in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeTuple([]octosql.Value{
+						octosql.MakeString("123124"),
+						octosql.MakeInt(13),
+					}),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123125"),
+								octosql.MakeInt(13),
+							}),
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123123"),
+								octosql.MakeInt(15),
+							}),
+						},
+					),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: false,
+		},
+		{
+			name: "simple in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeString("123123"),
+							octosql.MakeInt(13),
+						},
+					),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "simple in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeString("123123"),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rel := tt.rel
+			got, err := rel.Apply(ctx, tt.args.variables, tt.args.left, tt.args.right)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("In.Apply() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("In.Apply() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNotIn_Apply(t *testing.T) {
+	ctx := context.Background()
+	type args struct {
+		variables octosql.Variables
+		left      Expression
+		right     Expression
+	}
+	tests := []struct {
+		name    string
+		rel     *NotIn
+		args    args
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "simple in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeString("123124"),
+							octosql.MakeString("123123"),
+						},
+					),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: false,
+		},
+		{
+			name: "simple in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeString("123124"),
+							octosql.MakeString("123125"),
+						},
+					),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "record in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeTuple([]octosql.Value{
+						octosql.MakeString("123124"),
+						octosql.MakeInt(13),
+					}),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123124"),
+								octosql.MakeInt(13),
+							}),
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123123"),
+								octosql.MakeInt(15),
+							}),
+						},
+					),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: false,
+		},
+		{
+			name: "record in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeTuple([]octosql.Value{
+						octosql.MakeString("123124"),
+						octosql.MakeInt(13),
+					}),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123125"),
+								octosql.MakeInt(13),
+							}),
+							octosql.MakeTuple([]octosql.Value{
+								octosql.MakeString("123123"),
+								octosql.MakeInt(15),
+							}),
+						},
+					),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
+			name: "simple in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeTuple(
+						[]octosql.Value{
+							octosql.MakeString("123123"),
+							octosql.MakeInt(13),
+						},
+					),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: false,
+		},
+		{
+			name: "simple in",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeString("123123"),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rel := tt.rel
+			got, err := rel.Apply(ctx, tt.args.variables, tt.args.left, tt.args.right)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("In.Apply() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("In.Apply() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRegexp_Apply(t *testing.T) {
+	ctx := context.Background()
+	type args struct {
+		variables octosql.Variables
+		left      Expression
+		right     Expression
+	}
+	tests := []struct {
+		name    string
+		rel     *Regexp
+		args    args
+		want    bool
+		wantErr bool
+	}{
+		{
 			name: "simple number regex",
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{
@@ -650,7 +1094,7 @@ func TestLike_Apply(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rel := &Like{}
+			rel := tt.rel
 			got, err := rel.Apply(ctx, tt.args.variables, tt.args.left, tt.args.right)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Like.Apply() error = %v, wantErr %v", err, tt.wantErr)
@@ -658,306 +1102,6 @@ func TestLike_Apply(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("Like.Apply() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestIn_Apply(t *testing.T) {
-	ctx := context.Background()
-	type args struct {
-		variables octosql.Variables
-		left      Expression
-		right     Expression
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    bool
-		wantErr bool
-	}{
-		{
-			name: "simple in",
-			args: args{
-				variables: map[octosql.VariableName]octosql.Value{
-					"a": octosql.MakeString("123123"),
-					"b": octosql.MakeTuple(
-						[]octosql.Value{
-							octosql.MakeString("123124"),
-							octosql.MakeString("123123"),
-						},
-					),
-				},
-				left:  NewVariable("a"),
-				right: NewVariable("b"),
-			},
-			want:    true,
-			wantErr: false,
-		},
-		{
-			name: "simple in",
-			args: args{
-				variables: map[octosql.VariableName]octosql.Value{
-					"a": octosql.MakeString("123123"),
-					"b": octosql.MakeTuple(
-						[]octosql.Value{
-							octosql.MakeString("123124"),
-							octosql.MakeString("123125"),
-						},
-					),
-				},
-				left:  NewVariable("a"),
-				right: NewVariable("b"),
-			},
-			want:    false,
-			wantErr: false,
-		},
-		{
-			name: "record in",
-			args: args{
-				variables: map[octosql.VariableName]octosql.Value{
-					"a": octosql.MakeTuple([]octosql.Value{
-						octosql.MakeString("123124"),
-						octosql.MakeInt(13),
-					}),
-					"b": octosql.MakeTuple(
-						[]octosql.Value{
-							octosql.MakeTuple([]octosql.Value{
-								octosql.MakeString("123124"),
-								octosql.MakeInt(13),
-							}),
-							octosql.MakeTuple([]octosql.Value{
-								octosql.MakeString("123123"),
-								octosql.MakeInt(15),
-							}),
-						},
-					),
-				},
-				left:  NewVariable("a"),
-				right: NewVariable("b"),
-			},
-			want:    true,
-			wantErr: false,
-		},
-		{
-			name: "record in",
-			args: args{
-				variables: map[octosql.VariableName]octosql.Value{
-					"a": octosql.MakeTuple([]octosql.Value{
-						octosql.MakeString("123124"),
-						octosql.MakeInt(13),
-					}),
-					"b": octosql.MakeTuple(
-						[]octosql.Value{
-							octosql.MakeTuple([]octosql.Value{
-								octosql.MakeString("123125"),
-								octosql.MakeInt(13),
-							}),
-							octosql.MakeTuple([]octosql.Value{
-								octosql.MakeString("123123"),
-								octosql.MakeInt(15),
-							}),
-						},
-					),
-				},
-				left:  NewVariable("a"),
-				right: NewVariable("b"),
-			},
-			want:    false,
-			wantErr: false,
-		},
-		{
-			name: "simple in",
-			args: args{
-				variables: map[octosql.VariableName]octosql.Value{
-					"a": octosql.MakeString("123123"),
-					"b": octosql.MakeTuple(
-						[]octosql.Value{
-							octosql.MakeString("123123"),
-							octosql.MakeInt(13),
-						},
-					),
-				},
-				left:  NewVariable("a"),
-				right: NewVariable("b"),
-			},
-			want:    true,
-			wantErr: false,
-		},
-		{
-			name: "simple in",
-			args: args{
-				variables: map[octosql.VariableName]octosql.Value{
-					"a": octosql.MakeString("123123"),
-					"b": octosql.MakeString("123123"),
-				},
-				left:  NewVariable("a"),
-				right: NewVariable("b"),
-			},
-			want:    true,
-			wantErr: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rel := &In{}
-			got, err := rel.Apply(ctx, tt.args.variables, tt.args.left, tt.args.right)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("In.Apply() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("In.Apply() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestNotIn_Apply(t *testing.T) {
-	ctx := context.Background()
-	type args struct {
-		variables octosql.Variables
-		left      Expression
-		right     Expression
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    bool
-		wantErr bool
-	}{
-		{
-			name: "simple in",
-			args: args{
-				variables: map[octosql.VariableName]octosql.Value{
-					"a": octosql.MakeString("123123"),
-					"b": octosql.MakeTuple(
-						[]octosql.Value{
-							octosql.MakeString("123124"),
-							octosql.MakeString("123123"),
-						},
-					),
-				},
-				left:  NewVariable("a"),
-				right: NewVariable("b"),
-			},
-			want:    false,
-			wantErr: false,
-		},
-		{
-			name: "simple in",
-			args: args{
-				variables: map[octosql.VariableName]octosql.Value{
-					"a": octosql.MakeString("123123"),
-					"b": octosql.MakeTuple(
-						[]octosql.Value{
-							octosql.MakeString("123124"),
-							octosql.MakeString("123125"),
-						},
-					),
-				},
-				left:  NewVariable("a"),
-				right: NewVariable("b"),
-			},
-			want:    true,
-			wantErr: false,
-		},
-		{
-			name: "record in",
-			args: args{
-				variables: map[octosql.VariableName]octosql.Value{
-					"a": octosql.MakeTuple([]octosql.Value{
-						octosql.MakeString("123124"),
-						octosql.MakeInt(13),
-					}),
-					"b": octosql.MakeTuple(
-						[]octosql.Value{
-							octosql.MakeTuple([]octosql.Value{
-								octosql.MakeString("123124"),
-								octosql.MakeInt(13),
-							}),
-							octosql.MakeTuple([]octosql.Value{
-								octosql.MakeString("123123"),
-								octosql.MakeInt(15),
-							}),
-						},
-					),
-				},
-				left:  NewVariable("a"),
-				right: NewVariable("b"),
-			},
-			want:    false,
-			wantErr: false,
-		},
-		{
-			name: "record in",
-			args: args{
-				variables: map[octosql.VariableName]octosql.Value{
-					"a": octosql.MakeTuple([]octosql.Value{
-						octosql.MakeString("123124"),
-						octosql.MakeInt(13),
-					}),
-					"b": octosql.MakeTuple(
-						[]octosql.Value{
-							octosql.MakeTuple([]octosql.Value{
-								octosql.MakeString("123125"),
-								octosql.MakeInt(13),
-							}),
-							octosql.MakeTuple([]octosql.Value{
-								octosql.MakeString("123123"),
-								octosql.MakeInt(15),
-							}),
-						},
-					),
-				},
-				left:  NewVariable("a"),
-				right: NewVariable("b"),
-			},
-			want:    true,
-			wantErr: false,
-		},
-		{
-			name: "simple in",
-			args: args{
-				variables: map[octosql.VariableName]octosql.Value{
-					"a": octosql.MakeString("123123"),
-					"b": octosql.MakeTuple(
-						[]octosql.Value{
-							octosql.MakeString("123123"),
-							octosql.MakeInt(13),
-						},
-					),
-				},
-				left:  NewVariable("a"),
-				right: NewVariable("b"),
-			},
-			want:    false,
-			wantErr: false,
-		},
-		{
-			name: "simple in",
-			args: args{
-				variables: map[octosql.VariableName]octosql.Value{
-					"a": octosql.MakeString("123123"),
-					"b": octosql.MakeString("123123"),
-				},
-				left:  NewVariable("a"),
-				right: NewVariable("b"),
-			},
-			want:    false,
-			wantErr: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rel := &NotIn{}
-			got, err := rel.Apply(ctx, tt.args.variables, tt.args.left, tt.args.right)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("In.Apply() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("In.Apply() = %v, want %v", got, tt.want)
 			}
 		})
 	}

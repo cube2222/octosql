@@ -66,14 +66,9 @@ func NewRecordFromSlice(fields []octosql.VariableName, data []octosql.Value, opt
 		stringFields[i] = f.String()
 	}
 
-	pointerData := make([]*octosql.Value, len(data))
-	for i, v := range data {
-		pointerData[i] = &v
-	}
-
 	r := &Record{
 		FieldNames: stringFields,
-		Data:       pointerData,
+		Data:       octosql.GetPointersFromValues(data),
 	}
 
 	for _, opt := range opts {
@@ -136,13 +131,7 @@ func (r *Record) AsVariables() octosql.Variables {
 }
 
 func (r *Record) AsTuple() octosql.Value {
-	valueData := make([]octosql.Value, len(r.Data))
-
-	for i, v := range r.Data {
-		valueData[i] = *v
-	}
-
-	return octosql.MakeTuple(valueData)
+	return octosql.MakeTuple(octosql.GetValuesFromPointers(r.Data))
 }
 
 func (r *Record) Equal(other *Record) bool {
@@ -192,6 +181,10 @@ func (r *Record) EventTime() octosql.Value {
 
 func (r *Record) ID() ID {
 	return *r.Metadata.Id
+}
+
+func (r *Record) GetVariableNames() []octosql.VariableName {
+	return octosql.StringsToVariableNames(r.FieldNames)
 }
 
 type RecordStream interface {

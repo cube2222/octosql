@@ -505,3 +505,21 @@ func (v Value) ToRawValue() interface{} {
 		return nil
 	}
 }
+
+func GetValuesFromPointers(values []*Value) []Value {
+	result := make([]Value, len(values))
+	for i, v := range values {
+		result[i] = *v
+	}
+
+	return result
+}
+
+func GetPointersFromValues(values []Value) []*Value {
+	result := make([]*Value, len(values))
+	for i, v := range values {
+		result[i] = &v
+	}
+
+	return result
+}

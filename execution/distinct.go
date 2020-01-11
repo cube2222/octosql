@@ -116,6 +116,7 @@ func (rs *recordSet) Insert(r *Record) (bool, error) {
 	return false, nil
 }
 
+//TODO: should the hash include other fields as well?
 func HashRecord(rec *Record) (uint64, error) {
-	return hashstructure.Hash(rec.data, nil)
+	return hashstructure.Hash(octosql.GetValuesFromPointers(rec.Data), nil)
 }

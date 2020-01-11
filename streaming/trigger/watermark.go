@@ -35,7 +35,7 @@ func (wt *WatermarkTrigger) RecordReceived(ctx context.Context, tx storage.State
 
 	if watermark.After(eventTime) {
 		// TODO: Handling late data
-		log.Printf("late data...? %v %v", key, eventTime)
+		log.Printf("late data...? watermark: %v key: %v event_time: %v", watermark, key.Show(), eventTime)
 		return nil
 	}
 

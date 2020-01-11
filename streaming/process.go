@@ -18,9 +18,9 @@ type ProcessFunction interface {
 }
 
 type ProcessByKey struct {
-	output          chan *execution.Record // TODO: Temporary
+	output          chan outputEntry // TODO: Temporary
 	trigger         trigger.Trigger
-	byEventTime     bool
+	eventTimeField  octosql.VariableName // Empty if not grouping by event time.
 	keyExpression   []execution.Expression
 	processFunction ProcessFunction
 	variables       octosql.Variables
@@ -41,7 +41,6 @@ func (p *ProcessByKey) AddRecord(ctx context.Context, tx storage.StateTransactio
 	}
 
 	keyTuple := octosql.MakeTuple(key)
-
 	err = p.processFunction.AddRecord(ctx, tx, inputIndex, keyTuple, record)
 	if err != nil {
 		return errors.Wrap(err, "couldn't add record to process function")
@@ -49,7 +48,7 @@ func (p *ProcessByKey) AddRecord(ctx context.Context, tx storage.StateTransactio
 
 	// TODO: This probably has to be decided at runtime
 	eventTime := maxWatermark
-	if p.byEventTime {
+	if len(p.eventTimeField) > 0 {
 		eventTime = record.EventTime().AsTime()
 	}
 
@@ -66,6 +65,12 @@ func (p *ProcessByKey) AddRecord(ctx context.Context, tx storage.StateTransactio
 	return nil
 }
 
+type outputEntry struct {
+	record      *execution.Record
+	watermark   *time.Time
+	endOfStream bool
+}
+
 func (p *ProcessByKey) triggerKeys(ctx context.Context, tx storage.StateTransaction) error {
 	for key, err := p.trigger.PollKeyToFire(ctx, tx); err != trigger.ErrNoKeyToFire; key, err = p.trigger.PollKeyToFire(ctx, tx) {
 		if err != nil {
@@ -78,16 +83,47 @@ func (p *ProcessByKey) triggerKeys(ctx context.Context, tx storage.StateTransact
 		}
 
 		for i := range records {
-			p.output <- records[i]
+			p.output <- outputEntry{record: records[i]}
 		}
 	}
 
 	return nil
 }
 
+var outputWatermarkPrefix = []byte("$output_watermark$")
+var endOfStreamPrefix = []byte("$end_of_stream$")
+
 func (p *ProcessByKey) Next(ctx context.Context, tx storage.StateTransaction) (*execution.Record, error) {
+	endOfStreamState := storage.NewValueState(tx.WithPrefix(endOfStreamPrefix))
+	var eos octosql.Value
+	err := endOfStreamState.Get(&eos)
+	if err == storage.ErrKeyNotFound {
+	} else if err != nil {
+		return nil, errors.Wrap(err, "couldn't get end of stream value")
+	} else {
+		return nil, execution.ErrEndOfStream
+	}
+
 	for record := range p.output {
-		return record, nil
+		if record.endOfStream {
+			octoEndOfStream := octosql.MakeBool(true)
+			err := endOfStreamState.Set(&octoEndOfStream)
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't update end of stream state")
+			}
+			return nil, execution.ErrEndOfStream
+		} else if record.record != nil {
+			return record.record, nil
+		} else if record.watermark != nil {
+			outputWatermarkState := storage.NewValueState(tx.WithPrefix(outputWatermarkPrefix))
+			octoWatermark := octosql.MakeTime(*record.watermark)
+			err := outputWatermarkState.Set(&octoWatermark)
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't update output watermark")
+			}
+		} else {
+			panic("unreachable")
+		}
 	}
 	return nil, execution.ErrEndOfStream
 }
@@ -103,6 +139,26 @@ func (p *ProcessByKey) UpdateWatermark(ctx context.Context, tx storage.StateTran
 		return errors.Wrap(err, "couldn't trigger keys")
 	}
 
+	p.output <- outputEntry{watermark: &watermark}
+
+	return nil
+}
+
+func (p *ProcessByKey) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
+	outputWatermarkState := storage.NewValueState(tx.WithPrefix(outputWatermarkPrefix))
+	var octoWatermark octosql.Value
+	err := outputWatermarkState.Get(&octoWatermark)
+	if err == storage.ErrKeyNotFound {
+		return time.Time{}, nil
+	} else if err != nil {
+		return time.Time{}, errors.Wrap(err, "couldn't get output watermark")
+	}
+
+	return octoWatermark.AsTime(), nil
+}
+
+func (p *ProcessByKey) MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error {
+	p.output <- outputEntry{endOfStream: true}
 	return nil
 }
 

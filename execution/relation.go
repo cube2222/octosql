@@ -4,7 +4,6 @@ import (
 	"context"
 	"regexp"
 	"strings"
-	"unicode"
 
 	"github.com/pkg/errors"
 
@@ -188,45 +187,42 @@ func (rel *Like) Apply(ctx context.Context, variables octosql.Variables, left, r
 
 //we assume that the escape character is '\'
 func likePatternToRegexp(pattern string) (string, error) {
-	length := len(pattern)
-	if pattern[length-1] == LikeEscape {
-		return "", errors.New("the pattern cannot end with an escape character")
-	}
-
 	var sb strings.Builder
-
 	sb.WriteRune('^') // match start
 
-	for i, r := range pattern {
-		if r == LikeEscape { // if we find an escape sequence we just rewrite it
-			nextRune := pattern[i+1] // no illegal reference, because / can't be last
+	escaping := false // was the character previously seen an escaping \
 
-			if nextRune == LikeAny || nextRune == LikeAll {
-				i += 1
-			} else {
-				return "", errors.Errorf("escaped illegal character %v in LIKE pattern", string(nextRune))
+	for _, r := range pattern {
+		if escaping { // escaping _ and % is legal (we just write . or .*), otherwise an error occurs
+			if r != LikeAny && r != LikeAll {
+				return "", errors.Errorf("escaping invalid character in LIKE pattern: %v", r)
 			}
-		} else if r == LikeAny { // _ transforms to . (any character)
-			sb.WriteRune('.')
-		} else if r == LikeAll { // % transforms to .* (any string)
-			sb.WriteString(".*")
-		} else if isAlphaNumeric(r) { // just rewrite alphanumerics
-			sb.WriteRune(r)
-		} else if needsEscaping(r) { // escape, because it might break the regexp
-			sb.WriteRune('\\')
+
+			escaping = false
 			sb.WriteRune(r)
 		} else {
-			sb.WriteRune(r)
+			if r == LikeEscape { // if we find an escape sequence we just handle it in the next step
+				escaping = true
+			} else if r == LikeAny { // _ transforms to . (any character)
+				sb.WriteRune('.')
+			} else if r == LikeAll { // % transforms to .* (any string)
+				sb.WriteString(".*")
+			} else if needsEscaping(r) { // escape characters that might break the regexp
+				sb.WriteRune('\\')
+				sb.WriteRune(r)
+			} else { // just write everything else
+				sb.WriteRune(r)
+			}
 		}
 	}
 
 	sb.WriteRune('$') // match end
 
-	return sb.String(), nil
-}
+	if escaping {
+		return "", errors.New("pattern ends with an escape character that doesn't escape anything")
+	}
 
-func isAlphaNumeric(r rune) bool {
-	return unicode.IsNumber(r) || unicode.IsLetter(r)
+	return sb.String(), nil
 }
 
 func needsEscaping(r rune) bool {
@@ -239,7 +235,8 @@ func needsEscaping(r rune) bool {
 		r == '[' ||
 		r == ']' ||
 		r == '^' ||
-		r == '$'
+		r == '$' ||
+		r == '.'
 }
 
 type In struct {

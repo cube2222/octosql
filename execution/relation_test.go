@@ -695,7 +695,7 @@ func TestLike_Apply(t *testing.T) {
 			name: "test6 - escaped characters",
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{
-					"a": octosql.MakeString("_?%abc}"),
+					"a": octosql.MakeString("_%%abc}"),
 					"b": octosql.MakeString(`\_\%%}`),
 				},
 				left:  NewVariable("a"),

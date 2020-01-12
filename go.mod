@@ -5,7 +5,7 @@ require (
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible // indirect
 	github.com/bradleyjkemp/memmap v0.2.2 // indirect
 	github.com/bradleyjkemp/memviz v0.2.2
-	github.com/dgraph-io/badger v1.6.0 // indirect
+	github.com/dgraph-io/badger v1.6.0
 	github.com/dgraph-io/badger/v2 v2.0.1
 	github.com/go-redis/redis v6.15.2+incompatible
 	github.com/go-sql-driver/mysql v1.4.1

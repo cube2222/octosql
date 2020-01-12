@@ -1,80 +1,142 @@
 package streaming
 
-/*
 import (
 	"context"
-	"fmt"
 	"log"
-	"net/http"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/go-chi/chi"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/serialization"
+	"github.com/cube2222/octosql/streaming/aggregate"
+	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/streaming/trigger"
 )
 
-func TestStream(t *testing.T) {
-	stream := execution.NewInMemoryStream([]*execution.Record{
-		execution.NewRecordFromSliceWithNormalize(
-			[]octosql.VariableName{"name", "color"},
-			[]interface{}{"Kuba", "red"},
-			execution.WithID(execution.NewID("123")),
-		),
-		execution.NewRecordFromSliceWithNormalize(
-			[]octosql.VariableName{"name", "color"},
-			[]interface{}{"Janek", "blue"},
-			execution.WithID(execution.NewID("124")),
-		),
-		execution.NewRecordFromSliceWithNormalize(
-			[]octosql.VariableName{"name", "color"},
-			[]interface{}{"Wojtek", "greeeen"},
-			execution.WithID(execution.NewID("121")),
-		),
-	})
+func Time(t time.Time) *time.Time {
+	return &t
+}
 
-	db, err := badger.Open(badger.DefaultOptions("test"))
+func TestStream(t *testing.T) {
+	opts := badger.DefaultOptions("test")
+	opts.InMemory = true
+	opts.Dir = ""
+	opts.ValueDir = ""
+	db, err := badger.Open(opts)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close()
+	defer func() {
+		db.Close()
+		os.RemoveAll("test")
+	}()
+	storage := storage.NewBadgerStorage(db)
 
-	engine := NewPullEngine(&KeyValueSink{}, NewBadgerStorage(db), stream)
+	now := time.Date(2020, 1, 11, 19, 0, 0, 0, time.Local)
+	source := &WatermarkRecordStream{
+		stream: []WatermarkRecordStreamEntry{
+			{
+				watermark: Time(now.Add(time.Second * 3)),
+			},
+			/*{
+				record: execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"name", "color", "window_end"},
+					[]interface{}{"Kuba", "red", now.Add(time.Second * 5)},
+					execution.WithID(execution.NewID("123")),
+					execution.WithEventTimeField("window_end"),
+				),
+			},*/
+			{
+				record: execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"name", "color", "window_end"},
+					[]interface{}{"Janek", "blue", now.Add(time.Second * 5)},
+					execution.WithID(execution.NewID("124")),
+					execution.WithEventTimeField("window_end"),
+				),
+			},
+			{
+				record: execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"name", "color", "window_end"},
+					[]interface{}{"Janek", "blue", now.Add(time.Second * 5)},
+					execution.WithID(execution.NewID("124")),
+					execution.WithEventTimeField("window_end"),
+				),
+			},
+			{
+				record: execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"name", "color", "window_end"},
+					[]interface{}{"Janek", "blue", now.Add(time.Second * 10)},
+					execution.WithID(execution.NewID("124")),
+					execution.WithEventTimeField("window_end"),
+				),
+			},
+			{
+				record: execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"name", "color", "window_end"},
+					[]interface{}{"Janek", "blue", now.Add(time.Second * 5)},
+					execution.WithID(execution.NewID("124")),
+					execution.WithEventTimeField("window_end"),
+				),
+			},
+			{
+				watermark: Time(now.Add(time.Second * 7)),
+			},
+			{
+				record: execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"name", "color", "window_end"},
+					[]interface{}{"Janek", "blue", now.Add(time.Second * 10)},
+					execution.WithID(execution.NewID("124")),
+					execution.WithEventTimeField("window_end"),
+				),
+			},
+			{
+				record: execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"name", "color", "window_end"},
+					[]interface{}{"Janek", "blue", now.Add(time.Second * 5)},
+					execution.WithID(execution.NewID("124")),
+					execution.WithEventTimeField("window_end"),
+				),
+			},
+			{
+				record: execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"name", "color", "window_end"},
+					[]interface{}{"Janek", "blue", now.Add(time.Second * 10)},
+					execution.WithID(execution.NewID("124")),
+					execution.WithEventTimeField("window_end"),
+				),
+			},
+			/*{
+				record: execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"name", "color", "window_end"},
+					[]interface{}{"Wojtek", "greeeen", now.Add(time.Second * 15)},
+					execution.WithID(execution.NewID("121")),
+					execution.WithEventTimeField("window_end"),
+				),
+			},*/
+		},
+	}
+
+	groupBy := &GroupBy{
+		prefixes:         [][]byte{nil, []byte("$agg1$")},
+		inputFields:      []octosql.VariableName{"window_end", "*star*"},
+		eventTimeField:   "window_end",
+		aggregates:       []Aggregate{&aggregate.First{}, &aggregate.Count{}},
+		outputFieldNames: []octosql.VariableName{"window_end", "*star*_count"},
+	}
+	processFunc := &ProcessByKey{
+		eventTimeField:  "window_end",
+		output:          make(chan outputEntry, 1024),
+		trigger:         trigger.NewMultiTrigger(trigger.NewWatermarkTrigger(), trigger.NewCountingTrigger(1)),
+		keyExpression:   []execution.Expression{execution.NewVariable("window_end"), execution.NewVariable("color")},
+		processFunction: groupBy,
+		variables:       octosql.NoVariables(),
+	}
+	groupByPullEngine := NewPullEngine(processFunc, storage, source, source)
+	groupByPullEngine.Run(context.Background())
+
+	engine := NewPullEngine(&RecordStorePrint{}, storage, groupByPullEngine, groupByPullEngine)
 	engine.Run(context.Background())
 }
-
-func TestReader(t *testing.T) {
-	db, err := badger.Open(badger.DefaultOptions("test"))
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	m := chi.NewMux()
-	m.HandleFunc("/{id}", func(w http.ResponseWriter, r *http.Request) {
-		err := db.View(func(txn *badger.Txn) error {
-			item, err := txn.Get([]byte(chi.URLParam(r, "id")))
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			return item.Value(func(data []byte) error {
-				value, err := serialization.Deserialize(data)
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				fmt.Fprint(w, value.String())
-
-				return nil
-			})
-		})
-		if err != nil {
-			log.Fatal(err)
-		}
-	})
-	log.Fatal(http.ListenAndServe(":3000", m))
-}
-*/

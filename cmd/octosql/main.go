@@ -2,12 +2,12 @@ package main
 
 import (
 	"context"
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/storage/excel"
+	"fmt"
 	"log"
 	"os"
 	"reflect"
-	"time"
+
+	"github.com/spf13/cobra"
 
 	"github.com/cube2222/octosql/app"
 	"github.com/cube2222/octosql/config"
@@ -19,11 +19,11 @@ import (
 	"github.com/cube2222/octosql/parser/sqlparser"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/storage/csv"
+	"github.com/cube2222/octosql/storage/excel"
 	"github.com/cube2222/octosql/storage/json"
 	"github.com/cube2222/octosql/storage/mysql"
 	"github.com/cube2222/octosql/storage/postgres"
 	"github.com/cube2222/octosql/storage/redis"
-	"github.com/spf13/cobra"
 )
 
 var configPath string
@@ -103,19 +103,11 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 }
 
 func main() {
-	/*rootCmd.Flags().StringVarP(&configPath, "config", "c", os.Getenv("OCTOSQL_CONFIG"), "data source configuration path, defaults to $OCTOSQL_CONFIG")
+	rootCmd.Flags().StringVarP(&configPath, "config", "c", os.Getenv("OCTOSQL_CONFIG"), "data source configuration path, defaults to $OCTOSQL_CONFIG")
 	rootCmd.Flags().StringVarP(&outputFormat, "output", "o", "table", "output format, one of [table json csv tabbed table_row_separated]")
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
-	}*/
-
-	testInt := octosql.MakeInt(12)
-	testFloat := octosql.MakeFloat(12.12)
-
-	println(testInt.AsFloat(), testFloat.AsInt())
-
-	testDuration := octosql.MakeDuration(time.Duration(123))
-	println(testDuration.AsDuration())
+	}
 }

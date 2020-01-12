@@ -204,7 +204,7 @@ func (node *TableValuedFunction) Metadata() *metadata.NodeMetadata {
 		} else {
 			cardinality = metadata.BoundedFitsInLocalStorage
 		}
-		return metadata.NewNodeMetadata(cardinality, "window_end")
+		return metadata.NewNodeMetadata(cardinality, octosql.NewVariableName("window_end"))
 	default:
 		return metadata.NewNodeMetadata(metadata.Unbounded, octosql.NewVariableName(""))
 	}

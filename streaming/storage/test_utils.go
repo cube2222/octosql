@@ -28,23 +28,27 @@ func TestLinkedListIterator(iter *LinkedListIterator, expectedValues []octosql.V
 	return true, nil
 }
 
-func TestMapIteratorCorrectness(iter *MapIterator, expectedKeys, expectedValues []octosql.Value) (bool, error) {
+func TestMapIteratorCorrectness(iter *MapIterator, expectedKeys, expectedValues []octosql.Value, reverse bool) (bool, error) {
 	var key octosql.Value
 	var value octosql.Value
 
-	for i := 0; i < len(expectedValues); i++ {
+	length := len(expectedValues)
+
+	for i := 0; i < length; i++ {
 		err := iter.Next(&key, &value)
 
 		if err != nil {
 			return false, errors.Wrap(err, "expected a value, got an error")
 		}
 
-		if !octosql.AreEqual(value, expectedValues[i]) {
-			return false, errors.Errorf("mismatch of values at index %d", i)
-		}
-
-		if !octosql.AreEqual(key, expectedKeys[i]) {
-			return false, errors.Errorf("mismatch of keys at index %d", i)
+		if reverse {
+			if !octosql.AreEqual(value, expectedValues[length-1-i]) || !octosql.AreEqual(key, expectedKeys[length-1-i]) {
+				return false, errors.Errorf("mismatch of values at index %d", i)
+			}
+		} else {
+			if !octosql.AreEqual(value, expectedValues[i]) || !octosql.AreEqual(key, expectedKeys[i]) {
+				return false, errors.Errorf("mismatch of values at index %d", i)
+			}
 		}
 	}
 

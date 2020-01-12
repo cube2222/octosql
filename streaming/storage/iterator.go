@@ -13,7 +13,6 @@ var ErrEndOfIterator = errors.New("end of iterator")
 type Iterator interface {
 	Next(proto.Message) error
 	NextWithKey(key MonotonicallySerializable, value proto.Message) error
-	Rewind()
 	io.Closer
 }
 
@@ -54,10 +53,6 @@ func (bi *BadgerIterator) Next(value proto.Message) error {
 
 	bi.it.Next()
 	return nil
-}
-
-func (bi *BadgerIterator) Rewind() {
-	bi.it.Rewind()
 }
 
 func (bi *BadgerIterator) Close() error {

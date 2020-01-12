@@ -143,8 +143,6 @@ func (set *Set) clearUsingHash(hashFunction func(octosql.Value) ([]byte, error))
 
 func (set *Set) GetIterator() *SetIterator {
 	it := set.tx.Iterator(WithDefault())
-	it.Rewind()
-
 	return NewSetIterator(it)
 }
 
@@ -179,10 +177,6 @@ func (si *SetIterator) Next(value *octosql.Value) error {
 
 func (si *SetIterator) Close() error {
 	return si.it.Close()
-}
-
-func (si *SetIterator) Rewind() {
-	si.it.Rewind()
 }
 
 // Auxiliary functions

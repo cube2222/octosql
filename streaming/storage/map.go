@@ -71,8 +71,11 @@ func (hm *Map) GetIteratorWithPrefix(prefix []byte) *MapIterator {
 
 func (hm *Map) GetIterator() *MapIterator {
 	it := hm.tx.Iterator(WithDefault())
-	it.Rewind()
+	return NewMapIterator(it)
+}
 
+func (hm *Map) GetReverseIterator() *MapIterator {
+	it := hm.tx.Iterator(WithDefault(), WithReverse())
 	return NewMapIterator(it)
 }
 
@@ -119,10 +122,6 @@ func (hm *Map) Clear() error {
 
 func (mi *MapIterator) Next(key MonotonicallySerializable, value proto.Message) error {
 	return mi.it.NextWithKey(key, value)
-}
-
-func (mi *MapIterator) Rewind() {
-	mi.it.Rewind()
 }
 
 func (mi *MapIterator) Close() error {

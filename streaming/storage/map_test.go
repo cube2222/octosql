@@ -58,7 +58,20 @@ func TestMap(t *testing.T) {
 
 	/* test iterator */
 	it := badgerMap.GetIterator()
-	areEqual, err := TestMapIteratorCorrectness(it, keys, values)
+	areEqual, err := TestMapIteratorCorrectness(it, keys, values, false)
+	_ = it.Close()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if !areEqual {
+		log.Fatal(errors.Wrap(err, "the iterator isn't correct"))
+	}
+
+	/* test reverse iterator */
+	it = badgerMap.GetReverseIterator()
+	areEqual, err = TestMapIteratorCorrectness(it, keys, values, true)
 	_ = it.Close()
 
 	if err != nil {
@@ -76,7 +89,7 @@ func TestMap(t *testing.T) {
 	}
 
 	it = badgerMap.GetIterator()
-	areEqual, err = TestMapIteratorCorrectness(it, keys[1:], values[1:])
+	areEqual, err = TestMapIteratorCorrectness(it, keys[1:], values[1:], false)
 	_ = it.Close()
 
 	if err != nil {
@@ -94,7 +107,7 @@ func TestMap(t *testing.T) {
 	}
 
 	it = badgerMap.GetIterator()
-	areEqual, err = TestMapIteratorCorrectness(it, []octosql.Value{}, []octosql.Value{})
+	areEqual, err = TestMapIteratorCorrectness(it, []octosql.Value{}, []octosql.Value{}, false)
 	_ = it.Close()
 
 	if err != nil {
@@ -130,7 +143,7 @@ func TestMap(t *testing.T) {
 	}
 
 	it = bMap3.GetIterator()
-	areEqual, err = TestMapIteratorCorrectness(it, keys, values)
+	areEqual, err = TestMapIteratorCorrectness(it, keys, values, false)
 	_ = it.Close()
 
 	if err != nil {

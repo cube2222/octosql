@@ -89,6 +89,12 @@ func (tx *badgerTransaction) Iterator(opts ...IteratorOption) Iterator {
 
 	it := tx.tx.NewIterator(options.ToBadgerOptions())
 
+	if options.Reverse {
+		it.Seek(append(tx.prefix, 255))
+	} else {
+		it.Rewind()
+	}
+
 	return NewBadgerIterator(it, tx.GetPrefixLength())
 }
 
@@ -136,5 +142,11 @@ func WithDefault() IteratorOption {
 		opts.PrefetchSize = 100
 		opts.Reverse = false
 		opts.AllVersions = false
+	}
+}
+
+func WithReverse() IteratorOption {
+	return func(opts *IteratorOptions) {
+		opts.Reverse = true
 	}
 }

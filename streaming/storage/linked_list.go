@@ -165,8 +165,6 @@ func (ll *LinkedList) Clear() error {
 
 func (ll *LinkedList) GetIterator() *LinkedListIterator {
 	it := ll.tx.WithPrefix(linkedListValueKeyPrefix).Iterator(WithDefault())
-	it.Rewind()
-
 	return NewLinkedListIterator(it)
 }
 
@@ -181,10 +179,6 @@ func (lli *LinkedListIterator) Next(value proto.Message) error {
 
 func (lli *LinkedListIterator) Close() error {
 	return lli.it.Close()
-}
-
-func (lli *LinkedListIterator) Rewind() {
-	lli.it.Rewind()
 }
 
 func getIndexKey(index int) []byte {

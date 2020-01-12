@@ -23,17 +23,21 @@ func (node *Distinct) Get(ctx context.Context, variables octosql.Variables) (Rec
 		return nil, errors.Wrap(err, "couldn't get stream for child node in distinct")
 	}
 
-	return &DistinctStream{
-		stream:    stream,
-		variables: variables,
-		records:   newRecordSet(),
-	}, nil
+	return NewDistinctStream(stream, variables, newRecordSet()), nil
 }
 
 type DistinctStream struct {
 	stream    RecordStream
 	variables octosql.Variables
 	records   *recordSet
+}
+
+func NewDistinctStream(stream RecordStream, variables octosql.Variables, records *recordSet) *DistinctStream {
+	return &DistinctStream{
+		stream:    stream,
+		variables: variables,
+		records:   records,
+	}
 }
 
 func (ds *DistinctStream) Close() error {
@@ -116,6 +120,7 @@ func (rs *recordSet) Insert(r *Record) (bool, error) {
 	return false, nil
 }
 
+//TODO: should the hash include other fields as well?
 func HashRecord(rec *Record) (uint64, error) {
-	return hashstructure.Hash(rec.data, nil)
+	return hashstructure.Hash(octosql.GetValuesFromPointers(rec.Data), nil)
 }

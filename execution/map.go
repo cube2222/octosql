@@ -75,7 +75,7 @@ func (stream *MappedStream) Next(ctx context.Context) (*Record, error) {
 	}
 
 	if stream.keep {
-		for _, name := range srcRecord.fieldNames {
+		for _, name := range srcRecord.GetVariableNames() {
 			if _, ok := outValues[name]; !ok {
 				fieldNames = append(fieldNames, name)
 				outValues[name] = srcRecord.Value(name)

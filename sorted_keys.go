@@ -9,17 +9,21 @@ import (
 	"github.com/pkg/errors"
 )
 
+//Delimiters must be less than 128 and different from identifiers
+//Identifiers must all be unique and less than 128
 const (
-	NullIdentifier      = 1 /* Nonexistent */
-	PhantomIdentifier   = 2 /* Nonexsitent */
-	IntIdentifier       = 3 /* Number */
-	FloatIdentifier     = 4 /* Number */
-	BoolIdentifier      = 5 /* Bool */
-	StringIdentifier    = 6 /* Until StringDelimiter */
-	TimestampIdentifier = 7 /* Number */
-	DurationIdentifier  = 8 /* Number */
-	TupleIdentifier     = 9 /* Until TupleDelimiter */
-	ObjectIdentifier    = 10
+	NullIdentifier      = 1  /* Nonexistent */
+	PhantomIdentifier   = 2  /* Nonexsitent */
+	IntIdentifier       = 3  /* Number */
+	FloatIdentifier     = 4  /* Number */
+	BoolIdentifier      = 5  /* Bool */
+	StringIdentifier    = 6  /* Until StringDelimiter */
+	TimestampIdentifier = 7  /* Number */
+	DurationIdentifier  = 8  /* Number */
+	TupleIdentifier     = 9  /* Until TupleDelimiter */
+	ObjectIdentifier    = 10 /* Object is a tuple */
+	StringDelimiter     = 11
+	TupleDelimiter      = 12
 )
 
 const (
@@ -28,10 +32,7 @@ const (
 	NonexistentMarshalLength = 1         // null and phantom
 )
 
-//Delimiters must be less than 128 and different from identifiers
 const (
-	StringDelimiter     = 11
-	TupleDelimiter      = 12
 	BYTE_OFFSET         = 128
 	MinimalTupleLength  = 1 + 1 + 1 //b[0] = type, b[1] = element, b[2] = end of tuple
 	MinimalStringLength = 1 + 1     // b[0] = type, b[1] = end of string
@@ -376,6 +377,10 @@ func recursiveMonotonicUnmarshalTuple(b []byte) ([]Value, int, error) {
 	values := make([]Value, 0)
 	index := 1
 	length := len(b)
+	if length < MinimalTupleLength {
+		return nil, 0, errors.New("incorrect tuple length")
+	}
+
 	var value Value
 
 	for index < length {

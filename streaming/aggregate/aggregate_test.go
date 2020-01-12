@@ -26,11 +26,19 @@ func ExpectValue(t *testing.T, ctx context.Context, aggr Aggregate, tx storage.S
 		//assert.Equal(t, expected.AsFloat(), val.AsFloat())
 	case octosql.TypeDuration:
 		assert.Equal(t, expected.AsDuration(), val.AsDuration())
+	case octosql.TypeString:
+		assert.Equal(t, expected.AsString(), val.AsString())
 	default:
 		panic("unreachable")
 	}
 
 	assert.Nil(t, err)
+}
+
+func ExpectZeroValue(t *testing.T, ctx context.Context, aggr Aggregate, tx storage.StateTransaction) {
+	val, _ := aggr.GetValue(ctx, tx)
+	assert.NotNil(t, val)
+	assert.Equal(t, octosql.ZeroValue().GetType(), val.GetType())
 }
 
 func AddValue(t *testing.T, ctx context.Context, aggr Aggregate, tx storage.StateTransaction, value octosql.Value) {

@@ -109,5 +109,5 @@ func (dsb *DataSourceBuilder) Materialize(ctx context.Context, matCtx *Materiali
 }
 
 func (dsb *DataSourceBuilder) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMetadata(dsb.Cardinality)
+	return metadata.NewNodeMetadata(dsb.Cardinality, "")
 }

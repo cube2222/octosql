@@ -195,8 +195,17 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 func (node *TableValuedFunction) Metadata() *metadata.NodeMetadata {
 	switch node.Name {
 	case "range":
-		return metadata.NewNodeMetadata(metadata.BoundedFitsInLocalStorage)
+		return metadata.NewNodeMetadata(metadata.BoundedFitsInLocalStorage, octosql.NewVariableName(""))
+	case "tumble":
+		var cardinality metadata.Cardinality
+		source, err := node.getArgumentTable(octosql.NewVariableName("source"))
+		if err == nil {
+			cardinality = source.Metadata().Cardinality()
+		} else {
+			cardinality = metadata.BoundedFitsInLocalStorage
+		}
+		return metadata.NewNodeMetadata(cardinality, "window_end")
 	default:
-		return metadata.NewNodeMetadata(metadata.Unbounded)
+		return metadata.NewNodeMetadata(metadata.Unbounded, octosql.NewVariableName(""))
 	}
 }

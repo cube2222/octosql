@@ -11,13 +11,6 @@ import (
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
-type Aggregate interface {
-	AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error
-	RetractValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error
-	GetValue(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error)
-	String() string
-}
-
 // TODO: Physical plan nodes need to have the GetEventTimeField() method. There's no sense for a stream to be mixed anyways
 // This way, we know before creation, if the used variable is an event time group by or not.
 // This would be injected into any ProcessFunctions
@@ -26,7 +19,7 @@ type GroupBy struct {
 
 	eventTimeField octosql.VariableName // Empty if not grouping by event time
 	inputFields    []octosql.VariableName
-	aggregates     []Aggregate
+	aggregates     []aggregate.Aggregate
 
 	outputFieldNames []octosql.VariableName
 }

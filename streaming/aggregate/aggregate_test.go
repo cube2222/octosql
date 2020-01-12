@@ -2,10 +2,12 @@ package aggregate
 
 import (
 	"context"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 const eps = 0.00000001

@@ -2,11 +2,13 @@ package aggregate
 
 import (
 	"context"
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
-	"github.com/dgraph-io/badger/v2"
 	"os"
 	"testing"
+
+	"github.com/dgraph-io/badger"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/streaming/storage"
 )
 
 func TestSumInt(t *testing.T) {

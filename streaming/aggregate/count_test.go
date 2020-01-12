@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger"
+	"github.com/dgraph-io/badger/v2"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"log"
+	"os"
 	"testing"
 	"time"
 
@@ -10,13 +11,17 @@ import (
 )
 
 func TestValueState(t *testing.T) {
-	prefix := "test_value_store"
-	db, err := badger.Open(badger.DefaultOptions("test_value_store"))
+	prefix := []byte("test_value_store")
+	path := "test_value_store"
+	db, err := badger.Open(badger.DefaultOptions(path))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	defer db.DropAll()
+	defer func() {
+		_ = db.Close()
+		_ = os.RemoveAll(path)
+	}()
 
 	store := NewBadgerStorage(db)
 	txn := store.BeginTransaction().WithPrefix([]byte(prefix))

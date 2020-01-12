@@ -2,6 +2,7 @@ package storage
 
 import (
 	"log"
+	"os"
 	"testing"
 
 	"github.com/cube2222/octosql"
@@ -10,12 +11,17 @@ import (
 
 func TestLinkedList(t *testing.T) {
 	prefix := "test_linked_list"
-	db, err := badger.Open(badger.DefaultOptions("test"))
+	path := "test"
+
+	db, err := badger.Open(badger.DefaultOptions(path))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	defer db.DropAll()
+	defer func() {
+		_ = db.Close()
+		_ = os.RemoveAll(path)
+	}()
 
 	store := NewBadgerStorage(db)
 	txn := store.BeginTransaction().WithPrefix([]byte(prefix))
@@ -39,7 +45,7 @@ func TestLinkedList(t *testing.T) {
 
 	/* test if all values are there */
 	iter := linkedList.GetIterator()
-	areEqual, err := TestSimpleIteratorCorrectness(iter, values)
+	areEqual, err := TestLinkedListIterator(iter, values)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -82,7 +88,7 @@ func TestLinkedList(t *testing.T) {
 	_ = iter.Close() //we need to close the iterator, to be able to get the next one
 
 	iter = linkedList.GetIterator()
-	areEqual, err = TestSimpleIteratorCorrectness(iter, values[1:])
+	areEqual, err = TestLinkedListIterator(iter, values[1:])
 
 	if err != nil {
 		log.Fatal(err)
@@ -107,7 +113,7 @@ func TestLinkedList(t *testing.T) {
 	_ = iter.Close() //we need to close the iterator, to be able to get the next one
 
 	iter = linkedList2.GetIterator()
-	areEqual, err = TestSimpleIteratorCorrectness(iter, values[2:])
+	areEqual, err = TestLinkedListIterator(iter, values[2:])
 	_ = iter.Close()
 
 	if err != nil {
@@ -126,7 +132,7 @@ func TestLinkedList(t *testing.T) {
 
 	/* test if linked list is actually empty */
 	iter = linkedList2.GetIterator()
-	areEqual, err = TestSimpleIteratorCorrectness(iter, []octosql.Value{})
+	areEqual, err = TestLinkedListIterator(iter, []octosql.Value{})
 	_ = iter.Close()
 
 	if err != nil {
@@ -154,7 +160,7 @@ func TestLinkedList(t *testing.T) {
 	}
 
 	iter = linkedList2.GetIterator()
-	areEqual, err = TestSimpleIteratorCorrectness(iter, values[:1])
+	areEqual, err = TestLinkedListIterator(iter, values[:1])
 	_ = iter.Close()
 
 	if err != nil {

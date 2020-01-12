@@ -46,15 +46,6 @@ func (vs *ValueState) Get(value proto.Message) error {
 	return err
 }
 
-func (vs *ValueState) getBytes() ([]byte, error) {
-	bytes, err := vs.tx.Get(nil)
-	if err == badger.ErrKeyNotFound {
-		return nil, ErrKeyNotFound
-	}
-
-	return bytes, err
-}
-
 func (vs *ValueState) Clear() error {
 	err := vs.tx.Delete(nil)
 	if err != nil {

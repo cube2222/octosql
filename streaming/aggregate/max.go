@@ -73,7 +73,7 @@ func (agg *Max) GetValue(ctx context.Context, tx storage.StateTransaction) (octo
 	var currentMax octosql.Value
 	var currentMaxCount octosql.Value
 
-	it := currentMaxStorage.GetReverseIterator()
+	it := currentMaxStorage.GetIterator(storage.WithReverse())
 	defer func() {
 		_ = it.Close()
 	}()

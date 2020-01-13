@@ -26,17 +26,20 @@ func (agg *Sum) AddValue(ctx context.Context, tx storage.StateTransaction, value
 		return errors.Wrap(err, "couldn't get current sum")
 	}
 
+	if isNeutralElement(currentSum) {
+		currentSum, err = getAppropriateNeutralElement(value.GetType())
+		if err != nil {
+			return errors.Wrap(err, "couldn't get neutral element for sum")
+		}
+	}
+
 	switch valueType := value.GetType(); valueType {
 	case octosql.TypeInt:
 		currentSum = octosql.MakeInt(currentSum.AsInt() + value.AsInt())
 	case octosql.TypeFloat:
 		currentSum = octosql.MakeFloat(currentSum.AsFloat() + value.AsFloat())
 	case octosql.TypeDuration:
-		if currentSum.GetType() == octosql.TypeInt { // No value set
-			currentSum = value
-		} else {
-			currentSum = octosql.MakeDuration(currentSum.AsDuration() + value.AsDuration())
-		}
+		currentSum = octosql.MakeDuration(currentSum.AsDuration() + value.AsDuration())
 	default:
 		return errors.Errorf("unsupported value type passed to sum: %s", valueType)
 	}
@@ -47,6 +50,23 @@ func (agg *Sum) AddValue(ctx context.Context, tx storage.StateTransaction, value
 	}
 
 	return nil
+}
+
+func isNeutralElement(currentSum octosql.Value) bool {
+	return currentSum.GetType() == octosql.TypeInt && currentSum.AsInt() == 0
+}
+
+func getAppropriateNeutralElement(valueType octosql.Type) (octosql.Value, error) {
+	switch valueType {
+	case octosql.TypeInt:
+		return octosql.MakeInt(0), nil
+	case octosql.TypeFloat:
+		return octosql.MakeFloat(0.0), nil
+	case octosql.TypeDuration:
+		return octosql.MakeDuration(0), nil
+	default:
+		return octosql.ZeroValue(), errors.Errorf("unsupported value type passed to sum: %s", valueType)
+	}
 }
 
 func (agg *Sum) RetractValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {

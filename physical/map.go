@@ -52,6 +52,7 @@ func (node *Map) Materialize(ctx context.Context, matCtx *MaterializationContext
 	return execution.NewMap(matExprs, materialized, node.Keep), nil
 }
 
+// This checks if this expression is just a variable with the given variable name in disguise. (for example covered by aliased expressions)
 func isVariableNameRecursive(expr Expression, name octosql.VariableName) bool {
 	switch expr := expr.(type) {
 	case *Variable:
@@ -63,6 +64,7 @@ func isVariableNameRecursive(expr Expression, name octosql.VariableName) bool {
 	}
 }
 
+// This gets the name of the given expression.
 func getOuterName(expr Expression) octosql.VariableName {
 	switch expr := expr.(type) {
 	case *Variable:
@@ -81,9 +83,9 @@ func (node *Map) Metadata() *metadata.NodeMetadata {
 
 	eventTimeField := node.Source.Metadata().EventTimeField()
 	var newEventTimeField octosql.VariableName
-	for i := range node.Expressions {
-		if isVariableNameRecursive(node.Expressions[i], eventTimeField) {
-			newEventTimeField = getOuterName(node.Expressions[i])
+	for i, expr := range node.Expressions {
+		if isVariableNameRecursive(expr, eventTimeField) {
+			newEventTimeField = getOuterName(expr)
 			break
 		}
 	}

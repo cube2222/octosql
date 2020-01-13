@@ -27,14 +27,14 @@ const (
 )
 
 const (
-	NumberMarshalLength      = 1 + 8 // b[0] = type, b[1] = sign, b[2:] = marshal
+	NumberMarshalLength      = 1 + 8 // b[0] = type, b[1:] = marshal
 	BoolMarshalLength        = 1 + 1 // b[0] = type, b[1] = 0/1
 	NonexistentMarshalLength = 1     // null and phantom
 )
 
 const (
 	BYTE_OFFSET         = 128
-	MinimalTupleLength  = 1 + 1 + 1 //b[0] = type, b[1] = element, b[2] = end of tuple
+	MinimalTupleLength  = 1 + 1 + 1 // b[0] = type, b[1] = element, b[2] = end of tuple
 	MinimalStringLength = 1 + 1     // b[0] = type, b[1] = end of string
 )
 
@@ -204,7 +204,9 @@ func MonotonicUnmarshalInt64(b []byte) (int64, error) {
 	return int64(i) ^ math.MinInt64, nil
 }
 
-/* Marshal float */
+/*	Marshal float
+	Based on the code from https://github.com/danburkert/bytekey
+*/
 func MonotonicMarshalFloat(f float64) []byte {
 	val := math.Float64bits(f)
 	i := int(val)

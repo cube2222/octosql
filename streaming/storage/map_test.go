@@ -5,9 +5,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cube2222/octosql"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
 )
 
 func TestMap(t *testing.T) {
@@ -70,7 +71,7 @@ func TestMap(t *testing.T) {
 	}
 
 	/* test reverse iterator */
-	it = badgerMap.GetReverseIterator()
+	it = badgerMap.GetIterator(WithReverse())
 	areEqual, err = TestMapIteratorCorrectness(it, keys, values, true)
 	_ = it.Close()
 

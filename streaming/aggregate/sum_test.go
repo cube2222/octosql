@@ -29,6 +29,7 @@ func TestSumInt(t *testing.T) {
 
 	aggr := NewSumAggregate()
 
+	// Empty storage
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
 
 	// AddValue
@@ -97,6 +98,7 @@ func TestSumFloat(t *testing.T) {
 
 	aggr := NewSumAggregate()
 
+	// Empty storage
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
 
 	// AddValue
@@ -159,6 +161,7 @@ func TestSumDuration(t *testing.T) {
 
 	aggr := NewSumAggregate()
 
+	// Empty storage
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
 
 	// AddValue

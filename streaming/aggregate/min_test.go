@@ -29,6 +29,7 @@ func TestMinInt(t *testing.T) {
 
 	aggr := NewMinAggregate()
 
+	// Empty storage
 	ExpectZeroValue(t, ctx, aggr, tx)
 
 	// AddValue
@@ -107,6 +108,7 @@ func TestMinString(t *testing.T) {
 
 	aggr := NewMinAggregate()
 
+	// Empty storage
 	ExpectZeroValue(t, ctx, aggr, tx)
 
 	// AddValue

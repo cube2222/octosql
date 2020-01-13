@@ -29,6 +29,7 @@ func TestAvgInt(t *testing.T) {
 
 	aggr := NewAverageAggregate()
 
+	// Empty storage
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
 
 	// AddValue
@@ -117,6 +118,7 @@ func TestAvgFloat(t *testing.T) {
 
 	aggr := NewAverageAggregate()
 
+	// Empty storage
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
 
 	// AddValue

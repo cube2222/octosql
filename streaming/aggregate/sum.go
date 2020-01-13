@@ -9,14 +9,14 @@ import (
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
+var currentSumPrefix = []byte("$current_sum$")
+
 type Sum struct {
 }
 
 func NewSumAggregate() *Sum {
 	return &Sum{}
 }
-
-var currentSumPrefix = []byte("$current_sum$")
 
 func (agg *Sum) AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
 	currentSumStorage := storage.NewValueState(tx.WithPrefix(currentSumPrefix))

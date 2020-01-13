@@ -9,14 +9,14 @@ import (
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
+var currentMaxPrefix = []byte("$current_max$")
+
 type Max struct {
 }
 
 func NewMaxAggregate() *Max {
 	return &Max{}
 }
-
-var currentMaxPrefix = []byte("$current_max$")
 
 func (agg *Max) AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
 	currentMaxStorage := storage.NewMap(tx.WithPrefix(currentMaxPrefix))

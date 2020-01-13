@@ -30,6 +30,7 @@ func TestCount(t *testing.T) {
 
 	aggr := NewCountAggregate()
 
+	// Empty storage
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
 
 	// AddValue

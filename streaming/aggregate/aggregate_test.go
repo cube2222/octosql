@@ -21,13 +21,15 @@ func ExpectValue(t *testing.T, ctx context.Context, aggr Aggregate, tx storage.S
 	case octosql.TypeInt:
 		assert.Equal(t, expected.AsInt(), val.AsInt())
 	case octosql.TypeFloat:
-		assert.Greater(t, val.AsFloat()+octosql.MakeFloat(eps).AsFloat(), expected.AsFloat())
-		assert.Less(t, val.AsFloat()-octosql.MakeFloat(eps).AsFloat(), expected.AsFloat())
+		assert.Greater(t, expected.AsFloat(), val.AsFloat()-octosql.MakeFloat(eps).AsFloat())
+		assert.Less(t, expected.AsFloat(), val.AsFloat()+octosql.MakeFloat(eps).AsFloat())
 		//assert.Equal(t, expected.AsFloat(), val.AsFloat())
 	case octosql.TypeDuration:
 		assert.Equal(t, expected.AsDuration(), val.AsDuration())
 	case octosql.TypeString:
 		assert.Equal(t, expected.AsString(), val.AsString())
+	case octosql.TypeTuple:
+		assert.Equal(t, expected.AsSlice(), val.AsSlice())
 	default:
 		panic("unreachable")
 	}

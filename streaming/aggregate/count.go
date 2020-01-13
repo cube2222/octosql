@@ -9,14 +9,14 @@ import (
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
+var currentCountPrefix = []byte("$current_count$")
+
 type Count struct {
 }
 
 func NewCountAggregate() *Count {
 	return &Count{}
 }
-
-var currentCountPrefix = []byte("$current_count$")
 
 func (agg *Count) AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
 	currentCountStorage := storage.NewValueState(tx.WithPrefix(currentCountPrefix))

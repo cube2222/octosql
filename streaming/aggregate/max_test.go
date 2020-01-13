@@ -29,6 +29,7 @@ func TestMaxInt(t *testing.T) {
 
 	aggr := NewMaxAggregate()
 
+	// Empty storage
 	ExpectZeroValue(t, ctx, aggr, tx)
 
 	// AddValue
@@ -107,6 +108,7 @@ func TestMaxString(t *testing.T) {
 
 	aggr := NewMaxAggregate()
 
+	// Empty storage
 	ExpectZeroValue(t, ctx, aggr, tx)
 
 	// AddValue

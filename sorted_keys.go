@@ -27,9 +27,9 @@ const (
 )
 
 const (
-	NumberMarshalLength      = 1 + 1 + 8 // b[0] = type, b[1] = sign, b[2:] = marshal
-	BoolMarshalLength        = 1 + 1     // b[0] = type, b[1] = 0/1
-	NonexistentMarshalLength = 1         // null and phantom
+	NumberMarshalLength      = 1 + 8 // b[0] = type, b[1] = sign, b[2:] = marshal
+	BoolMarshalLength        = 1 + 1 // b[0] = type, b[1] = 0/1
+	NonexistentMarshalLength = 1     // null and phantom
 )
 
 const (
@@ -67,14 +67,14 @@ func (v *Value) MonotonicUnmarshal(bytes []byte) error {
 
 		finalValue = MakePhantom()
 	case IntIdentifier:
-		result, err := MonotonicUnmarshalInt(bytes)
+		result, err := MonotonicUnmarshalInt64(bytes)
 		if err != nil {
 			return err
 		}
 
-		finalValue = MakeInt(result)
+		finalValue = MakeInt(int(result))
 	case FloatIdentifier:
-		result, err := UnmarshalFloat(bytes)
+		result, err := MonotonicUnmarshalFloat(bytes)
 		if err != nil {
 			return err
 		}
@@ -135,7 +135,7 @@ func monotonicMarshal(v *Value) []byte {
 	case TypeString:
 		return MonotonicMarshalString(v.AsString())
 	case TypeInt:
-		return MonotonicMarshalInt(v.AsInt())
+		return MonotonicMarshalInt64(int64(v.AsInt()))
 	case TypeBool:
 		return MonotonicMarshalBool(v.AsBool())
 	case TypeNull:
@@ -147,7 +147,7 @@ func monotonicMarshal(v *Value) []byte {
 	case TypeDuration:
 		return MonotonicMarshalDuration(v.AsDuration())
 	case TypeFloat:
-		return MarshalFloat(v.AsFloat())
+		return MonotonicMarshalFloat(v.AsFloat())
 	case TypeTuple:
 		return MonotonicMarshalTuple(v.AsSlice())
 	case TypeObject:
@@ -192,61 +192,36 @@ func MonotonicUnmarshalPhantom(b []byte) error {
 }
 
 /* Marshal int and int64 */
-func MonotonicMarshalInt(i int) []byte {
-	return MonotonicMarshalUint64(uint64(i), i >= 0)
-}
-
-func MonotonicMarshalUint64(ui uint64, sign bool) []byte {
+func MonotonicMarshalInt64(i int64) []byte {
 	b := make([]byte, NumberMarshalLength)
-
-	binary.LittleEndian.PutUint64(b, ui)
-
-	/* store sign of the number */
-	if sign {
-		b[NumberMarshalLength-2] = 1
-	} else {
-		b[NumberMarshalLength-2] = 0
-	}
-
-	/* store type */
-	b[NumberMarshalLength-1] = IntIdentifier
-
-	return reverseByteSlice(b)
+	b[0] = IntIdentifier
+	binary.BigEndian.PutUint64(b[1:], uint64(i^math.MinInt64))
+	return b
 }
 
-func MonotonicUnmarshalInt(b []byte) (int, error) {
-	value, err := MonotonicUnmarshalUint64(b)
-	if err != nil {
-		return 0, errors.New("incorrect int64 key size")
-	}
-
-	return int(value), nil
-}
-
-func MonotonicUnmarshalUint64(b []byte) (uint64, error) {
-	if len(b) != NumberMarshalLength {
-		return 0, errors.New("incorrect uint64 key size")
-	}
-	return binary.LittleEndian.Uint64(reverseByteSlice(b[2:])), nil
+func MonotonicUnmarshalInt64(b []byte) (int64, error) {
+	i := binary.BigEndian.Uint64(b[1:])
+	return int64(i) ^ math.MinInt64, nil
 }
 
 /* Marshal float */
-func MarshalFloat(f float64) []byte {
+func MonotonicMarshalFloat(f float64) []byte {
 	val := math.Float64bits(f)
+	i := int(val)
+	t := (i >> 63) | math.MinInt64
 
-	bytes := MonotonicMarshalUint64(val, f >= 0.0)
-	bytes[0] = FloatIdentifier
-
-	return bytes
+	b := make([]byte, NumberMarshalLength)
+	b[0] = FloatIdentifier
+	binary.BigEndian.PutUint64(b[1:], uint64(i^t))
+	return b
 }
 
-func UnmarshalFloat(b []byte) (float64, error) {
-	value, err := MonotonicUnmarshalUint64(b)
-	if err != nil {
-		return 0.0, errors.Wrap(err, "incorrect float key representation")
-	}
+func MonotonicUnmarshalFloat(b []byte) (float64, error) {
+	val := binary.BigEndian.Uint64(b[1:])
+	i := int64(val)
 
-	floatValue := math.Float64frombits(value)
+	t := ((i ^ math.MinInt64) >> 63) | math.MinInt64
+	floatValue := math.Float64frombits(uint64(i ^ t))
 
 	return floatValue, nil
 }
@@ -316,36 +291,34 @@ func MonotonicUnmarshalString(b []byte) (string, error) {
 
 /* Marshal Timestamp */
 func MonotonicMarshalTime(t time.Time) []byte {
-	bytes := MonotonicMarshalUint64(uint64(t.UnixNano()), true)
+	bytes := MonotonicMarshalInt64(t.UnixNano())
 	bytes[0] = TimestampIdentifier
 
 	return bytes
 }
 
 func MonotonicUnmarshalTime(b []byte) (time.Time, error) {
-	value, err := MonotonicUnmarshalUint64(b)
+	value, err := MonotonicUnmarshalInt64(b)
 	if err != nil {
 		return time.Now(), errors.Wrap(err, "incorrect time key representation")
 	}
 
-	int64Value := int64(value)
-
-	seconds := int64Value / int64(time.Second)
-	nanoseconds := int64Value % int64(time.Second)
+	seconds := value / int64(time.Second)
+	nanoseconds := value % int64(time.Second)
 
 	return time.Unix(seconds, nanoseconds), nil
 }
 
 /* Marshal Duration */
 func MonotonicMarshalDuration(d time.Duration) []byte {
-	bytes := MonotonicMarshalUint64(uint64(d.Nanoseconds()), true)
+	bytes := MonotonicMarshalInt64(d.Nanoseconds())
 	bytes[0] = DurationIdentifier
 
 	return bytes
 }
 
 func MonotonicUnmarshalDuration(b []byte) (time.Duration, error) {
-	value, err := MonotonicUnmarshalUint64(b)
+	value, err := MonotonicUnmarshalInt64(b)
 	if err != nil {
 		return time.Duration(0), errors.Wrap(err, "incorrect duration key representation")
 	}

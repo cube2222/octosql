@@ -2,6 +2,9 @@ package storage
 
 import (
 	"github.com/cube2222/octosql"
+
+	"encoding/binary"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/mitchellh/hashstructure"
 	"github.com/pkg/errors"
@@ -191,7 +194,8 @@ func hashValue(value octosql.Value) ([]byte, error) {
 		return nil, errors.Wrap(err, "couldn't hash value")
 	}
 
-	hashKey := octosql.MonotonicMarshalUint64(hashValue, true)
+	hashKey := make([]byte, 8)
+	binary.BigEndian.PutUint64(hashKey, hashValue)
 
 	return hashKey, nil
 }

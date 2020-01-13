@@ -24,10 +24,14 @@ func ExpectValue(t *testing.T, ctx context.Context, aggr Aggregate, tx storage.S
 		assert.Greater(t, expected.AsFloat(), val.AsFloat()-octosql.MakeFloat(eps).AsFloat())
 		assert.Less(t, expected.AsFloat(), val.AsFloat()+octosql.MakeFloat(eps).AsFloat())
 		//assert.Equal(t, expected.AsFloat(), val.AsFloat())
-	case octosql.TypeDuration:
-		assert.Equal(t, expected.AsDuration(), val.AsDuration())
+	case octosql.TypeBool:
+		assert.Equal(t, expected.AsBool(), val.AsBool())
 	case octosql.TypeString:
 		assert.Equal(t, expected.AsString(), val.AsString())
+	case octosql.TypeTime:
+		assert.Equal(t, expected.AsTime(), val.AsTime())
+	case octosql.TypeDuration:
+		assert.Equal(t, expected.AsDuration(), val.AsDuration())
 	case octosql.TypeTuple:
 		assert.Equal(t, expected.AsSlice(), val.AsSlice())
 	default:

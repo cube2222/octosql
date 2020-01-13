@@ -176,3 +176,74 @@ func TestMinString(t *testing.T) {
 
 	ExpectZeroValue(t, ctx, aggr, tx)
 }
+
+func TestMinBool(t *testing.T) {
+	ctx := context.Background()
+	db, err := badger.Open(badger.DefaultOptions("test"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		db.Close()
+		os.RemoveAll("test")
+	}()
+
+	prefix := []byte("min")
+
+	badgerStorage := storage.NewBadgerStorage(db)
+	tx := badgerStorage.BeginTransaction().WithPrefix(prefix)
+
+	aggr := NewMinAggregate()
+
+	// Empty storage
+	ExpectZeroValue(t, ctx, aggr, tx)
+
+	// AddValue
+	AddValue(t, ctx, aggr, tx, octosql.MakeBool(true))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeBool(true))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeBool(false))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeBool(false))
+
+	// RetractValue
+	RetractValue(t, ctx, aggr, tx, octosql.MakeBool(true))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeBool(false))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeBool(false))
+
+	ExpectZeroValue(t, ctx, aggr, tx)
+
+	// Mixed + multiple values
+	AddValue(t, ctx, aggr, tx, octosql.MakeBool(true))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeBool(true))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeBool(true))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeBool(true))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeBool(false))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeBool(false))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeBool(false))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeBool(true))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeBool(true))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeBool(true))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeBool(false))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeBool(true))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeBool(false))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeBool(false))
+
+	ExpectZeroValue(t, ctx, aggr, tx)
+}

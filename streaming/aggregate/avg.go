@@ -78,9 +78,23 @@ func (agg *Average) RetractValue(ctx context.Context, tx storage.StateTransactio
 	var currentAvgNum octosql.Value
 	err = currentAvgNumStorage.Get(&currentAvgNum)
 	if err == storage.ErrKeyNotFound {
-		currentAvgNum = octosql.MakeInt(0)
+		currentAvgNum = octosql.MakeInt(0) // TODO - should this return error?
 	} else if err != nil {
 		return errors.Wrap(err, "couldn't get current elements number for avg from storage")
+	}
+
+	if currentAvgNum.AsInt() <= 1 { // Retracting last element
+		err = currentAvgStorage.Clear()
+		if err != nil {
+			return errors.Wrap(err, "couldn't clear current avg in storage")
+		}
+
+		err = currentAvgNumStorage.Clear()
+		if err != nil {
+			return errors.Wrap(err, "couldn't clear current elements number for avg in storage")
+		}
+
+		return nil
 	}
 
 	newScalar := octosql.MakeFloat(float64(currentAvgNum.AsInt()) / float64(currentAvgNum.AsInt()-1))
@@ -100,26 +114,14 @@ func (agg *Average) RetractValue(ctx context.Context, tx storage.StateTransactio
 	currentAvgVal = octosql.MakeFloat(currentAvgValScaled.AsFloat() - retractedComponent.AsFloat())
 	currentAvgNum = octosql.MakeInt(currentAvgNum.AsInt() - 1)
 
-	if currentAvgNum.AsInt() > 0 {
-		err = currentAvgStorage.Set(&currentAvgVal)
-		if err != nil {
-			return errors.Wrap(err, "couldn't set current avg in storage")
-		}
+	err = currentAvgStorage.Set(&currentAvgVal)
+	if err != nil {
+		return errors.Wrap(err, "couldn't set current avg in storage")
+	}
 
-		err = currentAvgNumStorage.Set(&currentAvgNum)
-		if err != nil {
-			return errors.Wrap(err, "couldn't set current elements number for avg in storage")
-		}
-	} else {
-		err = currentAvgStorage.Clear()
-		if err != nil {
-			return errors.Wrap(err, "couldn't set current avg in storage")
-		}
-
-		err = currentAvgNumStorage.Clear()
-		if err != nil {
-			return errors.Wrap(err, "couldn't set current elements number for avg in storage")
-		}
+	err = currentAvgNumStorage.Set(&currentAvgNum)
+	if err != nil {
+		return errors.Wrap(err, "couldn't set current elements number for avg in storage")
 	}
 
 	return nil

@@ -847,7 +847,7 @@ func (tkn *Tokenizer) scanString(delim uint16, typ int) (int, []byte) {
 				return LEX_ERROR, buffer.Bytes()
 			}
 
-			if tkn.lastChar == '\'' || tkn.lastChar == '\\' {
+			if tkn.lastChar == '\'' || tkn.lastChar == '\\' || tkn.lastChar == 'n' {
 				decodedChar := sqltypes.SQLDecodeMap[byte(tkn.lastChar)]
 				ch = uint16(decodedChar)
 			} else {

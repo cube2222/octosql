@@ -1,5 +1,7 @@
 package metadata
 
+import "github.com/cube2222/octosql"
+
 type Cardinality string
 
 const (
@@ -26,15 +28,21 @@ func CombineCardinalities(cardinalities ...Cardinality) Cardinality {
 }
 
 type NodeMetadata struct {
-	cardinality Cardinality
+	cardinality    Cardinality
+	eventTimeField octosql.VariableName
 }
 
 func (meta *NodeMetadata) Cardinality() Cardinality {
 	return meta.cardinality
 }
 
-func NewNodeMetadata(cardinality Cardinality) *NodeMetadata {
+func (meta *NodeMetadata) EventTimeField() octosql.VariableName {
+	return meta.eventTimeField
+}
+
+func NewNodeMetadata(cardinality Cardinality, eventTimeField octosql.VariableName) *NodeMetadata {
 	return &NodeMetadata{
-		cardinality: cardinality,
+		cardinality:    cardinality,
+		eventTimeField: eventTimeField,
 	}
 }

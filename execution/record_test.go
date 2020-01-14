@@ -195,7 +195,7 @@ func TestRecordMarshal(t *testing.T) {
 						octosql.MakeFloat(1.284),
 						octosql.MakeBool(true),
 						octosql.MakeString("something else"),
-						octosql.MakeTime(time.Now()),
+						octosql.MakeTime(time.Unix(42690321, 123456)),
 						octosql.MakeDuration(18247),
 					},
 				),
@@ -243,7 +243,7 @@ func TestRecordMarshal(t *testing.T) {
 						}),
 						octosql.MakeInt(15),
 						octosql.MakePhantom(),
-						octosql.MakeTime(time.Now()),
+						octosql.MakeTime(time.Unix(42690321, 123456)),
 					},
 					WithUndo(),
 					WithEventTimeField("this is my event time field"),
@@ -267,6 +267,126 @@ func TestRecordMarshal(t *testing.T) {
 
 			if !tt.args.rec.Equal(&resultRec) {
 				log.Fatal("The unmarshaled record is different from the original one")
+			}
+		})
+	}
+}
+
+func TestRecordConstructors(t *testing.T) {
+	type args struct {
+		first  *Record
+		second *Record
+	}
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "first test - basic types",
+			args: args{
+				first: NewRecord(
+					[]octosql.VariableName{"a", "b", "c", "d", "e", "f", "g", "h"},
+					map[octosql.VariableName]octosql.Value{
+						"a": octosql.MakeNull(),
+						"b": octosql.MakePhantom(),
+						"c": octosql.MakeInt(3),
+						"d": octosql.MakeFloat(5.182),
+						"e": octosql.MakeBool(false),
+						"f": octosql.MakeString("a string of great importance"),
+						"g": octosql.MakeTime(time.Unix(1111111, 492)),
+						"h": octosql.MakeDuration(1823),
+					},
+				),
+				second: NewRecordFromSlice(
+					[]octosql.VariableName{"a", "b", "c", "d", "e", "f", "g", "h"},
+					[]octosql.Value{
+						octosql.MakeNull(),
+						octosql.MakePhantom(),
+						octosql.MakeInt(3),
+						octosql.MakeFloat(5.182),
+						octosql.MakeBool(false),
+						octosql.MakeString("a string of great importance"),
+						octosql.MakeTime(time.Unix(1111111, 492)),
+						octosql.MakeDuration(1823),
+					},
+				),
+			},
+		},
+
+		{
+			name: "second test - complex types",
+			args: args{
+				first: NewRecord(
+					[]octosql.VariableName{"a", "b"},
+					map[octosql.VariableName]octosql.Value{
+						"a": octosql.MakeTuple(
+							[]octosql.Value{
+								octosql.MakeNull(),
+								octosql.MakeTime(time.Unix(1111111, 492)),
+								octosql.MakeInt(7),
+								octosql.MakeFloat(11.1145678),
+							},
+						),
+						"b": octosql.MakeObject(
+							map[string]octosql.Value{
+								"key1": octosql.MakeDuration(114),
+								"key2": octosql.MakeString("something_123$$$!@#__"),
+							},
+						),
+					},
+				),
+				second: NewRecordFromSlice(
+					[]octosql.VariableName{"a", "b"},
+					[]octosql.Value{
+						octosql.MakeTuple(
+							[]octosql.Value{
+								octosql.MakeNull(),
+								octosql.MakeTime(time.Unix(1111111, 492)),
+								octosql.MakeInt(7),
+								octosql.MakeFloat(11.1145678),
+							},
+						),
+						octosql.MakeObject(
+							map[string]octosql.Value{
+								"key1": octosql.MakeDuration(114),
+								"key2": octosql.MakeString("something_123$$$!@#__"),
+							},
+						),
+					},
+				),
+			},
+		},
+
+		{
+			name: "third test - metadata",
+			args: args{
+				first: NewRecord(
+					[]octosql.VariableName{"a", "b", "c"},
+					map[octosql.VariableName]octosql.Value{
+						"a": octosql.MakeInt(42),
+						"b": octosql.MakeFloat(42.0),
+						"c": octosql.MakePhantom(),
+					},
+					WithUndo(),
+					WithID(ID{ID: "this_is_my_id"}),
+				),
+				second: NewRecordFromSlice(
+					[]octosql.VariableName{"a", "b", "c"},
+					[]octosql.Value{
+						octosql.MakeInt(42),
+						octosql.MakeFloat(42.0),
+						octosql.MakePhantom(),
+					},
+					WithID(ID{ID: "this_is_my_id"}),
+					WithUndo(),
+				),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if !tt.args.first.Equal(tt.args.second) {
+				log.Fatalf("The records aren't equal!\n %v \n %v", tt.args.first, tt.args.second)
 			}
 		})
 	}

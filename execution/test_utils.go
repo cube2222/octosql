@@ -33,7 +33,7 @@ func newMultiSet() *recordMultiSet {
 }
 
 func (rms *recordMultiSet) Insert(rec *Record) error {
-	hash, err := HashRecord(rec)
+	hash, err := rec.Hash()
 	if err != nil {
 		return errors.Wrap(err, "couldn't hash record")
 	}
@@ -53,7 +53,7 @@ func (rms *recordMultiSet) Insert(rec *Record) error {
 }
 
 func (rms *recordMultiSet) GetCount(rec *Record) (int, error) {
-	hash, err := HashRecord(rec)
+	hash, err := rec.Hash()
 	if err != nil {
 		return 0, errors.Wrap(err, "couldn't hash record")
 	}

@@ -746,6 +746,20 @@ func TestLike_Apply(t *testing.T) {
 			want:    true,
 			wantErr: false,
 		},
+
+		{
+			name: "test10 - bugfix",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("Ab&_*{}[]()//>)--+"),
+					"b": octosql.MakeString(`Ab\%%`),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {

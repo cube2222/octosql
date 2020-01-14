@@ -5,22 +5,25 @@ import (
 	"fmt"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/docs"
+	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/streaming/trigger"
+
 	"github.com/pkg/errors"
 )
 
 type AggregatePrototype func() Aggregate
 
 type Aggregate interface {
-	docs.Documented
-	AddRecord(key octosql.Value, value octosql.Value) error
-	GetAggregated(key octosql.Value) (octosql.Value, error)
+	AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error
+	RetractValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error
+	GetValue(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error)
 	String() string
 }
 
 type GroupBy struct {
-	source Node
-	key    []Expression
+	storage storage.Storage
+	source  Node
+	key     []Expression
 
 	fields              []octosql.VariableName
 	aggregatePrototypes []AggregatePrototype
@@ -28,8 +31,8 @@ type GroupBy struct {
 	as []octosql.VariableName
 }
 
-func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, aggregatePrototypes []AggregatePrototype, as []octosql.VariableName) *GroupBy {
-	return &GroupBy{source: source, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, as: as}
+func NewGroupBy(storage storage.Storage, source Node, key []Expression, fields []octosql.VariableName, aggregatePrototypes []AggregatePrototype, as []octosql.VariableName) *GroupBy {
+	return &GroupBy{storage: storage, source: source, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, as: as}
 }
 
 func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
@@ -42,127 +45,158 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables) (Reco
 	for i := range node.aggregatePrototypes {
 		aggregates[i] = node.aggregatePrototypes[i]()
 	}
+	prefixes := make([][]byte, len(aggregates))
+	for i := range prefixes {
+		prefixes[i] = []byte(fmt.Sprintf("$agg%d$", i))
+	}
 
-	return &GroupByStream{
-		source:    source,
-		variables: variables,
+	outputFieldNames := make([]octosql.VariableName, len(aggregates))
+	for i := range aggregates {
+		if len(node.as[i]) > 0 {
+			outputFieldNames[i] = node.as[i]
+		} else {
+			outputFieldNames[i] = octosql.NewVariableName(
+				fmt.Sprintf(
+					"%s_%s",
+					node.fields[i].String(),
+					aggregates[i].String(),
+				),
+			)
+		}
+	}
 
-		key:    node.key,
-		groups: NewHashMap(),
+	groupBy := &GroupByStream{
+		prefixes:         prefixes,
+		inputFields:      node.fields,
+		eventTimeField:   "",
+		aggregates:       aggregates,
+		outputFieldNames: outputFieldNames,
+	}
+	processFunc := &ProcessByKey{
+		eventTimeField:  "",
+		output:          make(chan outputEntry, 1024),
+		trigger:         trigger.NewWatermarkTrigger(),
+		keyExpression:   node.key,
+		processFunction: groupBy,
+		variables:       variables,
+	}
+	groupByPullEngine := NewPullEngine(processFunc, node.storage, source, &ZeroWatermarkSource{})
+	go groupByPullEngine.Run(ctx) // TODO: .Close() should kill this context and the goroutine.
 
-		fields:     node.fields,
-		aggregates: aggregates,
-
-		as: node.as,
-	}, nil
+	return groupByPullEngine, nil
 }
 
+// TODO: Physical plan nodes need to have the GetEventTimeField() method. There's no sense for a stream to be mixed anyways
+// This way, we know before creation, if the used variable is an event time group by or not.
+// This would be injected into any ProcessFunctions
 type GroupByStream struct {
-	source    RecordStream
-	variables octosql.Variables
+	prefixes [][]byte
 
-	key    []Expression
-	groups *HashMap
+	eventTimeField octosql.VariableName // Empty if not grouping by event time
+	inputFields    []octosql.VariableName
+	aggregates     []Aggregate
 
-	fields     []octosql.VariableName
-	aggregates []Aggregate
-
-	as []octosql.VariableName
-
-	fieldNames []octosql.VariableName
-	iterator   *Iterator
+	outputFieldNames []octosql.VariableName
 }
 
-func (stream *GroupByStream) Next(ctx context.Context) (*Record, error) {
-	if stream.iterator == nil {
-		for {
-			record, err := stream.source.Next(ctx)
+var eventTimePrefix = []byte("$event_time$")
+
+func (gb *GroupByStream) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, key octosql.Value, record *Record) error {
+	if inputIndex > 0 {
+		panic("only one input stream allowed for group by")
+	}
+	keyPrefix := append(append([]byte("$"), key.MonotonicMarshal()...), '$')
+	txByKey := tx.WithPrefix(keyPrefix)
+
+	for i := range gb.aggregates {
+		var value octosql.Value
+		if gb.inputFields[i] == "*star*" {
+			mapping := make(map[string]octosql.Value, len(record.Fields()))
+			for _, field := range record.Fields() {
+				mapping[field.Name.String()] = record.Value(field.Name)
+			}
+			value = octosql.MakeObject(mapping)
+		} else if gb.inputFields[i] == gb.eventTimeField && gb.aggregates[i].String() == "first" {
+			eventTimeState := storage.NewValueState(txByKey.WithPrefix(eventTimePrefix))
+			val := record.Value(gb.eventTimeField)
+			err := eventTimeState.Set(&val)
 			if err != nil {
-				if err == ErrEndOfStream {
-					stream.fieldNames = make([]octosql.VariableName, len(stream.fields))
-					for i := range stream.fields {
-						if len(stream.as[i]) > 0 {
-							stream.fieldNames[i] = stream.as[i]
-						} else {
-							stream.fieldNames[i] = octosql.NewVariableName(
-								fmt.Sprintf(
-									"%s_%s",
-									stream.fields[i].String(),
-									stream.aggregates[i].String(),
-								),
-							)
-						}
-					}
-					stream.iterator = stream.groups.GetIterator()
-					break
-				}
-				return nil, errors.Wrap(err, "couldn't get next source record")
+				return errors.Wrap(err, "couldn't save event time")
 			}
-
-			variables, err := stream.variables.MergeWith(record.AsVariables())
+			continue
+		} else {
+			value = record.Value(gb.inputFields[i])
+		}
+		if !record.IsUndo() {
+			err := gb.aggregates[i].AddValue(ctx, txByKey.WithPrefix(gb.prefixes[i]), value)
 			if err != nil {
-				return nil, errors.Wrap(err, "couldn't merge stream variables with record")
+				return errors.Wrapf(
+					err,
+					"couldn't add record value to aggregate %s with index %v",
+					gb.aggregates[i].String(),
+					i,
+				)
 			}
-
-			key := make([]octosql.Value, len(stream.key))
-			for i := range stream.key {
-				key[i], err = stream.key[i].ExpressionValue(ctx, variables)
-				if err != nil {
-					return nil, errors.Wrapf(err, "couldn't evaluate group key expression with index %v", i)
-				}
-			}
-
-			if len(key) == 0 {
-				key = append(key, octosql.MakePhantom())
-			}
-
-			err = stream.groups.Set(octosql.MakeTuple(key), octosql.Phantom{})
+		} else {
+			err := gb.aggregates[i].RetractValue(ctx, txByKey.WithPrefix(gb.prefixes[i]), value)
 			if err != nil {
-				return nil, errors.Wrap(err, "couldn't put group key into hashmap")
-			}
-
-			for i := range stream.aggregates {
-				var value octosql.Value
-				if stream.fields[i] == "*star*" {
-					mapping := make(map[string]octosql.Value, len(record.Fields()))
-					for _, field := range record.Fields() {
-						mapping[field.Name.String()] = record.Value(field.Name)
-					}
-					value = octosql.MakeObject(mapping)
-
-				} else {
-					value = record.Value(stream.fields[i])
-				}
-				err := stream.aggregates[i].AddRecord(octosql.MakeTuple(key), value)
-				if err != nil {
-					return nil, errors.Wrapf(
-						err,
-						"couldn't add record value to aggregate %s with index %v",
-						stream.aggregates[i].String(),
-						i,
-					)
-				}
+				return errors.Wrapf(
+					err,
+					"couldn't retract record value from aggregate %s with index %v",
+					gb.aggregates[i].String(),
+					i,
+				)
 			}
 		}
 	}
 
-	key, _, ok := stream.iterator.Next()
-	if !ok {
-		return nil, ErrEndOfStream
+	return nil
+}
+
+var previouslyTriggeredValuePrefix = []byte("$previously_triggered_value$")
+
+func (gb *GroupByStream) Trigger(ctx context.Context, tx storage.StateTransaction, key octosql.Value) ([]*Record, error) {
+	output := make([]*Record, 0, 2)
+	keyPrefix := append(append([]byte("$"), key.MonotonicMarshal()...), '$')
+	txByKey := tx.WithPrefix(keyPrefix)
+
+	var opts []RecordOption
+	if len(gb.eventTimeField) > 0 {
+		opts = append(opts, WithEventTimeField(gb.eventTimeField))
 	}
 
-	values := make([]octosql.Value, len(stream.aggregates))
-	for i := range stream.aggregates {
+	previouslyTriggeredValues := storage.NewValueState(txByKey.WithPrefix(previouslyTriggeredValuePrefix))
+	var previouslyTriggered octosql.Value
+	err := previouslyTriggeredValues.Get(&previouslyTriggered)
+	if err == nil {
+		output = append(output, NewRecordFromSlice(gb.outputFieldNames, previouslyTriggered.AsSlice(), append(opts[:len(opts):len(opts)], WithUndo())...))
+	} else if err != storage.ErrKeyNotFound {
+		return nil, errors.Wrap(err, "couldn't get previously triggered value for key")
+	}
+
+	values := make([]octosql.Value, len(gb.aggregates))
+	for i := range gb.aggregates {
+		if gb.inputFields[i] == gb.eventTimeField && gb.aggregates[i].String() == "first" {
+			eventTimeState := storage.NewValueState(txByKey.WithPrefix(eventTimePrefix))
+			err := eventTimeState.Get(&values[i])
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't get event time")
+			}
+			continue
+		}
 		var err error
-		values[i], err = stream.aggregates[i].GetAggregated(key)
+		values[i], err = gb.aggregates[i].GetValue(ctx, txByKey.WithPrefix(gb.prefixes[i]))
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't get aggregate value")
+			return nil, errors.Wrapf(err, "couldn't get value of aggregate %s with index %d", gb.aggregates[i].String(), i)
 		}
 	}
+	output = append(output, NewRecordFromSlice(gb.outputFieldNames, values, opts...))
 
-	return NewRecordFromSlice(stream.fieldNames, values), nil
-}
+	newPreviouslyTriggeredValuesTuple := octosql.MakeTuple(values)
+	err = previouslyTriggeredValues.Set(&newPreviouslyTriggeredValuesTuple)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't set new previously triggered value")
+	}
 
-func (stream *GroupByStream) Close() error {
-	return stream.source.Close()
+	return output, nil
 }

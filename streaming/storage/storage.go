@@ -17,7 +17,7 @@ func NewBadgerStorage(db *badger.DB) *BadgerStorage {
 	}
 }
 
-func (bs *BadgerStorage) BeginTransaction() *badgerTransaction {
+func (bs *BadgerStorage) BeginTransaction() StateTransaction {
 	//bs.db.DropPrefix()
 	tx := bs.db.NewTransaction(true)
 	return &badgerTransaction{tx: tx, prefix: nil}

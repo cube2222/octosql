@@ -1,4 +1,4 @@
-package streaming
+package execution
 
 import (
 	"context"
@@ -8,27 +8,25 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/streaming/storage"
 	"github.com/cube2222/octosql/streaming/trigger"
 )
 
 type ProcessFunction interface {
-	AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, key octosql.Value, record *execution.Record) error
-	Trigger(ctx context.Context, tx storage.StateTransaction, key octosql.Value) ([]*execution.Record, error) // New Records and Retractions
+	AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, key octosql.Value, record *Record) error
+	Trigger(ctx context.Context, tx storage.StateTransaction, key octosql.Value) ([]*Record, error) // New Records and Retractions
 }
 
 type ProcessByKey struct {
 	output          chan outputEntry // TODO: Temporary
 	trigger         trigger.Trigger
 	eventTimeField  octosql.VariableName // Empty if not grouping by event time.
-	keyExpression   []execution.Expression
+	keyExpression   []Expression
 	processFunction ProcessFunction
 	variables       octosql.Variables
 }
 
-func (p *ProcessByKey) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *execution.Record) error {
-	log.Println("ProcessByKey.AddRecord")
+func (p *ProcessByKey) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *Record) error {
 	variables, err := p.variables.MergeWith(record.AsVariables())
 	if err != nil {
 		return errors.Wrap(err, "couldn't merge stream variables with record")
@@ -68,7 +66,7 @@ func (p *ProcessByKey) AddRecord(ctx context.Context, tx storage.StateTransactio
 }
 
 type outputEntry struct {
-	record      *execution.Record
+	record      *Record
 	watermark   *time.Time
 	endOfStream bool
 }
@@ -96,7 +94,7 @@ func (p *ProcessByKey) triggerKeys(ctx context.Context, tx storage.StateTransact
 var outputWatermarkPrefix = []byte("$output_watermark$")
 var endOfStreamPrefix = []byte("$end_of_stream$")
 
-func (p *ProcessByKey) Next(ctx context.Context, tx storage.StateTransaction) (*execution.Record, error) {
+func (p *ProcessByKey) Next(ctx context.Context, tx storage.StateTransaction) (*Record, error) {
 	endOfStreamState := storage.NewValueState(tx.WithPrefix(endOfStreamPrefix))
 	var eos octosql.Value
 	err := endOfStreamState.Get(&eos)
@@ -104,7 +102,7 @@ func (p *ProcessByKey) Next(ctx context.Context, tx storage.StateTransaction) (*
 	} else if err != nil {
 		return nil, errors.Wrap(err, "couldn't get end of stream value")
 	} else {
-		return nil, execution.ErrEndOfStream
+		return nil, ErrEndOfStream
 	}
 
 	for record := range p.output {
@@ -114,7 +112,7 @@ func (p *ProcessByKey) Next(ctx context.Context, tx storage.StateTransaction) (*
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't update end of stream state")
 			}
-			return nil, execution.ErrEndOfStream
+			return nil, ErrEndOfStream
 		} else if record.record != nil {
 			return record.record, nil
 		} else if record.watermark != nil {
@@ -128,7 +126,7 @@ func (p *ProcessByKey) Next(ctx context.Context, tx storage.StateTransaction) (*
 			panic("unreachable")
 		}
 	}
-	return nil, execution.ErrEndOfStream
+	return nil, ErrEndOfStream
 }
 
 func (p *ProcessByKey) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {

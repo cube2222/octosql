@@ -149,9 +149,9 @@ func NewLike() Relation {
 	return &Like{}
 }
 
-const LikeEscape = '\\'
-const LikeAny = '_'
-const LikeAll = '%'
+const likeEscape = '\\'
+const likeAny = '_'
+const likeAll = '%'
 
 func (rel *Like) Apply(ctx context.Context, variables octosql.Variables, left, right Expression) (bool, error) {
 	leftValue, err := left.ExpressionValue(ctx, variables)
@@ -194,24 +194,24 @@ func likePatternToRegexp(pattern string) (string, error) {
 
 	for _, r := range pattern {
 		if escaping { // escaping \, _ and % is legal (we just write . or .*), otherwise an error occurs
-			if r != LikeAny && r != LikeAll && r != LikeEscape {
+			if r != likeAny && r != likeAll && r != likeEscape {
 				return "", errors.Errorf("escaping invalid character in LIKE pattern: %v", r)
 			}
 
 			escaping = false
 			sb.WriteRune(r)
 
-			if r == LikeEscape {
+			if r == likeEscape {
 				// since _ and % don't need to be escaped in regexp we just replace \_ with _
 				// but \ needs to be replaced in both, so we need to write an additional \
-				sb.WriteRune(LikeEscape)
+				sb.WriteRune(likeEscape)
 			}
 		} else {
-			if r == LikeEscape { // if we find an escape sequence we just handle it in the next step
+			if r == likeEscape { // if we find an escape sequence we just handle it in the next step
 				escaping = true
-			} else if r == LikeAny { // _ transforms to . (any character)
+			} else if r == likeAny { // _ transforms to . (any character)
 				sb.WriteRune('.')
-			} else if r == LikeAll { // % transforms to .* (any string)
+			} else if r == likeAll { // % transforms to .* (any string)
 				sb.WriteString(".*")
 			} else if needsEscaping(r) { // escape characters that might break the regexp
 				sb.WriteRune('\\')

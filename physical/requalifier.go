@@ -2,7 +2,9 @@ package physical
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/pkg/errors"
@@ -37,5 +39,8 @@ func (node *Requalifier) Materialize(ctx context.Context, matCtx *Materializatio
 }
 
 func (node *Requalifier) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality())
+	eventTimeField := node.Source.Metadata().EventTimeField()
+	eventTimeField = octosql.NewVariableName(fmt.Sprintf("%s.%s", node.Qualifier, eventTimeField.Name()))
+
+	return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality(), eventTimeField)
 }

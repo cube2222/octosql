@@ -36,7 +36,7 @@ Octopus, because octopi have many arms, so they can grasp and manipulate multipl
 ## Installation
 Either download the binary for your operating system (Linux, OS X and Windows are supported) from the [Releases page](https://github.com/cube2222/octosql/releases), or install using the go command line tool:
 ```bash
-go get -u github.com/cube2222/octosql/cmd/octosql
+GO111MODULE=on go get -u github.com/cube2222/octosql/cmd/octosql
 ```
 
 ## Quickstart

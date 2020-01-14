@@ -71,5 +71,5 @@ func (node *OrderBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 }
 
 func (node *OrderBy) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMetadata(metadata.BoundedFitsInLocalStorage)
+	return metadata.NewNodeMetadata(metadata.BoundedFitsInLocalStorage, node.Source.Metadata().EventTimeField())
 }

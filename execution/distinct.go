@@ -5,7 +5,6 @@ import (
 
 	"context"
 
-	"github.com/mitchellh/hashstructure"
 	"github.com/pkg/errors"
 )
 
@@ -88,7 +87,7 @@ func newRecordSet() *recordSet {
 }
 
 func (rs *recordSet) Has(r *Record) (bool, error) {
-	hash, err := HashRecord(r)
+	hash, err := r.Hash()
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get hash of record")
 	}
@@ -103,7 +102,7 @@ func (rs *recordSet) Has(r *Record) (bool, error) {
 }
 
 func (rs *recordSet) Insert(r *Record) (bool, error) {
-	hash, err := HashRecord(r)
+	hash, err := r.Hash()
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get hash of record")
 	}
@@ -118,9 +117,4 @@ func (rs *recordSet) Insert(r *Record) (bool, error) {
 	}
 
 	return false, nil
-}
-
-//TODO: should the hash include other fields as well?
-func HashRecord(rec *Record) (uint64, error) {
-	return hashstructure.Hash(octosql.GetValuesFromPointers(rec.Data), nil)
 }

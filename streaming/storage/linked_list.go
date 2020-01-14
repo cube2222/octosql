@@ -184,7 +184,7 @@ func (lli *LinkedListIterator) Close() error {
 func getIndexKey(index int) []byte {
 	bytes := make([]byte, 0)
 	bytes = append(bytes, linkedListValueKeyPrefix...)
-	bytes = append(bytes, octosql.MonotonicMarshalInt(index)...)
+	bytes = append(bytes, octosql.MonotonicMarshalInt64(int64(index))...)
 
 	return bytes
 }
@@ -219,14 +219,15 @@ func (ll *LinkedList) getAttribute(attr []byte) (int, error) {
 	value, err := ll.tx.Get(attr)
 	switch err {
 	case badger.ErrKeyNotFound:
-		err2 := ll.tx.Set(attr, octosql.MonotonicMarshalInt(0))
+		err2 := ll.tx.Set(attr, octosql.MonotonicMarshalInt64(0))
 		if err2 != nil {
 			return 0, errors.Wrapf(err2, "couldn't initialize linked list %s field", string(attr))
 		}
 
 		return 0, nil
 	case nil:
-		return octosql.MonotonicUnmarshalInt(value)
+		i, err := octosql.MonotonicUnmarshalInt64(value)
+		return int(i), err
 	default:
 		return 0, errors.Wrapf(err, "couldn't read %s of linked list", string(attr))
 	}
@@ -246,7 +247,7 @@ func (ll *LinkedList) incAttribute(attr []byte) error {
 		return err
 	}
 
-	newValue := octosql.MonotonicMarshalInt(value + 1)
+	newValue := octosql.MonotonicMarshalInt64(int64(value) + 1)
 
 	err = ll.tx.Set(attr, newValue)
 	if err != nil {

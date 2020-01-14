@@ -76,6 +76,7 @@ func (engine *PullEngine) Run(ctx context.Context) {
 		if err != nil {
 			tx.Abort()
 			log.Println(err)
+			return // TODO: Error propagation?
 		}
 	}
 }

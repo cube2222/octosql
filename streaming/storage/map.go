@@ -1,10 +1,11 @@
 package storage
 
 import (
-	"github.com/cube2222/octosql"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
 )
 
 type Map struct {
@@ -69,13 +70,10 @@ func (hm *Map) GetIteratorWithPrefix(prefix []byte) *MapIterator {
 	return NewMapIterator(it)
 }
 
-func (hm *Map) GetIterator() *MapIterator {
-	it := hm.tx.Iterator(WithDefault())
-	return NewMapIterator(it)
-}
-
-func (hm *Map) GetReverseIterator() *MapIterator {
-	it := hm.tx.Iterator(WithDefault(), WithReverse())
+func (hm *Map) GetIterator(opts ...IteratorOption) *MapIterator {
+	allOpts := []IteratorOption{WithDefault()}
+	allOpts = append(allOpts, opts...)
+	it := hm.tx.Iterator(allOpts...)
 	return NewMapIterator(it)
 }
 

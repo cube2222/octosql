@@ -86,7 +86,7 @@ func (stream *LeftJoinedStream) Next(ctx context.Context) (*Record, error) {
 		}
 		stream.joinedAnyRecord = true
 
-		fields := stream.curRecord.fieldNames
+		fields := stream.curRecord.GetVariableNames()
 		for _, field := range joinedRecord.Fields() {
 			fields = append(fields, field.Name)
 		}

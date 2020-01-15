@@ -3,6 +3,7 @@ package tvf
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -47,8 +48,7 @@ func (r *Tumble) Get(ctx context.Context, variables octosql.Variables) (executio
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get window length")
 	}
-	octoDuration, ok := duration.(octosql.Duration)
-	if !ok {
+	if duration.GetType() != octosql.TypeDuration {
 		return nil, errors.Errorf("invalid tumble duration: %v", duration)
 	}
 
@@ -56,24 +56,23 @@ func (r *Tumble) Get(ctx context.Context, variables octosql.Variables) (executio
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get window offset")
 	}
-	octoOffset, ok := offset.(octosql.Duration)
-	if !ok {
+	if offset.GetType() != octosql.TypeDuration {
 		return nil, errors.Errorf("invalid tumble offset: %v", duration)
 	}
 
 	return &TumbleStream{
 		source:       source,
 		timeField:    r.timeField,
-		windowLength: octoDuration,
-		offset:       octoOffset,
+		windowLength: duration.AsDuration(),
+		offset:       offset.AsDuration(),
 	}, nil
 }
 
 type TumbleStream struct {
 	source       execution.RecordStream
 	timeField    octosql.VariableName
-	windowLength octosql.Duration
-	offset       octosql.Duration
+	windowLength time.Duration
+	offset       time.Duration
 }
 
 func (s *TumbleStream) Next(ctx context.Context) (*execution.Record, error) {
@@ -85,13 +84,13 @@ func (s *TumbleStream) Next(ctx context.Context) (*execution.Record, error) {
 		return nil, errors.Wrap(err, "couldn't get source record")
 	}
 
-	timeValue, ok := srcRecord.Value(s.timeField).(octosql.Time)
-	if !ok {
+	timeValue := srcRecord.Value(s.timeField)
+	if timeValue.GetType() != octosql.TypeTime {
 		return nil, fmt.Errorf("couldn't get time field '%v' as time, got: %v", s.timeField.String(), srcRecord.Value(s.timeField))
 	}
 
-	windowStart := timeValue.AsTime().Add(-1 * s.offset.AsDuration()).Truncate(s.windowLength.AsDuration()).Add(s.offset.AsDuration())
-	windowEnd := windowStart.Add(s.windowLength.AsDuration())
+	windowStart := timeValue.AsTime().Add(-1 * s.offset).Truncate(s.windowLength).Add(s.offset)
+	windowEnd := windowStart.Add(s.windowLength)
 
 	fields := make([]octosql.VariableName, len(srcRecord.Fields()), len(srcRecord.Fields())+2)
 	values := make([]octosql.Value, len(srcRecord.Fields()), len(srcRecord.Fields())+2)
@@ -104,7 +103,7 @@ func (s *TumbleStream) Next(ctx context.Context) (*execution.Record, error) {
 	fields = append(fields, octosql.NewVariableName("window_start"), octosql.NewVariableName("window_end"))
 	values = append(values, octosql.MakeTime(windowStart), octosql.MakeTime(windowEnd))
 
-	newRecord := execution.NewRecordFromSlice(fields, values, execution.WithMetadataFrom(srcRecord), execution.WithEventTime(windowEnd))
+	newRecord := execution.NewRecordFromSlice(fields, values, execution.WithMetadataFrom(srcRecord), execution.WithEventTimeField("window_end"))
 
 	return newRecord, nil
 }

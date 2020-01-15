@@ -1,13 +1,13 @@
 package table
 
 import (
-	"fmt"
 	"io"
+
+	"github.com/olekukonko/tablewriter"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/output"
-	"github.com/olekukonko/tablewriter"
 )
 
 type Output struct {
@@ -53,7 +53,7 @@ func (o *Output) Close() error {
 		var out []string
 		for _, field := range fields {
 			value := record.Value(octosql.NewVariableName(field))
-			out = append(out, fmt.Sprint(value))
+			out = append(out, value.Show())
 		}
 		table.Append(out)
 	}

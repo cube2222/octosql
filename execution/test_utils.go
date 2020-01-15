@@ -33,7 +33,7 @@ func newMultiSet() *recordMultiSet {
 }
 
 func (rms *recordMultiSet) Insert(rec *Record) error {
-	hash, err := HashRecord(rec)
+	hash, err := rec.Hash()
 	if err != nil {
 		return errors.Wrap(err, "couldn't hash record")
 	}
@@ -53,7 +53,7 @@ func (rms *recordMultiSet) Insert(rec *Record) error {
 }
 
 func (rms *recordMultiSet) GetCount(rec *Record) (int, error) {
-	hash, err := HashRecord(rec)
+	hash, err := rec.Hash()
 	if err != nil {
 		return 0, errors.Wrap(err, "couldn't hash record")
 	}
@@ -85,9 +85,8 @@ func newEntity(name octosql.VariableName, value octosql.Value) entity {
 
 func Normalize(rec *Record) *Record {
 	row := make(row, 0)
-	for k := range rec.fieldNames {
-		fieldName := rec.fieldNames[k]
-		value := rec.data[k]
+	for k, fieldName := range rec.GetVariableNames() {
+		value := *rec.Data[k]
 		row = append(row, newEntity(fieldName, value))
 	}
 
@@ -95,8 +94,9 @@ func Normalize(rec *Record) *Record {
 		return row[i].fieldName < row[j].fieldName
 	})
 
-	sortedFieldNames := make([]octosql.VariableName, len(rec.fieldNames))
-	values := make([]interface{}, len(rec.fieldNames))
+	fieldLength := len(rec.FieldNames)
+	sortedFieldNames := make([]octosql.VariableName, fieldLength)
+	values := make([]interface{}, fieldLength)
 
 	for k := range row {
 		ent := row[k]

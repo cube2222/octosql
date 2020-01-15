@@ -133,7 +133,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables) (exe
 			return nil, errors.Wrap(err, "couldn't get actual value from variables")
 		}
 
-		values = append(values, value)
+		values = append(values, value.ToRawValue())
 	}
 
 	rows, err := ds.stmt.QueryContext(ctx, values...)

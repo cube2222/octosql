@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"io"
 
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/output"
-	"github.com/pkg/errors"
 )
 
 type Output struct {
@@ -44,7 +45,7 @@ func (o *Output) WriteRecord(record *execution.Record) error {
 	}
 	kvs := make(map[string]interface{})
 	for _, field := range record.Fields() {
-		kvs[field.Name.String()] = record.Value(field.Name)
+		kvs[field.Name.String()] = record.Value(field.Name).ToRawValue()
 	}
 	err := o.enc.Encode(kvs)
 	if err != nil {

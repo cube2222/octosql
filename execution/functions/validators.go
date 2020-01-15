@@ -2,8 +2,6 @@ package functions
 
 import (
 	"fmt"
-	"log"
-	"reflect"
 	"strings"
 
 	"github.com/cube2222/octosql"
@@ -215,71 +213,10 @@ func TypeOf(wantedType octosql.Value) *typeOf {
 }
 
 func (v *typeOf) Validate(arg octosql.Value) error {
-	switch v.wantedType.(type) {
-	case octosql.Null:
-		if _, ok := arg.(octosql.Null); !ok {
-			return fmt.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroNull()).String(), arg)
-		}
-		return nil
-
-	case octosql.Phantom:
-		if _, ok := arg.(octosql.Phantom); !ok {
-			return fmt.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroPhantom()).String(), arg)
-		}
-		return nil
-
-	case octosql.Int:
-		if _, ok := arg.(octosql.Int); !ok {
-			return fmt.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroInt()).String(), arg)
-		}
-		return nil
-
-	case octosql.Float:
-		if _, ok := arg.(octosql.Float); !ok {
-			return fmt.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroFloat()).String(), arg)
-		}
-		return nil
-
-	case octosql.Bool:
-		if _, ok := arg.(octosql.Bool); !ok {
-			return fmt.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroBool()).String(), arg)
-		}
-		return nil
-
-	case octosql.String:
-		if _, ok := arg.(octosql.String); !ok {
-			return fmt.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroString()).String(), arg)
-		}
-		return nil
-
-	case octosql.Time:
-		if _, ok := arg.(octosql.Time); !ok {
-			return fmt.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroTime()).String(), arg)
-		}
-		return nil
-
-	case octosql.Duration:
-		if _, ok := arg.(octosql.Duration); !ok {
-			return fmt.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroDuration()).String(), arg)
-		}
-		return nil
-
-	case octosql.Tuple:
-		if _, ok := arg.(octosql.Tuple); !ok {
-			return fmt.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroTuple()).String(), arg)
-		}
-		return nil
-
-	case octosql.Object:
-		if _, ok := arg.(octosql.Object); !ok {
-			return fmt.Errorf("expected type %v but got %v", reflect.TypeOf(octosql.ZeroObject()).String(), arg)
-		}
-		return nil
-
+	if v.wantedType.GetType() != arg.GetType() {
+		return fmt.Errorf("expected type %v but got %v", v.wantedType.GetType(), arg.GetType())
 	}
-
-	log.Fatalf("unhandled type: %v", reflect.TypeOf(v.wantedType).String())
-	panic("unreachable")
+	return nil
 }
 
 func (v *typeOf) Document() docs.Documentation {

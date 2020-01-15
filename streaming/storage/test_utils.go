@@ -5,7 +5,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func TestLinkedListIterator(iter *LinkedListIterator, expectedValues []octosql.Value) (bool, error) {
+func TestDequeueIterator(iter *DequeueIterator, expectedValues []octosql.Value) (bool, error) {
 	var value octosql.Value
 
 	for i := 0; i < len(expectedValues); i++ {

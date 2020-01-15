@@ -45,7 +45,7 @@ func (agg *Min) RetractValue(ctx context.Context, tx storage.StateTransaction, v
 	var currentValueCount octosql.Value
 	err := currentMinStorage.Get(&value, &currentValueCount)
 	if err == storage.ErrKeyNotFound {
-		return errors.Wrap(err, "attempt to retract value that doesn't exist in min storage")
+		return errors.Wrap(err, "attempt to retract value that doesn't exist in min storage") // TODO
 	} else if err != nil {
 		return errors.Wrap(err, "couldn't get current value count from min storage")
 	}

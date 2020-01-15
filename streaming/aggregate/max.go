@@ -45,7 +45,7 @@ func (agg *Max) RetractValue(ctx context.Context, tx storage.StateTransaction, v
 	var currentValueCount octosql.Value
 	err := currentMaxStorage.Get(&value, &currentValueCount)
 	if err == storage.ErrKeyNotFound {
-		return errors.Wrap(err, "attempt to retract value that doesn't exist in max storage")
+		return errors.Wrap(err, "attempt to retract value that doesn't exist in max storage") // TODO
 	} else if err != nil {
 		return errors.Wrap(err, "couldn't get current value count from max storage")
 	}

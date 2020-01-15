@@ -9,6 +9,7 @@ import (
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical/metadata"
+	"github.com/cube2222/octosql/streaming/storage"
 )
 
 // Transformers is a structure containing functions to transform each of the physical plan components.
@@ -22,12 +23,14 @@ type Transformers struct {
 
 // MaterializationContext is a structure containing the configuration for the materialization.
 type MaterializationContext struct {
-	Config *config.Config
+	Config  *config.Config
+	Storage storage.Storage
 }
 
-func NewMaterializationContext(config *config.Config) *MaterializationContext {
+func NewMaterializationContext(config *config.Config, storage storage.Storage) *MaterializationContext {
 	return &MaterializationContext{
-		Config: config,
+		Config:  config,
+		Storage: storage,
 	}
 }
 

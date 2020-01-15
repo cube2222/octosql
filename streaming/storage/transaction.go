@@ -138,8 +138,6 @@ func WithPrefix(prefix []byte) IteratorOption {
 
 func WithDefault() IteratorOption {
 	return func(opts *IteratorOptions) {
-		opts.PrefetchValues = true
-		opts.PrefetchSize = 100
 		opts.Reverse = false
 		opts.AllVersions = false
 	}

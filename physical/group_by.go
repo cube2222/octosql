@@ -6,8 +6,8 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/execution/aggregates"
 	"github.com/cube2222/octosql/physical/metadata"
+	"github.com/cube2222/octosql/streaming/aggregate"
 	"github.com/pkg/errors"
 )
 
@@ -85,10 +85,10 @@ func (node *GroupBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 
 	aggregatePrototypes := make([]execution.AggregatePrototype, len(node.Aggregates))
 	for i := range node.Aggregates {
-		aggregatePrototypes[i] = aggregates.AggregateTable[string(node.Aggregates[i])]
+		aggregatePrototypes[i] = aggregate.AggregateTable[string(node.Aggregates[i])]
 	}
 
-	return execution.NewGroupBy(source, key, node.Fields, aggregatePrototypes, node.As), nil
+	return execution.NewGroupBy(matCtx.Storage, source, key, node.Fields, aggregatePrototypes, node.As), nil
 }
 
 func (node *GroupBy) Metadata() *metadata.NodeMetadata {

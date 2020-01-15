@@ -1,4 +1,4 @@
-package streaming
+package execution
 
 import (
 	"context"
@@ -8,8 +8,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql/streaming/storage"
-
-	"github.com/cube2222/octosql/execution"
 )
 
 // Based on protocol buffer max timestamp value.
@@ -19,9 +17,16 @@ type WatermarkSource interface {
 	GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error)
 }
 
+type ZeroWatermarkSource struct {
+}
+
+func (z *ZeroWatermarkSource) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
+	return time.Time{}, nil
+}
+
 type IntermediateRecordStore interface {
-	AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *execution.Record) error
-	Next(ctx context.Context, tx storage.StateTransaction) (*execution.Record, error)
+	AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *Record) error
+	Next(ctx context.Context, tx storage.StateTransaction) (*Record, error)
 	UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error
 	GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error)
 	MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error
@@ -30,13 +35,13 @@ type IntermediateRecordStore interface {
 
 type PullEngine struct {
 	irs                    IntermediateRecordStore
-	source                 execution.RecordStream
+	source                 RecordStream
 	lastCommittedWatermark time.Time
 	watermarkSource        WatermarkSource
-	storage                *storage.BadgerStorage
+	storage                storage.Storage
 }
 
-func NewPullEngine(irs IntermediateRecordStore, storage *storage.BadgerStorage, source execution.RecordStream, watermarkSource WatermarkSource) *PullEngine {
+func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, source RecordStream, watermarkSource WatermarkSource) *PullEngine {
 	return &PullEngine{
 		irs:             irs,
 		storage:         storage,
@@ -46,21 +51,37 @@ func NewPullEngine(irs IntermediateRecordStore, storage *storage.BadgerStorage, 
 }
 
 func (engine *PullEngine) Run(ctx context.Context) {
+	tx := engine.storage.BeginTransaction()
+
+	i := 0
 	for {
-		err := engine.loop(ctx)
-		if err == execution.ErrEndOfStream {
+		i++
+		if i%1 == 0 {
+			err := tx.Commit()
+			if err != nil {
+				log.Println("couldn't commit: ", err)
+				return
+			}
+			tx = engine.storage.BeginTransaction()
+		}
+		err := engine.loop(ctx, tx)
+		if err == ErrEndOfStream {
+			err := tx.Commit()
+			if err != nil {
+				log.Println("couldn't commit: ", err)
+			}
 			log.Println("end of stream, stopping loop")
 			return
 		}
 		if err != nil {
+			tx.Abort()
 			log.Println(err)
+			return // TODO: Error propagation?
 		}
 	}
 }
 
-func (engine *PullEngine) loop(ctx context.Context) error {
-	tx := engine.storage.BeginTransaction()
-	defer tx.Abort()
+func (engine *PullEngine) loop(ctx context.Context, tx storage.StateTransaction) error {
 	watermark, err := engine.watermarkSource.GetWatermark(ctx, tx)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current watermark from source")
@@ -70,17 +91,13 @@ func (engine *PullEngine) loop(ctx context.Context) error {
 		if err != nil {
 			return errors.Wrap(err, "couldn't update watermark in intermediate record store")
 		}
-		err = tx.Commit()
-		if err != nil {
-			return errors.Wrap(err, "couldn't commit transaction")
-		}
 		engine.lastCommittedWatermark = watermark
 		return nil
 	}
 
 	record, err := engine.source.Next(storage.InjectStateTransaction(ctx, tx))
 	if err != nil {
-		if err == execution.ErrEndOfStream {
+		if err == ErrEndOfStream {
 			err := engine.irs.UpdateWatermark(ctx, tx, maxWatermark)
 			if err != nil {
 				return errors.Wrap(err, "couldn't mark end of stream max watermark in intermediate record store")
@@ -89,11 +106,7 @@ func (engine *PullEngine) loop(ctx context.Context) error {
 			if err != nil {
 				return errors.Wrap(err, "couldn't mark end of stream in intermediate record store")
 			}
-			err = tx.Commit()
-			if err != nil {
-				return errors.Wrap(err, "couldn't commit transaction")
-			}
-			return execution.ErrEndOfStream
+			return ErrEndOfStream
 		}
 		return errors.Wrap(err, "couldn't get next record")
 	}
@@ -101,20 +114,16 @@ func (engine *PullEngine) loop(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "couldn't add record to intermediate record store")
 	}
-	err = tx.Commit()
-	if err != nil {
-		return errors.Wrap(err, "couldn't commit transaction")
-	}
 
 	return nil
 }
 
-func (engine *PullEngine) Next(ctx context.Context) (*execution.Record, error) {
+func (engine *PullEngine) Next(ctx context.Context) (*Record, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
 	rec, err := engine.irs.Next(ctx, tx)
 	if err != nil {
-		if err == execution.ErrEndOfStream {
-			return nil, execution.ErrEndOfStream
+		if err == ErrEndOfStream {
+			return nil, ErrEndOfStream
 		}
 		return nil, errors.Wrap(err, "couldn't get next record from intermediate record store")
 	}

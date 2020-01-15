@@ -5,6 +5,7 @@ import "github.com/dgraph-io/badger/v2"
 type Storage interface {
 	DropAll(prefix []byte) error
 	BeginTransaction() StateTransaction
+	WithPrefix(prefix []byte) StateTransaction
 }
 
 type BadgerStorage struct {
@@ -26,4 +27,10 @@ func (bs *BadgerStorage) BeginTransaction() StateTransaction {
 func (bs *BadgerStorage) DropAll(prefix []byte) error {
 	err := bs.db.DropPrefix(prefix)
 	return err
+}
+
+func (bs *BadgerStorage) WithPrefix(prefix []byte) StateTransaction {
+	tx := bs.db.NewTransaction(true)
+	badgerT := &badgerTransaction{tx: tx, prefix: nil}
+	return badgerT.WithPrefix(prefix)
 }

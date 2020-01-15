@@ -10,39 +10,43 @@ import (
 var ErrEmptyQueue = errors.New("the queue is empty")
 
 var (
-	dequeueLastElementKey  = []byte("last")
-	dequeueFirstElementKey = []byte("first")
-	dequeueValueKeyPrefix  = []byte("value")
+	dequeLastElementKey  = []byte("last")
+	dequeFirstElementKey = []byte("first")
+	dequeValueKeyPrefix  = []byte("value")
+	defaultValues        = map[string]int{
+		string(dequeFirstElementKey): 0,
+		string(dequeLastElementKey):  1,
+	}
 )
 
-type Dequeue struct {
+type Deque struct {
 	tx           StateTransaction
 	initialized  bool
 	lastElement  int
 	firstElement int
 }
 
-type DequeueIterator struct {
+type DequeIterator struct {
 	it Iterator
 }
 
-func NewDequeue(tx StateTransaction) *Dequeue {
-	return &Dequeue{
+func NewDeque(tx StateTransaction) *Deque {
+	return &Deque{
 		tx:           tx,
 		initialized:  false,
-		lastElement:  0,
+		lastElement:  1,
 		firstElement: 0,
 	}
 }
 
-func NewDequeueIterator(it Iterator) *DequeueIterator {
-	return &DequeueIterator{
+func NewDequeIterator(it Iterator) *DequeIterator {
+	return &DequeIterator{
 		it: it,
 	}
 }
 
 //Adds new element to the front of the queue
-func (ll *Dequeue) PushFront(value proto.Message) error {
+func (ll *Deque) PushFront(value proto.Message) error {
 	if !ll.initialized {
 		err := ll.initialize()
 		if err != nil {
@@ -59,7 +63,7 @@ func (ll *Dequeue) PushFront(value proto.Message) error {
 }
 
 //Adds new element to the end of the queue
-func (ll *Dequeue) PushBack(value proto.Message) error {
+func (ll *Deque) PushBack(value proto.Message) error {
 	if !ll.initialized {
 		err := ll.initialize()
 		if err != nil {
@@ -75,7 +79,7 @@ func (ll *Dequeue) PushBack(value proto.Message) error {
 	return ll.appendBytes(data, ll.lastElement, ll.incLast)
 }
 
-func (ll *Dequeue) appendBytes(data []byte, index int, modifier func() error) error {
+func (ll *Deque) appendBytes(data []byte, index int, modifier func() error) error {
 	byteKey := getIndexKey(index)
 
 	err := ll.tx.Set(byteKey, data)
@@ -93,29 +97,29 @@ func (ll *Dequeue) appendBytes(data []byte, index int, modifier func() error) er
 
 //Removes the first element from the queue and returns it
 //Returns ErrEmptyQueue if the list is empty
-func (ll *Dequeue) PopFront(value proto.Message) error {
+func (ll *Deque) PopFront(value proto.Message) error {
 	//there is no need to call initialize here, since PeekFront calls initialize
 	err := ll.PeekFront(value)
 	if err != nil {
 		return err
 	}
 
-	return ll.pop(value, ll.firstElement, ll.incFirst)
+	return ll.pop(value, ll.firstElement+1, ll.incFirst)
 }
 
 //Removes the last element from the queue and returns it
 //Returns ErrEmptyQueue if the list is empty
-func (ll *Dequeue) PopBack(value proto.Message) error {
+func (ll *Deque) PopBack(value proto.Message) error {
 	//there is no need to call initialize here, since PeekFront calls initialize
 	err := ll.PeekBack(value)
 	if err != nil {
 		return err
 	}
 
-	return ll.pop(value, ll.lastElement, ll.decLast)
+	return ll.pop(value, ll.lastElement-1, ll.decLast)
 }
 
-func (ll *Dequeue) pop(value proto.Message, index int, modifier func() error) error {
+func (ll *Deque) pop(value proto.Message, index int, modifier func() error) error {
 	err := ll.peekIndex(value, index)
 	if err != nil {
 		return err
@@ -134,7 +138,7 @@ func (ll *Dequeue) pop(value proto.Message, index int, modifier func() error) er
 
 //Returns the first element of the queue without removing it
 //Returns ErrEmptyQueue if the queue is empty
-func (ll *Dequeue) PeekFront(value proto.Message) error {
+func (ll *Deque) PeekFront(value proto.Message) error {
 	if !ll.initialized {
 		err := ll.initialize()
 		if err != nil {
@@ -142,12 +146,12 @@ func (ll *Dequeue) PeekFront(value proto.Message) error {
 		}
 	}
 
-	return ll.peekIndex(value, ll.firstElement)
+	return ll.peekIndex(value, ll.firstElement+1)
 }
 
 //Returns the last element of the queue without removing it
 //Returns ErrEmptyQueue if the queue is empty
-func (ll *Dequeue) PeekBack(value proto.Message) error {
+func (ll *Deque) PeekBack(value proto.Message) error {
 	if !ll.initialized {
 		err := ll.initialize()
 		if err != nil {
@@ -155,13 +159,13 @@ func (ll *Dequeue) PeekBack(value proto.Message) error {
 		}
 	}
 
-	return ll.peekIndex(value, ll.lastElement)
+	return ll.peekIndex(value, ll.lastElement-1)
 }
 
 //we don't check if the queue has been initialized here, since we only
 //call peekIndex from PeekFront/PeekBack, which both initialize the queue
-func (ll *Dequeue) peekIndex(value proto.Message, index int) error {
-	if ll.firstElement >= ll.lastElement {
+func (ll *Deque) peekIndex(value proto.Message, index int) error {
+	if ll.lastElement-ll.firstElement <= 1 {
 		return ErrEmptyQueue
 	}
 
@@ -176,9 +180,31 @@ func (ll *Dequeue) peekIndex(value proto.Message, index int) error {
 	return errors.Wrap(err, "couldn't unmarshal the element in peek")
 }
 
+func (ll *Deque) Print() error { //add initialize here (?)
+	var value octosql.Value
+	it := ll.tx.WithPrefix(dequeValueKeyPrefix).Iterator()
+
+	defer func() {
+		_ = it.Close() //TODO: panic here?
+	}()
+
+	for {
+		err := it.Next(&value)
+		if err == ErrEndOfIterator {
+			break
+		} else if err != nil {
+			return errors.Wrap(err, "error in iterator next")
+		}
+
+		println(value.Show())
+	}
+
+	return nil
+}
+
 //Clears all contents of the queue including the metadata
-func (ll *Dequeue) Clear() error {
-	for ll.firstElement < ll.lastElement {
+func (ll *Deque) Clear() error {
+	for ll.firstElement < ll.lastElement-1 {
 		key := getIndexKey(ll.firstElement)
 		err := ll.tx.Delete(key)
 
@@ -194,12 +220,12 @@ func (ll *Dequeue) Clear() error {
 		ll.firstElement++
 	}
 
-	err := ll.tx.Delete(dequeueFirstElementKey)
+	err := ll.tx.Delete(dequeFirstElementKey)
 	if err != nil {
 		return errors.Wrap(err, "couldn't clear first element index metadata")
 	}
 
-	err = ll.tx.Delete(dequeueLastElementKey)
+	err = ll.tx.Delete(dequeLastElementKey)
 	if err != nil {
 		return errors.Wrap(err, "couldn't clear last element index metadata")
 	}
@@ -213,12 +239,12 @@ func (ll *Dequeue) Clear() error {
 	return nil
 }
 
-func (ll *Dequeue) GetIterator() *DequeueIterator {
-	it := ll.tx.WithPrefix(dequeueValueKeyPrefix).Iterator(WithDefault())
-	return NewDequeueIterator(it)
+func (ll *Deque) GetIterator() *DequeIterator {
+	it := ll.tx.WithPrefix(dequeValueKeyPrefix).Iterator(WithDefault())
+	return NewDequeIterator(it)
 }
 
-func (lli *DequeueIterator) Next(value proto.Message) error {
+func (lli *DequeIterator) Next(value proto.Message) error {
 	err := lli.it.Next(value)
 	if err == ErrEndOfIterator || err == nil {
 		return err
@@ -227,19 +253,19 @@ func (lli *DequeueIterator) Next(value proto.Message) error {
 	return errors.Wrap(err, "couldn't read next element")
 }
 
-func (lli *DequeueIterator) Close() error {
+func (lli *DequeIterator) Close() error {
 	return lli.it.Close()
 }
 
 func getIndexKey(index int) []byte {
 	bytes := make([]byte, 0)
-	bytes = append(bytes, dequeueValueKeyPrefix...)
+	bytes = append(bytes, dequeValueKeyPrefix...)
 	bytes = append(bytes, octosql.MonotonicMarshalInt64(int64(index))...)
 
 	return bytes
 }
 
-func (ll *Dequeue) initialize() error {
+func (ll *Deque) initialize() error {
 	last, err := ll.getLast()
 	if err != nil {
 		return errors.Wrap(err, "couldn't initialize the queue last attribute")
@@ -257,34 +283,40 @@ func (ll *Dequeue) initialize() error {
 	return nil
 }
 
-func (ll *Dequeue) getLast() (int, error) {
-	return ll.getAttribute(dequeueLastElementKey)
+func (ll *Deque) getLast() (int, error) {
+	return ll.getAttribute(dequeLastElementKey)
 }
 
-func (ll *Dequeue) getFirst() (int, error) {
-	return ll.getAttribute(dequeueFirstElementKey)
+func (ll *Deque) getFirst() (int, error) {
+	return ll.getAttribute(dequeFirstElementKey)
 }
 
-func (ll *Dequeue) getAttribute(attr []byte) (int, error) {
+func (ll *Deque) getAttribute(attr []byte) (int, error) {
 	value, err := ll.tx.Get(attr)
+	stringAttribute := string(attr)
 	switch err {
 	case badger.ErrKeyNotFound:
-		err2 := ll.tx.Set(attr, octosql.MonotonicMarshalInt64(0))
-		if err2 != nil {
-			return 0, errors.Wrapf(err2, "couldn't initialize queue %s field", string(attr))
+		value, ok := defaultValues[stringAttribute]
+		if !ok {
+			return 0, errors.New("this byte slice isn't a queue attribute")
 		}
 
-		return 0, nil
+		err2 := ll.tx.Set(attr, octosql.MonotonicMarshalInt64(int64(value)))
+		if err2 != nil {
+			return 0, errors.Wrapf(err2, "couldn't initialize queue %s field", stringAttribute)
+		}
+
+		return value, nil
 	case nil:
 		i, err := octosql.MonotonicUnmarshalInt64(value)
 		return int(i), err
 	default:
-		return 0, errors.Wrapf(err, "couldn't read %s of queue", string(attr))
+		return 0, errors.Wrapf(err, "couldn't read %s of queue", stringAttribute)
 	}
 }
 
-func (ll *Dequeue) incLast() error {
-	err := ll.incAttribute(dequeueLastElementKey)
+func (ll *Deque) incLast() error {
+	err := ll.incAttribute(dequeLastElementKey)
 	if err != nil {
 		return errors.Wrap(err, "failed to increase queue last attribute")
 	}
@@ -293,8 +325,8 @@ func (ll *Dequeue) incLast() error {
 	return nil
 }
 
-func (ll *Dequeue) incFirst() error {
-	err := ll.incAttribute(dequeueFirstElementKey)
+func (ll *Deque) incFirst() error {
+	err := ll.incAttribute(dequeFirstElementKey)
 	if err != nil {
 		return errors.Wrap(err, "failed to increase queue first attribute")
 	}
@@ -303,8 +335,8 @@ func (ll *Dequeue) incFirst() error {
 	return nil
 }
 
-func (ll *Dequeue) decLast() error {
-	err := ll.decAttribute(dequeueLastElementKey)
+func (ll *Deque) decLast() error {
+	err := ll.decAttribute(dequeLastElementKey)
 	if err != nil {
 		return errors.Wrap(err, "failed to decrease queue last attribute")
 	}
@@ -313,8 +345,8 @@ func (ll *Dequeue) decLast() error {
 	return nil
 }
 
-func (ll *Dequeue) decFirst() error {
-	err := ll.decAttribute(dequeueFirstElementKey)
+func (ll *Deque) decFirst() error {
+	err := ll.decAttribute(dequeFirstElementKey)
 	if err != nil {
 		return errors.Wrap(err, "failed to decrease queue first attribute")
 	}
@@ -323,19 +355,19 @@ func (ll *Dequeue) decFirst() error {
 	return nil
 }
 
-func (ll *Dequeue) incAttribute(attr []byte) error {
+func (ll *Deque) incAttribute(attr []byte) error {
 	return ll.modifyAttribute(attr, func(v int64) int64 {
 		return v + 1
 	})
 }
 
-func (ll *Dequeue) decAttribute(attr []byte) error {
+func (ll *Deque) decAttribute(attr []byte) error {
 	return ll.modifyAttribute(attr, func(v int64) int64 {
 		return v - 1
 	})
 }
 
-func (ll *Dequeue) modifyAttribute(attr []byte, modifier func(int64) int64) error {
+func (ll *Deque) modifyAttribute(attr []byte, modifier func(int64) int64) error {
 	value, err := ll.getAttribute(attr)
 	if err != nil {
 		return err

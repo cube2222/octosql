@@ -204,8 +204,8 @@ func (ll *Deque) Print() error { //add initialize here (?)
 
 //Clears all contents of the queue including the metadata
 func (ll *Deque) Clear() error {
-	for ll.firstElement < ll.lastElement-1 {
-		key := getIndexKey(ll.firstElement)
+	for ll.lastElement-ll.firstElement > 1 {
+		key := getIndexKey(ll.firstElement + 1)
 		err := ll.tx.Delete(key)
 
 		if err != nil {
@@ -216,8 +216,6 @@ func (ll *Deque) Clear() error {
 		if err != nil {
 			return errors.Wrap(err, "couldn't increase first element index")
 		}
-
-		ll.firstElement++
 	}
 
 	err := ll.tx.Delete(dequeFirstElementKey)
@@ -231,10 +229,11 @@ func (ll *Deque) Clear() error {
 	}
 
 	/* Generally if someone uses Clear() on the a queue (as in a namespace), then they shouldn't
-	use the same one to add new values. In case they do we can set these to 0.
+	use the same one to add new values. In case they do we can set these to defaults.
 	*/
 	ll.firstElement = 0
-	ll.lastElement = 0
+	ll.lastElement = 1
+	ll.initialized = false
 
 	return nil
 }

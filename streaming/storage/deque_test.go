@@ -159,6 +159,62 @@ func TestLinkedList(t *testing.T) {
 	if err != ErrEmptyQueue {
 		log.Fatal("pop back should have returned ErrEmptyQueue", err)
 	}
+
+	println("peeks and pops return ErrEmptyQueue correctly")
+
+	//insert the data again
+	for i := 0; i < len(values); i++ {
+		err = queue.PushBack(&values[i])
+		if err != nil {
+			log.Fatal("repopulation of queue: ", err)
+		}
+	}
+
+	//check if initialize on a queue with some data works correctly
+	secondQueue := NewDeque(txn)
+
+	err = secondQueue.testPeekFront(values[0])
+	if err != nil {
+		log.Fatal("bad init peek front: ", err)
+	}
+
+	err = secondQueue.testPeekBack(values[5])
+	if err != nil {
+		log.Fatal("bad init peek back: ", err)
+	}
+
+	if secondQueue.firstElement != 0 {
+		log.Fatal("the first element index of the newly initialized queue should be 0")
+	}
+
+	if secondQueue.lastElement != len(values)+1 {
+		log.Fatal("the last element index of the newly initialized queue should be len(values) + 1")
+	}
+
+	println("reinitialization passed")
+
+	//check if Clear works correctly
+	err = secondQueue.Clear()
+	if err != nil {
+		log.Fatal("clear: ", err)
+	}
+
+	//secondQueue.Print()
+
+	err = secondQueue.isEqualTo([]octosql.Value{})
+	if err != nil {
+		log.Fatal("after clear, the iterator isn't empty: ", err)
+	}
+
+	_, err = txn.Get(dequeLastElementKey)
+	if err != badger.ErrKeyNotFound {
+		log.Fatal("after clear, the last key wasn't cleared: ", err)
+	}
+
+	_, err = txn.Get(dequeFirstElementKey)
+	if err != badger.ErrKeyNotFound {
+		log.Fatal("after clear, the first key wasn't cleared: ", err)
+	}
 }
 
 func (dq *Deque) testPeekBack(expected octosql.Value) error {
@@ -227,7 +283,7 @@ func (dq *Deque) isEqualTo(values []octosql.Value) error {
 		_ = it.Close()
 	}()
 
-	isCorrect, err := TestDequeueIterator(it, values)
+	isCorrect, err := TestDequeIterator(it, values)
 	if err != nil {
 		return err
 	}

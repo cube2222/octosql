@@ -11,8 +11,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-func TestLinkedList(t *testing.T) {
-	prefix := "test_linked_list"
+func TestDeque(t *testing.T) {
+	prefix := "test_deque"
 	path := "test"
 
 	db, err := badger.Open(badger.DefaultOptions(path))

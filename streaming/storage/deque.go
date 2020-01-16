@@ -67,7 +67,7 @@ func (ll *Deque) PushBack(value proto.Message) error {
 	if !ll.initialized {
 		err := ll.initialize()
 		if err != nil {
-			return errors.Wrap(err, "failed to initialize in queue.PushBack()")
+			return errors.Wrap(err, "failed to initialize in queue.PushBack")
 		}
 	}
 
@@ -177,26 +177,8 @@ func (ll *Deque) peekIndex(value proto.Message, index int) error {
 	}
 
 	err = proto.Unmarshal(data, value)
-	return errors.Wrap(err, "couldn't unmarshal the element in peek")
-}
-
-func (ll *Deque) Print() error { //add initialize here (?)
-	var value octosql.Value
-	it := ll.tx.WithPrefix(dequeValueKeyPrefix).Iterator()
-
-	defer func() {
-		_ = it.Close() //TODO: panic here?
-	}()
-
-	for {
-		err := it.Next(&value)
-		if err == ErrEndOfIterator {
-			break
-		} else if err != nil {
-			return errors.Wrap(err, "error in iterator next")
-		}
-
-		println(value.Show())
+	if err != nil {
+		return errors.Wrap(err, "couldn't unmarshal the element in peek")
 	}
 
 	return nil
@@ -334,6 +316,12 @@ func (ll *Deque) incFirst() error {
 	return nil
 }
 
+func (ll *Deque) incAttribute(attr []byte) error {
+	return ll.modifyAttribute(attr, func(v int64) int64 {
+		return v + 1
+	})
+}
+
 func (ll *Deque) decLast() error {
 	err := ll.decAttribute(dequeLastElementKey)
 	if err != nil {
@@ -352,12 +340,6 @@ func (ll *Deque) decFirst() error {
 
 	ll.firstElement -= 1
 	return nil
-}
-
-func (ll *Deque) incAttribute(attr []byte) error {
-	return ll.modifyAttribute(attr, func(v int64) int64 {
-		return v + 1
-	})
 }
 
 func (ll *Deque) decAttribute(attr []byte) error {

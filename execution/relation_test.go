@@ -764,7 +764,7 @@ func TestLike_Apply(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rel := tt.rel
+			rel := NewLike()
 			got, err := rel.Apply(ctx, tt.args.variables, tt.args.left, tt.args.right)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Like.Apply() error = %v, wantErr %v", err, tt.wantErr)

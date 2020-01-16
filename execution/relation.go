@@ -143,13 +143,10 @@ func (rel *LessEqual) Apply(ctx context.Context, variables octosql.Variables, le
 }
 
 type Like struct {
-	patternRegexp *regexp.Regexp
 }
 
 func NewLike() Relation {
-	return &Like{
-		patternRegexp: nil,
-	}
+	return &Like{}
 }
 
 const likeEscape = '\\'
@@ -176,22 +173,15 @@ func (rel *Like) Apply(ctx context.Context, variables octosql.Variables, left, r
 			leftValue.Show(), rightValue.Show(), leftValue.GetType(), rightValue.GetType())
 	}
 
-	if rel.patternRegexp == nil {
-		patternString, err := likePatternToRegexp(rightValue.AsString())
-		if err != nil {
-			return false, errors.Wrapf(err, "couldn't transform LIKE pattern %v to regexp", patternString)
-		}
-
-		patternRegularExpression, err := regexp.Compile(patternString)
-		if err != nil {
-			return false, errors.Wrap(err, "couldn't compile regexp")
-		}
-
-		rel.patternRegexp = patternRegularExpression
+	patternString, err := likePatternToRegexp(rightValue.AsString())
+	if err != nil {
+		return false, errors.Wrapf(err, "couldn't transform LIKE pattern %v to regexp", patternString)
 	}
 
-	match := rel.patternRegexp.MatchString(leftValue.AsString())
-
+	match, err := regexp.MatchString(patternString, leftValue.AsString())
+	if err != nil {
+		return false, errors.Wrapf(err, "couldn't match string in like relation with pattern %v", rightValue)
+	}
 	return match, nil
 }
 

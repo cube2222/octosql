@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/pkg/errors"
 )
 
 func TestBadgerStorage_Subscribe(t *testing.T) {
@@ -52,7 +53,7 @@ func TestBadgerStorage_Subscribe(t *testing.T) {
 			return nil
 		}
 
-		if err := storage.Subscribe(ctx, cb); err != nil && err != context.Canceled {
+		if err := storage.Subscribe(ctx, cb); err != nil && errors.Cause(err) != context.Canceled {
 			panic(err)
 		}
 		log.Printf("subscription closed")

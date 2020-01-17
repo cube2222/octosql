@@ -20,6 +20,7 @@ const (
 	NotIn        Relation = "not in"
 	GreaterEqual Relation = ">="
 	LessEqual    Relation = "<="
+	Regexp       Relation = "regexp"
 )
 
 func NewRelation(relation string) Relation {
@@ -46,6 +47,8 @@ func (rel Relation) Physical(ctx context.Context) (physical.Relation, error) {
 		return physical.GreaterEqual, nil
 	case LessEqual:
 		return physical.LessEqual, nil
+	case Regexp:
+		return physical.Regexp, nil
 	default:
 		return "", errors.Errorf("invalid relation %s", rel)
 	}

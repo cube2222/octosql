@@ -846,12 +846,14 @@ func (tkn *Tokenizer) scanString(delim uint16, typ int) (int, []byte) {
 				// String terminates mid escape character.
 				return LEX_ERROR, buffer.Bytes()
 			}
-			if decodedChar := sqltypes.SQLDecodeMap[byte(tkn.lastChar)]; decodedChar == sqltypes.DontEscape {
-				ch = tkn.lastChar
-			} else {
-				ch = uint16(decodedChar)
-			}
 
+			if tkn.lastChar == '\'' || tkn.lastChar == '\\' || tkn.lastChar == 'n' {
+				decodedChar := sqltypes.SQLDecodeMap[byte(tkn.lastChar)]
+				ch = uint16(decodedChar)
+			} else {
+				buffer.WriteByte('\\')
+				ch = tkn.lastChar
+			}
 		} else if ch == delim && tkn.lastChar != delim {
 			// Correctly terminated string, which is not a double delim.
 			break

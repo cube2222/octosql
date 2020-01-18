@@ -52,22 +52,22 @@ func (agg *First) RetractValue(ctx context.Context, tx storage.StateTransaction,
 	var currentValueCount octosql.Value
 	err := currentFirstCountsStorage.Get(&value, &currentValueCount)
 	if err == storage.ErrKeyNotFound {
-		return errors.Wrap(err, "attempt to retract value that doesn't exist in first storage") // TODO
+		currentValueCount = octosql.MakeInt(0)
 	} else if err != nil {
 		return errors.Wrap(err, "couldn't get current value count from first storage")
 	}
 
 	currentValueCount = octosql.MakeInt(currentValueCount.AsInt() - 1)
 
-	if currentValueCount.AsInt() > 0 {
-		err = currentFirstCountsStorage.Set(&value, &currentValueCount)
-		if err != nil {
-			return errors.Wrap(err, "couldn't set current value count in first storage")
-		}
-	} else {
+	if currentValueCount.AsInt() == 0 { // current value was just cleared, no need to store its count or retractions count
 		err = currentFirstCountsStorage.Delete(&value)
 		if err != nil {
 			return errors.Wrap(err, "couldn't delete current value from first storage")
+		}
+	} else {
+		err = currentFirstCountsStorage.Set(&value, &currentValueCount)
+		if err != nil {
+			return errors.Wrap(err, "couldn't set current value count in first storage")
 		}
 	}
 

@@ -94,6 +94,10 @@ func TestMinInt(t *testing.T) {
 
 	ExpectZeroValue(t, ctx, aggr, tx)
 
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectZeroValue(t, ctx, aggr, tx)
+
 	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(2))
 
 	ExpectZeroValue(t, ctx, aggr, tx)
@@ -106,11 +110,23 @@ func TestMinInt(t *testing.T) {
 
 	ExpectZeroValue(t, ctx, aggr, tx)
 
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(3))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(3))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(3))
+
 	AddValue(t, ctx, aggr, tx, octosql.MakeInt(1))
 
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(1))
 
 	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(3))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(3))
 
 	ExpectZeroValue(t, ctx, aggr, tx)
 }

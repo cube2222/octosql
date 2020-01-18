@@ -95,6 +95,10 @@ func TestMaxInt(t *testing.T) {
 
 	ExpectZeroValue(t, ctx, aggr, tx)
 
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectZeroValue(t, ctx, aggr, tx)
+
 	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(2))
 
 	ExpectZeroValue(t, ctx, aggr, tx)
@@ -107,11 +111,23 @@ func TestMaxInt(t *testing.T) {
 
 	ExpectZeroValue(t, ctx, aggr, tx)
 
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(-1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(-1))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(-1))
+
 	AddValue(t, ctx, aggr, tx, octosql.MakeInt(1))
 
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(1))
 
 	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(-1))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(-1))
 
 	ExpectZeroValue(t, ctx, aggr, tx)
 }

@@ -85,6 +85,10 @@ func TestCount(t *testing.T) {
 
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
 
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
 	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(2))
 
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
@@ -94,6 +98,10 @@ func TestCount(t *testing.T) {
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
 
 	AddValue(t, ctx, aggr, tx, octosql.MakeInt(2))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(1))
 
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
 

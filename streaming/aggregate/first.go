@@ -20,7 +20,7 @@ func NewFirstAggregate() *First {
 }
 
 func (agg *First) AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
-	currentFirstStorage := storage.NewLinkedList(tx.WithPrefix(currentFirstPrefix))
+	currentFirstStorage := storage.NewDeque(tx.WithPrefix(currentFirstPrefix))
 	currentFirstCountsStorage := storage.NewMap(tx.WithPrefix(currentFirstCountsPrefix))
 
 	var currentValueCount octosql.Value
@@ -33,7 +33,7 @@ func (agg *First) AddValue(ctx context.Context, tx storage.StateTransaction, val
 
 	currentValueCount = octosql.MakeInt(currentValueCount.AsInt() + 1)
 
-	err = currentFirstStorage.Append(&value)
+	err = currentFirstStorage.PushBack(&value)
 	if err != nil {
 		return errors.Wrap(err, "couldn't append current value to first list")
 	}
@@ -75,14 +75,14 @@ func (agg *First) RetractValue(ctx context.Context, tx storage.StateTransaction,
 }
 
 func (agg *First) GetValue(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error) {
-	currentFirstStorage := storage.NewLinkedList(tx.WithPrefix(currentFirstPrefix))
+	currentFirstStorage := storage.NewDeque(tx.WithPrefix(currentFirstPrefix))
 	currentFirstCountsStorage := storage.NewMap(tx.WithPrefix(currentFirstCountsPrefix))
 
 	var currentFirst octosql.Value
 	var currentFirstCount octosql.Value
 
 	for {
-		err := currentFirstStorage.Peek(&currentFirst)
+		err := currentFirstStorage.PeekFront(&currentFirst)
 		if err != nil {
 			return octosql.ZeroValue(), errors.Wrap(err, "couldn't peek current first from storage")
 		}
@@ -97,7 +97,7 @@ func (agg *First) GetValue(ctx context.Context, tx storage.StateTransaction) (oc
 		if currentFirstCount.AsInt() > 0 { // first element actually exists
 			return currentFirst, nil
 		} else { // first element was retracted -> ew can pop it
-			err := currentFirstStorage.Pop(&currentFirst)
+			err := currentFirstStorage.PopFront(&currentFirst)
 			if err != nil {
 				return octosql.ZeroValue(), errors.Wrap(err, "couldn't pop current first from storage")
 			}

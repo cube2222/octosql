@@ -89,6 +89,31 @@ func TestMaxInt(t *testing.T) {
 	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(11))
 
 	ExpectZeroValue(t, ctx, aggr, tx)
+
+	// Early retractions
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectZeroValue(t, ctx, aggr, tx)
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(2))
+
+	ExpectZeroValue(t, ctx, aggr, tx)
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectZeroValue(t, ctx, aggr, tx)
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(2))
+
+	ExpectZeroValue(t, ctx, aggr, tx)
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectZeroValue(t, ctx, aggr, tx)
 }
 
 func TestMaxString(t *testing.T) {

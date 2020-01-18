@@ -45,22 +45,22 @@ func (agg *Max) RetractValue(ctx context.Context, tx storage.StateTransaction, v
 	var currentValueCount octosql.Value
 	err := currentMaxStorage.Get(&value, &currentValueCount)
 	if err == storage.ErrKeyNotFound {
-		return errors.Wrap(err, "attempt to retract value that doesn't exist in max storage") // TODO
+		currentValueCount = octosql.MakeInt(0)
 	} else if err != nil {
 		return errors.Wrap(err, "couldn't get current value count from max storage")
 	}
 
 	currentValueCount = octosql.MakeInt(currentValueCount.AsInt() - 1)
 
-	if currentValueCount.AsInt() > 0 {
-		err = currentMaxStorage.Set(&value, &currentValueCount)
-		if err != nil {
-			return errors.Wrap(err, "couldn't set current value count in max storage")
-		}
-	} else {
+	if currentValueCount.AsInt() == 0 { // current value was just cleared, no need to store its count or retractions count
 		err = currentMaxStorage.Delete(&value)
 		if err != nil {
 			return errors.Wrap(err, "couldn't delete current value from max storage")
+		}
+	} else {
+		err = currentMaxStorage.Set(&value, &currentValueCount)
+		if err != nil {
+			return errors.Wrap(err, "couldn't set current value count in max storage")
 		}
 	}
 
@@ -78,12 +78,16 @@ func (agg *Max) GetValue(ctx context.Context, tx storage.StateTransaction) (octo
 		_ = it.Close()
 	}()
 
-	err := it.Next(&currentMax, &currentMaxCount)
-	if err != nil {
-		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get current max from storage")
-	}
+	for {
+		err := it.Next(&currentMax, &currentMaxCount)
+		if err != nil {
+			return octosql.ZeroValue(), errors.Wrap(err, "couldn't get current max from storage")
+		}
 
-	return currentMax, nil
+		if currentMaxCount.AsInt() > 0 {
+			return currentMax, nil
+		}
+	}
 }
 
 func (agg *Max) String() string {

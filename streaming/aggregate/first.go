@@ -35,7 +35,7 @@ func (agg *First) AddValue(ctx context.Context, tx storage.StateTransaction, val
 
 	err = currentFirstStorage.PushBack(&value)
 	if err != nil {
-		return errors.Wrap(err, "couldn't append current value to first list")
+		return errors.Wrap(err, "couldn't push back current value to first deque")
 	}
 
 	err = currentFirstCountsStorage.Set(&value, &currentValueCount)
@@ -96,7 +96,7 @@ func (agg *First) GetValue(ctx context.Context, tx storage.StateTransaction) (oc
 
 		if currentFirstCount.AsInt() > 0 { // first element actually exists
 			return currentFirst, nil
-		} else { // first element was retracted -> ew can pop it
+		} else { // first element was retracted -> we can pop it
 			err := currentFirstStorage.PopFront(&currentFirst)
 			if err != nil {
 				return octosql.ZeroValue(), errors.Wrap(err, "couldn't pop current first from storage")

@@ -45,22 +45,22 @@ func (agg *Min) RetractValue(ctx context.Context, tx storage.StateTransaction, v
 	var currentValueCount octosql.Value
 	err := currentMinStorage.Get(&value, &currentValueCount)
 	if err == storage.ErrKeyNotFound {
-		return errors.Wrap(err, "attempt to retract value that doesn't exist in min storage") // TODO
+		currentValueCount = octosql.MakeInt(0)
 	} else if err != nil {
 		return errors.Wrap(err, "couldn't get current value count from min storage")
 	}
 
 	currentValueCount = octosql.MakeInt(currentValueCount.AsInt() - 1)
 
-	if currentValueCount.AsInt() > 0 {
-		err = currentMinStorage.Set(&value, &currentValueCount)
-		if err != nil {
-			return errors.Wrap(err, "couldn't set current value count in min storage")
-		}
-	} else {
+	if currentValueCount.AsInt() == 0 { // current value was just cleared, no need to store its count or retractions count
 		err = currentMinStorage.Delete(&value)
 		if err != nil {
 			return errors.Wrap(err, "couldn't delete current value from min storage")
+		}
+	} else {
+		err = currentMinStorage.Set(&value, &currentValueCount)
+		if err != nil {
+			return errors.Wrap(err, "couldn't set current value count in min storage")
 		}
 	}
 
@@ -78,12 +78,16 @@ func (agg *Min) GetValue(ctx context.Context, tx storage.StateTransaction) (octo
 		_ = it.Close()
 	}()
 
-	err := it.Next(&currentMin, &currentMinCount)
-	if err != nil {
-		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get current min from storage")
-	}
+	for {
+		err := it.Next(&currentMin, &currentMinCount)
+		if err != nil {
+			return octosql.ZeroValue(), errors.Wrap(err, "couldn't get current min from storage")
+		}
 
-	return currentMin, nil
+		if currentMinCount.AsInt() > 0 {
+			return currentMin, nil
+		}
+	}
 }
 
 func (agg *Min) String() string {

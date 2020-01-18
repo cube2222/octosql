@@ -80,7 +80,7 @@ func TestCount(t *testing.T) {
 
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
 
-	// Retracts first
+	// Early retractions
 	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(1))
 
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))

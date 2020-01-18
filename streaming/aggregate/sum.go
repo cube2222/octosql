@@ -21,19 +21,25 @@ func NewSumAggregate() *Sum {
 func (agg *Sum) AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
 	currentSumStorage := storage.NewValueState(tx.WithPrefix(currentSumPrefix))
 
+	valueType := value.GetType()
+
 	currentSum, err := agg.GetValue(ctx, tx)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current sum")
 	}
 
 	if isNeutralElement(currentSum) {
-		currentSum, err = getAppropriateNeutralElement(value.GetType())
+		currentSum, err = getAppropriateNeutralElement(valueType)
 		if err != nil {
 			return errors.Wrap(err, "couldn't get neutral element for sum")
 		}
 	}
 
-	switch valueType := value.GetType(); valueType {
+	if valueType != currentSum.GetType() {
+		return errors.Errorf("type of value passed (%s) doesn't match current sum type (%s)", value.GetType(), currentSum.GetType())
+	}
+
+	switch valueType {
 	case octosql.TypeInt:
 		currentSum = octosql.MakeInt(currentSum.AsInt() + value.AsInt())
 	case octosql.TypeFloat:

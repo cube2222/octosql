@@ -52,6 +52,11 @@ func AddValue(t *testing.T, ctx context.Context, aggr Aggregate, tx storage.Stat
 	assert.Nil(t, err)
 }
 
+func AddValueError(t *testing.T, ctx context.Context, aggr Aggregate, tx storage.StateTransaction, value octosql.Value) {
+	err := aggr.AddValue(ctx, tx, value)
+	assert.NotNil(t, err)
+}
+
 func RetractValue(t *testing.T, ctx context.Context, aggr Aggregate, tx storage.StateTransaction, value octosql.Value) {
 	err := aggr.RetractValue(ctx, tx, value)
 	assert.Nil(t, err)

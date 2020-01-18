@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -44,6 +45,11 @@ func TestSumInt(t *testing.T) {
 	AddValue(t, ctx, aggr, tx, octosql.MakeInt(12))
 
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(27))
+
+	// Wrong type passed
+	AddValueError(t, ctx, aggr, tx, octosql.MakeDuration(1234))
+
+	AddValueError(t, ctx, aggr, tx, octosql.MakeTime(time.Now()))
 
 	// RetractValue
 	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(13))

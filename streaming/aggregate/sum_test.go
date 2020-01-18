@@ -123,7 +123,7 @@ func TestSumFloat(t *testing.T) {
 
 	RetractValue(t, ctx, aggr, tx, octosql.MakeFloat(2))
 
-	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(0))
 
 	// Mixed
 	AddValue(t, ctx, aggr, tx, octosql.MakeFloat(2.123))
@@ -146,7 +146,7 @@ func TestSumFloat(t *testing.T) {
 
 	RetractValue(t, ctx, aggr, tx, octosql.MakeFloat(0.222))
 
-	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(0))
 }
 
 func TestSumDuration(t *testing.T) {
@@ -186,7 +186,7 @@ func TestSumDuration(t *testing.T) {
 
 	RetractValue(t, ctx, aggr, tx, octosql.MakeDuration(2))
 
-	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(0))
 
 	// Mixed
 	AddValue(t, ctx, aggr, tx, octosql.MakeDuration(2))
@@ -209,5 +209,5 @@ func TestSumDuration(t *testing.T) {
 
 	RetractValue(t, ctx, aggr, tx, octosql.MakeDuration(2))
 
-	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(0))
 }

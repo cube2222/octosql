@@ -78,46 +78,40 @@ func getAppropriateNeutralElement(valueType octosql.Type) (octosql.Value, error)
 func (agg *Sum) RetractValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
 	currentSumPrefix := storage.NewValueState(tx.WithPrefix(currentSumPrefix))
 
+	valueType := value.GetType()
+
 	currentSum, err := agg.GetValue(ctx, tx)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current sum")
 	}
 
-	clearSum := true
+	// TODO - is this needed ?
+	if isNeutralElement(currentSum) {
+		currentSum, err = getAppropriateNeutralElement(valueType)
+		if err != nil {
+			return errors.Wrap(err, "couldn't get neutral element for sum")
+		}
+	}
 
-	switch valueType := value.GetType(); valueType {
+	// TODO - is this needed ?
+	if valueType != currentSum.GetType() {
+		return errors.Errorf("type of value passed (%s) doesn't match current sum type (%s)", value.GetType(), currentSum.GetType())
+	}
+
+	switch valueType {
 	case octosql.TypeInt:
 		currentSum = octosql.MakeInt(currentSum.AsInt() - value.AsInt())
-
-		if currentSum.AsInt() > 0 {
-			clearSum = false
-		}
 	case octosql.TypeFloat:
 		currentSum = octosql.MakeFloat(currentSum.AsFloat() - value.AsFloat())
-
-		if currentSum.AsFloat() > 0.0 {
-			clearSum = false
-		}
 	case octosql.TypeDuration:
 		currentSum = octosql.MakeDuration(currentSum.AsDuration() - value.AsDuration())
-
-		if currentSum.AsDuration() > 0 {
-			clearSum = false
-		}
 	default:
 		return errors.Errorf("unsupported value type passed to sum: %s", valueType)
 	}
 
-	if !clearSum {
-		err = currentSumPrefix.Set(&currentSum)
-		if err != nil {
-			return errors.Wrap(err, "couldn't set current sum in storage")
-		}
-	} else {
-		err = currentSumPrefix.Clear()
-		if err != nil {
-			return errors.Wrap(err, "couldn't clear current sum in storage")
-		}
+	err = currentSumPrefix.Set(&currentSum)
+	if err != nil {
+		return errors.Wrap(err, "couldn't set current sum in storage")
 	}
 
 	return nil

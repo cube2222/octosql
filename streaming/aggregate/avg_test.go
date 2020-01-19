@@ -28,7 +28,7 @@ func TestAvgInt(t *testing.T) {
 	badgerStorage := storage.NewBadgerStorage(db)
 	tx := badgerStorage.BeginTransaction().WithPrefix(prefix)
 
-	aggr := NewAverageAggregate(NewSumAggregate(), NewCountAggregate())
+	aggr := NewAverageAggregate()
 
 	// Empty storage
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
@@ -165,7 +165,7 @@ func TestAvgFloat(t *testing.T) {
 	badgerStorage := storage.NewBadgerStorage(db)
 	tx := badgerStorage.BeginTransaction().WithPrefix(prefix)
 
-	aggr := NewAverageAggregate(NewSumAggregate(), NewCountAggregate())
+	aggr := NewAverageAggregate()
 
 	// Empty storage
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))

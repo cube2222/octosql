@@ -17,10 +17,10 @@ type Average struct {
 	underlyingCount *Count
 }
 
-func NewAverageAggregate(sum *Sum, count *Count) *Average {
+func NewAverageAggregate() *Average {
 	return &Average{
-		underlyingSum:   sum,
-		underlyingCount: count,
+		underlyingSum:   NewSumAggregate(),
+		underlyingCount: NewCountAggregate(),
 	}
 }
 

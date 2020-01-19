@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/pkg/errors"
 )
 
 type KeyValueList = *badger.KVList
@@ -13,7 +12,7 @@ type Storage interface {
 	DropAll(prefix []byte) error
 	BeginTransaction() StateTransaction
 	WithPrefix(prefix []byte) Storage
-	Subscribe(ctx context.Context, onNotification func() error) error
+	Subscribe(ctx context.Context) *Subscription
 }
 
 type BadgerStorage struct {
@@ -28,7 +27,7 @@ func NewBadgerStorage(db *badger.DB) *BadgerStorage {
 }
 
 func (bs *BadgerStorage) BeginTransaction() StateTransaction {
-	//bs.db.DropPrefix()
+	// bs.db.DropPrefix()
 	tx := bs.db.NewTransaction(true)
 	return &badgerTransaction{tx: tx, prefix: bs.prefix}
 }
@@ -45,15 +44,15 @@ func (bs *BadgerStorage) WithPrefix(prefix []byte) Storage {
 	return &copyStorage
 }
 
-func (bs *BadgerStorage) Subscribe(ctx context.Context, onNotification func() error) error {
-	cb := func(kv KeyValueList) error {
-		return onNotification()
-	}
-
-	err := bs.db.Subscribe(ctx, cb, bs.prefix)
-	if err != nil {
-		return errors.Wrap(err, "couldn't subscribe to db")
-	}
-
-	return nil
+func (bs *BadgerStorage) Subscribe(ctx context.Context) *Subscription {
+	return NewSubscription(ctx, func(ctx context.Context, changes chan<- struct{}) error {
+		return bs.db.Subscribe(ctx, func(kv *badger.KVList) error {
+			select {
+			case changes <- struct{}{}:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+			return nil
+		}, bs.prefix)
+	})
 }

@@ -213,6 +213,8 @@ func (dq *Deque) Clear() error {
 			return errors.Wrap(err, "couldn't clear the list")
 		}
 
+		//we call increaseFirstFree instead of simply dq.firstFree += 1 because
+		//a machine can die in the middle of a clear
 		err = dq.increaseFirstFreeFrontSpot()
 		if err != nil {
 			return errors.Wrap(err, "couldn't increase first element index")
@@ -232,8 +234,8 @@ func (dq *Deque) Clear() error {
 	/* Generally if someone uses Clear() on the a queue (as in a namespace), then they shouldn't
 	use the same one to add new values. In case they do we can set these to defaults.
 	*/
-	dq.firstFreeFrontSpot = 0
-	dq.firstFreeBackSpot = 1
+	dq.firstFreeFrontSpot = defaultFirstFreeFrontSpot
+	dq.firstFreeBackSpot = defaultFirstFreeBackSpot
 	dq.initializedFront = false
 
 	return nil

@@ -29,7 +29,7 @@ func (ct *CountingTrigger) RecordReceived(ctx context.Context, tx storage.StateT
 	var countValue octosql.Value
 	err := keyCounts.Get(&key, &countValue)
 	if err != nil {
-		if err == storage.ErrKeyNotFound {
+		if err == storage.ErrNotFound {
 			countValue = octosql.MakeInt(0)
 		} else {
 			return errors.Wrap(err, "couldn't get current count for key")
@@ -69,7 +69,7 @@ func (ct *CountingTrigger) PollKeyToFire(ctx context.Context, tx storage.StateTr
 	var out octosql.Value
 	err := toSend.Get(&out)
 	if err != nil {
-		if err == storage.ErrKeyNotFound {
+		if err == storage.ErrNotFound {
 			return octosql.ZeroValue(), ErrNoKeyToFire
 		}
 		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get value to send")
@@ -93,7 +93,7 @@ func (ct *CountingTrigger) KeyFired(ctx context.Context, tx storage.StateTransac
 			return errors.Wrap(err, "couldn't delete current count for key")
 		}
 		return nil
-	} else if err != storage.ErrKeyNotFound {
+	} else if err != storage.ErrNotFound {
 		return errors.Wrap(err, "couldn't get current count for key")
 	}
 
@@ -107,7 +107,7 @@ func (ct *CountingTrigger) KeyFired(ctx context.Context, tx storage.StateTransac
 			return errors.Wrap(err, "couldn't delete key to send")
 		}
 		return nil
-	} else if err != storage.ErrKeyNotFound {
+	} else if err != storage.ErrNotFound {
 		return errors.Wrap(err, "couldn't get value to send")
 	}
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 )
 
@@ -52,10 +53,14 @@ func (tx *badgerTransaction) Set(key, value []byte) error {
 
 func (tx *badgerTransaction) Get(key []byte) ([]byte, error) {
 	var value []byte
+
 	item, err := tx.tx.Get(tx.getKeyWithPrefix(key))
-	if err != nil {
-		return nil, err
+	if err == badger.ErrKeyNotFound {
+		return nil, ErrNotFound
+	} else if err != nil {
+		return nil, errors.Wrap(err, "couldn't get byte key")
 	}
+
 	value, err = item.ValueCopy(value)
 	if err != nil {
 		return nil, err

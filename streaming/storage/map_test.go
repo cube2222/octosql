@@ -119,13 +119,13 @@ func TestMap(t *testing.T) {
 		log.Fatal(errors.Wrap(err, "the iterator is not empty"))
 	}
 
-	/* test if accessing a missing key returns ErrKeyNotFound */
+	/* test if accessing a missing key returns ErrNotFound */
 	missingKey := octosql.MakeString("invalid key")
 	var value octosql.Value
 
 	err = badgerMap.Get(&missingKey, &value)
-	if err != ErrKeyNotFound {
-		log.Fatal("Accessing a nonexistent key should return ErrKeyNotFound")
+	if err != ErrNotFound {
+		log.Fatal("Accessing a nonexistent key should return ErrNotFound")
 	}
 
 	/* although map doesn't store any metadata to load, check if

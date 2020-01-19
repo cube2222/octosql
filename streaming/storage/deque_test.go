@@ -141,23 +141,23 @@ func TestDeque(t *testing.T) {
 	var value octosql.Value
 
 	err = queue.PeekFront(&value) //peek front
-	if err != ErrEmptyQueue {
-		log.Fatal("peek front should have returned ErrEmptyQueue", err)
+	if err != ErrNotFound {
+		log.Fatal("peek front should have returned ErrNotFound", err)
 	}
 
 	err = queue.PeekBack(&value) //peek back
-	if err != ErrEmptyQueue {
-		log.Fatal("peek back should have returned ErrEmptyQueue", err)
+	if err != ErrNotFound {
+		log.Fatal("peek back should have returned ErrNotFound", err)
 	}
 
 	err = queue.PopFront(&value) // pop front
-	if err != ErrEmptyQueue {
-		log.Fatal("pop front should have returned ErrEmptyQueue", err)
+	if err != ErrNotFound {
+		log.Fatal("pop front should have returned ErrNotFound", err)
 	}
 
 	err = queue.PopBack(&value) // pop back
-	if err != ErrEmptyQueue {
-		log.Fatal("pop back should have returned ErrEmptyQueue", err)
+	if err != ErrNotFound {
+		log.Fatal("pop back should have returned ErrNotFound", err)
 	}
 
 	println("peeks and pops return ErrEmptyQueue correctly")
@@ -183,12 +183,12 @@ func TestDeque(t *testing.T) {
 		log.Fatal("bad init peek back: ", err)
 	}
 
-	if secondQueue.firstElement != 0 {
-		log.Fatal("the first element index of the newly initialized queue should be 0")
+	if secondQueue.firstFreeFrontSpot != 0 {
+		log.Fatal("the first element index of the newly initializedFront queue should be 0")
 	}
 
-	if secondQueue.lastElement != len(values)+1 {
-		log.Fatal("the last element index of the newly initialized queue should be len(values) + 1")
+	if secondQueue.firstFreeBackSpot != len(values)+1 {
+		log.Fatal("the last element index of the newly initializedFront queue should be len(values) + 1")
 	}
 
 	println("reinitialization passed")
@@ -206,13 +206,13 @@ func TestDeque(t *testing.T) {
 		log.Fatal("after clear, the iterator isn't empty: ", err)
 	}
 
-	_, err = txn.Get(dequeLastElementKey)
-	if err != badger.ErrKeyNotFound {
+	_, err = txn.Get(dequeFirstFreeBackSpot)
+	if err != ErrNotFound {
 		log.Fatal("after clear, the last key wasn't cleared: ", err)
 	}
 
-	_, err = txn.Get(dequeFirstElementKey)
-	if err != badger.ErrKeyNotFound {
+	_, err = txn.Get(dequeFirstFreeFrontSpot)
+	if err != ErrNotFound {
 		log.Fatal("after clear, the first key wasn't cleared: ", err)
 	}
 }
@@ -261,7 +261,7 @@ func testPop(pop func(value proto.Message) error, expected octosql.Value, wantEm
 	var value octosql.Value
 
 	err := pop(&value)
-	if err == ErrEmptyQueue && !wantEmpty {
+	if err == ErrNotFound && !wantEmpty {
 		return errors.New("expected a value, but the queue is empty")
 	} else if err == nil && wantEmpty {
 		return errors.New("expected an empty queue, but a value was returned")

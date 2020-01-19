@@ -6,7 +6,7 @@ import (
 
 //TODO: this file should probably have it's name changed, or have it's contents moved to some other file
 
-var ErrKeyNotFound = errors.New("couldn't find key")
+var ErrNotFound = errors.New("couldn't find element")
 
 /*
 	A type that implements this interface must have a MonotonicMarshal method,
@@ -16,7 +16,6 @@ var ErrKeyNotFound = errors.New("couldn't find key")
 	[]byte). Since in mathematics such a function is called Monotonous, thus the name.
 	A MonotonicUnmarshal which is the inverse of MonotonicMarshal is also required.
 
-	WARNING: Float and Object are Serializable, but the serialization is not Monotonic!
 */
 type MonotonicallySerializable interface {
 	MonotonicMarshal() []byte

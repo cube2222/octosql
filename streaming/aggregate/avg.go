@@ -9,9 +9,6 @@ import (
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
-var currentAvgPrefix = []byte("$current_avg$")
-var currentAvgNumPrefix = []byte("$current_avg_num$")
-
 type Average struct {
 	underlyingSum   *Sum
 	underlyingCount *Count
@@ -108,5 +105,5 @@ func (agg *Average) GetValue(ctx context.Context, tx storage.StateTransaction) (
 }
 
 func (agg *Average) String() string {
-	return "average"
+	return "avg"
 }

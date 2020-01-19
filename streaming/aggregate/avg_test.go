@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -27,7 +28,7 @@ func TestAvgInt(t *testing.T) {
 	badgerStorage := storage.NewBadgerStorage(db)
 	tx := badgerStorage.BeginTransaction().WithPrefix(prefix)
 
-	aggr := NewAverageAggregate()
+	aggr := NewAverageAggregate(NewSumAggregate(), NewCountAggregate())
 
 	// Empty storage
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
@@ -48,6 +49,13 @@ func TestAvgInt(t *testing.T) {
 	AddValue(t, ctx, aggr, tx, octosql.MakeInt(2)) // Val: 14	Num: 4
 
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(3.5))
+
+	// Wrong type passed
+	AddValueError(t, ctx, aggr, tx, octosql.MakeDuration(1234))
+
+	AddValueError(t, ctx, aggr, tx, octosql.MakeTime(time.Now()))
+
+	AddValueError(t, ctx, aggr, tx, octosql.MakeFloat(123.123)) // TODO - is this alright? You can't sum different types
 
 	// RetractValue
 	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(8)) // Val: 6	Num: 3
@@ -98,6 +106,47 @@ func TestAvgInt(t *testing.T) {
 	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(1))
 
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	// Early retractions
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(2))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(3))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(2))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(2))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(2))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(4))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(3))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(4))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(2.5))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(4))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(4))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
 }
 
 func TestAvgFloat(t *testing.T) {
@@ -116,7 +165,7 @@ func TestAvgFloat(t *testing.T) {
 	badgerStorage := storage.NewBadgerStorage(db)
 	tx := badgerStorage.BeginTransaction().WithPrefix(prefix)
 
-	aggr := NewAverageAggregate()
+	aggr := NewAverageAggregate(NewSumAggregate(), NewCountAggregate())
 
 	// Empty storage
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
@@ -138,6 +187,13 @@ func TestAvgFloat(t *testing.T) {
 
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(2.55))
 
+	// Wrong type passed
+	AddValueError(t, ctx, aggr, tx, octosql.MakeDuration(1234))
+
+	AddValueError(t, ctx, aggr, tx, octosql.MakeTime(time.Now()))
+
+	AddValueError(t, ctx, aggr, tx, octosql.MakeInt(123)) // TODO - is this alright? You can't sum different types
+
 	// RetractValue
 	RetractValue(t, ctx, aggr, tx, octosql.MakeFloat(4.2)) // Val: 6	 Num: 3
 
@@ -152,6 +208,47 @@ func TestAvgFloat(t *testing.T) {
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(0.9))
 
 	RetractValue(t, ctx, aggr, tx, octosql.MakeFloat(0.9))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	// Early retractions
+	RetractValue(t, ctx, aggr, tx, octosql.MakeFloat(2))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeFloat(3))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeFloat(2))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeFloat(2))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeFloat(2))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeFloat(4))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeFloat(3))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(4))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeFloat(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(2.5))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeFloat(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(4))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeFloat(4))
 
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
 }

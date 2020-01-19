@@ -51,6 +51,8 @@ func TestSumInt(t *testing.T) {
 
 	AddValueError(t, ctx, aggr, tx, octosql.MakeTime(time.Now()))
 
+	AddValueError(t, ctx, aggr, tx, octosql.MakeFloat(123.123)) // TODO - is this alright? You can't sum different types
+
 	// RetractValue
 	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(13))
 

@@ -29,7 +29,7 @@ func TestKey(t *testing.T) {
 
 	aggr := NewKeyAggregate()
 
-	key := octosql.MakeTuple([]octosql.Value{octosql.MakeString("first_name")})
+	key := octosql.MakeTuple([]octosql.Value{octosql.MakeString("first_name"), octosql.MakeString("surname"), octosql.MakeString("age")})
 
 	// Empty storage
 	ExpectZeroValue(t, ctx, aggr, tx)

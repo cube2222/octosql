@@ -323,14 +323,3 @@ func (dq *Deque) isEqualTo(values []octosql.Value) error {
 
 	return nil
 }
-
-func reverseValues(values []octosql.Value) []octosql.Value {
-	length := len(values)
-	result := make([]octosql.Value, length)
-
-	for i := 0; i < length; i++ {
-		result[length-i-1] = values[i]
-	}
-
-	return result
-}

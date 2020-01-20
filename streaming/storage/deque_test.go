@@ -62,6 +62,35 @@ func TestDeque(t *testing.T) {
 
 	println("PushBack test passed")
 
+	// test the iterators
+	it := queue.GetIterator()
+	areEqual, err := TestDequeIterator(it, values)
+
+	if err != nil {
+		log.Fatal("get iterator: ", err)
+	}
+
+	if !areEqual {
+		log.Fatal("the iterator isn't correct")
+	}
+
+	_ = it.Close()
+
+	it = queue.GetIterator(WithReverse())
+	areEqual, err = TestDequeIterator(it, reverseValues(values))
+
+	if err != nil {
+		log.Fatal("get reverse iterator: ", err)
+	}
+
+	if !areEqual {
+		log.Fatal("the reverse iterator isn't correct")
+	}
+
+	_ = it.Close()
+
+	println("Iterators test passed")
+
 	// test PeekFront and PeekBack
 
 	err = queue.testPeekBack(values[5])
@@ -293,4 +322,15 @@ func (dq *Deque) isEqualTo(values []octosql.Value) error {
 	}
 
 	return nil
+}
+
+func reverseValues(values []octosql.Value) []octosql.Value {
+	length := len(values)
+	result := make([]octosql.Value, length)
+
+	for i := 0; i < length; i++ {
+		result[length-i-1] = values[i]
+	}
+
+	return result
 }

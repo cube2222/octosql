@@ -252,15 +252,7 @@ func (dq *Deque) Clear() error {
 }
 
 func (dq *Deque) GetIterator(opts ...IteratorOption) *DequeIterator {
-	allOpts := []IteratorOption{WithPrefix(dequeValueKeyPrefix)}
-	allOpts = append(allOpts, opts...)
-	it := dq.tx.Iterator(allOpts...)
-
-	return NewDequeIterator(it)
-}
-
-func (dq *Deque) GetReverseIterator(opts ...IteratorOption) *DequeIterator {
-	allOpts := []IteratorOption{WithPrefix(dequeValueKeyPrefix), WithReverse()}
+	allOpts := []IteratorOption{WithDefault(), WithPrefix(dequeValueKeyPrefix)}
 	allOpts = append(allOpts, opts...)
 	it := dq.tx.Iterator(allOpts...)
 

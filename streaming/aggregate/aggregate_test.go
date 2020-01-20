@@ -32,8 +32,17 @@ func ExpectValue(t *testing.T, ctx context.Context, aggr Aggregate, tx storage.S
 		assert.Equal(t, expected.AsTime(), val.AsTime())
 	case octosql.TypeDuration:
 		assert.Equal(t, expected.AsDuration(), val.AsDuration())
-	case octosql.TypeTuple:
-		assert.Equal(t, expected.AsSlice(), val.AsSlice())
+	case octosql.TypeTuple: // works only for basic types in tuple
+		expectedSlice := expected.AsSlice()
+		valSlice := val.AsSlice()
+
+		assert.Equal(t, len(expectedSlice), len(valSlice))
+
+		for i, _ := range expectedSlice {
+			assert.Equal(t, &expectedSlice[i].Value, &valSlice[i].Value)
+		}
+
+		//assert.Equal(t, expected.AsSlice(), val.AsSlice())
 	default:
 		panic("unreachable")
 	}

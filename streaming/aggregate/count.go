@@ -55,7 +55,7 @@ func (agg *Count) RetractValue(ctx context.Context, tx storage.StateTransaction,
 	if currentCount.AsInt() == 0 { // storage was just cleared, no need to store count or retractions count
 		err = currentCountStorage.Clear()
 		if err != nil {
-			return errors.Wrap(err, "couldn't clear current count in storage")
+			return errors.Wrap(err, "couldn't clear current count from storage")
 		}
 	} else {
 		err = currentCountStorage.Set(&currentCount)

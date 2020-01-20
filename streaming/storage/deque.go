@@ -17,9 +17,9 @@ const (
 )
 
 var (
-	dequeValueKeyPrefix     = []byte("value")
-	dequeFirstFreeFrontSpot = []byte("first")
-	dequeFirstFreeBackSpot  = []byte("last")
+	dequeValueKeyPrefix     = []byte("$value$")
+	dequeFirstFreeFrontSpot = []byte("$first$")
+	dequeFirstFreeBackSpot  = []byte("$last$")
 	defaultValues           = map[string]int{
 		string(dequeFirstFreeFrontSpot): defaultFirstFreeFrontSpot,
 		string(dequeFirstFreeBackSpot):  defaultFirstFreeBackSpot,

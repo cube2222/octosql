@@ -219,6 +219,20 @@ func (dq *Deque) getValueAtIndex(value proto.Message, index int) error {
 
 // Clears all contents of the queue including the metadata.
 func (dq *Deque) Clear() error {
+	if !dq.initializedFront {
+		err := dq.initializeFront()
+		if err != nil {
+			return errors.Wrap(err, "failed to initialize front in Clear")
+		}
+	}
+
+	if !dq.initializedBack {
+		err := dq.initializeBack()
+		if err != nil {
+			return errors.Wrap(err, "failed to initialize back in Clear")
+		}
+	}
+
 	for dq.firstFreeBackSpot-dq.firstFreeFrontSpot > 1 {
 		key := getIndexKey(dq.firstFreeFrontSpot + 1)
 		err := dq.tx.Delete(key)
@@ -261,11 +275,13 @@ func (dq *Deque) GetIterator(opts ...IteratorOption) *DequeIterator {
 
 func (lli *DequeIterator) Next(value proto.Message) error {
 	err := lli.it.Next(value)
-	if err == ErrEndOfIterator || err == nil {
+	if err == ErrEndOfIterator {
 		return err
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't read next element")
 	}
 
-	return errors.Wrap(err, "couldn't read next element")
+	return nil
 }
 
 func (lli *DequeIterator) Close() error {

@@ -2,18 +2,15 @@ package storage
 
 import (
 	"context"
-	"io/ioutil"
 	"log"
-	"os"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/pkg/errors"
 )
 
 func TestBadgerStorage_Subscribe(t *testing.T) {
+	ctx := context.Background()
 	prefix := []byte{'a'}
 
 	// This key should be printed, since it matches the prefix.
@@ -24,55 +21,47 @@ func TestBadgerStorage_Subscribe(t *testing.T) {
 	bKey := []byte("b-key")
 	bValue := []byte("b-value")
 
-	// Open the DB.
-	dir, err := ioutil.TempDir("", "badger-test")
+	opts := badger.DefaultOptions("")
+	opts.Dir = ""
+	opts.ValueDir = ""
+	opts.InMemory = true
+	db, err := badger.Open(opts)
 	if err != nil {
-		panic(err)
-	}
-
-	defer os.RemoveAll(dir)
-	db, err := badger.Open(badger.DefaultOptions(dir))
-	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	defer db.Close()
 
 	storage := NewBadgerStorage(db).WithPrefix(prefix)
+	subscription := storage.Subscribe(ctx)
 
-	// Create the context here so we can cancel it after sending the writes.
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// Use the WaitGroup to make sure we wait for the subscription to stop before continuing.
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		cb := func() error {
-			println("Received")
-			return nil
-		}
-
-		if err := storage.Subscribe(ctx, cb); err != nil && errors.Cause(err) != context.Canceled {
-			panic(err)
-		}
-		log.Printf("subscription closed")
-	}()
-
-	// Wait for the above go routine to be scheduled.
-	time.Sleep(2 * time.Second)
 	// Write both keys, but only one should be printed in the Output.
 	err = db.Update(func(txn *badger.Txn) error { return txn.Set(aKey, aValue) })
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	err = db.Update(func(txn *badger.Txn) error { return txn.Set(bKey, bValue) })
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, time.Millisecond*100)
+	defer cancel()
+	err = subscription.ListenForChanges(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel = context.WithTimeout(ctx, time.Millisecond*100)
+	defer cancel()
+	err = subscription.ListenForChanges(ctx)
+	if err != context.DeadlineExceeded {
+		t.Fatal(err)
 	}
 
 	log.Printf("stopping subscription")
-	cancel()
+	err = subscription.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 	log.Printf("waiting for subscription to close")
-	wg.Wait()
 }

@@ -30,6 +30,7 @@ func NewSubscription(ctx context.Context, subscriptionFunc ChangesNotifierFunc) 
 	}
 
 	sub.wg.Add(1)
+	// Here we start the goroutine that is the internal workhorse of this subscription.
 	go func() {
 		err := subscriptionFunc(ctx, changes)
 		errs <- err

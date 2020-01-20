@@ -56,136 +56,150 @@ func NewDequeIterator(it Iterator) *DequeIterator {
 	}
 }
 
-//Adds new element to the front of the queue
+// Adds new element to the front of the queue.
 func (dq *Deque) PushFront(value proto.Message) error {
 	if !dq.initializedFront {
 		err := dq.initializeFront()
 		if err != nil {
-			return errors.Wrap(err, "failed to initialize in queue.PushFront")
+			return errors.Wrap(err, "failed to initialize in PushFront")
 		}
 	}
 
 	data, err := proto.Marshal(value)
 	if err != nil {
-		return errors.Wrap(err, "couldn't serialize given value")
+		return errors.Wrap(err, "couldn't serialize given value in PushFront")
 	}
 
-	return dq.appendBytes(data, dq.firstFreeFrontSpot, dq.decreaseFirstFreeFrontSpot)
+	byteKey := getIndexKey(dq.firstFreeFrontSpot)
+
+	err = dq.tx.Set(byteKey, data)
+	if err != nil {
+		return errors.Wrap(err, "failed to set value in PushFront")
+	}
+
+	err = dq.decreaseFirstFreeFrontSpot() // we move the free spot at the front to the left
+	if err != nil {
+		return errors.Wrap(err, "failed to decrease first free front spot in PushFront")
+	}
+
+	return nil
 }
 
-//Adds new element to the back of the queue
+//Adds new element to the back of the queue.
 func (dq *Deque) PushBack(value proto.Message) error {
 	if !dq.initializedBack {
 		err := dq.initializeBack()
 		if err != nil {
-			return errors.Wrap(err, "failed to initialize in queue.PushBack")
+			return errors.Wrap(err, "failed to initialize in PushBack")
 		}
 	}
 
 	data, err := proto.Marshal(value)
 	if err != nil {
-		return errors.Wrap(err, "couldn't serialize given value")
+		return errors.Wrap(err, "couldn't serialize given value in PushBack")
 	}
 
-	return dq.appendBytes(data, dq.firstFreeBackSpot, dq.increaseFirstFreeBackSpot)
-}
+	byteKey := getIndexKey(dq.firstFreeBackSpot)
 
-//This is an auxiliary function used in PushBack and PushFront. The modifier is needed,
-//to move the firstFreeFrontSpot to the left (PushFront) or the firstFreeBackSpot to the
-// right (PushBack). These functions call appendBytes with modifier set to
-// dq.decreaseFirstFreeFrontSpot and dq.increaseFirstFreeBackSpot respectively.
-func (dq *Deque) appendBytes(data []byte, index int, modifier func() error) error {
-	byteKey := getIndexKey(index)
-
-	err := dq.tx.Set(byteKey, data)
+	err = dq.tx.Set(byteKey, data)
 	if err != nil {
-		return errors.Wrap(err, "couldn't add the element to the queue")
+		return errors.Wrap(err, "failed to set value in PushBack")
 	}
 
-	err = modifier() //modifier is a function of the dq so it modifies dq
+	err = dq.increaseFirstFreeBackSpot() // we move the free spot at the back to the right
 	if err != nil {
-		return errors.Wrap(err, "failed to actualize queue attributes")
+		return errors.Wrap(err, "failed to increase first free back spot in PushBack")
 	}
 
 	return nil
 }
 
-//Removes the first element from the queue and returns it
-//Returns ErrNotFound if the list is empty
+// Removes the first element from the queue and returns it.
+// Returns ErrNotFound if the list is empty.
 func (dq *Deque) PopFront(value proto.Message) error {
-	//there is no need to call initialize here, since PeekFront calls initialize
-	err := dq.PeekFront(value)
-	if err != nil {
-		return err
-	}
+	// there is no need to call initialize here, since PeekFront calls initialize
 
-	return dq.pop(value, dq.firstFreeFrontSpot+1, dq.increaseFirstFreeFrontSpot)
-}
-
-//Removes the last element from the queue and returns it
-//Returns ErrNotFound if the list is empty
-func (dq *Deque) PopBack(value proto.Message) error {
-	//there is no need to call initialize here, since PeekBack calls initialize
-	err := dq.PeekBack(value)
-	if err != nil {
-		return err
-	}
-
-	return dq.pop(value, dq.firstFreeBackSpot-1, dq.decreaseFirstFreeBackSpot)
-}
-
-func (dq *Deque) pop(value proto.Message, index int, modifier func() error) error {
-	err := dq.peekIndex(value, index)
+	err := dq.PeekFront(value) // retrieve the value
 	if err == ErrNotFound {
 		return ErrNotFound
 	} else if err != nil {
-		return errors.Wrap(err, "something went wrong during peek")
+		return errors.Wrap(err, "failed to read first element in PopFront")
 	}
 
-	key := getIndexKey(index)
+	// and now we have to remove it from the deque
 
+	key := getIndexKey(dq.firstFreeFrontSpot + 1)
 	err = dq.tx.Delete(key)
 	if err != nil {
-		return errors.Wrap(err, "failed to delete element from queue in pop")
+		return errors.Wrap(err, "failed to delete first element in PopFront")
 	}
 
-	err = modifier()
+	err = dq.increaseFirstFreeFrontSpot() // we move the first free front spot to the right
 	if err != nil {
-		return errors.Wrap(err, "failed to actualize queue attributes in pop")
+		return errors.Wrap(err, "failed to modify first free front spot in PopFront")
 	}
 
 	return nil
 }
 
-//Returns the first element of the queue without removing it
-//Returns ErrNotFound if the queue is empty
+// Removes the last element from the queue and returns it.
+// Returns ErrNotFound if the list is empty.
+func (dq *Deque) PopBack(value proto.Message) error {
+	// there is no need to call initialize here, since PeekBack calls initialize
+
+	err := dq.PeekBack(value) // retrieve the value
+	if err == ErrNotFound {
+		return ErrNotFound
+	} else if err != nil {
+		return errors.Wrap(err, "failed to read last element in PopBack")
+	}
+
+	// and now we have to remove it from the deque
+
+	key := getIndexKey(dq.firstFreeBackSpot - 1)
+	err = dq.tx.Delete(key)
+	if err != nil {
+		return errors.Wrap(err, "failed to delete last element in PopBack")
+	}
+
+	err = dq.decreaseFirstFreeBackSpot() // we move the first free back spot to the left
+	if err != nil {
+		return errors.Wrap(err, "failed to modify first free back spot in PopBack")
+	}
+
+	return nil
+}
+
+// Returns the first element of the queue without removing it.
+// Returns ErrNotFound if the queue is empty.
 func (dq *Deque) PeekFront(value proto.Message) error {
 	if !dq.initializedFront {
 		err := dq.initializeFront()
 		if err != nil {
-			return errors.Wrap(err, "failed to initialize in queue.PeekFront")
+			return errors.Wrap(err, "failed to initialize in PeekFront")
 		}
 	}
 
-	return dq.peekIndex(value, dq.firstFreeFrontSpot+1)
+	return dq.getValueAtIndex(value, dq.firstFreeFrontSpot+1)
 }
 
-//Returns the last element of the queue without removing it
-//Returns ErrNotFound if the queue is empty
+// Returns the last element of the queue without removing it.
+// Returns ErrNotFound if the queue is empty.
 func (dq *Deque) PeekBack(value proto.Message) error {
 	if !dq.initializedBack {
 		err := dq.initializeBack()
 		if err != nil {
-			return errors.Wrap(err, "failed to initialize in queue.PeekBack")
+			return errors.Wrap(err, "failed to initialize in PeekBack")
 		}
 	}
 
-	return dq.peekIndex(value, dq.firstFreeBackSpot-1)
+	return dq.getValueAtIndex(value, dq.firstFreeBackSpot-1)
 }
 
-//we don't check if the queue has been initialized here, since we only
-//call peekIndex from PeekFront/PeekBack, which both initialize the queue
-func (dq *Deque) peekIndex(value proto.Message, index int) error {
+// Returns the value at given index.
+// We don't call initialize here, since this method is only called in methods like
+// Push/Peek which call initialize themselves.
+func (dq *Deque) getValueAtIndex(value proto.Message, index int) error {
 	key := getIndexKey(index)
 
 	data, err := dq.tx.Get(key)
@@ -203,7 +217,7 @@ func (dq *Deque) peekIndex(value proto.Message, index int) error {
 	return nil
 }
 
-//Clears all contents of the queue including the metadata
+// Clears all contents of the queue including the metadata.
 func (dq *Deque) Clear() error {
 	for dq.firstFreeBackSpot-dq.firstFreeFrontSpot > 1 {
 		key := getIndexKey(dq.firstFreeFrontSpot + 1)
@@ -213,12 +227,7 @@ func (dq *Deque) Clear() error {
 			return errors.Wrap(err, "couldn't clear the list")
 		}
 
-		//we call increaseFirstFree instead of simply dq.firstFree += 1 because
-		//a machine can die in the middle of a clear
-		err = dq.increaseFirstFreeFrontSpot()
-		if err != nil {
-			return errors.Wrap(err, "couldn't increase first element index")
-		}
+		dq.firstFreeFrontSpot += 1
 	}
 
 	err := dq.tx.Delete(dequeFirstFreeFrontSpot)
@@ -237,6 +246,7 @@ func (dq *Deque) Clear() error {
 	dq.firstFreeFrontSpot = defaultFirstFreeFrontSpot
 	dq.firstFreeBackSpot = defaultFirstFreeBackSpot
 	dq.initializedFront = false
+	dq.initializedBack = false
 
 	return nil
 }
@@ -370,23 +380,23 @@ func (dq *Deque) modifyAttribute(attr []byte, modifier func(int64) int64) error 
 func (dq *Deque) getAttribute(attr []byte) (int, error) {
 	value, err := dq.tx.Get(attr)
 	stringAttribute := string(attr)
-	switch err {
-	case ErrNotFound:
+
+	if err == ErrNotFound {
 		value, ok := defaultValues[stringAttribute]
 		if !ok {
 			return 0, errors.New("this byte slice isn't a queue attribute")
 		}
 
-		err2 := dq.tx.Set(attr, octosql.MonotonicMarshalInt64(int64(value)))
-		if err2 != nil {
-			return 0, errors.Wrapf(err2, "couldn't initialize queue %s field", stringAttribute)
+		err := dq.tx.Set(attr, octosql.MonotonicMarshalInt64(int64(value)))
+		if err != nil {
+			return 0, errors.Wrapf(err, "couldn't initialize queue %s field", stringAttribute)
 		}
 
 		return value, nil
-	case nil:
+	} else if err == nil {
 		i, err := octosql.MonotonicUnmarshalInt64(value)
 		return int(i), err
-	default:
+	} else {
 		return 0, errors.Wrapf(err, "couldn't read %s of queue", stringAttribute)
 	}
 }

@@ -117,7 +117,7 @@ func TestDeque(t *testing.T) {
 		log.Fatal("after popping and pushing: ", err)
 	}
 
-	println("pop front and pop front passed")
+	println("pop front and pop back passed")
 
 	//try to clear the whole queue using pops (at the moment there should be 1,2,3,4 in the queue)
 	for i := 0; i < 2; i++ { //warning these constants are dependant on the original values

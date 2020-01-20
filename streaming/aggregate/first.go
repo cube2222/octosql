@@ -40,6 +40,11 @@ func (agg *First) AddValue(ctx context.Context, tx storage.StateTransaction, val
 
 	err = currentFirstCountsStorage.Set(&value, &currentValueCount)
 	if err != nil {
+		err2 := currentFirstStorage.PopBack(&value) // TODO - is this necessary
+		if err2 != nil {
+			return errors.Wrap(err2, "couldn't pop back value after error occured in last counts update")
+		}
+
 		return errors.Wrap(err, "couldn't set current value count in first storage")
 	}
 

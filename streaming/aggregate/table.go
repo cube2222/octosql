@@ -13,4 +13,5 @@ var AggregateTable = map[string]execution.AggregatePrototype{
 	"avg_distinct":   func() execution.Aggregate { return NewDistinctAggregate(NewAverageAggregate()) },
 	"first":          func() execution.Aggregate { return NewFirstAggregate() },
 	"last":           func() execution.Aggregate { return NewLastAggregate() },
+	"key":            func() execution.Aggregate { return NewKeyAggregate() },
 }

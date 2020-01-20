@@ -95,7 +95,7 @@ func (tx *badgerTransaction) Iterator(opts ...IteratorOption) Iterator {
 	it := tx.tx.NewIterator(options.ToBadgerOptions())
 
 	if options.Reverse {
-		it.Seek(append(tx.prefix, 255))
+		it.Seek(append(options.Prefix, 255))
 	} else {
 		it.Rewind()
 	}

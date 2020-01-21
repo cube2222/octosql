@@ -36,7 +36,7 @@ func (tsk *TimeSortedKeys) Update(key octosql.Value, t time.Time) error {
 		if err != nil {
 			return errors.Wrap(err, "couldn't delete old time for key")
 		}
-	} else if err == storage.ErrKeyNotFound {
+	} else if err == storage.ErrNotFound {
 	} else {
 		return errors.Wrap(err, "couldn't get old time for key")
 	}
@@ -70,7 +70,7 @@ func (tsk *TimeSortedKeys) GetFirst() (octosql.Value, time.Time, error) {
 	}
 	if err != nil {
 		if err == storage.ErrEndOfIterator {
-			return octosql.ZeroValue(), time.Time{}, storage.ErrKeyNotFound
+			return octosql.ZeroValue(), time.Time{}, storage.ErrNotFound
 		}
 		return octosql.ZeroValue(), time.Time{}, errors.Wrap(err, "couldn't get first element from iterator")
 	}
@@ -100,8 +100,8 @@ func (tsk *TimeSortedKeys) DeleteByKey(key octosql.Value) error {
 	var t octosql.Value
 	err := byKeyToTime.Get(&key, &t)
 	if err != nil {
-		if err == storage.ErrKeyNotFound {
-			return storage.ErrKeyNotFound
+		if err == storage.ErrNotFound {
+			return storage.ErrNotFound
 		}
 		return errors.Wrap(err, "couldn't get send time for key")
 	}

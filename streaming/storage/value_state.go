@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"github.com/dgraph-io/badger/v2"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 )
@@ -36,8 +35,8 @@ func (vs *ValueState) setBytes(b []byte) error {
 
 func (vs *ValueState) Get(value proto.Message) error {
 	data, err := vs.tx.Get(nil)
-	if err == badger.ErrKeyNotFound {
-		return ErrKeyNotFound
+	if err == ErrNotFound {
+		return ErrNotFound
 	} else if err != nil {
 		return errors.Wrap(err, "an error occurred while reading the value")
 	}

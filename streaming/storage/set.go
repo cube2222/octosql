@@ -55,7 +55,7 @@ func (set *Set) containsUsingHash(value octosql.Value, hashFunction func(octosql
 	var tuple octosql.Value
 	err = state.Get(&tuple)
 
-	if err == ErrKeyNotFound {
+	if err == ErrNotFound {
 		return false, nil
 	} else if err != nil {
 		return false, errors.Wrap(err, "failed to read set")
@@ -81,7 +81,7 @@ func (set *Set) eraseUsingHash(value octosql.Value, hashFunction func(octosql.Va
 	var tuple octosql.Value
 	err = state.Get(&tuple)
 
-	if err == ErrKeyNotFound {
+	if err == ErrNotFound {
 		return false, nil //the element wasn't present in the set
 	} else if err != nil {
 		return false, errors.Wrap(err, "failed to read set elements")
@@ -219,7 +219,7 @@ func (set *Set) insertValueWithGivenHash(value octosql.Value, hash []byte) (bool
 	var tuple octosql.Value
 	err := state.Get(&tuple)
 
-	if err == ErrKeyNotFound {
+	if err == ErrNotFound {
 		tuple = octosql.ZeroTuple()
 	} else if err != nil {
 		return false, errors.Wrap(err, "failed to read set elements")

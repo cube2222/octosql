@@ -94,7 +94,7 @@ func (agg *Sum) GetValue(ctx context.Context, tx storage.StateTransaction) (octo
 
 	var currentSum octosql.Value
 	err := currentSumStorage.Get(&currentSum)
-	if err == storage.ErrKeyNotFound {
+	if err == storage.ErrNotFound {
 		return octosql.MakeInt(0), nil
 	} else if err != nil {
 		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get current sum from storage")

@@ -98,7 +98,7 @@ func (p *ProcessByKey) Next(ctx context.Context, tx storage.StateTransaction) (*
 	endOfStreamState := storage.NewValueState(tx.WithPrefix(endOfStreamPrefix))
 	var eos octosql.Value
 	err := endOfStreamState.Get(&eos)
-	if err == storage.ErrKeyNotFound {
+	if err == storage.ErrNotFound {
 	} else if err != nil {
 		return nil, errors.Wrap(err, "couldn't get end of stream value")
 	} else {
@@ -150,7 +150,7 @@ func (p *ProcessByKey) GetWatermark(ctx context.Context, tx storage.StateTransac
 	outputWatermarkState := storage.NewValueState(tx.WithPrefix(outputWatermarkPrefix))
 	var octoWatermark octosql.Value
 	err := outputWatermarkState.Get(&octoWatermark)
-	if err == storage.ErrKeyNotFound {
+	if err == storage.ErrNotFound {
 		return time.Time{}, nil
 	} else if err != nil {
 		return time.Time{}, errors.Wrap(err, "couldn't get output watermark")

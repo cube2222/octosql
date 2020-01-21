@@ -59,7 +59,7 @@ func TestMap(t *testing.T) {
 
 	/* test iterator */
 	it := badgerMap.GetIterator()
-	areEqual, err := TestMapIteratorCorrectness(it, keys, values, false)
+	areEqual, err := TestMapIteratorCorrectness(it, keys, values)
 	_ = it.Close()
 
 	if err != nil {
@@ -72,7 +72,7 @@ func TestMap(t *testing.T) {
 
 	/* test reverse iterator */
 	it = badgerMap.GetIterator(WithReverse())
-	areEqual, err = TestMapIteratorCorrectness(it, keys, values, true)
+	areEqual, err = TestMapIteratorCorrectness(it, reverseValues(keys), reverseValues(values))
 	_ = it.Close()
 
 	if err != nil {
@@ -90,7 +90,7 @@ func TestMap(t *testing.T) {
 	}
 
 	it = badgerMap.GetIterator()
-	areEqual, err = TestMapIteratorCorrectness(it, keys[1:], values[1:], false)
+	areEqual, err = TestMapIteratorCorrectness(it, keys[1:], values[1:])
 	_ = it.Close()
 
 	if err != nil {
@@ -108,7 +108,7 @@ func TestMap(t *testing.T) {
 	}
 
 	it = badgerMap.GetIterator()
-	areEqual, err = TestMapIteratorCorrectness(it, []octosql.Value{}, []octosql.Value{}, false)
+	areEqual, err = TestMapIteratorCorrectness(it, []octosql.Value{}, []octosql.Value{})
 	_ = it.Close()
 
 	if err != nil {
@@ -119,13 +119,13 @@ func TestMap(t *testing.T) {
 		log.Fatal(errors.Wrap(err, "the iterator is not empty"))
 	}
 
-	/* test if accessing a missing key returns ErrKeyNotFound */
+	/* test if accessing a missing key returns ErrNotFound */
 	missingKey := octosql.MakeString("invalid key")
 	var value octosql.Value
 
 	err = badgerMap.Get(&missingKey, &value)
-	if err != ErrKeyNotFound {
-		log.Fatal("Accessing a nonexistent key should return ErrKeyNotFound")
+	if err != ErrNotFound {
+		log.Fatal("Accessing a nonexistent key should return ErrNotFound")
 	}
 
 	/* although map doesn't store any metadata to load, check if
@@ -144,7 +144,7 @@ func TestMap(t *testing.T) {
 	}
 
 	it = bMap3.GetIterator()
-	areEqual, err = TestMapIteratorCorrectness(it, keys, values, false)
+	areEqual, err = TestMapIteratorCorrectness(it, keys, values)
 	_ = it.Close()
 
 	if err != nil {

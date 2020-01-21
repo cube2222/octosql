@@ -23,7 +23,7 @@ func (agg *Max) AddValue(ctx context.Context, tx storage.StateTransaction, value
 
 	var currentValueCount octosql.Value
 	err := currentMaxStorage.Get(&value, &currentValueCount)
-	if err == storage.ErrKeyNotFound {
+	if err == storage.ErrNotFound {
 		currentValueCount = octosql.MakeInt(0)
 	} else if err != nil {
 		return errors.Wrap(err, "couldn't get current value count from max storage")
@@ -44,7 +44,7 @@ func (agg *Max) RetractValue(ctx context.Context, tx storage.StateTransaction, v
 
 	var currentValueCount octosql.Value
 	err := currentMaxStorage.Get(&value, &currentValueCount)
-	if err == storage.ErrKeyNotFound {
+	if err == storage.ErrNotFound {
 		currentValueCount = octosql.MakeInt(0)
 	} else if err != nil {
 		return errors.Wrap(err, "couldn't get current value count from max storage")

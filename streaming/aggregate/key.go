@@ -25,7 +25,7 @@ func (agg *Key) AddValue(ctx context.Context, tx storage.StateTransaction, value
 
 	var currentKeyCount octosql.Value
 	err := currentKeyCountsStorage.Get(&currentKeyCount)
-	if err == storage.ErrKeyNotFound {
+	if err == storage.ErrNotFound {
 		currentKeyCount = octosql.MakeInt(0)
 	} else if err != nil {
 		return errors.Wrap(err, "couldn't get current key count from storage")
@@ -54,7 +54,7 @@ func (agg *Key) RetractValue(ctx context.Context, tx storage.StateTransaction, v
 
 	var currentKeyCount octosql.Value
 	err := currentKeyCountsStorage.Get(&currentKeyCount)
-	if err == storage.ErrKeyNotFound {
+	if err == storage.ErrNotFound {
 		currentKeyCount = octosql.MakeInt(0)
 	} else if err != nil {
 		return errors.Wrap(err, "couldn't get current key count from storage")
@@ -88,7 +88,7 @@ func (agg *Key) GetValue(ctx context.Context, tx storage.StateTransaction) (octo
 
 	var currentKeyCount octosql.Value
 	err := currentKeyCountsStorage.Get(&currentKeyCount)
-	if err == storage.ErrKeyNotFound || currentKeyCount.AsInt() <= 0 {
+	if err == storage.ErrNotFound || currentKeyCount.AsInt() <= 0 {
 		return octosql.ZeroValue(), nil // what should be returned when there is no key in key storage?
 	} else if err != nil {
 		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get current key count from storage")

@@ -25,7 +25,7 @@ func (agg *First) AddValue(ctx context.Context, tx storage.StateTransaction, val
 
 	var currentValueCount octosql.Value
 	err := currentFirstCountsStorage.Get(&value, &currentValueCount)
-	if err == storage.ErrKeyNotFound {
+	if err == storage.ErrNotFound {
 		currentValueCount = octosql.MakeInt(0)
 	} else if err != nil {
 		return errors.Wrap(err, "couldn't get current value count from first storage")
@@ -51,7 +51,7 @@ func (agg *First) RetractValue(ctx context.Context, tx storage.StateTransaction,
 
 	var currentValueCount octosql.Value
 	err := currentFirstCountsStorage.Get(&value, &currentValueCount)
-	if err == storage.ErrKeyNotFound {
+	if err == storage.ErrNotFound {
 		currentValueCount = octosql.MakeInt(0)
 	} else if err != nil {
 		return errors.Wrap(err, "couldn't get current value count from first storage")
@@ -88,7 +88,7 @@ func (agg *First) GetValue(ctx context.Context, tx storage.StateTransaction) (oc
 		}
 
 		err = currentFirstCountsStorage.Get(&currentFirst, &currentFirstCount)
-		if err == storage.ErrKeyNotFound {
+		if err == storage.ErrNotFound {
 			currentFirstCount = octosql.MakeInt(0)
 		} else if err != nil {
 			return octosql.ZeroValue(), errors.Wrap(err, "couldn't get current first count from storage")

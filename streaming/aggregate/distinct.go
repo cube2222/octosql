@@ -27,7 +27,7 @@ func (agg *Distinct) AddValue(ctx context.Context, tx storage.StateTransaction, 
 
 	var currentValueCount octosql.Value
 	err := currentDistinctStorage.Get(&value, &currentValueCount)
-	if err == storage.ErrKeyNotFound {
+	if err == storage.ErrNotFound {
 		currentValueCount = octosql.MakeInt(0)
 	} else if err != nil {
 		return errors.Wrap(err, "couldn't get current value count from distinct storage")
@@ -55,7 +55,7 @@ func (agg *Distinct) RetractValue(ctx context.Context, tx storage.StateTransacti
 
 	var currentValueCount octosql.Value
 	err := currentDistinctStorage.Get(&value, &currentValueCount)
-	if err == storage.ErrKeyNotFound {
+	if err == storage.ErrNotFound {
 		currentValueCount = octosql.MakeInt(0)
 	} else if err != nil {
 		return errors.Wrap(err, "couldn't get current value count from distinct storage")

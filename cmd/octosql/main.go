@@ -3,10 +3,19 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/cube2222/octosql/storage/excel"
 	"log"
+	"net/http"
 	"os"
 	"reflect"
+
+	"github.com/dgraph-io/badger/v2"
+
+	"github.com/go-chi/chi/middleware"
+
+	"github.com/cube2222/octosql/storage/excel"
+	"github.com/cube2222/octosql/streaming/storage"
+
+	"github.com/spf13/cobra"
 
 	"github.com/cube2222/octosql/app"
 	"github.com/cube2222/octosql/config"
@@ -22,7 +31,6 @@ import (
 	"github.com/cube2222/octosql/storage/mysql"
 	"github.com/cube2222/octosql/storage/postgres"
 	"github.com/cube2222/octosql/storage/redis"
-	"github.com/spf13/cobra"
 )
 
 var configPath string
@@ -93,8 +101,18 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 			log.Fatal("couldn't parse query: ", err)
 		}
 
+		opts := badger.DefaultOptions("")
+		opts.Dir = ""
+		opts.ValueDir = ""
+		opts.InMemory = true
+		db, err := badger.Open(opts)
+		if err != nil {
+			log.Fatal("couldn't open in-memory badger database: ", err)
+		}
+		stateStorage := storage.NewBadgerStorage(db)
+
 		// Run query
-		err = app.RunPlan(ctx, plan)
+		err = app.RunPlan(ctx, stateStorage, plan)
 		if err != nil {
 			log.Fatal("couldn't run plan: ", err)
 		}
@@ -104,6 +122,10 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 func main() {
 	rootCmd.Flags().StringVarP(&configPath, "config", "c", os.Getenv("OCTOSQL_CONFIG"), "data source configuration path, defaults to $OCTOSQL_CONFIG")
 	rootCmd.Flags().StringVarP(&outputFormat, "output", "o", "table", "output format, one of [table json csv tabbed table_row_separated]")
+
+	go func() {
+		log.Fatal(http.ListenAndServe(":3000", middleware.Profiler()))
+	}()
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

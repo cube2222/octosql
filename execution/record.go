@@ -79,6 +79,20 @@ func NewRecordFromSlice(fields []octosql.VariableName, data []octosql.Value, opt
 	return r
 }
 
+func NewRecordFromRecord(record *Record, opts ...RecordOption) *Record {
+	r := &Record{
+		FieldNames: record.FieldNames,
+		Data:       record.Data,
+		Metadata:   &(*record.Metadata),
+	}
+
+	for _, opt := range opts {
+		opt(r)
+	}
+
+	return r
+}
+
 func (r *Record) Value(field octosql.VariableName) octosql.Value {
 	if field.Source() == "sys" {
 		switch field.Name() {
@@ -142,9 +156,10 @@ func (r *Record) Equal(other *Record) bool {
 }
 
 func (r *Record) Show() string {
-	parts := make([]string, len(r.FieldNames))
-	for i := range r.FieldNames {
-		parts[i] = fmt.Sprintf("%s: %s", r.FieldNames[i], r.Data[i].Show())
+	fields := r.Fields()
+	parts := make([]string, len(fields))
+	for i, field := range fields {
+		parts[i] = fmt.Sprintf("%s: %s", field.Name, r.Value(field.Name).Show())
 	}
 
 	return fmt.Sprintf("{%s}", strings.Join(parts, ", "))

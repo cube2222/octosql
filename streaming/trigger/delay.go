@@ -45,7 +45,7 @@ func (dt *DelayTrigger) PollKeyToFire(ctx context.Context, tx storage.StateTrans
 
 	key, sendTime, err := timeKeys.GetFirst()
 	if err != nil {
-		if err == storage.ErrKeyNotFound {
+		if err == storage.ErrNotFound {
 			return octosql.ZeroValue(), ErrNoKeyToFire
 		}
 		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get first key by time")
@@ -67,7 +67,7 @@ func (dt *DelayTrigger) KeyFired(ctx context.Context, tx storage.StateTransactio
 	timeKeys := NewTimeSortedKeys(tx.WithPrefix(timeSortedKeys))
 
 	err := timeKeys.DeleteByKey(key)
-	if err != nil && err != storage.ErrKeyNotFound {
+	if err != nil && err != storage.ErrNotFound {
 		return errors.Wrap(err, "couldn't delete send time for key")
 	}
 

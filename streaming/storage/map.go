@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"github.com/dgraph-io/badger/v2"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 
@@ -46,14 +45,14 @@ func (hm *Map) Set(key MonotonicallySerializable, value proto.Message) error {
 	return nil
 }
 
-//Returns the value corresponding to key. Returns ErrKeyNotFound if the given key
+//Returns the value corresponding to key. Returns ErrNotFound if the given key
 //doesn't correspond to a value in the map.
 func (hm *Map) Get(key MonotonicallySerializable, value proto.Message) error {
 	byteKey := key.MonotonicMarshal()
 
 	data, err := hm.tx.Get(byteKey) //remove prefix from data
-	if err == badger.ErrKeyNotFound {
-		return ErrKeyNotFound
+	if err == ErrNotFound {
+		return ErrNotFound
 	} else if err != nil {
 		return errors.Wrap(err, "something went wrong during the key look-up")
 	}

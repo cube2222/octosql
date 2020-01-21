@@ -73,8 +73,8 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables) (Reco
 		outputFieldNames: outputFieldNames,
 	}
 	processFunc := &ProcessByKey{
+		stateStorage:    node.storage,
 		eventTimeField:  "",
-		output:          make(chan outputEntry, 1024),
 		trigger:         trigger.NewWatermarkTrigger(),
 		keyExpression:   node.key,
 		processFunction: groupBy,
@@ -170,7 +170,7 @@ func (gb *GroupByStream) Trigger(ctx context.Context, tx storage.StateTransactio
 	err := previouslyTriggeredValues.Get(&previouslyTriggered)
 	if err == nil {
 		output = append(output, NewRecordFromSlice(gb.outputFieldNames, previouslyTriggered.AsSlice(), append(opts[:len(opts):len(opts)], WithUndo())...))
-	} else if err != storage.ErrKeyNotFound {
+	} else if err != storage.ErrNotFound {
 		return nil, errors.Wrap(err, "couldn't get previously triggered value for key")
 	}
 

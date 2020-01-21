@@ -30,7 +30,7 @@ func (wt *WatermarkTrigger) RecordReceived(ctx context.Context, tx storage.State
 	err := watermarkStorage.Get(&octoWatermark)
 	if err == nil {
 		watermark = octoWatermark.AsTime()
-	} else if err != storage.ErrKeyNotFound {
+	} else if err != storage.ErrNotFound {
 		return errors.Wrap(err, "couldn't get current watermark")
 	}
 
@@ -80,7 +80,7 @@ func (wt *WatermarkTrigger) isSomethingReadyToFire(ctx context.Context, tx stora
 
 	_, sendTime, err := timeKeys.GetFirst()
 	if err != nil {
-		if err == storage.ErrKeyNotFound {
+		if err == storage.ErrNotFound {
 			return false, nil
 		}
 		return false, errors.Wrap(err, "couldn't get first key by time")
@@ -100,7 +100,7 @@ func (wt *WatermarkTrigger) PollKeyToFire(ctx context.Context, tx storage.StateT
 
 	var octoReady octosql.Value
 	err := readyToFire.Get(&octoReady)
-	if err == storage.ErrKeyNotFound {
+	if err == storage.ErrNotFound {
 		octoReady = octosql.MakeBool(false)
 	} else if err != nil {
 		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get readiness to fire value")
@@ -111,7 +111,7 @@ func (wt *WatermarkTrigger) PollKeyToFire(ctx context.Context, tx storage.StateT
 
 	key, sendTime, err := timeKeys.GetFirst()
 	if err != nil {
-		if err == storage.ErrKeyNotFound {
+		if err == storage.ErrNotFound {
 			panic("unreachable")
 		}
 		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get first key by time")
@@ -122,7 +122,7 @@ func (wt *WatermarkTrigger) PollKeyToFire(ctx context.Context, tx storage.StateT
 	err = watermarkStorage.Get(&octoWatermark)
 	if err == nil {
 		watermark = octoWatermark.AsTime()
-	} else if err != storage.ErrKeyNotFound {
+	} else if err != storage.ErrNotFound {
 		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get current watermark")
 	}
 

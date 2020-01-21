@@ -215,5 +215,3 @@ type RecordStream interface {
 }
 
 var ErrEndOfStream = errors.New("end of stream")
-
-var ErrNotFound = errors.New("not found")

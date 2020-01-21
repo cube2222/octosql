@@ -68,7 +68,7 @@ func TestValueState(t *testing.T) {
 			log.Fatal(err)
 		}
 
-		if vs.Get(&targetValue) != ErrKeyNotFound {
+		if vs.Get(&targetValue) != ErrNotFound {
 			log.Fatal("the value state should be empty after clear")
 		}
 	}

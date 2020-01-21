@@ -28,7 +28,7 @@ func TestDequeIterator(iter *DequeIterator, expectedValues []octosql.Value) (boo
 	return true, nil
 }
 
-func TestMapIteratorCorrectness(iter *MapIterator, expectedKeys, expectedValues []octosql.Value, reverse bool) (bool, error) {
+func TestMapIteratorCorrectness(iter *MapIterator, expectedKeys, expectedValues []octosql.Value) (bool, error) {
 	var key octosql.Value
 	var value octosql.Value
 
@@ -41,14 +41,8 @@ func TestMapIteratorCorrectness(iter *MapIterator, expectedKeys, expectedValues 
 			return false, errors.Wrap(err, "expected a value, got an error")
 		}
 
-		if reverse {
-			if !octosql.AreEqual(value, expectedValues[length-1-i]) || !octosql.AreEqual(key, expectedKeys[length-1-i]) {
-				return false, errors.Errorf("mismatch of values at index %d", i)
-			}
-		} else {
-			if !octosql.AreEqual(value, expectedValues[i]) || !octosql.AreEqual(key, expectedKeys[i]) {
-				return false, errors.Errorf("mismatch of values at index %d", i)
-			}
+		if !octosql.AreEqual(value, expectedValues[i]) || !octosql.AreEqual(key, expectedKeys[i]) {
+			return false, errors.Errorf("mismatch of values at index %d", i)
 		}
 	}
 
@@ -89,4 +83,15 @@ func TestSetIteratorCorrectness(iter *SetIterator, expectedValues []octosql.Valu
 	}
 
 	return true, nil
+}
+
+func reverseValues(values []octosql.Value) []octosql.Value {
+	length := len(values)
+	result := make([]octosql.Value, length)
+
+	for i := 0; i < length; i++ {
+		result[length-i-1] = values[i]
+	}
+
+	return result
 }

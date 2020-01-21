@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"log"
 
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
@@ -52,9 +53,30 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		ctx := storage.InjectStateTransaction(ctx, tx)
 
 		rec, err = stream.Next(ctx)
-		if err != nil {
-			tx.Abort()
+		if err == execution.ErrEndOfStream {
+			err := tx.Commit()
+			if err != nil {
+				return errors.Wrap(err, "couldn't commit transaction")
+			}
 			break
+		} else if errors.Cause(err) == execution.ErrNewTransactionRequired {
+			log.Println("main new transaction required")
+		} else if waitableError := execution.GetErrWaitForChanges(err); waitableError != nil {
+			err := tx.Commit()
+			if err != nil {
+				log.Println("couldn't commit: ", err)
+				continue
+			}
+			log.Println("main listening for changes")
+			err = waitableError.ListenForChanges(ctx)
+			if err != nil {
+				log.Println("couldn't listen for changes: ", err)
+			}
+			continue
+		} else if err != nil {
+			tx.Abort()
+			log.Println(err)
+			break // TODO: Error propagation?
 		}
 
 		err := tx.Commit()

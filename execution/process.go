@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/golang/protobuf/ptypes"
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
@@ -18,7 +19,8 @@ type ProcessFunction interface {
 }
 
 type ProcessByKey struct {
-	output          chan outputEntry // TODO: Temporary
+	stateStorage storage.Storage
+
 	trigger         trigger.Trigger
 	eventTimeField  octosql.VariableName // Empty if not grouping by event time.
 	keyExpression   []Expression
@@ -72,6 +74,8 @@ type outputEntry struct {
 }
 
 func (p *ProcessByKey) triggerKeys(ctx context.Context, tx storage.StateTransaction) error {
+	outputQueue := NewOutputQueue(p.stateStorage.WithPrefix(outputQueuePrefix), tx.WithPrefix(outputQueuePrefix))
+
 	for key, err := p.trigger.PollKeyToFire(ctx, tx); err != trigger.ErrNoKeyToFire; key, err = p.trigger.PollKeyToFire(ctx, tx) {
 		if err != nil {
 			return errors.Wrap(err, "couldn't poll trigger for key to fire")
@@ -84,7 +88,14 @@ func (p *ProcessByKey) triggerKeys(ctx context.Context, tx storage.StateTransact
 
 		for i := range records {
 			log.Printf("triggerKeys: record: %s", records[i].Show())
-			p.output <- outputEntry{record: records[i]}
+			err := outputQueue.Push(ctx, &QueueElement{
+				Type: &QueueElement_Record{
+					Record: records[i],
+				},
+			})
+			if err != nil {
+				return errors.Wrap(err, "couldn't push record to output queue")
+			}
 		}
 	}
 
@@ -93,8 +104,11 @@ func (p *ProcessByKey) triggerKeys(ctx context.Context, tx storage.StateTransact
 
 var outputWatermarkPrefix = []byte("$output_watermark$")
 var endOfStreamPrefix = []byte("$end_of_stream$")
+var outputQueuePrefix = []byte("$output_queue$")
 
 func (p *ProcessByKey) Next(ctx context.Context, tx storage.StateTransaction) (*Record, error) {
+	outputQueue := NewOutputQueue(p.stateStorage.WithPrefix(outputQueuePrefix), tx.WithPrefix(outputQueuePrefix))
+
 	endOfStreamState := storage.NewValueState(tx.WithPrefix(endOfStreamPrefix))
 	var eos octosql.Value
 	err := endOfStreamState.Get(&eos)
@@ -105,31 +119,40 @@ func (p *ProcessByKey) Next(ctx context.Context, tx storage.StateTransaction) (*
 		return nil, ErrEndOfStream
 	}
 
-	for record := range p.output {
-		if record.endOfStream {
+	var element *QueueElement
+	for element, err = outputQueue.Pop(ctx); err == nil; element, err = outputQueue.Pop(ctx) {
+		switch payload := element.Type.(type) {
+		case *QueueElement_EndOfStream:
 			octoEndOfStream := octosql.MakeBool(true)
 			err := endOfStreamState.Set(&octoEndOfStream)
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't update end of stream state")
 			}
 			return nil, ErrEndOfStream
-		} else if record.record != nil {
-			return record.record, nil
-		} else if record.watermark != nil {
+		case *QueueElement_Record:
+			return payload.Record, nil
+		case *QueueElement_Watermark:
 			outputWatermarkState := storage.NewValueState(tx.WithPrefix(outputWatermarkPrefix))
-			octoWatermark := octosql.MakeTime(*record.watermark)
-			err := outputWatermarkState.Set(&octoWatermark)
+			watermark, err := ptypes.Timestamp(payload.Watermark)
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't parse watermark timestamp")
+			}
+			octoWatermark := octosql.MakeTime(watermark)
+			err = outputWatermarkState.Set(&octoWatermark)
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't update output watermark")
 			}
-		} else {
-			panic("unreachable")
+		default:
+			panic("invalid queue element type")
 		}
 	}
-	return nil, ErrEndOfStream
+
+	return nil, errors.Wrap(err, "couldn't pop element from output queue")
 }
 
 func (p *ProcessByKey) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
+	outputQueue := NewOutputQueue(p.stateStorage.WithPrefix(outputQueuePrefix), tx.WithPrefix(outputQueuePrefix))
+
 	err := p.trigger.UpdateWatermark(ctx, tx, watermark)
 	if err != nil {
 		return errors.Wrap(err, "couldn't update watermark in trigger")
@@ -141,7 +164,14 @@ func (p *ProcessByKey) UpdateWatermark(ctx context.Context, tx storage.StateTran
 	}
 
 	log.Printf("triggerKeys: watermark: %v", watermark)
-	p.output <- outputEntry{watermark: &watermark}
+	timestamp, err := ptypes.TimestampProto(watermark)
+	if err != nil {
+		return errors.Wrap(err, "couldn't convert time to proto timestamp")
+	}
+	err = outputQueue.Push(ctx, &QueueElement{Type: &QueueElement_Watermark{Watermark: timestamp}})
+	if err != nil {
+		return errors.Wrap(err, "couldn't push item to output queue")
+	}
 
 	return nil
 }
@@ -160,10 +190,73 @@ func (p *ProcessByKey) GetWatermark(ctx context.Context, tx storage.StateTransac
 }
 
 func (p *ProcessByKey) MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error {
-	p.output <- outputEntry{endOfStream: true}
+	outputQueue := NewOutputQueue(p.stateStorage.WithPrefix(outputQueuePrefix), tx.WithPrefix(outputQueuePrefix))
+	err := outputQueue.Push(ctx, &QueueElement{Type: &QueueElement_EndOfStream{EndOfStream: true}})
+	if err != nil {
+		return errors.Wrap(err, "couldn't push item to output queue")
+	}
 	return nil
 }
 
 func (p *ProcessByKey) Close() error {
 	panic("implement me")
+}
+
+type OutputQueue struct {
+	stateStorage storage.Storage
+	tx           storage.StateTransaction
+}
+
+func NewOutputQueue(stateStorage storage.Storage, tx storage.StateTransaction) *OutputQueue {
+	return &OutputQueue{
+		stateStorage: stateStorage,
+		tx:           tx,
+	}
+}
+
+var queueElementsPrefix = []byte("$queue_elements$")
+
+func (q *OutputQueue) Push(ctx context.Context, element *QueueElement) error {
+	queueElements := storage.NewDeque(q.tx.WithPrefix(queueElementsPrefix))
+
+	err := queueElements.PushBack(element)
+	if err != nil {
+		return errors.Wrap(err, "couldn't append element to queue")
+	}
+	return nil
+}
+
+func (q *OutputQueue) Pop(ctx context.Context) (*QueueElement, error) {
+	queueElements := storage.NewDeque(q.tx.WithPrefix(queueElementsPrefix))
+
+	var element QueueElement
+	err := queueElements.PopFront(&element)
+	if err == storage.ErrNotFound {
+		prefixedStorage := q.stateStorage.WithPrefix(queueElementsPrefix)
+		subscription := prefixedStorage.Subscribe(ctx)
+
+		curTx := prefixedStorage.BeginTransaction()
+		defer curTx.Abort()
+		curQueueElements := storage.NewDeque(curTx.WithPrefix(queueElementsPrefix))
+
+		var element QueueElement
+		err := curQueueElements.PeekFront(&element)
+		if err == storage.ErrNotFound {
+			return nil, NewErrWaitForChanges(subscription)
+		} else {
+			if subErr := subscription.Close(); subErr != nil {
+				return nil, errors.Wrap(subErr, "couldn't close subscription")
+			}
+			if err == nil {
+				return nil, ErrNewTransactionRequired
+			} else {
+				return nil, errors.Wrap(err, "couldn't check if there are elements in the queue out of transaction")
+			}
+		}
+	} else if err != nil {
+		return nil, errors.Wrap(err, "couldn't pop element from queue")
+	}
+	log.Println("ok")
+
+	return &element, nil
 }

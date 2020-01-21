@@ -256,7 +256,6 @@ func (q *OutputQueue) Pop(ctx context.Context) (*QueueElement, error) {
 	} else if err != nil {
 		return nil, errors.Wrap(err, "couldn't pop element from queue")
 	}
-	log.Println("ok")
 
 	return &element, nil
 }

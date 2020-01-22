@@ -35,11 +35,6 @@ func (agg *Average) AddValue(ctx context.Context, tx storage.StateTransaction, v
 
 	err = agg.underlyingCount.AddValue(ctx, tx, value)
 	if err != nil {
-		err2 := agg.underlyingSum.RetractValue(ctx, tx, value) // TODO - is this necessary
-		if err2 != nil {
-			return errors.Wrap(err2, "couldn't retract value from sum for avg after error occured in count update")
-		}
-
 		return errors.Wrap(err, "couldn't add element to elements count for avg")
 	}
 
@@ -64,11 +59,6 @@ func (agg *Average) RetractValue(ctx context.Context, tx storage.StateTransactio
 
 	err = agg.underlyingCount.RetractValue(ctx, tx, value)
 	if err != nil {
-		err2 := agg.underlyingSum.AddValue(ctx, tx, value) // TODO - is this necessary
-		if err2 != nil {
-			return errors.Wrap(err2, "couldn't add value to sum for avg after error occured in count update")
-		}
-
 		return errors.Wrap(err, "couldn't add element to elements count for avg")
 	}
 
@@ -87,7 +77,7 @@ func (agg *Average) GetValue(ctx context.Context, tx storage.StateTransaction) (
 	}
 
 	if currentCount.AsInt() <= 0 { // no values or early retractions
-		return octosql.MakeInt(0), nil // TODO - I don't think returning anything other than "neutral element" would be better
+		return octosql.MakeInt(0), nil
 	}
 
 	var currentAvg octosql.Value

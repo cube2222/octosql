@@ -55,7 +55,7 @@ func TestAvgInt(t *testing.T) {
 
 	AddValueError(t, ctx, aggr, tx, octosql.MakeTime(time.Now()))
 
-	AddValueError(t, ctx, aggr, tx, octosql.MakeFloat(123.123)) // TODO - is this alright? You can't sum different types
+	AddValueError(t, ctx, aggr, tx, octosql.MakeFloat(123.123))
 
 	// RetractValue
 	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(8)) // Val: 6	Num: 3
@@ -192,7 +192,7 @@ func TestAvgFloat(t *testing.T) {
 
 	AddValueError(t, ctx, aggr, tx, octosql.MakeTime(time.Now()))
 
-	AddValueError(t, ctx, aggr, tx, octosql.MakeInt(123)) // TODO - is this alright? You can't sum different types
+	AddValueError(t, ctx, aggr, tx, octosql.MakeInt(123))
 
 	// RetractValue
 	RetractValue(t, ctx, aggr, tx, octosql.MakeFloat(4.2)) // Val: 6	 Num: 3

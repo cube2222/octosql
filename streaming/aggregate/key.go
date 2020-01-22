@@ -89,7 +89,7 @@ func (agg *Key) GetValue(ctx context.Context, tx storage.StateTransaction) (octo
 	var currentKeyCount octosql.Value
 	err := currentKeyCountsStorage.Get(&currentKeyCount)
 	if err == storage.ErrNotFound || currentKeyCount.AsInt() <= 0 {
-		return octosql.ZeroValue(), nil // what should be returned when there is no key in key storage?
+		return octosql.ZeroValue(), nil
 	} else if err != nil {
 		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get current key count from storage")
 	}

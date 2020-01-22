@@ -19,6 +19,9 @@ func NewFirstAggregate() *First {
 	return &First{}
 }
 
+// First storage contains Deque for actual order of elements added and Map for storing counts of every element.
+// Ones the element is added, we PushBack it into the Deque (because it is the last one to pick as 'first' in order).
+// Above that, we increment its count in Map.
 func (agg *First) AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
 	currentFirstStorage := storage.NewDeque(tx.WithPrefix(currentFirstPrefix))
 	currentFirstCountsStorage := storage.NewMap(tx.WithPrefix(currentFirstCountsPrefix))
@@ -46,6 +49,8 @@ func (agg *First) AddValue(ctx context.Context, tx storage.StateTransaction, val
 	return nil
 }
 
+// Now, ones the element is retracted we don't know its current position in Deque, so the only thing we can do is
+// decrement its count value in Map (if it reaches 0, we will Pop it from deque during GetValue and don't bother)
 func (agg *First) RetractValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
 	currentFirstCountsStorage := storage.NewMap(tx.WithPrefix(currentFirstCountsPrefix))
 
@@ -74,6 +79,9 @@ func (agg *First) RetractValue(ctx context.Context, tx storage.StateTransaction,
 	return nil
 }
 
+// Now the only think we need to do is PopFront ('front' because together with PushBack it creates a queue structure)
+// first element which has positive count value (which means it wasn't fully retracted). If the front element doesn't
+// have positive count, we need to 'forget' about its existence (as is described above RetractValue method), so we just Pop it.
 func (agg *First) GetValue(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error) {
 	currentFirstStorage := storage.NewDeque(tx.WithPrefix(currentFirstPrefix))
 	currentFirstCountsStorage := storage.NewMap(tx.WithPrefix(currentFirstCountsPrefix))

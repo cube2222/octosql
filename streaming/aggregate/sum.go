@@ -85,7 +85,6 @@ func (agg *Sum) RetractValue(ctx context.Context, tx storage.StateTransaction, v
 		return errors.Wrap(err, "couldn't get current sum")
 	}
 
-	// TODO - is this needed ?
 	if isNeutralElement(currentSum) {
 		currentSum, err = getAppropriateNeutralElement(valueType)
 		if err != nil {
@@ -93,7 +92,6 @@ func (agg *Sum) RetractValue(ctx context.Context, tx storage.StateTransaction, v
 		}
 	}
 
-	// TODO - is this needed ?
 	if valueType != currentSum.GetType() {
 		return errors.Errorf("type of value passed (%s) doesn't match current sum type (%s)", value.GetType(), currentSum.GetType())
 	}

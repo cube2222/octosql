@@ -10,7 +10,9 @@ import (
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
-const eps = 0.00000001
+var (
+	eps = octosql.MakeFloat(0.00000001).AsFloat()
+)
 
 func ExpectValue(t *testing.T, ctx context.Context, aggr Aggregate, tx storage.StateTransaction, expected octosql.Value) {
 	val, err := aggr.GetValue(ctx, tx)
@@ -21,8 +23,8 @@ func ExpectValue(t *testing.T, ctx context.Context, aggr Aggregate, tx storage.S
 	case octosql.TypeInt:
 		assert.Equal(t, expected.AsInt(), val.AsInt())
 	case octosql.TypeFloat:
-		assert.Greater(t, expected.AsFloat(), val.AsFloat()-octosql.MakeFloat(eps).AsFloat())
-		assert.Less(t, expected.AsFloat(), val.AsFloat()+octosql.MakeFloat(eps).AsFloat())
+		assert.Greater(t, expected.AsFloat(), val.AsFloat()-eps)
+		assert.Less(t, expected.AsFloat(), val.AsFloat()+eps)
 		//assert.Equal(t, expected.AsFloat(), val.AsFloat())
 	case octosql.TypeBool:
 		assert.Equal(t, expected.AsBool(), val.AsBool())

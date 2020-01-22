@@ -213,3 +213,92 @@ func TestSumDuration(t *testing.T) {
 
 	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(0))
 }
+
+func TestSumNasty(t *testing.T) {
+	ctx := context.Background()
+	db, err := badger.Open(badger.DefaultOptions("test"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		db.Close()
+		os.RemoveAll("test")
+	}()
+
+	prefix := []byte("sum")
+
+	badgerStorage := storage.NewBadgerStorage(db)
+	tx := badgerStorage.BeginTransaction().WithPrefix(prefix)
+
+	aggr := NewSumAggregate()
+
+	// Elements count > 0
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(5))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(-5))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	AddValueError(t, ctx, aggr, tx, octosql.MakeFloat(1.1)) // this shouldn't work, because current sum is of type Int
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(5))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(-5))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeFloat(1.1)) // now the sum is cleared so we can change type
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeFloat(1.1))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeFloat(2.5))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeFloat(-2.5))
+
+	AddValueError(t, ctx, aggr, tx, octosql.MakeDuration(1)) // this shouldn't work, because current sum is of type Float
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeFloat(2.5))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeFloat(-2.5))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeDuration(1)) // now the sum is cleared so we can change type
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeDuration(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(0))
+
+	// Elements count < 0
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(5))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(-5))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	RetractValueError(t, ctx, aggr, tx, octosql.MakeDuration(1)) // this shouldn't work, because current sum is of type Int
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(5))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(-5))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeDuration(1)) // now the sum is cleared so we can change type
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeDuration(1))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeDuration(2))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeDuration(-2))
+
+	RetractValueError(t, ctx, aggr, tx, octosql.MakeFloat(3.5)) // this shouldn't work, because current sum is of type Float
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeDuration(-2))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeDuration(2))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeFloat(3.5)) // now the sum is cleared so we can change type
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeFloat(3.5))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(0))
+}

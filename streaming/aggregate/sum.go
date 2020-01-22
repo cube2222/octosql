@@ -11,6 +11,10 @@ import (
 
 var currentSumPrefix = []byte("$current_sum$")
 
+// this tells us whether we have active sum (of >1 elements) or not
+// (so we can to distinguish neutral element and currentSum = 0)
+var currentSumCountPrefix = []byte("$current_sum_count$")
+
 type Sum struct {
 }
 
@@ -20,15 +24,24 @@ func NewSumAggregate() *Sum {
 
 func (agg *Sum) AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
 	currentSumStorage := storage.NewValueState(tx.WithPrefix(currentSumPrefix))
+	currentSumCountStorage := storage.NewValueState(tx.WithPrefix(currentSumCountPrefix))
 
 	valueType := value.GetType()
 
 	currentSum, err := agg.GetValue(ctx, tx)
 	if err != nil {
-		return errors.Wrap(err, "couldn't get current sum")
+		return errors.Wrap(err, "couldn't get current sum from storage")
 	}
 
-	if isNeutralElement(currentSum) {
+	var currentCount octosql.Value
+	err = currentSumCountStorage.Get(&currentCount)
+	if err == storage.ErrNotFound {
+		currentCount = octosql.MakeInt(0)
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't get current sum elements count from storage")
+	}
+
+	if isNeutralElement(currentSum, currentCount) {
 		currentSum, err = getAppropriateNeutralElement(valueType)
 		if err != nil {
 			return errors.Wrap(err, "couldn't get neutral element for sum")
@@ -50,16 +63,32 @@ func (agg *Sum) AddValue(ctx context.Context, tx storage.StateTransaction, value
 		return errors.Errorf("unsupported value type passed to sum: %s", valueType)
 	}
 
+	currentCount = octosql.MakeInt(currentCount.AsInt() + 1)
+
 	err = currentSumStorage.Set(&currentSum)
 	if err != nil {
-		return errors.Wrap(err, "couldn't set current sum in storage")
+		return errors.Wrap(err, "couldn't set current sum in storage in storage")
+	}
+
+	err = currentSumCountStorage.Set(&currentCount)
+	if err != nil {
+		return errors.Wrap(err, "couldn't set current sum elements count in storage")
 	}
 
 	return nil
 }
 
-func isNeutralElement(currentSum octosql.Value) bool {
-	return currentSum.GetType() == octosql.TypeInt && currentSum.AsInt() == 0
+func isNeutralElement(currentSum octosql.Value, currentCount octosql.Value) bool {
+	switch currentSum.GetType() {
+	case octosql.TypeInt:
+		return currentSum.AsInt() == 0 && currentCount.AsInt() == 0
+	case octosql.TypeFloat:
+		return currentSum.AsFloat() == 0.0 && currentCount.AsInt() == 0
+	case octosql.TypeDuration:
+		return currentSum.AsDuration() == 0 && currentCount.AsInt() == 0
+	default:
+		panic("unreachable")
+	}
 }
 
 func getAppropriateNeutralElement(valueType octosql.Type) (octosql.Value, error) {
@@ -77,15 +106,24 @@ func getAppropriateNeutralElement(valueType octosql.Type) (octosql.Value, error)
 
 func (agg *Sum) RetractValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
 	currentSumPrefix := storage.NewValueState(tx.WithPrefix(currentSumPrefix))
+	currentSumCountStorage := storage.NewValueState(tx.WithPrefix(currentSumCountPrefix))
 
 	valueType := value.GetType()
 
 	currentSum, err := agg.GetValue(ctx, tx)
 	if err != nil {
-		return errors.Wrap(err, "couldn't get current sum")
+		return errors.Wrap(err, "couldn't get current sum from storage")
 	}
 
-	if isNeutralElement(currentSum) {
+	var currentCount octosql.Value
+	err = currentSumCountStorage.Get(&currentCount)
+	if err == storage.ErrNotFound {
+		currentCount = octosql.MakeInt(0)
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't get current sum elements count from storage")
+	}
+
+	if isNeutralElement(currentSum, currentCount) {
 		currentSum, err = getAppropriateNeutralElement(valueType)
 		if err != nil {
 			return errors.Wrap(err, "couldn't get neutral element for sum")
@@ -107,9 +145,23 @@ func (agg *Sum) RetractValue(ctx context.Context, tx storage.StateTransaction, v
 		return errors.Errorf("unsupported value type passed to sum: %s", valueType)
 	}
 
+	currentCount = octosql.MakeInt(currentCount.AsInt() - 1)
+
 	err = currentSumPrefix.Set(&currentSum)
 	if err != nil {
 		return errors.Wrap(err, "couldn't set current sum in storage")
+	}
+
+	if currentCount.AsInt() == 0 {
+		err = currentSumCountStorage.Clear()
+		if err != nil {
+			return errors.Wrap(err, "couldn't clear current sum elements count from storage")
+		}
+	} else {
+		err = currentSumCountStorage.Set(&currentCount)
+		if err != nil {
+			return errors.Wrap(err, "couldn't set current sum elements count in storage")
+		}
 	}
 
 	return nil

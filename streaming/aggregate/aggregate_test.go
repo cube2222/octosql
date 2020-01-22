@@ -72,3 +72,8 @@ func RetractValue(t *testing.T, ctx context.Context, aggr Aggregate, tx storage.
 	err := aggr.RetractValue(ctx, tx, value)
 	assert.Nil(t, err)
 }
+
+func RetractValueError(t *testing.T, ctx context.Context, aggr Aggregate, tx storage.StateTransaction, value octosql.Value) {
+	err := aggr.RetractValue(ctx, tx, value)
+	assert.NotNil(t, err)
+}

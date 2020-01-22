@@ -232,10 +232,9 @@ func (q *OutputQueue) Pop(ctx context.Context) (*QueueElement, error) {
 	var element QueueElement
 	err := queueElements.PopFront(&element)
 	if err == storage.ErrNotFound {
-		prefixedStorage := q.stateStorage.WithPrefix(queueElementsPrefix)
-		subscription := prefixedStorage.Subscribe(ctx)
+		subscription := q.stateStorage.Subscribe(ctx)
 
-		curTx := prefixedStorage.BeginTransaction()
+		curTx := q.stateStorage.BeginTransaction()
 		defer curTx.Abort()
 		curQueueElements := storage.NewDeque(curTx.WithPrefix(queueElementsPrefix))
 

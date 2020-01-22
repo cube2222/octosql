@@ -42,7 +42,7 @@ func (agg *Average) AddValue(ctx context.Context, tx storage.StateTransaction, v
 }
 
 func isAppropriateType(valueType octosql.Type) bool {
-	return valueType == octosql.TypeInt || valueType == octosql.TypeFloat
+	return valueType == octosql.TypeInt || valueType == octosql.TypeFloat || valueType == octosql.TypeDuration
 }
 
 func (agg *Average) RetractValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
@@ -87,6 +87,8 @@ func (agg *Average) GetValue(ctx context.Context, tx storage.StateTransaction) (
 		currentAvg = octosql.MakeFloat(float64(currentSum.AsInt()) / float64(currentCount.AsInt()))
 	case octosql.TypeFloat:
 		currentAvg = octosql.MakeFloat(currentSum.AsFloat() / float64(currentCount.AsInt()))
+	case octosql.TypeDuration:
+		currentAvg = octosql.MakeFloat(float64(currentSum.AsDuration()) / float64(currentCount.AsInt()))
 	default:
 		panic("unreachable")
 	}

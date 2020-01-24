@@ -41,5 +41,5 @@ func (node *UnionAll) Materialize(ctx context.Context, matCtx *MaterializationCo
 }
 
 func (node *UnionAll) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMetadata(metadata.CombineCardinalities(node.First.Metadata().Cardinality(), node.Second.Metadata().Cardinality()))
+	return metadata.NewNodeMetadata(metadata.CombineCardinalities(node.First.Metadata().Cardinality(), node.Second.Metadata().Cardinality()), node.First.Metadata().EventTimeField())
 }

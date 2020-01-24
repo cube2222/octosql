@@ -121,22 +121,22 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 	return NewDataSourceBuilderFactory(primaryKeys), nil
 }
 
-func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, error) {
+func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables) (execution.RecordStream, error) {
 	values := make([]interface{}, 0)
 
 	for i := range ds.aliases {
 		expression := ds.aliases[i]
 
 		//since we have an execution expression, then we can evaluate it given the variables
-		value, err := expression.ExpressionValue(variables)
+		value, err := expression.ExpressionValue(ctx, variables)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't get actual value from variables")
 		}
 
-		values = append(values, value)
+		values = append(values, value.ToRawValue())
 	}
 
-	rows, err := ds.stmt.Query(values...)
+	rows, err := ds.stmt.QueryContext(ctx, values...)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't query statement")
 	}
@@ -171,7 +171,7 @@ func (rs *RecordStream) Close() error {
 	return nil
 }
 
-func (rs *RecordStream) Next() (*execution.Record, error) {
+func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 	if rs.isDone {
 		return nil, execution.ErrEndOfStream
 	}

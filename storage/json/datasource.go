@@ -56,7 +56,7 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 	return NewDataSourceBuilderFactory(), nil
 }
 
-func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, error) {
+func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables) (execution.RecordStream, error) {
 	file, err := os.Open(ds.path)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't open file")
@@ -90,7 +90,7 @@ func (rs *RecordStream) Close() error {
 	return nil
 }
 
-func (rs *RecordStream) Next() (*execution.Record, error) {
+func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 	if rs.isDone {
 		return nil, execution.ErrEndOfStream
 	}

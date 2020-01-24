@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"context"
 	"fmt"
 	"sort"
 
@@ -32,7 +33,7 @@ func newMultiSet() *recordMultiSet {
 }
 
 func (rms *recordMultiSet) Insert(rec *Record) error {
-	hash, err := HashRecord(rec)
+	hash, err := rec.Hash()
 	if err != nil {
 		return errors.Wrap(err, "couldn't hash record")
 	}
@@ -52,7 +53,7 @@ func (rms *recordMultiSet) Insert(rec *Record) error {
 }
 
 func (rms *recordMultiSet) GetCount(rec *Record) (int, error) {
-	hash, err := HashRecord(rec)
+	hash, err := rec.Hash()
 	if err != nil {
 		return 0, errors.Wrap(err, "couldn't hash record")
 	}
@@ -84,9 +85,8 @@ func newEntity(name octosql.VariableName, value octosql.Value) entity {
 
 func Normalize(rec *Record) *Record {
 	row := make(row, 0)
-	for k := range rec.fieldNames {
-		fieldName := rec.fieldNames[k]
-		value := rec.data[k]
+	for k, fieldName := range rec.GetVariableNames() {
+		value := *rec.Data[k]
 		row = append(row, newEntity(fieldName, value))
 	}
 
@@ -94,8 +94,9 @@ func Normalize(rec *Record) *Record {
 		return row[i].fieldName < row[j].fieldName
 	})
 
-	sortedFieldNames := make([]octosql.VariableName, len(rec.fieldNames))
-	values := make([]interface{}, len(rec.fieldNames))
+	fieldLength := len(rec.FieldNames)
+	sortedFieldNames := make([]octosql.VariableName, fieldLength)
+	values := make([]interface{}, fieldLength)
 
 	for k := range row {
 		ent := row[k]
@@ -106,10 +107,10 @@ func Normalize(rec *Record) *Record {
 	return NewRecordFromSliceWithNormalize(sortedFieldNames, values)
 }
 
-func AreStreamsEqual(first, second RecordStream) (bool, error) {
+func AreStreamsEqual(ctx context.Context, first, second RecordStream) (bool, error) {
 	for {
-		firstRec, firstErr := first.Next()
-		secondRec, secondErr := second.Next()
+		firstRec, firstErr := first.Next(ctx)
+		secondRec, secondErr := second.Next(ctx)
 
 		if firstErr == secondErr && firstErr == ErrEndOfStream {
 			break
@@ -131,13 +132,13 @@ func AreStreamsEqual(first, second RecordStream) (bool, error) {
 	return true, nil
 }
 
-func AreStreamsEqualNoOrdering(first, second RecordStream) (bool, error) {
+func AreStreamsEqualNoOrdering(ctx context.Context, first, second RecordStream) (bool, error) {
 	firstMultiSet := newMultiSet()
 	secondMultiSet := newMultiSet()
 
 	for {
-		firstRec, firstErr := first.Next()
-		secondRec, secondErr := second.Next()
+		firstRec, firstErr := first.Next(ctx)
+		secondRec, secondErr := second.Next(ctx)
 
 		if firstErr == secondErr && firstErr == ErrEndOfStream {
 			break
@@ -217,7 +218,7 @@ type DummyNode struct {
 	data []*Record
 }
 
-func (dn *DummyNode) Get(variables octosql.Variables) (RecordStream, error) {
+func (dn *DummyNode) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
 	if dn.data == nil {
 		return NewInMemoryStream([]*Record{}), nil
 	}
@@ -235,6 +236,6 @@ type DummyValue struct {
 	value octosql.Value
 }
 
-func (dv *DummyValue) ExpressionValue(variables octosql.Variables) (octosql.Value, error) {
+func (dv *DummyValue) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
 	return dv.value, nil
 }

@@ -1,6 +1,7 @@
 package tvf
 
 import (
+	"context"
 	"testing"
 
 	"github.com/cube2222/octosql"
@@ -8,6 +9,7 @@ import (
 )
 
 func TestRange_Get(t *testing.T) {
+	ctx := context.Background()
 	type fields struct {
 		start execution.Expression
 		end   execution.Expression
@@ -147,12 +149,12 @@ func TestRange_Get(t *testing.T) {
 				start: tt.fields.start,
 				end:   tt.fields.end,
 			}
-			got, err := r.Get(tt.args.variables)
+			got, err := r.Get(ctx, tt.args.variables)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Range.Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			eq, err := execution.AreStreamsEqual(got, tt.want)
+			eq, err := execution.AreStreamsEqual(ctx, got, tt.want)
 			if err != nil {
 				t.Errorf("Range.Get() AreStreamsEqual error = %v", err)
 			}

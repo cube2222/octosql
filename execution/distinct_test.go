@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -481,13 +482,13 @@ func TestDistinct_Get(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			distinct := DistinctStream{
-				stream:    tt.args.stream,
-				variables: nil,
-				records:   newRecordSet(),
-			}
+			distinct := NewDistinctStream(tt.args.stream, nil, newRecordSet())
 
-			equal, err := AreStreamsEqualNoOrdering(tt.want, &distinct)
+			_ = NewRecordFromSliceWithNormalize(
+				[]octosql.VariableName{"id", "name"},
+				[]interface{}{1, "Janek"})
+
+			equal, err := AreStreamsEqualNoOrdering(context.Background(), tt.want, distinct)
 			if err != nil {
 				t.Errorf("Error in AreStreamsEqual()")
 				return

@@ -1,6 +1,7 @@
 package execution
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 )
 
 func TestEqual_Apply(t *testing.T) {
+	ctx := context.Background()
 	type args struct {
 		variables octosql.Variables
 		left      Expression
@@ -62,7 +64,7 @@ func TestEqual_Apply(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rel := &Equal{}
-			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
+			got, err := rel.Apply(ctx, tt.args.variables, tt.args.left, tt.args.right)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Equal.Apply() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -75,6 +77,7 @@ func TestEqual_Apply(t *testing.T) {
 }
 
 func TestNotEqual_Apply(t *testing.T) {
+	ctx := context.Background()
 	type args struct {
 		variables octosql.Variables
 		left      Expression
@@ -129,7 +132,7 @@ func TestNotEqual_Apply(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rel := &NotEqual{}
-			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
+			got, err := rel.Apply(ctx, tt.args.variables, tt.args.left, tt.args.right)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NotEqual.Apply() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -142,6 +145,7 @@ func TestNotEqual_Apply(t *testing.T) {
 }
 
 func TestMoreThan_Apply(t *testing.T) {
+	ctx := context.Background()
 	type args struct {
 		variables octosql.Variables
 		left      Expression
@@ -222,7 +226,7 @@ func TestMoreThan_Apply(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rel := &MoreThan{}
-			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
+			got, err := rel.Apply(ctx, tt.args.variables, tt.args.left, tt.args.right)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("MoreThan.Apply() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -230,7 +234,7 @@ func TestMoreThan_Apply(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("MoreThan.Apply() = %v, want %v", got, tt.want)
 			}
-			gotOpposite, err := rel.Apply(tt.args.variables, tt.args.right, tt.args.left)
+			gotOpposite, err := rel.Apply(ctx, tt.args.variables, tt.args.right, tt.args.left)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("MoreThan.Apply() opposite error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -246,6 +250,7 @@ func TestMoreThan_Apply(t *testing.T) {
 }
 
 func TestLessThan_Apply(t *testing.T) {
+	ctx := context.Background()
 	type args struct {
 		variables octosql.Variables
 		left      Expression
@@ -326,7 +331,7 @@ func TestLessThan_Apply(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rel := &LessThan{}
-			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
+			got, err := rel.Apply(ctx, tt.args.variables, tt.args.left, tt.args.right)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LessThan.Apply() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -334,7 +339,7 @@ func TestLessThan_Apply(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("LessThan.Apply() = %v, want %v", got, tt.want)
 			}
-			gotOpposite, err := rel.Apply(tt.args.variables, tt.args.right, tt.args.left)
+			gotOpposite, err := rel.Apply(ctx, tt.args.variables, tt.args.right, tt.args.left)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("MoreThan.Apply() opposite error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -350,6 +355,7 @@ func TestLessThan_Apply(t *testing.T) {
 }
 
 func TestGreaterEqual_Apply(t *testing.T) {
+	ctx := context.Background()
 	type args struct {
 		variables octosql.Variables
 		left      Expression
@@ -462,7 +468,7 @@ func TestGreaterEqual_Apply(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rel := &GreaterEqual{}
-			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
+			got, err := rel.Apply(ctx, tt.args.variables, tt.args.left, tt.args.right)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LessThan.Apply() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -475,6 +481,7 @@ func TestGreaterEqual_Apply(t *testing.T) {
 }
 
 func TestLessEqual_Apply(t *testing.T) {
+	ctx := context.Background()
 	type args struct {
 		variables octosql.Variables
 		left      Expression
@@ -588,7 +595,7 @@ func TestLessEqual_Apply(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rel := &LessEqual{}
-			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
+			got, err := rel.Apply(ctx, tt.args.variables, tt.args.left, tt.args.right)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LessThan.Apply() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -601,6 +608,7 @@ func TestLessEqual_Apply(t *testing.T) {
 }
 
 func TestLike_Apply(t *testing.T) {
+	ctx := context.Background()
 	type args struct {
 		variables octosql.Variables
 		left      Expression
@@ -614,11 +622,11 @@ func TestLike_Apply(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "simple number regex",
+			name: "test1 - usage of _",
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{
-					"a": octosql.MakeString("123123"),
-					"b": octosql.MakeString("^[0-9]+$"),
+					"a": octosql.MakeString("abcd"),
+					"b": octosql.MakeString("a__d"),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -626,12 +634,125 @@ func TestLike_Apply(t *testing.T) {
 			want:    true,
 			wantErr: false,
 		},
+
 		{
-			name: "simple number regex",
+			name: "test2 - usage of %",
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{
-					"a": octosql.MakeString("123123"),
-					"b": octosql.MakeString("^[0-9]$"),
+					"a": octosql.MakeString("abcdef"),
+					"b": octosql.MakeString("a%f"),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+
+		{
+			name: "test3 - usage of both",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("abcdef"),
+					"b": octosql.MakeString("a_c%f"),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+
+		{
+			name: "test4 - amount of _ doesn't match",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("abcd"),
+					"b": octosql.MakeString("a_d"),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: false,
+		},
+
+		{
+			name: "test5 - weird characters",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("a*{([])}$$bcd"),
+					"b": octosql.MakeString("_*{([])}$$%"),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+
+		{
+			name: "test6 - escaped characters",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("_%%abc}"),
+					"b": octosql.MakeString(`\_\%%}`),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+
+		{
+			name: "test7 - illegal escape",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("_?abc}"),
+					"b": octosql.MakeString(`\*\_\??}`),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: true,
+		},
+
+		{
+			name: "test8 - all of it",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("_%{}[]()+%?:xd{}[]()?._:+"),
+					"b": octosql.MakeString(`\_\%{}[]()+__:%`),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+
+		{
+			name: "test9 - double backslash",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString(`\`),
+					"b": octosql.MakeString(`\\`),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+
+		{
+			name: "test10 - bugfix",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("Ab&_*{}[]()//>)--+"),
+					"b": octosql.MakeString(`Ab\%%`),
 				},
 				left:  NewVariable("a"),
 				right: NewVariable("b"),
@@ -640,10 +761,11 @@ func TestLike_Apply(t *testing.T) {
 			wantErr: false,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rel := &Like{}
-			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
+			rel := NewLike()
+			got, err := rel.Apply(ctx, tt.args.variables, tt.args.left, tt.args.right)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Like.Apply() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -656,6 +778,7 @@ func TestLike_Apply(t *testing.T) {
 }
 
 func TestIn_Apply(t *testing.T) {
+	ctx := context.Background()
 	type args struct {
 		variables octosql.Variables
 		left      Expression
@@ -663,6 +786,7 @@ func TestIn_Apply(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
+		rel     *In
 		args    args
 		want    bool
 		wantErr bool
@@ -791,8 +915,8 @@ func TestIn_Apply(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rel := &In{}
-			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
+			rel := tt.rel
+			got, err := rel.Apply(ctx, tt.args.variables, tt.args.left, tt.args.right)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("In.Apply() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -805,6 +929,7 @@ func TestIn_Apply(t *testing.T) {
 }
 
 func TestNotIn_Apply(t *testing.T) {
+	ctx := context.Background()
 	type args struct {
 		variables octosql.Variables
 		left      Expression
@@ -812,6 +937,7 @@ func TestNotIn_Apply(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
+		rel     *NotIn
 		args    args
 		want    bool
 		wantErr bool
@@ -940,14 +1066,99 @@ func TestNotIn_Apply(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rel := &NotIn{}
-			got, err := rel.Apply(tt.args.variables, tt.args.left, tt.args.right)
+			rel := tt.rel
+			got, err := rel.Apply(ctx, tt.args.variables, tt.args.left, tt.args.right)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("In.Apply() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
 				t.Errorf("In.Apply() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRegexp_Apply(t *testing.T) {
+	ctx := context.Background()
+	type args struct {
+		variables octosql.Variables
+		left      Expression
+		right     Expression
+	}
+	tests := []struct {
+		name    string
+		rel     *Regexp
+		args    args
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "test1 - simple number regex",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123123"),
+					"b": octosql.MakeString("^[0-9]+$"),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+
+		{
+			name: "test2 - regex with letters and special signs",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("123?abc-[]"),
+					"b": octosql.MakeString(`^[0-9]+\?[a-z]*-\[\]$`),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    true,
+			wantErr: false,
+		},
+
+		{
+			name: "test3 - no match (missing number at the front)",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("?abc-[]"),
+					"b": octosql.MakeString(`^[0-9]+\?[a-z]*-\[\]$`),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: false,
+		},
+
+		{
+			name: "test4 - no compile",
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"a": octosql.MakeString("?abc-[]"),
+					"b": octosql.MakeString(`^[0-9]+\?[a-z]*-\[\][a-z\]$`),
+				},
+				left:  NewVariable("a"),
+				right: NewVariable("b"),
+			},
+			want:    false,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rel := tt.rel
+			got, err := rel.Apply(ctx, tt.args.variables, tt.args.left, tt.args.right)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Like.Apply() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("Like.Apply() = %v, want %v", got, tt.want)
 			}
 		})
 	}

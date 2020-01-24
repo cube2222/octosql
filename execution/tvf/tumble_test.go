@@ -1,6 +1,7 @@
 package tvf
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 )
 
 func TestTumble_Get(t *testing.T) {
+	ctx := context.Background()
 	baseTime := time.Date(2019, 9, 3, 12, 0, 0, 0, time.UTC)
 
 	type fields struct {
@@ -62,22 +64,22 @@ func TestTumble_Get(t *testing.T) {
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time", "window_start", "window_end"},
 					[]interface{}{1, baseTime, baseTime.Add(time.Second * -7), baseTime.Add(time.Second * 3)},
-					execution.WithEventTime(baseTime.Add(time.Second*3)),
+					execution.WithEventTimeField("window_end"),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time", "window_start", "window_end"},
 					[]interface{}{2, baseTime.Add(time.Second * 10), baseTime.Add(time.Second * 3), baseTime.Add(time.Second * 13)},
-					execution.WithEventTime(baseTime.Add(time.Second*13)),
+					execution.WithEventTimeField("window_end"),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time", "window_start", "window_end"},
 					[]interface{}{3, baseTime.Add(time.Second * 8), baseTime.Add(time.Second * 3), baseTime.Add(time.Second * 13)},
-					execution.WithEventTime(baseTime.Add(time.Second*13)),
+					execution.WithEventTimeField("window_end"),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time", "window_start", "window_end"},
 					[]interface{}{4, baseTime.Add(time.Second * 13), baseTime.Add(time.Second * 13), baseTime.Add(time.Second * 23)},
-					execution.WithEventTime(baseTime.Add(time.Second*23)),
+					execution.WithEventTimeField("window_end"),
 				),
 			}),
 			wantErr: false,
@@ -117,22 +119,22 @@ func TestTumble_Get(t *testing.T) {
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time", "window_start", "window_end"},
 					[]interface{}{1, baseTime, baseTime, baseTime.Add(time.Second * 10)},
-					execution.WithEventTime(baseTime.Add(time.Second*10)),
+					execution.WithEventTimeField("window_end"),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time", "window_start", "window_end"},
 					[]interface{}{2, baseTime.Add(time.Second * 10), baseTime.Add(time.Second * 10), baseTime.Add(time.Second * 20)},
-					execution.WithEventTime(baseTime.Add(time.Second*20)),
+					execution.WithEventTimeField("window_end"),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time", "window_start", "window_end"},
 					[]interface{}{3, baseTime.Add(time.Second * 8), baseTime, baseTime.Add(time.Second * 10)},
-					execution.WithEventTime(baseTime.Add(time.Second*10)),
+					execution.WithEventTimeField("window_end"),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time", "window_start", "window_end"},
 					[]interface{}{4, baseTime.Add(time.Second * 13), baseTime.Add(time.Second * 10), baseTime.Add(time.Second * 20)},
-					execution.WithEventTime(baseTime.Add(time.Second*20)),
+					execution.WithEventTimeField("window_end"),
 				),
 			}),
 			wantErr: false,
@@ -146,12 +148,12 @@ func TestTumble_Get(t *testing.T) {
 				windowLength: tt.fields.windowLength,
 				offset:       tt.fields.offset,
 			}
-			got, err := r.Get(tt.args.variables)
+			got, err := r.Get(ctx, tt.args.variables)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Tumble.Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			eq, err := execution.AreStreamsEqual(got, tt.want)
+			eq, err := execution.AreStreamsEqual(ctx, got, tt.want)
 			if err != nil {
 				t.Errorf("Tumble.Get() AreStreamsEqual error = %v", err)
 			}

@@ -2,6 +2,9 @@ package execution
 
 import (
 	"github.com/cube2222/octosql"
+
+	"context"
+
 	"github.com/pkg/errors"
 )
 
@@ -16,8 +19,8 @@ func NewInnerJoin(prefetchCount int, source Node, joined Node) *InnerJoin {
 	return &InnerJoin{prefetchCount: prefetchCount, source: source, joined: joined}
 }
 
-func (node *InnerJoin) Get(variables octosql.Variables) (RecordStream, error) {
-	recordStream, err := node.source.Get(variables)
+func (node *InnerJoin) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
+	recordStream, err := node.source.Get(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get record stream")
 	}
@@ -50,11 +53,11 @@ func (stream *InnerJoinedStream) Close() error {
 	return nil
 }
 
-func (stream *InnerJoinedStream) Next() (*Record, error) {
+func (stream *InnerJoinedStream) Next(ctx context.Context) (*Record, error) {
 	for {
 		if stream.curRecord == nil {
 			var err error
-			stream.curRecord, stream.curJoinedStream, err = stream.joiner.GetNextRecord()
+			stream.curRecord, stream.curJoinedStream, err = stream.joiner.GetNextRecord(ctx)
 			if err != nil {
 				if err == ErrEndOfStream {
 					return nil, ErrEndOfStream
@@ -63,7 +66,7 @@ func (stream *InnerJoinedStream) Next() (*Record, error) {
 			}
 		}
 
-		joinedRecord, err := stream.curJoinedStream.Next()
+		joinedRecord, err := stream.curJoinedStream.Next(ctx)
 		if err != nil {
 			if err == ErrEndOfStream {
 				stream.curRecord = nil
@@ -73,7 +76,7 @@ func (stream *InnerJoinedStream) Next() (*Record, error) {
 			return nil, errors.Wrap(err, "couldn't get joined record")
 		}
 
-		fields := stream.curRecord.fieldNames
+		fields := stream.curRecord.GetVariableNames()
 		for _, field := range joinedRecord.Fields() {
 			fields = append(fields, field.Name)
 		}

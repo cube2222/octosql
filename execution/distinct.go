@@ -2,7 +2,9 @@ package execution
 
 import (
 	"github.com/cube2222/octosql"
-	"github.com/mitchellh/hashstructure"
+
+	"context"
+
 	"github.com/pkg/errors"
 )
 
@@ -14,23 +16,27 @@ func NewDistinct(child Node) *Distinct {
 	return &Distinct{child: child}
 }
 
-func (node *Distinct) Get(variables octosql.Variables) (RecordStream, error) {
-	stream, err := node.child.Get(variables)
+func (node *Distinct) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
+	stream, err := node.child.Get(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get stream for child node in distinct")
 	}
 
-	return &DistinctStream{
-		stream:    stream,
-		variables: variables,
-		records:   newRecordSet(),
-	}, nil
+	return NewDistinctStream(stream, variables, newRecordSet()), nil
 }
 
 type DistinctStream struct {
 	stream    RecordStream
 	variables octosql.Variables
 	records   *recordSet
+}
+
+func NewDistinctStream(stream RecordStream, variables octosql.Variables, records *recordSet) *DistinctStream {
+	return &DistinctStream{
+		stream:    stream,
+		variables: variables,
+		records:   records,
+	}
 }
 
 func (ds *DistinctStream) Close() error {
@@ -42,9 +48,9 @@ func (ds *DistinctStream) Close() error {
 	return nil
 }
 
-func (ds *DistinctStream) Next() (*Record, error) {
+func (ds *DistinctStream) Next(ctx context.Context) (*Record, error) {
 	for {
-		record, err := ds.stream.Next()
+		record, err := ds.stream.Next(ctx)
 		if err != nil {
 			if err == ErrEndOfStream {
 				return nil, ErrEndOfStream
@@ -81,7 +87,7 @@ func newRecordSet() *recordSet {
 }
 
 func (rs *recordSet) Has(r *Record) (bool, error) {
-	hash, err := HashRecord(r)
+	hash, err := r.Hash()
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get hash of record")
 	}
@@ -96,7 +102,7 @@ func (rs *recordSet) Has(r *Record) (bool, error) {
 }
 
 func (rs *recordSet) Insert(r *Record) (bool, error) {
-	hash, err := HashRecord(r)
+	hash, err := r.Hash()
 	if err != nil {
 		return false, errors.Wrap(err, "couldn't get hash of record")
 	}
@@ -111,8 +117,4 @@ func (rs *recordSet) Insert(r *Record) (bool, error) {
 	}
 
 	return false, nil
-}
-
-func HashRecord(rec *Record) (uint64, error) {
-	return hashstructure.Hash(rec.data, nil)
 }

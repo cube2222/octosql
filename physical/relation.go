@@ -20,6 +20,7 @@ const (
 	NotIn        Relation = "not_in"
 	GreaterEqual Relation = "greater_equal"
 	LessEqual    Relation = "less_equal"
+	Regexp       Relation = "regexp"
 )
 
 func NewRelation(relation string) Relation {
@@ -46,6 +47,8 @@ func (rel Relation) Materialize(ctx context.Context, matCtx *MaterializationCont
 		return execution.NewGreaterEqual()
 	case LessEqual:
 		return execution.NewLessEqual()
+	case Regexp:
+		return execution.NewRegexp()
 	default:
 		log.Fatalf("Invalid relation: %+v", rel) // This should be filtered at the logical plan level
 		return nil

@@ -2,6 +2,9 @@ package execution
 
 import (
 	"github.com/cube2222/octosql"
+
+	"context"
+
 	"github.com/pkg/errors"
 )
 
@@ -14,26 +17,26 @@ func NewLimit(data Node, limit Expression) *Limit {
 	return &Limit{data: data, limitExpr: limit}
 }
 
-func (node *Limit) Get(variables octosql.Variables) (RecordStream, error) {
-	dataStream, err := node.data.Get(variables)
+func (node *Limit) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
+	dataStream, err := node.data.Get(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get data RecordStream")
 	}
 
-	exprVal, err := node.limitExpr.ExpressionValue(variables)
+	exprVal, err := node.limitExpr.ExpressionValue(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't extract value from limit subexpression")
 	}
 
-	limitVal, ok := exprVal.(octosql.Int)
-	if !ok {
+	if exprVal.GetType() != octosql.TypeInt {
 		return nil, errors.New("limit value not int")
 	}
+	limitVal := exprVal.AsInt()
 	if limitVal < 0 {
 		return nil, errors.New("negative limit value")
 	}
 
-	return newLimitedStream(dataStream, limitVal.AsInt()), nil
+	return newLimitedStream(dataStream, limitVal), nil
 }
 
 func newLimitedStream(rs RecordStream, limit int) *LimitedStream {
@@ -57,9 +60,9 @@ func (node *LimitedStream) Close() error {
 	return nil
 }
 
-func (node *LimitedStream) Next() (*Record, error) {
+func (node *LimitedStream) Next(ctx context.Context) (*Record, error) {
 	if node.limit > 0 {
-		record, err := node.rs.Next()
+		record, err := node.rs.Next(ctx)
 		if err != nil {
 			if err == ErrEndOfStream {
 				node.limit = 0

@@ -1,11 +1,14 @@
 package execution
 
 import (
+	"context"
+
 	"github.com/cube2222/octosql"
 	"testing"
 )
 
 func TestOffset_Get(t *testing.T) {
+	ctx := context.Background()
 	const NO_ERROR = ""
 
 	tests := []struct {
@@ -110,7 +113,7 @@ func TestOffset_Get(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rs, err := tt.node.Get(tt.vars)
+			rs, err := tt.node.Get(ctx, tt.vars)
 
 			if (err == nil) != (tt.wantError == NO_ERROR) {
 				t.Errorf("exactly one of test.wantError, tt.node.Get() is not nil")
@@ -124,7 +127,7 @@ func TestOffset_Get(t *testing.T) {
 				return
 			}
 
-			equal, err := AreStreamsEqual(rs, tt.wantStream)
+			equal, err := AreStreamsEqual(context.Background(), rs, tt.wantStream)
 			if !equal {
 				t.Errorf("limitedStream doesn't work as expected")
 			}

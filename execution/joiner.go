@@ -2,6 +2,9 @@ package execution
 
 import (
 	"github.com/cube2222/octosql"
+
+	"context"
+
 	"github.com/pkg/errors"
 )
 
@@ -33,9 +36,9 @@ func NewJoiner(prefetchCount int, variables octosql.Variables, sourceStream Reco
 	}
 }
 
-func (joiner *Joiner) fillPending() error {
+func (joiner *Joiner) fillPending(ctx context.Context) error {
 	for joiner.elements < joiner.prefetchCount && !joiner.reachedEndOfStream {
-		srcRecord, err := joiner.source.Next()
+		srcRecord, err := joiner.source.Next(ctx)
 		if err != nil {
 			if err == ErrEndOfStream {
 				joiner.reachedEndOfStream = true
@@ -56,7 +59,7 @@ func (joiner *Joiner) fillPending() error {
 		joiner.elements++
 
 		go func() {
-			joinedStream, err := joiner.joined.Get(variables)
+			joinedStream, err := joiner.joined.Get(ctx, variables)
 			if err != nil {
 				joiner.errors <- errors.Wrap(err, "couldn't get joined stream")
 			}
@@ -68,8 +71,8 @@ func (joiner *Joiner) fillPending() error {
 	return nil
 }
 
-func (joiner *Joiner) GetNextRecord() (*Record, RecordStream, error) {
-	err := joiner.fillPending()
+func (joiner *Joiner) GetNextRecord(ctx context.Context) (*Record, RecordStream, error) {
+	err := joiner.fillPending(ctx)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "could't fill pending record queue")
 	}

@@ -383,7 +383,7 @@ func TestAvgDuration(t *testing.T) {
 
 	AddValue(t, ctx, aggr, tx, octosql.MakeDuration(1))
 
-	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(2)) // Val: 5	Num: 1
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(2)) // Val: 5	Num: 2
 
 	RetractValue(t, ctx, aggr, tx, octosql.MakeDuration(1))
 

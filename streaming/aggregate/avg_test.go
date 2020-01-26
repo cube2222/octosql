@@ -277,19 +277,19 @@ func TestAvgDuration(t *testing.T) {
 	// AddValue
 	AddValue(t, ctx, aggr, tx, octosql.MakeDuration(1)) // Val: 1	Num: 1
 
-	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(1))
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(1))
 
 	AddValue(t, ctx, aggr, tx, octosql.MakeDuration(3)) // Val: 4	Num: 2
 
-	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(2))
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(2))
 
 	AddValue(t, ctx, aggr, tx, octosql.MakeDuration(8)) // Val: 12	Num: 3
 
-	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(4))
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(4))
 
 	AddValue(t, ctx, aggr, tx, octosql.MakeDuration(2)) // Val: 14	Num: 4
 
-	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(3.5))
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(3))
 
 	// Wrong type passed
 	AddValueError(t, ctx, aggr, tx, octosql.MakeInt(1234))
@@ -301,15 +301,15 @@ func TestAvgDuration(t *testing.T) {
 	// RetractValue
 	RetractValue(t, ctx, aggr, tx, octosql.MakeDuration(8)) // Val: 6	Num: 3
 
-	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(2))
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(2))
 
 	RetractValue(t, ctx, aggr, tx, octosql.MakeDuration(3)) // Val: 3	Num: 2
 
-	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(1.5))
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(1))
 
 	RetractValue(t, ctx, aggr, tx, octosql.MakeDuration(1)) // Val: 2	Num: 1
 
-	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(2))
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(2))
 
 	RetractValue(t, ctx, aggr, tx, octosql.MakeDuration(2))
 
@@ -318,15 +318,15 @@ func TestAvgDuration(t *testing.T) {
 	// Mixed
 	AddValue(t, ctx, aggr, tx, octosql.MakeDuration(3)) // Val: 3	Num: 1
 
-	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(3))
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(3))
 
 	AddValue(t, ctx, aggr, tx, octosql.MakeDuration(8)) // Val: 11	Num: 2
 
-	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(5.5))
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(5))
 
 	RetractValue(t, ctx, aggr, tx, octosql.MakeDuration(3)) // Val: 8	Num: 1
 
-	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(8))
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(8))
 
 	AddValue(t, ctx, aggr, tx, octosql.MakeDuration(41)) // Val: 49	Num: 2
 
@@ -334,19 +334,19 @@ func TestAvgDuration(t *testing.T) {
 
 	AddValue(t, ctx, aggr, tx, octosql.MakeDuration(41)) // Val: 49	Num: 2
 
-	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(24.5))
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(24))
 
 	AddValue(t, ctx, aggr, tx, octosql.MakeDuration(1)) // Val: 50	Num: 3
 
-	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(16.6666666666))
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(16))
 
 	RetractValue(t, ctx, aggr, tx, octosql.MakeDuration(41)) // Val: 9	Num: 2
 
-	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(4.5))
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(4))
 
 	RetractValue(t, ctx, aggr, tx, octosql.MakeDuration(8)) // Val: 1	Num: 1
 
-	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(1))
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(1))
 
 	RetractValue(t, ctx, aggr, tx, octosql.MakeDuration(1))
 
@@ -379,15 +379,15 @@ func TestAvgDuration(t *testing.T) {
 
 	AddValue(t, ctx, aggr, tx, octosql.MakeDuration(3))
 
-	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(4))
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(4)) // Val: 4	Num: 1
 
 	AddValue(t, ctx, aggr, tx, octosql.MakeDuration(1))
 
-	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(2.5))
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(2)) // Val: 5	Num: 1
 
 	RetractValue(t, ctx, aggr, tx, octosql.MakeDuration(1))
 
-	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(4))
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeDuration(4)) // Val: 4	Num: 1
 
 	RetractValue(t, ctx, aggr, tx, octosql.MakeDuration(4))
 

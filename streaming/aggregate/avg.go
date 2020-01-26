@@ -2,6 +2,7 @@ package aggregate
 
 import (
 	"context"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -88,7 +89,7 @@ func (agg *Average) GetValue(ctx context.Context, tx storage.StateTransaction) (
 	case octosql.TypeFloat:
 		currentAvg = octosql.MakeFloat(currentSum.AsFloat() / float64(currentCount.AsInt()))
 	case octosql.TypeDuration:
-		currentAvg = octosql.MakeFloat(float64(currentSum.AsDuration()) / float64(currentCount.AsInt()))
+		currentAvg = octosql.MakeDuration(currentSum.AsDuration() / time.Duration(currentCount.AsInt()))
 	default:
 		panic("unreachable")
 	}

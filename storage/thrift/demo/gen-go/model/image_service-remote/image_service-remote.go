@@ -168,8 +168,8 @@ func main() {
       fmt.Fprintln(os.Stderr, "GetRecord requires 1 args")
       flag.Usage()
     }
-    tmp0, err10 := (strconv.Atoi(flag.Arg(1)))
-    if err10 != nil {
+    tmp0, err11 := (strconv.Atoi(flag.Arg(1)))
+    if err11 != nil {
       Usage()
       return
     }

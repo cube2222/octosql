@@ -52,6 +52,19 @@ func (p *CalculatorHandler) GetRecord(ctx context.Context, streamID int32) (r *m
 		var r model.Record = model.Record{
 			A: "record" + strconv.Itoa(int(p.iterators[streamID])),
 			B: "B",
+			Bar: nil,
+			Lst: []string{
+				"elo", "hehs",
+			},
+			Foo: &model.Foo{
+				FooString: "acab",
+				FooInt16: 16,
+				FooInt32: 32,
+				FooInt64: 64,
+				FooBool: true,
+				FooDouble: 0.77,
+				FooByte: 42,
+			},
 		}
 		p.iterators[streamID]++
 		return &r, nil

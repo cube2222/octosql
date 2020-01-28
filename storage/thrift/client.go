@@ -80,15 +80,15 @@ func RunDataClient(transportFactory thrift.TTransportFactory, protocolFactory th
 
 	client := thrift.NewTStandardClient(protocolFactory.GetProtocol(transport), protocolFactory.GetProtocol(transport))
 
-	result := EmptyCallResult(rs, -1)
+	result := EmptyCallResult(rs, "")
 	var args GetRecordCallArgs
 
 	if !rs.isOpen {
-		var openResult = EmptyCallResult(rs, -1)
+		var openResult = EmptyCallResult(rs, "")
 		var openArgs CallArgs
 		err = client.Call(defaultCtx, "openRecords", &openArgs, &openResult)
 		if err != nil {
-			return EmptyCallResult(rs, -1), ThriftWrapError(err)
+			return EmptyCallResult(rs, ""), ThriftWrapError(err)
 		}
 
 		k := openResult.Fields[octosql.NewVariableName(fmt.Sprintf("%s.field_0", rs.alias))]
@@ -99,7 +99,7 @@ func RunDataClient(transportFactory thrift.TTransportFactory, protocolFactory th
 	}
 	args.StreamID = rs.streamID
 
-	result.MetaResultStructID = rs.thriftMeta.GetMetaResultStructID("getRecord")
+	result.CalledMethodName = "getRecord"
 	err = client.Call(defaultCtx, "getRecord", &args, &result)
 
 	if err != nil {

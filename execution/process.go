@@ -67,12 +67,6 @@ func (p *ProcessByKey) AddRecord(ctx context.Context, tx storage.StateTransactio
 	return nil
 }
 
-type outputEntry struct {
-	record      *Record
-	watermark   *time.Time
-	endOfStream bool
-}
-
 func (p *ProcessByKey) triggerKeys(ctx context.Context, tx storage.StateTransaction) error {
 	outputQueue := NewOutputQueue(p.stateStorage.WithPrefix(outputQueuePrefix), tx.WithPrefix(outputQueuePrefix))
 

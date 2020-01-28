@@ -136,7 +136,7 @@ func (engine *PullEngine) loop(ctx context.Context, tx storage.StateTransaction)
 		if err != nil {
 			return errors.Wrap(err, "couldn't update watermark in intermediate record store")
 		}
-		engine.lastCommittedWatermark = watermark
+		engine.lastCommittedWatermark = watermark // TODO: last _commited_ watermark :(
 		return nil
 	}
 

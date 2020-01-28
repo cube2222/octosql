@@ -1061,6 +1061,30 @@ func Test_various(t *testing.T) {
 			want:    MakeTime(time.Date(2019, 06, 13, 0, 0, 0, 0, time.UTC)),
 			wantErr: false,
 		},
+		{
+			name: "parse_time('2006-01-02', '2019-06-13')",
+			args: args{
+				args: []Value{
+					MakeString("2006-01-02 15:04"),
+					MakeString("2019-06-13 17:21"),
+				},
+				fun: FuncParseTime,
+			},
+			want:    MakeTime(time.Date(2019, 06, 13, 17, 21, 0, 0, time.UTC)),
+			wantErr: false,
+		},
+		{
+			name: "parse_time('2006-01-02', '2019-06-13')",
+			args: args{
+				args: []Value{
+					MakeString("2006-01-02 15:04"),
+					MakeString("2019-13-06 17:21"),
+				},
+				fun: FuncParseTime,
+			},
+			want:    ZeroValue(),
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

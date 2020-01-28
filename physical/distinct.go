@@ -38,5 +38,5 @@ func (node *Distinct) Materialize(ctx context.Context, matCtx *MaterializationCo
 }
 
 func (node *Distinct) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality())
+	return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality(), node.Source.Metadata().EventTimeField())
 }

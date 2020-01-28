@@ -36,6 +36,14 @@ func (vn *VariableName) Name() string {
 	return vn.String()[i+1:]
 }
 
+func (vn *VariableName) Empty() bool {
+	return len(*vn) == 0
+}
+
+func (vn *VariableName) Equal(other VariableName) bool {
+	return *vn == other
+}
+
 type Variables map[VariableName]Value
 
 func NoVariables() Variables {

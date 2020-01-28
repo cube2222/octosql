@@ -43,5 +43,5 @@ func (node *Limit) Materialize(ctx context.Context, matCtx *MaterializationConte
 }
 
 func (node *Limit) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMetadata(metadata.BoundedFitsInLocalStorage)
+	return metadata.NewNodeMetadata(metadata.BoundedFitsInLocalStorage, node.Source.Metadata().EventTimeField())
 }

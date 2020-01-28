@@ -84,8 +84,9 @@ func (r *Record) Value(field octosql.VariableName) octosql.Value {
 		switch field.Name() {
 		case "undo":
 			return octosql.MakeBool(r.IsUndo())
-		case "event_time":
-			return r.EventTime()
+		case "event_time_field":
+			eventTimeField := r.EventTimeField()
+			return octosql.MakeString(eventTimeField.String())
 		default:
 			return octosql.MakeNull()
 		}

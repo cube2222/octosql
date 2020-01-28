@@ -35,19 +35,19 @@ func (p *CalculatorHandler) Close(ctx context.Context) (err error) {
 }
 
 func (p *CalculatorHandler) FindSimilar(ctx context.Context, image []byte) (retval17 int32, err error) {
-	fmt.Print("findSimilar()")
+	fmt.Print("findSimilar()\n")
 	return 42, nil
 }
 
 func (p *CalculatorHandler) OpenRecords(ctx context.Context) (r int32, err error) {
-	fmt.Print("OpenRecords()")
+	fmt.Print("OpenRecords()\n")
 	p.nextFreeIterator++
 	p.iterators[p.nextFreeIterator] = 0
 	return p.nextFreeIterator, nil
 }
 
 func (p *CalculatorHandler) GetRecord(ctx context.Context, streamID int32) (r *model.Record, err error) {
-	fmt.Print("getRecord()")
+	fmt.Print("getRecord()\n")
 	if p.iterators[streamID] < 5 {
 		var r model.Record = model.Record{
 			A: "record" + strconv.Itoa(int(p.iterators[streamID])),

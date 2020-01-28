@@ -17,6 +17,7 @@ require (
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0 // indirect
 	github.com/pkg/errors v0.8.1
+	github.com/samuel/go-thrift v0.0.0-20191111193933-5165175b40af
 	github.com/spf13/cobra v0.0.5
 	golang.org/x/net v0.0.0-20190522155817-f3200d17e092
 	google.golang.org/appengine v1.5.0 // indirect

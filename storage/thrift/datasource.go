@@ -7,7 +7,9 @@ import (
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/metadata"
+	"github.com/cube2222/octosql/storage/thrift/analyzer"
 	"github.com/pkg/errors"
+	"io/ioutil"
 	"sort"
 )
 
@@ -21,6 +23,7 @@ type DataSource struct {
 	thriftAddr  string
 	protocol    string
 	secure      bool
+	thriftMeta  *analyzer.ThriftMeta
 }
 
 func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
@@ -42,11 +45,30 @@ func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 				return nil, errors.Wrap(err, "couldn't get thrift server secure option")
 			}
 
+			var thriftMeta *analyzer.ThriftMeta = nil
+			thriftSpecsPath, err := config.GetString(dbConfig, "thriftSpecs", config.WithDefault(""))
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't get thrift specs option")
+			}
+
+			if len(thriftSpecsPath) > 0 {
+				thriftSpecsContent, err := ioutil.ReadFile(thriftSpecsPath)
+				if err != nil {
+					return nil, errors.Wrap(err, "couldn't open thrift specs file: "+thriftSpecsPath)
+				}
+
+				err, thriftMeta = analyzer.AnalyzeThriftSpecs(string(thriftSpecsContent))
+				if err != nil {
+					return nil, errors.Wrap(err, "couldn't load thrift specs file: "+err.Error())
+				}
+			}
+
 			return &DataSource{
 				alias:       alias,
 				thriftAddr:  thriftAddr,
 				protocol:    protocol,
 				secure:      secure,
+				thriftMeta:  thriftMeta,
 			}, nil
 		},
 		nil,
@@ -60,14 +82,14 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 	return NewDataSourceBuilderFactory(), nil
 }
 
-func (ds *DataSource) Get(variables octosql.Variables) (execution.RecordStream, error) {
-
+func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables) (execution.RecordStream, error) {
 	return &RecordStream{
 		isDone:                        false,
 		alias:                         ds.alias,
 		source:                        *ds,
 		streamID:                      0,
 		isOpen:                        false,
+		thriftMeta:                    ds.thriftMeta,
 	}, nil
 }
 
@@ -77,19 +99,25 @@ type RecordStream struct {
 	source                        DataSource
 	streamID                      int32
 	isOpen                        bool
+	thriftMeta                    *analyzer.ThriftMeta
 }
 
 func (rs *RecordStream) Close() error {
 	return nil
 }
 
-func (rs *RecordStream) Next() (*execution.Record, error) {
+func GetErrorContextDescription(rs *RecordStream) string {
+	return "Thrift data source \"" + rs.alias + "\""
+}
+
+func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 	if rs.isDone {
 		return nil, execution.ErrEndOfStream
 	}
 
 	result, err := RunClient(rs)
 	if err != nil {
+		err.WithContextDescription(GetErrorContextDescription(rs))
 		return nil, err
 	}
 

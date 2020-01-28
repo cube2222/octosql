@@ -20,7 +20,7 @@ func NewFirstAggregate() *First {
 }
 
 // First storage contains Deque for actual order of elements added and Map for storing counts of every element.
-// Ones the element is added, we PushBack it into the Deque (because it is the last one to pick as 'first' in order).
+// Once the element is added, we PushBack it into the Deque (because it is the last one to pick as 'first' in order).
 // Above that, we increment its count in Map.
 func (agg *First) AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
 	currentFirstStorage := storage.NewDeque(tx.WithPrefix(currentFirstPrefix))
@@ -49,7 +49,7 @@ func (agg *First) AddValue(ctx context.Context, tx storage.StateTransaction, val
 	return nil
 }
 
-// Now, ones the element is retracted we don't know its current position in Deque, so the only thing we can do is
+// Now, once the element is retracted we don't know its current position in Deque, so the only thing we can do is
 // decrement its count value in Map (if it reaches 0, we will Pop it from deque during GetValue and don't bother)
 func (agg *First) RetractValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
 	currentFirstCountsStorage := storage.NewMap(tx.WithPrefix(currentFirstCountsPrefix))

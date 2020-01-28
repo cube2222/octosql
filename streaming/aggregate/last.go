@@ -20,7 +20,7 @@ func NewLastAggregate() *Last {
 }
 
 // Last storage contains Deque for actual order of elements added and Map for storing counts of every element.
-// Ones the element is added, we PushFront it into the Deque (because it is the first one to pick as 'last' in order).
+// Once the element is added, we PushFront it into the Deque (because it is the first one to pick as 'last' in order).
 // Above that, we increment its count in Map.
 func (agg *Last) AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
 	currentLastStorage := storage.NewDeque(tx.WithPrefix(currentLastPrefix))
@@ -49,7 +49,7 @@ func (agg *Last) AddValue(ctx context.Context, tx storage.StateTransaction, valu
 	return nil
 }
 
-// Now, ones the element is retracted we don't know its current position in Deque, so the only thing we can do is
+// Now, once the element is retracted we don't know its current position in Deque, so the only thing we can do is
 // decrement its count value in Map (if it reaches 0, we will Pop it from deque during GetValue and don't bother)
 func (agg *Last) RetractValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
 	currentLastCountsStorage := storage.NewMap(tx.WithPrefix(currentLastCountsPrefix))

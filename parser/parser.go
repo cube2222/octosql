@@ -517,7 +517,7 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 		return logical.NewConstant(nil), nil
 
 	case sqlparser.BoolVal:
-		return logical.NewConstant(expr), nil
+		return logical.NewConstant(bool(expr)), nil
 
 	case sqlparser.ValTuple:
 		if len(expr) == 1 {

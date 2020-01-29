@@ -77,7 +77,7 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 			log.Fatal("invalid output type")
 		}
 
-		app := app.NewApp(cfg, dataSourceRespository, out)
+		app := app.NewApp(cfg, dataSourceRespository, out, true)
 
 		// Parse query
 		stmt, err := sqlparser.Parse(query)

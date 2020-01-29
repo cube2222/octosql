@@ -11,10 +11,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+
 	. "github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/execution"
-	"github.com/pkg/errors"
 )
 
 func execute(fun execution.Function, args ...Value) (Value, error) {
@@ -599,7 +600,7 @@ var FuncReverse = execution.Function{
 }
 
 var FuncSubstring = execution.Function{
-	Name: "sub", //TODO: fix parsing so that you can name this function substring
+	Name: "sub", // TODO: fix parsing so that you can name this function substring
 	ArgumentNames: [][]string{
 		{"word", "begin"},
 		{"word", "begin", "end"},
@@ -628,8 +629,8 @@ var FuncSubstring = execution.Function{
 	},
 }
 
-var FuncMatchRegexp = execution.Function{
-	Name: "matchregexp",
+var FuncRegexpFind = execution.Function{
+	Name: "regexp_find",
 	ArgumentNames: [][]string{
 		{"regexp", "text"},
 	},
@@ -650,6 +651,26 @@ var FuncMatchRegexp = execution.Function{
 		}
 
 		return MakeString(match), nil
+	},
+}
+
+var FuncRegexpMatches = execution.Function{
+	Name: "regexp_matches",
+	ArgumentNames: [][]string{
+		{"regexp", "text"},
+	},
+	Description: docs.Text("Returns a boolean indicating if the text matches the given regular expression."),
+	Validator: All(
+		ExactlyNArgs(2),
+		AllArgs(TypeOf(ZeroString())),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		re, err := regexp.Compile(args[0].AsString())
+		if err != nil {
+			return ZeroValue(), fmt.Errorf("couldn't compile regular expression")
+		}
+
+		return MakeBool(re.MatchString(args[1].AsString())), nil
 	},
 }
 
@@ -1220,6 +1241,28 @@ var FuncNullIf = execution.Function{
 		}
 
 		return args[1], nil
+	},
+}
+
+var FuncParseTime = execution.Function{
+	Name: "parse_time",
+	ArgumentNames: [][]string{
+		{"format", "text"},
+	},
+	Description: docs.List(
+		docs.Text("Parses the text using the time format given. The format argument should encode the date 'Mon Jan 2 15:04:05 -0700 MST 2006'."),
+	),
+	Validator: All(
+		ExactlyNArgs(2),
+		AllArgs(TypeOf(ZeroString())),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		t, err := time.Parse(args[0].AsString(), args[1].AsString())
+		if err != nil {
+			return ZeroValue(), errors.Wrap(err, "couldn't parse time")
+		}
+
+		return MakeTime(t), nil
 	},
 }
 

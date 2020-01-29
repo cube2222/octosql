@@ -1,3 +1,7 @@
+//
+// Thrift data source implementation
+//
+//
 package thrift
 
 import (
@@ -13,6 +17,7 @@ import (
 	"sort"
 )
 
+// Filters for Thrift endpoint
 var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 	physical.Primary:   make(map[physical.Relation]struct{}),
 	physical.Secondary: make(map[physical.Relation]struct{}),
@@ -51,6 +56,7 @@ func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 				return nil, errors.Wrap(err, "couldn't get thrift specs option")
 			}
 
+			// Load thrift specification and parse it creating metadata
 			if len(thriftSpecsPath) > 0 {
 				thriftSpecsContent, err := ioutil.ReadFile(thriftSpecsPath)
 				if err != nil {
@@ -90,6 +96,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables) (exe
 		streamID:                      0,
 		isOpen:                        false,
 		thriftMeta:                    ds.thriftMeta,
+		thriftConnection:              nil,
 	}, nil
 }
 
@@ -100,6 +107,7 @@ type RecordStream struct {
 	streamID                      int32
 	isOpen                        bool
 	thriftMeta                    *analyzer.ThriftMeta
+	thriftConnection              *ThriftConnection
 }
 
 func (rs *RecordStream) Close() error {
@@ -112,6 +120,10 @@ func GetErrorContextDescription(rs *RecordStream) string {
 
 func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 	if rs.isDone {
+		err := CloseClient(rs)
+		if err != nil {
+			return nil, err
+		}
 		return nil, execution.ErrEndOfStream
 	}
 

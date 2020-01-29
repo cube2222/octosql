@@ -23,22 +23,26 @@ func NewCalculatorHandler() *CalculatorHandler {
 	}
 }
 
+// Ping server
 func (p *CalculatorHandler) Ping(ctx context.Context) (err error) {
 	fmt.Print("ping()\n")
 	return nil
 }
 
+// Closing server
 func (p *CalculatorHandler) Close(ctx context.Context) (err error) {
 	fmt.Print("close()\n")
 	p.serverLiveWG.Done()
 	return nil
 }
 
+// Some dummy method
 func (p *CalculatorHandler) FindSimilar(ctx context.Context, image []byte) (retval17 int32, err error) {
 	fmt.Print("findSimilar()\n")
 	return 42, nil
 }
 
+// Handle openRecords()
 func (p *CalculatorHandler) OpenRecords(ctx context.Context) (r int32, err error) {
 	fmt.Print("OpenRecords()\n")
 	p.nextFreeIterator++
@@ -49,9 +53,9 @@ func (p *CalculatorHandler) OpenRecords(ctx context.Context) (r int32, err error
 func (p *CalculatorHandler) GetRecord(ctx context.Context, streamID int32) (r *model.Record, err error) {
 	fmt.Print("getRecord()\n")
 	if p.iterators[streamID] < 5 {
+		// Return the same record 5 times
 		var r model.Record = model.Record{
 			A: "record" + strconv.Itoa(int(p.iterators[streamID])),
-			B: "B",
 			Bar: nil,
 			Lst: []string{
 				"elo", "hehs",
@@ -69,6 +73,6 @@ func (p *CalculatorHandler) GetRecord(ctx context.Context, streamID int32) (r *m
 		p.iterators[streamID]++
 		return &r, nil
 	}
-	//var rec model.Record = model.Record{A: "stringa", B: "string"}
+
 	return nil, nil
 }

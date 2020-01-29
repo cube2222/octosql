@@ -9,6 +9,7 @@ import (
     "os"
 )
 
+// Print usage
 func Usage() {
     fmt.Fprint(os.Stderr, "Usage of ", os.Args[0], ":\n")
     flag.PrintDefaults()
@@ -54,12 +55,12 @@ func main() {
     }
 
     if *serverMode {
-        // always run server here
+        // Always run server here
         if err := server.RunServer(transportFactory, protocolFactory, *addr, *secure); err != nil {
             fmt.Println("error running server:", err)
         }
     } else {
-        // always be client
+        // Always be client
         fmt.Printf("*secure = '%v'\n", *secure)
         fmt.Printf("*addr   = '%v'\n", *addr)
         if err := client.RunClient(transportFactory, protocolFactory, *addr, *secure); err != nil {

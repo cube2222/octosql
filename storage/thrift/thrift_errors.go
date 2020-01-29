@@ -2,15 +2,18 @@ package thrift
 
 import "github.com/apache/thrift/lib/go/thrift"
 
+// Thrift Error wrapper
 type ThriftClientError struct {
 	description string
 	contextDescription string
 }
 
+// Set the context description of an error
 func (err *ThriftClientError) WithContextDescription(description string) {
 	err.contextDescription = description
 }
 
+// Stringify error
 func (err *ThriftClientError) Error() string {
 	if len(err.contextDescription) > 0 {
 		return err.contextDescription + " is " + err.description
@@ -18,6 +21,7 @@ func (err *ThriftClientError) Error() string {
 	return err.description
 }
 
+// Create empty error
 func ThriftClientNewError(description string) *ThriftClientError {
 	return &ThriftClientError{
 		description: description,
@@ -25,6 +29,9 @@ func ThriftClientNewError(description string) *ThriftClientError {
 	}
 }
 
+// Wrap standard go error into Thrift error
+// If the error is instance of thrift.TTransportException then additional description is injeted
+// In other cases the error is wrapped "as is".
 func ThriftWrapError(err error) *ThriftClientError {
 	terr, ok := err.(thrift.TTransportException)
 	if ok {

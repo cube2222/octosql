@@ -14,7 +14,6 @@ struct Bar {
 
 struct Record {
     1: string a,
-    2: string b,
     3: optional Bar bar,
     4: required Foo foo,
     5: list<string> lst,

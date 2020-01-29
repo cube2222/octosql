@@ -1,3 +1,6 @@
+//
+// Utilities for the demo client
+//
 package client
 
 import (

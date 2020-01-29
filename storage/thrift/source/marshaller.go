@@ -3,7 +3,7 @@
 //
 //
 //
-package thrift
+package source
 
 import (
 	"fmt"

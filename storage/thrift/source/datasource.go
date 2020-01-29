@@ -110,11 +110,6 @@ func NewThriftDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 	)
 }
 
-// NewDataSourceBuilderFactoryFromConfig creates a data source builder factory using the configuration.
-func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (physical.DataSourceBuilderFactory, error) {
-	return NewThriftDataSourceBuilderFactory(), nil
-}
-
 func (ds *DataSource) GetWithIOStreams(ctx context.Context, variables octosql.Variables, overrideIO bool, inputStream io.Reader, outputStream io.Writer) (execution.RecordStream, error) {
 	return &RecordStream{
 		isDone:                        false,

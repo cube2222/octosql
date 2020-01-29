@@ -9,3 +9,8 @@ import (
 func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 	return source.NewThriftDataSourceBuilderFactory()
 }
+
+// NewDataSourceBuilderFactoryFromConfig creates a data source builder factory using the configuration.
+func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (physical.DataSourceBuilderFactory, error) {
+	return source.NewThriftDataSourceBuilderFactory(), nil
+}

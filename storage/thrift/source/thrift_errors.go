@@ -1,4 +1,4 @@
-package thrift
+package source
 
 import "github.com/apache/thrift/lib/go/thrift"
 

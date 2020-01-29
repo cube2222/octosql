@@ -1,4 +1,4 @@
-package thrift
+package source
 
 import (
 	"context"
@@ -37,6 +37,12 @@ func RunClient(rs *RecordStream) (CallResult, *ThriftClientError) {
 	protocolFactory := GetProtocolFactory(pr)
 	transportFactory := thrift.NewTTransportFactory()
 	addr := rs.source.thriftAddr
+
+	// Override input/output streams
+	if rs.overrideIO {
+		transportFactory = thrift.NewStreamTransportFactory(rs.overrideStreamIn, rs.overrideStreamOut, false)
+	}
+
 	return RunClientEx(transportFactory, protocolFactory, addr, rs)
 }
 
@@ -78,9 +84,11 @@ func RunClientEx(transportFactory thrift.TTransportFactory, protocolFactory thri
 			return r, ThriftClientNewError("Error from transportFactory.GetTransport(), got nil transport. Is server available?")
 		}
 
-		err = connectionTransport.Open()
-		if err != nil {
-			return r, ThriftWrapError(err)
+		if !connectionTransport.IsOpen() {
+			err = connectionTransport.Open()
+			if err != nil {
+				return r, ThriftWrapError(err)
+			}
 		}
 
 		client := thrift.NewTStandardClient(protocolFactory.GetProtocol(connectionTransport), protocolFactory.GetProtocol(connectionTransport))

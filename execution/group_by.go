@@ -6,7 +6,6 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
-	"github.com/cube2222/octosql/streaming/trigger"
 
 	"github.com/pkg/errors"
 )
@@ -20,6 +19,8 @@ type Aggregate interface {
 	String() string
 }
 
+type TriggerPrototype func(ctx context.Context, variables octosql.Variables) (Trigger, error)
+
 type GroupBy struct {
 	storage             storage.Storage
 	source              Node
@@ -32,10 +33,12 @@ type GroupBy struct {
 
 	as                []octosql.VariableName
 	outEventTimeField octosql.VariableName
+
+	triggerPrototype TriggerPrototype
 }
 
-func NewGroupBy(storage storage.Storage, source Node, sourceStoragePrefix []byte, key []Expression, fields []octosql.VariableName, aggregatePrototypes []AggregatePrototype, eventTimeField octosql.VariableName, as []octosql.VariableName, outEventTimeField octosql.VariableName) *GroupBy {
-	return &GroupBy{storage: storage, source: source, sourceStoragePrefix: sourceStoragePrefix, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, eventTimeField: eventTimeField, as: as, outEventTimeField: outEventTimeField}
+func NewGroupBy(storage storage.Storage, source Node, sourceStoragePrefix []byte, key []Expression, fields []octosql.VariableName, aggregatePrototypes []AggregatePrototype, eventTimeField octosql.VariableName, as []octosql.VariableName, outEventTimeField octosql.VariableName, triggerPrototype TriggerPrototype) *GroupBy {
+	return &GroupBy{storage: storage, source: source, sourceStoragePrefix: sourceStoragePrefix, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, eventTimeField: eventTimeField, as: as, outEventTimeField: outEventTimeField, triggerPrototype: triggerPrototype}
 }
 
 func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
@@ -68,6 +71,11 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables) (Reco
 		}
 	}
 
+	trigger, err := node.triggerPrototype(ctx, variables)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get trigger from trigger prototype")
+	}
+
 	groupBy := &GroupByStream{
 		prefixes:             prefixes,
 		inputFields:          node.fields,
@@ -79,7 +87,7 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables) (Reco
 	processFunc := &ProcessByKey{
 		stateStorage:    node.storage,
 		eventTimeField:  node.eventTimeField,
-		trigger:         trigger.NewWatermarkTrigger(),
+		trigger:         trigger,
 		keyExpression:   node.key,
 		processFunction: groupBy,
 		variables:       variables,

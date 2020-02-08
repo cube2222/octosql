@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
@@ -70,7 +71,7 @@ func (ct *CountingTrigger) PollKeyToFire(ctx context.Context, tx storage.StateTr
 	err := toSend.Get(&out)
 	if err != nil {
 		if err == storage.ErrNotFound {
-			return octosql.ZeroValue(), ErrNoKeyToFire
+			return octosql.ZeroValue(), execution.ErrNoKeyToFire
 		}
 		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get value to send")
 	}

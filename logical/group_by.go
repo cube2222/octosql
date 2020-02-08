@@ -40,6 +40,53 @@ var AggregateFunctions = map[Aggregate]struct{}{
 	SumDistinct:   struct{}{},
 }
 
+type Trigger interface {
+	Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Trigger, octosql.Variables, error)
+}
+
+type CountingTrigger struct {
+	Count Expression
+}
+
+func NewCountingTrigger(count Expression) *CountingTrigger {
+	return &CountingTrigger{Count: count}
+}
+
+func (w *CountingTrigger) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Trigger, octosql.Variables, error) {
+	countExpr, vars, err := w.Count.Physical(ctx, physicalCreator)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't get physical plan for count expression")
+	}
+	return physical.NewCountingTrigger(countExpr), vars, nil
+}
+
+type DelayTrigger struct {
+	Delay Expression
+}
+
+func NewDelayTrigger(delay Expression) *DelayTrigger {
+	return &DelayTrigger{Delay: delay}
+}
+
+func (w *DelayTrigger) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Trigger, octosql.Variables, error) {
+	delayExpr, vars, err := w.Delay.Physical(ctx, physicalCreator)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't get physical plan for delay expression")
+	}
+	return physical.NewDelayTrigger(delayExpr), vars, nil
+}
+
+type WatermarkTrigger struct {
+}
+
+func NewWatermarkTrigger() *WatermarkTrigger {
+	return &WatermarkTrigger{}
+}
+
+func (w *WatermarkTrigger) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Trigger, octosql.Variables, error) {
+	return physical.NewWatermarkTrigger(), octosql.NoVariables(), nil
+}
+
 type GroupBy struct {
 	source Node
 	key    []Expression
@@ -48,10 +95,12 @@ type GroupBy struct {
 	aggregates []Aggregate
 
 	as []octosql.VariableName
+
+	triggers []Trigger
 }
 
-func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, aggregates []Aggregate, as []octosql.VariableName) *GroupBy {
-	return &GroupBy{source: source, key: key, fields: fields, aggregates: aggregates, as: as}
+func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, aggregates []Aggregate, as []octosql.VariableName, triggers []Trigger) *GroupBy {
+	return &GroupBy{source: source, key: key, fields: fields, aggregates: aggregates, as: as, triggers: triggers}
 }
 
 func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
@@ -110,5 +159,20 @@ func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlan
 		}
 	}
 
-	return physical.NewGroupBy(source, key, node.fields, aggregates, node.as), variables, nil
+	triggers := make([]physical.Trigger, len(node.triggers))
+	for i := range node.triggers {
+		out, triggerVariables, err := node.triggers[i].Physical(ctx, physicalCreator)
+		if err != nil {
+			return nil, octosql.NoVariables(), errors.Wrapf(err, "couldn't get physical plan for trigger with index %d", i)
+		}
+
+		variables, err = variables.MergeWith(triggerVariables)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "couldn't merge variables with those of trigger with index %d", i)
+		}
+
+		triggers[i] = out
+	}
+
+	return physical.NewGroupBy(source, key, node.fields, aggregates, node.as, triggers), variables, nil
 }

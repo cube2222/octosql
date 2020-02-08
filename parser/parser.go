@@ -166,7 +166,15 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 			}
 		}
 
-		root = logical.NewGroupBy(root, key, fields, aggregates, aggregatesAs)
+		triggers := make([]logical.Trigger, len(statement.Trigger))
+		for i := range statement.Trigger {
+			triggers[i], err = ParseTrigger(statement.Trigger[i])
+			if err != nil {
+				return nil, errors.Wrapf(err, "couldn't parse trigger with index %d", i)
+			}
+		}
+
+		root = logical.NewGroupBy(root, key, fields, aggregates, aggregatesAs, triggers)
 	}
 
 	if statement.OrderBy != nil {
@@ -365,6 +373,8 @@ func ParseTableValuedFunctionArgument(expr sqlparser.TableValuedFunctionArgument
 	}
 }
 
+var ErrNotAggregate = errors.New("expression is not aggregate")
+
 func ParseAggregate(expr sqlparser.Expr) (logical.Aggregate, logical.NamedExpression, error) {
 	switch expr := expr.(type) {
 	case *sqlparser.FuncExpr:
@@ -407,7 +417,28 @@ func ParseAggregate(expr sqlparser.Expr) (logical.Aggregate, logical.NamedExpres
 	return "", nil, errors.Wrapf(ErrNotAggregate, "invalid group by select expression type")
 }
 
-var ErrNotAggregate = errors.New("expression is not aggregate")
+func ParseTrigger(trigger sqlparser.Trigger) (logical.Trigger, error) {
+	switch trigger := trigger.(type) {
+	case *sqlparser.CountingTrigger:
+		countExpr, err := ParseExpression(trigger.Count)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't parse count expression")
+		}
+		return logical.NewCountingTrigger(countExpr), nil
+
+	case *sqlparser.DelayTrigger:
+		countExpr, err := ParseExpression(trigger.Delay)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't parse delay expression")
+		}
+		return logical.NewDelayTrigger(countExpr), nil
+
+	case *sqlparser.WatermarkTrigger:
+		return logical.NewWatermarkTrigger(), nil
+	}
+
+	return nil, errors.Errorf("invalid trigger type: %v", trigger)
+}
 
 func ParseAliasedExpression(expr *sqlparser.AliasedExpr) (logical.NamedExpression, error) {
 	subExpr, err := ParseExpression(expr.Expr)

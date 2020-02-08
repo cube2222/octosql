@@ -8,15 +8,16 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
 type MultiTrigger struct {
 	prefixes [][]byte
-	triggers []Trigger
+	triggers []execution.Trigger
 }
 
-func NewMultiTrigger(triggers ...Trigger) *MultiTrigger {
+func NewMultiTrigger(triggers ...execution.Trigger) *MultiTrigger {
 	prefixes := make([][]byte, len(triggers))
 	for i := range triggers {
 		prefixes[i] = []byte(fmt.Sprintf("$%d$", i))
@@ -55,19 +56,19 @@ func (m *MultiTrigger) PollKeyToFire(ctx context.Context, tx storage.StateTransa
 		if err == nil {
 			for j := range m.triggers {
 				if j != i {
-					err := m.triggers[j].KeyFired(ctx, tx.WithPrefix(m.prefixes[j]), key)
+					err := m.triggers[i].KeyFired(ctx, tx.WithPrefix(m.prefixes[j]), key)
 					if err != nil {
 						return octosql.ZeroValue(), errors.Wrapf(err, "couldn't mark key fired in trigger with index %d after trigger with index %d fired", j, i)
 					}
 				}
 			}
 			return key, nil
-		} else if err != ErrNoKeyToFire {
+		} else if err != execution.ErrNoKeyToFire {
 			return octosql.ZeroValue(), errors.Wrapf(err, "couldn't poll key to fire in trigger with index %d: %v", i, m.triggers[i])
 		}
 	}
 
-	return octosql.ZeroValue(), ErrNoKeyToFire
+	return octosql.ZeroValue(), execution.ErrNoKeyToFire
 }
 
 func (m *MultiTrigger) KeyFired(ctx context.Context, tx storage.StateTransaction, key octosql.Value) error {

@@ -29,7 +29,8 @@ var usableFunctions = []execution.Function{
 	FuncPower,
 	FuncReverse,
 	FuncSubstring,
-	FuncMatchRegexp,
+	FuncRegexpFind,
+	FuncRegexpMatches,
 	FuncNth,
 	FuncReplace,
 	FuncHasPrefix,
@@ -46,6 +47,7 @@ var usableFunctions = []execution.Function{
 	FuncDuration,
 	FuncCoalesce,
 	FuncNullIf,
+	FuncParseTime,
 }
 
 func init() {

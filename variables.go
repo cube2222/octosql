@@ -15,11 +15,11 @@ func NewVariableName(varname string) VariableName {
 	return VariableName(strings.ToLower(varname))
 }
 
-func (vn *VariableName) String() string {
-	return string(*vn)
+func (vn VariableName) String() string {
+	return string(vn)
 }
 
-func (vn *VariableName) Source() string {
+func (vn VariableName) Source() string {
 	parts := strings.Split(vn.String(), ".")
 	if len(parts) == 1 {
 		return ""
@@ -28,7 +28,7 @@ func (vn *VariableName) Source() string {
 	}
 }
 
-func (vn *VariableName) Name() string {
+func (vn VariableName) Name() string {
 	i := strings.Index(vn.String(), ".")
 	if i == -1 {
 		return vn.String()
@@ -36,12 +36,12 @@ func (vn *VariableName) Name() string {
 	return vn.String()[i+1:]
 }
 
-func (vn *VariableName) Empty() bool {
-	return len(*vn) == 0
+func (vn VariableName) Empty() bool {
+	return len(vn) == 0
 }
 
-func (vn *VariableName) Equal(other VariableName) bool {
-	return *vn == other
+func (vn VariableName) Equal(other VariableName) bool {
+	return vn == other
 }
 
 type Variables map[VariableName]Value

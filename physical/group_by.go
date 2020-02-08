@@ -4,11 +4,12 @@ import (
 	"context"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/cube2222/octosql/streaming/aggregate"
-	"github.com/pkg/errors"
 )
 
 type Aggregate string
@@ -19,6 +20,7 @@ const (
 	Count         Aggregate = "count"
 	CountDistinct Aggregate = "count_distinct"
 	First         Aggregate = "first"
+	Key           Aggregate = "key"
 	Last          Aggregate = "last"
 	Max           Aggregate = "max"
 	Min           Aggregate = "min"
@@ -88,13 +90,49 @@ func (node *GroupBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 		aggregatePrototypes[i] = aggregate.AggregateTable[string(node.Aggregates[i])]
 	}
 
-	return execution.NewGroupBy(matCtx.Storage, source, key, node.Fields, aggregatePrototypes, node.As), nil
+	sourceMetadata := node.Source.Metadata()
+	eventTimeField := octosql.NewVariableName("")
+	if node.groupingByEventTime(sourceMetadata) {
+		eventTimeField = sourceMetadata.EventTimeField()
+	}
+
+	meta := node.Metadata()
+
+	return execution.NewGroupBy(matCtx.Storage, source, key, node.Fields, aggregatePrototypes, eventTimeField, node.As, meta.EventTimeField()), nil
+}
+
+func (node *GroupBy) groupingByEventTime(sourceMetadata *metadata.NodeMetadata) bool {
+	groupingByEventTime := false
+	if !sourceMetadata.EventTimeField().Empty() {
+		for i := range node.Key {
+			if variable, ok := node.Key[i].(*Variable); ok {
+				if variable.Name == sourceMetadata.EventTimeField() {
+					groupingByEventTime = true
+				}
+			}
+		}
+	}
+
+	return groupingByEventTime
 }
 
 func (node *GroupBy) Metadata() *metadata.NodeMetadata {
-	var cardinality = node.Metadata().Cardinality()
+	sourceMetadata := node.Source.Metadata()
+	var cardinality = sourceMetadata.Cardinality()
 	if cardinality == metadata.BoundedDoesntFitInLocalStorage {
 		cardinality = metadata.BoundedFitsInLocalStorage
 	}
-	return metadata.NewNodeMetadata(cardinality, octosql.NewVariableName(""))
+
+	groupingByEventTime := node.groupingByEventTime(sourceMetadata)
+
+	outEventTimeField := octosql.NewVariableName("")
+	if groupingByEventTime {
+		for i := range node.Fields {
+			if node.Aggregates[i] == Key && node.Fields[i] == sourceMetadata.EventTimeField() {
+				outEventTimeField = node.As[i]
+			}
+		}
+	}
+
+	return metadata.NewNodeMetadata(cardinality, outEventTimeField)
 }

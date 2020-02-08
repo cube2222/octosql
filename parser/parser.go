@@ -150,11 +150,18 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 			}
 		}
 
-		// If the user doesn't specify an aggregate, we default to the first element in the group.
+		// If the user doesn't specify an aggregate, we default to the FIRST aggregate, or KEY if it's a part of the key.
 		// However, we don't want to change the name of that field.
 		for i := range aggregates {
 			if len(aggregates[i]) == 0 {
 				aggregates[i] = logical.First
+				for j := range key {
+					if namedKeyElement, ok := key[j].(logical.NamedExpression); ok {
+						if namedKeyElement.Name() == fields[i] {
+							aggregates[i] = logical.Key
+						}
+					}
+				}
 				aggregatesAs[i] = expressions[i].Name()
 			}
 		}

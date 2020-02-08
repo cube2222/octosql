@@ -27,12 +27,14 @@ type GroupBy struct {
 
 	fields              []octosql.VariableName
 	aggregatePrototypes []AggregatePrototype
+	eventTimeField      octosql.VariableName
 
-	as []octosql.VariableName
+	as                []octosql.VariableName
+	outEventTimeField octosql.VariableName
 }
 
-func NewGroupBy(storage storage.Storage, source Node, key []Expression, fields []octosql.VariableName, aggregatePrototypes []AggregatePrototype, as []octosql.VariableName) *GroupBy {
-	return &GroupBy{storage: storage, source: source, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, as: as}
+func NewGroupBy(storage storage.Storage, source Node, key []Expression, fields []octosql.VariableName, aggregatePrototypes []AggregatePrototype, eventTimeField octosql.VariableName, as []octosql.VariableName, outEventTimeField octosql.VariableName) *GroupBy {
+	return &GroupBy{storage: storage, source: source, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, eventTimeField: eventTimeField, as: as, outEventTimeField: outEventTimeField}
 }
 
 func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
@@ -66,15 +68,16 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables) (Reco
 	}
 
 	groupBy := &GroupByStream{
-		prefixes:         prefixes,
-		inputFields:      node.fields,
-		eventTimeField:   "",
-		aggregates:       aggregates,
-		outputFieldNames: outputFieldNames,
+		prefixes:             prefixes,
+		inputFields:          node.fields,
+		eventTimeField:       node.eventTimeField,
+		outputEventTimeField: node.outEventTimeField,
+		aggregates:           aggregates,
+		outputFieldNames:     outputFieldNames,
 	}
 	processFunc := &ProcessByKey{
 		stateStorage:    node.storage,
-		eventTimeField:  "",
+		eventTimeField:  node.eventTimeField,
 		trigger:         trigger.NewWatermarkTrigger(),
 		keyExpression:   node.key,
 		processFunction: groupBy,
@@ -86,9 +89,6 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables) (Reco
 	return groupByPullEngine, nil
 }
 
-// TODO: Physical plan nodes need to have the GetEventTimeField() method. There's no sense for a stream to be mixed anyways
-// This way, we know before creation, if the used variable is an event time group by or not.
-// This would be injected into any ProcessFunctions
 type GroupByStream struct {
 	prefixes [][]byte
 
@@ -96,7 +96,8 @@ type GroupByStream struct {
 	inputFields    []octosql.VariableName
 	aggregates     []Aggregate
 
-	outputFieldNames []octosql.VariableName
+	outputFieldNames     []octosql.VariableName
+	outputEventTimeField octosql.VariableName
 }
 
 var eventTimePrefix = []byte("$event_time$")
@@ -116,14 +117,6 @@ func (gb *GroupByStream) AddRecord(ctx context.Context, tx storage.StateTransact
 				mapping[field.Name.String()] = record.Value(field.Name)
 			}
 			value = octosql.MakeObject(mapping)
-		} else if gb.inputFields[i] == gb.eventTimeField && gb.aggregates[i].String() == "first" {
-			eventTimeState := storage.NewValueState(txByKey.WithPrefix(eventTimePrefix))
-			val := record.Value(gb.eventTimeField)
-			err := eventTimeState.Set(&val)
-			if err != nil {
-				return errors.Wrap(err, "couldn't save event time")
-			}
-			continue
 		} else {
 			value = record.Value(gb.inputFields[i])
 		}
@@ -162,7 +155,7 @@ func (gb *GroupByStream) Trigger(ctx context.Context, tx storage.StateTransactio
 
 	var opts []RecordOption
 	if len(gb.eventTimeField) > 0 {
-		opts = append(opts, WithEventTimeField(gb.eventTimeField))
+		opts = append(opts, WithEventTimeField(gb.outputEventTimeField))
 	}
 
 	previouslyTriggeredValues := storage.NewValueState(txByKey.WithPrefix(previouslyTriggeredValuePrefix))
@@ -176,14 +169,6 @@ func (gb *GroupByStream) Trigger(ctx context.Context, tx storage.StateTransactio
 
 	values := make([]octosql.Value, len(gb.aggregates))
 	for i := range gb.aggregates {
-		if gb.inputFields[i] == gb.eventTimeField && gb.aggregates[i].String() == "first" {
-			eventTimeState := storage.NewValueState(txByKey.WithPrefix(eventTimePrefix))
-			err := eventTimeState.Get(&values[i])
-			if err != nil {
-				return nil, errors.Wrap(err, "couldn't get event time")
-			}
-			continue
-		}
 		var err error
 		values[i], err = gb.aggregates[i].GetValue(ctx, txByKey.WithPrefix(gb.prefixes[i]))
 		if err != nil {

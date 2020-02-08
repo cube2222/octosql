@@ -63,6 +63,9 @@ func (stream *RequalifiedStream) Next(ctx context.Context) (*Record, error) {
 	fields := make([]octosql.VariableName, len(record.Fields()))
 	values := make(map[octosql.VariableName]octosql.Value)
 	for i := range oldFields {
+		if oldFields[i].Name.Source() == SystemSource {
+			continue
+		}
 		name := string(oldFields[i].Name)
 		if dotIndex := strings.Index(name, "."); dotIndex != -1 {
 			if simpleQualifierMatcher.MatchString(name[:dotIndex]) {
@@ -75,5 +78,10 @@ func (stream *RequalifiedStream) Next(ctx context.Context) (*Record, error) {
 		values[qualifiedName] = record.Value(oldFields[i].Name)
 	}
 
-	return NewRecord(fields, values), nil
+	eventTimeField := record.EventTimeField()
+	if !eventTimeField.Empty() {
+		eventTimeField = octosql.NewVariableName(fmt.Sprintf("%s.%s", stream.qualifier, eventTimeField.Name()))
+	}
+
+	return NewRecord(fields, values, WithMetadataFrom(record), WithEventTimeField(eventTimeField)), nil
 }

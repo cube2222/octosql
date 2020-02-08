@@ -4,9 +4,10 @@ import (
 	"context"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/physical"
-	"github.com/pkg/errors"
 )
 
 type Aggregate string
@@ -17,6 +18,7 @@ const (
 	Count         Aggregate = "count"
 	CountDistinct Aggregate = "count_distinct"
 	First         Aggregate = "first"
+	Key           Aggregate = "key"
 	Last          Aggregate = "last"
 	Max           Aggregate = "max"
 	Min           Aggregate = "min"
@@ -30,6 +32,7 @@ var AggregateFunctions = map[Aggregate]struct{}{
 	Count:         struct{}{},
 	CountDistinct: struct{}{},
 	First:         struct{}{},
+	Key:           struct{}{},
 	Last:          struct{}{},
 	Max:           struct{}{},
 	Min:           struct{}{},
@@ -90,6 +93,8 @@ func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlan
 			aggregates[i] = physical.CountDistinct
 		case First:
 			aggregates[i] = physical.First
+		case Key:
+			aggregates[i] = physical.Key
 		case Last:
 			aggregates[i] = physical.Last
 		case Max:

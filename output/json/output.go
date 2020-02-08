@@ -44,7 +44,7 @@ func (o *Output) WriteRecord(record *execution.Record) error {
 		}
 	}
 	kvs := make(map[string]interface{})
-	for _, field := range record.Fields() {
+	for _, field := range record.ShowFields() {
 		kvs[field.Name.String()] = record.Value(field.Name).ToRawValue()
 	}
 	err := o.enc.Encode(kvs)

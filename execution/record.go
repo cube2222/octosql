@@ -93,8 +93,14 @@ func NewRecordFromRecord(record *Record, opts ...RecordOption) *Record {
 	return r
 }
 
+var SystemSource string = "sys"
+
+func SystemField(field string) octosql.VariableName {
+	return octosql.NewVariableName(fmt.Sprintf("%s.%s", SystemSource, field))
+}
+
 func (r *Record) Value(field octosql.VariableName) octosql.Value {
-	if field.Source() == "sys" {
+	if field.Source() == SystemSource {
 		switch field.Name() {
 		case "undo":
 			return octosql.MakeBool(r.IsUndo())
@@ -123,6 +129,12 @@ func (r *Record) Fields() []Field {
 			Name: octosql.NewVariableName(fieldName),
 		})
 	}
+
+	return fields
+}
+
+func (r *Record) ShowFields() []Field {
+	fields := r.Fields()
 
 	if len(r.EventTimeField()) > 0 {
 		fields = append(fields, Field{

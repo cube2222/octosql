@@ -2,6 +2,8 @@ package physical
 
 import (
 	"context"
+	"crypto/rand"
+	"log"
 
 	"github.com/pkg/errors"
 
@@ -25,6 +27,19 @@ type Transformers struct {
 type MaterializationContext struct {
 	Config  *config.Config
 	Storage storage.Storage
+}
+
+func (matCtx *MaterializationContext) WithStoragePrefix() (out *MaterializationContext, prefix []byte) {
+	prefix = make([]byte, 8)
+	_, err := rand.Read(prefix)
+	if err != nil {
+		log.Fatalf("couldn't generate random byte slice: %v", err)
+	}
+
+	return &MaterializationContext{
+		Config:  matCtx.Config,
+		Storage: matCtx.Storage.WithPrefix(prefix),
+	}, prefix
 }
 
 func NewMaterializationContext(config *config.Config, storage storage.Storage) *MaterializationContext {

@@ -70,7 +70,9 @@ func (node *GroupBy) Transform(ctx context.Context, transformers *Transformers) 
 }
 
 func (node *GroupBy) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
-	source, err := node.Source.Materialize(ctx, matCtx)
+	sourceMatCtx, sourceStoragePrefix := matCtx.WithStoragePrefix()
+
+	source, err := node.Source.Materialize(ctx, sourceMatCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize Source node")
 	}
@@ -98,7 +100,7 @@ func (node *GroupBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 
 	meta := node.Metadata()
 
-	return execution.NewGroupBy(matCtx.Storage, source, key, node.Fields, aggregatePrototypes, eventTimeField, node.As, meta.EventTimeField()), nil
+	return execution.NewGroupBy(matCtx.Storage, source, sourceStoragePrefix, key, node.Fields, aggregatePrototypes, eventTimeField, node.As, meta.EventTimeField()), nil
 }
 
 func (node *GroupBy) groupingByEventTime(sourceMetadata *metadata.NodeMetadata) bool {

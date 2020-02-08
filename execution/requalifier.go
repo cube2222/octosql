@@ -3,11 +3,13 @@ package execution
 import (
 	"context"
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 
-	"github.com/cube2222/octosql"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
 )
 
 type Requalifier struct {
@@ -83,5 +85,8 @@ func (stream *RequalifiedStream) Next(ctx context.Context) (*Record, error) {
 		eventTimeField = octosql.NewVariableName(fmt.Sprintf("%s.%s", stream.qualifier, eventTimeField.Name()))
 	}
 
-	return NewRecord(fields, values, WithMetadataFrom(record), WithEventTimeField(eventTimeField)), nil
+	out := NewRecord(fields, values, WithMetadataFrom(record), WithEventTimeField(eventTimeField))
+	log.Printf("in %s out %s", record.Show(), out.Show())
+
+	return out, nil
 }

@@ -61,17 +61,19 @@ type IntermediateRecordStore interface {
 type PullEngine struct {
 	irs                    IntermediateRecordStore
 	source                 RecordStream
+	sourceStoragePrefix    []byte
 	lastCommittedWatermark time.Time
 	watermarkSource        WatermarkSource
 	storage                storage.Storage
 }
 
-func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, source RecordStream, watermarkSource WatermarkSource) *PullEngine {
+func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, source RecordStream, sourceStoragePrefix []byte, watermarkSource WatermarkSource) *PullEngine {
 	return &PullEngine{
-		irs:             irs,
-		storage:         storage,
-		source:          source,
-		watermarkSource: watermarkSource,
+		irs:                 irs,
+		storage:             storage,
+		source:              source,
+		sourceStoragePrefix: sourceStoragePrefix,
+		watermarkSource:     watermarkSource,
 	}
 }
 
@@ -127,7 +129,9 @@ func (engine *PullEngine) Run(ctx context.Context) {
 }
 
 func (engine *PullEngine) loop(ctx context.Context, tx storage.StateTransaction) error {
-	watermark, err := engine.watermarkSource.GetWatermark(ctx, tx)
+	sourcePrefixedTx := tx.WithPrefix(engine.sourceStoragePrefix)
+
+	watermark, err := engine.watermarkSource.GetWatermark(ctx, sourcePrefixedTx)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current watermark from source")
 	}
@@ -136,11 +140,11 @@ func (engine *PullEngine) loop(ctx context.Context, tx storage.StateTransaction)
 		if err != nil {
 			return errors.Wrap(err, "couldn't update watermark in intermediate record store")
 		}
-		engine.lastCommittedWatermark = watermark // TODO: last _commited_ watermark :(
+		engine.lastCommittedWatermark = watermark // TODO: last _commited_ watermark :( this is not committed
 		return nil
 	}
 
-	record, err := engine.source.Next(storage.InjectStateTransaction(ctx, tx))
+	record, err := engine.source.Next(storage.InjectStateTransaction(ctx, sourcePrefixedTx))
 	if err != nil {
 		if err == ErrEndOfStream {
 			err := engine.irs.UpdateWatermark(ctx, tx, maxWatermark)

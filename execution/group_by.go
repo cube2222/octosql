@@ -21,9 +21,10 @@ type Aggregate interface {
 }
 
 type GroupBy struct {
-	storage storage.Storage
-	source  Node
-	key     []Expression
+	storage             storage.Storage
+	source              Node
+	sourceStoragePrefix []byte
+	key                 []Expression
 
 	fields              []octosql.VariableName
 	aggregatePrototypes []AggregatePrototype
@@ -33,8 +34,8 @@ type GroupBy struct {
 	outEventTimeField octosql.VariableName
 }
 
-func NewGroupBy(storage storage.Storage, source Node, key []Expression, fields []octosql.VariableName, aggregatePrototypes []AggregatePrototype, eventTimeField octosql.VariableName, as []octosql.VariableName, outEventTimeField octosql.VariableName) *GroupBy {
-	return &GroupBy{storage: storage, source: source, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, eventTimeField: eventTimeField, as: as, outEventTimeField: outEventTimeField}
+func NewGroupBy(storage storage.Storage, source Node, sourceStoragePrefix []byte, key []Expression, fields []octosql.VariableName, aggregatePrototypes []AggregatePrototype, eventTimeField octosql.VariableName, as []octosql.VariableName, outEventTimeField octosql.VariableName) *GroupBy {
+	return &GroupBy{storage: storage, source: source, sourceStoragePrefix: sourceStoragePrefix, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, eventTimeField: eventTimeField, as: as, outEventTimeField: outEventTimeField}
 }
 
 func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
@@ -83,7 +84,7 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables) (Reco
 		processFunction: groupBy,
 		variables:       variables,
 	}
-	groupByPullEngine := NewPullEngine(processFunc, node.storage, source, &ZeroWatermarkSource{})
+	groupByPullEngine := NewPullEngine(processFunc, node.storage, source, node.sourceStoragePrefix, &ZeroWatermarkSource{})
 	go groupByPullEngine.Run(ctx) // TODO: .Close() should kill this context and the goroutine.
 
 	return groupByPullEngine, nil

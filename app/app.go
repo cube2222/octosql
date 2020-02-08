@@ -64,7 +64,7 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		} else if waitableError := execution.GetErrWaitForChanges(err); waitableError != nil {
 			err := tx.Commit()
 			if err != nil {
-				log.Println("couldn't commit: ", err)
+				log.Println("main couldn't commit: ", err)
 				continue
 			}
 			log.Println("main listening for changes")

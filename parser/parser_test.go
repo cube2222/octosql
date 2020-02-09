@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
 
 	memmap "github.com/bradleyjkemp/memviz"
 	"github.com/cube2222/octosql"
@@ -641,6 +642,7 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 					[]octosql.VariableName{"p.name"},
 					[]logical.Aggregate{logical.CountDistinct},
 					[]octosql.VariableName{""},
+					[]logical.Trigger{},
 				),
 				false,
 			),
@@ -649,7 +651,7 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 		{
 			name: "normal group by",
 			args: args{
-				statement: `SELECT COUNT(DISTINCT p.name), FIRST(p.age as myage) as firstage, p.surname, p.surname as mysurname FROM people p GROUP BY p.age, p.city`,
+				statement: `SELECT COUNT(DISTINCT p.name), FIRST(p.age as myage) as firstage, p.surname, p.surname as mysurname FROM people p GROUP BY p.age, p.city TRIGGER AFTER DELAY INTERVAL 3 SECONDS, ON WATERMARK, COUNTING 5`,
 			},
 			want: logical.NewMap(
 				[]logical.NamedExpression{
@@ -682,6 +684,11 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 					[]octosql.VariableName{"p.name", "myage", "p.surname", "mysurname"},
 					[]logical.Aggregate{logical.CountDistinct, logical.First, logical.First, logical.First},
 					[]octosql.VariableName{"", "firstage", "p.surname", "mysurname"},
+					[]logical.Trigger{
+						logical.NewDelayTrigger(logical.NewConstant(time.Second * 3)),
+						logical.NewWatermarkTrigger(),
+						logical.NewCountingTrigger(logical.NewConstant(5)),
+					},
 				),
 				false,
 			),

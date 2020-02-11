@@ -1,0 +1,5 @@
+dataSources:
+  - name: bikes
+    type: json
+    config:
+      path: "bikes.json"

@@ -49,7 +49,7 @@ type Tokenizer struct {
 	lastToken           []byte
 	LastError           error
 	posVarIndex         int
-	ParseTree           Statement
+	ParseTree           *Program
 	partialDDL          *DDL
 	nesting             int
 	multi               bool
@@ -148,6 +148,7 @@ var keywords = map[string]int{
 	"cursor":              UNUSED,
 	"database":            DATABASE,
 	"databases":           DATABASES,
+	"datasource":          DATASOURCE,
 	"day_hour":            UNUSED,
 	"day_microsecond":     UNUSED,
 	"day_minute":          UNUSED,
@@ -283,6 +284,7 @@ var keywords = map[string]int{
 	"no_write_to_binlog":  UNUSED,
 	"null":                NULL,
 	"numeric":             NUMERIC,
+	"of":                  OF,
 	"off":                 OFF,
 	"offset":              OFFSET,
 	"on":                  ON,
@@ -295,6 +297,7 @@ var keywords = map[string]int{
 	"order":               ORDER,
 	"out":                 UNUSED,
 	"outer":               OUTER,
+	"options":             OPTIONS,
 	"outfile":             UNUSED,
 	"partition":           PARTITION,
 	"plugins":             PLUGINS,
@@ -371,6 +374,7 @@ var keywords = map[string]int{
 	"tinyblob":            TINYBLOB,
 	"tinyint":             TINYINT,
 	"tinytext":            TINYTEXT,
+	"type":                TYPE,
 	"to":                  TO,
 	"trailing":            UNUSED,
 	"transaction":         TRANSACTION,

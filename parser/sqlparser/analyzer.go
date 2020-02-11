@@ -25,8 +25,6 @@ package sqlparser
 // analyzer.go contains utility analysis functions.
 
 import (
-	"fmt"
-	"strconv"
 	"strings"
 	"unicode"
 )
@@ -221,72 +219,72 @@ type SetKey struct {
 // if the query is a SET statement. Values can be bool, int64 or string.
 // Since set variable names are case insensitive, all keys are returned
 // as lower case.
-func ExtractSetValues(sql string) (keyValues map[SetKey]interface{}, scope string, err error) {
-	stmt, err := Parse(sql)
-	if err != nil {
-		return nil, "", err
-	}
-	setStmt, ok := stmt.(*Set)
-	if !ok {
-		return nil, "", fmt.Errorf("ast did not yield *sqlparser.Set: %T", stmt)
-	}
-	result := make(map[SetKey]interface{})
-	for _, expr := range setStmt.Exprs {
-		scope := ImplicitStr
-		key := expr.Name.Lowered()
-		switch {
-		case strings.HasPrefix(key, "@@global."):
-			scope = GlobalStr
-			key = strings.TrimPrefix(key, "@@global.")
-		case strings.HasPrefix(key, "@@session."):
-			scope = SessionStr
-			key = strings.TrimPrefix(key, "@@session.")
-		case strings.HasPrefix(key, "@@"):
-			key = strings.TrimPrefix(key, "@@")
-		}
-
-		if strings.HasPrefix(expr.Name.Lowered(), "@@") {
-			if setStmt.Scope != "" && scope != "" {
-				return nil, "", fmt.Errorf("unsupported in set: mixed using of variable scope")
-			}
-			_, out := NewStringTokenizer(key).Scan()
-			key = string(out)
-		}
-
-		setKey := SetKey{
-			Key:   key,
-			Scope: scope,
-		}
-
-		switch expr := expr.Expr.(type) {
-		case *SQLVal:
-			switch expr.Type {
-			case StrVal:
-				result[setKey] = strings.ToLower(string(expr.Val))
-			case IntVal:
-				num, err := strconv.ParseInt(string(expr.Val), 0, 64)
-				if err != nil {
-					return nil, "", err
-				}
-				result[setKey] = num
-			default:
-				return nil, "", fmt.Errorf("invalid value type: %v", String(expr))
-			}
-		case BoolVal:
-			var val int64
-			if expr {
-				val = 1
-			}
-			result[setKey] = val
-		case *ColName:
-			result[setKey] = expr.Name.String()
-		case *NullVal:
-			result[setKey] = nil
-		case *Default:
-			result[setKey] = "default"
-		default:
-			return nil, "", fmt.Errorf("invalid syntax: %s", String(expr))
-		}
-	}
-	return result, strings.ToLower(setStmt.Scope), nil
-}
+//func ExtractSetValues(sql string) (keyValues map[SetKey]interface{}, scope string, err error) {
+//	stmt, _, err := Parse(sql)
+//	if err != nil {
+//		return nil, "", err
+//	}
+//	setStmt, ok := stmt.(*Set)
+//	if !ok {
+//		return nil, "", fmt.Errorf("ast did not yield *sqlparser.Set: %T", stmt)
+//	}
+//	result := make(map[SetKey]interface{})
+//	for _, expr := range setStmt.Exprs {
+//		scope := ImplicitStr
+//		key := expr.Name.Lowered()
+//		switch {
+//		case strings.HasPrefix(key, "@@global."):
+//			scope = GlobalStr
+//			key = strings.TrimPrefix(key, "@@global.")
+//		case strings.HasPrefix(key, "@@session."):
+//			scope = SessionStr
+//			key = strings.TrimPrefix(key, "@@session.")
+//		case strings.HasPrefix(key, "@@"):
+//			key = strings.TrimPrefix(key, "@@")
+//		}
+//
+//		if strings.HasPrefix(expr.Name.Lowered(), "@@") {
+//			if setStmt.Scope != "" && scope != "" {
+//				return nil, "", fmt.Errorf("unsupported in set: mixed using of variable scope")
+//			}
+//			_, out := NewStringTokenizer(key).Scan()
+//			key = string(out)
+//		}
+//
+//		setKey := SetKey{
+//			Key:   key,
+//			Scope: scope,
+//		}
+//
+//		switch expr := expr.Expr.(type) {
+//		case *SQLVal:
+//			switch expr.Type {
+//			case StrVal:
+//				result[setKey] = strings.ToLower(string(expr.Val))
+//			case IntVal:
+//				num, err := strconv.ParseInt(string(expr.Val), 0, 64)
+//				if err != nil {
+//					return nil, "", err
+//				}
+//				result[setKey] = num
+//			default:
+//				return nil, "", fmt.Errorf("invalid value type: %v", String(expr))
+//			}
+//		case BoolVal:
+//			var val int64
+//			if expr {
+//				val = 1
+//			}
+//			result[setKey] = val
+//		case *ColName:
+//			result[setKey] = expr.Name.String()
+//		case *NullVal:
+//			result[setKey] = nil
+//		case *Default:
+//			result[setKey] = "default"
+//		default:
+//			return nil, "", fmt.Errorf("invalid syntax: %s", String(expr))
+//		}
+//	}
+//	return result, strings.ToLower(setStmt.Scope), nil
+//}

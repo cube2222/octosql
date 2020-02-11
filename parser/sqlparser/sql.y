@@ -23,7 +23,7 @@ Licensed under the MIT license, as in the LICENSE file
 %{
 package sqlparser
 
-func setParseTree(yylex interface{}, stmt Statement) {
+func setParseTree(yylex interface{}, stmt *Program) {
   yylex.(*Tokenizer).ParseTree = stmt
 }
 
@@ -126,6 +126,9 @@ func skipToEnd(yylex interface{}) {
   vindexParams  []VindexParam
   showFilter    *ShowFilter
   optLike       *OptLike
+  pprogram      Program
+  optionsSpecs  OptionsSpecs
+  optionsSpecsEntry []OptionsSpecsEntry
 }
 
 %token LEX_ERROR
@@ -168,8 +171,8 @@ func skipToEnd(yylex interface{}) {
 %token <empty> JSON_EXTRACT_OP JSON_UNQUOTE_EXTRACT_OP
 
 // DDL Tokens
-%token <bytes> CREATE ALTER DROP RENAME ANALYZE ADD FLUSH
-%token <bytes> SCHEMA TABLE DESCRIPTOR INDEX VIEW TO IGNORE IF UNIQUE PRIMARY COLUMN  SPATIAL FULLTEXT KEY_BLOCK_SIZE
+%token <bytes> CREATE ALTER DROP RENAME ANALYZE ADD FLUSH OPTIONS
+%token <bytes> SCHEMA DATASOURCE OF TYPE TABLE DESCRIPTOR INDEX VIEW TO IGNORE IF UNIQUE PRIMARY COLUMN  SPATIAL FULLTEXT KEY_BLOCK_SIZE
 %token <bytes> ACTION CASCADE CONSTRAINT FOREIGN NO REFERENCES RESTRICT
 %token <bytes> SHOW DESCRIBE EXPLAIN DATE ESCAPE REPAIR OPTIMIZE TRUNCATE
 %token <bytes> MAXVALUE PARTITION REORGANIZE LESS THAN PROCEDURE TRIGGER
@@ -213,6 +216,7 @@ func skipToEnd(yylex interface{}) {
 // MySQL reserved words that are unused by this grammar will map to this token.
 %token <bytes> UNUSED
 
+%type <pprogram> program
 %type <statement> command
 %type <selStmt> select_statement base_select union_lhs union_rhs
 %type <statement> stream_statement insert_statement update_statement delete_statement set_statement
@@ -323,20 +327,30 @@ func skipToEnd(yylex interface{}) {
 %type <colIdent> vindex_type vindex_type_opt
 %type <bytes> alter_object_type
 %type <ReferenceAction> fk_reference_action fk_on_delete fk_on_update
+%type <optionsSpecs> options_specs
+%type <optionsSpecsEntry> option_spec_entry_list
 
-%start any_command
+%start entry
 
 %%
 
-any_command:
-  command semicolon_opt
+entry:
+  program
   {
-    setParseTree(yylex, $1)
+    prog := $1
+    setParseTree(yylex, &prog)
   }
 
-semicolon_opt:
-/*empty*/ {}
-| ';' {}
+program:
+  command
+  {
+    $$ = Program{ Command: SqlCommand{ Statement: $1, Next: nil, }, }
+  }
+| command ';' program
+  {
+    next := $3
+    $$ = Program{ Command: SqlCommand{ Statement: $1, Next: &next, }, }
+  }
 
 command:
   select_statement
@@ -600,6 +614,13 @@ create_statement:
   {
     $$ = &DDL{Action: CreateStr, Table: $3.ToViewName()}
   }
+| CREATE DATASOURCE table_name OF TYPE value_expression options_specs
+  {
+    $$ = &DDL{Action: CreateDataSourceStr, Table: $3.ToViewName(), CrateDatasourceSpecs: &CrateDatasourceSpecs{
+        TypeName: $6,
+        OptionsSpecs: $7,
+    }}
+  }
 | CREATE OR REPLACE VIEW table_name ddl_skip_to_end
   {
     $$ = &DDL{Action: CreateStr, Table: $5.ToViewName()}
@@ -612,6 +633,32 @@ create_statement:
   {
     $$ = &DBDDL{Action: CreateStr, DBName: string($4)}
   }
+
+option_spec_entry_list:
+ ID ID
+  {
+    $$ = []OptionsSpecsEntry{{
+       Key: string($1),
+       Value: string($2),
+    }}
+  }
+| option_spec_entry_list ',' ID ID
+  {
+    $$ = append($$, OptionsSpecsEntry{
+        Key: string($3),
+        Value: string($4),
+    })
+  }
+
+options_specs:
+ /* empty */
+ {
+    $$ = OptionsSpecs{ Entries: []OptionsSpecsEntry{} }
+ }
+ | OPTIONS '(' option_spec_entry_list ')'
+ {
+    $$ = OptionsSpecs{ Entries: $3 }
+ }
 
 vindex_type_opt:
   {
@@ -3404,6 +3451,7 @@ non_reserved_keyword:
 | COUNTING
 | DATE
 | DATETIME
+| DATASOURCE
 | DECIMAL
 | DELAY
 | DOUBLE
@@ -3443,9 +3491,11 @@ non_reserved_keyword:
 | NCHAR
 | NO
 | NUMERIC
+| OF
 | OFFSET
 | ONLY
 | OPTIMIZE
+| OPTIONS
 | PARTITION
 | PLUGINS
 | POINT
@@ -3480,6 +3530,7 @@ non_reserved_keyword:
 | TINYTEXT
 | TRANSACTION
 | TRUNCATE
+| TYPE
 | UNCOMMITTED
 | UNSIGNED
 | UNUSED

@@ -56,6 +56,14 @@ func (repo *DataSourceRepository) Register(dataSourceName string, factory DataSo
 	return nil
 }
 
+// Merges two source repositories overriding any duplicate entries
+func (repo *DataSourceRepository) MergeFrom(src DataSourceRepository) error {
+	for k, v := range src.factories {
+		repo.factories[k] = v
+	}
+	return nil
+}
+
 // DataSourceBuilder is used to build a data source instance with an alias.
 // It may be given filters, which are later executed at the database level.
 type DataSourceBuilder struct {

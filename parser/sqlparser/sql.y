@@ -646,18 +646,18 @@ option_name:
    }
 
 option_spec_entry_list:
- option_name value_expression
+ option_name '=' value_expression
   {
     $$ = []OptionsSpecsEntry{{
        Key: $1,
-       Value: $2,
+       Value: $3,
     }}
   }
-| option_spec_entry_list ',' option_name value_expression
+| option_spec_entry_list ',' option_name '=' value_expression
   {
     $$ = append($$, OptionsSpecsEntry{
         Key: $3,
-        Value: $4,
+        Value: $5,
     })
   }
 

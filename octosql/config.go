@@ -3,29 +3,25 @@ package octosql
 import (
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/physical"
-	"github.com/cube2222/octosql/storage/csv"
-	"github.com/cube2222/octosql/storage/excel"
-	"github.com/cube2222/octosql/storage/json"
-	"github.com/cube2222/octosql/storage/mysql"
-	"github.com/cube2222/octosql/storage/postgres"
-	"github.com/cube2222/octosql/storage/redis"
+	"os"
 )
 
 func (e *OctosqlExecutor) LoadConfiguration(configPath string) error {
-	cfg, err := config.ReadConfig(configPath)
-	if err != nil {
-		return err
+
+	cfg := &config.Config{
+		DataSources: []config.DataSourceConfig{},
+		Execution:   map[string]interface{}{},
+	}
+
+	if _, err := os.Stat(configPath); err == nil {
+		cfg, err = config.ReadConfig(configPath)
+		if err != nil {
+			return err
+		}
 	}
 
 	dataSourceRespository, err := physical.CreateDataSourceRepositoryFromConfig(
-		map[string]physical.Factory{
-			"csv":      csv.NewDataSourceBuilderFactoryFromConfig,
-			"json":     json.NewDataSourceBuilderFactoryFromConfig,
-			"mysql":    mysql.NewDataSourceBuilderFactoryFromConfig,
-			"postgres": postgres.NewDataSourceBuilderFactoryFromConfig,
-			"redis":    redis.NewDataSourceBuilderFactoryFromConfig,
-			"excel":    excel.NewDataSourceBuilderFactoryFromConfig,
-		},
+		e.dataSourceFactories,
 		cfg,
 	)
 	if err != nil {

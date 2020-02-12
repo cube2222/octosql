@@ -33,7 +33,7 @@ import (
 
 func TestAppend(t *testing.T) {
 	query := "select * from t where a = 1"
-	tree, err := Parse(query)
+	tree, _, err := Parse(query)
 	if err != nil {
 		t.Error(err)
 	}
@@ -53,11 +53,11 @@ func TestAppend(t *testing.T) {
 }
 
 func TestSelect(t *testing.T) {
-	tree, err := Parse("select * from t where a = 1")
+	tree, _, err := Parse("select * from t where a = 1")
 	if err != nil {
 		t.Error(err)
 	}
-	expr := tree.(*Select).Where.Expr
+	expr := tree.Command.Statement.(*Select).Where.Expr
 
 	sel := &Select{}
 	sel.AddWhere(expr)
@@ -91,11 +91,11 @@ func TestSelect(t *testing.T) {
 	}
 
 	// OR clauses must be parenthesized.
-	tree, err = Parse("select * from t where a = 1 or b = 1")
+	tree, _, err = Parse("select * from t where a = 1 or b = 1")
 	if err != nil {
 		t.Error(err)
 	}
-	expr = tree.(*Select).Where.Expr
+	expr = tree.Command.Statement.(*Select).Where.Expr
 	sel = &Select{}
 	sel.AddWhere(expr)
 	buf = NewTrackedBuffer(nil)
@@ -119,11 +119,11 @@ func TestRemoveHints(t *testing.T) {
 		"select * from t use index (i)",
 		"select * from t force index (i)",
 	} {
-		tree, err := Parse(query)
+		tree, _, err := Parse(query)
 		if err != nil {
 			t.Fatal(err)
 		}
-		sel := tree.(*Select)
+		sel := tree.Command.Statement.(*Select)
 		sel.From = TableExprs{
 			sel.From[0].(*AliasedTableExpr).RemoveHints(),
 		}
@@ -136,27 +136,27 @@ func TestRemoveHints(t *testing.T) {
 }
 
 func TestAddOrder(t *testing.T) {
-	src, err := Parse("select foo, bar from baz order by foo")
+	src, _, err := Parse("select foo, bar from baz order by foo")
 	if err != nil {
 		t.Error(err)
 	}
-	order := src.(*Select).OrderBy[0]
-	dst, err := Parse("select * from t")
+	order := src.Command.Statement.(*Select).OrderBy[0]
+	dst, _, err := Parse("select * from t")
 	if err != nil {
 		t.Error(err)
 	}
-	dst.(*Select).AddOrder(order)
+	dst.Command.Statement.(*Select).AddOrder(order)
 	buf := NewTrackedBuffer(nil)
 	dst.Format(buf)
 	want := "select * from t order by foo asc"
 	if buf.String() != want {
 		t.Errorf("order: %q, want %s", buf.String(), want)
 	}
-	dst, err = Parse("select * from t union select * from s")
+	dst, _, err = Parse("select * from t union select * from s")
 	if err != nil {
 		t.Error(err)
 	}
-	dst.(*Union).AddOrder(order)
+	dst.Command.Statement.(*Union).AddOrder(order)
 	buf = NewTrackedBuffer(nil)
 	dst.Format(buf)
 	want = "select * from t union select * from s order by foo asc"
@@ -166,27 +166,27 @@ func TestAddOrder(t *testing.T) {
 }
 
 func TestSetLimit(t *testing.T) {
-	src, err := Parse("select foo, bar from baz limit 4")
+	src, _, err := Parse("select foo, bar from baz limit 4")
 	if err != nil {
 		t.Error(err)
 	}
-	limit := src.(*Select).Limit
-	dst, err := Parse("select * from t")
+	limit := src.Command.Statement.(*Select).Limit
+	dst, _, err := Parse("select * from t")
 	if err != nil {
 		t.Error(err)
 	}
-	dst.(*Select).SetLimit(limit)
+	dst.Command.Statement.(*Select).SetLimit(limit)
 	buf := NewTrackedBuffer(nil)
 	dst.Format(buf)
 	want := "select * from t limit 4"
 	if buf.String() != want {
 		t.Errorf("limit: %q, want %s", buf.String(), want)
 	}
-	dst, err = Parse("select * from t union select * from s")
+	dst, _, err = Parse("select * from t union select * from s")
 	if err != nil {
 		t.Error(err)
 	}
-	dst.(*Union).SetLimit(limit)
+	dst.Command.Statement.(*Union).SetLimit(limit)
 	buf = NewTrackedBuffer(nil)
 	dst.Format(buf)
 	want = "select * from t union select * from s limit 4"
@@ -254,7 +254,7 @@ func TestDDL(t *testing.T) {
 		affected: []string{"a", "b"},
 	}}
 	for _, tcase := range testcases {
-		got, err := Parse(tcase.query)
+		got, _, err := Parse(tcase.query)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -265,18 +265,18 @@ func TestDDL(t *testing.T) {
 		for _, t := range tcase.affected {
 			want = append(want, TableName{Name: NewTableIdent(t)})
 		}
-		if affected := got.(*DDL).AffectedTables(); !reflect.DeepEqual(affected, want) {
+		if affected := got.Command.Statement.(*DDL).AffectedTables(); !reflect.DeepEqual(affected, want) {
 			t.Errorf("Affected(%s): %v, want %v", tcase.query, affected, want)
 		}
 	}
 }
 
 func TestSetAutocommitON(t *testing.T) {
-	stmt, err := Parse("SET autocommit=ON")
+	stmt, _, err := Parse("SET autocommit=ON")
 	if err != nil {
 		t.Error(err)
 	}
-	s, ok := stmt.(*Set)
+	s, ok := stmt.Command.Statement.(*Set)
 	if !ok {
 		t.Errorf("SET statement is not Set: %T", s)
 	}
@@ -299,11 +299,11 @@ func TestSetAutocommitON(t *testing.T) {
 		t.Errorf("SET statement expression is not SQLVal: %T", e.Expr)
 	}
 
-	stmt, err = Parse("SET @@session.autocommit=ON")
+	stmt, _, err = Parse("SET @@session.autocommit=ON")
 	if err != nil {
 		t.Error(err)
 	}
-	s, ok = stmt.(*Set)
+	s, ok = stmt.Command.Statement.(*Set)
 	if !ok {
 		t.Errorf("SET statement is not Set: %T", s)
 	}
@@ -328,11 +328,11 @@ func TestSetAutocommitON(t *testing.T) {
 }
 
 func TestSetAutocommitOFF(t *testing.T) {
-	stmt, err := Parse("SET autocommit=OFF")
+	stmt, _, err := Parse("SET autocommit=OFF")
 	if err != nil {
 		t.Error(err)
 	}
-	s, ok := stmt.(*Set)
+	s, ok := stmt.Command.Statement.(*Set)
 	if !ok {
 		t.Errorf("SET statement is not Set: %T", s)
 	}
@@ -355,11 +355,11 @@ func TestSetAutocommitOFF(t *testing.T) {
 		t.Errorf("SET statement expression is not SQLVal: %T", e.Expr)
 	}
 
-	stmt, err = Parse("SET @@session.autocommit=OFF")
+	stmt, _, err = Parse("SET @@session.autocommit=OFF")
 	if err != nil {
 		t.Error(err)
 	}
-	s, ok = stmt.(*Set)
+	s, ok = stmt.Command.Statement.(*Set)
 	if !ok {
 		t.Errorf("SET statement is not Set: %T", s)
 	}
@@ -569,7 +569,7 @@ func TestReplaceExpr(t *testing.T) {
 	}}
 	to := NewValArg([]byte(":a"))
 	for _, tcase := range tcases {
-		tree, err := Parse(tcase.in)
+		tree, _, err := Parse(tcase.in)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -584,7 +584,7 @@ func TestReplaceExpr(t *testing.T) {
 		if from == nil {
 			t.Fatalf("from is nil for %s", tcase.in)
 		}
-		expr := ReplaceExpr(tree.(*Select).Where.Expr, from, to)
+		expr := ReplaceExpr(tree.Command.Statement.(*Select).Where.Expr, from, to)
 		got := String(expr)
 		if tcase.out != got {
 			t.Errorf("ReplaceExpr(%s): %s, want %s", tcase.in, got, tcase.out)

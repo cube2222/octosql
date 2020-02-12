@@ -329,6 +329,7 @@ func skipToEnd(yylex interface{}) {
 %type <ReferenceAction> fk_reference_action fk_on_delete fk_on_update
 %type <optionsSpecs> options_specs
 %type <optionsSpecsEntry> option_spec_entry_list
+%type <strs> option_name
 
 %start entry
 
@@ -634,30 +635,40 @@ create_statement:
     $$ = &DBDDL{Action: CreateStr, DBName: string($4)}
   }
 
+option_name:
+ table_id
+   {
+      $$ = []string{ $1.v }
+   }
+ | table_id '.' option_name
+   {
+      $$ = append($3, $1.v)
+   }
+
 option_spec_entry_list:
- ID ID
+ option_name value_expression
   {
     $$ = []OptionsSpecsEntry{{
-       Key: string($1),
-       Value: string($2),
+       Key: $1,
+       Value: $2,
     }}
   }
-| option_spec_entry_list ',' ID ID
+| option_spec_entry_list ',' option_name value_expression
   {
     $$ = append($$, OptionsSpecsEntry{
-        Key: string($3),
-        Value: string($4),
+        Key: $3,
+        Value: $4,
     })
   }
 
 options_specs:
  /* empty */
  {
-    $$ = OptionsSpecs{ Entries: []OptionsSpecsEntry{} }
+    $$ = OptionsSpecs{ Options: map[string]interface{}{} }
  }
  | OPTIONS '(' option_spec_entry_list ')'
  {
-    $$ = OptionsSpecs{ Entries: $3 }
+    $$ = OptionsSpecs{ Options: OptionsSpecsEntriesToMap($3) }
  }
 
 vindex_type_opt:

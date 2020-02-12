@@ -278,15 +278,44 @@ type Program struct {
 	Command SqlCommand
 }
 
+func (node Program) walkSubtree(visit Visit) error {
+	return Walk(visit, &node.Command)
+}
+
 // Format formats the node.
 func (node Program) Format(buf *TrackedBuffer) {
 	buf.Myprintf("%v", node.Command)
 }
 
-//
+// Single SQL command
 type SqlCommand struct {
 	Statement Statement
 	Next *Program
+}
+
+func (node *SqlCommand) getAllStatements(out *[]Statement) {
+	if node == nil {
+		return
+	}
+	*out = append(*out, node.Statement)
+	if node.Next != nil {
+		node.Next.Command.getAllStatements(out)
+	}
+}
+
+func (node *SqlCommand) walkSubtree(visit Visit) error {
+	if node == nil {
+		return nil
+	}
+	statements := []Statement{}
+	node.getAllStatements(&statements)
+
+	for _, t := range statements {
+		if err := Walk(visit, t); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Format formats the node.
@@ -779,12 +808,12 @@ type DDL struct {
 }
 
 type OptionsSpecsEntry struct {
-	Key string
-	Value string
+	Key []string
+	Value Expr
 }
 
 type OptionsSpecs struct {
-	Entries []OptionsSpecsEntry
+	Options map[string]interface{}
 }
 
 // DDL strings.

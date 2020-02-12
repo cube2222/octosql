@@ -28,7 +28,7 @@ import (
 )
 
 func TestNewParsedQuery(t *testing.T) {
-	stmt, _, err := Parse("select * from a where id =:id")
+	stmt, err := Parse("select * from a where id =:id")
 	if err != nil {
 		t.Error(err)
 		return

@@ -94,7 +94,12 @@ func Parse(sql string) (*Program, error) {
 			if typ, val := tokenizer.Scan(); typ != 0 {
 				return nil, fmt.Errorf("extra characters encountered after end of DDL: '%s'", string(val))
 			}
-			//tokenizer.ParseTree = tokenizer.partialDDL
+			tokenizer.ParseTree = &Program{
+				Command: SqlCommand{
+					Statement: tokenizer.partialDDL,
+					Next:      nil,
+				},
+			}
 			return tokenizer.ParseTree, nil
 		}
 		return nil, fmt.Errorf("invalid argument %v", tokenizer.LastError.Error())
@@ -152,14 +157,19 @@ func parseNext(tokenizer *Tokenizer, strict bool) (*Program, error) {
 	tokenizer.multi = true
 	if yyParsePooled(tokenizer) != 0 {
 		if tokenizer.partialDDL != nil && !strict {
-			//tokenizer.ParseTree = tokenizer.partialDDL
+			tokenizer.ParseTree = &Program{
+				Command: SqlCommand{
+					Statement: tokenizer.partialDDL,
+					Next:      nil,
+				},
+			}
 			return tokenizer.ParseTree, nil
 		}
 		return nil, tokenizer.LastError
 	}
-	//if tokenizer.ParseTree == nil {
-	//	return ParseNext(tokenizer)
-	//}
+	if tokenizer.ParseTree == nil {
+		return ParseNext(tokenizer)
+	}
 	return tokenizer.ParseTree, nil
 }
 
@@ -280,7 +290,7 @@ type Program struct {
 
 // Walk program node
 func (node Program) walkSubtree(visit Visit) error {
-	return Walk(visit, &node.Command)
+	return Walk(visit, node.Command)
 }
 
 // Format formats the node.
@@ -296,10 +306,7 @@ type SqlCommand struct {
 }
 
 // Translate SqlCommand into slice of statements
-func (node *SqlCommand) getAllStatements(out *[]Statement) {
-	if node == nil {
-		return
-	}
+func (node SqlCommand) getAllStatements(out *[]Statement) {
 	*out = append(*out, node.Statement)
 	if node.Next != nil {
 		node.Next.Command.getAllStatements(out)
@@ -307,10 +314,7 @@ func (node *SqlCommand) getAllStatements(out *[]Statement) {
 }
 
 // Walk SqlCommand node
-func (node *SqlCommand) walkSubtree(visit Visit) error {
-	if node == nil {
-		return nil
-	}
+func (node SqlCommand) walkSubtree(visit Visit) error {
 	statements := []Statement{}
 	node.getAllStatements(&statements)
 
@@ -323,7 +327,7 @@ func (node *SqlCommand) walkSubtree(visit Visit) error {
 }
 
 // Format formats the node.
-func (node *SqlCommand) Format(buf *TrackedBuffer) {
+func (node SqlCommand) Format(buf *TrackedBuffer) {
 	if node.Next != nil {
 		buf.Myprintf("%v;%v", node.Statement, node.Next)
 	} else {

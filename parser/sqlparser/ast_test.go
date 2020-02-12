@@ -258,7 +258,7 @@ func TestDDL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !reflect.DeepEqual(got, tcase.output) {
+		if !reflect.DeepEqual(got.Command.Statement, tcase.output) {
 			t.Errorf("%s: %v, want %v", tcase.query, got, tcase.output)
 		}
 		want := make(TableNames, 0, len(tcase.affected))

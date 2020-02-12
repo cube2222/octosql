@@ -273,11 +273,12 @@ func Append(buf *strings.Builder, node SQLNode) {
 	node.Format(tbuf)
 }
 
-//
+// SQL Program node which is the AST entrypoint
 type Program struct {
 	Command SqlCommand
 }
 
+// Walk program node
 func (node Program) walkSubtree(visit Visit) error {
 	return Walk(visit, &node.Command)
 }
@@ -287,12 +288,14 @@ func (node Program) Format(buf *TrackedBuffer) {
 	buf.Myprintf("%v", node.Command)
 }
 
-// Single SQL command
+// SQL command which can have ancestors
+// This structure can be interpreted as a linked-list of SQL commands that will be executed
 type SqlCommand struct {
 	Statement Statement
 	Next *Program
 }
 
+// Translate SqlCommand into slice of statements
 func (node *SqlCommand) getAllStatements(out *[]Statement) {
 	if node == nil {
 		return
@@ -303,6 +306,7 @@ func (node *SqlCommand) getAllStatements(out *[]Statement) {
 	}
 }
 
+// Walk SqlCommand node
 func (node *SqlCommand) walkSubtree(visit Visit) error {
 	if node == nil {
 		return nil

@@ -6,6 +6,7 @@ import (
 	"os"
 )
 
+// Load configuration from the file using provided path
 func (e *OctosqlExecutor) LoadConfiguration(configPath string) error {
 
 	cfg := &config.Config{

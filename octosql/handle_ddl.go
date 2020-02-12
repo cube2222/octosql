@@ -8,10 +8,13 @@ import (
 	"github.com/cube2222/octosql/physical"
 )
 
-
+// DDL SQL handler
+// This handler takes every sql DDL statement (see parser/ast.go for more details) and tries to execute it
 func (e *OctosqlExecutor) handleDDLStatement(ctx context.Context, statement *sqlparser.DDL) error {
+	// Handle CREATE DATASOURCE statements
 	if statement.Action == sqlparser.CreateDataSourceStr {
 
+		// Create empty source configuration
 		sourceConfig := config.DataSourceConfig{
 			Name:   "",
 			Type:   "",
@@ -26,8 +29,11 @@ func (e *OctosqlExecutor) handleDDLStatement(ctx context.Context, statement *sql
 			for k, v := range statement.CrateDatasourceSpecs.OptionsSpecs.Options {
 				sourceConfig.Config[k] = v
 			}
+		} else {
+			// TODO: Maybe handle sql values in other way?
+			return errors.New("Source name in CREATE DATASOURCE statement must be a string value.")
 		}
-		// TODO: Handle invalid source names
+
 		rep, err := physical.CreateDataSourceRepositoryFromConfig(e.dataSourceFactories, &config.Config{
 			DataSources: []config.DataSourceConfig{ sourceConfig },
 			Execution:   nil,
@@ -37,6 +43,7 @@ func (e *OctosqlExecutor) handleDDLStatement(ctx context.Context, statement *sql
 		}
 		newDataSources := append(e.cfg.DataSources, sourceConfig)
 
+		// Add new data source
 		err = e.dataSources.MergeFrom(*rep)
 		if err != nil {
 			return err

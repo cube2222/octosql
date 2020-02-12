@@ -5,37 +5,16 @@ import (
 	"fmt"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/logical"
-	"github.com/cube2222/octosql/parser"
 	"github.com/cube2222/octosql/parser/sqlparser"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/optimizer"
 	"github.com/cube2222/octosql/streaming/storage"
-	"github.com/dgraph-io/badger/v2"
 	"github.com/pkg/errors"
 	"log"
 	"reflect"
 )
 
-func (e *OctosqlExecutor) handleSelectStatement(ctx context.Context, statement sqlparser.SelectStatement) error {
-	plan, err := parser.ParseNode(statement)
-	if err != nil {
-		log.Fatal("couldn't parse query: ", err)
-	}
-
-	opts := badger.DefaultOptions("")
-	opts.Dir = ""
-	opts.ValueDir = ""
-	opts.InMemory = true
-	db, err := badger.Open(opts)
-	if err != nil {
-		log.Fatal("couldn't open in-memory badger database: ", err)
-	}
-	stateStorage := storage.NewBadgerStorage(db)
-
-	// Run query
-	return e.RunPlan(ctx, stateStorage, plan)
-}
-
+// Runs query plan
 func (e *OctosqlExecutor) RunPlan(ctx context.Context, stateStorage storage.Storage, plan logical.Node) error {
 	phys, variables, err := plan.Physical(ctx, logical.NewPhysicalPlanCreator(e.dataSources))
 	if err != nil {
@@ -120,6 +99,7 @@ func (e *OctosqlExecutor) RunPlan(ctx context.Context, stateStorage storage.Stor
 	return nil
 }
 
+// Helper to run parsed AST node
 func (e *OctosqlExecutor) runParsedQuery(ctx context.Context, program *sqlparser.Program) error {
 	if program == nil {
 		return errors.New("Empty program cannot be executed.")
@@ -130,7 +110,7 @@ func (e *OctosqlExecutor) runParsedQuery(ctx context.Context, program *sqlparser
 		if !ok {
 			ddlStmt, ok := ((program.Command.Statement).(interface{})).(*sqlparser.DDL)
 			if !ok {
-				return fmt.Errorf("Invalid statement type, wanted sqlparser.SelectStatement got %v", reflect.TypeOf(program.Command.Statement))
+				return fmt.Errorf("Invalid statement type: %v", reflect.TypeOf(program.Command.Statement))
 			}
 			err := e.handleDDLStatement(ctx, ddlStmt)
 			if err != nil {
@@ -151,14 +131,13 @@ func (e *OctosqlExecutor) runParsedQuery(ctx context.Context, program *sqlparser
 	return nil
 }
 
+// Run SQL query
 func (e *OctosqlExecutor) RunQuery(ctx context.Context, query string) error {
 	// Parse query
-	e.tokenizer = nil
-	program, tokenizer, err := sqlparser.Parse(query)
+	program, err := sqlparser.Parse(query)
 	if err != nil {
 		return err
 	}
-	e.tokenizer = tokenizer
 
 	return e.runParsedQuery(ctx, program)
 }

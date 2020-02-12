@@ -87,22 +87,22 @@ func yyParsePooled(yylex yyLexer) int {
 // is the AST representation of the query. If a DDL statement
 // is partially parsed but still contains a syntax error, the
 // error is ignored and the DDL is returned anyway.
-func Parse(sql string) (*Program, *Tokenizer, error) {
+func Parse(sql string) (*Program, error) {
 	tokenizer := NewStringTokenizer(sql)
 	if yyParsePooled(tokenizer) != 0 {
 		if tokenizer.partialDDL != nil {
 			if typ, val := tokenizer.Scan(); typ != 0 {
-				return nil, tokenizer, fmt.Errorf("extra characters encountered after end of DDL: '%s'", string(val))
+				return nil, fmt.Errorf("extra characters encountered after end of DDL: '%s'", string(val))
 			}
 			//tokenizer.ParseTree = tokenizer.partialDDL
-			return tokenizer.ParseTree, tokenizer, nil
+			return tokenizer.ParseTree, nil
 		}
-		return nil, nil, fmt.Errorf("invalid argument %v", tokenizer.LastError.Error())
+		return nil, fmt.Errorf("invalid argument %v", tokenizer.LastError.Error())
 	}
 	if tokenizer.ParseTree == nil {
-		return nil, nil, ErrEmpty
+		return nil, ErrEmpty
 	}
-	return tokenizer.ParseTree, tokenizer, nil
+	return tokenizer.ParseTree, nil
 }
 
 // ParseStrictDDL is the same as Parse except it errors on

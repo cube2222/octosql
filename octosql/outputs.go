@@ -19,6 +19,7 @@ func (err *InvalidOutputFormatError) Error() string {
 	return fmt.Sprintf("Invalid output format: %s", err.outputFormat)
 }
 
+// Translates format name to the specific interface
 func translateOutputName(outputFormat string) (output.Output, error) {
 	switch outputFormat {
 	case "table":

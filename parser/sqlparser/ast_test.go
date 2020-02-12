@@ -33,7 +33,7 @@ import (
 
 func TestAppend(t *testing.T) {
 	query := "select * from t where a = 1"
-	tree, _, err := Parse(query)
+	tree, err := Parse(query)
 	if err != nil {
 		t.Error(err)
 	}
@@ -53,7 +53,7 @@ func TestAppend(t *testing.T) {
 }
 
 func TestSelect(t *testing.T) {
-	tree, _, err := Parse("select * from t where a = 1")
+	tree, err := Parse("select * from t where a = 1")
 	if err != nil {
 		t.Error(err)
 	}
@@ -91,7 +91,7 @@ func TestSelect(t *testing.T) {
 	}
 
 	// OR clauses must be parenthesized.
-	tree, _, err = Parse("select * from t where a = 1 or b = 1")
+	tree, err = Parse("select * from t where a = 1 or b = 1")
 	if err != nil {
 		t.Error(err)
 	}
@@ -119,7 +119,7 @@ func TestRemoveHints(t *testing.T) {
 		"select * from t use index (i)",
 		"select * from t force index (i)",
 	} {
-		tree, _, err := Parse(query)
+		tree, err := Parse(query)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -136,12 +136,12 @@ func TestRemoveHints(t *testing.T) {
 }
 
 func TestAddOrder(t *testing.T) {
-	src, _, err := Parse("select foo, bar from baz order by foo")
+	src, err := Parse("select foo, bar from baz order by foo")
 	if err != nil {
 		t.Error(err)
 	}
 	order := src.Command.Statement.(*Select).OrderBy[0]
-	dst, _, err := Parse("select * from t")
+	dst, err := Parse("select * from t")
 	if err != nil {
 		t.Error(err)
 	}
@@ -152,7 +152,7 @@ func TestAddOrder(t *testing.T) {
 	if buf.String() != want {
 		t.Errorf("order: %q, want %s", buf.String(), want)
 	}
-	dst, _, err = Parse("select * from t union select * from s")
+	dst, err = Parse("select * from t union select * from s")
 	if err != nil {
 		t.Error(err)
 	}
@@ -166,12 +166,12 @@ func TestAddOrder(t *testing.T) {
 }
 
 func TestSetLimit(t *testing.T) {
-	src, _, err := Parse("select foo, bar from baz limit 4")
+	src, err := Parse("select foo, bar from baz limit 4")
 	if err != nil {
 		t.Error(err)
 	}
 	limit := src.Command.Statement.(*Select).Limit
-	dst, _, err := Parse("select * from t")
+	dst, err := Parse("select * from t")
 	if err != nil {
 		t.Error(err)
 	}
@@ -182,7 +182,7 @@ func TestSetLimit(t *testing.T) {
 	if buf.String() != want {
 		t.Errorf("limit: %q, want %s", buf.String(), want)
 	}
-	dst, _, err = Parse("select * from t union select * from s")
+	dst, err = Parse("select * from t union select * from s")
 	if err != nil {
 		t.Error(err)
 	}
@@ -254,7 +254,7 @@ func TestDDL(t *testing.T) {
 		affected: []string{"a", "b"},
 	}}
 	for _, tcase := range testcases {
-		got, _, err := Parse(tcase.query)
+		got, err := Parse(tcase.query)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -272,7 +272,7 @@ func TestDDL(t *testing.T) {
 }
 
 func TestSetAutocommitON(t *testing.T) {
-	stmt, _, err := Parse("SET autocommit=ON")
+	stmt, err := Parse("SET autocommit=ON")
 	if err != nil {
 		t.Error(err)
 	}
@@ -299,7 +299,7 @@ func TestSetAutocommitON(t *testing.T) {
 		t.Errorf("SET statement expression is not SQLVal: %T", e.Expr)
 	}
 
-	stmt, _, err = Parse("SET @@session.autocommit=ON")
+	stmt, err = Parse("SET @@session.autocommit=ON")
 	if err != nil {
 		t.Error(err)
 	}
@@ -328,7 +328,7 @@ func TestSetAutocommitON(t *testing.T) {
 }
 
 func TestSetAutocommitOFF(t *testing.T) {
-	stmt, _, err := Parse("SET autocommit=OFF")
+	stmt, err := Parse("SET autocommit=OFF")
 	if err != nil {
 		t.Error(err)
 	}
@@ -355,7 +355,7 @@ func TestSetAutocommitOFF(t *testing.T) {
 		t.Errorf("SET statement expression is not SQLVal: %T", e.Expr)
 	}
 
-	stmt, _, err = Parse("SET @@session.autocommit=OFF")
+	stmt, err = Parse("SET @@session.autocommit=OFF")
 	if err != nil {
 		t.Error(err)
 	}
@@ -569,7 +569,7 @@ func TestReplaceExpr(t *testing.T) {
 	}}
 	to := NewValArg([]byte(":a"))
 	for _, tcase := range tcases {
-		tree, _, err := Parse(tcase.in)
+		tree, err := Parse(tcase.in)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -4,7 +4,7 @@ OctoSQL is a query tool that allows you to join, analyse and transform data from
 
 [![CircleCI](https://circleci.com/gh/cube2222/octosql.svg?style=shield)](https://circleci.com/gh/cube2222/octosql)
 [![GoDoc](https://godoc.org/github.com/cube2222/octosql?status.svg)](https://godoc.org/github.com/cube2222/octosql)
-[![Gitter](https://badges.gitter.im/octosql/community.svg)](https://gitter.im/octosql/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+[![Gitter](https://badges.gitter.im/octosql/general.svg)](https://gitter.im/octosql/general?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
 ## Table of Contents
 - [What is OctoSQL?](#what-is-octosql)

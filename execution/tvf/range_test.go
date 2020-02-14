@@ -6,6 +6,7 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/streaming/storage"
 )
 
 func TestRange_Get(t *testing.T) {
@@ -149,6 +150,11 @@ func TestRange_Get(t *testing.T) {
 				start: tt.fields.start,
 				end:   tt.fields.end,
 			}
+
+			stateStorage := execution.GetTestStorage(t)
+			tx := stateStorage.BeginTransaction()
+			ctx := storage.InjectStateTransaction(ctx, tx)
+
 			got, err := r.Get(ctx, tt.args.variables, execution.GetRawStreamID())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Range.Get() error = %v, wantErr %v", err, tt.wantErr)
@@ -160,6 +166,10 @@ func TestRange_Get(t *testing.T) {
 			}
 			if !eq {
 				t.Errorf("Range.Get() streams not equal")
+			}
+
+			if err := tx.Commit(); err != nil {
+				t.Fatal(err)
 			}
 		})
 	}

@@ -427,11 +427,11 @@ func ParseTrigger(trigger sqlparser.Trigger) (logical.Trigger, error) {
 		return logical.NewCountingTrigger(countExpr), nil
 
 	case *sqlparser.DelayTrigger:
-		countExpr, err := ParseExpression(trigger.Delay)
+		delayExpr, err := ParseExpression(trigger.Delay)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't parse delay expression")
 		}
-		return logical.NewDelayTrigger(countExpr), nil
+		return logical.NewDelayTrigger(delayExpr), nil
 
 	case *sqlparser.WatermarkTrigger:
 		return logical.NewWatermarkTrigger(), nil

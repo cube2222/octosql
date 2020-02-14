@@ -163,9 +163,8 @@ func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlan
 	for i := range node.triggers {
 		out, triggerVariables, err := node.triggers[i].Physical(ctx, physicalCreator)
 		if err != nil {
-			return nil, octosql.NoVariables(), errors.Wrapf(err, "couldn't get physical plan for trigger with index %d", i)
+			return nil, nil, errors.Wrapf(err, "couldn't get physical plan for trigger with index %d", i)
 		}
-
 		variables, err = variables.MergeWith(triggerVariables)
 		if err != nil {
 			return nil, nil, errors.Wrapf(err, "couldn't merge variables with those of trigger with index %d", i)

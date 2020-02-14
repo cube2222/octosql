@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/streaming/storage"
 )
 
 func TestLimit_Get(t *testing.T) {
@@ -113,7 +114,11 @@ func TestLimit_Get(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rs, err := tt.node.Get(ctx, tt.vars)
+			stateStorage := GetTestStorage(t)
+			tx := stateStorage.BeginTransaction()
+			ctx := storage.InjectStateTransaction(ctx, tx)
+
+			rs, err := tt.node.Get(ctx, tt.vars, GetRawStreamID())
 
 			if (err == nil) != (tt.wantError == NO_ERROR) {
 				t.Errorf("exactly one of test.wantError, tt.node.Get() is not nil")
@@ -134,6 +139,8 @@ func TestLimit_Get(t *testing.T) {
 			if err != nil {
 				t.Errorf("limitedStream comparison error: %v", err)
 			}
+
+			tx.Commit()
 		})
 	}
 }

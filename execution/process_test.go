@@ -53,12 +53,12 @@ func TestOutputQueue_Ok(t *testing.T) {
 
 	{
 		tx := stateStorage.BeginTransaction()
-		queue := NewOutputQueue(stateStorage, tx)
+		queue := NewOutputQueue(tx)
 		assert.Nil(t, queue.Push(ctx, recordElement))
 		assert.Nil(t, queue.Push(ctx, recordElement2))
 		assert.Nil(t, tx.Commit())
 		tx = stateStorage.BeginTransaction()
-		queue = NewOutputQueue(stateStorage, tx)
+		queue = NewOutputQueue(tx)
 		assert.Nil(t, queue.Push(ctx, watermarkElement))
 		assert.Nil(t, queue.Push(ctx, recordElement))
 		assert.Nil(t, queue.Push(ctx, eosElement))
@@ -66,12 +66,12 @@ func TestOutputQueue_Ok(t *testing.T) {
 	}
 	{
 		tx := stateStorage.BeginTransaction()
-		queue := NewOutputQueue(stateStorage, tx)
+		queue := NewOutputQueue(tx)
 		assert.True(t, proto.Equal(recordElement, GetElementAssertNoError(t, ctx, queue)))
 		assert.True(t, proto.Equal(recordElement2, GetElementAssertNoError(t, ctx, queue)))
 		assert.Nil(t, tx.Commit())
 		tx = stateStorage.BeginTransaction()
-		queue = NewOutputQueue(stateStorage, tx)
+		queue = NewOutputQueue(tx)
 		assert.True(t, proto.Equal(watermarkElement, GetElementAssertNoError(t, ctx, queue)))
 		assert.True(t, proto.Equal(recordElement, GetElementAssertNoError(t, ctx, queue)))
 		assert.True(t, proto.Equal(eosElement, GetElementAssertNoError(t, ctx, queue)))
@@ -93,17 +93,17 @@ func TestOutputQueue_AbortTransaction(t *testing.T) {
 
 	{
 		tx := stateStorage.BeginTransaction()
-		queue := NewOutputQueue(stateStorage, tx)
+		queue := NewOutputQueue(tx)
 		assert.Nil(t, queue.Push(ctx, recordElement))
 		assert.Nil(t, queue.Push(ctx, recordElement2))
 		tx.Abort()
 		tx = stateStorage.BeginTransaction()
-		queue = NewOutputQueue(stateStorage, tx)
+		queue = NewOutputQueue(tx)
 		assert.Nil(t, queue.Push(ctx, recordElement))
 		assert.Nil(t, queue.Push(ctx, recordElement2))
 		assert.Nil(t, tx.Commit())
 		tx = stateStorage.BeginTransaction()
-		queue = NewOutputQueue(stateStorage, tx)
+		queue = NewOutputQueue(tx)
 		assert.Nil(t, queue.Push(ctx, watermarkElement))
 		assert.Nil(t, queue.Push(ctx, recordElement))
 		assert.Nil(t, queue.Push(ctx, eosElement))
@@ -111,18 +111,18 @@ func TestOutputQueue_AbortTransaction(t *testing.T) {
 	}
 	{
 		tx := stateStorage.BeginTransaction()
-		queue := NewOutputQueue(stateStorage, tx)
+		queue := NewOutputQueue(tx)
 		assert.True(t, proto.Equal(recordElement, GetElementAssertNoError(t, ctx, queue)))
 		assert.True(t, proto.Equal(recordElement2, GetElementAssertNoError(t, ctx, queue)))
 		assert.Nil(t, tx.Commit())
 		tx = stateStorage.BeginTransaction()
-		queue = NewOutputQueue(stateStorage, tx)
+		queue = NewOutputQueue(tx)
 		assert.True(t, proto.Equal(watermarkElement, GetElementAssertNoError(t, ctx, queue)))
 		assert.True(t, proto.Equal(recordElement, GetElementAssertNoError(t, ctx, queue)))
 		assert.True(t, proto.Equal(eosElement, GetElementAssertNoError(t, ctx, queue)))
 		tx.Abort()
 		tx = stateStorage.BeginTransaction()
-		queue = NewOutputQueue(stateStorage, tx)
+		queue = NewOutputQueue(tx)
 		assert.True(t, proto.Equal(watermarkElement, GetElementAssertNoError(t, ctx, queue)))
 		assert.True(t, proto.Equal(recordElement, GetElementAssertNoError(t, ctx, queue)))
 		assert.True(t, proto.Equal(eosElement, GetElementAssertNoError(t, ctx, queue)))
@@ -144,11 +144,11 @@ func TestOutputQueue_NewTransactionRequired(t *testing.T) {
 
 	{
 		readTx := stateStorage.BeginTransaction()
-		readQueue := NewOutputQueue(stateStorage, readTx)
+		readQueue := NewOutputQueue(readTx)
 
 		{
 			writeTx := stateStorage.BeginTransaction()
-			writeQueue := NewOutputQueue(stateStorage, writeTx)
+			writeQueue := NewOutputQueue(writeTx)
 
 			assert.Nil(t, writeQueue.Push(ctx, recordElement))
 			assert.Nil(t, writeTx.Commit())
@@ -159,7 +159,7 @@ func TestOutputQueue_NewTransactionRequired(t *testing.T) {
 		readTx.Abort()
 
 		readTx = stateStorage.BeginTransaction()
-		readQueue = NewOutputQueue(stateStorage, readTx)
+		readQueue = NewOutputQueue(readTx)
 		assert.True(t, proto.Equal(recordElement, GetElementAssertNoError(t, ctx, readQueue)))
 		assert.Nil(t, readTx.Commit())
 	}
@@ -179,7 +179,7 @@ func TestOutputQueue_NewTransactionRequired(t *testing.T) {
 
 	{
 		readTx := stateStorage.BeginTransaction()
-		readQueue := NewOutputQueue(stateStorage, readTx)
+		readQueue := NewOutputQueue(readTx)
 		_, err := readQueue.Pop(ctx)
 		assert.IsType(t, err, &ErrWaitForChanges{})
 		readTx.Abort()
@@ -195,7 +195,7 @@ func TestOutputQueue_NewTransactionRequired(t *testing.T) {
 
 		{
 			writeTx := stateStorage.BeginTransaction()
-			writeQueue := NewOutputQueue(stateStorage, writeTx)
+			writeQueue := NewOutputQueue(writeTx)
 
 			assert.Nil(t, writeQueue.Push(ctx, recordElement))
 			assert.Nil(t, writeTx.Commit())
@@ -203,7 +203,7 @@ func TestOutputQueue_NewTransactionRequired(t *testing.T) {
 
 		{
 			tx := stateStorage.BeginTransaction()
-			queue := NewOutputQueue(stateStorage, tx)
+			queue := NewOutputQueue(tx)
 			assert.True(t, proto.Equal(recordElement, GetElementAssertNoError(t, ctx, queue)))
 			assert.Nil(t, tx.Commit())
 		}

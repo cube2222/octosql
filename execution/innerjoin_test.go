@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/streaming/storage"
 )
 
 func TestInnerJoinedStream_Next(t *testing.T) {
@@ -123,7 +124,11 @@ func TestInnerJoinedStream_Next(t *testing.T) {
 					tt.fields.joined,
 				),
 			}
-			equal, err := AreStreamsEqual(context.Background(), stream, tt.want)
+			stateStorage := GetTestStorage(t)
+			tx := stateStorage.BeginTransaction()
+			ctx := storage.InjectStateTransaction(context.Background(), tx)
+
+			equal, err := AreStreamsEqual(ctx, stream, tt.want)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("InnerJoinedStream.Next() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -131,6 +136,8 @@ func TestInnerJoinedStream_Next(t *testing.T) {
 			if err == nil && !equal {
 				t.Errorf("InnerJoinedStream.Next() streams not equal")
 			}
+
+			tx.Commit()
 		})
 	}
 }

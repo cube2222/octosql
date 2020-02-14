@@ -361,7 +361,7 @@ func TestDataSource_Get(t *testing.T) {
 				verticalOffset:   tt.fields.verticalOffset,
 				timeColumns:      tt.fields.timeColumns,
 			}
-			got, err := ds.Get(ctx, tt.args.variables)
+			got, err := ds.Get(ctx, tt.args.variables, execution.GetRawStreamID())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataSource.Get() error = %v, wantErr %v", err, tt.wantErr)
 				return

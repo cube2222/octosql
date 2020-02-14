@@ -60,8 +60,15 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 			}
 			break
 		} else if errors.Cause(err) == execution.ErrNewTransactionRequired {
-			log.Println("main new transaction required")
+			log.Println("main new transaction required: ", err)
+			err := tx.Commit()
+			if err != nil {
+				log.Println("main couldn't commit: ", err)
+				continue
+			}
+			continue
 		} else if waitableError := execution.GetErrWaitForChanges(err); waitableError != nil {
+			log.Println("main wait for changes: ", err)
 			err := tx.Commit()
 			if err != nil {
 				log.Println("main couldn't commit: ", err)
@@ -72,6 +79,11 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 			if err != nil {
 				log.Println("couldn't listen for changes: ", err)
 			}
+			err = waitableError.Close()
+			if err != nil {
+				log.Println("couldn't close subscription: ", err)
+			}
+			log.Println("main received change")
 			continue
 		} else if err != nil {
 			tx.Abort()

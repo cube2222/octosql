@@ -10,7 +10,6 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
-	"github.com/cube2222/octosql/streaming/trigger"
 )
 
 type ProcessFunction interface {
@@ -18,10 +17,19 @@ type ProcessFunction interface {
 	Trigger(ctx context.Context, tx storage.StateTransaction, key octosql.Value) ([]*Record, error) // New Records and Retractions
 }
 
+var ErrNoKeyToFire = errors.New("no record to send")
+
+type Trigger interface {
+	RecordReceived(ctx context.Context, tx storage.StateTransaction, key octosql.Value, eventTime time.Time) error
+	UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error
+	PollKeyToFire(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error)
+	KeyFired(ctx context.Context, tx storage.StateTransaction, key octosql.Value) error
+}
+
 type ProcessByKey struct {
 	stateStorage storage.Storage
 
-	trigger         trigger.Trigger
+	trigger         Trigger
 	eventTimeField  octosql.VariableName // Empty if not grouping by event time.
 	keyExpression   []Expression
 	processFunction ProcessFunction
@@ -72,7 +80,7 @@ func (p *ProcessByKey) AddRecord(ctx context.Context, tx storage.StateTransactio
 func (p *ProcessByKey) triggerKeys(ctx context.Context, tx storage.StateTransaction) error {
 	outputQueue := NewOutputQueue(p.stateStorage.WithPrefix(outputQueuePrefix), tx.WithPrefix(outputQueuePrefix))
 
-	for key, err := p.trigger.PollKeyToFire(ctx, tx); err != trigger.ErrNoKeyToFire; key, err = p.trigger.PollKeyToFire(ctx, tx) {
+	for key, err := p.trigger.PollKeyToFire(ctx, tx); err != ErrNoKeyToFire; key, err = p.trigger.PollKeyToFire(ctx, tx) {
 		if err != nil {
 			return errors.Wrap(err, "couldn't poll trigger for key to fire")
 		}
@@ -195,7 +203,7 @@ func (p *ProcessByKey) MarkEndOfStream(ctx context.Context, tx storage.StateTran
 }
 
 func (p *ProcessByKey) Close() error {
-	panic("implement me")
+	return nil // TODO: Close this, remove state
 }
 
 type OutputQueue struct {

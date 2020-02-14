@@ -119,6 +119,10 @@ func (engine *PullEngine) Run(ctx context.Context) {
 			if err != nil {
 				log.Println("couldn't listen for changes: ", err)
 			}
+			err = waitableError.Close()
+			if err != nil {
+				log.Println("couldn't close listening for changes: ", err)
+			}
 			tx = engine.storage.BeginTransaction()
 		} else if err != nil {
 			tx.Abort()

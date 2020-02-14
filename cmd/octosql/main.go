@@ -9,6 +9,7 @@ import (
 	"reflect"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/go-chi/chi"
 
 	"github.com/go-chi/chi/middleware"
 
@@ -124,7 +125,9 @@ func main() {
 	rootCmd.Flags().StringVarP(&outputFormat, "output", "o", "table", "output format, one of [table json csv tabbed table_row_separated]")
 
 	go func() {
-		log.Fatal(http.ListenAndServe(":3000", middleware.Profiler()))
+		r := chi.NewRouter()
+		r.Mount("/debug", middleware.Profiler())
+		log.Fatal(http.ListenAndServe(":3000", r))
 	}()
 
 	if err := rootCmd.Execute(); err != nil {

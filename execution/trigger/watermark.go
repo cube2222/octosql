@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
@@ -106,7 +107,7 @@ func (wt *WatermarkTrigger) PollKeyToFire(ctx context.Context, tx storage.StateT
 		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get readiness to fire value")
 	}
 	if !octoReady.AsBool() {
-		return octosql.ZeroValue(), ErrNoKeyToFire
+		return octosql.ZeroValue(), execution.ErrNoKeyToFire
 	}
 
 	key, sendTime, err := timeKeys.GetFirst()

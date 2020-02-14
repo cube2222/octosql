@@ -329,6 +329,7 @@ type Select struct {
 	OrderBy     OrderBy
 	Limit       *Limit
 	Lock        string
+	Trigger     Triggers
 }
 
 // Select.Distinct
@@ -3603,6 +3604,71 @@ func (node *Limit) walkSubtree(visit Visit) error {
 		node.Offset,
 		node.Rowcount,
 	)
+}
+
+// Triggers represents a TRIGGER clause.
+type Triggers []Trigger
+
+// Format formats the node.
+func (node Triggers) Format(buf *TrackedBuffer) {
+	prefix := "TRIGGER "
+	for _, n := range node {
+		buf.Myprintf("%s%v", prefix, n)
+		prefix = ", "
+	}
+}
+
+func (node Triggers) walkSubtree(visit Visit) error {
+	for _, n := range node {
+		if err := Walk(visit, n); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type Trigger interface {
+	SQLNode
+	iTrigger()
+}
+
+func (w *WatermarkTrigger) iTrigger() {}
+func (w *DelayTrigger) iTrigger()     {}
+func (w *CountingTrigger) iTrigger()  {}
+
+type WatermarkTrigger struct {
+}
+
+func (w *WatermarkTrigger) Format(buf *TrackedBuffer) {
+	buf.Myprintf("WATERMARK")
+}
+
+func (w *WatermarkTrigger) walkSubtree(visit Visit) error {
+	return nil
+}
+
+type DelayTrigger struct {
+	Delay Expr
+}
+
+func (w *DelayTrigger) Format(buf *TrackedBuffer) {
+	buf.Myprintf("DELAY %v", w.Delay)
+}
+
+func (w *DelayTrigger) walkSubtree(visit Visit) error {
+	return Walk(visit, w.Delay)
+}
+
+type CountingTrigger struct {
+	Count Expr
+}
+
+func (w *CountingTrigger) Format(buf *TrackedBuffer) {
+	buf.Myprintf("COUNT %v", w.Count)
+}
+
+func (w *CountingTrigger) walkSubtree(visit Visit) error {
+	return Walk(visit, w.Count)
 }
 
 // Values represents a VALUES clause.

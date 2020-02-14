@@ -321,7 +321,7 @@ func TestDataSource_Get(t *testing.T) {
 				return
 			}
 
-			equal, err := execution.AreStreamsEqualNoOrdering(context.Background(), stream, tt.want)
+			equal, err := execution.AreStreamsEqualNoOrdering(context.Background(), execution.GetTestStorage(t), stream, tt.want)
 			if err != nil {
 				t.Errorf("Error in AreStreamsEqual(): %v", err)
 				return

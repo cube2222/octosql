@@ -17,6 +17,7 @@ type StateTransaction interface {
 	Iterator(opts ...IteratorOption) Iterator
 	Commit() error
 	Abort()
+	GetUnderlyingStorage() Storage
 }
 
 type stateTransactionKey struct{}
@@ -36,8 +37,9 @@ func InjectStateTransaction(ctx context.Context, tx StateTransaction) context.Co
 }
 
 type badgerTransaction struct {
-	tx     *badger.Txn
-	prefix []byte
+	tx      *badger.Txn
+	prefix  []byte
+	storage Storage
 }
 
 func (tx *badgerTransaction) getKeyWithPrefix(key []byte) []byte {
@@ -78,8 +80,9 @@ func (tx *badgerTransaction) GetPrefixLength() int {
 
 func (tx *badgerTransaction) WithPrefix(prefix []byte) StateTransaction {
 	return &badgerTransaction{
-		tx:     tx.tx,
-		prefix: tx.getKeyWithPrefix(prefix),
+		tx:      tx.tx,
+		prefix:  tx.getKeyWithPrefix(prefix),
+		storage: tx.storage.WithPrefix(prefix),
 	}
 }
 
@@ -109,6 +112,10 @@ func (tx *badgerTransaction) Commit() error {
 
 func (tx *badgerTransaction) Abort() {
 	tx.tx.Discard()
+}
+
+func (tx *badgerTransaction) GetUnderlyingStorage() Storage {
+	return tx.storage
 }
 
 //IteratorOptions are a copy of badger.IteratorOptions

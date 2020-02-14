@@ -2,6 +2,7 @@ package execution
 
 import (
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/streaming/storage"
 
 	"context"
 
@@ -16,8 +17,14 @@ func NewDistinct(child Node) *Distinct {
 	return &Distinct{child: child}
 }
 
-func (node *Distinct) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
-	stream, err := node.child.Get(ctx, variables)
+func (node *Distinct) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, error) {
+	tx := storage.GetStateTransactionFromContext(ctx)
+	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get source stream ID")
+	}
+
+	stream, err := node.child.Get(ctx, variables, sourceStreamID)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get stream for child node in distinct")
 	}

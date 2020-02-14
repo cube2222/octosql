@@ -27,8 +27,6 @@ type Trigger interface {
 }
 
 type ProcessByKey struct {
-	stateStorage storage.Storage
-
 	trigger         Trigger
 	eventTimeField  octosql.VariableName // Empty if not grouping by event time.
 	keyExpression   []Expression
@@ -75,7 +73,7 @@ func (p *ProcessByKey) AddRecord(ctx context.Context, tx storage.StateTransactio
 }
 
 func (p *ProcessByKey) triggerKeys(ctx context.Context, tx storage.StateTransaction) error {
-	outputQueue := NewOutputQueue(p.stateStorage.WithPrefix(outputQueuePrefix), tx.WithPrefix(outputQueuePrefix))
+	outputQueue := NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
 
 	for key, err := p.trigger.PollKeyToFire(ctx, tx); err != ErrNoKeyToFire; key, err = p.trigger.PollKeyToFire(ctx, tx) {
 		if err != nil {
@@ -108,7 +106,7 @@ var endOfStreamPrefix = []byte("$end_of_stream$")
 var outputQueuePrefix = []byte("$output_queue$")
 
 func (p *ProcessByKey) Next(ctx context.Context, tx storage.StateTransaction) (*Record, error) {
-	outputQueue := NewOutputQueue(p.stateStorage.WithPrefix(outputQueuePrefix), tx.WithPrefix(outputQueuePrefix))
+	outputQueue := NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
 
 	endOfStreamState := storage.NewValueState(tx.WithPrefix(endOfStreamPrefix))
 	var eos octosql.Value
@@ -152,7 +150,7 @@ func (p *ProcessByKey) Next(ctx context.Context, tx storage.StateTransaction) (*
 }
 
 func (p *ProcessByKey) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
-	outputQueue := NewOutputQueue(p.stateStorage.WithPrefix(outputQueuePrefix), tx.WithPrefix(outputQueuePrefix))
+	outputQueue := NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
 
 	err := p.trigger.UpdateWatermark(ctx, tx, watermark)
 	if err != nil {
@@ -191,7 +189,7 @@ func (p *ProcessByKey) GetWatermark(ctx context.Context, tx storage.StateTransac
 }
 
 func (p *ProcessByKey) MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error {
-	outputQueue := NewOutputQueue(p.stateStorage.WithPrefix(outputQueuePrefix), tx.WithPrefix(outputQueuePrefix))
+	outputQueue := NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
 	err := outputQueue.Push(ctx, &QueueElement{Type: &QueueElement_EndOfStream{EndOfStream: true}})
 	if err != nil {
 		return errors.Wrap(err, "couldn't push item to output queue")
@@ -204,14 +202,12 @@ func (p *ProcessByKey) Close() error {
 }
 
 type OutputQueue struct {
-	stateStorage storage.Storage
-	tx           storage.StateTransaction
+	tx storage.StateTransaction
 }
 
-func NewOutputQueue(stateStorage storage.Storage, tx storage.StateTransaction) *OutputQueue {
+func NewOutputQueue(tx storage.StateTransaction) *OutputQueue {
 	return &OutputQueue{
-		stateStorage: stateStorage,
-		tx:           tx,
+		tx: tx,
 	}
 }
 
@@ -233,9 +229,9 @@ func (q *OutputQueue) Pop(ctx context.Context) (*QueueElement, error) {
 	var element QueueElement
 	err := queueElements.PopFront(&element)
 	if err == storage.ErrNotFound {
-		subscription := q.stateStorage.Subscribe(ctx)
+		subscription := q.tx.GetUnderlyingStorage().Subscribe(ctx)
 
-		curTx := q.stateStorage.BeginTransaction()
+		curTx := q.tx.GetUnderlyingStorage().BeginTransaction()
 		defer curTx.Abort()
 		curQueueElements := storage.NewDeque(curTx.WithPrefix(queueElementsPrefix))
 

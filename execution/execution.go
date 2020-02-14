@@ -9,7 +9,7 @@ import (
 )
 
 type Node interface {
-	Get(ctx context.Context, variables octosql.Variables) (RecordStream, error)
+	Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, error)
 }
 
 type Expression interface {
@@ -71,7 +71,7 @@ func NewNodeExpression(node Node) *NodeExpression {
 }
 
 func (ne *NodeExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
-	records, err := ne.node.Get(ctx, variables)
+	records, err := ne.node.Get(ctx, variables, GetRawStreamID()) // TODO: Think about this.
 	if err != nil {
 		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get record stream")
 	}

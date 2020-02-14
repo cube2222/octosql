@@ -61,19 +61,19 @@ type IntermediateRecordStore interface {
 type PullEngine struct {
 	irs                    IntermediateRecordStore
 	source                 RecordStream
-	sourceStoragePrefix    []byte
 	lastCommittedWatermark time.Time
 	watermarkSource        WatermarkSource
 	storage                storage.Storage
+	nodeStatePrefix        []byte
 }
 
-func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, source RecordStream, sourceStoragePrefix []byte, watermarkSource WatermarkSource) *PullEngine {
+func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, source RecordStream, nodeStatePrefix []byte, watermarkSource WatermarkSource) *PullEngine {
 	return &PullEngine{
-		irs:                 irs,
-		storage:             storage,
-		source:              source,
-		sourceStoragePrefix: sourceStoragePrefix,
-		watermarkSource:     watermarkSource,
+		irs:             irs,
+		storage:         storage,
+		source:          source,
+		nodeStatePrefix: nodeStatePrefix,
+		watermarkSource: watermarkSource,
 	}
 }
 
@@ -133,14 +133,14 @@ func (engine *PullEngine) Run(ctx context.Context) {
 }
 
 func (engine *PullEngine) loop(ctx context.Context, tx storage.StateTransaction) error {
-	sourcePrefixedTx := tx.WithPrefix(engine.sourceStoragePrefix)
+	prefixedTx := tx.WithPrefix(engine.nodeStatePrefix)
 
-	watermark, err := engine.watermarkSource.GetWatermark(ctx, sourcePrefixedTx)
+	watermark, err := engine.watermarkSource.GetWatermark(ctx, tx)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get current watermark from source")
 	}
 	if watermark.After(engine.lastCommittedWatermark) {
-		err := engine.irs.UpdateWatermark(ctx, tx, watermark)
+		err := engine.irs.UpdateWatermark(ctx, prefixedTx, watermark)
 		if err != nil {
 			return errors.Wrap(err, "couldn't update watermark in intermediate record store")
 		}
@@ -148,14 +148,14 @@ func (engine *PullEngine) loop(ctx context.Context, tx storage.StateTransaction)
 		return nil
 	}
 
-	record, err := engine.source.Next(storage.InjectStateTransaction(ctx, sourcePrefixedTx))
+	record, err := engine.source.Next(storage.InjectStateTransaction(ctx, tx))
 	if err != nil {
 		if err == ErrEndOfStream {
-			err := engine.irs.UpdateWatermark(ctx, tx, maxWatermark)
+			err := engine.irs.UpdateWatermark(ctx, prefixedTx, maxWatermark)
 			if err != nil {
 				return errors.Wrap(err, "couldn't mark end of stream max watermark in intermediate record store")
 			}
-			err = engine.irs.MarkEndOfStream(ctx, tx)
+			err = engine.irs.MarkEndOfStream(ctx, prefixedTx)
 			if err != nil {
 				return errors.Wrap(err, "couldn't mark end of stream in intermediate record store")
 			}
@@ -163,7 +163,7 @@ func (engine *PullEngine) loop(ctx context.Context, tx storage.StateTransaction)
 		}
 		return errors.Wrap(err, "couldn't get next record")
 	}
-	err = engine.irs.AddRecord(ctx, tx, 0, record)
+	err = engine.irs.AddRecord(ctx, prefixedTx, 0, record)
 	if err != nil {
 		return errors.Wrap(err, "couldn't add record to intermediate record store")
 	}
@@ -173,7 +173,9 @@ func (engine *PullEngine) loop(ctx context.Context, tx storage.StateTransaction)
 
 func (engine *PullEngine) Next(ctx context.Context) (*Record, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
-	rec, err := engine.irs.Next(ctx, tx)
+	prefixedTx := tx.WithPrefix(engine.nodeStatePrefix)
+
+	rec, err := engine.irs.Next(ctx, prefixedTx)
 	if err != nil {
 		if err == ErrEndOfStream {
 			return nil, ErrEndOfStream
@@ -184,7 +186,9 @@ func (engine *PullEngine) Next(ctx context.Context) (*Record, error) {
 }
 
 func (engine *PullEngine) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
-	return engine.irs.GetWatermark(ctx, tx)
+	prefixedTx := tx.WithPrefix(engine.nodeStatePrefix)
+
+	return engine.irs.GetWatermark(ctx, prefixedTx)
 }
 
 func (engine *PullEngine) Close() error {

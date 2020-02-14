@@ -42,9 +42,15 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		return errors.Wrap(err, "couldn't materialize the physical plan into an execution plan")
 	}
 
-	stream, err := exec.Get(ctx, variables)
+	programID := &execution.StreamID{Id: ""}
+
+	tx := stateStorage.BeginTransaction()
+	stream, err := exec.Get(storage.InjectStateTransaction(ctx, tx), variables, programID)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get record stream from execution plan")
+	}
+	if err := tx.Commit(); err != nil {
+		return errors.Wrap(err, "couldn't commit transaction to get record stream from execution plan")
 	}
 
 	var rec *execution.Record

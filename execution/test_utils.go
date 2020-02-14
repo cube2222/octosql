@@ -171,7 +171,7 @@ type DummyNode struct {
 	data []*Record
 }
 
-func (dn *DummyNode) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
+func (dn *DummyNode) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, error) {
 	if dn.data == nil {
 		return NewInMemoryStream([]*Record{}), nil
 	}

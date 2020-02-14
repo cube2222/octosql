@@ -2,6 +2,7 @@ package execution
 
 import (
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/streaming/storage"
 
 	"context"
 
@@ -17,8 +18,14 @@ func NewOffset(data Node, offsetExpr Expression) *Offset {
 	return &Offset{data: data, offsetExpr: offsetExpr}
 }
 
-func (node *Offset) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
-	dataStream, err := node.data.Get(ctx, variables)
+func (node *Offset) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, error) {
+	tx := storage.GetStateTransactionFromContext(ctx)
+	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get source stream ID")
+	}
+
+	dataStream, err := node.data.Get(ctx, variables, sourceStreamID)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get data record stream")
 	}

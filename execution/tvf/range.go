@@ -31,7 +31,7 @@ func (r *Range) Document() docs.Documentation {
 	)
 }
 
-func (r *Range) Get(ctx context.Context, variables octosql.Variables) (execution.RecordStream, error) {
+func (r *Range) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, error) {
 	start, err := r.start.ExpressionValue(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get range start point")

@@ -148,7 +148,7 @@ func TestTumble_Get(t *testing.T) {
 				windowLength: tt.fields.windowLength,
 				offset:       tt.fields.offset,
 			}
-			got, err := r.Get(ctx, tt.args.variables)
+			got, err := r.Get(ctx, tt.args.variables, execution.GetRawStreamID())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Tumble.Get() error = %v, wantErr %v", err, tt.wantErr)
 				return

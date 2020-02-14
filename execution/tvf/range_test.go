@@ -149,7 +149,7 @@ func TestRange_Get(t *testing.T) {
 				start: tt.fields.start,
 				end:   tt.fields.end,
 			}
-			got, err := r.Get(ctx, tt.args.variables)
+			got, err := r.Get(ctx, tt.args.variables, execution.GetRawStreamID())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Range.Get() error = %v, wantErr %v", err, tt.wantErr)
 				return

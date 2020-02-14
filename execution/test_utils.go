@@ -3,70 +3,46 @@ package execution
 import (
 	"context"
 	"fmt"
+	"log"
 	"sort"
+	"testing"
 
+	"github.com/dgraph-io/badger/v2"
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/streaming/storage"
 )
 
-type multiSetElement struct {
-	rec   *Record
-	count int
-}
-
 type recordMultiSet struct {
-	set map[uint64][]multiSetElement
-}
-
-func newMultiSetElement(rec *Record) multiSetElement {
-	return multiSetElement{
-		rec:   rec,
-		count: 1,
-	}
+	set   []*Record
+	count []int
 }
 
 func newMultiSet() *recordMultiSet {
-	return &recordMultiSet{
-		set: make(map[uint64][]multiSetElement),
-	}
+	return &recordMultiSet{}
 }
 
-func (rms *recordMultiSet) Insert(rec *Record) error {
-	hash, err := rec.Hash()
-	if err != nil {
-		return errors.Wrap(err, "couldn't hash record")
-	}
-
-	targetSlice := rms.set[hash]
-	for k := range targetSlice {
-		element := targetSlice[k]
-		if element.rec.Equal(rec) {
-			rms.set[hash][k].count++
-			return nil
+func (rms *recordMultiSet) Insert(rec *Record) {
+	for i := range rms.set {
+		if rms.set[i].Equal(rec) {
+			rms.count[i]++
+			return
 		}
 	}
 
-	rms.set[hash] = append(rms.set[hash], newMultiSetElement(rec))
-
-	return nil
+	rms.set = append(rms.set, rec)
+	rms.count = append(rms.count, 1)
 }
 
-func (rms *recordMultiSet) GetCount(rec *Record) (int, error) {
-	hash, err := rec.Hash()
-	if err != nil {
-		return 0, errors.Wrap(err, "couldn't hash record")
-	}
-
-	targetSlice := rms.set[hash]
-	for k := range targetSlice {
-		element := targetSlice[k]
-		if element.rec.Equal(rec) {
-			return element.count, nil
+func (rms *recordMultiSet) GetCount(rec *Record) int {
+	for i := range rms.set {
+		if rms.set[i].Equal(rec) {
+			return rms.count[i]
 		}
 	}
 
-	return 0, nil
+	return 0
 }
 
 type entity struct {
@@ -132,47 +108,32 @@ func AreStreamsEqual(ctx context.Context, first, second RecordStream) (bool, err
 	return true, nil
 }
 
-func AreStreamsEqualNoOrdering(ctx context.Context, first, second RecordStream) (bool, error) {
+func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage, first, second RecordStream) (bool, error) {
 	firstMultiSet := newMultiSet()
 	secondMultiSet := newMultiSet()
 
-	for {
-		firstRec, firstErr := first.Next(ctx)
-		secondRec, secondErr := second.Next(ctx)
-
-		if firstErr == secondErr && firstErr == ErrEndOfStream {
-			break
-		} else if firstErr == ErrEndOfStream && secondErr == nil {
-			return false, nil
-		} else if firstErr == nil && secondErr == ErrEndOfStream {
-			return false, nil
-		} else if firstErr != nil {
-			return false, errors.Wrap(firstErr, "error in Next for first stream")
-		} else if secondErr != nil {
-			return false, errors.Wrap(secondErr, "error in Next for second stream")
-		}
-
-		err := firstMultiSet.Insert(firstRec)
-		if err != nil {
-			return false, errors.Wrap(err, "couldn't insert into the multiset")
-		}
-
-		err = secondMultiSet.Insert(secondRec)
-		if err != nil {
-			return false, errors.Wrap(err, "couldn't insert into the multiset")
-		}
-	}
-
-	firstContained, err := firstMultiSet.isContained(secondMultiSet)
+	firstRecords, err := ReadAll(ctx, stateStorage, first)
 	if err != nil {
-		return false, errors.Wrap(err, "couldn't check whether first contained in second")
+		return false, errors.Wrap(err, "couldn't read first stream records")
+	}
+	for _, rec := range firstRecords {
+		firstMultiSet.Insert(rec)
 	}
 
-	secondContained, err := secondMultiSet.isContained(firstMultiSet)
+	secondRecords, err := ReadAll(ctx, stateStorage, second)
 	if err != nil {
-		return false, errors.Wrap(err, "couldn't check whether second contained in first")
+		return false, errors.Wrap(err, "couldn't read second stream records")
+	}
+	for _, rec := range secondRecords {
+		secondMultiSet.Insert(rec)
 	}
 
+	for _, rec := range secondRecords {
+		log.Println(rec.Show())
+	}
+
+	firstContained := firstMultiSet.isContained(secondMultiSet)
+	secondContained := secondMultiSet.isContained(firstMultiSet)
 	if !(firstContained && secondContained) {
 		return false, nil
 	}
@@ -180,24 +141,16 @@ func AreStreamsEqualNoOrdering(ctx context.Context, first, second RecordStream) 
 	return true, nil
 }
 
-func (rms *recordMultiSet) isContained(other *recordMultiSet) (bool, error) {
-	for key := range rms.set {
-		hashSlice := rms.set[key]
-		for k := range hashSlice {
-			setElem := hashSlice[k]
-
-			otherCount, err := other.GetCount(setElem.rec)
-			if err != nil {
-				return false, errors.Wrap(err, "couldn't get count of elem in second set")
-			}
-
-			if otherCount < setElem.count {
-				return false, nil
-			}
+func (rms *recordMultiSet) isContained(other *recordMultiSet) bool {
+	for i, rec := range rms.set {
+		myCount := rms.count[i]
+		otherCount := other.GetCount(rec)
+		if otherCount != myCount {
+			return false
 		}
 	}
 
-	return true, nil
+	return true
 }
 
 func NewRecordFromSliceWithNormalize(fields []octosql.VariableName, data []interface{}, opts ...RecordOption) *Record {
@@ -238,4 +191,64 @@ type DummyValue struct {
 
 func (dv *DummyValue) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
 	return dv.value, nil
+}
+
+func ReadAll(ctx context.Context, stateStorage storage.Storage, stream RecordStream) ([]*Record, error) {
+	var records []*Record
+	for {
+		tx := stateStorage.BeginTransaction()
+		ctx := storage.InjectStateTransaction(ctx, tx)
+
+		rec, err := stream.Next(ctx)
+		if err == ErrEndOfStream {
+			err := tx.Commit()
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't commit transaction")
+			}
+			break
+		} else if errors.Cause(err) == ErrNewTransactionRequired {
+			err := tx.Commit()
+			if err != nil {
+				continue
+			}
+			continue
+		} else if waitableError := GetErrWaitForChanges(err); waitableError != nil {
+			err := tx.Commit()
+			if err != nil {
+				continue
+			}
+			err = waitableError.ListenForChanges(ctx)
+			if err != nil {
+				log.Println("couldn't listen for changes: ", err)
+			}
+			err = waitableError.Close()
+			if err != nil {
+				log.Println("couldn't close subscription: ", err)
+			}
+			continue
+		} else if err != nil {
+			return nil, errors.Wrap(err, "couldn't get next record")
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't commit transaction")
+		}
+
+		records = append(records, rec)
+	}
+
+	return records, nil
+}
+
+func GetTestStorage(t *testing.T) storage.Storage {
+	opts := badger.DefaultOptions("")
+	opts.Dir = ""
+	opts.ValueDir = ""
+	opts.InMemory = true
+	db, err := badger.Open(opts)
+	if err != nil {
+		t.Fatal("couldn't open in-memory badger database: ", err)
+	}
+	return storage.NewBadgerStorage(db)
 }

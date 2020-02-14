@@ -127,7 +127,7 @@ func (engine *PullEngine) Run(ctx context.Context) {
 		} else if err != nil {
 			tx.Abort()
 			log.Println(err)
-			return // TODO: Error propagation?
+			return // TODO: Error propagation? Add this to the underlying queue as an ErrorElement? How to do this well?
 		}
 	}
 }

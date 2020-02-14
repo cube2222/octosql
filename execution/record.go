@@ -29,6 +29,12 @@ func (id ID) Show() string {
 
 type RecordOption func(stream *Record)
 
+func WithClearUndo() RecordOption {
+	return func(r *Record) {
+		r.Metadata.Undo = false
+	}
+}
+
 func WithUndo() RecordOption {
 	return func(r *Record) {
 		r.Metadata.Undo = true
@@ -80,10 +86,11 @@ func NewRecordFromSlice(fields []octosql.VariableName, data []octosql.Value, opt
 }
 
 func NewRecordFromRecord(record *Record, opts ...RecordOption) *Record {
+	metadataCopy := *record.Metadata
 	r := &Record{
 		FieldNames: record.FieldNames,
 		Data:       record.Data,
-		Metadata:   &(*record.Metadata),
+		Metadata:   &metadataCopy,
 	}
 
 	for _, opt := range opts {
@@ -168,7 +175,7 @@ func (r *Record) Equal(other *Record) bool {
 }
 
 func (r *Record) Show() string {
-	fields := r.Fields()
+	fields := r.ShowFields()
 	parts := make([]string, len(fields))
 	for i, field := range fields {
 		parts[i] = fmt.Sprintf("%s: %s", field.Name, r.Value(field.Name).Show())

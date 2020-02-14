@@ -1,181 +1,356 @@
-package execution
+package execution_test
 
-/*
 import (
 	"context"
-	"reflect"
 	"testing"
-
-	"github.com/golang/protobuf/proto"
+	"time"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/docs"
+	. "github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/execution/trigger"
+	"github.com/cube2222/octosql/streaming/aggregate"
 )
 
-type AggregateMock struct {
-	addI      int
-	addKeys   []octosql.Value
-	addValues []octosql.Value
+func TestGroupBy_SimpleBatch(t *testing.T) {
+	stateStorage := GetTestStorage(t)
 
-	getI      int
-	getKeySet map[string]struct{}
-	getValues []octosql.Value
-
-	t *testing.T
-}
-
-func getHash(value octosql.Value) string {
-	buf := proto.NewBuffer(nil)
-	buf.SetDeterministic(true)
-	err := buf.Marshal(&value)
-	if err != nil {
-		panic(err)
-	}
-	return string(buf.Bytes())
-}
-
-func (mock *AggregateMock) Document() docs.Documentation {
-	panic("implement me")
-}
-
-func (mock *AggregateMock) AddRecord(key octosql.Value, value octosql.Value) error {
-	if !reflect.DeepEqual(mock.addKeys[mock.addI], key) {
-		mock.t.Errorf("invalid %v call key: got %v wanted %v", mock.addI, key, mock.addKeys[mock.addI])
-	}
-	if !reflect.DeepEqual(mock.addValues[mock.addI], value) {
-		mock.t.Errorf("invalid %v call value: got %v wanted %v", mock.addI, value, mock.addValues[mock.addI])
-	}
-	mock.addI++
-	return nil
-}
-
-func (mock *AggregateMock) GetAggregated(key octosql.Value) (octosql.Value, error) {
-	_, ok := mock.getKeySet[getHash(key.AsSlice()[0])]
-	if !ok {
-		mock.t.Errorf("invalid %v call key: got %v wanted one of %v", mock.getI, key, mock.getKeySet)
-	}
-	delete(mock.getKeySet, getHash(key.AsSlice()[0]))
-	mock.getI++
-	return mock.getValues[mock.getI-1], nil
-}
-
-func (*AggregateMock) String() string {
-	return "mock"
-}
-
-func TestGroupBy_AggregateCalling(t *testing.T) {
 	ctx := context.Background()
 	fields := []octosql.VariableName{"cat", "livesleft", "ownerid"}
+	source := NewDummyNode([]*Record{
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Buster", 9, 5}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 6, 4}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Nala", 5, 3}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Tiger", 4, 3}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Lucy", 3, 3}),
+	})
 
-	firstAggregate := &AggregateMock{
-		addKeys: []octosql.Value{
-			octosql.MakeTuple([]octosql.Value{octosql.MakeInt(5)}),
-			octosql.MakeTuple([]octosql.Value{octosql.MakeInt(4)}),
-			octosql.MakeTuple([]octosql.Value{octosql.MakeInt(3)}),
-			octosql.MakeTuple([]octosql.Value{octosql.MakeInt(3)}),
-			octosql.MakeTuple([]octosql.Value{octosql.MakeInt(3)}),
+	gb := NewGroupBy(
+		stateStorage,
+		source,
+		[]byte{},
+		[]Expression{NewVariable(octosql.NewVariableName("ownerid"))},
+		[]octosql.VariableName{
+			octosql.NewVariableName("ownerid"),
+			octosql.NewVariableName("livesleft"),
+			octosql.NewVariableName("livesleft"),
 		},
-		addValues: []octosql.Value{
-			octosql.MakeString("Buster"),
-			octosql.MakeString("Precious"),
-			octosql.MakeString("Nala"),
-			octosql.MakeString("Tiger"),
-			octosql.MakeString("Lucy"),
+		[]AggregatePrototype{
+			aggregate.AggregateTable["key"],
+			aggregate.AggregateTable["avg"],
+			aggregate.AggregateTable["count"],
 		},
+		octosql.NewVariableName(""),
+		[]octosql.VariableName{
+			octosql.NewVariableName("ownerid"),
+			octosql.NewVariableName("livesleft_avg"),
+			octosql.NewVariableName("livesleft_count"),
+		},
+		octosql.NewVariableName(""),
+		func(ctx context.Context, variables octosql.Variables) (Trigger, error) {
+			return trigger.NewWatermarkTrigger(), nil
+		},
+	)
 
-		getKeySet: map[string]struct{}{
-			getHash(octosql.MakeInt(5)): {},
-			getHash(octosql.MakeInt(4)): {},
-			getHash(octosql.MakeInt(3)): {},
-		},
-		getValues: []octosql.Value{
-			octosql.MakeString("Buster"),
-			octosql.MakeString("Precious"),
-			octosql.MakeString("Nala"),
-		},
-
-		t: t,
-	}
-	secondAggregate := &AggregateMock{
-		addKeys: []octosql.Value{
-			octosql.MakeTuple([]octosql.Value{octosql.MakeInt(5)}),
-			octosql.MakeTuple([]octosql.Value{octosql.MakeInt(4)}),
-			octosql.MakeTuple([]octosql.Value{octosql.MakeInt(3)}),
-			octosql.MakeTuple([]octosql.Value{octosql.MakeInt(3)}),
-			octosql.MakeTuple([]octosql.Value{octosql.MakeInt(3)}),
-		},
-		addValues: []octosql.Value{
-			octosql.MakeInt(9),
-			octosql.MakeInt(6),
-			octosql.MakeInt(5),
-			octosql.MakeInt(4),
-			octosql.MakeInt(3),
-		},
-
-		getKeySet: map[string]struct{}{
-			getHash(octosql.MakeInt(5)): {},
-			getHash(octosql.MakeInt(4)): {},
-			getHash(octosql.MakeInt(3)): {},
-		},
-		getValues: []octosql.Value{
-			octosql.MakeInt(9),
-			octosql.MakeInt(6),
-			octosql.MakeInt(4),
-		},
-
-		t: t,
+	stream, err := gb.Get(ctx, octosql.NoVariables())
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	groupby := &GroupByStream{
-		source: NewInMemoryStream([]*Record{
-			NewRecordFromSliceWithNormalize(fields, []interface{}{"Buster", 9, 5}),
-			NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 6, 4}),
-			NewRecordFromSliceWithNormalize(fields, []interface{}{"Nala", 5, 3}),
-			NewRecordFromSliceWithNormalize(fields, []interface{}{"Tiger", 4, 3}),
-			NewRecordFromSliceWithNormalize(fields, []interface{}{"Lucy", 3, 3}),
-		}),
-		variables:  octosql.NoVariables(),
-		key:        []Expression{NewVariable("ownerid")},
-		groups:     NewHashMap(),
-		fields:     []octosql.VariableName{"cat", "livesleft"},
-		aggregates: []Aggregate{firstAggregate, secondAggregate},
-		as:         []octosql.VariableName{"", "lives_left"},
-	}
-
-	outFields := []octosql.VariableName{"cat_mock", "lives_left"}
+	outFields := []octosql.VariableName{"ownerid", "livesleft_avg", "livesleft_count"}
 	expectedOutput := []*Record{
-		NewRecordFromSliceWithNormalize(outFields, []interface{}{"Buster", 9}),
-		NewRecordFromSliceWithNormalize(outFields, []interface{}{"Precious", 6}),
-		NewRecordFromSliceWithNormalize(outFields, []interface{}{"Nala", 4}),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{3, 4.0, 3}),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{4, 6.0, 1}),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{5, 9.0, 1}),
 	}
 
-	var rec *Record
-	var err error
-	i := 0
-	for rec, err = groupby.Next(ctx); err == nil; rec, err = groupby.Next(ctx) {
-		if !reflect.DeepEqual(rec, expectedOutput[i]) {
-			t.Errorf("Record got %+v wanted %+v", rec, expectedOutput[i])
-			return
-		}
-		i++
+	ok, err := AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(expectedOutput), stream)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if err != ErrEndOfStream {
-		t.Errorf("unexpected error: %v", err)
-		return
-	}
-
-	if firstAggregate.addI != len(firstAggregate.addKeys) {
-		t.Errorf("invalid firstAggregate add call count: got %v wanted %v", firstAggregate.addI, len(firstAggregate.addKeys))
-	}
-	if len(firstAggregate.getKeySet) != 0 {
-		t.Errorf("invalid firstAggregate get call count: still waiting for %v", firstAggregate.getKeySet)
-	}
-
-	if secondAggregate.addI != len(secondAggregate.addKeys) {
-		t.Errorf("invalid secondAggregate add call count: got %v wanted %v", secondAggregate.addI, len(secondAggregate.addKeys))
-	}
-	if len(secondAggregate.getKeySet) != 0 {
-		t.Errorf("invalid secondAggregate get call count: still waiting for %v", secondAggregate.getKeySet)
+	if !ok {
+		t.Fatal("streams not equal")
 	}
 }
-*/
+
+func TestGroupBy_BatchWithUndos(t *testing.T) {
+	stateStorage := GetTestStorage(t)
+
+	ctx := context.Background()
+	fields := []octosql.VariableName{"cat", "livesleft", "ownerid"}
+	source := NewDummyNode([]*Record{
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Buster", 9, 5}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 6, 4}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 6, 4}, WithUndo()),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 6, 4}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 6, 4}, WithUndo()),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 6, 4}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 6, 4}, WithUndo()),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 5, 4}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Nala", 6, 3}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Tiger", 4, 3}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Tiger", 4, 3}, WithUndo()),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Lucy", 4, 3}),
+	})
+
+	gb := NewGroupBy(
+		stateStorage,
+		source,
+		[]byte{},
+		[]Expression{NewVariable(octosql.NewVariableName("ownerid"))},
+		[]octosql.VariableName{
+			octosql.NewVariableName("ownerid"),
+			octosql.NewVariableName("livesleft"),
+			octosql.NewVariableName("livesleft"),
+		},
+		[]AggregatePrototype{
+			aggregate.AggregateTable["key"],
+			aggregate.AggregateTable["avg"],
+			aggregate.AggregateTable["count"],
+		},
+		octosql.NewVariableName(""),
+		[]octosql.VariableName{
+			octosql.NewVariableName("ownerid"),
+			octosql.NewVariableName("livesleft_avg"),
+			octosql.NewVariableName("livesleft_count"),
+		},
+		octosql.NewVariableName(""),
+		func(ctx context.Context, variables octosql.Variables) (Trigger, error) {
+			return trigger.NewWatermarkTrigger(), nil
+		},
+	)
+
+	stream, err := gb.Get(ctx, octosql.NoVariables())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	outFields := []octosql.VariableName{"ownerid", "livesleft_avg", "livesleft_count"}
+	expectedOutput := []*Record{
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{3, 5.0, 2}),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{4, 5.0, 1}),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{5, 9.0, 1}),
+	}
+
+	ok, err := AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(expectedOutput), stream)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("streams not equal")
+	}
+}
+
+func TestGroupBy_WithOutputUndos(t *testing.T) {
+	stateStorage := GetTestStorage(t)
+
+	ctx := context.Background()
+	fields := []octosql.VariableName{"cat", "livesleft", "ownerid"}
+	source := NewDummyNode([]*Record{
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Buster", 9, 5}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 6, 4}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 6, 4}, WithUndo()),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 6, 4}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 6, 4}, WithUndo()),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 6, 4}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 6, 4}, WithUndo()),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 5, 4}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Nala", 6, 3}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Tiger", 4, 3}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Tiger", 4, 3}, WithUndo()),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Lucy", 4, 3}),
+	})
+
+	gb := NewGroupBy(
+		stateStorage,
+		source,
+		[]byte{},
+		[]Expression{NewVariable(octosql.NewVariableName("ownerid"))},
+		[]octosql.VariableName{
+			octosql.NewVariableName("ownerid"),
+			octosql.NewVariableName("livesleft"),
+			octosql.NewVariableName("livesleft"),
+		},
+		[]AggregatePrototype{
+			aggregate.AggregateTable["key"],
+			aggregate.AggregateTable["avg"],
+			aggregate.AggregateTable["count"],
+		},
+		octosql.NewVariableName(""),
+		[]octosql.VariableName{
+			octosql.NewVariableName("ownerid"),
+			octosql.NewVariableName("livesleft_avg"),
+			octosql.NewVariableName("livesleft_count"),
+		},
+		octosql.NewVariableName(""),
+		func(ctx context.Context, variables octosql.Variables) (Trigger, error) {
+			return trigger.NewCountingTrigger(1), nil
+		},
+	)
+
+	stream, err := gb.Get(ctx, octosql.NoVariables())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	outFields := []octosql.VariableName{"ownerid", "livesleft_avg", "livesleft_count"}
+	expectedOutput := []*Record{
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{5, 9.0, 1}),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{4, 6.0, 1}),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{4, 6.0, 1}, WithUndo()),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{4, 6.0, 1}),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{4, 6.0, 1}, WithUndo()),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{4, 6.0, 1}),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{4, 6.0, 1}, WithUndo()),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{4, 5.0, 1}),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{3, 6.0, 1}),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{3, 6.0, 1}, WithUndo()),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{3, 5.0, 2}),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{3, 5.0, 2}, WithUndo()),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{3, 6.0, 1}),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{3, 6.0, 1}, WithUndo()),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{3, 5.0, 2}),
+	}
+
+	ok, err := AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(expectedOutput), stream)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("streams not equal")
+	}
+}
+
+func TestGroupBy_newRecordsNoChanges(t *testing.T) {
+	stateStorage := GetTestStorage(t)
+
+	ctx := context.Background()
+	fields := []octosql.VariableName{"cat", "livesleft", "ownerid"}
+	source := NewDummyNode([]*Record{
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 5, 3}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Nala", 5, 3}),
+	})
+
+	gb := NewGroupBy(
+		stateStorage,
+		source,
+		[]byte{},
+		[]Expression{NewVariable(octosql.NewVariableName("ownerid"))},
+		[]octosql.VariableName{
+			octosql.NewVariableName("ownerid"),
+			octosql.NewVariableName("livesleft"),
+		},
+		[]AggregatePrototype{
+			aggregate.AggregateTable["key"],
+			aggregate.AggregateTable["avg"],
+		},
+		octosql.NewVariableName(""),
+		[]octosql.VariableName{
+			octosql.NewVariableName("ownerid"),
+			octosql.NewVariableName("livesleft_avg"),
+		},
+		octosql.NewVariableName(""),
+		func(ctx context.Context, variables octosql.Variables) (Trigger, error) {
+			return trigger.NewCountingTrigger(1), nil
+		},
+	)
+
+	stream, err := gb.Get(ctx, octosql.NoVariables())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	outFields := []octosql.VariableName{"ownerid", "livesleft_avg"}
+	expectedOutput := []*Record{
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{3, 5.0}),
+	}
+
+	ok, err := AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(expectedOutput), stream)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("streams not equal")
+	}
+}
+
+func TestGroupBy_EventTimes(t *testing.T) {
+	stateStorage := GetTestStorage(t)
+
+	start := time.Date(2020, 7, 2, 14, 0, 0, 0, time.UTC)
+	firstWindow := start
+	secondWindow := start.Add(time.Minute * 10)
+	thirdWindow := start.Add(time.Minute * 20)
+
+	ctx := context.Background()
+	fields := []octosql.VariableName{"cat", "livesleft", "ownerid", "t"}
+	source := NewDummyNode([]*Record{
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Buster", 9, 5, firstWindow}, WithEventTimeField(octosql.NewVariableName("t"))),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 6, 4, firstWindow}, WithEventTimeField(octosql.NewVariableName("t"))),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Nala", 6, 3, firstWindow}, WithEventTimeField(octosql.NewVariableName("t"))),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Tiger", 5, 3, firstWindow}, WithEventTimeField(octosql.NewVariableName("t"))),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Lucy", 4, 3, firstWindow}, WithEventTimeField(octosql.NewVariableName("t"))),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Buster", 9, 5, secondWindow}, WithEventTimeField(octosql.NewVariableName("t"))),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Nala", 6, 3, secondWindow}, WithEventTimeField(octosql.NewVariableName("t"))),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Lucy", 4, 3, secondWindow}, WithEventTimeField(octosql.NewVariableName("t"))),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Buster", 9, 5, thirdWindow}, WithEventTimeField(octosql.NewVariableName("t"))),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Tiger", 5, 3, thirdWindow}, WithEventTimeField(octosql.NewVariableName("t"))),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Lucy", 4, 3, thirdWindow}, WithEventTimeField(octosql.NewVariableName("t"))),
+	})
+
+	gb := NewGroupBy(
+		stateStorage,
+		source,
+		[]byte{},
+		[]Expression{
+			NewVariable(octosql.NewVariableName("ownerid")),
+			NewVariable(octosql.NewVariableName("t")),
+		},
+		[]octosql.VariableName{
+			octosql.NewVariableName("t"),
+			octosql.NewVariableName("ownerid"),
+			octosql.NewVariableName("livesleft"),
+			octosql.NewVariableName("livesleft"),
+		},
+		[]AggregatePrototype{
+			aggregate.AggregateTable["key"],
+			aggregate.AggregateTable["key"],
+			aggregate.AggregateTable["avg"],
+			aggregate.AggregateTable["count"],
+		},
+		octosql.NewVariableName("t"),
+		[]octosql.VariableName{
+			octosql.NewVariableName("renamed_t"),
+			octosql.NewVariableName("ownerid"),
+			octosql.NewVariableName("livesleft_avg"),
+			octosql.NewVariableName("livesleft_count"),
+		},
+		octosql.NewVariableName("renamed_t"),
+		func(ctx context.Context, variables octosql.Variables) (Trigger, error) {
+			return trigger.NewWatermarkTrigger(), nil
+		},
+	)
+
+	stream, err := gb.Get(ctx, octosql.NoVariables())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	outFields := []octosql.VariableName{"renamed_t", "ownerid", "livesleft_avg", "livesleft_count"}
+	expectedOutput := []*Record{
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{firstWindow, 5, 9.0, 1}, WithEventTimeField(octosql.NewVariableName("renamed_t"))),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{firstWindow, 4, 6.0, 1}, WithEventTimeField(octosql.NewVariableName("renamed_t"))),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{firstWindow, 3, 5.0, 3}, WithEventTimeField(octosql.NewVariableName("renamed_t"))),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{secondWindow, 5, 9.0, 1}, WithEventTimeField(octosql.NewVariableName("renamed_t"))),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{secondWindow, 3, 5.0, 2}, WithEventTimeField(octosql.NewVariableName("renamed_t"))),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{thirdWindow, 5, 9.0, 1}, WithEventTimeField(octosql.NewVariableName("renamed_t"))),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{thirdWindow, 3, 4.5, 2}, WithEventTimeField(octosql.NewVariableName("renamed_t"))),
+	}
+
+	ok, err := AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(expectedOutput), stream)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("streams not equal")
+	}
+}

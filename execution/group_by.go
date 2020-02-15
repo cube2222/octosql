@@ -96,7 +96,7 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 		processFunction: groupBy,
 		variables:       variables,
 	}
-	groupByPullEngine := NewPullEngine(processFunc, node.storage, source, streamID.AsPrefix(), &ZeroWatermarkSource{})
+	groupByPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, &ZeroWatermarkSource{})
 	go groupByPullEngine.Run(ctx) // TODO: .Close() should kill this context and the goroutine.
 
 	return groupByPullEngine, nil

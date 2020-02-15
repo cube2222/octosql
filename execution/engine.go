@@ -64,15 +64,15 @@ type PullEngine struct {
 	lastCommittedWatermark time.Time
 	watermarkSource        WatermarkSource
 	storage                storage.Storage
-	nodeStatePrefix        []byte
+	streamID               *StreamID
 }
 
-func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, source RecordStream, nodeStatePrefix []byte, watermarkSource WatermarkSource) *PullEngine {
+func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, source RecordStream, streamID *StreamID, watermarkSource WatermarkSource) *PullEngine {
 	return &PullEngine{
 		irs:             irs,
 		storage:         storage,
 		source:          source,
-		nodeStatePrefix: nodeStatePrefix,
+		streamID:        streamID,
 		watermarkSource: watermarkSource,
 	}
 }
@@ -127,13 +127,16 @@ func (engine *PullEngine) Run(ctx context.Context) {
 		} else if err != nil {
 			tx.Abort()
 			log.Println(err)
-			return // TODO: Error propagation? Add this to the underlying queue as an ErrorElement? How to do this well?
+			return // TODO: Error propagation? Add this to the underlying queue as an ErrorElement? How to do this well? Send it to the underlying IRS like a watermark?
 		}
 	}
 }
 
 func (engine *PullEngine) loop(ctx context.Context, tx storage.StateTransaction) error {
-	prefixedTx := tx.WithPrefix(engine.nodeStatePrefix)
+	// This is a transaction prefixed with the current node StreamID,
+	// which should be used for all storage operations of this node.
+	// Source streams will get the raw, non-prefixed, transaction.
+	prefixedTx := tx.WithPrefix(engine.streamID.AsPrefix())
 
 	watermark, err := engine.watermarkSource.GetWatermark(ctx, tx)
 	if err != nil {

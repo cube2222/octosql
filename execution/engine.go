@@ -176,7 +176,7 @@ func (engine *PullEngine) loop(ctx context.Context, tx storage.StateTransaction)
 
 func (engine *PullEngine) Next(ctx context.Context) (*Record, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
-	prefixedTx := tx.WithPrefix(engine.nodeStatePrefix)
+	prefixedTx := tx.WithPrefix(engine.streamID.AsPrefix())
 
 	rec, err := engine.irs.Next(ctx, prefixedTx)
 	if err != nil {
@@ -189,7 +189,7 @@ func (engine *PullEngine) Next(ctx context.Context) (*Record, error) {
 }
 
 func (engine *PullEngine) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
-	prefixedTx := tx.WithPrefix(engine.nodeStatePrefix)
+	prefixedTx := tx.WithPrefix(engine.streamID.AsPrefix())
 
 	return engine.irs.GetWatermark(ctx, prefixedTx)
 }

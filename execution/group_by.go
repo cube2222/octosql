@@ -109,7 +109,7 @@ type GroupByStream struct {
 	outputEventTimeField octosql.VariableName
 }
 
-var eventTimePrefix = []byte("$event_time$")
+var recordCountPrefix = []byte("$record_count$")
 
 func (gb *GroupByStream) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, key octosql.Value, record *Record) error {
 	if inputIndex > 0 {
@@ -118,6 +118,37 @@ func (gb *GroupByStream) AddRecord(ctx context.Context, tx storage.StateTransact
 	keyPrefix := append(append([]byte("$"), key.MonotonicMarshal()...), '$')
 	txByKey := tx.WithPrefix(keyPrefix)
 
+	// Keep track of record vs retraction count
+	recordCountState := storage.NewValueState(txByKey.WithPrefix(recordCountPrefix))
+	var recordCount octosql.Value
+	err := recordCountState.Get(&recordCount)
+	if err == storage.ErrNotFound {
+		recordCount = octosql.MakeInt(0)
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't get current record count")
+	}
+
+	var newRecordCount int
+	if !record.IsUndo() {
+		newRecordCount = recordCount.AsInt() + 1
+	} else {
+		newRecordCount = recordCount.AsInt() - 1
+	}
+
+	if newRecordCount != 0 {
+		newRecordCountValue := octosql.MakeInt(newRecordCount)
+		err := recordCountState.Set(&newRecordCountValue)
+		if err != nil {
+			return errors.Wrap(err, "couldn't save record count")
+		}
+	} else {
+		err := recordCountState.Clear()
+		if err != nil {
+			return errors.Wrap(err, "couldn't clear record count")
+		}
+	}
+
+	// Update aggregates
 	for i := range gb.aggregates {
 		var value octosql.Value
 		if gb.inputFields[i] == "*star*" {
@@ -162,11 +193,13 @@ func (gb *GroupByStream) Trigger(ctx context.Context, tx storage.StateTransactio
 	keyPrefix := append(append([]byte("$"), key.MonotonicMarshal()...), '$')
 	txByKey := tx.WithPrefix(keyPrefix)
 
+	// Check if we have to handle event time
 	var opts []RecordOption
 	if len(gb.eventTimeField) > 0 {
 		opts = append(opts, WithEventTimeField(gb.outputEventTimeField))
 	}
 
+	// Handle previously triggered record
 	previouslyTriggeredValues := storage.NewValueState(txByKey.WithPrefix(previouslyTriggeredValuePrefix))
 	var previouslyTriggered octosql.Value
 	err := previouslyTriggeredValues.Get(&previouslyTriggered)
@@ -176,20 +209,49 @@ func (gb *GroupByStream) Trigger(ctx context.Context, tx storage.StateTransactio
 		return nil, errors.Wrap(err, "couldn't get previously triggered value for key")
 	}
 
-	values := make([]octosql.Value, len(gb.aggregates))
-	for i := range gb.aggregates {
-		var err error
-		values[i], err = gb.aggregates[i].GetValue(ctx, txByKey.WithPrefix(gb.prefixes[i]))
+	// Check if record count == retraction count
+	recordCountState := storage.NewValueState(txByKey.WithPrefix(recordCountPrefix))
+	var recordCountValue octosql.Value
+	err = recordCountState.Get(&recordCountValue)
+	if err == storage.ErrNotFound {
+		recordCountValue = octosql.MakeInt(0)
+	} else if err != nil {
+		return nil, errors.Wrap(err, "couldn't get current record count")
+	}
+
+	if recordCountValue.AsInt() > 0 {
+		// Get new record to trigger
+		values := make([]octosql.Value, len(gb.aggregates))
+		for i := range gb.aggregates {
+			var err error
+			values[i], err = gb.aggregates[i].GetValue(ctx, txByKey.WithPrefix(gb.prefixes[i]))
+			if err != nil {
+				return nil, errors.Wrapf(err, "couldn't get value of aggregate %s with index %d", gb.aggregates[i].String(), i)
+			}
+		}
+		output = append(output, NewRecordFromSlice(gb.outputFieldNames, values, opts...))
+
+		// Save currently triggered record
+		newPreviouslyTriggeredValuesTuple := octosql.MakeTuple(values)
+		err = previouslyTriggeredValues.Set(&newPreviouslyTriggeredValuesTuple)
 		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't get value of aggregate %s with index %d", gb.aggregates[i].String(), i)
+			return nil, errors.Wrap(err, "couldn't set new previously triggered value")
+		}
+	} else {
+		// Clear previously triggered record, as we're sending a retraction for it now
+		err = previouslyTriggeredValues.Clear()
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't clear previously triggered value")
 		}
 	}
-	output = append(output, NewRecordFromSlice(gb.outputFieldNames, values, opts...))
 
-	newPreviouslyTriggeredValuesTuple := octosql.MakeTuple(values)
-	err = previouslyTriggeredValues.Set(&newPreviouslyTriggeredValuesTuple)
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't set new previously triggered value")
+	// We can have at most one retraction and one normal record.
+	// In case we have both, check if they're not equal, because then they cancel each other out and we send neither.
+	if len(output) == 2 {
+		firstNoUndo := NewRecordFromRecord(output[0], WithNoUndo())
+		if firstNoUndo.Equal(output[1]) {
+			return nil, nil
+		}
 	}
 
 	return output, nil

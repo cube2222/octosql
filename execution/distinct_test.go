@@ -488,7 +488,9 @@ func TestDistinct_Get(t *testing.T) {
 				[]octosql.VariableName{"id", "name"},
 				[]interface{}{1, "Janek"})
 
-			equal, err := AreStreamsEqualNoOrdering(context.Background(), tt.want, distinct)
+			stateStorage := GetTestStorage(t)
+
+			equal, err := AreStreamsEqualNoOrdering(context.Background(), stateStorage, tt.want, distinct)
 			if err != nil {
 				t.Errorf("Error in AreStreamsEqual()")
 				return

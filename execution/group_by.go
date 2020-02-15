@@ -109,7 +109,7 @@ type GroupByStream struct {
 	outputEventTimeField octosql.VariableName
 }
 
-var eventTimePrefix = []byte("$event_time$")
+var recordCountPrefix = []byte("$record_count$")
 
 func (gb *GroupByStream) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, key octosql.Value, record *Record) error {
 	if inputIndex > 0 {
@@ -187,7 +187,6 @@ func (gb *GroupByStream) AddRecord(ctx context.Context, tx storage.StateTransact
 }
 
 var previouslyTriggeredValuePrefix = []byte("$previously_triggered_value$")
-var recordCountPrefix = []byte("$record_count$")
 
 func (gb *GroupByStream) Trigger(ctx context.Context, tx storage.StateTransaction, key octosql.Value) ([]*Record, error) {
 	output := make([]*Record, 0, 2)
@@ -246,8 +245,10 @@ func (gb *GroupByStream) Trigger(ctx context.Context, tx storage.StateTransactio
 		}
 	}
 
+	// We can have at most one retraction and one normal record.
+	// In case we have both, check if they're not equal, because then they cancel each other out and we send neither.
 	if len(output) == 2 {
-		firstNoUndo := NewRecordFromRecord(output[0], WithClearUndo())
+		firstNoUndo := NewRecordFromRecord(output[0], WithNoUndo())
 		if firstNoUndo.Equal(output[1]) {
 			return nil, nil
 		}

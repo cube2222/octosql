@@ -29,7 +29,7 @@ func (id ID) Show() string {
 
 type RecordOption func(stream *Record)
 
-func WithClearUndo() RecordOption {
+func WithNoUndo() RecordOption {
 	return func(r *Record) {
 		r.Metadata.Undo = false
 	}

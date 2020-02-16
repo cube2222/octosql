@@ -8,15 +8,15 @@ import (
 )
 
 func TestMappedStream_Next(t *testing.T) {
-	fieldNames := []octosql.VariableName{
-		octosql.NewVariableName("age"),
-		octosql.NewVariableName("something"),
-		octosql.NewVariableName("something_else"),
+	fieldNames := []string{
+		"age",
+		"something",
+		"something_else",
 	}
 
-	fieldNamesNew := []octosql.VariableName{
-		octosql.NewVariableName("awesome_age"),
-		octosql.NewVariableName("awesome_something"),
+	fieldNamesNew := []string{
+		"awesome_age",
+		"awesome_something",
 	}
 
 	fieldNamesAll := append(fieldNamesNew, fieldNames...)
@@ -144,7 +144,7 @@ func TestMappedStream_Next(t *testing.T) {
 							NewDummyNode(
 								[]*Record{
 									NewRecordFromSliceWithNormalize(
-										[]octosql.VariableName{octosql.NewVariableName("test")},
+										[]string{"test"},
 										[]interface{}{5},
 									),
 								},
@@ -156,7 +156,7 @@ func TestMappedStream_Next(t *testing.T) {
 				source: NewInMemoryStream(
 					[]*Record{
 						NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{},
+							[]string{},
 							[]interface{}{},
 						),
 					},
@@ -166,7 +166,7 @@ func TestMappedStream_Next(t *testing.T) {
 			want: NewInMemoryStream(
 				[]*Record{
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{octosql.NewVariableName("awesome")},
+						[]string{"awesome"},
 						[]interface{}{5},
 					),
 				},
@@ -183,9 +183,9 @@ func TestMappedStream_Next(t *testing.T) {
 							NewDummyNode(
 								[]*Record{
 									NewRecordFromSliceWithNormalize(
-										[]octosql.VariableName{
-											octosql.NewVariableName("test"),
-											octosql.NewVariableName("test2"),
+										[]string{
+											"test",
+											"test2",
 										},
 										[]interface{}{
 											5,
@@ -201,7 +201,7 @@ func TestMappedStream_Next(t *testing.T) {
 				source: NewInMemoryStream(
 					[]*Record{
 						NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{},
+							[]string{},
 							[]interface{}{},
 						),
 					},
@@ -211,7 +211,7 @@ func TestMappedStream_Next(t *testing.T) {
 			want: NewInMemoryStream(
 				[]*Record{
 					NewRecordFromSlice(
-						[]octosql.VariableName{"awesome"},
+						[]octosql.VariableName{octosql.NewVariableName("awesome")},
 						[]octosql.Value{
 							octosql.MakeTuple([]octosql.Value{
 								octosql.MakeInt(5),

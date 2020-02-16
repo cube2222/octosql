@@ -50,9 +50,9 @@ func TestDataSource_Get(t *testing.T) {
 				dbIndex:  dbIndex,
 				dbKey:    dbKey,
 				filter: physical.NewPredicate(
-					physical.NewVariable("r.key"),
+					physical.NewVariable(octosql.NewVariableName("r.key")),
 					physical.NewRelation("equal"),
-					physical.NewVariable("const_0")),
+					physical.NewVariable(octosql.NewVariableName("const_0"))),
 				alias: "r",
 				queries: map[string]map[string]interface{}{
 					"key0": {
@@ -70,13 +70,13 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecord(
-					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
+					[]octosql.VariableName{octosql.NewVariableName("r.key"), "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key0"),
-						"r.age":     octosql.MakeString("3"),
-						"r.city":    octosql.MakeString("warsaw"),
-						"r.name":    octosql.MakeString("wojtek"),
-						"r.surname": octosql.MakeString("k"),
+						octosql.NewVariableName("r.key"):     octosql.MakeString("key0"),
+						octosql.NewVariableName("r.age"):     octosql.MakeString("3"),
+						octosql.NewVariableName("r.city"):    octosql.MakeString("warsaw"),
+						octosql.NewVariableName("r.name"):    octosql.MakeString("wojtek"),
+						octosql.NewVariableName("r.surname"): octosql.MakeString("k"),
 					},
 				),
 			},
@@ -92,9 +92,9 @@ func TestDataSource_Get(t *testing.T) {
 				dbIndex:  dbIndex,
 				dbKey:    "some_other_key_name",
 				filter: physical.NewPredicate(
-					physical.NewVariable("r.some_other_key_name"),
+					physical.NewVariable(octosql.NewVariableName("r.some_other_key_name")),
 					physical.NewRelation("equal"),
-					physical.NewVariable("const_0")),
+					physical.NewVariable(octosql.NewVariableName("const_0"))),
 				alias: "r",
 				queries: map[string]map[string]interface{}{
 					"key0": {
@@ -112,13 +112,13 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecord(
-					[]octosql.VariableName{"r.some_other_key_name", "r.age", "r.city", "r.name", "r.surname"},
+					[]string{"r.some_other_key_name", "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]octosql.Value{
-						"r.some_other_key_name": octosql.MakeString("key0"),
-						"r.age":                 octosql.MakeString("3"),
-						"r.city":                octosql.MakeString("warsaw"),
-						"r.name":                octosql.MakeString("wojtek"),
-						"r.surname":             octosql.MakeString("k"),
+						octosql.NewVariableName("r.some_other_key_name"): octosql.MakeString("key0"),
+						octosql.NewVariableName("r.age"):                 octosql.MakeString("3"),
+						octosql.NewVariableName("r.city"):                octosql.MakeString("warsaw"),
+						octosql.NewVariableName("r.name"):                octosql.MakeString("wojtek"),
+						octosql.NewVariableName("r.surname"):             octosql.MakeString("k"),
 					},
 				),
 			},
@@ -135,13 +135,13 @@ func TestDataSource_Get(t *testing.T) {
 				dbKey:    dbKey,
 				filter: physical.NewOr(
 					physical.NewPredicate(
-						physical.NewVariable("r.key"),
+						physical.NewVariable(octosql.NewVariableName("r.key")),
 						physical.NewRelation("equal"),
-						physical.NewVariable("const_0")),
+						physical.NewVariable(octosql.NewVariableName("const_0"))),
 					physical.NewPredicate(
-						physical.NewVariable("r.key"),
+						physical.NewVariable(octosql.NewVariableName("r.key")),
 						physical.NewRelation("equal"),
-						physical.NewVariable("const_1")),
+						physical.NewVariable(octosql.NewVariableName("const_1"))),
 				),
 				alias: "r",
 				queries: map[string]map[string]interface{}{
@@ -173,23 +173,23 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecord(
-					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
+					[]octosql.VariableName{octosql.NewVariableName("r.key"), octosql.NewVariableName("r.age"), octosql.NewVariableName("r.city"), octosql.NewVariableName("r.name"), octosql.NewVariableName("r.surname")},
 					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key0"),
-						"r.age":     octosql.MakeString("3"),
-						"r.city":    octosql.MakeString("warsaw"),
-						"r.name":    octosql.MakeString("wojtek"),
-						"r.surname": octosql.MakeString("k"),
+						octosql.NewVariableName("r.key"):     octosql.MakeString("key0"),
+						octosql.NewVariableName("r.age"):     octosql.MakeString("3"),
+						octosql.NewVariableName("r.city"):    octosql.MakeString("warsaw"),
+						octosql.NewVariableName("r.name"):    octosql.MakeString("wojtek"),
+						octosql.NewVariableName("r.surname"): octosql.MakeString("k"),
 					},
 				),
 				execution.NewRecord(
-					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
+					[]octosql.VariableName{octosql.NewVariableName("r.key"), "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key1"),
-						"r.age":     octosql.MakeString("4"),
-						"r.city":    octosql.MakeString("zacisze"),
-						"r.name":    octosql.MakeString("janek"),
-						"r.surname": octosql.MakeString("ch"),
+						octosql.NewVariableName("r.key"):     octosql.MakeString("key1"),
+						octosql.NewVariableName("r.age"):     octosql.MakeString("4"),
+						octosql.NewVariableName("r.city"):    octosql.MakeString("zacisze"),
+						octosql.NewVariableName("r.name"):    octosql.MakeString("janek"),
+						octosql.NewVariableName("r.surname"): octosql.MakeString("ch"),
 					},
 				),
 			},
@@ -206,13 +206,13 @@ func TestDataSource_Get(t *testing.T) {
 				dbKey:    dbKey,
 				filter: physical.NewAnd(
 					physical.NewPredicate(
-						physical.NewVariable("r.key"),
+						physical.NewVariable(octosql.NewVariableName("r.key")),
 						physical.NewRelation("equal"),
-						physical.NewVariable("const_0")),
+						physical.NewVariable(octosql.NewVariableName("const_0"))),
 					physical.NewPredicate(
-						physical.NewVariable("r.key"),
+						physical.NewVariable(octosql.NewVariableName("r.key")),
 						physical.NewRelation("equal"),
-						physical.NewVariable("const_0")),
+						physical.NewVariable(octosql.NewVariableName("const_0"))),
 				),
 				alias: "r",
 				queries: map[string]map[string]interface{}{
@@ -232,13 +232,13 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecord(
-					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
+					[]octosql.VariableName{octosql.NewVariableName("r.key"), "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key0"),
-						"r.age":     octosql.MakeString("3"),
-						"r.city":    octosql.MakeString("warsaw"),
-						"r.name":    octosql.MakeString("wojtek"),
-						"r.surname": octosql.MakeString("k"),
+						octosql.NewVariableName("r.key"):     octosql.MakeString("key0"),
+						octosql.NewVariableName("r.age"):     octosql.MakeString("3"),
+						octosql.NewVariableName("r.city"):    octosql.MakeString("warsaw"),
+						octosql.NewVariableName("r.name"):    octosql.MakeString("wojtek"),
+						octosql.NewVariableName("r.surname"): octosql.MakeString("k"),
 					},
 				),
 			},
@@ -287,43 +287,43 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecord(
-					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
+					[]octosql.VariableName{octosql.NewVariableName("r.key"), "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key0"),
-						"r.age":     octosql.MakeString("3"),
-						"r.city":    octosql.MakeString("warsaw"),
-						"r.name":    octosql.MakeString("wojtek"),
-						"r.surname": octosql.MakeString("k"),
+						octosql.NewVariableName("r.key"):     octosql.MakeString("key0"),
+						octosql.NewVariableName("r.age"):     octosql.MakeString("3"),
+						octosql.NewVariableName("r.city"):    octosql.MakeString("warsaw"),
+						octosql.NewVariableName("r.name"):    octosql.MakeString("wojtek"),
+						octosql.NewVariableName("r.surname"): octosql.MakeString("k"),
 					},
 				),
 				execution.NewRecord(
-					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
+					[]octosql.VariableName{octosql.NewVariableName("r.key"), "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key1"),
-						"r.age":     octosql.MakeString("4"),
-						"r.city":    octosql.MakeString("zacisze"),
-						"r.name":    octosql.MakeString("janek"),
-						"r.surname": octosql.MakeString("ch"),
+						octosql.NewVariableName("r.key"):     octosql.MakeString("key1"),
+						octosql.NewVariableName("r.age"):     octosql.MakeString("4"),
+						octosql.NewVariableName("r.city"):    octosql.MakeString("zacisze"),
+						octosql.NewVariableName("r.name"):    octosql.MakeString("janek"),
+						octosql.NewVariableName("r.surname"): octosql.MakeString("ch"),
 					},
 				),
 				execution.NewRecord(
-					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
+					[]octosql.VariableName{octosql.NewVariableName("r.key"), "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key2"),
-						"r.age":     octosql.MakeString("2"),
-						"r.city":    octosql.MakeString("warsaw"),
-						"r.name":    octosql.MakeString("kuba"),
-						"r.surname": octosql.MakeString("m"),
+						octosql.NewVariableName("r.key"):     octosql.MakeString("key2"),
+						octosql.NewVariableName("r.age"):     octosql.MakeString("2"),
+						octosql.NewVariableName("r.city"):    octosql.MakeString("warsaw"),
+						octosql.NewVariableName("r.name"):    octosql.MakeString("kuba"),
+						octosql.NewVariableName("r.surname"): octosql.MakeString("m"),
 					},
 				),
 				execution.NewRecord(
-					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
+					[]octosql.VariableName{octosql.NewVariableName("r.key"), "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key3"),
-						"r.age":     octosql.MakeString("1"),
-						"r.city":    octosql.MakeString("ciechanow"),
-						"r.name":    octosql.MakeString("adam"),
-						"r.surname": octosql.MakeString("cz"),
+						octosql.NewVariableName("r.key"):     octosql.MakeString("key3"),
+						octosql.NewVariableName("r.age"):     octosql.MakeString("1"),
+						octosql.NewVariableName("r.city"):    octosql.MakeString("ciechanow"),
+						octosql.NewVariableName("r.name"):    octosql.MakeString("adam"),
+						octosql.NewVariableName("r.surname"): octosql.MakeString("cz"),
 					},
 				),
 			},
@@ -342,29 +342,29 @@ func TestDataSource_Get(t *testing.T) {
 				filter: physical.NewAnd(
 					physical.NewOr(
 						physical.NewPredicate(
-							physical.NewVariable("r.key"),
+							physical.NewVariable(octosql.NewVariableName("r.key")),
 							physical.NewRelation("equal"),
-							physical.NewVariable("const_0")),
+							physical.NewVariable(octosql.NewVariableName("const_0"))),
 						physical.NewPredicate(
-							physical.NewVariable("r.key"),
+							physical.NewVariable(octosql.NewVariableName("r.key")),
 							physical.NewRelation("equal"),
-							physical.NewVariable("const_1")),
+							physical.NewVariable(octosql.NewVariableName("const_1"))),
 					),
 					physical.NewOr(
 						physical.NewOr(
 							physical.NewPredicate(
-								physical.NewVariable("r.key"),
+								physical.NewVariable(octosql.NewVariableName("r.key")),
 								physical.NewRelation("equal"),
-								physical.NewVariable("const_2")),
+								physical.NewVariable(octosql.NewVariableName("const_2"))),
 							physical.NewPredicate(
-								physical.NewVariable("r.key"),
+								physical.NewVariable(octosql.NewVariableName("r.key")),
 								physical.NewRelation("equal"),
-								physical.NewVariable("const_1")),
+								physical.NewVariable(octosql.NewVariableName("const_1"))),
 						),
 						physical.NewPredicate(
-							physical.NewVariable("r.key"),
+							physical.NewVariable(octosql.NewVariableName("r.key")),
 							physical.NewRelation("equal"),
-							physical.NewVariable("const_0")),
+							physical.NewVariable(octosql.NewVariableName("const_0"))),
 					),
 				),
 				alias: "r",
@@ -405,23 +405,23 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecord(
-					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
+					[]octosql.VariableName{octosql.NewVariableName("r.key"), "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key0"),
-						"r.age":     octosql.MakeString("3"),
-						"r.city":    octosql.MakeString("warsaw"),
-						"r.name":    octosql.MakeString("wojtek"),
-						"r.surname": octosql.MakeString("k"),
+						octosql.NewVariableName("r.key"):     octosql.MakeString("key0"),
+						octosql.NewVariableName("r.age"):     octosql.MakeString("3"),
+						octosql.NewVariableName("r.city"):    octosql.MakeString("warsaw"),
+						octosql.NewVariableName("r.name"):    octosql.MakeString("wojtek"),
+						octosql.NewVariableName("r.surname"): octosql.MakeString("k"),
 					},
 				),
 				execution.NewRecord(
-					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
+					[]octosql.VariableName{octosql.NewVariableName("r.key"), "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key1"),
-						"r.age":     octosql.MakeString("4"),
-						"r.city":    octosql.MakeString("zacisze"),
-						"r.name":    octosql.MakeString("janek"),
-						"r.surname": octosql.MakeString("ch"),
+						octosql.NewVariableName("r.key"):     octosql.MakeString("key1"),
+						octosql.NewVariableName("r.age"):     octosql.MakeString("4"),
+						octosql.NewVariableName("r.city"):    octosql.MakeString("zacisze"),
+						octosql.NewVariableName("r.name"):    octosql.MakeString("janek"),
+						octosql.NewVariableName("r.surname"): octosql.MakeString("ch"),
 					},
 				),
 			},
@@ -440,29 +440,29 @@ func TestDataSource_Get(t *testing.T) {
 				filter: physical.NewOr(
 					physical.NewAnd(
 						physical.NewPredicate(
-							physical.NewVariable("r.key"),
+							physical.NewVariable(octosql.NewVariableName("r.key")),
 							physical.NewRelation("equal"),
-							physical.NewVariable("const_0")),
+							physical.NewVariable(octosql.NewVariableName("const_0"))),
 						physical.NewPredicate(
-							physical.NewVariable("const_1"),
+							physical.NewVariable(octosql.NewVariableName("const_1")),
 							physical.NewRelation("equal"),
-							physical.NewVariable("r.key")),
+							physical.NewVariable(octosql.NewVariableName("r.key"))),
 					),
 					physical.NewAnd(
 						physical.NewOr(
 							physical.NewPredicate(
-								physical.NewVariable("r.key"),
+								physical.NewVariable(octosql.NewVariableName("r.key")),
 								physical.NewRelation("equal"),
-								physical.NewVariable("const_1")),
+								physical.NewVariable(octosql.NewVariableName("const_1"))),
 							physical.NewPredicate(
-								physical.NewVariable("r.key"),
+								physical.NewVariable(octosql.NewVariableName("r.key")),
 								physical.NewRelation("equal"),
-								physical.NewVariable("const_2")),
+								physical.NewVariable(octosql.NewVariableName("const_2"))),
 						),
 						physical.NewPredicate(
-							physical.NewVariable("r.key"),
+							physical.NewVariable(octosql.NewVariableName("r.key")),
 							physical.NewRelation("equal"),
-							physical.NewVariable("const_1")),
+							physical.NewVariable(octosql.NewVariableName("const_1"))),
 					),
 				),
 				alias: "r",
@@ -496,13 +496,13 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecord(
-					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
+					[]octosql.VariableName{octosql.NewVariableName("r.key"), "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key1"),
-						"r.age":     octosql.MakeString("4"),
-						"r.city":    octosql.MakeString("zacisze"),
-						"r.name":    octosql.MakeString("janek"),
-						"r.surname": octosql.MakeString("ch"),
+						octosql.NewVariableName("r.key"):     octosql.MakeString("key1"),
+						octosql.NewVariableName("r.age"):     octosql.MakeString("4"),
+						octosql.NewVariableName("r.city"):    octosql.MakeString("zacisze"),
+						octosql.NewVariableName("r.name"):    octosql.MakeString("janek"),
+						octosql.NewVariableName("r.surname"): octosql.MakeString("ch"),
 					},
 				),
 			},
@@ -518,12 +518,12 @@ func TestDataSource_Get(t *testing.T) {
 				dbIndex:  dbIndex,
 				dbKey:    dbKey,
 				filter: physical.NewPredicate(
-					physical.NewVariable("r.key"),
+					physical.NewVariable(octosql.NewVariableName("r.key")),
 					physical.NewRelation("in"),
 					physical.NewTuple([]physical.Expression{
-						physical.NewVariable("const_0"),
-						physical.NewVariable("const_1"),
-						physical.NewVariable("const_2"),
+						physical.NewVariable(octosql.NewVariableName("const_0")),
+						physical.NewVariable(octosql.NewVariableName("const_1")),
+						physical.NewVariable(octosql.NewVariableName("const_2")),
 					}),
 				),
 				alias: "r",
@@ -563,33 +563,33 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecord(
-					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
+					[]octosql.VariableName{octosql.NewVariableName("r.key"), "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key0"),
-						"r.age":     octosql.MakeString("3"),
-						"r.city":    octosql.MakeString("warsaw"),
-						"r.name":    octosql.MakeString("wojtek"),
-						"r.surname": octosql.MakeString("k"),
+						octosql.NewVariableName("r.key"):     octosql.MakeString("key0"),
+						octosql.NewVariableName("r.age"):     octosql.MakeString("3"),
+						octosql.NewVariableName("r.city"):    octosql.MakeString("warsaw"),
+						octosql.NewVariableName("r.name"):    octosql.MakeString("wojtek"),
+						octosql.NewVariableName("r.surname"): octosql.MakeString("k"),
 					},
 				),
 				execution.NewRecord(
-					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
+					[]octosql.VariableName{octosql.NewVariableName("r.key"), "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key1"),
-						"r.age":     octosql.MakeString("4"),
-						"r.city":    octosql.MakeString("zacisze"),
-						"r.name":    octosql.MakeString("janek"),
-						"r.surname": octosql.MakeString("ch"),
+						octosql.NewVariableName("r.key"):     octosql.MakeString("key1"),
+						octosql.NewVariableName("r.age"):     octosql.MakeString("4"),
+						octosql.NewVariableName("r.city"):    octosql.MakeString("zacisze"),
+						octosql.NewVariableName("r.name"):    octosql.MakeString("janek"),
+						octosql.NewVariableName("r.surname"): octosql.MakeString("ch"),
 					},
 				),
 				execution.NewRecord(
-					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
+					[]octosql.VariableName{octosql.NewVariableName("r.key"), "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key2"),
-						"r.age":     octosql.MakeString("2"),
-						"r.city":    octosql.MakeString("warsaw"),
-						"r.name":    octosql.MakeString("kuba"),
-						"r.surname": octosql.MakeString("m"),
+						octosql.NewVariableName("r.key"):     octosql.MakeString("key2"),
+						octosql.NewVariableName("r.age"):     octosql.MakeString("2"),
+						octosql.NewVariableName("r.city"):    octosql.MakeString("warsaw"),
+						octosql.NewVariableName("r.name"):    octosql.MakeString("kuba"),
+						octosql.NewVariableName("r.surname"): octosql.MakeString("m"),
 					},
 				),
 			},
@@ -605,9 +605,9 @@ func TestDataSource_Get(t *testing.T) {
 				dbIndex:  dbIndex,
 				dbKey:    dbKey,
 				filter: physical.NewPredicate(
-					physical.NewVariable("r.key"),
+					physical.NewVariable(octosql.NewVariableName("r.key")),
 					physical.NewRelation("equal"),
-					physical.NewVariable("const_0")),
+					physical.NewVariable(octosql.NewVariableName("const_0"))),
 				alias: "r",
 				queries: map[string]map[string]interface{}{
 					"key0": {
@@ -633,9 +633,9 @@ func TestDataSource_Get(t *testing.T) {
 				dbIndex:  dbIndex,
 				dbKey:    dbKey,
 				filter: physical.NewPredicate(
-					physical.NewVariable("r.key"),
+					physical.NewVariable(octosql.NewVariableName("r.key")),
 					physical.NewRelation("equal"),
-					physical.NewVariable("const_0")),
+					physical.NewVariable(octosql.NewVariableName("const_0"))),
 				alias:   "r",
 				queries: map[string]map[string]interface{}{},
 			},
@@ -656,9 +656,9 @@ func TestDataSource_Get(t *testing.T) {
 				dbIndex:  dbIndex,
 				dbKey:    dbKey,
 				filter: physical.NewPredicate(
-					physical.NewVariable("r.key"),
+					physical.NewVariable(octosql.NewVariableName("r.key")),
 					physical.NewRelation("equal"),
-					physical.NewVariable("const_0")),
+					physical.NewVariable(octosql.NewVariableName("const_0"))),
 				alias:   "r",
 				queries: map[string]map[string]interface{}{},
 			},
@@ -679,9 +679,9 @@ func TestDataSource_Get(t *testing.T) {
 				dbIndex:  dbIndex,
 				dbKey:    dbKey,
 				filter: physical.NewPredicate(
-					physical.NewVariable("r.key"),
+					physical.NewVariable(octosql.NewVariableName("r.key")),
 					physical.NewRelation("equal"),
-					physical.NewVariable("const_0")),
+					physical.NewVariable(octosql.NewVariableName("const_0"))),
 				alias:   "r",
 				queries: map[string]map[string]interface{}{},
 			},
@@ -702,9 +702,9 @@ func TestDataSource_Get(t *testing.T) {
 				dbIndex:  20,
 				dbKey:    dbKey,
 				filter: physical.NewPredicate(
-					physical.NewVariable("r.key"),
+					physical.NewVariable(octosql.NewVariableName("r.key")),
 					physical.NewRelation("equal"),
-					physical.NewVariable("const_0")),
+					physical.NewVariable(octosql.NewVariableName("const_0"))),
 				alias:   "r",
 				queries: map[string]map[string]interface{}{},
 			},

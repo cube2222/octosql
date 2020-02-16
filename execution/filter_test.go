@@ -8,9 +8,9 @@ import (
 )
 
 func TestFilteredStream_Next(t *testing.T) {
-	fieldNames := []octosql.VariableName{
-		octosql.NewVariableName("age"),
-		octosql.NewVariableName("something"),
+	fieldNames := []string{
+		"age",
+		"something",
 	}
 
 	type fields struct {
@@ -28,9 +28,9 @@ func TestFilteredStream_Next(t *testing.T) {
 			name: "simple filter",
 			fields: fields{
 				formula: NewPredicate(
-					NewVariable("age"),
+					NewVariable(octosql.NewVariableName("age")),
 					NewNotEqual(),
-					NewVariable("const"),
+					NewVariable(octosql.NewVariableName("const")),
 				),
 				variables: map[octosql.VariableName]octosql.Value{
 					octosql.NewVariableName("const"): octosql.MakeInt(3),
@@ -82,9 +82,9 @@ func TestFilteredStream_Next(t *testing.T) {
 			name: "filter with duplicates",
 			fields: fields{
 				formula: NewPredicate(
-					NewVariable("age"),
+					NewVariable(octosql.NewVariableName("age")),
 					NewNotEqual(),
-					NewVariable("const"),
+					NewVariable(octosql.NewVariableName("const")),
 				),
 				variables: map[octosql.VariableName]octosql.Value{
 					octosql.NewVariableName("const"): octosql.MakeInt(3),
@@ -152,9 +152,9 @@ func TestFilteredStream_Next(t *testing.T) {
 			name: "empty stream",
 			fields: fields{
 				formula: NewPredicate(
-					NewVariable("age"),
+					NewVariable(octosql.NewVariableName("age")),
 					NewNotEqual(),
-					NewVariable("const"),
+					NewVariable(octosql.NewVariableName("const")),
 				),
 				variables: map[octosql.VariableName]octosql.Value{
 					octosql.NewVariableName("const"): octosql.MakeInt(3),

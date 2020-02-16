@@ -35,7 +35,7 @@ func TestDataSource_Get(t *testing.T) {
 	type args struct {
 		tablename        string
 		alias            string
-		primaryKey       []octosql.VariableName
+		primaryKey       []string
 		variables        octosql.Variables
 		formula          physical.Formula
 		rows             [][]interface{}
@@ -53,7 +53,7 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				tablename:  "animals",
 				alias:      "a",
-				primaryKey: []octosql.VariableName{"name"},
+				primaryKey: []string{"name"},
 				variables:  map[octosql.VariableName]octosql.Value{},
 				formula:    physical.NewConstant(true),
 				rows: [][]interface{}{
@@ -66,19 +66,19 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"a.name", "a.population"},
+					[]string{"a.name", "a.population"},
 					[]interface{}{"human", 7000000},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"a.name", "a.population"},
+					[]string{"a.name", "a.population"},
 					[]interface{}{"mammoth", 0},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"a.name", "a.population"},
+					[]string{"a.name", "a.population"},
 					[]interface{}{"panda", 500},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"a.name", "a.population"},
+					[]string{"a.name", "a.population"},
 					[]interface{}{"zebra", 5000},
 				),
 			},
@@ -91,14 +91,14 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				tablename:  "animals",
 				alias:      "a",
-				primaryKey: []octosql.VariableName{"name"},
+				primaryKey: []string{"name"},
 				variables: map[octosql.VariableName]octosql.Value{
 					"const_0": octosql.MakeInt(20000),
 				},
 				formula: physical.NewPredicate(
-					physical.NewVariable("a.population"),
+					physical.NewVariable(octosql.NewVariableName("a.population")),
 					physical.MoreThan,
-					physical.NewVariable("const_0"),
+					physical.NewVariable(octosql.NewVariableName("const_0")),
 				),
 				rows: [][]interface{}{
 					{"panda", 500},
@@ -115,14 +115,14 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				tablename:  "animals",
 				alias:      "a",
-				primaryKey: []octosql.VariableName{"name"},
+				primaryKey: []string{"name"},
 				variables: map[octosql.VariableName]octosql.Value{
 					"const_0": octosql.MakeString("panda"),
 				},
 				formula: physical.NewPredicate(
-					physical.NewVariable("a.name"),
+					physical.NewVariable(octosql.NewVariableName("a.name")),
 					physical.Equal,
-					physical.NewVariable("const_0"),
+					physical.NewVariable(octosql.NewVariableName("const_0")),
 				),
 				rows: [][]interface{}{
 					{"panda", 500},
@@ -134,7 +134,7 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"a.name", "a.population"},
+					[]string{"a.name", "a.population"},
 					[]interface{}{"panda", 500},
 				),
 			}),
@@ -146,14 +146,14 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				tablename:  "people",
 				alias:      "p",
-				primaryKey: []octosql.VariableName{"id"},
+				primaryKey: []string{"id"},
 				variables: map[octosql.VariableName]octosql.Value{
 					"const_0": octosql.MakeInt(1),
 				},
 				formula: physical.NewPredicate(
-					physical.NewVariable("const_0"),
+					physical.NewVariable(octosql.NewVariableName("const_0")),
 					physical.NotEqual,
-					physical.NewVariable("p.id"),
+					physical.NewVariable(octosql.NewVariableName("p.id")),
 				),
 				rows: [][]interface{}{
 					{1, "Janek"},
@@ -165,15 +165,15 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.id", "p.name"},
+					[]string{"p.id", "p.name"},
 					[]interface{}{2, "Kuba"},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.id", "p.name"},
+					[]string{"p.id", "p.name"},
 					[]interface{}{3, "Wojtek"},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.id", "p.name"},
+					[]string{"p.id", "p.name"},
 					[]interface{}{4, "Adam"},
 				),
 			}),
@@ -185,21 +185,21 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				tablename:  "people",
 				alias:      "p",
-				primaryKey: []octosql.VariableName{"id"},
+				primaryKey: []string{"id"},
 				variables: map[octosql.VariableName]octosql.Value{
 					"const_0": octosql.MakeInt(1),
 					"const_1": octosql.MakeString("Kuba"),
 				},
 				formula: physical.NewAnd(
 					physical.NewPredicate(
-						physical.NewVariable("p.name"),
+						physical.NewVariable(octosql.NewVariableName("p.name")),
 						physical.GreaterEqual,
-						physical.NewVariable("const_1"),
+						physical.NewVariable(octosql.NewVariableName("const_1")),
 					),
 					physical.NewPredicate(
-						physical.NewVariable("const_0"),
+						physical.NewVariable(octosql.NewVariableName("const_0")),
 						physical.NotEqual,
-						physical.NewVariable("p.id"),
+						physical.NewVariable(octosql.NewVariableName("p.id")),
 					),
 				),
 
@@ -213,11 +213,11 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.id", "p.name"},
+					[]string{"p.id", "p.name"},
 					[]interface{}{2, "Kuba"},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.id", "p.name"},
+					[]string{"p.id", "p.name"},
 					[]interface{}{3, "Wojtek"},
 				),
 			}),
@@ -229,21 +229,21 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				tablename:  "people",
 				alias:      "p",
-				primaryKey: []octosql.VariableName{"id"},
+				primaryKey: []string{"id"},
 				variables: map[octosql.VariableName]octosql.Value{
 					"const_0": octosql.MakeString("K"),
 					"const_1": octosql.MakeInt(3),
 				},
 				formula: physical.NewOr(
 					physical.NewPredicate(
-						physical.NewVariable("p.name"),
+						physical.NewVariable(octosql.NewVariableName("p.name")),
 						physical.LessEqual,
-						physical.NewVariable("const_0"),
+						physical.NewVariable(octosql.NewVariableName("const_0")),
 					),
 					physical.NewPredicate(
-						physical.NewVariable("const_1"),
+						physical.NewVariable(octosql.NewVariableName("const_1")),
 						physical.Equal,
-						physical.NewVariable("p.id"),
+						physical.NewVariable(octosql.NewVariableName("p.id")),
 					),
 				),
 
@@ -257,15 +257,15 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.id", "p.name"},
+					[]string{"p.id", "p.name"},
 					[]interface{}{1, "Janek"},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.id", "p.name"},
+					[]string{"p.id", "p.name"},
 					[]interface{}{3, "Wojtek"},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.id", "p.name"},
+					[]string{"p.id", "p.name"},
 					[]interface{}{4, "Adam"},
 				),
 			}),

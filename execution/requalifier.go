@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"regexp"
-	"strings"
 
 	"github.com/pkg/errors"
 
@@ -75,13 +74,7 @@ func (stream *RequalifiedStream) Next(ctx context.Context) (*Record, error) {
 		if oldFields[i].Name.Source() == SystemSource {
 			continue
 		}
-		name := string(oldFields[i].Name)
-		if dotIndex := strings.Index(name, "."); dotIndex != -1 {
-			if simpleQualifierMatcher.MatchString(name[:dotIndex]) {
-				name = name[dotIndex+1:]
-			}
-		}
-		qualifiedName := octosql.NewVariableName(fmt.Sprintf("%s.%s", stream.qualifier, name))
+		qualifiedName := octosql.NewVariableName(fmt.Sprintf("%s.%s", stream.qualifier, oldFields[i].Name.Name()))
 
 		fields[i] = qualifiedName
 		values[qualifiedName] = record.Value(oldFields[i].Name)

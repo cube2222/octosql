@@ -22,14 +22,14 @@ func TestAreEqual(t *testing.T) {
 			name: "simple equal records - no metadata",
 			args: args{
 				first: NewRecordFromSlice(
-					[]octosql.VariableName{"a", "b"},
+					[]string{"a", "b"},
 					[]octosql.Value{
 						octosql.MakeInt(3),
 						octosql.MakeString("ma kota ala"),
 					},
 				),
 				second: NewRecordFromSlice(
-					[]octosql.VariableName{"a", "b"},
+					[]string{"a", "b"},
 					[]octosql.Value{
 						octosql.MakeInt(3),
 						octosql.MakeString("ma kota ala"),
@@ -43,7 +43,7 @@ func TestAreEqual(t *testing.T) {
 			name: "simple equal records - with metadata",
 			args: args{
 				first: NewRecordFromSlice(
-					[]octosql.VariableName{"a", "b"},
+					[]string{"a", "b"},
 					[]octosql.Value{
 						octosql.MakeInt(3),
 						octosql.MakeString("ma kota ala"),
@@ -53,7 +53,7 @@ func TestAreEqual(t *testing.T) {
 					WithID(ID{ID: "ID"}),
 				),
 				second: NewRecordFromSlice(
-					[]octosql.VariableName{"a", "b"},
+					[]string{"a", "b"},
 					[]octosql.Value{
 						octosql.MakeInt(3),
 						octosql.MakeString("ma kota ala"),
@@ -70,14 +70,14 @@ func TestAreEqual(t *testing.T) {
 			name: "different records - values mismatch",
 			args: args{
 				first: NewRecordFromSlice(
-					[]octosql.VariableName{"a", "b"},
+					[]string{"a", "b"},
 					[]octosql.Value{
 						octosql.MakeInt(3),
 						octosql.MakeString("ma kota ala"),
 					},
 				),
 				second: NewRecordFromSlice(
-					[]octosql.VariableName{"a", "b"},
+					[]string{"a", "b"},
 					[]octosql.Value{
 						octosql.MakeInt(4),
 						octosql.MakeString("ma kota ala"),
@@ -91,14 +91,14 @@ func TestAreEqual(t *testing.T) {
 			name: "different records - variable names mismatch",
 			args: args{
 				first: NewRecordFromSlice(
-					[]octosql.VariableName{"a", "c"},
+					[]string{"a", "c"},
 					[]octosql.Value{
 						octosql.MakeInt(3),
 						octosql.MakeString("ma kota ala"),
 					},
 				),
 				second: NewRecordFromSlice(
-					[]octosql.VariableName{"a", "b"},
+					[]string{"a", "b"},
 					[]octosql.Value{
 						octosql.MakeInt(3),
 						octosql.MakeString("ma kota ala"),
@@ -112,14 +112,14 @@ func TestAreEqual(t *testing.T) {
 			name: "different records - different order",
 			args: args{
 				first: NewRecordFromSlice(
-					[]octosql.VariableName{"a", "b"},
+					[]string{"a", "b"},
 					[]octosql.Value{
 						octosql.MakeInt(3),
 						octosql.MakeString("ma kota ala"),
 					},
 				),
 				second: NewRecordFromSlice(
-					[]octosql.VariableName{"b", "a"},
+					[]string{"b", "a"},
 					[]octosql.Value{
 						octosql.MakeString("ma kota ala"),
 						octosql.MakeInt(3),
@@ -133,7 +133,7 @@ func TestAreEqual(t *testing.T) {
 			name: "different records - different metadata",
 			args: args{
 				first: NewRecordFromSlice(
-					[]octosql.VariableName{"a", "b"},
+					[]string{"a", "b"},
 					[]octosql.Value{
 						octosql.MakeInt(3),
 						octosql.MakeString("ma kota ala"),
@@ -142,7 +142,7 @@ func TestAreEqual(t *testing.T) {
 					WithID(ID{ID: "ID"}),
 				),
 				second: NewRecordFromSlice(
-					[]octosql.VariableName{"b", "a"},
+					[]string{"b", "a"},
 					[]octosql.Value{
 						octosql.MakeString("ma kota ala"),
 						octosql.MakeInt(3),
@@ -174,7 +174,7 @@ func TestRecordMarshal(t *testing.T) {
 			name: "simple record 1 - no metadata",
 			args: args{
 				rec: NewRecordFromSlice(
-					[]octosql.VariableName{"a", "b", "c"},
+					[]string{"a", "b", "c"},
 					[]octosql.Value{
 						octosql.MakeInt(2),
 						octosql.MakeNull(),
@@ -187,7 +187,7 @@ func TestRecordMarshal(t *testing.T) {
 			name: "simple record 2 - all basic types, no metadata",
 			args: args{
 				rec: NewRecordFromSlice(
-					[]octosql.VariableName{"a", "b", "c", "d", "e", "f", "g", "h"},
+					[]string{"a", "b", "c", "d", "e", "f", "g", "h"},
 					[]octosql.Value{
 						octosql.MakeNull(),
 						octosql.MakePhantom(),
@@ -206,7 +206,7 @@ func TestRecordMarshal(t *testing.T) {
 			name: "simple record 3 - tuple and object, no metadata",
 			args: args{
 				rec: NewRecordFromSlice(
-					[]octosql.VariableName{"a", "b"},
+					[]string{"a", "b"},
 					[]octosql.Value{
 						octosql.MakeTuple([]octosql.Value{
 							octosql.MakeInt(3),
@@ -228,7 +228,7 @@ func TestRecordMarshal(t *testing.T) {
 			name: "complex record with metadata",
 			args: args{
 				rec: NewRecordFromSlice(
-					[]octosql.VariableName{"a", "b", "c", "d", "e"},
+					[]string{"a", "b", "c", "d", "e"},
 					[]octosql.Value{
 						octosql.MakeTuple([]octosql.Value{
 							octosql.MakeInt(3),
@@ -285,7 +285,7 @@ func TestRecordConstructors(t *testing.T) {
 			name: "first test - basic types",
 			args: args{
 				first: NewRecord(
-					[]octosql.VariableName{"a", "b", "c", "d", "e", "f", "g", "h"},
+					[]string{"a", "b", "c", "d", "e", "f", "g", "h"},
 					map[octosql.VariableName]octosql.Value{
 						"a": octosql.MakeNull(),
 						"b": octosql.MakePhantom(),
@@ -298,7 +298,7 @@ func TestRecordConstructors(t *testing.T) {
 					},
 				),
 				second: NewRecordFromSlice(
-					[]octosql.VariableName{"a", "b", "c", "d", "e", "f", "g", "h"},
+					[]string{"a", "b", "c", "d", "e", "f", "g", "h"},
 					[]octosql.Value{
 						octosql.MakeNull(),
 						octosql.MakePhantom(),
@@ -317,7 +317,7 @@ func TestRecordConstructors(t *testing.T) {
 			name: "second test - complex types",
 			args: args{
 				first: NewRecord(
-					[]octosql.VariableName{"a", "b"},
+					[]string{"a", "b"},
 					map[octosql.VariableName]octosql.Value{
 						"a": octosql.MakeTuple(
 							[]octosql.Value{
@@ -336,7 +336,7 @@ func TestRecordConstructors(t *testing.T) {
 					},
 				),
 				second: NewRecordFromSlice(
-					[]octosql.VariableName{"a", "b"},
+					[]string{"a", "b"},
 					[]octosql.Value{
 						octosql.MakeTuple(
 							[]octosql.Value{
@@ -361,7 +361,7 @@ func TestRecordConstructors(t *testing.T) {
 			name: "third test - metadata",
 			args: args{
 				first: NewRecord(
-					[]octosql.VariableName{"a", "b", "c"},
+					[]string{"a", "b", "c"},
 					map[octosql.VariableName]octosql.Value{
 						"a": octosql.MakeInt(42),
 						"b": octosql.MakeFloat(42.0),
@@ -371,7 +371,7 @@ func TestRecordConstructors(t *testing.T) {
 					WithID(ID{ID: "this_is_my_id"}),
 				),
 				second: NewRecordFromSlice(
-					[]octosql.VariableName{"a", "b", "c"},
+					[]string{"a", "b", "c"},
 					[]octosql.Value{
 						octosql.MakeInt(42),
 						octosql.MakeFloat(42.0),

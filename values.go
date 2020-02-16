@@ -7,10 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/ptypes"
-	"github.com/golang/protobuf/ptypes/duration"
-	"github.com/golang/protobuf/ptypes/timestamp"
+	"github.com/gogo/protobuf/proto"
+	ptypes "github.com/gogo/protobuf/types"
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql/docs"
@@ -76,14 +74,14 @@ func MakeTime(v time.Time) Value {
 	return Value{Value: &Value_Time{Time: t}}
 }
 func ZeroTime() Value {
-	return Value{Value: &Value_Time{Time: &timestamp.Timestamp{}}}
+	return Value{Value: &Value_Time{Time: &ptypes.Timestamp{}}}
 }
 
 func MakeDuration(v time.Duration) Value {
 	return Value{Value: &Value_Duration{Duration: ptypes.DurationProto(v)}}
 }
 func ZeroDuration() Value {
-	return Value{Value: &Value_Duration{Duration: &duration.Duration{}}}
+	return Value{Value: &Value_Duration{Duration: &ptypes.Duration{}}}
 }
 
 func MakeTuple(v []Value) Value {
@@ -297,7 +295,7 @@ func (v Value) AsString() string {
 }
 
 func (v Value) AsTime() time.Time {
-	t, err := ptypes.Timestamp(v.GetTime())
+	t, err := ptypes.TimestampFromProto(v.GetTime())
 	if err != nil {
 		panic(err)
 	}
@@ -305,7 +303,7 @@ func (v Value) AsTime() time.Time {
 }
 
 func (v Value) AsDuration() time.Duration {
-	d, err := ptypes.Duration(v.GetDuration())
+	d, err := ptypes.DurationFromProto(v.GetDuration())
 	if err != nil {
 		panic(err)
 	}

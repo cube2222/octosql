@@ -39,28 +39,28 @@ func TestLimit_Get(t *testing.T) {
 			node: NewLimit(&DummyNode{
 				[]*Record{
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"num",
 						},
 						[]interface{}{
 							1e10,
 						}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"num",
 						},
 						[]interface{}{
 							3.21,
 						}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"flag",
 						},
 						[]interface{}{
 							false,
 						}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"num",
 						},
 						[]interface{}{
@@ -70,21 +70,21 @@ func TestLimit_Get(t *testing.T) {
 			}, NewDummyValue(octosql.MakeInt(3))),
 			wantStream: NewInMemoryStream([]*Record{
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{
+					[]string{
 						"num",
 					},
 					[]interface{}{
 						1e10,
 					}),
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{
+					[]string{
 						"num",
 					},
 					[]interface{}{
 						3.21,
 					}),
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{
+					[]string{
 						"flag",
 					},
 					[]interface{}{
@@ -99,7 +99,7 @@ func TestLimit_Get(t *testing.T) {
 			node: NewLimit(&DummyNode{
 				[]*Record{
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"num",
 						},
 						[]interface{}{
@@ -156,14 +156,14 @@ func TestLimitedStream_Next(t *testing.T) {
 			stream: newLimitedStream(
 				NewInMemoryStream([]*Record{
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"num",
 						},
 						[]interface{}{
 							1,
 						}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"num",
 						},
 						[]interface{}{
@@ -174,7 +174,7 @@ func TestLimitedStream_Next(t *testing.T) {
 			),
 			wantStream: NewInMemoryStream([]*Record{
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{
+					[]string{
 						"num",
 					},
 					[]interface{}{

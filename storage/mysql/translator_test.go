@@ -22,16 +22,16 @@ func TestFormulaToSQL(t *testing.T) {
 			name: "simple formula test",
 			args: args{
 				formula: physical.NewPredicate(
-					physical.NewVariable("u.id"),
+					physical.NewVariable(octosql.NewVariableName("u.id")),
 					physical.MoreThan,
-					physical.NewVariable("const_0"),
+					physical.NewVariable(octosql.NewVariableName("const_0")),
 				),
 				aliases: newAliases("u"),
 			},
 			want: "(u.id) > (?)",
 			wantAliases: &aliases{
 				PlaceholderToExpression: []physical.Expression{
-					physical.NewVariable("const_0"),
+					physical.NewVariable(octosql.NewVariableName("const_0")),
 				},
 				Alias: "u",
 			},
@@ -42,9 +42,9 @@ func TestFormulaToSQL(t *testing.T) {
 				formula: physical.NewAnd(
 					physical.NewConstant(true),
 					physical.NewPredicate(
-						physical.NewVariable("const_0"),
+						physical.NewVariable(octosql.NewVariableName("const_0")),
 						physical.Equal,
-						physical.NewVariable("table.age"),
+						physical.NewVariable(octosql.NewVariableName("table.age")),
 					),
 				),
 				aliases: newAliases("table"),
@@ -52,7 +52,7 @@ func TestFormulaToSQL(t *testing.T) {
 			want: "(TRUE) AND ((?) = (table.age))",
 			wantAliases: &aliases{
 				PlaceholderToExpression: []physical.Expression{
-					physical.NewVariable("const_0"),
+					physical.NewVariable(octosql.NewVariableName("const_0")),
 				},
 				Alias: "table",
 			},
@@ -62,9 +62,9 @@ func TestFormulaToSQL(t *testing.T) {
 			args: args{
 				formula: physical.NewOr(
 					physical.NewPredicate(
-						physical.NewVariable("alias.age"),
+						physical.NewVariable(octosql.NewVariableName("alias.age")),
 						physical.NotEqual,
-						physical.NewVariable("alias.IQ"),
+						physical.NewVariable(octosql.NewVariableName("alias.IQ")),
 					),
 					physical.NewNot(
 						physical.NewConstant(false),
@@ -82,17 +82,17 @@ func TestFormulaToSQL(t *testing.T) {
 			name: "simple test with more than one alias",
 			args: args{
 				formula: physical.NewPredicate(
-					physical.NewVariable("b.age"),
+					physical.NewVariable(octosql.NewVariableName("b.age")),
 					physical.MoreThan,
-					physical.NewVariable("c.age"),
+					physical.NewVariable(octosql.NewVariableName("c.age")),
 				),
 				aliases: newAliases("a"),
 			},
 			want: "(?) > (?)",
 			wantAliases: &aliases{
 				PlaceholderToExpression: []physical.Expression{
-					physical.NewVariable("b.age"),
-					physical.NewVariable("c.age"),
+					physical.NewVariable(octosql.NewVariableName("b.age")),
+					physical.NewVariable(octosql.NewVariableName("c.age")),
 				},
 				Alias: "a",
 			},
@@ -105,22 +105,22 @@ func TestFormulaToSQL(t *testing.T) {
 
 					physical.NewAnd(
 						physical.NewPredicate( //a.age > b.age
-							physical.NewVariable("a.age"),
+							physical.NewVariable(octosql.NewVariableName("a.age")),
 							physical.MoreThan,
-							physical.NewVariable("b.age"),
+							physical.NewVariable(octosql.NewVariableName("b.age")),
 						),
 
 						physical.NewPredicate( //a.age = const_0
-							physical.NewVariable("a.sex"),
+							physical.NewVariable(octosql.NewVariableName("a.sex")),
 							physical.Equal,
-							physical.NewVariable("const_0"),
+							physical.NewVariable(octosql.NewVariableName("const_0")),
 						),
 					),
 
 					physical.NewPredicate( //const_1 < b.id
-						physical.NewVariable("const_1"),
+						physical.NewVariable(octosql.NewVariableName("const_1")),
 						physical.LessThan,
-						physical.NewVariable("b.id"),
+						physical.NewVariable(octosql.NewVariableName("b.id")),
 					),
 				),
 
@@ -130,10 +130,10 @@ func TestFormulaToSQL(t *testing.T) {
 			want: "(((a.age) > (?)) AND ((a.sex) = (?))) OR ((?) < (?))",
 			wantAliases: &aliases{
 				PlaceholderToExpression: []physical.Expression{
-					physical.NewVariable("b.age"),
-					physical.NewVariable("const_0"),
-					physical.NewVariable("const_1"),
-					physical.NewVariable("b.id"),
+					physical.NewVariable(octosql.NewVariableName("b.age")),
+					physical.NewVariable(octosql.NewVariableName("const_0")),
+					physical.NewVariable(octosql.NewVariableName("const_1")),
+					physical.NewVariable(octosql.NewVariableName("b.id")),
 				},
 				Alias: "a",
 			},

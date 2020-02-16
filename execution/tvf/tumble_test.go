@@ -35,52 +35,52 @@ func TestTumble_Get(t *testing.T) {
 			fields: fields{
 				source: execution.NewDummyNode([]*execution.Record{
 					execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"id", "time"},
+						[]string{"id", "time"},
 						[]interface{}{1, baseTime},
 					),
 					execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"id", "time"},
+						[]string{"id", "time"},
 						[]interface{}{2, baseTime.Add(time.Second * 10)},
 					),
 					execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"id", "time"},
+						[]string{"id", "time"},
 						[]interface{}{3, baseTime.Add(time.Second * 8)},
 					),
 					execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"id", "time"},
+						[]string{"id", "time"},
 						[]interface{}{4, baseTime.Add(time.Second * 13)},
 					),
 				}),
-				timeField:    "time",
+				timeField:    octosql.NewVariableName("time"),
 				windowLength: execution.NewVariable(octosql.NewVariableName("window_length")),
 				offset:       execution.NewVariable(octosql.NewVariableName("offset")),
 			},
 			args: args{
 				variables: octosql.NewVariables(map[octosql.VariableName]octosql.Value{
-					"window_length": octosql.MakeDuration(time.Second * 10),
-					"offset":        octosql.MakeDuration(time.Second * 3),
+					octosql.NewVariableName("window_length"): octosql.MakeDuration(time.Second * 10),
+					octosql.NewVariableName("offset"):        octosql.MakeDuration(time.Second * 3),
 				}),
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"id", "time", "window_start", "window_end"},
+					[]string{"id", "time", "window_start", "window_end"},
 					[]interface{}{1, baseTime, baseTime.Add(time.Second * -7), baseTime.Add(time.Second * 3)},
-					execution.WithEventTimeField("window_end"),
+					execution.WithEventTimeField(octosql.NewVariableName("window_end")),
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"id", "time", "window_start", "window_end"},
+					[]string{"id", "time", "window_start", "window_end"},
 					[]interface{}{2, baseTime.Add(time.Second * 10), baseTime.Add(time.Second * 3), baseTime.Add(time.Second * 13)},
-					execution.WithEventTimeField("window_end"),
+					execution.WithEventTimeField(octosql.NewVariableName("window_end")),
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"id", "time", "window_start", "window_end"},
+					[]string{"id", "time", "window_start", "window_end"},
 					[]interface{}{3, baseTime.Add(time.Second * 8), baseTime.Add(time.Second * 3), baseTime.Add(time.Second * 13)},
-					execution.WithEventTimeField("window_end"),
+					execution.WithEventTimeField(octosql.NewVariableName("window_end")),
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"id", "time", "window_start", "window_end"},
+					[]string{"id", "time", "window_start", "window_end"},
 					[]interface{}{4, baseTime.Add(time.Second * 13), baseTime.Add(time.Second * 13), baseTime.Add(time.Second * 23)},
-					execution.WithEventTimeField("window_end"),
+					execution.WithEventTimeField(octosql.NewVariableName("window_end")),
 				),
 			}),
 			wantErr: false,
@@ -90,52 +90,52 @@ func TestTumble_Get(t *testing.T) {
 			fields: fields{
 				source: execution.NewDummyNode([]*execution.Record{
 					execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"id", "time"},
+						[]string{"id", "time"},
 						[]interface{}{1, baseTime},
 					),
 					execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"id", "time"},
+						[]string{"id", "time"},
 						[]interface{}{2, baseTime.Add(time.Second * 10)},
 					),
 					execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"id", "time"},
+						[]string{"id", "time"},
 						[]interface{}{3, baseTime.Add(time.Second * 8)},
 					),
 					execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"id", "time"},
+						[]string{"id", "time"},
 						[]interface{}{4, baseTime.Add(time.Second * 13)},
 					),
 				}),
-				timeField:    "time",
+				timeField:    octosql.NewVariableName("time"),
 				windowLength: execution.NewVariable(octosql.NewVariableName("window_length")),
 				offset:       execution.NewVariable(octosql.NewVariableName("offset")),
 			},
 			args: args{
 				variables: octosql.NewVariables(map[octosql.VariableName]octosql.Value{
-					"window_length": octosql.MakeDuration(time.Second * 10),
-					"offset":        octosql.MakeDuration(0),
+					octosql.NewVariableName("window_length"): octosql.MakeDuration(time.Second * 10),
+					octosql.NewVariableName("offset"):        octosql.MakeDuration(0),
 				}),
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"id", "time", "window_start", "window_end"},
+					[]string{"id", "time", "window_start", "window_end"},
 					[]interface{}{1, baseTime, baseTime, baseTime.Add(time.Second * 10)},
-					execution.WithEventTimeField("window_end"),
+					execution.WithEventTimeField(octosql.NewVariableName("window_end")),
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"id", "time", "window_start", "window_end"},
+					[]string{"id", "time", "window_start", "window_end"},
 					[]interface{}{2, baseTime.Add(time.Second * 10), baseTime.Add(time.Second * 10), baseTime.Add(time.Second * 20)},
-					execution.WithEventTimeField("window_end"),
+					execution.WithEventTimeField(octosql.NewVariableName("window_end")),
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"id", "time", "window_start", "window_end"},
+					[]string{"id", "time", "window_start", "window_end"},
 					[]interface{}{3, baseTime.Add(time.Second * 8), baseTime, baseTime.Add(time.Second * 10)},
-					execution.WithEventTimeField("window_end"),
+					execution.WithEventTimeField(octosql.NewVariableName("window_end")),
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"id", "time", "window_start", "window_end"},
+					[]string{"id", "time", "window_start", "window_end"},
 					[]interface{}{4, baseTime.Add(time.Second * 13), baseTime.Add(time.Second * 10), baseTime.Add(time.Second * 20)},
-					execution.WithEventTimeField("window_end"),
+					execution.WithEventTimeField(octosql.NewVariableName("window_end")),
 				),
 			}),
 			wantErr: false,

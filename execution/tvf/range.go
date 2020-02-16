@@ -63,7 +63,7 @@ func (s *RangeStream) Next(ctx context.Context) (*execution.Record, error) {
 		return nil, execution.ErrEndOfStream
 	}
 
-	out := execution.NewRecordFromSlice([]octosql.VariableName{"i"}, []octosql.Value{octosql.MakeInt(s.current)})
+	out := execution.NewRecordFromSlice([]octosql.VariableName{octosql.NewVariableName("i")}, []octosql.Value{octosql.MakeInt(s.current)})
 	s.current++
 
 	return out, nil

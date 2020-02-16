@@ -80,7 +80,7 @@ func TestMergeRequalifiers(t *testing.T) {
 			name: "deeper merge",
 			args: args{
 				plan: &physical.Map{
-					Expressions: []physical.NamedExpression{physical.NewVariable("expr")},
+					Expressions: []physical.NamedExpression{physical.NewVariable(octosql.NewVariableName("expr"))},
 					Source: &physical.Requalifier{
 						Qualifier: "a",
 						Source: &physical.Requalifier{
@@ -96,7 +96,7 @@ func TestMergeRequalifiers(t *testing.T) {
 				},
 			},
 			want: &physical.Map{
-				Expressions: []physical.NamedExpression{physical.NewVariable("expr")},
+				Expressions: []physical.NamedExpression{physical.NewVariable(octosql.NewVariableName("expr"))},
 				Source: &physical.Requalifier{
 					Qualifier: "a",
 					Source: &PlaceholderNode{
@@ -129,15 +129,15 @@ func TestMergeFilters(t *testing.T) {
 			args: args{
 				plan: &physical.Filter{
 					Formula: physical.NewPredicate(
-						physical.NewVariable("parent_left"),
+						physical.NewVariable(octosql.NewVariableName("parent_left")),
 						physical.Equal,
-						physical.NewVariable("parent_right"),
+						physical.NewVariable(octosql.NewVariableName("parent_right")),
 					),
 					Source: &physical.Filter{
 						Formula: physical.NewPredicate(
-							physical.NewVariable("child_left"),
+							physical.NewVariable(octosql.NewVariableName("child_left")),
 							physical.NotEqual,
-							physical.NewVariable("child_right"),
+							physical.NewVariable(octosql.NewVariableName("child_right")),
 						),
 						Source: &PlaceholderNode{
 							Name: "stub",
@@ -148,14 +148,14 @@ func TestMergeFilters(t *testing.T) {
 			want: &physical.Filter{
 				Formula: physical.NewAnd(
 					physical.NewPredicate(
-						physical.NewVariable("parent_left"),
+						physical.NewVariable(octosql.NewVariableName("parent_left")),
 						physical.Equal,
-						physical.NewVariable("parent_right"),
+						physical.NewVariable(octosql.NewVariableName("parent_right")),
 					),
 					physical.NewPredicate(
-						physical.NewVariable("child_left"),
+						physical.NewVariable(octosql.NewVariableName("child_left")),
 						physical.NotEqual,
-						physical.NewVariable("child_right"),
+						physical.NewVariable(octosql.NewVariableName("child_right")),
 					),
 				),
 				Source: &PlaceholderNode{
@@ -168,27 +168,27 @@ func TestMergeFilters(t *testing.T) {
 			args: args{
 				plan: &physical.Filter{
 					Formula: physical.NewPredicate(
-						physical.NewVariable("a_left"),
+						physical.NewVariable(octosql.NewVariableName("a_left")),
 						physical.Equal,
-						physical.NewVariable("a_right"),
+						physical.NewVariable(octosql.NewVariableName("a_right")),
 					),
 					Source: &physical.Filter{
 						Formula: physical.NewPredicate(
-							physical.NewVariable("b_left"),
+							physical.NewVariable(octosql.NewVariableName("b_left")),
 							physical.MoreThan,
-							physical.NewVariable("b_right"),
+							physical.NewVariable(octosql.NewVariableName("b_right")),
 						),
 						Source: &physical.Filter{
 							Formula: physical.NewPredicate(
-								physical.NewVariable("c_left"),
+								physical.NewVariable(octosql.NewVariableName("c_left")),
 								physical.LessThan,
-								physical.NewVariable("c_right"),
+								physical.NewVariable(octosql.NewVariableName("c_right")),
 							),
 							Source: &physical.Filter{
 								Formula: physical.NewPredicate(
-									physical.NewVariable("d_left"),
+									physical.NewVariable(octosql.NewVariableName("d_left")),
 									physical.NotEqual,
-									physical.NewVariable("d_right"),
+									physical.NewVariable(octosql.NewVariableName("d_right")),
 								),
 								Source: &PlaceholderNode{
 									Name: "stub",
@@ -201,26 +201,26 @@ func TestMergeFilters(t *testing.T) {
 			want: &physical.Filter{
 				Formula: physical.NewAnd(
 					physical.NewPredicate(
-						physical.NewVariable("a_left"),
+						physical.NewVariable(octosql.NewVariableName("a_left")),
 						physical.Equal,
-						physical.NewVariable("a_right"),
+						physical.NewVariable(octosql.NewVariableName("a_right")),
 					),
 					physical.NewAnd(
 						physical.NewPredicate(
-							physical.NewVariable("b_left"),
+							physical.NewVariable(octosql.NewVariableName("b_left")),
 							physical.MoreThan,
-							physical.NewVariable("b_right"),
+							physical.NewVariable(octosql.NewVariableName("b_right")),
 						),
 						physical.NewAnd(
 							physical.NewPredicate(
-								physical.NewVariable("c_left"),
+								physical.NewVariable(octosql.NewVariableName("c_left")),
 								physical.LessThan,
-								physical.NewVariable("c_right"),
+								physical.NewVariable(octosql.NewVariableName("c_right")),
 							),
 							physical.NewPredicate(
-								physical.NewVariable("d_left"),
+								physical.NewVariable(octosql.NewVariableName("d_left")),
 								physical.NotEqual,
-								physical.NewVariable("d_right"),
+								physical.NewVariable(octosql.NewVariableName("d_right")),
 							),
 						),
 					),
@@ -234,24 +234,24 @@ func TestMergeFilters(t *testing.T) {
 			name: "deeper merge",
 			args: args{
 				plan: &physical.Map{
-					Expressions: []physical.NamedExpression{physical.NewVariable("expr")},
+					Expressions: []physical.NamedExpression{physical.NewVariable(octosql.NewVariableName("expr"))},
 					Source: &physical.Filter{
 						Formula: physical.NewPredicate(
-							physical.NewVariable("a_left"),
+							physical.NewVariable(octosql.NewVariableName("a_left")),
 							physical.Equal,
-							physical.NewVariable("a_right"),
+							physical.NewVariable(octosql.NewVariableName("a_right")),
 						),
 						Source: &physical.Filter{
 							Formula: physical.NewPredicate(
-								physical.NewVariable("b_left"),
+								physical.NewVariable(octosql.NewVariableName("b_left")),
 								physical.MoreThan,
-								physical.NewVariable("b_right"),
+								physical.NewVariable(octosql.NewVariableName("b_right")),
 							),
 							Source: &physical.Filter{
 								Formula: physical.NewPredicate(
-									physical.NewVariable("c_left"),
+									physical.NewVariable(octosql.NewVariableName("c_left")),
 									physical.LessThan,
-									physical.NewVariable("c_right"),
+									physical.NewVariable(octosql.NewVariableName("c_right")),
 								),
 								Source: &PlaceholderNode{
 									Name: "stub",
@@ -262,24 +262,24 @@ func TestMergeFilters(t *testing.T) {
 				},
 			},
 			want: &physical.Map{
-				Expressions: []physical.NamedExpression{physical.NewVariable("expr")},
+				Expressions: []physical.NamedExpression{physical.NewVariable(octosql.NewVariableName("expr"))},
 				Source: &physical.Filter{
 					Formula: physical.NewAnd(
 						physical.NewPredicate(
-							physical.NewVariable("a_left"),
+							physical.NewVariable(octosql.NewVariableName("a_left")),
 							physical.Equal,
-							physical.NewVariable("a_right"),
+							physical.NewVariable(octosql.NewVariableName("a_right")),
 						),
 						physical.NewAnd(
 							physical.NewPredicate(
-								physical.NewVariable("b_left"),
+								physical.NewVariable(octosql.NewVariableName("b_left")),
 								physical.MoreThan,
-								physical.NewVariable("b_right"),
+								physical.NewVariable(octosql.NewVariableName("b_right")),
 							),
 							physical.NewPredicate(
-								physical.NewVariable("c_left"),
+								physical.NewVariable(octosql.NewVariableName("c_left")),
 								physical.LessThan,
-								physical.NewVariable("c_right"),
+								physical.NewVariable(octosql.NewVariableName("c_right")),
 							),
 						),
 					),
@@ -419,7 +419,7 @@ func TestMergeDataSourceWithRequalifier(t *testing.T) {
 			name: "simple single merge",
 			args: args{
 				plan: &physical.Map{
-					Expressions: []physical.NamedExpression{physical.NewVariable("expr")},
+					Expressions: []physical.NamedExpression{physical.NewVariable(octosql.NewVariableName("expr"))},
 					Source: &physical.Requalifier{
 						Qualifier: "a",
 						Source: &physical.DataSourceBuilder{
@@ -448,7 +448,7 @@ func TestMergeDataSourceWithRequalifier(t *testing.T) {
 				},
 			},
 			want: &physical.Map{
-				Expressions: []physical.NamedExpression{physical.NewVariable("expr")},
+				Expressions: []physical.NamedExpression{physical.NewVariable(octosql.NewVariableName("expr"))},
 				Source: &physical.DataSourceBuilder{
 					Materializer: nil,
 					PrimaryKeys:  []octosql.VariableName{octosql.NewVariableName("a")},
@@ -497,9 +497,9 @@ func TestMergeDataSourceWithFilter(t *testing.T) {
 			args: args{
 				plan: &physical.Filter{
 					Formula: physical.NewPredicate(
-						physical.NewVariable("a.name"),
+						physical.NewVariable(octosql.NewVariableName("a.name")),
 						physical.Equal,
-						physical.NewVariable("a.surname"),
+						physical.NewVariable(octosql.NewVariableName("a.surname")),
 					),
 					Source: &physical.DataSourceBuilder{
 						Materializer: nil,
@@ -537,9 +537,9 @@ func TestMergeDataSourceWithFilter(t *testing.T) {
 				},
 				Filter: physical.NewAnd(
 					physical.NewPredicate(
-						physical.NewVariable("a.name"),
+						physical.NewVariable(octosql.NewVariableName("a.name")),
 						physical.Equal,
-						physical.NewVariable("a.surname"),
+						physical.NewVariable(octosql.NewVariableName("a.surname")),
 					),
 					physical.NewConstant(true),
 				),
@@ -553,20 +553,20 @@ func TestMergeDataSourceWithFilter(t *testing.T) {
 				plan: &physical.Filter{
 					Formula: physical.NewAnd(
 						physical.NewPredicate(
-							physical.NewVariable("a.name"),
+							physical.NewVariable(octosql.NewVariableName("a.name")),
 							physical.Equal,
-							physical.NewVariable("a.surname"),
+							physical.NewVariable(octosql.NewVariableName("a.surname")),
 						),
 						physical.NewPredicate(
-							physical.NewVariable("b.test"),
+							physical.NewVariable(octosql.NewVariableName("b.test")),
 							physical.MoreThan,
-							physical.NewVariable("a.surname"),
+							physical.NewVariable(octosql.NewVariableName("a.surname")),
 						),
 					),
 
 					Source: &physical.DataSourceBuilder{
 						Materializer: nil,
-						PrimaryKeys:  []octosql.VariableName{"a.name"},
+						PrimaryKeys:  []octosql.VariableName{octosql.NewVariableName("a.name")},
 						AvailableFilters: map[physical.FieldType]map[physical.Relation]struct{}{
 							physical.Primary: {
 								physical.Equal:    struct{}{},
@@ -586,13 +586,13 @@ func TestMergeDataSourceWithFilter(t *testing.T) {
 			},
 			want: &physical.Filter{
 				Formula: physical.NewPredicate(
-					physical.NewVariable("b.test"),
+					physical.NewVariable(octosql.NewVariableName("b.test")),
 					physical.MoreThan,
-					physical.NewVariable("a.surname"),
+					physical.NewVariable(octosql.NewVariableName("a.surname")),
 				),
 				Source: &physical.DataSourceBuilder{
 					Materializer: nil,
-					PrimaryKeys:  []octosql.VariableName{"a.name"},
+					PrimaryKeys:  []octosql.VariableName{octosql.NewVariableName("a.name")},
 					AvailableFilters: map[physical.FieldType]map[physical.Relation]struct{}{
 						physical.Primary: {
 							physical.Equal:    struct{}{},
@@ -606,9 +606,9 @@ func TestMergeDataSourceWithFilter(t *testing.T) {
 					},
 					Filter: physical.NewAnd(
 						physical.NewPredicate(
-							physical.NewVariable("a.name"),
+							physical.NewVariable(octosql.NewVariableName("a.name")),
 							physical.Equal,
-							physical.NewVariable("a.surname"),
+							physical.NewVariable(octosql.NewVariableName("a.surname")),
 						),
 						physical.NewConstant(true),
 					),
@@ -623,20 +623,20 @@ func TestMergeDataSourceWithFilter(t *testing.T) {
 				plan: &physical.Filter{
 					Formula: physical.NewAnd(
 						physical.NewPredicate(
-							physical.NewVariable("a.name"),
+							physical.NewVariable(octosql.NewVariableName("a.name")),
 							physical.Equal,
-							physical.NewVariable("a.surname"),
+							physical.NewVariable(octosql.NewVariableName("a.surname")),
 						),
 						physical.NewPredicate(
-							physical.NewVariable("b.test"),
+							physical.NewVariable(octosql.NewVariableName("b.test")),
 							physical.MoreThan,
-							physical.NewVariable("b.test2"),
+							physical.NewVariable(octosql.NewVariableName("b.test2")),
 						),
 					),
 
 					Source: &physical.DataSourceBuilder{
 						Materializer: nil,
-						PrimaryKeys:  []octosql.VariableName{"a.name"},
+						PrimaryKeys:  []octosql.VariableName{octosql.NewVariableName("a.name")},
 						AvailableFilters: map[physical.FieldType]map[physical.Relation]struct{}{
 							physical.Primary: {
 								physical.Equal:    struct{}{},
@@ -656,13 +656,13 @@ func TestMergeDataSourceWithFilter(t *testing.T) {
 			},
 			want: &physical.Filter{
 				Formula: physical.NewPredicate(
-					physical.NewVariable("b.test"),
+					physical.NewVariable(octosql.NewVariableName("b.test")),
 					physical.MoreThan,
-					physical.NewVariable("b.test2"),
+					physical.NewVariable(octosql.NewVariableName("b.test2")),
 				),
 				Source: &physical.DataSourceBuilder{
 					Materializer: nil,
-					PrimaryKeys:  []octosql.VariableName{"a.name"},
+					PrimaryKeys:  []octosql.VariableName{octosql.NewVariableName("a.name")},
 					AvailableFilters: map[physical.FieldType]map[physical.Relation]struct{}{
 						physical.Primary: {
 							physical.Equal:    struct{}{},
@@ -676,9 +676,9 @@ func TestMergeDataSourceWithFilter(t *testing.T) {
 					},
 					Filter: physical.NewAnd(
 						physical.NewPredicate(
-							physical.NewVariable("a.name"),
+							physical.NewVariable(octosql.NewVariableName("a.name")),
 							physical.Equal,
-							physical.NewVariable("a.surname"),
+							physical.NewVariable(octosql.NewVariableName("a.surname")),
 						),
 						physical.NewConstant(true),
 					),
@@ -692,14 +692,14 @@ func TestMergeDataSourceWithFilter(t *testing.T) {
 			args: args{
 				plan: &physical.Filter{
 					Formula: physical.NewPredicate(
-						physical.NewVariable("a.name"),
+						physical.NewVariable(octosql.NewVariableName("a.name")),
 						physical.Equal,
-						physical.NewVariable("b.surname"),
+						physical.NewVariable(octosql.NewVariableName("b.surname")),
 					),
 
 					Source: &physical.DataSourceBuilder{
 						Materializer: nil,
-						PrimaryKeys:  []octosql.VariableName{"a.name"},
+						PrimaryKeys:  []octosql.VariableName{octosql.NewVariableName("a.name")},
 						AvailableFilters: map[physical.FieldType]map[physical.Relation]struct{}{
 							physical.Primary: {
 								physical.Equal: struct{}{},
@@ -714,7 +714,7 @@ func TestMergeDataSourceWithFilter(t *testing.T) {
 			},
 			want: &physical.DataSourceBuilder{
 				Materializer: nil,
-				PrimaryKeys:  []octosql.VariableName{"a.name"},
+				PrimaryKeys:  []octosql.VariableName{octosql.NewVariableName("a.name")},
 				AvailableFilters: map[physical.FieldType]map[physical.Relation]struct{}{
 					physical.Primary: {
 						physical.Equal: struct{}{},
@@ -723,9 +723,9 @@ func TestMergeDataSourceWithFilter(t *testing.T) {
 				},
 				Filter: physical.NewAnd(
 					physical.NewPredicate(
-						physical.NewVariable("a.name"),
+						physical.NewVariable(octosql.NewVariableName("a.name")),
 						physical.Equal,
-						physical.NewVariable("b.surname"),
+						physical.NewVariable(octosql.NewVariableName("b.surname")),
 					),
 					physical.NewConstant(true),
 				),
@@ -756,7 +756,7 @@ func TestMultiOptimization(t *testing.T) {
 			name: "multiple optimizations",
 			args: args{
 				plan: &physical.Map{
-					Expressions: []physical.NamedExpression{physical.NewVariable("expr")},
+					Expressions: []physical.NamedExpression{physical.NewVariable(octosql.NewVariableName("expr"))},
 					Source: &physical.Requalifier{
 						Qualifier: "a",
 						Source: &physical.Requalifier{
@@ -803,7 +803,7 @@ func TestMultiOptimization(t *testing.T) {
 				},
 			},
 			want: &physical.Map{
-				Expressions: []physical.NamedExpression{physical.NewVariable("expr")},
+				Expressions: []physical.NamedExpression{physical.NewVariable(octosql.NewVariableName("expr"))},
 				Source: &physical.Requalifier{
 					Qualifier: "a",
 					Source: &physical.Filter{

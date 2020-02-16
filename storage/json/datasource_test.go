@@ -27,19 +27,19 @@ func TestJSONRecordStream_Get(t *testing.T) {
 			want: execution.NewInMemoryStream(
 				[]*execution.Record{
 					execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
+						[]string{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
 						[]interface{}{"green", 1.0, 152849.0, 3.0, 2014.0},
 					),
 					execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
+						[]string{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
 						[]interface{}{"black", 2.0, 106332.0, 2.0, 1988.0},
 					),
 					execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
+						[]string{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
 						[]interface{}{"purple", 3.0, 99148.0, 2.0, 2009.0},
 					),
 					execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
+						[]string{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
 						[]interface{}{"orange", 4.0, 97521.0, 2.0, 1979.0},
 					),
 				},
@@ -53,19 +53,19 @@ func TestJSONRecordStream_Get(t *testing.T) {
 			want: execution.NewInMemoryStream(
 				[]*execution.Record{
 					execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
+						[]string{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
 						[]interface{}{"green", 1.0, 152849.0, 3.0, 2014.0},
 					),
 					execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
+						[]string{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
 						[]interface{}{"black", 2.0, 106332.0, 2.0, 1988.0},
 					),
 					execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
+						[]string{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
 						[]interface{}{"purple", 3.0, 99148.0, 2.0, 2009.0},
 					),
 					execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
+						[]string{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
 						[]interface{}{"orange", 4.0, 97521.0, 2.0, 1979.0},
 					),
 				},

@@ -9,13 +9,13 @@ import (
 )
 
 func TestInnerJoinedStream_Next(t *testing.T) {
-	fieldNames := []octosql.VariableName{
-		octosql.NewVariableName("bike"),
-		octosql.NewVariableName("name"),
+	fieldNames := []string{
+		"bike",
+		"name",
 	}
-	fieldNames2 := []octosql.VariableName{
-		octosql.NewVariableName("color"),
-		octosql.NewVariableName("score"),
+	fieldNames2 := []string{
+		"color",
+		"score",
 	}
 
 	type fields struct {
@@ -54,14 +54,14 @@ func TestInnerJoinedStream_Next(t *testing.T) {
 				joined: NewFilter(
 					NewAnd(
 						NewPredicate(
-							NewVariable("score"),
+							NewVariable(octosql.NewVariableName("score")),
 							&MoreThan{},
-							NewVariable("const"),
+							NewVariable(octosql.NewVariableName("const")),
 						),
 						NewPredicate(
-							NewVariable("bike"),
+							NewVariable(octosql.NewVariableName("bike")),
 							&Equal{},
-							NewVariable("color"),
+							NewVariable(octosql.NewVariableName("color")),
 						),
 					),
 					NewDummyNode([]*Record{
@@ -86,15 +86,15 @@ func TestInnerJoinedStream_Next(t *testing.T) {
 			want: NewInMemoryStream(
 				[]*Record{
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"bike", "name", "color", "score"},
+						[]string{"bike", "name", "color", "score"},
 						[]interface{}{"red", "test", "red", 5},
 					),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"bike", "name", "color", "score"},
+						[]string{"bike", "name", "color", "score"},
 						[]interface{}{"green", "test3", "green", 7},
 					),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"bike", "name", "color", "score"},
+						[]string{"bike", "name", "color", "score"},
 						[]interface{}{"green", "test3", "green", 4},
 					),
 				},

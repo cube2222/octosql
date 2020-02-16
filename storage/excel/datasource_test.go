@@ -174,15 +174,15 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"t.name", "t.surname", "t.age"},
+					[]string{"t.name", "t.surname", "t.age"},
 					[]interface{}{"Jan", "Chomiak", 20},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"t.name", "t.surname", "t.age"},
+					[]string{"t.name", "t.surname", "t.age"},
 					[]interface{}{"Kuba", "Martin", 21},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"t.name", "t.surname", "t.age"},
+					[]string{"t.name", "t.surname", "t.age"},
 					[]interface{}{"Wojtek", "Kuźmiński", 21},
 				),
 			}),
@@ -205,19 +205,19 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"t.col1", "t.col2"},
+					[]string{"t.col1", "t.col2"},
 					[]interface{}{"Warsaw", 1700000},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"t.col1", "t.col2"},
+					[]string{"t.col1", "t.col2"},
 					[]interface{}{"Atlanta", 2000},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"t.col1", "t.col2"},
+					[]string{"t.col1", "t.col2"},
 					[]interface{}{"New York", 2},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"t.col1", "t.col2"},
+					[]string{"t.col1", "t.col2"},
 					[]interface{}{"Miami", -5},
 				),
 			}),
@@ -240,15 +240,15 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"t.id", "t.points"},
+					[]string{"t.id", "t.points"},
 					[]interface{}{1, 10},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"t.id", "t.points"},
+					[]string{"t.id", "t.points"},
 					[]interface{}{2, 4},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"t.id", "t.points"},
+					[]string{"t.id", "t.points"},
 					[]interface{}{3, 19},
 				),
 			}),
@@ -271,15 +271,15 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"t.name", "t.age", "t.id"},
+					[]string{"t.name", "t.age", "t.id"},
 					[]interface{}{"Bob", 13, 1},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"t.name", "t.age", "t.id"},
+					[]string{"t.name", "t.age", "t.id"},
 					[]interface{}{"Ally", nil, 2},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"t.name", "t.age", "t.id"},
+					[]string{"t.name", "t.age", "t.id"},
 					[]interface{}{nil, 7, nil},
 				),
 			}),
@@ -303,15 +303,15 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"t.col1", "t.col2"},
+					[]string{"t.col1", "t.col2"},
 					[]interface{}{time.Date(2017, 3, 14, 13, 0, 0, 0, time.UTC), 1},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"t.col1", "t.col2"},
+					[]string{"t.col1", "t.col2"},
 					[]interface{}{time.Date(2017, 3, 15, 13, 0, 0, 0, time.UTC), 2},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"t.col1", "t.col2"},
+					[]string{"t.col1", "t.col2"},
 					[]interface{}{time.Date(2019, 5, 19, 14, 0, 0, 0, time.UTC), 3},
 				),
 			}),
@@ -335,15 +335,15 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"t.date", "t.points"},
+					[]string{"t.date", "t.points"},
 					[]interface{}{time.Date(2017, 3, 14, 13, 0, 0, 0, time.UTC), 101},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"t.date", "t.points"},
+					[]string{"t.date", "t.points"},
 					[]interface{}{time.Date(2017, 3, 15, 13, 0, 0, 0, time.UTC), 102},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"t.date", "t.points"},
+					[]string{"t.date", "t.points"},
 					[]interface{}{time.Date(2019, 5, 19, 14, 0, 0, 0, time.UTC), 103},
 				),
 			}),

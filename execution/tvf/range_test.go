@@ -33,45 +33,45 @@ func TestRange_Get(t *testing.T) {
 			},
 			args: args{
 				variables: octosql.NewVariables(map[octosql.VariableName]octosql.Value{
-					"start": octosql.MakeInt(1),
-					"end":   octosql.MakeInt(10),
+					octosql.NewVariableName("start"): octosql.MakeInt(1),
+					octosql.NewVariableName("end"):   octosql.MakeInt(10),
 				}),
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"i"},
+					[]string{"i"},
 					[]interface{}{1},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"i"},
+					[]string{"i"},
 					[]interface{}{2},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"i"},
+					[]string{"i"},
 					[]interface{}{3},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"i"},
+					[]string{"i"},
 					[]interface{}{4},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"i"},
+					[]string{"i"},
 					[]interface{}{5},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"i"},
+					[]string{"i"},
 					[]interface{}{6},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"i"},
+					[]string{"i"},
 					[]interface{}{7},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"i"},
+					[]string{"i"},
 					[]interface{}{8},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"i"},
+					[]string{"i"},
 					[]interface{}{9},
 				),
 			}),
@@ -85,29 +85,29 @@ func TestRange_Get(t *testing.T) {
 			},
 			args: args{
 				variables: octosql.NewVariables(map[octosql.VariableName]octosql.Value{
-					"start": octosql.MakeInt(5),
-					"end":   octosql.MakeInt(10),
+					octosql.NewVariableName("start"): octosql.MakeInt(5),
+					octosql.NewVariableName("end"):   octosql.MakeInt(10),
 				}),
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"i"},
+					[]string{"i"},
 					[]interface{}{5},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"i"},
+					[]string{"i"},
 					[]interface{}{6},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"i"},
+					[]string{"i"},
 					[]interface{}{7},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"i"},
+					[]string{"i"},
 					[]interface{}{8},
 				),
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"i"},
+					[]string{"i"},
 					[]interface{}{9},
 				),
 			}),
@@ -121,8 +121,8 @@ func TestRange_Get(t *testing.T) {
 			},
 			args: args{
 				variables: octosql.NewVariables(map[octosql.VariableName]octosql.Value{
-					"start": octosql.MakeInt(3),
-					"end":   octosql.MakeInt(3),
+					octosql.NewVariableName("start"): octosql.MakeInt(3),
+					octosql.NewVariableName("end"):   octosql.MakeInt(3),
 				}),
 			},
 			want:    execution.NewInMemoryStream([]*execution.Record{}),
@@ -136,8 +136,8 @@ func TestRange_Get(t *testing.T) {
 			},
 			args: args{
 				variables: octosql.NewVariables(map[octosql.VariableName]octosql.Value{
-					"start": octosql.MakeInt(4),
-					"end":   octosql.MakeInt(3),
+					octosql.NewVariableName("start"): octosql.MakeInt(4),
+					octosql.NewVariableName("end"):   octosql.MakeInt(3),
 				}),
 			},
 			want:    execution.NewInMemoryStream([]*execution.Record{}),

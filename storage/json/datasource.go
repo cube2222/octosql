@@ -135,7 +135,7 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 	}
 
 	sort.Slice(fields, func(i, j int) bool {
-		return fields[i] < fields[j]
+		return fields[i].LessThan(fields[j])
 	})
 
 	return execution.NewRecord(fields, aliasedRecord), nil

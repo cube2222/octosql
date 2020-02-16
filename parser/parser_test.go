@@ -33,21 +33,21 @@ func TestParseNode(t *testing.T) {
 			want: logical.NewUnionDistinct(
 				logical.NewMap(
 					[]logical.NamedExpression{
-						logical.NewVariable("p.id"),
-						logical.NewVariable("p.name"),
-						logical.NewVariable("p.surname"),
+						logical.NewVariable(octosql.NewVariableName("p.id")),
+						logical.NewVariable(octosql.NewVariableName("p.name")),
+						logical.NewVariable(octosql.NewVariableName("p.surname")),
 					},
 					logical.NewFilter(
 						logical.NewPredicate(
-							logical.NewVariable("p.surname"),
+							logical.NewVariable(octosql.NewVariableName("p.surname")),
 							logical.Equal,
 							logical.NewConstant("Kowalski"),
 						),
 						logical.NewMap(
 							[]logical.NamedExpression{
-								logical.NewVariable("p.id"),
-								logical.NewVariable("p.name"),
-								logical.NewVariable("p.surname"),
+								logical.NewVariable(octosql.NewVariableName("p.id")),
+								logical.NewVariable(octosql.NewVariableName("p.name")),
+								logical.NewVariable(octosql.NewVariableName("p.surname")),
 							},
 							logical.NewDataSource("people", "p"),
 							false),
@@ -56,7 +56,7 @@ func TestParseNode(t *testing.T) {
 				),
 				logical.NewFilter(
 					logical.NewPredicate(
-						logical.NewVariable("a.exp"),
+						logical.NewVariable(octosql.NewVariableName("a.exp")),
 						logical.LessThan,
 						logical.NewConstant(2),
 					),
@@ -80,19 +80,19 @@ func TestParseNode(t *testing.T) {
 				logical.NewUnionAll(
 					logical.NewMap(
 						[]logical.NamedExpression{
-							logical.NewVariable("c.name"),
-							logical.NewVariable("c.age"),
+							logical.NewVariable(octosql.NewVariableName("c.name")),
+							logical.NewVariable(octosql.NewVariableName("c.age")),
 						},
 						logical.NewFilter(
 							logical.NewPredicate(
-								logical.NewVariable("c.age"),
+								logical.NewVariable(octosql.NewVariableName("c.age")),
 								logical.MoreThan,
 								logical.NewConstant(100),
 							),
 							logical.NewMap(
 								[]logical.NamedExpression{
-									logical.NewVariable("c.name"),
-									logical.NewVariable("c.age"),
+									logical.NewVariable(octosql.NewVariableName("c.name")),
+									logical.NewVariable(octosql.NewVariableName("c.age")),
 								},
 								logical.NewDataSource("cities", "c"),
 								true,
@@ -102,19 +102,19 @@ func TestParseNode(t *testing.T) {
 					),
 					logical.NewMap(
 						[]logical.NamedExpression{
-							logical.NewVariable("p.name"),
-							logical.NewVariable("p.age"),
+							logical.NewVariable(octosql.NewVariableName("p.name")),
+							logical.NewVariable(octosql.NewVariableName("p.age")),
 						},
 						logical.NewFilter(
 							logical.NewPredicate(
-								logical.NewVariable("p.age"),
+								logical.NewVariable(octosql.NewVariableName("p.age")),
 								logical.MoreThan,
 								logical.NewConstant(4),
 							),
 							logical.NewMap(
 								[]logical.NamedExpression{
-									logical.NewVariable("p.name"),
-									logical.NewVariable("p.age"),
+									logical.NewVariable(octosql.NewVariableName("p.name")),
+									logical.NewVariable(octosql.NewVariableName("p.age")),
 								},
 								logical.NewDataSource("people", "p"),
 								true,
@@ -136,13 +136,13 @@ func TestParseNode(t *testing.T) {
 				logical.NewOffset(
 					logical.NewMap(
 						[]logical.NamedExpression{
-							logical.NewVariable("p.name"),
-							logical.NewVariable("p.age"),
+							logical.NewVariable(octosql.NewVariableName("p.name")),
+							logical.NewVariable(octosql.NewVariableName("p.age")),
 						},
 						logical.NewMap(
 							[]logical.NamedExpression{
-								logical.NewVariable("p.name"),
-								logical.NewVariable("p.age"),
+								logical.NewVariable(octosql.NewVariableName("p.name")),
+								logical.NewVariable(octosql.NewVariableName("p.age")),
 							},
 							logical.NewDataSource("people", "p"),
 							true,
@@ -165,19 +165,19 @@ func TestParseNode(t *testing.T) {
 			want: logical.NewUnionAll(
 				logical.NewMap(
 					[]logical.NamedExpression{
-						logical.NewVariable("p2.name"),
-						logical.NewVariable("p2.age"),
+						logical.NewVariable(octosql.NewVariableName("p2.name")),
+						logical.NewVariable(octosql.NewVariableName("p2.age")),
 					},
 					logical.NewFilter(
 						logical.NewPredicate(
-							logical.NewVariable("p2.age"),
+							logical.NewVariable(octosql.NewVariableName("p2.age")),
 							logical.MoreThan,
 							logical.NewConstant(3),
 						),
 						logical.NewMap(
 							[]logical.NamedExpression{
-								logical.NewVariable("p2.name"),
-								logical.NewVariable("p2.age"),
+								logical.NewVariable(octosql.NewVariableName("p2.name")),
+								logical.NewVariable(octosql.NewVariableName("p2.age")),
 							},
 							logical.NewDataSource("people", "p2"),
 							true,
@@ -187,19 +187,19 @@ func TestParseNode(t *testing.T) {
 				),
 				logical.NewMap(
 					[]logical.NamedExpression{
-						logical.NewVariable("p2.name"),
-						logical.NewVariable("p2.age"),
+						logical.NewVariable(octosql.NewVariableName("p2.name")),
+						logical.NewVariable(octosql.NewVariableName("p2.age")),
 					},
 					logical.NewFilter(
 						logical.NewPredicate(
-							logical.NewVariable("p2.age"),
+							logical.NewVariable(octosql.NewVariableName("p2.age")),
 							logical.MoreThan,
 							logical.NewConstant(4),
 						),
 						logical.NewMap(
 							[]logical.NamedExpression{
-								logical.NewVariable("p2.name"),
-								logical.NewVariable("p2.age"),
+								logical.NewVariable(octosql.NewVariableName("p2.name")),
+								logical.NewVariable(octosql.NewVariableName("p2.age")),
 							},
 							logical.NewDataSource("people", "p2"),
 							true,
@@ -221,19 +221,19 @@ func TestParseNode(t *testing.T) {
 				logical.NewUnionAll(
 					logical.NewMap(
 						[]logical.NamedExpression{
-							logical.NewVariable("p2.name"),
-							logical.NewVariable("p2.age"),
+							logical.NewVariable(octosql.NewVariableName("p2.name")),
+							logical.NewVariable(octosql.NewVariableName("p2.age")),
 						},
 						logical.NewFilter(
 							logical.NewPredicate(
-								logical.NewVariable("p2.age"),
+								logical.NewVariable(octosql.NewVariableName("p2.age")),
 								logical.MoreThan,
 								logical.NewConstant(3),
 							),
 							logical.NewMap(
 								[]logical.NamedExpression{
-									logical.NewVariable("p2.name"),
-									logical.NewVariable("p2.age"),
+									logical.NewVariable(octosql.NewVariableName("p2.name")),
+									logical.NewVariable(octosql.NewVariableName("p2.age")),
 								},
 								logical.NewDataSource("people", "p2"),
 								true,
@@ -243,19 +243,19 @@ func TestParseNode(t *testing.T) {
 					),
 					logical.NewMap(
 						[]logical.NamedExpression{
-							logical.NewVariable("p2.name"),
-							logical.NewVariable("p2.age"),
+							logical.NewVariable(octosql.NewVariableName("p2.name")),
+							logical.NewVariable(octosql.NewVariableName("p2.age")),
 						},
 						logical.NewFilter(
 							logical.NewPredicate(
-								logical.NewVariable("p2.age"),
+								logical.NewVariable(octosql.NewVariableName("p2.age")),
 								logical.LessThan,
 								logical.NewConstant(5),
 							),
 							logical.NewMap(
 								[]logical.NamedExpression{
-									logical.NewVariable("p2.name"),
-									logical.NewVariable("p2.age"),
+									logical.NewVariable(octosql.NewVariableName("p2.name")),
+									logical.NewVariable(octosql.NewVariableName("p2.age")),
 								},
 								logical.NewDataSource("people", "p2"),
 								true,
@@ -267,19 +267,19 @@ func TestParseNode(t *testing.T) {
 				logical.NewUnionAll(
 					logical.NewMap(
 						[]logical.NamedExpression{
-							logical.NewVariable("p2.name"),
-							logical.NewVariable("p2.age"),
+							logical.NewVariable(octosql.NewVariableName("p2.name")),
+							logical.NewVariable(octosql.NewVariableName("p2.age")),
 						},
 						logical.NewFilter(
 							logical.NewPredicate(
-								logical.NewVariable("p2.city"),
+								logical.NewVariable(octosql.NewVariableName("p2.city")),
 								logical.MoreThan,
 								logical.NewConstant("ciechanowo"),
 							),
 							logical.NewMap(
 								[]logical.NamedExpression{
-									logical.NewVariable("p2.name"),
-									logical.NewVariable("p2.age"),
+									logical.NewVariable(octosql.NewVariableName("p2.name")),
+									logical.NewVariable(octosql.NewVariableName("p2.age")),
 								},
 								logical.NewDataSource("people", "p2"),
 								true,
@@ -289,19 +289,19 @@ func TestParseNode(t *testing.T) {
 					),
 					logical.NewMap(
 						[]logical.NamedExpression{
-							logical.NewVariable("p2.name"),
-							logical.NewVariable("p2.age"),
+							logical.NewVariable(octosql.NewVariableName("p2.name")),
+							logical.NewVariable(octosql.NewVariableName("p2.age")),
 						},
 						logical.NewFilter(
 							logical.NewPredicate(
-								logical.NewVariable("p2.city"),
+								logical.NewVariable(octosql.NewVariableName("p2.city")),
 								logical.LessThan,
 								logical.NewConstant("wwa"),
 							),
 							logical.NewMap(
 								[]logical.NamedExpression{
-									logical.NewVariable("p2.name"),
-									logical.NewVariable("p2.age"),
+									logical.NewVariable(octosql.NewVariableName("p2.name")),
+									logical.NewVariable(octosql.NewVariableName("p2.age")),
 								},
 								logical.NewDataSource("people", "p2"),
 								true,
@@ -320,19 +320,19 @@ func TestParseNode(t *testing.T) {
 			},
 			want: logical.NewMap(
 				[]logical.NamedExpression{
-					logical.NewVariable("p2.name"),
-					logical.NewVariable("p2.age"),
+					logical.NewVariable(octosql.NewVariableName("p2.name")),
+					logical.NewVariable(octosql.NewVariableName("p2.age")),
 				},
 				logical.NewFilter(
 					logical.NewPredicate(
-						logical.NewVariable("p2.age"),
+						logical.NewVariable(octosql.NewVariableName("p2.age")),
 						logical.MoreThan,
 						logical.NewConstant(3),
 					),
 					logical.NewMap(
 						[]logical.NamedExpression{
-							logical.NewVariable("p2.name"),
-							logical.NewVariable("p2.age"),
+							logical.NewVariable(octosql.NewVariableName("p2.name")),
+							logical.NewVariable(octosql.NewVariableName("p2.age")),
 						},
 						logical.NewDataSource("people", "p2"),
 						true,
@@ -380,40 +380,40 @@ WHERE p2.age > 3 AND p2.age = 3 AND p2.age < 3 AND p2.age <> 3 AND p2.age != 3 A
 							logical.NewInfixOperator(
 								logical.NewInfixOperator(
 									logical.NewPredicate(
-										logical.NewVariable("p2.age"),
+										logical.NewVariable(octosql.NewVariableName("p2.age")),
 										logical.MoreThan,
 										logical.NewConstant(3),
 									),
 									logical.NewPredicate(
-										logical.NewVariable("p2.age"),
+										logical.NewVariable(octosql.NewVariableName("p2.age")),
 										logical.Equal,
 										logical.NewConstant(3),
 									),
 									"AND",
 								),
 								logical.NewPredicate(
-									logical.NewVariable("p2.age"),
+									logical.NewVariable(octosql.NewVariableName("p2.age")),
 									logical.LessThan,
 									logical.NewConstant(3),
 								),
 								"AND",
 							),
 							logical.NewPredicate(
-								logical.NewVariable("p2.age"),
+								logical.NewVariable(octosql.NewVariableName("p2.age")),
 								logical.NotEqual,
 								logical.NewConstant(3),
 							),
 							"AND",
 						),
 						logical.NewPredicate(
-							logical.NewVariable("p2.age"),
+							logical.NewVariable(octosql.NewVariableName("p2.age")),
 							logical.NotEqual,
 							logical.NewConstant(3),
 						),
 						"AND",
 					),
 					logical.NewPredicate(
-						logical.NewVariable("p2.age"),
+						logical.NewVariable(octosql.NewVariableName("p2.age")),
 						logical.In,
 						logical.NewNodeExpression(logical.NewDataSource("people", "p3")),
 					),
@@ -433,25 +433,25 @@ WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age`,
 			},
 			want: logical.NewMap(
 				[]logical.NamedExpression{
-					logical.NewVariable("p3.name"),
-					logical.NewVariable("city"),
+					logical.NewVariable(octosql.NewVariableName("p3.name")),
+					logical.NewVariable(octosql.NewVariableName("city")),
 				},
 				logical.NewFilter(
 					logical.NewPredicate(
 						logical.NewNodeExpression(
 							logical.NewMap(
 								[]logical.NamedExpression{
-									logical.NewVariable("p2.age"),
+									logical.NewVariable(octosql.NewVariableName("p2.age")),
 								},
 								logical.NewFilter(
 									logical.NewPredicate(
-										logical.NewVariable("p2.name"),
+										logical.NewVariable(octosql.NewVariableName("p2.name")),
 										logical.Equal,
 										logical.NewConstant("wojtek"),
 									),
 									logical.NewMap(
 										[]logical.NamedExpression{
-											logical.NewVariable("p2.age"),
+											logical.NewVariable(octosql.NewVariableName("p2.age")),
 										},
 										logical.NewDataSource("people", "p2"),
 										true,
@@ -461,27 +461,27 @@ WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age`,
 							),
 						),
 						logical.MoreThan,
-						logical.NewVariable("p3.age"),
+						logical.NewVariable(octosql.NewVariableName("p3.age")),
 					),
 					logical.NewMap(
 						[]logical.NamedExpression{
-							logical.NewVariable("p3.name"),
+							logical.NewVariable(octosql.NewVariableName("p3.name")),
 							logical.NewAliasedExpression(
-								"city",
+								octosql.NewVariableName("city"),
 								logical.NewNodeExpression(
 									logical.NewMap(
 										[]logical.NamedExpression{
-											logical.NewVariable("p1.city"),
+											logical.NewVariable(octosql.NewVariableName("p1.city")),
 										},
 										logical.NewFilter(
 											logical.NewInfixOperator(
 												logical.NewPredicate(
-													logical.NewVariable("p3.name"),
+													logical.NewVariable(octosql.NewVariableName("p3.name")),
 													logical.Equal,
 													logical.NewConstant("Kuba"),
 												),
 												logical.NewPredicate(
-													logical.NewVariable("p1.name"),
+													logical.NewVariable(octosql.NewVariableName("p1.name")),
 													logical.Equal,
 													logical.NewConstant("adam"),
 												),
@@ -489,7 +489,7 @@ WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age`,
 											),
 											logical.NewMap(
 												[]logical.NamedExpression{
-													logical.NewVariable("p1.city"),
+													logical.NewVariable(octosql.NewVariableName("p1.city")),
 												},
 												logical.NewDataSource("people", "p1"),
 												true,
@@ -519,25 +519,25 @@ SELECT p.name FROM people p LEFT JOIN cities c ON p.city = c.name AND p.favorite
 			},
 			want: logical.NewMap(
 				[]logical.NamedExpression{
-					logical.NewVariable("p.name"),
+					logical.NewVariable(octosql.NewVariableName("p.name")),
 				},
 				logical.NewMap(
 					[]logical.NamedExpression{
-						logical.NewVariable("p.name"),
+						logical.NewVariable(octosql.NewVariableName("p.name")),
 					},
 					logical.NewLeftJoin(
 						logical.NewDataSource("people", "p"),
 						logical.NewFilter(
 							logical.NewInfixOperator(
 								logical.NewPredicate(
-									logical.NewVariable("p.city"),
+									logical.NewVariable(octosql.NewVariableName("p.city")),
 									logical.Equal,
-									logical.NewVariable("c.name"),
+									logical.NewVariable(octosql.NewVariableName("c.name")),
 								),
 								logical.NewPredicate(
-									logical.NewVariable("p.favorite_city"),
+									logical.NewVariable(octosql.NewVariableName("p.favorite_city")),
 									logical.Equal,
-									logical.NewVariable("c.name"),
+									logical.NewVariable(octosql.NewVariableName("c.name")),
 								),
 								"AND",
 							),
@@ -558,25 +558,25 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 			},
 			want: logical.NewMap(
 				[]logical.NamedExpression{
-					logical.NewVariable("p.name"),
+					logical.NewVariable(octosql.NewVariableName("p.name")),
 				},
 				logical.NewMap(
 					[]logical.NamedExpression{
-						logical.NewVariable("p.name"),
+						logical.NewVariable(octosql.NewVariableName("p.name")),
 					},
 					logical.NewLeftJoin(
 						logical.NewDataSource("people", "p"),
 						logical.NewFilter(
 							logical.NewInfixOperator(
 								logical.NewPredicate(
-									logical.NewVariable("p.city"),
+									logical.NewVariable(octosql.NewVariableName("p.city")),
 									logical.Equal,
-									logical.NewVariable("c.name"),
+									logical.NewVariable(octosql.NewVariableName("c.name")),
 								),
 								logical.NewPredicate(
-									logical.NewVariable("p.favorite_city"),
+									logical.NewVariable(octosql.NewVariableName("p.favorite_city")),
 									logical.Equal,
-									logical.NewVariable("c.name"),
+									logical.NewVariable(octosql.NewVariableName("c.name")),
 								),
 								"AND",
 							),
@@ -597,7 +597,7 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 			want: logical.NewFilter(
 				logical.NewInfixOperator(
 					logical.NewPredicate(
-						logical.NewVariable("p.age"),
+						logical.NewVariable(octosql.NewVariableName("p.age")),
 						logical.In,
 						logical.NewTuple([]logical.Expression{
 							logical.NewConstant(1),
@@ -628,20 +628,20 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 			},
 			want: logical.NewMap(
 				[]logical.NamedExpression{
-					logical.NewVariable("p.name_count_distinct"),
+					logical.NewVariable(octosql.NewVariableName("p.name_count_distinct")),
 				},
 				logical.NewGroupBy(
 					logical.NewMap(
 						[]logical.NamedExpression{
-							logical.NewVariable("p.name"),
+							logical.NewVariable(octosql.NewVariableName("p.name")),
 						},
 						logical.NewDataSource("people", "p"),
 						true,
 					),
 					[]logical.Expression{logical.NewConstant(true)},
-					[]octosql.VariableName{"p.name"},
+					[]octosql.VariableName{octosql.NewVariableName("p.name")},
 					[]logical.Aggregate{logical.CountDistinct},
-					[]octosql.VariableName{""},
+					[]octosql.VariableName{octosql.NewVariableName("")},
 					[]logical.Trigger{},
 				),
 				false,
@@ -655,35 +655,35 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 			},
 			want: logical.NewMap(
 				[]logical.NamedExpression{
-					logical.NewVariable("p.name_count_distinct"),
-					logical.NewVariable("firstage"),
-					logical.NewVariable("p.surname"),
-					logical.NewVariable("mysurname"),
+					logical.NewVariable(octosql.NewVariableName("p.name_count_distinct")),
+					logical.NewVariable(octosql.NewVariableName("firstage")),
+					logical.NewVariable(octosql.NewVariableName("p.surname")),
+					logical.NewVariable(octosql.NewVariableName("mysurname")),
 				},
 				logical.NewGroupBy(
 					logical.NewMap(
 						[]logical.NamedExpression{
-							logical.NewVariable("p.name"),
+							logical.NewVariable(octosql.NewVariableName("p.name")),
 							logical.NewAliasedExpression(
-								"myage",
-								logical.NewVariable("p.age"),
+								octosql.NewVariableName("myage"),
+								logical.NewVariable(octosql.NewVariableName("p.age")),
 							),
-							logical.NewVariable("p.surname"),
+							logical.NewVariable(octosql.NewVariableName("p.surname")),
 							logical.NewAliasedExpression(
-								"mysurname",
-								logical.NewVariable("p.surname"),
+								octosql.NewVariableName("mysurname"),
+								logical.NewVariable(octosql.NewVariableName("p.surname")),
 							),
 						},
 						logical.NewDataSource("people", "p"),
 						true,
 					),
 					[]logical.Expression{
-						logical.NewVariable("p.age"),
-						logical.NewVariable("p.city"),
+						logical.NewVariable(octosql.NewVariableName("p.age")),
+						logical.NewVariable(octosql.NewVariableName("p.city")),
 					},
-					[]octosql.VariableName{"p.name", "myage", "p.surname", "mysurname"},
+					[]octosql.VariableName{octosql.NewVariableName("p.name"), octosql.NewVariableName("myage"), octosql.NewVariableName("p.surname"), octosql.NewVariableName("mysurname")},
 					[]logical.Aggregate{logical.CountDistinct, logical.First, logical.First, logical.First},
-					[]octosql.VariableName{"", "firstage", "p.surname", "mysurname"},
+					[]octosql.VariableName{octosql.NewVariableName(""), octosql.NewVariableName("firstage"), octosql.NewVariableName("p.surname"), octosql.NewVariableName("mysurname")},
 					[]logical.Trigger{
 						logical.NewDelayTrigger(logical.NewConstant(time.Second * 3)),
 						logical.NewWatermarkTrigger(),

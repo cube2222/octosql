@@ -143,7 +143,7 @@ func (r *Record) Fields() []Field {
 func (r *Record) ShowFields() []Field {
 	fields := r.Fields()
 
-	if len(r.EventTimeField()) > 0 {
+	if !r.EventTimeField().Empty() {
 		fields = append(fields, Field{
 			Name: octosql.NewVariableName("sys.event_time_field"),
 		})

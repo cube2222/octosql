@@ -55,9 +55,9 @@ func TestNewKeyFormula(t *testing.T) {
 			name: "simple equal",
 			args: args{
 				formula: physical.NewPredicate(
-					physical.NewVariable("p.key"),
+					physical.NewVariable(octosql.NewVariableName("p.key")),
 					physical.NewRelation("equal"),
-					physical.NewVariable("const_0"),
+					physical.NewVariable(octosql.NewVariableName("const_0")),
 				),
 				key:   "key",
 				alias: "p",
@@ -72,9 +72,9 @@ func TestNewKeyFormula(t *testing.T) {
 			name: "simple equal reverse",
 			args: args{
 				formula: physical.NewPredicate(
-					physical.NewVariable("const_0"),
+					physical.NewVariable(octosql.NewVariableName("const_0")),
 					physical.NewRelation("equal"),
-					physical.NewVariable("p.key"),
+					physical.NewVariable(octosql.NewVariableName("p.key")),
 				),
 				key:   "key",
 				alias: "p",
@@ -89,9 +89,9 @@ func TestNewKeyFormula(t *testing.T) {
 			name: "simple equal no p.key",
 			args: args{
 				formula: physical.NewPredicate(
-					physical.NewVariable("const_0"),
+					physical.NewVariable(octosql.NewVariableName("const_0")),
 					physical.NewRelation("equal"),
-					physical.NewVariable("const_1"),
+					physical.NewVariable(octosql.NewVariableName("const_1")),
 				),
 				key:   "key",
 				alias: "p",
@@ -105,14 +105,14 @@ func TestNewKeyFormula(t *testing.T) {
 			args: args{
 				formula: physical.NewOr(
 					physical.NewPredicate(
-						physical.NewVariable("p.key"),
+						physical.NewVariable(octosql.NewVariableName("p.key")),
 						physical.NewRelation("equal"),
-						physical.NewVariable("const_0"),
+						physical.NewVariable(octosql.NewVariableName("const_0")),
 					),
 					physical.NewPredicate(
-						physical.NewVariable("p.key"),
+						physical.NewVariable(octosql.NewVariableName("p.key")),
 						physical.NewRelation("equal"),
-						physical.NewVariable("const_0"),
+						physical.NewVariable(octosql.NewVariableName("const_0")),
 					),
 				),
 				key:   "key",
@@ -130,14 +130,14 @@ func TestNewKeyFormula(t *testing.T) {
 			args: args{
 				formula: physical.NewOr(
 					physical.NewPredicate(
-						physical.NewVariable("p.key"),
+						physical.NewVariable(octosql.NewVariableName("p.key")),
 						physical.NewRelation("equal"),
-						physical.NewVariable("const_0"),
+						physical.NewVariable(octosql.NewVariableName("const_0")),
 					),
 					physical.NewPredicate(
-						physical.NewVariable("p.key"),
+						physical.NewVariable(octosql.NewVariableName("p.key")),
 						physical.NewRelation("equal"),
-						physical.NewVariable("const_1"),
+						physical.NewVariable(octosql.NewVariableName("const_1")),
 					),
 				),
 				key:   "key",
@@ -156,26 +156,26 @@ func TestNewKeyFormula(t *testing.T) {
 				formula: physical.NewOr(
 					physical.NewOr(
 						physical.NewPredicate(
-							physical.NewVariable("p.key"),
+							physical.NewVariable(octosql.NewVariableName("p.key")),
 							physical.NewRelation("equal"),
-							physical.NewVariable("const_1"),
+							physical.NewVariable(octosql.NewVariableName("const_1")),
 						),
 						physical.NewPredicate(
-							physical.NewVariable("p.key"),
+							physical.NewVariable(octosql.NewVariableName("p.key")),
 							physical.NewRelation("equal"),
-							physical.NewVariable("const_0"),
+							physical.NewVariable(octosql.NewVariableName("const_0")),
 						),
 					),
 					physical.NewOr(
 						physical.NewPredicate(
-							physical.NewVariable("p.key"),
+							physical.NewVariable(octosql.NewVariableName("p.key")),
 							physical.NewRelation("equal"),
-							physical.NewVariable("const_0"),
+							physical.NewVariable(octosql.NewVariableName("const_0")),
 						),
 						physical.NewPredicate(
-							physical.NewVariable("p.key"),
+							physical.NewVariable(octosql.NewVariableName("p.key")),
 							physical.NewRelation("equal"),
-							physical.NewVariable("const_1"),
+							physical.NewVariable(octosql.NewVariableName("const_1")),
 						),
 					),
 				),
@@ -200,14 +200,14 @@ func TestNewKeyFormula(t *testing.T) {
 			args: args{
 				formula: physical.NewAnd(
 					physical.NewPredicate(
-						physical.NewVariable("p.key"),
+						physical.NewVariable(octosql.NewVariableName("p.key")),
 						physical.NewRelation("equal"),
-						physical.NewVariable("const_0"),
+						physical.NewVariable(octosql.NewVariableName("const_0")),
 					),
 					physical.NewPredicate(
-						physical.NewVariable("p.key"),
+						physical.NewVariable(octosql.NewVariableName("p.key")),
 						physical.NewRelation("equal"),
-						physical.NewVariable("const_0"),
+						physical.NewVariable(octosql.NewVariableName("const_0")),
 					),
 				),
 				key:   "key",
@@ -225,14 +225,14 @@ func TestNewKeyFormula(t *testing.T) {
 			args: args{
 				formula: physical.NewAnd(
 					physical.NewPredicate(
-						physical.NewVariable("p.key"),
+						physical.NewVariable(octosql.NewVariableName("p.key")),
 						physical.NewRelation("equal"),
-						physical.NewVariable("const_1"),
+						physical.NewVariable(octosql.NewVariableName("const_1")),
 					),
 					physical.NewPredicate(
-						physical.NewVariable("p.key"),
+						physical.NewVariable(octosql.NewVariableName("p.key")),
 						physical.NewRelation("equal"),
-						physical.NewVariable("const_0"),
+						physical.NewVariable(octosql.NewVariableName("const_0")),
 					),
 				),
 				key:   "key",
@@ -251,26 +251,26 @@ func TestNewKeyFormula(t *testing.T) {
 				formula: physical.NewAnd(
 					physical.NewAnd(
 						physical.NewPredicate(
-							physical.NewVariable("p.key"),
+							physical.NewVariable(octosql.NewVariableName("p.key")),
 							physical.NewRelation("equal"),
-							physical.NewVariable("const_0"),
+							physical.NewVariable(octosql.NewVariableName("const_0")),
 						),
 						physical.NewPredicate(
-							physical.NewVariable("p.key"),
+							physical.NewVariable(octosql.NewVariableName("p.key")),
 							physical.NewRelation("equal"),
-							physical.NewVariable("const_1"),
+							physical.NewVariable(octosql.NewVariableName("const_1")),
 						),
 					),
 					physical.NewAnd(
 						physical.NewPredicate(
-							physical.NewVariable("p.key"),
+							physical.NewVariable(octosql.NewVariableName("p.key")),
 							physical.NewRelation("equal"),
-							physical.NewVariable("const_2"),
+							physical.NewVariable(octosql.NewVariableName("const_2")),
 						),
 						physical.NewPredicate(
-							physical.NewVariable("p.key"),
+							physical.NewVariable(octosql.NewVariableName("p.key")),
 							physical.NewRelation("equal"),
-							physical.NewVariable("const_3"),
+							physical.NewVariable(octosql.NewVariableName("const_3")),
 						),
 					),
 				),
@@ -296,33 +296,33 @@ func TestNewKeyFormula(t *testing.T) {
 				formula: physical.NewOr(
 					physical.NewAnd(
 						physical.NewPredicate(
-							physical.NewVariable("p.key"),
+							physical.NewVariable(octosql.NewVariableName("p.key")),
 							physical.NewRelation("equal"),
-							physical.NewVariable("const_0"),
+							physical.NewVariable(octosql.NewVariableName("const_0")),
 						),
 						physical.NewPredicate(
-							physical.NewVariable("p.key"),
+							physical.NewVariable(octosql.NewVariableName("p.key")),
 							physical.NewRelation("equal"),
-							physical.NewVariable("const_1"),
+							physical.NewVariable(octosql.NewVariableName("const_1")),
 						),
 					),
 					physical.NewAnd(
 						physical.NewOr(
 							physical.NewPredicate(
-								physical.NewVariable("p.key"),
+								physical.NewVariable(octosql.NewVariableName("p.key")),
 								physical.NewRelation("equal"),
-								physical.NewVariable("const_2"),
+								physical.NewVariable(octosql.NewVariableName("const_2")),
 							),
 							physical.NewPredicate(
-								physical.NewVariable("p.key"),
+								physical.NewVariable(octosql.NewVariableName("p.key")),
 								physical.NewRelation("equal"),
-								physical.NewVariable("const_1"),
+								physical.NewVariable(octosql.NewVariableName("const_1")),
 							),
 						),
 						physical.NewPredicate(
-							physical.NewVariable("p.key"),
+							physical.NewVariable(octosql.NewVariableName("p.key")),
 							physical.NewRelation("equal"),
-							physical.NewVariable("const_42"),
+							physical.NewVariable(octosql.NewVariableName("const_42")),
 						),
 					),
 				),
@@ -351,9 +351,9 @@ func TestNewKeyFormula(t *testing.T) {
 				formula: physical.NewOr(
 					physical.NewAnd(
 						physical.NewPredicate(
-							physical.NewVariable("p.key"),
+							physical.NewVariable(octosql.NewVariableName("p.key")),
 							physical.NewRelation("equal"),
-							physical.NewVariable("const_0"),
+							physical.NewVariable(octosql.NewVariableName("const_0")),
 						),
 						physical.NewConstant(
 							true,
@@ -365,9 +365,9 @@ func TestNewKeyFormula(t *testing.T) {
 								false,
 							),
 							physical.NewPredicate(
-								physical.NewVariable("p.key"),
+								physical.NewVariable(octosql.NewVariableName("p.key")),
 								physical.NewRelation("equal"),
-								physical.NewVariable("const_1"),
+								physical.NewVariable(octosql.NewVariableName("const_1")),
 							),
 						),
 						physical.NewConstant(

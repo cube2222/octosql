@@ -16,7 +16,7 @@ func TestGroupBy_SimpleBatch(t *testing.T) {
 	stateStorage := GetTestStorage(t)
 
 	ctx := context.Background()
-	fields := []octosql.VariableName{"cat", "livesleft", "ownerid"}
+	fields := []string{"cat", "livesleft", "ownerid"}
 	source := NewDummyNode([]*Record{
 		NewRecordFromSliceWithNormalize(fields, []interface{}{"Buster", 9, 5}),
 		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 6, 4}),
@@ -29,7 +29,7 @@ func TestGroupBy_SimpleBatch(t *testing.T) {
 		stateStorage,
 		source,
 		[]Expression{NewVariable(octosql.NewVariableName("ownerid"))},
-		[]octosql.VariableName{
+		[]string{
 			octosql.NewVariableName("ownerid"),
 			octosql.NewVariableName("livesleft"),
 			octosql.NewVariableName("livesleft"),
@@ -40,7 +40,7 @@ func TestGroupBy_SimpleBatch(t *testing.T) {
 			aggregate.AggregateTable["count"],
 		},
 		octosql.NewVariableName(""),
-		[]octosql.VariableName{
+		[]string{
 			octosql.NewVariableName("ownerid"),
 			octosql.NewVariableName("livesleft_avg"),
 			octosql.NewVariableName("livesleft_count"),
@@ -60,7 +60,7 @@ func TestGroupBy_SimpleBatch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	outFields := []octosql.VariableName{"ownerid", "livesleft_avg", "livesleft_count"}
+	outFields := []string{"ownerid", "livesleft_avg", "livesleft_count"}
 	expectedOutput := []*Record{
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{3, 4.0, 3}),
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{4, 6.0, 1}),
@@ -80,7 +80,7 @@ func TestGroupBy_BatchWithUndos(t *testing.T) {
 	stateStorage := GetTestStorage(t)
 
 	ctx := context.Background()
-	fields := []octosql.VariableName{"cat", "livesleft", "ownerid"}
+	fields := []string{"cat", "livesleft", "ownerid"}
 	source := NewDummyNode([]*Record{
 		NewRecordFromSliceWithNormalize(fields, []interface{}{"Buster", 9, 5}),
 		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 6, 4}),
@@ -100,7 +100,7 @@ func TestGroupBy_BatchWithUndos(t *testing.T) {
 		stateStorage,
 		source,
 		[]Expression{NewVariable(octosql.NewVariableName("ownerid"))},
-		[]octosql.VariableName{
+		[]string{
 			octosql.NewVariableName("ownerid"),
 			octosql.NewVariableName("livesleft"),
 			octosql.NewVariableName("livesleft"),
@@ -111,7 +111,7 @@ func TestGroupBy_BatchWithUndos(t *testing.T) {
 			aggregate.AggregateTable["count"],
 		},
 		octosql.NewVariableName(""),
-		[]octosql.VariableName{
+		[]string{
 			octosql.NewVariableName("ownerid"),
 			octosql.NewVariableName("livesleft_avg"),
 			octosql.NewVariableName("livesleft_count"),
@@ -131,7 +131,7 @@ func TestGroupBy_BatchWithUndos(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	outFields := []octosql.VariableName{"ownerid", "livesleft_avg", "livesleft_count"}
+	outFields := []string{"ownerid", "livesleft_avg", "livesleft_count"}
 	expectedOutput := []*Record{
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{3, 5.0, 2}),
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{4, 5.0, 1}),
@@ -151,7 +151,7 @@ func TestGroupBy_WithOutputUndos(t *testing.T) {
 	stateStorage := GetTestStorage(t)
 
 	ctx := context.Background()
-	fields := []octosql.VariableName{"cat", "livesleft", "ownerid"}
+	fields := []string{"cat", "livesleft", "ownerid"}
 	source := NewDummyNode([]*Record{
 		NewRecordFromSliceWithNormalize(fields, []interface{}{"Buster", 9, 5}),
 		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 6, 4}),
@@ -171,7 +171,7 @@ func TestGroupBy_WithOutputUndos(t *testing.T) {
 		stateStorage,
 		source,
 		[]Expression{NewVariable(octosql.NewVariableName("ownerid"))},
-		[]octosql.VariableName{
+		[]string{
 			octosql.NewVariableName("ownerid"),
 			octosql.NewVariableName("livesleft"),
 			octosql.NewVariableName("livesleft"),
@@ -182,7 +182,7 @@ func TestGroupBy_WithOutputUndos(t *testing.T) {
 			aggregate.AggregateTable["count"],
 		},
 		octosql.NewVariableName(""),
-		[]octosql.VariableName{
+		[]string{
 			octosql.NewVariableName("ownerid"),
 			octosql.NewVariableName("livesleft_avg"),
 			octosql.NewVariableName("livesleft_count"),
@@ -202,7 +202,7 @@ func TestGroupBy_WithOutputUndos(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	outFields := []octosql.VariableName{"ownerid", "livesleft_avg", "livesleft_count"}
+	outFields := []string{"ownerid", "livesleft_avg", "livesleft_count"}
 	expectedOutput := []*Record{
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{5, 9.0, 1}),
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{4, 6.0, 1}),
@@ -234,7 +234,7 @@ func TestGroupBy_newRecordsNoChanges(t *testing.T) {
 	stateStorage := GetTestStorage(t)
 
 	ctx := context.Background()
-	fields := []octosql.VariableName{"cat", "livesleft", "ownerid"}
+	fields := []string{"cat", "livesleft", "ownerid"}
 	source := NewDummyNode([]*Record{
 		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 5, 3}),
 		NewRecordFromSliceWithNormalize(fields, []interface{}{"Nala", 5, 3}),
@@ -244,7 +244,7 @@ func TestGroupBy_newRecordsNoChanges(t *testing.T) {
 		stateStorage,
 		source,
 		[]Expression{NewVariable(octosql.NewVariableName("ownerid"))},
-		[]octosql.VariableName{
+		[]string{
 			octosql.NewVariableName("ownerid"),
 			octosql.NewVariableName("livesleft"),
 		},
@@ -253,7 +253,7 @@ func TestGroupBy_newRecordsNoChanges(t *testing.T) {
 			aggregate.AggregateTable["avg"],
 		},
 		octosql.NewVariableName(""),
-		[]octosql.VariableName{
+		[]string{
 			octosql.NewVariableName("ownerid"),
 			octosql.NewVariableName("livesleft_avg"),
 		},
@@ -272,7 +272,7 @@ func TestGroupBy_newRecordsNoChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	outFields := []octosql.VariableName{"ownerid", "livesleft_avg"}
+	outFields := []string{"ownerid", "livesleft_avg"}
 	expectedOutput := []*Record{
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{3, 5.0}),
 	}
@@ -295,7 +295,7 @@ func TestGroupBy_EventTimes(t *testing.T) {
 	thirdWindow := start.Add(time.Minute * 20)
 
 	ctx := context.Background()
-	fields := []octosql.VariableName{"cat", "livesleft", "ownerid", "t"}
+	fields := []string{"cat", "livesleft", "ownerid", "t"}
 	source := NewDummyNode([]*Record{
 		NewRecordFromSliceWithNormalize(fields, []interface{}{"Buster", 9, 5, firstWindow}, WithEventTimeField(octosql.NewVariableName("t"))),
 		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 6, 4, firstWindow}, WithEventTimeField(octosql.NewVariableName("t"))),
@@ -317,7 +317,7 @@ func TestGroupBy_EventTimes(t *testing.T) {
 			NewVariable(octosql.NewVariableName("ownerid")),
 			NewVariable(octosql.NewVariableName("t")),
 		},
-		[]octosql.VariableName{
+		[]string{
 			octosql.NewVariableName("t"),
 			octosql.NewVariableName("ownerid"),
 			octosql.NewVariableName("livesleft"),
@@ -330,7 +330,7 @@ func TestGroupBy_EventTimes(t *testing.T) {
 			aggregate.AggregateTable["count"],
 		},
 		octosql.NewVariableName("t"),
-		[]octosql.VariableName{
+		[]string{
 			octosql.NewVariableName("renamed_t"),
 			octosql.NewVariableName("ownerid"),
 			octosql.NewVariableName("livesleft_avg"),
@@ -351,7 +351,7 @@ func TestGroupBy_EventTimes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	outFields := []octosql.VariableName{"renamed_t", "ownerid", "livesleft_avg", "livesleft_count"}
+	outFields := []string{"renamed_t", "ownerid", "livesleft_avg", "livesleft_count"}
 	expectedOutput := []*Record{
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{firstWindow, 5, 9.0, 1}, WithEventTimeField(octosql.NewVariableName("renamed_t"))),
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{firstWindow, 4, 6.0, 1}, WithEventTimeField(octosql.NewVariableName("renamed_t"))),

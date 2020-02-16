@@ -1,0 +1,11 @@
+// protoc --gogofaster_out=Mgoogle/protobuf/duration.proto=github.com/gogo/protobuf/types,Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types:./../../../ -I=/Users/jakub/Environment/Go/src/ -I=. *.proto
+syntax = "proto3";
+package octosql;
+option go_package = "github.com/cube2222/octosql";
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+message VariableName {
+    option (gogoproto.goproto_stringer) = false;
+    string namespace = 1;
+    string varName = 2;
+}

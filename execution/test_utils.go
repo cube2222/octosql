@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"sort"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -57,30 +56,6 @@ func newEntity(name octosql.VariableName, value octosql.Value) entity {
 		fieldName: name,
 		value:     value,
 	}
-}
-
-func Normalize(rec *Record) *Record {
-	row := make(row, 0)
-	for k, fieldName := range rec.GetVariableNames() {
-		value := *rec.Data[k]
-		row = append(row, newEntity(fieldName, value))
-	}
-
-	sort.Slice(row, func(i, j int) bool {
-		return row[i].fieldName < row[j].fieldName
-	})
-
-	fieldLength := len(rec.FieldNames)
-	sortedFieldNames := make([]octosql.VariableName, fieldLength)
-	values := make([]interface{}, fieldLength)
-
-	for k := range row {
-		ent := row[k]
-		sortedFieldNames[k] = ent.fieldName
-		values[k] = ent.value
-	}
-
-	return NewRecordFromSliceWithNormalize(sortedFieldNames, values)
 }
 
 func AreStreamsEqual(ctx context.Context, first, second RecordStream) (bool, error) {
@@ -153,12 +128,16 @@ func (rms *recordMultiSet) isContained(other *recordMultiSet) bool {
 	return true
 }
 
-func NewRecordFromSliceWithNormalize(fields []octosql.VariableName, data []interface{}, opts ...RecordOption) *Record {
+func NewRecordFromSliceWithNormalize(fields []string, data []interface{}, opts ...RecordOption) *Record {
+	variableNames := make([]octosql.VariableName, len(fields))
+	for i := range fields {
+		variableNames[i] = octosql.NewVariableName(fields[i])
+	}
 	normalized := make([]octosql.Value, len(data))
 	for i := range data {
 		normalized[i] = octosql.NormalizeType(data[i])
 	}
-	return NewRecordFromSlice(fields, normalized, opts...)
+	return NewRecordFromSlice(variableNames, normalized, opts...)
 }
 
 func NewDummyNode(data []*Record) *DummyNode {

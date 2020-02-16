@@ -119,7 +119,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			want: []wanted{
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"p.name",
 							"p.surname",
 							"p.age",
@@ -130,7 +130,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 				},
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"p.name",
 							"p.surname",
 							"p.age",
@@ -141,7 +141,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 				},
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"p.name",
 							"p.surname",
 							"p.age",
@@ -152,7 +152,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 				},
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"p.name",
 							"p.surname",
 							"p.age",
@@ -180,7 +180,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			want: []wanted{
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"wc.name",
 							"wc.surname",
 						},
@@ -217,7 +217,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			want: []wanted{
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"hh.dog",
 							"hh.age",
 						},
@@ -226,7 +226,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 				},
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"hh.dog",
 							"hh.age",
 						},
@@ -245,7 +245,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			want: []wanted{
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"nh.col1",
 							"nh.col2",
 						},
@@ -254,7 +254,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 				},
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"nh.col1",
 							"nh.col2",
 						},
@@ -272,7 +272,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			want: []wanted{
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"p.name",
 							"p.surname",
 							"p.age",
@@ -283,7 +283,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 				},
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"p.name",
 							"p.surname",
 							"p.age",
@@ -294,7 +294,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 				},
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"p.name",
 							"p.surname",
 							"p.age",
@@ -305,7 +305,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 				},
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"p.name",
 							"p.surname",
 							"p.age",
@@ -333,7 +333,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			want: []wanted{
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"p.name",
 							"p.surname",
 							"p.age",
@@ -344,7 +344,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 				},
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"p.name",
 							"p.surname",
 							"p.age",
@@ -355,7 +355,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 				},
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"p.name",
 							"p.surname",
 							"p.age",
@@ -366,7 +366,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 				},
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"p.name",
 							"p.surname",
 							"p.age",
@@ -394,7 +394,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			want: []wanted{
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"p.name, surname, age, city",
 						},
 						[]interface{}{"jan, chomiak, 3, warsaw"}),
@@ -402,7 +402,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 				},
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"p.name, surname, age, city",
 						},
 						[]interface{}{"wojtek, kuzminski, 4, warsaw"}),
@@ -410,7 +410,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 				},
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"p.name, surname, age, city",
 						},
 						[]interface{}{"adam, cz, 5, ciechanowo"}),
@@ -418,7 +418,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 				},
 				{
 					record: execution.NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"p.name, surname, age, city",
 						},
 						[]interface{}{"kuba, m, 2, warsaw"}),

@@ -29,13 +29,13 @@ func TestOrderBy_Get(t *testing.T) {
 			args: args{
 				stream: NewInMemoryStream([]*Record{
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"id", "age"},
+						[]string{"id", "age"},
 						[]interface{}{1, 7}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"id", "age"},
+						[]string{"id", "age"},
 						[]interface{}{2, 10}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"id", "age"},
+						[]string{"id", "age"},
 						[]interface{}{3, 2}),
 				}),
 				expressions: []Expression{NewVariable(octosql.NewVariableName("age"))},
@@ -43,13 +43,13 @@ func TestOrderBy_Get(t *testing.T) {
 			},
 			want: NewInMemoryStream([]*Record{
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"id", "age"},
+					[]string{"id", "age"},
 					[]interface{}{3, 2}),
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"id", "age"},
+					[]string{"id", "age"},
 					[]interface{}{1, 7}),
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"id", "age"},
+					[]string{"id", "age"},
 					[]interface{}{2, 10}),
 			}),
 			wantErr: false,
@@ -59,13 +59,13 @@ func TestOrderBy_Get(t *testing.T) {
 			args: args{
 				stream: NewInMemoryStream([]*Record{
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"name", "age"},
+						[]string{"name", "age"},
 						[]interface{}{"b", 10}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"name", "age"},
+						[]string{"name", "age"},
 						[]interface{}{"c", 7}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"name", "age"},
+						[]string{"name", "age"},
 						[]interface{}{"a", 2}),
 				}),
 				expressions: []Expression{NewVariable(octosql.NewVariableName("name"))},
@@ -73,13 +73,13 @@ func TestOrderBy_Get(t *testing.T) {
 			},
 			want: NewInMemoryStream([]*Record{
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"name", "age"},
+					[]string{"name", "age"},
 					[]interface{}{"c", 7}),
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"name", "age"},
+					[]string{"name", "age"},
 					[]interface{}{"b", 10}),
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"name", "age"},
+					[]string{"name", "age"},
 					[]interface{}{"a", 2}),
 			}),
 			wantErr: false,
@@ -89,13 +89,13 @@ func TestOrderBy_Get(t *testing.T) {
 			args: args{
 				stream: NewInMemoryStream([]*Record{
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"name", "birth"},
+						[]string{"name", "birth"},
 						[]interface{}{"b", now}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"name", "birth"},
+						[]string{"name", "birth"},
 						[]interface{}{"c", now.Add(time.Hour)}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"name", "birth"},
+						[]string{"name", "birth"},
 						[]interface{}{"a", now.Add(-1 * time.Hour)}),
 				}),
 				expressions: []Expression{NewVariable(octosql.NewVariableName("birth"))},
@@ -103,13 +103,13 @@ func TestOrderBy_Get(t *testing.T) {
 			},
 			want: NewInMemoryStream([]*Record{
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"name", "birth"},
+					[]string{"name", "birth"},
 					[]interface{}{"c", now.Add(time.Hour)}),
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"name", "birth"},
+					[]string{"name", "birth"},
 					[]interface{}{"b", now}),
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"name", "birth"},
+					[]string{"name", "birth"},
 					[]interface{}{"a", now.Add(-1 * time.Hour)}),
 			}),
 			wantErr: false,
@@ -119,19 +119,19 @@ func TestOrderBy_Get(t *testing.T) {
 			args: args{
 				stream: NewInMemoryStream([]*Record{
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"name", "age"},
+						[]string{"name", "age"},
 						[]interface{}{"a", 7}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"name", "age"},
+						[]string{"name", "age"},
 						[]interface{}{"d", 19}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"name", "age"},
+						[]string{"name", "age"},
 						[]interface{}{"a", -2}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"name", "age"},
+						[]string{"name", "age"},
 						[]interface{}{"c", 1}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"name", "age"},
+						[]string{"name", "age"},
 						[]interface{}{"d", 17}),
 				}),
 				expressions: []Expression{
@@ -145,19 +145,19 @@ func TestOrderBy_Get(t *testing.T) {
 			},
 			want: NewInMemoryStream([]*Record{
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"name", "age"},
+					[]string{"name", "age"},
 					[]interface{}{"a", 7}),
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"name", "age"},
+					[]string{"name", "age"},
 					[]interface{}{"a", -2}),
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"name", "age"},
+					[]string{"name", "age"},
 					[]interface{}{"c", 1}),
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"name", "age"},
+					[]string{"name", "age"},
 					[]interface{}{"d", 19}),
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"name", "age"},
+					[]string{"name", "age"},
 					[]interface{}{"d", 17}),
 			}),
 			wantErr: false,
@@ -167,24 +167,24 @@ func TestOrderBy_Get(t *testing.T) {
 			args: args{
 				stream: NewInMemoryStream([]*Record{
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"name", "age"},
+						[]string{"name", "age"},
 						[]interface{}{"a", 7.3}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"name", "age"},
+						[]string{"name", "age"},
 						[]interface{}{"d", 19.02}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"name", "age"},
+						[]string{"name", "age"},
 						[]interface{}{"a", -2.248}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"name", "age"},
+						[]string{"name", "age"},
 						[]interface{}{"c", 1.123}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"name", "age"},
+						[]string{"name", "age"},
 						[]interface{}{"d", 17.918}),
 				}),
 				expressions: []Expression{
-					NewVariable("name"),
-					NewFunctionExpression(&FuncIdentity, []Expression{NewVariable("age")}),
+					NewVariable(octosql.NewVariableName("name")),
+					NewFunctionExpression(&FuncIdentity, []Expression{NewVariable(octosql.NewVariableName("age"))}),
 				},
 				directions: []OrderDirection{
 					Ascending,
@@ -194,19 +194,19 @@ func TestOrderBy_Get(t *testing.T) {
 
 			want: NewInMemoryStream([]*Record{
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"name", "age"},
+					[]string{"name", "age"},
 					[]interface{}{"a", 7.3}),
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"name", "age"},
+					[]string{"name", "age"},
 					[]interface{}{"a", -2.248}),
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"name", "age"},
+					[]string{"name", "age"},
 					[]interface{}{"c", 1.123}),
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"name", "age"},
+					[]string{"name", "age"},
 					[]interface{}{"d", 19.02}),
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"name", "age"},
+					[]string{"name", "age"},
 					[]interface{}{"d", 17.918}),
 			}),
 			wantErr: false,
@@ -216,10 +216,10 @@ func TestOrderBy_Get(t *testing.T) {
 			args: args{
 				stream: NewInMemoryStream([]*Record{
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"name", "age"},
+						[]string{"name", "age"},
 						[]interface{}{"a", 7}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"name", "age?"},
+						[]string{"name", "age?"},
 						[]interface{}{"d", 19}),
 				}),
 				expressions: []Expression{NewVariable(octosql.NewVariableName("age"))},
@@ -234,10 +234,10 @@ func TestOrderBy_Get(t *testing.T) {
 			args: args{
 				stream: NewInMemoryStream([]*Record{
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"name", "age"},
+						[]string{"name", "age"},
 						[]interface{}{"a", 7}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"name", "age"},
+						[]string{"name", "age"},
 						[]interface{}{"d", 19.5}),
 				}),
 				expressions: []Expression{NewVariable(octosql.NewVariableName("age"))},

@@ -55,7 +55,7 @@ func (p *ProcessByKey) AddRecord(ctx context.Context, tx storage.StateTransactio
 	}
 
 	eventTime := maxWatermark
-	if len(p.eventTimeField) > 0 {
+	if !p.eventTimeField.Empty() {
 		eventTime = record.EventTime().AsTime()
 	}
 

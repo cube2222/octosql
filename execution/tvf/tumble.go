@@ -110,7 +110,7 @@ func (s *TumbleStream) Next(ctx context.Context) (*execution.Record, error) {
 	fields = append(fields, octosql.NewVariableName("window_start"), octosql.NewVariableName("window_end"))
 	values = append(values, octosql.MakeTime(windowStart), octosql.MakeTime(windowEnd))
 
-	newRecord := execution.NewRecordFromSlice(fields, values, execution.WithMetadataFrom(srcRecord), execution.WithEventTimeField("window_end"))
+	newRecord := execution.NewRecordFromSlice(fields, values, execution.WithMetadataFrom(srcRecord), execution.WithEventTimeField(octosql.NewVariableName("window_end")))
 
 	return newRecord, nil
 }

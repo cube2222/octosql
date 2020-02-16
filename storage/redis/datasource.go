@@ -225,7 +225,7 @@ func GetNewRecord(client *redis.Client, keyName, key, alias string) (*execution.
 
 	// The key is always the first record field
 	sort.Slice(fieldNames[1:], func(i, j int) bool {
-		return fieldNames[i+1] < fieldNames[j+1]
+		return fieldNames[i+1].LessThan(fieldNames[j+1])
 	})
 
 	return execution.NewRecord(fieldNames, aliasedRecord), nil

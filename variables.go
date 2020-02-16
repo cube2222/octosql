@@ -1,47 +1,51 @@
 package octosql
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
 )
 
-type VariableName string
-
 func NewVariableName(varname string) VariableName {
 	if len(varname) > 0 && varname[0] == '.' {
 		varname = varname[1:]
 	}
-	return VariableName(strings.ToLower(varname))
+	var namespace, name string
+	if i := strings.Index(varname, "."); i != -1 {
+		namespace = varname[:i]
+		name = varname[i+1:]
+	} else {
+		name = varname
+	}
+	return VariableName{Namespace: namespace, VarName: name}
 }
 
 func (vn VariableName) String() string {
-	return string(vn)
+	return fmt.Sprintf("%s.%s", vn.Namespace, vn.VarName)
 }
 
 func (vn VariableName) Source() string {
-	parts := strings.Split(vn.String(), ".")
-	if len(parts) == 1 {
-		return ""
-	} else {
-		return parts[0]
-	}
+	return vn.Namespace
 }
 
 func (vn VariableName) Name() string {
-	i := strings.Index(vn.String(), ".")
-	if i == -1 {
-		return vn.String()
-	}
-	return vn.String()[i+1:]
+	return vn.VarName
 }
 
 func (vn VariableName) Empty() bool {
-	return len(vn) == 0
+	return len(vn.VarName) == 0
 }
 
 func (vn VariableName) Equal(other VariableName) bool {
-	return vn == other
+	return vn.Namespace == other.Namespace && vn.VarName == other.VarName
+}
+
+func (vn VariableName) LessThan(other VariableName) bool {
+	if vn.Source() == other.Source() {
+		return vn.Name() < other.Name()
+	}
+	return vn.Source() < other.Source()
 }
 
 type Variables map[VariableName]Value
@@ -81,7 +85,7 @@ func (vs Variables) MergeWith(other Variables) (Variables, error) {
 func StringsToVariableNames(strings []string) []VariableName {
 	result := make([]VariableName, len(strings))
 	for i, s := range strings {
-		result[i] = VariableName(s) //TODO: it can be either this, or NewVariableName
+		result[i] = NewVariableName(s) // TODO: it can be either this, or NewVariableName
 	}
 
 	return result

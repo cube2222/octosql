@@ -63,7 +63,7 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 
 	outputFieldNames := make([]octosql.VariableName, len(aggregates))
 	for i := range aggregates {
-		if len(node.as[i]) > 0 {
+		if !node.as[i].Empty() {
 			outputFieldNames[i] = node.as[i]
 		} else {
 			outputFieldNames[i] = octosql.NewVariableName(
@@ -155,7 +155,7 @@ func (gb *GroupByStream) AddRecord(ctx context.Context, tx storage.StateTransact
 	// Update aggregates
 	for i := range gb.aggregates {
 		var value octosql.Value
-		if gb.inputFields[i] == "*star*" {
+		if gb.inputFields[i].VarName == "*star*" {
 			mapping := make(map[string]octosql.Value, len(record.Fields()))
 			for _, field := range record.Fields() {
 				mapping[field.Name.String()] = record.Value(field.Name)
@@ -199,7 +199,7 @@ func (gb *GroupByStream) Trigger(ctx context.Context, tx storage.StateTransactio
 
 	// Check if we have to handle event time
 	var opts []RecordOption
-	if len(gb.eventTimeField) > 0 {
+	if !gb.eventTimeField.Empty() {
 		opts = append(opts, WithEventTimeField(gb.outputEventTimeField))
 	}
 

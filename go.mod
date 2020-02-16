@@ -9,7 +9,8 @@ require (
 	github.com/go-chi/chi v4.0.3+incompatible
 	github.com/go-redis/redis v6.15.2+incompatible
 	github.com/go-sql-driver/mysql v1.4.1
-	github.com/golang/protobuf v1.3.1
+	github.com/gogo/protobuf v1.3.1
+	github.com/golang/protobuf v1.4.0-rc.1
 	github.com/lib/pq v1.0.0
 	github.com/mattn/go-runewidth v0.0.4 // indirect
 	github.com/mitchellh/hashstructure v1.0.0
@@ -22,6 +23,7 @@ require (
 	github.com/stretchr/testify v1.4.0
 	golang.org/x/net v0.0.0-20190620200207-3b0461eec859
 	google.golang.org/appengine v1.5.0 // indirect
+	google.golang.org/protobuf v0.0.0-20200215002714-91b2604634a3 // indirect
 	gopkg.in/yaml.v2 v2.2.2
 )
 

@@ -40,28 +40,28 @@ func TestOffset_Get(t *testing.T) {
 			node: NewOffset(&DummyNode{
 				[]*Record{
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"num",
 						},
 						[]interface{}{
 							1e10,
 						}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"num",
 						},
 						[]interface{}{
 							3.21,
 						}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"flag",
 						},
 						[]interface{}{
 							false,
 						}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"num",
 						},
 						[]interface{}{
@@ -71,14 +71,14 @@ func TestOffset_Get(t *testing.T) {
 			}, NewDummyValue(octosql.MakeInt(2))),
 			wantStream: NewInMemoryStream([]*Record{
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{
+					[]string{
 						"flag",
 					},
 					[]interface{}{
 						false,
 					}),
 				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{
+					[]string{
 						"num",
 					},
 					[]interface{}{
@@ -93,14 +93,14 @@ func TestOffset_Get(t *testing.T) {
 			node: NewOffset(&DummyNode{
 				[]*Record{
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"num",
 						},
 						[]interface{}{
 							1,
 						}),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
+						[]string{
 							"num",
 						},
 						[]interface{}{

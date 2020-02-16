@@ -8,10 +8,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-type Distinct struct {
-	Source Node
-}
-
 func NewDistinct(child Node) *Distinct {
 	return &Distinct{Source: child}
 }

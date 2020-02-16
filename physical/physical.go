@@ -36,7 +36,7 @@ func NewMaterializationContext(config *config.Config, storage storage.Storage) *
 }
 
 // Node describes a single record stream source.
-type Node interface {
+type PhysicalNode interface {
 	// Transform returns a new Node after recursively calling Transform
 	Transform(ctx context.Context, transformers *Transformers) Node
 	Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error)
@@ -44,14 +44,14 @@ type Node interface {
 }
 
 // Expressions describes a single value source.
-type Expression interface {
+type PhysicalExpression interface {
 	// Transform returns a new Expression after recursively calling Transform
 	Transform(ctx context.Context, transformers *Transformers) Expression
 	Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Expression, error)
 }
 
 // NamedExpressions describes a single named value source.
-type NamedExpression interface {
+type PhysicalNamedExpression interface {
 	Expression
 	// TransformNamed returns a new NamedExpression after recursively calling Transform
 	TransformNamed(ctx context.Context, transformers *Transformers) NamedExpression
@@ -59,7 +59,7 @@ type NamedExpression interface {
 }
 
 // Variables describes a variable Name.
-type Variable struct {
+type PhysicalVariable struct {
 	Name octosql.VariableName
 }
 

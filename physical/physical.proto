@@ -1,0 +1,277 @@
+syntax = "proto3";
+package physical;
+option go_package = "github.com/cube2222/octosql/physical";
+
+message NamedExpression {
+    oneof expression {
+        AliasedExpression aliasedExpression = 1;
+        Variable variable = 2;
+    }
+}
+
+message Expression {
+    oneof expression {
+        AliasedExpression aliasedExpression = 1;
+        Variable variable = 2;
+        Function function = 3;
+        Tuple tuple = 4;
+        NodeExpression nodeExpression = 5;
+        LogicExpression logicExpression = 6;
+    }
+}
+
+message AliasedExpression {
+    string name = 1;
+    Expression expression = 2;
+}
+
+message Variable {
+    string name = 1;
+}
+
+message Function {
+    string name = 1;
+    repeated Expression arguments = 2;
+}
+
+message Tuple {
+    repeated Expression elements = 1;
+}
+
+message NodeExpression {
+    Node node = 1;
+}
+
+message LogicExpression {
+
+}
+
+message Relation {
+    oneof relation {
+        Equal equal = 1;
+        NotEqual notEqual = 2;
+        MoreThan moreThan = 3;
+        LessThan lessThan = 4;
+        Like like = 5;
+        In in = 6;
+        NotIn notIn = 7;
+        GreaterEqual greaterEqual = 8;
+        LessEqual lessEqual = 9;
+        Regexp regexp = 10;
+    }
+}
+
+message Equal {
+}
+message NotEqual {
+}
+message MoreThan {
+}
+message LessThan {
+}
+message Like {
+}
+message In {
+}
+message NotIn {
+}
+message GreaterEqual {
+}
+message LessEqual {
+}
+message Regexp {
+}
+
+message Formula {
+    oneof formula {
+        Constant constant = 1;
+        And and = 2;
+        Or or = 3;
+        Not not = 4;
+        Predicate predicate = 5;
+    }
+}
+
+message Constant {
+    bool constant = 1;
+}
+
+message And {
+    Formula left = 1;
+    Formula right = 2;
+}
+
+message Or {
+    Formula left = 1;
+    Formula right = 2;
+}
+
+message Not {
+    Formula child = 1;
+}
+
+message Predicate {
+    Expression left = 1;
+    Relation relation = 2;
+    Expression right = 3;
+}
+
+message Node {
+    oneof node {
+        Distinct distinct = 1;
+        Filter filter = 2;
+        GroupBy groupBy = 3;
+        InnerJoin innerJoin = 4;
+        LeftJoin leftJoin = 5;
+        Limit limit = 6;
+        Offset offset = 7;
+        Map map = 8;
+        OrderBy orderBy = 9;
+        Requalifier requalifier = 10;
+        TableValuedFunction tableValuedFunction = 11;
+        UnionAll unionAll = 12;
+    }
+}
+
+message Distinct {
+    Node source = 1;
+}
+
+message Filter {
+    Node source = 1;
+    Formula formula = 2;
+}
+
+message GroupBy {
+    Node source = 1;
+    repeated Expression key = 2;
+    repeated string fields = 3;
+    repeated Aggregate aggregates = 4;
+    repeated Trigger trigger = 5;
+    repeated string as = 6;
+}
+
+message Aggregate {
+    oneof aggregate {
+        Avg avg = 1;
+        AvgDistinct avgDistinct = 2;
+        Count count = 3;
+        CountDistinct countDistinct = 4;
+        First first = 5;
+        Key key = 6;
+        Last last = 7;
+        Max max = 8;
+        Min min = 9;
+        Sum sum = 10;
+        SumDistinct sumDistinct = 11;
+    }
+}
+
+message Avg {
+}
+message AvgDistinct {
+}
+message Count {
+}
+message CountDistinct {
+}
+message First {
+}
+message Key {
+}
+message Last {
+}
+message Max {
+}
+message Min {
+}
+message Sum {
+}
+message SumDistinct {
+}
+
+message Trigger {
+    oneof trigger {
+        CountingTrigger countingTrigger = 1;
+        DelayTrigger delayTrigger = 2;
+        WatermarkTrigger watermarkTrigger = 3;
+    }
+}
+
+message CountingTrigger {
+    Expression count = 1;
+}
+
+message DelayTrigger {
+    Expression delay = 1;
+}
+
+message WatermarkTrigger {
+}
+
+message InnerJoin {
+    Node source = 1;
+    Node joined = 2;
+}
+
+message LeftJoin {
+    Node source = 1;
+    Node joined = 2;
+}
+
+message Limit {
+    Node source = 1;
+    Expression count = 2;
+}
+
+message Offset {
+    Node source = 1;
+    Expression count = 2;
+}
+
+message Map {
+    Node source = 1;
+    repeated NamedExpression expressions = 2;
+    bool keep = 3;
+}
+
+message OrderBy {
+    Node source = 1;
+    repeated Expression expressions = 2;
+    repeated Direction directions = 3;
+}
+
+message Direction {
+    oneof direction {
+        Ascending ascending = 1;
+        Descending descending = 2;
+    }
+}
+
+message Ascending {
+}
+message Descending {
+}
+
+message Requalifier {
+    Node source = 1;
+    string qualifier = 2;
+}
+
+message TableValuedFunction {
+    Node source = 1;
+    string qualifier = 2;
+}
+
+message TableValuedFunctionArgument {
+    oneof value {
+        Expression expression = 1;
+        Node node = 2;
+        string descriptor = 3;
+    }
+}
+
+message UnionAll {
+    Node first = 1;
+    Node second = 2;
+}

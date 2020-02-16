@@ -2,6 +2,7 @@ package execution
 
 import (
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/streaming/storage"
 
 	"context"
 
@@ -16,12 +17,24 @@ func NewUnionAll(first, second Node) *UnionAll {
 	return &UnionAll{first: first, second: second}
 }
 
-func (node *UnionAll) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
-	firstRecordStream, err := node.first.Get(ctx, variables)
+func (node *UnionAll) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, error) {
+	tx := storage.GetStateTransactionFromContext(ctx)
+	prefixedTx := tx.WithPrefix(streamID.AsPrefix())
+
+	firstSourceStreamID, err := GetSourceStreamID(prefixedTx, octosql.MakeInt(1))
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get first source stream ID")
+	}
+	secondSourceStreamID, err := GetSourceStreamID(prefixedTx, octosql.MakeInt(2))
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get first source stream ID")
+	}
+
+	firstRecordStream, err := node.first.Get(ctx, variables, firstSourceStreamID)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get first record stream")
 	}
-	secondRecordStream, err := node.second.Get(ctx, variables)
+	secondRecordStream, err := node.second.Get(ctx, variables, secondSourceStreamID)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get second record stream")
 	}

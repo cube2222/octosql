@@ -1,9 +1,10 @@
 package execution
 
 import (
-	"github.com/cube2222/octosql"
-
 	"context"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/streaming/storage"
 
 	"github.com/pkg/errors"
 )
@@ -17,8 +18,14 @@ func NewFilter(formula Formula, child Node) *Filter {
 	return &Filter{formula: formula, source: child}
 }
 
-func (node *Filter) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
-	recordStream, err := node.source.Get(ctx, variables)
+func (node *Filter) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, error) {
+	tx := storage.GetStateTransactionFromContext(ctx)
+	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get source stream ID")
+	}
+
+	recordStream, err := node.source.Get(ctx, variables, sourceStreamID)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get record stream")
 	}

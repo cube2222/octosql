@@ -13,6 +13,7 @@ require (
 	github.com/lib/pq v1.0.0
 	github.com/mattn/go-runewidth v0.0.4 // indirect
 	github.com/mitchellh/hashstructure v1.0.0
+	github.com/oklog/ulid v1.3.1
 	github.com/olekukonko/tablewriter v0.0.1
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0 // indirect

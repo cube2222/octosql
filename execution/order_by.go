@@ -6,6 +6,8 @@ import (
 	"sort"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/streaming/storage"
+
 	"github.com/pkg/errors"
 )
 
@@ -49,8 +51,14 @@ func isSorteable(x octosql.Value) bool {
 	panic("unreachable")
 }
 
-func (ob *OrderBy) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
-	sourceStream, err := ob.source.Get(ctx, variables)
+func (ob *OrderBy) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, error) {
+	tx := storage.GetStateTransactionFromContext(ctx)
+	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get source stream ID")
+	}
+
+	sourceStream, err := ob.source.Get(ctx, variables, sourceStreamID)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get underlying stream in order by")
 	}

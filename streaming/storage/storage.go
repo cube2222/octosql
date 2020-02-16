@@ -26,7 +26,7 @@ func NewBadgerStorage(db *badger.DB) *BadgerStorage {
 
 func (bs *BadgerStorage) BeginTransaction() StateTransaction {
 	tx := bs.db.NewTransaction(true)
-	return &badgerTransaction{tx: tx, prefix: bs.prefix}
+	return &badgerTransaction{tx: tx, prefix: bs.prefix, storage: bs}
 }
 
 func (bs *BadgerStorage) DropAll(prefix []byte) error {

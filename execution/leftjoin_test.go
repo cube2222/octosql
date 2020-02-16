@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/streaming/storage"
 )
 
 func TestLeftJoinedStream_Next(t *testing.T) {
@@ -127,7 +128,11 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 					tt.fields.joined,
 				),
 			}
-			equal, err := AreStreamsEqual(context.Background(), stream, tt.want)
+			stateStorage := GetTestStorage(t)
+			tx := stateStorage.BeginTransaction()
+			ctx := storage.InjectStateTransaction(context.Background(), tx)
+
+			equal, err := AreStreamsEqual(ctx, stream, tt.want)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LeftJoinedStream.Next() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -135,6 +140,8 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 			if err == nil && !equal {
 				t.Errorf("LeftJoinedStream.Next() streams not equal")
 			}
+
+			tx.Commit()
 		})
 	}
 }

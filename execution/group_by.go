@@ -22,10 +22,9 @@ type Aggregate interface {
 type TriggerPrototype func(ctx context.Context, variables octosql.Variables) (Trigger, error)
 
 type GroupBy struct {
-	storage             storage.Storage
-	source              Node
-	sourceStoragePrefix []byte
-	key                 []Expression
+	storage storage.Storage
+	source  Node
+	key     []Expression
 
 	fields              []octosql.VariableName
 	aggregatePrototypes []AggregatePrototype
@@ -37,12 +36,18 @@ type GroupBy struct {
 	triggerPrototype TriggerPrototype
 }
 
-func NewGroupBy(storage storage.Storage, source Node, sourceStoragePrefix []byte, key []Expression, fields []octosql.VariableName, aggregatePrototypes []AggregatePrototype, eventTimeField octosql.VariableName, as []octosql.VariableName, outEventTimeField octosql.VariableName, triggerPrototype TriggerPrototype) *GroupBy {
-	return &GroupBy{storage: storage, source: source, sourceStoragePrefix: sourceStoragePrefix, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, eventTimeField: eventTimeField, as: as, outEventTimeField: outEventTimeField, triggerPrototype: triggerPrototype}
+func NewGroupBy(storage storage.Storage, source Node, key []Expression, fields []octosql.VariableName, aggregatePrototypes []AggregatePrototype, eventTimeField octosql.VariableName, as []octosql.VariableName, outEventTimeField octosql.VariableName, triggerPrototype TriggerPrototype) *GroupBy {
+	return &GroupBy{storage: storage, source: source, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, eventTimeField: eventTimeField, as: as, outEventTimeField: outEventTimeField, triggerPrototype: triggerPrototype}
 }
 
-func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
-	source, err := node.source.Get(ctx, variables)
+func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, error) {
+	tx := storage.GetStateTransactionFromContext(ctx)
+	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get source stream ID")
+	}
+
+	source, err := node.source.Get(ctx, variables, sourceStreamID)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get stream for source in group by")
 	}
@@ -85,14 +90,13 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables) (Reco
 		outputFieldNames:     outputFieldNames,
 	}
 	processFunc := &ProcessByKey{
-		stateStorage:    node.storage,
 		eventTimeField:  node.eventTimeField,
 		trigger:         trigger,
 		keyExpression:   node.key,
 		processFunction: groupBy,
 		variables:       variables,
 	}
-	groupByPullEngine := NewPullEngine(processFunc, node.storage, source, node.sourceStoragePrefix, &ZeroWatermarkSource{})
+	groupByPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, &ZeroWatermarkSource{})
 	go groupByPullEngine.Run(ctx) // TODO: .Close() should kill this context and the goroutine.
 
 	return groupByPullEngine, nil

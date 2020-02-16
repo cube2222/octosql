@@ -121,7 +121,7 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 	return NewDataSourceBuilderFactory(primaryKeys), nil
 }
 
-func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables) (execution.RecordStream, error) {
+func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, error) {
 	values := make([]interface{}, 0)
 
 	for i := range ds.aliases {

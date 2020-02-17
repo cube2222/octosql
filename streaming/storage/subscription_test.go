@@ -8,17 +8,22 @@ import (
 	"github.com/dgraph-io/badger/v2"
 )
 
-func TestBadgerStorage_Subscribe(t *testing.T) {
+func TestConcatSubscriptions(t *testing.T) {
 	ctx := context.Background()
-	prefix := []byte{'a'}
+	aPrefix := []byte{'a'}
+	bPrefix := []byte{'b'}
 
 	// This key should be printed, since it matches the prefix.
 	aKey := []byte("a-key")
 	aValue := []byte("a-value")
 
-	// This key should not be printed.
+	// This key should be printed, since it matches the prefix.
 	bKey := []byte("b-key")
 	bValue := []byte("b-value")
+
+	// This key should not be printed.
+	cKey := []byte("c-key")
+	cValue := []byte("c-value")
 
 	opts := badger.DefaultOptions("")
 	opts.Dir = ""
@@ -30,8 +35,10 @@ func TestBadgerStorage_Subscribe(t *testing.T) {
 	}
 	defer db.Close()
 
-	storage := NewBadgerStorage(db).WithPrefix(prefix)
-	subscription := storage.Subscribe(ctx)
+	storage := NewBadgerStorage(db)
+	aSubscription := storage.WithPrefix(aPrefix).Subscribe(ctx)
+	bSubscription := storage.WithPrefix(bPrefix).Subscribe(ctx)
+	concatted := ConcatSubscriptions(ctx, aSubscription, bSubscription)
 
 	// Write both keys, but only one should be printed in the Output.
 	err = db.Update(func(txn *badger.Txn) error { return txn.Set(aKey, aValue) })
@@ -42,22 +49,33 @@ func TestBadgerStorage_Subscribe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = db.Update(func(txn *badger.Txn) error { return txn.Set(cKey, cValue) })
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx, cancel := context.WithTimeout(ctx, time.Millisecond*100)
 	defer cancel()
-	err = subscription.ListenForChanges(ctx)
+	err = concatted.ListenForChanges(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ctx, cancel = context.WithTimeout(ctx, time.Millisecond*100)
 	defer cancel()
-	err = subscription.ListenForChanges(ctx)
+	err = concatted.ListenForChanges(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel = context.WithTimeout(ctx, time.Millisecond*100)
+	defer cancel()
+	err = concatted.ListenForChanges(ctx)
 	if err != context.DeadlineExceeded {
 		t.Fatal(err)
 	}
 
-	err = subscription.Close()
+	err = concatted.Close()
 	if err != nil {
 		t.Fatal(err)
 	}

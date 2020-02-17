@@ -3,7 +3,6 @@ package execution
 import (
 	"context"
 	"fmt"
-	"log"
 	"regexp"
 	"strings"
 
@@ -93,7 +92,6 @@ func (stream *RequalifiedStream) Next(ctx context.Context) (*Record, error) {
 	}
 
 	out := NewRecord(fields, values, WithMetadataFrom(record), WithEventTimeField(eventTimeField))
-	log.Printf("in %s out %s", record.Show(), out.Show())
 
 	return out, nil
 }

@@ -21,6 +21,8 @@ func TestMappedStream_Next(t *testing.T) {
 
 	fieldNamesAll := append(fieldNamesNew, fieldNames...)
 
+	stateStorage := GetTestStorage(t)
+
 	type fields struct {
 		expressions []NamedExpression
 		variables   octosql.Variables
@@ -149,6 +151,7 @@ func TestMappedStream_Next(t *testing.T) {
 									),
 								},
 							),
+							stateStorage,
 						),
 					),
 				},
@@ -194,6 +197,7 @@ func TestMappedStream_Next(t *testing.T) {
 									),
 								},
 							),
+							stateStorage,
 						),
 					),
 				},

@@ -73,10 +73,14 @@ func NewNodeExpression(node Node, stateStorage storage.Storage) *NodeExpression 
 }
 
 func (ne *NodeExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
+	tx := ne.stateStorage.BeginTransaction()
 	// TODO: All of this has to be rewritten to be multithreaded using background jobs for the subqueries.
-	recordStream, err := ne.node.Get(ctx, variables, GetRawStreamID()) // TODO: Think about this.
+	recordStream, err := ne.node.Get(storage.InjectStateTransaction(ctx, tx), variables, GetRawStreamID()) // TODO: Think about this.
 	if err != nil {
 		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get record stream")
+	}
+	if err := tx.Commit(); err != nil {
+		return octosql.ZeroValue(), errors.Wrap(err, "couldn't commit transaction")
 	}
 
 	records, err := ReadAll(ctx, ne.stateStorage, recordStream)

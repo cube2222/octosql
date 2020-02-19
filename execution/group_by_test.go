@@ -7,7 +7,6 @@ import (
 
 	"github.com/cube2222/octosql"
 	. "github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/execution/trigger"
 	"github.com/cube2222/octosql/streaming/aggregate"
 	"github.com/cube2222/octosql/streaming/storage"
 )
@@ -46,9 +45,7 @@ func TestGroupBy_SimpleBatch(t *testing.T) {
 			octosql.NewVariableName("livesleft_count"),
 		},
 		octosql.NewVariableName(""),
-		func(ctx context.Context, variables octosql.Variables) (Trigger, error) {
-			return trigger.NewWatermarkTrigger(), nil
-		},
+		NewWatermarkTrigger(),
 	)
 
 	tx := stateStorage.BeginTransaction()
@@ -117,9 +114,7 @@ func TestGroupBy_BatchWithUndos(t *testing.T) {
 			octosql.NewVariableName("livesleft_count"),
 		},
 		octosql.NewVariableName(""),
-		func(ctx context.Context, variables octosql.Variables) (Trigger, error) {
-			return trigger.NewWatermarkTrigger(), nil
-		},
+		NewWatermarkTrigger(),
 	)
 
 	tx := stateStorage.BeginTransaction()
@@ -167,6 +162,10 @@ func TestGroupBy_WithOutputUndos(t *testing.T) {
 		NewRecordFromSliceWithNormalize(fields, []interface{}{"Lucy", 4, 3}),
 	})
 
+	variables := map[octosql.VariableName]octosql.Value{
+		octosql.NewVariableName("count"): octosql.MakeInt(1),
+	}
+
 	gb := NewGroupBy(
 		stateStorage,
 		source,
@@ -188,13 +187,11 @@ func TestGroupBy_WithOutputUndos(t *testing.T) {
 			octosql.NewVariableName("livesleft_count"),
 		},
 		octosql.NewVariableName(""),
-		func(ctx context.Context, variables octosql.Variables) (Trigger, error) {
-			return trigger.NewCountingTrigger(1), nil
-		},
+		NewCountingTrigger(NewVariable(octosql.NewVariableName("count"))),
 	)
 
 	tx := stateStorage.BeginTransaction()
-	stream, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
+	stream, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NewVariables(variables), GetRawStreamID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,6 +237,10 @@ func TestGroupBy_newRecordsNoChanges(t *testing.T) {
 		NewRecordFromSliceWithNormalize(fields, []interface{}{"Nala", 5, 3}),
 	})
 
+	variables := map[octosql.VariableName]octosql.Value{
+		octosql.NewVariableName("count"): octosql.MakeInt(1),
+	}
+
 	gb := NewGroupBy(
 		stateStorage,
 		source,
@@ -258,13 +259,11 @@ func TestGroupBy_newRecordsNoChanges(t *testing.T) {
 			octosql.NewVariableName("livesleft_avg"),
 		},
 		octosql.NewVariableName(""),
-		func(ctx context.Context, variables octosql.Variables) (Trigger, error) {
-			return trigger.NewCountingTrigger(1), nil
-		},
+		NewCountingTrigger(NewVariable(octosql.NewVariableName("count"))),
 	)
 
 	tx := stateStorage.BeginTransaction()
-	stream, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
+	stream, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), variables, GetRawStreamID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,9 +336,7 @@ func TestGroupBy_EventTimes(t *testing.T) {
 			octosql.NewVariableName("livesleft_count"),
 		},
 		octosql.NewVariableName("renamed_t"),
-		func(ctx context.Context, variables octosql.Variables) (Trigger, error) {
-			return trigger.NewWatermarkTrigger(), nil
-		},
+		NewWatermarkTrigger(),
 	)
 
 	tx := stateStorage.BeginTransaction()

@@ -10,9 +10,8 @@ import (
 )
 
 type Telemetry struct {
-	UserID      string
-	TelemetryID string
-	Features    struct {
+	UserID   string
+	Features struct {
 		GroupBy             bool
 		Limit               bool
 		Offset              bool
@@ -89,7 +88,7 @@ func SendTelemetry(ctx context.Context, telemetry *Telemetry) {
 		return
 	}
 
-	req, err := http.NewRequest(http.MethodPost, "http://localhost:8080", bytes.NewReader(data))
+	req, err := http.NewRequest(http.MethodPost, "http://localhost:8080/telemetry", bytes.NewReader(data))
 	if err != nil {
 		return
 	}

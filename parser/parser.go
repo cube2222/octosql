@@ -157,7 +157,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 				aggregates[i] = logical.First
 				for j := range key {
 					if namedKeyElement, ok := key[j].(logical.NamedExpression); ok {
-						if namedKeyElement.Name() == fields[i] {
+						if namedKeyElement.Name().Equal(fields[i]) {
 							aggregates[i] = logical.Key
 						}
 					}

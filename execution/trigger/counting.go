@@ -7,7 +7,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
@@ -65,51 +64,57 @@ func (ct *CountingTrigger) UpdateWatermark(ctx context.Context, tx storage.State
 	return nil
 }
 
-func (ct *CountingTrigger) PollKeyToFire(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error) {
+func (ct *CountingTrigger) PollKeysToFire(ctx context.Context, tx storage.StateTransaction) ([]octosql.Value, error) {
 	toSend := storage.NewValueState(tx.WithPrefix(toSendPrefix))
 	var out octosql.Value
 	err := toSend.Get(&out)
 	if err != nil {
 		if err == storage.ErrNotFound {
-			return octosql.ZeroValue(), execution.ErrNoKeyToFire
+			return nil, nil
 		}
-		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get value to send")
+		return nil, errors.Wrap(err, "couldn't get value to send")
 	}
 
 	err = toSend.Clear()
 	if err != nil {
-		return octosql.ZeroValue(), errors.Wrap(err, "couldn't clear value to send")
+		return nil, errors.Wrap(err, "couldn't clear value to send")
 	}
-	return out, nil
+	return []octosql.Value{out}, nil
 }
 
-func (ct *CountingTrigger) KeyFired(ctx context.Context, tx storage.StateTransaction, key octosql.Value) error {
+func (ct *CountingTrigger) KeysFired(ctx context.Context, tx storage.StateTransaction, keys []octosql.Value) error {
 	keyCounts := storage.NewMap(tx.WithPrefix(keyCountsPrefix))
-
-	var countValue octosql.Value
-	err := keyCounts.Get(&key, &countValue)
-	if err == nil {
-		err := keyCounts.Delete(&key)
-		if err != nil {
-			return errors.Wrap(err, "couldn't delete current count for key")
-		}
-		return nil
-	} else if err != storage.ErrNotFound {
-		return errors.Wrap(err, "couldn't get current count for key")
-	}
-
 	toSend := storage.NewValueState(tx.WithPrefix(toSendPrefix))
 
 	var out octosql.Value
-	err = toSend.Get(&out)
-	if err == nil && octosql.AreEqual(key, out) {
-		err := toSend.Clear()
-		if err != nil {
-			return errors.Wrap(err, "couldn't delete key to send")
-		}
-		return nil
+	var foundToSend bool
+	err := toSend.Get(&out)
+	if err == nil {
+		foundToSend = true
 	} else if err != storage.ErrNotFound {
 		return errors.Wrap(err, "couldn't get value to send")
+	}
+
+	for _, key := range keys {
+		var countValue octosql.Value
+		err := keyCounts.Get(&key, &countValue)
+		if err == nil {
+			err := keyCounts.Delete(&key)
+			if err != nil {
+				return errors.Wrap(err, "couldn't delete current count for key")
+			}
+			return nil
+		} else if err != storage.ErrNotFound {
+			return errors.Wrap(err, "couldn't get current count for key")
+		}
+
+		if foundToSend && octosql.AreEqual(key, out) {
+			err := toSend.Clear()
+			if err != nil {
+				return errors.Wrap(err, "couldn't delete key to send")
+			}
+			return nil
+		}
 	}
 
 	return nil

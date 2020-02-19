@@ -58,6 +58,50 @@ func (tsk *TimeSortedKeys) Update(key octosql.Value, t time.Time) error {
 	return nil
 }
 
+func (tsk *TimeSortedKeys) GetUntil(until time.Time) ([]octosql.Value, []time.Time, error) {
+	byTimeAndKey := storage.NewMap(tsk.tx.WithPrefix(byTimeAndKeyPrefix))
+
+	var outValues []octosql.Value
+	var outTimes []time.Time
+
+	iter := byTimeAndKey.GetIterator()
+	var key octosql.Value
+	var value octosql.Value
+	var err error
+	for err = iter.Next(&key, &value); err == nil; err = iter.Next(&key, &value) {
+		if key.GetType() != octosql.TypeTuple {
+			return nil, nil, fmt.Errorf("storage corruption, expected tuple key, got %v", key.GetType())
+		}
+
+		tuple := key.AsSlice()
+
+		if len(tuple) != 2 {
+			return nil, nil, fmt.Errorf("storage corruption, expected tuple of length 2, got %v", len(tuple))
+		}
+
+		if tuple[0].GetType() != octosql.TypeTime {
+			return nil, nil, fmt.Errorf("storage corruption, expected time in first element of tuple, got %v", tuple[0].GetType())
+		}
+
+		t := tuple[0].AsTime()
+		if t.After(until) {
+			break
+		}
+
+		outTimes = append(outTimes, tuple[0].AsTime())
+		outValues = append(outValues, tuple[1])
+	}
+	if err == storage.ErrEndOfIterator {
+	} else if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't get first element from iterator")
+	}
+	if err := iter.Close(); err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't close iterator")
+	}
+
+	return outValues, outTimes, nil
+}
+
 func (tsk *TimeSortedKeys) GetFirst() (octosql.Value, time.Time, error) {
 	byTimeAndKey := storage.NewMap(tsk.tx.WithPrefix(byTimeAndKeyPrefix))
 

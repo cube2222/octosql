@@ -7,7 +7,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
@@ -31,7 +30,7 @@ func (dt *DelayTrigger) RecordReceived(ctx context.Context, tx storage.StateTran
 
 	err := timeKeys.Update(key, sendTime)
 	if err != nil {
-		return errors.Wrap(err, "couldn't update trigger time for key")
+		return errors.Wrap(err, "couldn't update Trigger time for key")
 	}
 
 	return nil
@@ -41,35 +40,34 @@ func (dt *DelayTrigger) UpdateWatermark(ctx context.Context, tx storage.StateTra
 	return nil
 }
 
-func (dt *DelayTrigger) PollKeyToFire(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error) {
+func (dt *DelayTrigger) PollKeysToFire(ctx context.Context, tx storage.StateTransaction) ([]octosql.Value, error) {
 	timeKeys := NewTimeSortedKeys(tx.WithPrefix(timeSortedKeys))
 
-	key, sendTime, err := timeKeys.GetFirst()
+	now := dt.clock()
+
+	keys, times, err := timeKeys.GetUntil(now)
 	if err != nil {
-		if err == storage.ErrNotFound {
-			return octosql.ZeroValue(), execution.ErrNoKeyToFire
+		return nil, errors.Wrap(err, "couldn't get first key by time")
+	}
+
+	for i := range keys {
+		err = timeKeys.Delete(keys[i], times[i])
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't delete key")
 		}
-		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get first key by time")
 	}
 
-	if dt.clock().Before(sendTime) {
-		return octosql.ZeroValue(), execution.ErrNoKeyToFire
-	}
-
-	err = timeKeys.Delete(key, sendTime)
-	if err != nil {
-		return octosql.ZeroValue(), errors.Wrap(err, "couldn't delete key")
-	}
-
-	return key, nil
+	return keys, nil
 }
 
-func (dt *DelayTrigger) KeyFired(ctx context.Context, tx storage.StateTransaction, key octosql.Value) error {
+func (dt *DelayTrigger) KeysFired(ctx context.Context, tx storage.StateTransaction, keys []octosql.Value) error {
 	timeKeys := NewTimeSortedKeys(tx.WithPrefix(timeSortedKeys))
 
-	err := timeKeys.DeleteByKey(key)
-	if err != nil && err != storage.ErrNotFound {
-		return errors.Wrap(err, "couldn't delete send time for key")
+	for _, key := range keys {
+		err := timeKeys.DeleteByKey(key)
+		if err != nil && err != storage.ErrNotFound {
+			return errors.Wrap(err, "couldn't delete send time for key")
+		}
 	}
 
 	return nil

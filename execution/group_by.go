@@ -19,8 +19,6 @@ type Aggregate interface {
 	String() string
 }
 
-type TriggerPrototype func(ctx context.Context, variables octosql.Variables) (Trigger, error)
-
 type GroupBy struct {
 	storage storage.Storage
 	source  Node
@@ -76,7 +74,7 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 		}
 	}
 
-	trigger, err := node.triggerPrototype(ctx, variables)
+	trigger, err := node.triggerPrototype.Get(ctx, variables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get trigger from trigger prototype")
 	}

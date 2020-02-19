@@ -110,7 +110,7 @@ func TestWatermarkTrigger(t *testing.T) {
 
 	ExpectNoFire(t, ctx, wt, badgerStorage)
 
-	// Two keys trigger at once
+	// Two keys Trigger at once
 
 	RecordReceived(t, ctx, wt, badgerStorage, octosql.MakeInt(2), watermark.Add(time.Minute))
 
@@ -128,9 +128,7 @@ func TestWatermarkTrigger(t *testing.T) {
 	watermark = watermark.Add(time.Minute * 2)
 	UpdateWatermark(t, ctx, wt, badgerStorage, watermark)
 
-	ExpectFire(t, ctx, wt, badgerStorage, octosql.MakeInt(2))
-
-	ExpectFire(t, ctx, wt, badgerStorage, octosql.MakeInt(3))
+	ExpectFire(t, ctx, wt, badgerStorage, octosql.MakeInt(2), octosql.MakeInt(3))
 
 	ExpectNoFire(t, ctx, wt, badgerStorage)
 
@@ -161,7 +159,7 @@ func TestWatermarkTrigger(t *testing.T) {
 
 	ExpectFire(t, ctx, wt, badgerStorage, octosql.MakeInt(3))
 
-	// Key fired after trigger ready
+	// Key fired after Trigger ready
 
 	RecordReceived(t, ctx, wt, badgerStorage, octosql.MakeInt(2), watermark.Add(time.Minute))
 

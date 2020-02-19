@@ -35,7 +35,7 @@ func TestMultiTrigger(t *testing.T) {
 
 		ExpectNoFire(t, ctx, mt, badgerStorage)
 
-		KeyFired(t, ctx, mt, badgerStorage, octosql.MakeInt(2))
+		KeysFired(t, ctx, mt, badgerStorage, octosql.MakeInt(2))
 
 		ExpectFire(t, ctx, mt, badgerStorage, octosql.MakeInt(3))
 	*/

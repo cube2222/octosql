@@ -128,10 +128,6 @@ func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage
 		secondMultiSet.Insert(rec)
 	}
 
-	for _, rec := range secondRecords {
-		log.Println(rec.Show())
-	}
-
 	firstContained := firstMultiSet.isContained(secondMultiSet)
 	secondContained := secondMultiSet.isContained(firstMultiSet)
 	if !(firstContained && secondContained) {

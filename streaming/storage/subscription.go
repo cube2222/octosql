@@ -2,8 +2,10 @@ package storage
 
 import (
 	"context"
-	"errors"
+	"reflect"
 	"sync"
+
+	"github.com/pkg/errors"
 )
 
 // A Subscription lets the client listen for changes in the given prefixed storage.
@@ -66,4 +68,55 @@ func (sub *Subscription) Close() error {
 	} else {
 		return err
 	}
+}
+
+func ConcatSubscriptions(ctx context.Context, subs ...*Subscription) *Subscription {
+	count := len(subs)
+
+	// We create a slice of channels
+	// First n positions are change channels
+	// Next n positions are error channels
+	// Next 1 position will be a ctx.Done channel
+	channels := make([]reflect.SelectCase, count*2+1)
+	for i := range subs {
+		channels[i] = reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(subs[i].changes)}
+	}
+	for i := range subs {
+		channels[count+i] = reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(subs[i].errors)}
+	}
+	return NewSubscription(ctx, func(ctx context.Context, changes chan<- struct{}) error {
+		channels[len(channels)-1] = reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(ctx.Done())}
+		var closedErr error
+	loop:
+		for {
+			chosen, recv, _ := reflect.Select(channels)
+			if chosen == len(channels)-1 { // ctx.Done
+				closedErr = ctx.Err()
+				break
+			} else if chosen >= count { // error channel
+				if err, ok := recv.Interface().(error); ok {
+					return err
+				} else {
+					return errors.Errorf("unknown value in error receive, wanted error: %+v", err)
+				}
+			} else { // change channel
+				select {
+				case changes <- struct{}{}:
+				case <-ctx.Done():
+					closedErr = ctx.Err()
+					break loop
+				}
+			}
+		}
+
+		// We have to close all underlying subscriptions when closing.
+		for i := range subs {
+			err := subs[i].Close()
+			if err != nil {
+				return errors.Wrapf(err, "couldn't close subscription with index %d", i)
+			}
+		}
+
+		return closedErr
+	})
 }

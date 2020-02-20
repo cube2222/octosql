@@ -2,7 +2,6 @@ package execution
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
@@ -22,16 +21,16 @@ func (node *UnionAll) Get(ctx context.Context, variables octosql.Variables, stre
 	prefixedTx := storage.GetStateTransactionFromContext(ctx).WithPrefix(streamID.AsPrefix())
 
 	sourceRecordStreams := make([]RecordStream, len(node.sources))
-	for i := range node.sources {
-		sourceStreamID, err := GetSourceStreamID(prefixedTx, octosql.MakeInt(i))
+	for sourceIndex := range node.sources {
+		sourceStreamID, err := GetSourceStreamID(prefixedTx, octosql.MakeInt(sourceIndex))
 		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't get source stream ID for source with index %d", i)
+			return nil, errors.Wrapf(err, "couldn't get source stream ID for source with index %d", sourceIndex)
 		}
-		recordStream, err := node.sources[i].Get(ctx, variables, sourceStreamID)
+		recordStream, err := node.sources[sourceIndex].Get(ctx, variables, sourceStreamID)
 		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't get source record stream with index %d", i)
+			return nil, errors.Wrapf(err, "couldn't get source record stream with index %d", sourceIndex)
 		}
-		sourceRecordStreams[i] = recordStream
+		sourceRecordStreams[sourceIndex] = recordStream
 	}
 
 	return &UnifiedStream{
@@ -64,9 +63,12 @@ func (node *UnifiedStream) Next(ctx context.Context) (*Record, error) {
 
 	changeSubscriptions := make([]*storage.Subscription, len(node.sources))
 	for i := range node.sources { // TODO: Think about randomizing order.
-		key := octosql.MakeString(fmt.Sprint(i))
+		// Here we try to get a record from the i'th source stream.
+
+		// First check if this stream hasn't been closed already.
+		indexValue := octosql.MakeInt(i)
 		var endOfStream octosql.Value
-		err := endOfStreamsMap.Get(&key, &endOfStream)
+		err := endOfStreamsMap.Get(&indexValue, &endOfStream)
 		if err == storage.ErrNotFound {
 		} else if err != nil {
 			return nil, errors.Wrapf(err, "couldn't get end of stream for source stream with index %d", i)
@@ -77,8 +79,9 @@ func (node *UnifiedStream) Next(ctx context.Context) (*Record, error) {
 
 		record, err := node.sources[i].Next(ctx)
 		if err == ErrEndOfStream {
+			// We save that this stream is over
 			endOfStream = octosql.MakeBool(true)
-			err := endOfStreamsMap.Set(&key, &endOfStream)
+			err := endOfStreamsMap.Set(&indexValue, &endOfStream)
 			if err != nil {
 				return nil, errors.Wrapf(err, "couldn't set end of stream for source stream with index %d", i)
 			}
@@ -86,12 +89,15 @@ func (node *UnifiedStream) Next(ctx context.Context) (*Record, error) {
 		} else if errors.Cause(err) == ErrNewTransactionRequired {
 			return nil, err
 		} else if errWaitForChanges := GetErrWaitForChanges(err); errWaitForChanges != nil {
+			// We save this subscription, as we'll later wait on all the streams at once
+			// if others will respond with this error too.
 			changeSubscriptions[i] = errWaitForChanges.Subscription
 			continue
 		} else if err != nil {
 			return nil, errors.Wrapf(err, "couldn't get next record from source stream with index %d", i)
 		}
 
+		// We got a record, so we close all the received subscriptions from the previous streams.
 		for j := 0; j < i; j++ {
 			if changeSubscriptions[j] == nil {
 				continue

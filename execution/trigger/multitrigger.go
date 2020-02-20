@@ -69,7 +69,7 @@ func (m *MultiTrigger) PollKeysToFire(ctx context.Context, tx storage.StateTrans
 					}
 				}
 			}
-			if outKeys == nil {
+			if outKeys == nil { // Just a small premature optimization.
 				outKeys = keys
 			} else {
 				outKeys = append(outKeys, keys...)

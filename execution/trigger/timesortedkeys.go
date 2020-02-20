@@ -95,6 +95,7 @@ func (tsk *TimeSortedKeys) GetUntil(until time.Time) ([]octosql.Value, []time.Ti
 	} else if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get first element from iterator")
 	}
+
 	if err := iter.Close(); err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't close iterator")
 	}

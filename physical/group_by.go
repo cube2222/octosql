@@ -3,13 +3,11 @@ package physical
 import (
 	"context"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/execution/trigger"
 	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/cube2222/octosql/streaming/aggregate"
 )
@@ -63,16 +61,7 @@ func (c *CountingTrigger) Materialize(ctx context.Context, matCtx *Materializati
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize count expression")
 	}
-	return func(ctx context.Context, variables octosql.Variables) (execution.Trigger, error) {
-		count, err := countExpr.ExpressionValue(ctx, variables)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't get count expression value")
-		}
-		if t := count.GetType(); t != octosql.TypeInt {
-			return nil, errors.Errorf("counting trigger argument must be int, got %v", t)
-		}
-		return trigger.NewCountingTrigger(count.AsInt()), nil
-	}, nil
+	return execution.NewCountingTrigger(countExpr), nil
 }
 
 type DelayTrigger struct {
@@ -98,18 +87,7 @@ func (c *DelayTrigger) Materialize(ctx context.Context, matCtx *MaterializationC
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize delay expression")
 	}
-	return func(ctx context.Context, variables octosql.Variables) (execution.Trigger, error) {
-		delay, err := delayExpr.ExpressionValue(ctx, variables)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't get delay expression value")
-		}
-		if t := delay.GetType(); t != octosql.TypeDuration {
-			return nil, errors.Errorf("delay trigger argument must be duration, got %v", t)
-		}
-		return trigger.NewDelayTrigger(delay.AsDuration(), func() time.Time {
-			return time.Now()
-		}), nil
-	}, nil
+	return execution.NewDelayTrigger(delayExpr), nil
 }
 
 type WatermarkTrigger struct {
@@ -128,9 +106,7 @@ func (c *WatermarkTrigger) Transform(ctx context.Context, transformers *Transfor
 }
 
 func (c *WatermarkTrigger) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.TriggerPrototype, error) {
-	return func(ctx context.Context, variables octosql.Variables) (execution.Trigger, error) {
-		return trigger.NewWatermarkTrigger(), nil
-	}, nil
+	return execution.NewWatermarkTrigger(), nil
 }
 
 type GroupBy struct {
@@ -207,22 +183,11 @@ func (node *GroupBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 		}
 	}
 
-	triggerPrototype := func(ctx context.Context, variables octosql.Variables) (execution.Trigger, error) {
-		if len(triggerPrototypes) == 0 {
-			return trigger.NewWatermarkTrigger(), nil
-		}
-
-		triggers := make([]execution.Trigger, len(triggerPrototypes))
-		for i := range triggerPrototypes {
-			out, err := triggerPrototypes[i](ctx, variables)
-			if err != nil {
-				return nil, errors.Wrapf(err, "couldnt get trigger from trigger prototype with index %d", i)
-			}
-
-			triggers[i] = out
-		}
-
-		return trigger.NewMultiTrigger(triggers...), nil
+	var triggerPrototype execution.TriggerPrototype
+	if len(triggerPrototypes) == 0 {
+		triggerPrototype = execution.NewWatermarkTrigger()
+	} else {
+		triggerPrototype = execution.NewMultiTrigger(triggerPrototypes...)
 	}
 
 	sourceMetadata := node.Source.Metadata()

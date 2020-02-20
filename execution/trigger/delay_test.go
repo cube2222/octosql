@@ -119,7 +119,7 @@ func TestDelayTrigger(t *testing.T) {
 
 	ExpectNoFire(t, ctx, dt, badgerStorage)
 
-	// Two keys trigger at once
+	// Two keys Trigger at once
 
 	RecordReceived(t, ctx, dt, badgerStorage, octosql.MakeInt(2), time.Time{})
 
@@ -135,9 +135,7 @@ func TestDelayTrigger(t *testing.T) {
 
 	clock.Advance(time.Minute * 2)
 
-	ExpectFire(t, ctx, dt, badgerStorage, octosql.MakeInt(2))
-
-	ExpectFire(t, ctx, dt, badgerStorage, octosql.MakeInt(3))
+	ExpectFire(t, ctx, dt, badgerStorage, octosql.MakeInt(2), octosql.MakeInt(3))
 
 	ExpectNoFire(t, ctx, dt, badgerStorage)
 
@@ -165,7 +163,7 @@ func TestDelayTrigger(t *testing.T) {
 
 	ExpectFire(t, ctx, dt, badgerStorage, octosql.MakeInt(3))
 
-	// Key fired after trigger ready
+	// Key fired after Trigger ready
 
 	RecordReceived(t, ctx, dt, badgerStorage, octosql.MakeInt(2), time.Time{})
 

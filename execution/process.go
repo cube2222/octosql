@@ -17,13 +17,11 @@ type ProcessFunction interface {
 	Trigger(ctx context.Context, tx storage.StateTransaction, key octosql.Value) ([]*Record, error) // New Records and Retractions
 }
 
-var ErrNoKeyToFire = errors.New("no record to send")
-
 type Trigger interface {
 	RecordReceived(ctx context.Context, tx storage.StateTransaction, key octosql.Value, eventTime time.Time) error
 	UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error
-	PollKeyToFire(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error)
-	KeyFired(ctx context.Context, tx storage.StateTransaction, key octosql.Value) error
+	PollKeysToFire(ctx context.Context, tx storage.StateTransaction) ([]octosql.Value, error)
+	KeysFired(ctx context.Context, tx storage.StateTransaction, key []octosql.Value) error
 }
 
 type ProcessByKey struct {
@@ -75,11 +73,12 @@ func (p *ProcessByKey) AddRecord(ctx context.Context, tx storage.StateTransactio
 func (p *ProcessByKey) triggerKeys(ctx context.Context, tx storage.StateTransaction) error {
 	outputQueue := NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
 
-	for key, err := p.trigger.PollKeyToFire(ctx, tx); err != ErrNoKeyToFire; key, err = p.trigger.PollKeyToFire(ctx, tx) {
-		if err != nil {
-			return errors.Wrap(err, "couldn't poll trigger for key to fire")
-		}
+	keys, err := p.trigger.PollKeysToFire(ctx, tx)
+	if err != nil {
+		return errors.Wrap(err, "couldn't poll keys to fire")
+	}
 
+	for _, key := range keys {
 		records, err := p.processFunction.Trigger(ctx, tx, key)
 		if err != nil {
 			return errors.Wrap(err, "couldn't trigger process function")

@@ -98,13 +98,13 @@ func (node *UnifiedStream) Next(ctx context.Context) (*Record, error) {
 		}
 
 		// We got a record, so we close all the received subscriptions from the previous streams.
-		for j := 0; j < sourceIndex; j++ {
-			if changeSubscriptions[j] == nil {
+		for i := 0; i < sourceIndex; i++ {
+			if changeSubscriptions[i] == nil {
 				continue
 			}
-			err := changeSubscriptions[j].Close()
+			err := changeSubscriptions[i].Close()
 			if err != nil {
-				return nil, errors.Wrapf(err, "couldn't close changes subscription for source stream with index %d", j)
+				return nil, errors.Wrapf(err, "couldn't close changes subscription for source stream with index %d", i)
 			}
 		}
 

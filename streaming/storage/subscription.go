@@ -73,6 +73,10 @@ func (sub *Subscription) Close() error {
 func ConcatSubscriptions(ctx context.Context, subs ...*Subscription) *Subscription {
 	count := len(subs)
 
+	// We create a slice of channels
+	// First n positions are change channels
+	// Next n positions are error channels
+	// Next 1 position will be a ctx.Done channel
 	channels := make([]reflect.SelectCase, len(subs)*2+1)
 	for i := range subs {
 		channels[i] = reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(subs[i].changes)}
@@ -86,16 +90,16 @@ func ConcatSubscriptions(ctx context.Context, subs ...*Subscription) *Subscripti
 	loop:
 		for {
 			chosen, recv, _ := reflect.Select(channels)
-			if chosen == len(channels)-1 {
+			if chosen == len(channels)-1 { // ctx.Done
 				closedErr = ctx.Err()
 				break
-			} else if chosen >= count {
+			} else if chosen >= count { // error channel
 				if err, ok := recv.Interface().(error); ok {
 					return err
 				} else {
 					return errors.Errorf("unknown value in error receive, wanted error: %+v", err)
 				}
-			} else {
+			} else { // change channel
 				select {
 				case changes <- struct{}{}:
 				case <-ctx.Done():
@@ -105,6 +109,7 @@ func ConcatSubscriptions(ctx context.Context, subs ...*Subscription) *Subscripti
 			}
 		}
 
+		// We have to close all underlying subscriptions when closing.
 		for i := range subs {
 			err := subs[i].Close()
 			if err != nil {

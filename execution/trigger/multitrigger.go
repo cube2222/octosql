@@ -61,6 +61,8 @@ func (m *MultiTrigger) PollKeysToFire(ctx context.Context, tx storage.StateTrans
 	for i := range m.triggers {
 		keys, err := m.triggers[i].PollKeysToFire(ctx, tx.WithPrefix(m.prefixes[i]))
 		if err == nil && len(keys) > 0 {
+			// In all other triggers, mark these keys as fired.
+			// We don't want duplicates in the outKeys slice.
 			for j := range m.triggers {
 				if j != i {
 					err := m.triggers[j].KeysFired(ctx, tx.WithPrefix(m.prefixes[j]), keys)

@@ -77,7 +77,7 @@ func ConcatSubscriptions(ctx context.Context, subs ...*Subscription) *Subscripti
 	// First n positions are change channels
 	// Next n positions are error channels
 	// Next 1 position will be a ctx.Done channel
-	channels := make([]reflect.SelectCase, len(subs)*2+1)
+	channels := make([]reflect.SelectCase, count*2+1)
 	for i := range subs {
 		channels[i] = reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(subs[i].changes)}
 	}

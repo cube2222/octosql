@@ -1,9 +1,10 @@
 package execution
 
 import (
-	"github.com/cube2222/octosql"
-
 	"context"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/streaming/storage"
 
 	"github.com/pkg/errors"
 )
@@ -63,31 +64,37 @@ func (tup *TupleExpression) ExpressionValue(ctx context.Context, variables octos
 }
 
 type NodeExpression struct {
-	node Node
+	node         Node
+	stateStorage storage.Storage
 }
 
-func NewNodeExpression(node Node) *NodeExpression {
-	return &NodeExpression{node: node}
+func NewNodeExpression(node Node, stateStorage storage.Storage) *NodeExpression {
+	return &NodeExpression{node: node, stateStorage: stateStorage}
 }
 
 func (ne *NodeExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
-	records, err := ne.node.Get(ctx, variables, GetRawStreamID()) // TODO: Think about this.
+	tx := ne.stateStorage.BeginTransaction()
+	// TODO: All of this has to be rewritten to be multithreaded using background jobs for the subqueries. Think about this.
+	recordStream, err := ne.node.Get(storage.InjectStateTransaction(ctx, tx), variables, GetRawStreamID())
 	if err != nil {
 		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get record stream")
+	}
+	if err := tx.Commit(); err != nil {
+		return octosql.ZeroValue(), errors.Wrap(err, "couldn't commit transaction")
+	}
+
+	records, err := ReadAll(ctx, ne.stateStorage, recordStream)
+	if err != nil {
+		return octosql.ZeroValue(), errors.Wrap(err, "couldn't read whole subquery stream")
 	}
 
 	var firstRecord octosql.Value
 	outRecords := make([]octosql.Value, 0)
-
-	var curRecord *Record
-	for curRecord, err = records.Next(ctx); err == nil; curRecord, err = records.Next(ctx) {
+	for _, curRecord := range records {
 		if octosql.AreEqual(firstRecord, octosql.ZeroValue()) {
 			firstRecord = curRecord.AsTuple()
 		}
 		outRecords = append(outRecords, curRecord.AsTuple())
-	}
-	if err != ErrEndOfStream {
-		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get records from stream")
 	}
 
 	if len(outRecords) > 1 {

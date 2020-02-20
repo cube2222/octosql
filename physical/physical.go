@@ -149,7 +149,7 @@ func (ne *NodeExpression) Materialize(ctx context.Context, matCtx *Materializati
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize node")
 	}
-	return execution.NewNodeExpression(materialized), nil
+	return execution.NewNodeExpression(materialized, matCtx.Storage), nil
 }
 
 // LogicExpressions describes a boolean expression which get's it's value from the logic formula underneath.

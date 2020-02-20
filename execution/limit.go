@@ -64,7 +64,7 @@ type LimitedStream struct {
 func (node *LimitedStream) Close() error {
 	err := node.rs.Close()
 	if err != nil {
-		return errors.Wrap(err, "Couldn't close underlying stream")
+		return errors.Wrap(err, "couldn't close underlying stream")
 	}
 
 	return nil
@@ -74,31 +74,43 @@ func (node *LimitedStream) Next(ctx context.Context) (*Record, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
 	limitState := storage.NewValueState(tx.WithPrefix(node.streamID.AsPrefix()).WithPrefix(limitPrefix))
 
-	var limit octosql.Value
-	err := limitState.Get(&limit)
+	var limitValue octosql.Value
+	err := limitState.Get(&limitValue)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get limit state")
 	}
+	limit := limitValue.AsInt()
 
-	if limit.AsInt() > 0 {
-		record, err := node.rs.Next(ctx)
-		if err != nil {
-			if err == ErrEndOfStream {
-				limit = octosql.MakeInt(0)
-				return nil, ErrEndOfStream
-			}
-			return nil, errors.Wrap(err, "LimitedStream: couldn't get record")
-		}
-		limit = octosql.MakeInt(limit.AsInt() - 1)
-		if limit.AsInt() == 0 {
-			node.rs.Close()
-		}
-		err = limitState.Set(&limit)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't set new limit state")
-		}
-		return record, nil
+	if limit == 0 {
+		return nil, ErrEndOfStream
 	}
 
-	return nil, ErrEndOfStream
+	record, err := node.rs.Next(ctx)
+	if err != nil {
+		if err == ErrEndOfStream {
+			limitValue = octosql.MakeInt(0)
+			err = limitState.Set(&limitValue)
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't set new limit state")
+			}
+
+			return nil, ErrEndOfStream
+		}
+		return nil, errors.Wrap(err, "couldn't get record")
+	}
+
+	limit--
+	if limit == 0 {
+		err := node.rs.Close()
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't close source stream")
+		}
+	}
+
+	limitValue = octosql.MakeInt(limit)
+	err = limitState.Set(&limitValue)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't set new limit state")
+	}
+	return record, nil
 }

@@ -187,6 +187,18 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 
 		return tvf.NewTumble(matSource, timeField, matWindowLength, matWindowOffset), nil
 
+	case "watermark_highest_time":
+		source, err := node.getArgumentTable(octosql.NewVariableName("source"))
+		if err != nil {
+			return nil, err
+		}
+
+		matSource, err := source.Materialize(ctx, matCtx)
+		if err != nil {
+			return nil, errors.Errorf("couldn't materialize source")
+		}
+
+		return tvf.NewWatermarkHighestTime(matSource), nil
 	}
 
 	return nil, errors.Errorf("invalid table valued function: %v", node.Name)

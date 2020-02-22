@@ -2,6 +2,7 @@ package tvf
 
 import (
 	"context"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -43,6 +44,10 @@ func (wg *WatermarkHighestTime) Get(ctx context.Context, variables octosql.Varia
 
 type WatermarkHighestTimeStream struct {
 	source execution.RecordStream
+}
+
+func (s *WatermarkHighestTimeStream) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
+	panic("implement me")
 }
 
 func (s *WatermarkHighestTimeStream) Next(ctx context.Context) (*execution.Record, error) {

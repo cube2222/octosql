@@ -88,8 +88,9 @@ func (w *WatermarkTrigger) Physical(ctx context.Context, physicalCreator *Physic
 }
 
 type GroupBy struct {
-	source Node
-	key    []Expression
+	source    Node
+	watermark TableValuedFunction
+	key       []Expression
 
 	fields     []octosql.VariableName
 	aggregates []Aggregate
@@ -99,8 +100,8 @@ type GroupBy struct {
 	triggers []Trigger
 }
 
-func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, aggregates []Aggregate, as []octosql.VariableName, triggers []Trigger) *GroupBy {
-	return &GroupBy{source: source, key: key, fields: fields, aggregates: aggregates, as: as, triggers: triggers}
+func NewGroupBy(source Node, watermark TableValuedFunction, key []Expression, fields []octosql.VariableName, aggregates []Aggregate, as []octosql.VariableName, triggers []Trigger) *GroupBy {
+	return &GroupBy{source: source, watermark: watermark, key: key, fields: fields, aggregates: aggregates, as: as, triggers: triggers}
 }
 
 func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
@@ -111,6 +112,15 @@ func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlan
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for group by source")
 	}
 	variables, err = variables.MergeWith(sourceVariables)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't merge variables with those of source")
+	}
+
+	watermark, watermarkVariables, err := node.watermark.Physical(ctx, physicalCreator)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't get physical plan for group by watermark")
+	}
+	variables, err = variables.MergeWith(watermarkVariables)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't merge variables with those of source")
 	}
@@ -173,5 +183,5 @@ func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlan
 		triggers[i] = out
 	}
 
-	return physical.NewGroupBy(source, key, node.fields, aggregates, node.as, triggers), variables, nil
+	return physical.NewGroupBy(source, watermark, key, node.fields, aggregates, node.as, triggers), variables, nil
 }

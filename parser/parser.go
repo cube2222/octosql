@@ -174,7 +174,10 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 			}
 		}
 
-		root = logical.NewGroupBy(root, key, fields, aggregates, aggregatesAs, triggers)
+		// TODO - sparsuj watermarka i przekaz jego "typ" to groupby
+		//  (albo informacje ze go nie ma => wtedy pull engine stworzy ZeroWatermark)
+		phantomTvf := logical.NewTableValuedFunction("zero", nil)
+		root = logical.NewGroupBy(root, phantomTvf, key, fields, aggregates, aggregatesAs, triggers)
 	}
 
 	if statement.OrderBy != nil {

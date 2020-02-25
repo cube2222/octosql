@@ -175,7 +175,7 @@ func getDateFromExcelTime(timeValueStr string) (time.Time, error) {
 
 func isRowEmpty(row []octosql.Value) bool {
 	for i := range row {
-		if octosql.AreEqual(row[i], octosql.MakeNull()) {
+		if !octosql.AreEqual(row[i], octosql.MakeNull()) {
 			return false
 		}
 	}

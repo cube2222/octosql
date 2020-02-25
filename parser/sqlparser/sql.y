@@ -60,6 +60,9 @@ func skipToEnd(yylex interface{}) {
   tableValuedFunctionArguments TableValuedFunctionArguments
   tableValuedFunctionArgument *TableValuedFunctionArgument
   tableValuedFunctionArgumentValue TableValuedFunctionArgumentValue
+  commonTableExpression *CommonTableExpression
+  commonTableExpressions []*CommonTableExpression
+  with 					*With
   empty         struct{}
   statement     Statement
   selStmt       SelectStatement
@@ -215,6 +218,8 @@ func skipToEnd(yylex interface{}) {
 
 %type <statement> command
 %type <selStmt> select_statement base_select union_lhs union_rhs
+%type <commonTableExpression> cte
+%type <commonTableExpressions> cte_list
 %type <statement> stream_statement insert_statement update_statement delete_statement set_statement
 %type <statement> create_statement alter_statement rename_statement drop_statement truncate_statement flush_statement
 %type <ddl> create_table_prefix rename_list
@@ -375,6 +380,10 @@ select_statement:
     sel.Lock = $4
     $$ = sel
   }
+| WITH cte_list select_statement
+	{
+		$$ = &With{CommonTableExpressions: $2, Select: $2}
+	}
 | union_lhs union_op union_rhs order_by_opt limit_opt lock_opt
   {
     $$ = &Union{Type: $2, Left: $1, Right: $3, OrderBy: $4, Limit: $5, Lock: $6}
@@ -383,6 +392,23 @@ select_statement:
   {
     $$ = &Select{Comments: Comments($2), Cache: $3, SelectExprs: SelectExprs{Nextval{Expr: $5}}, From: TableExprs{&AliasedTableExpr{Expr: $7}}}
   }
+
+cte_list:
+	cte
+	{
+		$$ = []*CommonTableExpression{$1}
+	}
+|	cte_list ',' cte
+	{
+		$$ = append($1, $3)
+	}
+
+cte:
+	table_alias AS openb select_statement closeb
+	{
+		$$ = &CommonTableExpression{Name: $1, Select: $4}
+	}
+
 
 stream_statement:
   STREAM comment_opt select_expression FROM table_name
@@ -398,11 +424,7 @@ base_select:
   }
 
 union_lhs:
-  select_statement
-  {
-    $$ = $1
-  }
-| openb select_statement closeb
+	openb select_statement closeb
   {
     $$ = &ParenSelect{Select: $2}
   }
@@ -3374,6 +3396,7 @@ reserved_keyword:
 | VALUES
 | WHEN
 | WHERE
+| WITH
 
 /*
   These are non-reserved Vitess, because they don't cause conflicts in the grammar.
@@ -3497,7 +3520,6 @@ non_reserved_keyword:
 | VITESS_TARGET
 | WARNINGS
 | WATERMARK
-| WITH
 | WRITE
 | YEAR
 | ZEROFILL

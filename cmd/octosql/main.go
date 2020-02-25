@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/cube2222/octosql/storage/excel"
+	"github.com/cube2222/octosql/storage/thrift"
 	"log"
 	"os"
 	"reflect"
@@ -54,6 +55,7 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 				"postgres": postgres.NewDataSourceBuilderFactoryFromConfig,
 				"redis":    redis.NewDataSourceBuilderFactoryFromConfig,
 				"excel":    excel.NewDataSourceBuilderFactoryFromConfig,
+				"thrift":   thrift.NewDataSourceBuilderFactoryFromConfig,
 			},
 			cfg,
 		)

@@ -231,6 +231,26 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 	return root, nil
 }
 
+func ParseWith(statement *sqlparser.With) (logical.Node, error) {
+	source, err := ParseNode(statement.Select)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't parse underlying select in WITH statement")
+	}
+
+	nodes := make([]logical.Node, len(statement.CommonTableExpressions))
+	names := make([]string, len(statement.CommonTableExpressions))
+	for i, cte := range statement.CommonTableExpressions {
+		node, err := ParseNode(cte.Select)
+		if err != nil {
+			return nil, errors.Wrapf(err, "couldn't parse common table expression %s with index %d", cte.Name, i)
+		}
+		nodes[i] = node
+		names[i] = cte.Name.String()
+	}
+
+	return logical.NewWith(names, nodes, source), nil
+}
+
 func ParseNode(statement sqlparser.SelectStatement) (logical.Node, error) {
 	switch statement := statement.(type) {
 	case *sqlparser.Select:
@@ -241,6 +261,9 @@ func ParseNode(statement sqlparser.SelectStatement) (logical.Node, error) {
 
 	case *sqlparser.ParenSelect:
 		return ParseNode(statement.Select)
+
+	case *sqlparser.With:
+		return ParseWith(statement)
 
 	default:
 		// Union

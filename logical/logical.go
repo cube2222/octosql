@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/physical"
-	"github.com/pkg/errors"
 )
 
 type PhysicalPlanCreator struct {
@@ -25,6 +26,22 @@ func (creator *PhysicalPlanCreator) GetVariableName() (out octosql.VariableName)
 	out = octosql.NewVariableName(fmt.Sprintf("const_%d", creator.variableCounter))
 	creator.variableCounter++
 	return
+}
+
+func (creator *PhysicalPlanCreator) WithCommonTableExpression(name string, node physical.Node) *PhysicalPlanCreator {
+	newDataSourceRepo := creator.dataSourceRepo.WithFactory(
+		name,
+		func(name, alias string) physical.Node {
+			return physical.NewRequalifier(alias, node)
+		},
+	)
+
+	newCreator := &PhysicalPlanCreator{
+		variableCounter: creator.variableCounter,
+		dataSourceRepo:  newDataSourceRepo,
+	}
+
+	return newCreator
 }
 
 type Node interface {

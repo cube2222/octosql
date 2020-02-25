@@ -218,6 +218,7 @@ func skipToEnd(yylex interface{}) {
 
 %type <statement> command
 %type <selStmt> select_statement base_select union_lhs union_rhs
+%type <bytes> comma_opt
 %type <commonTableExpression> cte
 %type <commonTableExpressions> cte_list
 %type <statement> stream_statement insert_statement update_statement delete_statement set_statement
@@ -380,9 +381,9 @@ select_statement:
     sel.Lock = $4
     $$ = sel
   }
-| WITH cte_list select_statement
+| WITH cte_list comma_opt select_statement
 	{
-		$$ = &With{CommonTableExpressions: $2, Select: $3}
+		$$ = &With{CommonTableExpressions: $2, Select: $4}
 	}
 | union_lhs union_op union_rhs order_by_opt limit_opt lock_opt
   {
@@ -392,6 +393,16 @@ select_statement:
   {
     $$ = &Select{Comments: Comments($2), Cache: $3, SelectExprs: SelectExprs{Nextval{Expr: $5}}, From: TableExprs{&AliasedTableExpr{Expr: $7}}}
   }
+
+comma_opt:
+	{
+	$$ = nil
+	}
+| ','
+	{
+	$$ = []byte(",")
+	}
+
 
 cte_list:
 	cte

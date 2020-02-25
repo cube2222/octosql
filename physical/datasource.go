@@ -3,10 +3,11 @@ package physical
 import (
 	"context"
 
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical/metadata"
-	"github.com/pkg/errors"
 )
 
 // FieldType describes if a key is a primary or secondary attribute.
@@ -18,7 +19,7 @@ const (
 )
 
 // DataSourceBuilderFactory is a function used to create a new aliased data source builder.
-type DataSourceBuilderFactory func(name, alias string) *DataSourceBuilder
+type DataSourceBuilderFactory func(name, alias string) Node
 
 // DataSourceRepository is used to register factories for builders for any data source.
 // It can also later create a builder for any of those data source.
@@ -33,14 +34,14 @@ func NewDataSourceRepository() *DataSourceRepository {
 }
 
 // Get gets a new builder for a given data source.
-func (repo *DataSourceRepository) Get(dataSourceName, alias string) (*DataSourceBuilder, error) {
+func (repo *DataSourceRepository) Get(dataSourceName, alias string) (Node, error) {
 	ds, ok := repo.factories[dataSourceName]
 	if !ok {
 		var dss []string
 		for k := range repo.factories {
 			dss = append(dss, k)
 		}
-		return nil, errors.Errorf("no such datasource: %s, available datasources: %+v", dataSourceName, dss)
+		return nil, errors.Errorf("no such datasource or common table expression: %s, available datasources and CTEs: %+v", dataSourceName, dss)
 	}
 
 	return ds(dataSourceName, alias), nil
@@ -54,6 +55,20 @@ func (repo *DataSourceRepository) Register(dataSourceName string, factory DataSo
 	}
 	repo.factories[dataSourceName] = factory
 	return nil
+}
+
+// Register registers a builder factory for the given data source ColumnName.
+func (repo *DataSourceRepository) WithFactory(dataSourceName string, factory DataSourceBuilderFactory) *DataSourceRepository {
+	newRepo := &DataSourceRepository{
+		factories: make(map[string]DataSourceBuilderFactory),
+	}
+
+	for oldName, oldFactory := range repo.factories {
+		newRepo.factories[oldName] = oldFactory
+	}
+	newRepo.factories[dataSourceName] = factory
+
+	return newRepo
 }
 
 // DataSourceBuilder is used to build a data source instance with an alias.
@@ -71,7 +86,7 @@ type DataSourceBuilder struct {
 }
 
 func NewDataSourceBuilderFactory(materializer func(ctx context.Context, matCtx *MaterializationContext, dbConfig map[string]interface{}, filter Formula, alias string) (execution.Node, error), primaryKeys []octosql.VariableName, availableFilters map[FieldType]map[Relation]struct{}, cardinality metadata.Cardinality) DataSourceBuilderFactory {
-	return func(name, alias string) *DataSourceBuilder {
+	return func(name, alias string) Node {
 		return &DataSourceBuilder{
 			Materializer:     materializer,
 			PrimaryKeys:      primaryKeys,

@@ -87,14 +87,19 @@ func yyParsePooled(yylex yyLexer) int {
 // is the AST representation of the query. If a DDL statement
 // is partially parsed but still contains a syntax error, the
 // error is ignored and the DDL is returned anyway.
-func Parse(sql string) (Statement, error) {
+func Parse(sql string) (*Program, error) {
 	tokenizer := NewStringTokenizer(sql)
 	if yyParsePooled(tokenizer) != 0 {
 		if tokenizer.partialDDL != nil {
 			if typ, val := tokenizer.Scan(); typ != 0 {
 				return nil, fmt.Errorf("extra characters encountered after end of DDL: '%s'", string(val))
 			}
-			tokenizer.ParseTree = tokenizer.partialDDL
+			tokenizer.ParseTree = &Program{
+				Command: SqlCommand{
+					Statement: tokenizer.partialDDL,
+					Next:      nil,
+				},
+			}
 			return tokenizer.ParseTree, nil
 		}
 		return nil, fmt.Errorf("invalid argument %v", tokenizer.LastError.Error())
@@ -107,7 +112,7 @@ func Parse(sql string) (Statement, error) {
 
 // ParseStrictDDL is the same as Parse except it errors on
 // partially parsed DDL statements.
-func ParseStrictDDL(sql string) (Statement, error) {
+func ParseStrictDDL(sql string) (*Program, error) {
 	tokenizer := NewStringTokenizer(sql)
 	if yyParsePooled(tokenizer) != 0 {
 		return nil, tokenizer.LastError
@@ -129,17 +134,17 @@ func ParseTokenizer(tokenizer *Tokenizer) int {
 // The tokenizer will always read up to the end of the statement, allowing for
 // the next call to ParseNext to parse any subsequent SQL statements. When
 // there are no more statements to parse, a error of io.EOF is returned.
-func ParseNext(tokenizer *Tokenizer) (Statement, error) {
+func ParseNext(tokenizer *Tokenizer) (*Program, error) {
 	return parseNext(tokenizer, false)
 }
 
 // ParseNextStrictDDL is the same as ParseNext except it errors on
 // partially parsed DDL statements.
-func ParseNextStrictDDL(tokenizer *Tokenizer) (Statement, error) {
+func ParseNextStrictDDL(tokenizer *Tokenizer) (*Program, error) {
 	return parseNext(tokenizer, true)
 }
 
-func parseNext(tokenizer *Tokenizer, strict bool) (Statement, error) {
+func parseNext(tokenizer *Tokenizer, strict bool) (*Program, error) {
 	if tokenizer.lastChar == ';' {
 		tokenizer.next()
 		tokenizer.skipBlank()
@@ -152,7 +157,12 @@ func parseNext(tokenizer *Tokenizer, strict bool) (Statement, error) {
 	tokenizer.multi = true
 	if yyParsePooled(tokenizer) != 0 {
 		if tokenizer.partialDDL != nil && !strict {
-			tokenizer.ParseTree = tokenizer.partialDDL
+			tokenizer.ParseTree = &Program{
+				Command: SqlCommand{
+					Statement: tokenizer.partialDDL,
+					Next:      nil,
+				},
+			}
 			return tokenizer.ParseTree, nil
 		}
 		return nil, tokenizer.LastError
@@ -271,6 +281,58 @@ func Append(buf *strings.Builder, node SQLNode) {
 		Builder: buf,
 	}
 	node.Format(tbuf)
+}
+
+// SQL Program node which is the AST entrypoint
+type Program struct {
+	Command SqlCommand
+}
+
+// Walk program node
+func (node Program) walkSubtree(visit Visit) error {
+	return Walk(visit, node.Command)
+}
+
+// Format formats the node.
+func (node Program) Format(buf *TrackedBuffer) {
+	buf.Myprintf("%v", node.Command)
+}
+
+// SQL command which can have ancestors
+// This structure can be interpreted as a linked-list of SQL commands that will be executed
+type SqlCommand struct {
+	Statement Statement
+	Next *Program
+}
+
+// Translate SqlCommand into slice of statements
+func (node SqlCommand) getAllStatements(out *[]Statement) {
+	*out = append(*out, node.Statement)
+	if node.Next != nil {
+		node.Next.Command.getAllStatements(out)
+	}
+}
+
+// Walk SqlCommand node
+func (node SqlCommand) walkSubtree(visit Visit) error {
+	statements := []Statement{}
+	node.getAllStatements(&statements)
+
+	for _, t := range statements {
+		if err := Walk(visit, t); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Format formats the node.
+func (node SqlCommand) Format(buf *TrackedBuffer) {
+	if node.Next != nil {
+		buf.Myprintf("%v;%v", node.Statement, node.Next)
+	} else {
+		buf.Myprintf("%v", node.Statement)
+	}
 }
 
 // Statement represents a statement.
@@ -718,6 +780,12 @@ func (node *DBDDL) walkSubtree(visit Visit) error {
 	return nil
 }
 
+// Metadata for CREATE DATASOURCE statement
+type CrateDatasourceSpecs struct {
+	TypeName Expr
+	OptionsSpecs OptionsSpecs
+}
+
 // DDL represents a CREATE, ALTER, DROP, RENAME, TRUNCATE or ANALYZE statement.
 type DDL struct {
 	Action string
@@ -742,6 +810,18 @@ type DDL struct {
 
 	// VindexCols is set for AddColVindexStr.
 	VindexCols []ColIdent
+
+	// CrateDatasourceSpecs is set for CreateDataSourceStr
+	CrateDatasourceSpecs *CrateDatasourceSpecs
+}
+
+type OptionsSpecsEntry struct {
+	Key []string
+	Value Expr
+}
+
+type OptionsSpecs struct {
+	Options map[string]interface{}
 }
 
 // DDL strings.
@@ -758,6 +838,7 @@ const (
 	DropVschemaTableStr = "drop vschema table"
 	AddColVindexStr     = "on table add vindex"
 	DropColVindexStr    = "on table drop vindex"
+	CreateDataSourceStr = "create datasource"
 
 	// Vindex DDL param to specify the owner of a vindex
 	VindexOwnerStr = "owner"
@@ -774,6 +855,8 @@ func (node *DDL) Format(buf *TrackedBuffer) {
 		} else {
 			buf.Myprintf("%s table %v", node.Action, node.Table)
 		}
+	case CreateDataSourceStr:
+		buf.Myprintf("%s data source", node.Action)
 	case DropStr:
 		exists := ""
 		if node.IfExists {

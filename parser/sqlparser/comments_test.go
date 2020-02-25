@@ -390,7 +390,7 @@ func TestExtractCommentDirectives(t *testing.T) {
 	for _, testCase := range testCases {
 		sql := "select " + testCase.input + " 1 from dual"
 		stmt, _ := Parse(sql)
-		comments := stmt.(*Select).Comments
+		comments := stmt.Command.Statement.(*Select).Comments
 		vals := ExtractCommentDirectives(comments)
 
 		if !reflect.DeepEqual(vals, testCase.vals) {
@@ -434,27 +434,27 @@ func TestExtractCommentDirectives(t *testing.T) {
 
 func TestSkipQueryPlanCacheDirective(t *testing.T) {
 	stmt, _ := Parse("insert /*vt+ SKIP_QUERY_PLAN_CACHE=1 */ into user(id) values (1), (2)")
-	if !SkipQueryPlanCacheDirective(stmt) {
+	if !SkipQueryPlanCacheDirective(stmt.Command.Statement) {
 		t.Errorf("d.SkipQueryPlanCacheDirective(stmt) should be true")
 	}
 
 	stmt, _ = Parse("insert into user(id) values (1), (2)")
-	if SkipQueryPlanCacheDirective(stmt) {
+	if SkipQueryPlanCacheDirective(stmt.Command.Statement) {
 		t.Errorf("d.SkipQueryPlanCacheDirective(stmt) should be false")
 	}
 
 	stmt, _ = Parse("update /*vt+ SKIP_QUERY_PLAN_CACHE=1 */ users set name=1")
-	if !SkipQueryPlanCacheDirective(stmt) {
+	if !SkipQueryPlanCacheDirective(stmt.Command.Statement) {
 		t.Errorf("d.SkipQueryPlanCacheDirective(stmt) should be true")
 	}
 
 	stmt, _ = Parse("select /*vt+ SKIP_QUERY_PLAN_CACHE=1 */ * from users")
-	if !SkipQueryPlanCacheDirective(stmt) {
+	if !SkipQueryPlanCacheDirective(stmt.Command.Statement) {
 		t.Errorf("d.SkipQueryPlanCacheDirective(stmt) should be true")
 	}
 
 	stmt, _ = Parse("delete /*vt+ SKIP_QUERY_PLAN_CACHE=1 */ from users")
-	if !SkipQueryPlanCacheDirective(stmt) {
+	if !SkipQueryPlanCacheDirective(stmt.Command.Statement) {
 		t.Errorf("d.SkipQueryPlanCacheDirective(stmt) should be true")
 	}
 }

@@ -57,7 +57,7 @@ func TestSelect(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	expr := tree.(*Select).Where.Expr
+	expr := tree.Command.Statement.(*Select).Where.Expr
 
 	sel := &Select{}
 	sel.AddWhere(expr)
@@ -95,7 +95,7 @@ func TestSelect(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	expr = tree.(*Select).Where.Expr
+	expr = tree.Command.Statement.(*Select).Where.Expr
 	sel = &Select{}
 	sel.AddWhere(expr)
 	buf = NewTrackedBuffer(nil)
@@ -123,7 +123,7 @@ func TestRemoveHints(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		sel := tree.(*Select)
+		sel := tree.Command.Statement.(*Select)
 		sel.From = TableExprs{
 			sel.From[0].(*AliasedTableExpr).RemoveHints(),
 		}
@@ -140,12 +140,12 @@ func TestAddOrder(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	order := src.(*Select).OrderBy[0]
+	order := src.Command.Statement.(*Select).OrderBy[0]
 	dst, err := Parse("select * from t")
 	if err != nil {
 		t.Error(err)
 	}
-	dst.(*Select).AddOrder(order)
+	dst.Command.Statement.(*Select).AddOrder(order)
 	buf := NewTrackedBuffer(nil)
 	dst.Format(buf)
 	want := "select * from t order by foo asc"
@@ -156,7 +156,7 @@ func TestAddOrder(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	dst.(*Union).AddOrder(order)
+	dst.Command.Statement.(*Union).AddOrder(order)
 	buf = NewTrackedBuffer(nil)
 	dst.Format(buf)
 	want = "select * from t union select * from s order by foo asc"
@@ -170,12 +170,12 @@ func TestSetLimit(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	limit := src.(*Select).Limit
+	limit := src.Command.Statement.(*Select).Limit
 	dst, err := Parse("select * from t")
 	if err != nil {
 		t.Error(err)
 	}
-	dst.(*Select).SetLimit(limit)
+	dst.Command.Statement.(*Select).SetLimit(limit)
 	buf := NewTrackedBuffer(nil)
 	dst.Format(buf)
 	want := "select * from t limit 4"
@@ -186,7 +186,7 @@ func TestSetLimit(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	dst.(*Union).SetLimit(limit)
+	dst.Command.Statement.(*Union).SetLimit(limit)
 	buf = NewTrackedBuffer(nil)
 	dst.Format(buf)
 	want = "select * from t union select * from s limit 4"
@@ -258,14 +258,14 @@ func TestDDL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !reflect.DeepEqual(got, tcase.output) {
+		if !reflect.DeepEqual(got.Command.Statement, tcase.output) {
 			t.Errorf("%s: %v, want %v", tcase.query, got, tcase.output)
 		}
 		want := make(TableNames, 0, len(tcase.affected))
 		for _, t := range tcase.affected {
 			want = append(want, TableName{Name: NewTableIdent(t)})
 		}
-		if affected := got.(*DDL).AffectedTables(); !reflect.DeepEqual(affected, want) {
+		if affected := got.Command.Statement.(*DDL).AffectedTables(); !reflect.DeepEqual(affected, want) {
 			t.Errorf("Affected(%s): %v, want %v", tcase.query, affected, want)
 		}
 	}
@@ -276,7 +276,7 @@ func TestSetAutocommitON(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	s, ok := stmt.(*Set)
+	s, ok := stmt.Command.Statement.(*Set)
 	if !ok {
 		t.Errorf("SET statement is not Set: %T", s)
 	}
@@ -303,7 +303,7 @@ func TestSetAutocommitON(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	s, ok = stmt.(*Set)
+	s, ok = stmt.Command.Statement.(*Set)
 	if !ok {
 		t.Errorf("SET statement is not Set: %T", s)
 	}
@@ -332,7 +332,7 @@ func TestSetAutocommitOFF(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	s, ok := stmt.(*Set)
+	s, ok := stmt.Command.Statement.(*Set)
 	if !ok {
 		t.Errorf("SET statement is not Set: %T", s)
 	}
@@ -359,7 +359,7 @@ func TestSetAutocommitOFF(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	s, ok = stmt.(*Set)
+	s, ok = stmt.Command.Statement.(*Set)
 	if !ok {
 		t.Errorf("SET statement is not Set: %T", s)
 	}
@@ -584,7 +584,7 @@ func TestReplaceExpr(t *testing.T) {
 		if from == nil {
 			t.Fatalf("from is nil for %s", tcase.in)
 		}
-		expr := ReplaceExpr(tree.(*Select).Where.Expr, from, to)
+		expr := ReplaceExpr(tree.Command.Statement.(*Select).Where.Expr, from, to)
 		got := String(expr)
 		if tcase.out != got {
 			t.Errorf("ReplaceExpr(%s): %s, want %s", tcase.in, got, tcase.out)

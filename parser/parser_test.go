@@ -729,7 +729,7 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 				t.Fatal(err)
 			}
 
-			statement := stmt.(sqlparser.SelectStatement)
+			statement := stmt.Command.Statement.(sqlparser.SelectStatement)
 
 			got, err := ParseNode(statement)
 			if (err != nil) != tt.wantErr {

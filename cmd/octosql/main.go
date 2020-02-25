@@ -3,35 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/cube2222/octosql/octosql"
+	"github.com/go-chi/chi"
 	"log"
 	"net/http"
 	"os"
-	"reflect"
-
-	"github.com/dgraph-io/badger/v2"
-	"github.com/go-chi/chi"
 
 	"github.com/go-chi/chi/middleware"
 
-	"github.com/cube2222/octosql/storage/excel"
-	"github.com/cube2222/octosql/streaming/storage"
-
 	"github.com/spf13/cobra"
-
-	"github.com/cube2222/octosql/app"
-	"github.com/cube2222/octosql/config"
-	"github.com/cube2222/octosql/output"
-	csvoutput "github.com/cube2222/octosql/output/csv"
-	jsonoutput "github.com/cube2222/octosql/output/json"
-	"github.com/cube2222/octosql/output/table"
-	"github.com/cube2222/octosql/parser"
-	"github.com/cube2222/octosql/parser/sqlparser"
-	"github.com/cube2222/octosql/physical"
-	"github.com/cube2222/octosql/storage/csv"
-	"github.com/cube2222/octosql/storage/json"
-	"github.com/cube2222/octosql/storage/mysql"
-	"github.com/cube2222/octosql/storage/postgres"
-	"github.com/cube2222/octosql/storage/redis"
 )
 
 var configPath string
@@ -50,72 +30,19 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 		ctx := context.Background()
 		query := args[0]
 
-		// Configuration
-		cfg, err := config.ReadConfig(configPath)
-		if err != nil {
-			log.Fatal(err)
-		}
-		dataSourceRespository, err := physical.CreateDataSourceRepositoryFromConfig(
-			map[string]physical.Factory{
-				"csv":      csv.NewDataSourceBuilderFactoryFromConfig,
-				"json":     json.NewDataSourceBuilderFactoryFromConfig,
-				"mysql":    mysql.NewDataSourceBuilderFactoryFromConfig,
-				"postgres": postgres.NewDataSourceBuilderFactoryFromConfig,
-				"redis":    redis.NewDataSourceBuilderFactoryFromConfig,
-				"excel":    excel.NewDataSourceBuilderFactoryFromConfig,
-			},
-			cfg,
-		)
+		executor, err := octosql.NewOctosqlExecutor()
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		var out output.Output
-		switch outputFormat {
-		case "table":
-			out = table.NewOutput(os.Stdout, false)
-		case "table_row_separated":
-			out = table.NewOutput(os.Stdout, true)
-		case "json":
-			out = jsonoutput.NewOutput(os.Stdout)
-		case "csv":
-			out = csvoutput.NewOutput(',', os.Stdout)
-		case "tabbed":
-			out = csvoutput.NewOutput('\t', os.Stdout)
-		default:
-			log.Fatal("invalid output type")
+		err = executor.LoadConfiguration(configPath)
+		if err != nil {
+			log.Fatal(err)
 		}
 
-		app := app.NewApp(cfg, dataSourceRespository, out)
-
-		// Parse query
-		stmt, err := sqlparser.Parse(query)
+		err = executor.RunQuery(ctx, query)
 		if err != nil {
-			log.Fatal("couldn't parse query: ", err)
-		}
-		typed, ok := stmt.(sqlparser.SelectStatement)
-		if !ok {
-			log.Fatalf("invalid statement type, wanted sqlparser.SelectStatement got %v", reflect.TypeOf(stmt))
-		}
-		plan, err := parser.ParseNode(typed)
-		if err != nil {
-			log.Fatal("couldn't parse query: ", err)
-		}
-
-		opts := badger.DefaultOptions("")
-		opts.Dir = ""
-		opts.ValueDir = ""
-		opts.InMemory = true
-		db, err := badger.Open(opts)
-		if err != nil {
-			log.Fatal("couldn't open in-memory badger database: ", err)
-		}
-		stateStorage := storage.NewBadgerStorage(db)
-
-		// Run query
-		err = app.RunPlan(ctx, stateStorage, plan)
-		if err != nil {
-			log.Fatal("couldn't run plan: ", err)
+			log.Fatal(err)
 		}
 	},
 }

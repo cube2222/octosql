@@ -647,7 +647,7 @@ var FuncRegexpFind = execution.Function{
 
 		match := re.FindString(args[1].AsString())
 		if match == "" {
-			return ZeroValue(), nil
+			return MakeNull(), nil
 		}
 
 		return MakeString(match), nil

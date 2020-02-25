@@ -10,6 +10,25 @@ import (
 
 func EqualNodes(node1, node2 Node) error {
 	switch node1 := node1.(type) {
+	case *With:
+		if node2, ok := node2.(*With); ok {
+			if len(node1.cteNames) != len(node2.cteNames) {
+				return errors.Errorf("counts of cte's not equal: %d vs %d", len(node1.cteNames), len(node2.cteNames))
+			}
+			for i := range node1.cteNames {
+				if node1.cteNames[i] != node2.cteNames[i] {
+					return errors.Errorf("cte names with index %d not equal: %s vs %s", i, node1.cteNames[i], node2.cteNames[i])
+				}
+				if err := EqualNodes(node1.cteNodes[i], node2.cteNodes[i]); err != nil {
+					return errors.Wrapf(err, "cte nodes with index %d not equal: %+v, %+v", i, node1.cteNodes[i], node2.cteNodes[i])
+				}
+			}
+			if err := EqualNodes(node1.source, node2.source); err != nil {
+				return errors.Wrapf(err, "source node not equal: %+v, %+v", node1.source, node2.source)
+			}
+			return nil
+		}
+
 	case *UnionAll:
 		if node2, ok := node2.(*UnionAll); ok {
 			if err := EqualNodes(node1.first, node2.first); err != nil {

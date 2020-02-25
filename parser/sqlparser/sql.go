@@ -45,7 +45,7 @@ type yySymType struct {
 	tableValuedFunctionArgument      *TableValuedFunctionArgument
 	tableValuedFunctionArgumentValue TableValuedFunctionArgumentValue
 	commonTableExpression            *CommonTableExpression
-	commonTableExpressions           []*CommonTableExpression
+	commonTableExpressions           CommonTableExpressions
 	with                             *With
 	empty                            struct{}
 	statement                        Statement
@@ -3190,7 +3190,7 @@ yydefault:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line sql.y:384
 		{
-			yyVAL.selStmt = &With{CommonTableExpressions: yyDollar[2].commonTableExpressions, Select: yyDollar[2].commonTableExpressions}
+			yyVAL.selStmt = &With{CommonTableExpressions: yyDollar[2].commonTableExpressions, Select: yyDollar[3].selStmt}
 		}
 	case 26:
 		yyDollar = yyS[yypt-6 : yypt+1]

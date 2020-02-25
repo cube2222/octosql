@@ -281,6 +281,7 @@ type Statement interface {
 
 func (*Union) iStatement()      {}
 func (*Select) iStatement()     {}
+func (*With) iStatement()       {}
 func (*Stream) iStatement()     {}
 func (*Insert) iStatement()     {}
 func (*Update) iStatement()     {}
@@ -306,14 +307,13 @@ type SelectStatement interface {
 	iSelectStatement()
 	iStatement()
 	iInsertRows()
-	AddOrder(*Order)
-	SetLimit(*Limit)
 	SQLNode
 }
 
 func (*Select) iSelectStatement()      {}
 func (*Union) iSelectStatement()       {}
 func (*ParenSelect) iSelectStatement() {}
+func (*With) iSelectStatement()        {}
 
 // Select represents a SELECT statement.
 type Select struct {
@@ -349,16 +349,6 @@ const (
 	SQLCacheStr   = "sql_cache "
 	SQLNoCacheStr = "sql_no_cache "
 )
-
-// AddOrder adds an order by element
-func (node *Select) AddOrder(order *Order) {
-	node.OrderBy = append(node.OrderBy, order)
-}
-
-// SetLimit sets the limit clause
-func (node *Select) SetLimit(limit *Limit) {
-	node.Limit = limit
-}
 
 // Format formats the node.
 func (node *Select) Format(buf *TrackedBuffer) {
@@ -435,16 +425,6 @@ type ParenSelect struct {
 	Select SelectStatement
 }
 
-// AddOrder adds an order by element
-func (node *ParenSelect) AddOrder(order *Order) {
-	panic("unreachable")
-}
-
-// SetLimit sets the limit clause
-func (node *ParenSelect) SetLimit(limit *Limit) {
-	panic("unreachable")
-}
-
 // Format formats the node.
 func (node *ParenSelect) Format(buf *TrackedBuffer) {
 	buf.Myprintf("(%v)", node.Select)
@@ -476,16 +456,6 @@ const (
 	UnionDistinctStr = "union distinct"
 )
 
-// AddOrder adds an order by element
-func (node *Union) AddOrder(order *Order) {
-	node.OrderBy = append(node.OrderBy, order)
-}
-
-// SetLimit sets the limit clause
-func (node *Union) SetLimit(limit *Limit) {
-	node.Limit = limit
-}
-
 // Format formats the node.
 func (node *Union) Format(buf *TrackedBuffer) {
 	buf.Myprintf("%v %s %v%v%v%s", node.Left, node.Type, node.Right,
@@ -501,6 +471,63 @@ func (node *Union) walkSubtree(visit Visit) error {
 		node.Left,
 		node.Right,
 	)
+}
+
+type With struct {
+	CommonTableExpressions CommonTableExpressions
+	Select                 SelectStatement
+}
+
+func (node *With) Format(buf *TrackedBuffer) {
+	buf.Myprintf("WITH %v %v", node.CommonTableExpressions, node.Select)
+}
+
+func (node *With) walkSubtree(visit Visit) error {
+	if err := Walk(visit, node.CommonTableExpressions); err != nil {
+		return err
+	}
+	if err := Walk(visit, node.Select); err != nil {
+		return err
+	}
+	return nil
+}
+
+type CommonTableExpressions []*CommonTableExpression
+
+func (node CommonTableExpressions) Format(buf *TrackedBuffer) {
+	var prefix string
+	for _, n := range node {
+		buf.Myprintf("%s%v", prefix, n)
+		prefix = ", "
+	}
+}
+
+func (node CommonTableExpressions) walkSubtree(visit Visit) error {
+	for _, n := range node {
+		if err := Walk(visit, n); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type CommonTableExpression struct {
+	Name   TableIdent
+	Select SelectStatement
+}
+
+func (node *CommonTableExpression) Format(buf *TrackedBuffer) {
+	buf.Myprintf("%s AS (%v)", node.Name, node.Select)
+}
+
+func (node *CommonTableExpression) walkSubtree(visit Visit) error {
+	if err := Walk(visit, node.Name); err != nil {
+		return err
+	}
+	if err := Walk(visit, node.Select); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Stream represents a SELECT statement.
@@ -585,6 +612,7 @@ func (*Select) iInsertRows()      {}
 func (*Union) iInsertRows()       {}
 func (Values) iInsertRows()       {}
 func (*ParenSelect) iInsertRows() {}
+func (*With) iInsertRows()        {}
 
 // Update represents an UPDATE statement.
 // If you add fields here, consider adding them to calls to validateUnshardedRoute.

@@ -61,7 +61,7 @@ func skipToEnd(yylex interface{}) {
   tableValuedFunctionArgument *TableValuedFunctionArgument
   tableValuedFunctionArgumentValue TableValuedFunctionArgumentValue
   commonTableExpression *CommonTableExpression
-  commonTableExpressions []*CommonTableExpression
+  commonTableExpressions CommonTableExpressions
   with 					*With
   empty         struct{}
   statement     Statement
@@ -382,7 +382,7 @@ select_statement:
   }
 | WITH cte_list select_statement
 	{
-		$$ = &With{CommonTableExpressions: $2, Select: $2}
+		$$ = &With{CommonTableExpressions: $2, Select: $3}
 	}
 | union_lhs union_op union_rhs order_by_opt limit_opt lock_opt
   {

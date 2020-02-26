@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/execution/tvf"
 	"github.com/cube2222/octosql/streaming/storage"
 
 	"github.com/pkg/errors"
@@ -21,10 +20,9 @@ type Aggregate interface {
 }
 
 type GroupBy struct {
-	storage   storage.Storage
-	source    Node
-	watermark Node
-	key       []Expression
+	storage storage.Storage
+	source  Node
+	key     []Expression
 
 	fields              []octosql.VariableName
 	aggregatePrototypes []AggregatePrototype
@@ -36,8 +34,8 @@ type GroupBy struct {
 	triggerPrototype TriggerPrototype
 }
 
-func NewGroupBy(storage storage.Storage, source Node, watermark Node, key []Expression, fields []octosql.VariableName, aggregatePrototypes []AggregatePrototype, eventTimeField octosql.VariableName, as []octosql.VariableName, outEventTimeField octosql.VariableName, triggerPrototype TriggerPrototype) *GroupBy {
-	return &GroupBy{storage: storage, source: source, watermark: watermark, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, eventTimeField: eventTimeField, as: as, outEventTimeField: outEventTimeField, triggerPrototype: triggerPrototype}
+func NewGroupBy(storage storage.Storage, source Node, key []Expression, fields []octosql.VariableName, aggregatePrototypes []AggregatePrototype, eventTimeField octosql.VariableName, as []octosql.VariableName, outEventTimeField octosql.VariableName, triggerPrototype TriggerPrototype) *GroupBy {
+	return &GroupBy{storage: storage, source: source, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, eventTimeField: eventTimeField, as: as, outEventTimeField: outEventTimeField, triggerPrototype: triggerPrototype}
 }
 
 func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, error) {
@@ -50,12 +48,6 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 	source, err := node.source.Get(ctx, variables, sourceStreamID)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get stream for source in group by")
-	}
-
-	// TODO - actually, watermark has source underlying, so we dont need "source" field in group by anymore ...
-	watermark, err := node.watermark.Get(ctx, variables, sourceStreamID)
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get stream for watermark in group by")
 	}
 
 	aggregates := make([]Aggregate, len(node.aggregatePrototypes))
@@ -103,8 +95,7 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 		variables:       variables,
 	}
 
-	// TODO - damn, it would have been so beautiful (what to do, what to do...)
-	groupByPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, watermark)
+	groupByPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, &ZeroWatermarkSource{})
 	go groupByPullEngine.Run(ctx) // TODO: .Close() should kill this context and the goroutine.
 
 	return groupByPullEngine, nil

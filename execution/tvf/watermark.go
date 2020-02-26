@@ -31,7 +31,6 @@ func (w *Watermark) Document() docs.Documentation {
 
 func (w *Watermark) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
-
 	sourceStreamID, err := execution.GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get source stream ID")
@@ -84,13 +83,14 @@ func (s *WatermarkStream) Next(ctx context.Context) (*execution.Record, error) {
 		return nil, fmt.Errorf("couldn't get time field '%v' as time, got: %v", s.timeField.String(), srcRecord.Value(s.timeField))
 	}
 
-	currentWatermark, err := s.GetWatermark(ctx, tx) // TODO - nie mam tu transakcji - zrobic nowa (?)
+	tx := storage.GetStateTransactionFromContext(ctx)
+	currentWatermark, err := s.GetWatermark(ctx, tx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get current watermark value")
 	}
 
 	if timeValue.AsTime().After(currentWatermark) { // time in current record is bigger than current watermark - update it
-		watermarkStorage := storage.NewValueState(tx.WithPrefix(watermarkPrefix)) // TODO - same
+		watermarkStorage := storage.NewValueState(tx.WithPrefix(watermarkPrefix))
 
 		err := watermarkStorage.Set(&timeValue)
 		if err != nil {

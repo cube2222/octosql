@@ -28,7 +28,6 @@ func (w *ZeroWatermark) Document() docs.Documentation {
 
 func (w *ZeroWatermark) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
-
 	sourceStreamID, err := execution.GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get source stream ID")

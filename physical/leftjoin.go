@@ -6,6 +6,7 @@ import (
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/pkg/errors"
 )
@@ -51,4 +52,11 @@ func (node *LeftJoin) Materialize(ctx context.Context, matCtx *MaterializationCo
 
 func (node *LeftJoin) Metadata() *metadata.NodeMetadata {
 	return metadata.NewNodeMetadata(metadata.CombineCardinalities(node.Source.Metadata().Cardinality(), node.Joined.Metadata().Cardinality()), octosql.NewVariableName(""))
+}
+
+func (node *LeftJoin) Visualize() *graph.Node {
+	n := graph.NewNode("Left Join")
+	n.AddChild("source", node.Source.Visualize())
+	n.AddChild("joined", node.Joined.Visualize())
+	return n
 }

@@ -36,6 +36,7 @@ import (
 
 var configPath string
 var outputFormat string
+var describe bool
 
 var rootCmd = &cobra.Command{
 	Use:   "octosql <query>",
@@ -86,7 +87,7 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 			log.Fatal("invalid output type")
 		}
 
-		app := app.NewApp(cfg, dataSourceRespository, out)
+		app := app.NewApp(cfg, dataSourceRespository, out, describe)
 
 		// Parse query
 		stmt, err := sqlparser.Parse(query)
@@ -123,6 +124,7 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 func main() {
 	rootCmd.Flags().StringVarP(&configPath, "config", "c", os.Getenv("OCTOSQL_CONFIG"), "data source configuration path, defaults to $OCTOSQL_CONFIG")
 	rootCmd.Flags().StringVarP(&outputFormat, "output", "o", "table", "output format, one of [table json csv tabbed table_row_separated]")
+	rootCmd.Flags().BoolVar(&describe, "describe", false, "Print out the physical query plan in graphviz format. You can use a command like \"dot -Tpng file > output.png\" to view it.")
 
 	go func() {
 		r := chi.NewRouter()

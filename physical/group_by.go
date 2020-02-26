@@ -2,12 +2,15 @@ package physical
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/execution/aggregates"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/cube2222/octosql/streaming/aggregate"
 )
@@ -235,4 +238,23 @@ func (node *GroupBy) Metadata() *metadata.NodeMetadata {
 	}
 
 	return metadata.NewNodeMetadata(cardinality, outEventTimeField)
+}
+
+func (node *GroupBy) Visualize() *graph.Node {
+	n := graph.NewNode("Group By")
+
+	n.AddChild("source", node.Source.Visualize())
+	for i, expr := range node.Key {
+		n.AddChild(fmt.Sprintf("key_%d", i), expr.Visualize())
+	}
+
+	for i := range node.Fields {
+		value := fmt.Sprintf("%s(%s)", node.Aggregates[i], node.Fields[i])
+		if !node.As[i].Empty() {
+			value += fmt.Sprintf(" as %s", node.As[i])
+		}
+		n.AddField(fmt.Sprintf("field_%d", i), value)
+	}
+
+	return n
 }

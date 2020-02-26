@@ -205,10 +205,7 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 		if err != nil {
 			return nil, err
 		}
-		timeField, err := node.getArgumentDescriptor(octosql.NewVariableName("time_field"))
-		if err != nil {
-			return nil, err
-		}
+		timeField := source.Metadata().EventTimeField()
 
 		matSource, err := source.Materialize(ctx, matCtx)
 		if err != nil {

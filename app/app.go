@@ -2,10 +2,8 @@ package app
 
 import (
 	"context"
-	"log"
 	"fmt"
-
-	"github.com/pkg/errors"
+	"log"
 
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"

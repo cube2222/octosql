@@ -4,14 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
-
-	"github.com/pkg/errors"
-
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
+
+	"github.com/pkg/errors"
 )
 
 // FieldType describes if a key is a primary or secondary attribute.

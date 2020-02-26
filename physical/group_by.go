@@ -9,7 +9,6 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/execution/aggregates"
 	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/cube2222/octosql/streaming/aggregate"
@@ -39,6 +38,7 @@ type Trigger interface {
 	// Transform returns a new Expression after recursively calling Transform
 	Transform(ctx context.Context, transformers *Transformers) Trigger
 	Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.TriggerPrototype, error)
+	graph.Visualizer
 }
 
 type CountingTrigger struct {
@@ -67,6 +67,12 @@ func (c *CountingTrigger) Materialize(ctx context.Context, matCtx *Materializati
 	return execution.NewCountingTrigger(countExpr), nil
 }
 
+func (c *CountingTrigger) Visualize() *graph.Node {
+	n := graph.NewNode("Counting Trigger")
+	n.AddChild("count", c.Count.Visualize())
+	return n
+}
+
 type DelayTrigger struct {
 	Delay Expression
 }
@@ -93,6 +99,12 @@ func (c *DelayTrigger) Materialize(ctx context.Context, matCtx *MaterializationC
 	return execution.NewDelayTrigger(delayExpr), nil
 }
 
+func (c *DelayTrigger) Visualize() *graph.Node {
+	n := graph.NewNode("Delay Trigger")
+	n.AddChild("count", c.Delay.Visualize())
+	return n
+}
+
 type WatermarkTrigger struct {
 }
 
@@ -110,6 +122,11 @@ func (c *WatermarkTrigger) Transform(ctx context.Context, transformers *Transfor
 
 func (c *WatermarkTrigger) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.TriggerPrototype, error) {
 	return execution.NewWatermarkTrigger(), nil
+}
+
+func (c *WatermarkTrigger) Visualize() *graph.Node {
+	n := graph.NewNode("Watermark Trigger")
+	return n
 }
 
 type GroupBy struct {
@@ -246,6 +263,9 @@ func (node *GroupBy) Visualize() *graph.Node {
 	n.AddChild("source", node.Source.Visualize())
 	for i, expr := range node.Key {
 		n.AddChild(fmt.Sprintf("key_%d", i), expr.Visualize())
+	}
+	for i, trigger := range node.Triggers {
+		n.AddChild(fmt.Sprintf("trigger_%d", i), trigger.Visualize())
 	}
 
 	for i := range node.Fields {

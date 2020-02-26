@@ -2,6 +2,7 @@ module github.com/cube2222/octosql
 
 require (
 	github.com/360EntSecGroup-Skylar/excelize v1.4.1
+	github.com/awalterschulze/gographviz v0.0.0-20190522210029-fa59802746ab
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible // indirect
 	github.com/bradleyjkemp/memmap v0.2.2 // indirect
 	github.com/bradleyjkemp/memviz v0.2.2

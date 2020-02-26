@@ -2,12 +2,14 @@ package physical
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
 )
 
@@ -37,6 +39,7 @@ type Node interface {
 	Transform(ctx context.Context, transformers *Transformers) Node
 	Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error)
 	Metadata() *metadata.NodeMetadata
+	graph.Visualizer
 }
 
 // Expressions describes a single value source.
@@ -44,6 +47,7 @@ type Expression interface {
 	// Transform returns a new Expression after recursively calling Transform
 	Transform(ctx context.Context, transformers *Transformers) Expression
 	Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Expression, error)
+	graph.Visualizer
 }
 
 // NamedExpressions describes a single named value source.
@@ -85,6 +89,12 @@ func (v *Variable) MaterializeNamed(ctx context.Context, matCtx *Materialization
 	return execution.NewVariable(v.Name), nil
 }
 
+func (node *Variable) Visualize() *graph.Node {
+	n := graph.NewNode("Variable")
+	n.AddField("name", node.Name.String())
+	return n
+}
+
 // TupleExpression describes an expression which is a tuple of subexpressions.
 type Tuple struct {
 	Expressions []Expression
@@ -121,6 +131,14 @@ func (tup *Tuple) Materialize(ctx context.Context, matCtx *MaterializationContex
 	return execution.NewTuple(matExprs), nil
 }
 
+func (tup *Tuple) Visualize() *graph.Node {
+	n := graph.NewNode("Tuple")
+	for i := range tup.Expressions {
+		n.AddChild(fmt.Sprintf("expr_%d", i), tup.Expressions[i].Visualize())
+	}
+	return n
+}
+
 // NodeExpressions describes an expression which gets it's value from a node underneath.
 type NodeExpression struct {
 	Node Node
@@ -148,6 +166,12 @@ func (ne *NodeExpression) Materialize(ctx context.Context, matCtx *Materializati
 	return execution.NewNodeExpression(materialized), nil
 }
 
+func (ne *NodeExpression) Visualize() *graph.Node {
+	n := graph.NewNode("Node Expression")
+	n.AddChild("source", ne.Node.Visualize())
+	return n
+}
+
 // LogicExpressions describes a boolean expression which get's it's value from the logic formula underneath.
 type LogicExpression struct {
 	Formula Formula
@@ -173,6 +197,12 @@ func (le *LogicExpression) Materialize(ctx context.Context, matCtx *Materializat
 		return nil, errors.Wrap(err, "couldn't materialize formula")
 	}
 	return execution.NewLogicExpression(materialized), nil
+}
+
+func (le *LogicExpression) Visualize() *graph.Node {
+	n := graph.NewNode("Logic Expression")
+	n.AddChild("source", le.Formula.Visualize())
+	return n
 }
 
 // AliasedExpression describes an expression which is explicitly named.
@@ -210,4 +240,11 @@ func (alExpr *AliasedExpression) MaterializeNamed(ctx context.Context, matCtx *M
 		return nil, errors.Wrap(err, "couldn't materialize node")
 	}
 	return execution.NewAliasedExpression(alExpr.Name, materialized), nil
+}
+
+func (alExpr *AliasedExpression) Visualize() *graph.Node {
+	n := graph.NewNode("Aliased Expression")
+	n.AddField("alias", alExpr.Name.String())
+	n.AddChild("expr", alExpr.Expr.Visualize())
+	return n
 }

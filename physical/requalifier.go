@@ -6,6 +6,7 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/pkg/errors"
 )
@@ -43,4 +44,11 @@ func (node *Requalifier) Metadata() *metadata.NodeMetadata {
 	eventTimeField = octosql.NewVariableName(fmt.Sprintf("%s.%s", node.Qualifier, eventTimeField.Name()))
 
 	return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality(), eventTimeField)
+}
+
+func (node *Requalifier) Visualize() *graph.Node {
+	n := graph.NewNode("Requalifier")
+	n.AddField("qualifier", node.Qualifier)
+	n.AddChild("source", node.Source.Visualize())
+	return n
 }

@@ -2,9 +2,11 @@ package physical
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/pkg/errors"
 )
@@ -90,4 +92,17 @@ func (node *Map) Metadata() *metadata.NodeMetadata {
 		}
 	}
 	return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality(), newEventTimeField)
+}
+
+func (node *Map) Visualize() *graph.Node {
+	n := graph.NewNode("Map")
+
+	n.AddChild("source", node.Source.Visualize())
+	for i, expr := range node.Expressions {
+		n.AddChild(fmt.Sprintf("expr_%d", i), expr.Visualize())
+	}
+
+	n.AddField("keep", fmt.Sprint(node.Keep))
+
+	return n
 }

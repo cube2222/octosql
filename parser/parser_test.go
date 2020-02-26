@@ -7,6 +7,7 @@ import (
 	"time"
 
 	memmap "github.com/bradleyjkemp/memviz"
+
 	"github.com/cube2222/octosql"
 
 	"github.com/cube2222/octosql/logical"
@@ -26,9 +27,9 @@ func TestParseNode(t *testing.T) {
 		{
 			name: "simple union",
 			args: args{
-				`SELECT p.id, p.name, p.surname FROM people p WHERE p.surname = 'Kowalski'
+				`(SELECT p.id, p.name, p.surname FROM people p WHERE p.surname = 'Kowalski')
 					UNION
-					SELECT * FROM admins a WHERE a.exp < 2`,
+					(SELECT * FROM admins a WHERE a.exp < 2)`,
 			},
 			want: logical.NewUnionDistinct(
 				logical.NewMap(
@@ -71,9 +72,9 @@ func TestParseNode(t *testing.T) {
 		{
 			name: "simple union all + limit + NO offset",
 			args: args{
-				`SELECT c.name, c.age FROM cities c WHERE c.age > 100
+				`(SELECT c.name, c.age FROM cities c WHERE c.age > 100)
 					UNION ALL
-					SELECT p.name, p.age FROM people p WHERE p.age > 4
+					(SELECT p.name, p.age FROM people p WHERE p.age > 4)
 					LIMIT 5`,
 			},
 			want: logical.NewLimit(
@@ -158,9 +159,9 @@ func TestParseNode(t *testing.T) {
 		{
 			name: "simple union all",
 			args: args{
-				`SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 3
+				`(SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 3)
 					UNION ALL
-					SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 4`,
+					(SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 4)`,
 			},
 			want: logical.NewUnionAll(
 				logical.NewMap(
@@ -213,9 +214,9 @@ func TestParseNode(t *testing.T) {
 		{
 			name: "complex union all",
 			args: args{
-				`(SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 3 UNION ALL SELECT p2.name, p2.age FROM people p2 WHERE p2.age < 5)
+				`((SELECT p2.name, p2.age FROM people p2 WHERE p2.age > 3) UNION ALL (SELECT p2.name, p2.age FROM people p2 WHERE p2.age < 5))
 					UNION ALL
-					(SELECT p2.name, p2.age FROM people p2 WHERE p2.city > 'ciechanowo' UNION ALL SELECT p2.name, p2.age FROM people p2 WHERE p2.city < 'wwa')`,
+					((SELECT p2.name, p2.age FROM people p2 WHERE p2.city > 'ciechanowo') UNION ALL (SELECT p2.name, p2.age FROM people p2 WHERE p2.city < 'wwa'))`,
 			},
 			want: logical.NewUnionAll(
 				logical.NewUnionAll(
@@ -718,6 +719,24 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 						octosql.NewVariableName("arg4"): logical.NewTableValuedFunctionArgumentValueDescriptor("test2.test3"),
 					},
 				),
+			),
+			wantErr: false,
+		},
+		{
+			name: "table valued function",
+			args: args{
+				statement: `WITH xtab AS (SELECT * FROM tab t), ytab AS (SELECT * FROM xtab x) SELECT * FROM ytab y`,
+			},
+			want: logical.NewWith(
+				[]string{
+					"xtab",
+					"ytab",
+				},
+				[]logical.Node{
+					logical.NewDataSource("tab", "t"),
+					logical.NewDataSource("xtab", "x"),
+				},
+				logical.NewDataSource("ytab", "y"),
 			),
 			wantErr: false,
 		},

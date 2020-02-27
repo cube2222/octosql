@@ -39,32 +39,32 @@ func (r *Tumble) Document() docs.Documentation {
 	)
 }
 
-func (r *Tumble) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, error) {
+func (r *Tumble) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecOutput, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
 	sourceStreamID, err := execution.GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get source stream ID")
+		return nil, nil, errors.Wrap(err, "couldn't get source stream ID")
 	}
 
-	source, err := r.source.Get(ctx, variables, sourceStreamID)
+	source, execOutput, err := r.source.Get(ctx, variables, sourceStreamID)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get source")
+		return nil, nil, errors.Wrap(err, "couldn't get source")
 	}
 
 	duration, err := r.windowLength.ExpressionValue(ctx, variables)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get window length")
+		return nil, nil, errors.Wrap(err, "couldn't get window length")
 	}
 	if duration.GetType() != octosql.TypeDuration {
-		return nil, errors.Errorf("invalid tumble duration: %v", duration)
+		return nil, nil, errors.Errorf("invalid tumble duration: %v", duration)
 	}
 
 	offset, err := r.offset.ExpressionValue(ctx, variables)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get window offset")
+		return nil, nil, errors.Wrap(err, "couldn't get window offset")
 	}
 	if offset.GetType() != octosql.TypeDuration {
-		return nil, errors.Errorf("invalid tumble offset: %v", duration)
+		return nil, nil, errors.Errorf("invalid tumble offset: %v", duration)
 	}
 
 	return &TumbleStream{
@@ -72,7 +72,7 @@ func (r *Tumble) Get(ctx context.Context, variables octosql.Variables, streamID 
 		timeField:    r.timeField,
 		windowLength: duration.AsDuration(),
 		offset:       offset.AsDuration(),
-	}, nil
+	}, execOutput, nil
 }
 
 type TumbleStream struct {

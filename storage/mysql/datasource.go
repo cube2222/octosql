@@ -121,7 +121,7 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 	return NewDataSourceBuilderFactory(primaryKeys), nil
 }
 
-func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, error) {
+func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecOutput, error) {
 	values := make([]interface{}, 0)
 
 	for i := range ds.aliases {
@@ -130,7 +130,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		//since we have an execution expression, then we can evaluate it given the variables
 		value, err := expression.ExpressionValue(ctx, variables)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't get actual value from variables")
+			return nil, nil, errors.Wrap(err, "couldn't get actual value from variables")
 		}
 
 		values = append(values, value.ToRawValue())
@@ -138,12 +138,12 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 
 	rows, err := ds.stmt.QueryContext(ctx, values...)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't query statement")
+		return nil, nil, errors.Wrap(err, "couldn't query statement")
 	}
 
 	columns, err := rows.Columns()
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get columns from rows")
+		return nil, nil, errors.Wrap(err, "couldn't get columns from rows")
 	}
 
 	return &RecordStream{
@@ -151,7 +151,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		columns: columns,
 		isDone:  false,
 		alias:   ds.alias,
-	}, nil
+	}, nil, nil
 
 }
 

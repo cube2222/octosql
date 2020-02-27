@@ -9,8 +9,19 @@ import (
 	"github.com/pkg/errors"
 )
 
+// This struct represents additional metadata to be returned with Get() and used recursively (like WatermarkSource)
+type ExecOutput struct {
+	WatermarkSource WatermarkSource
+}
+
+func NewExecOutput(ws WatermarkSource) *ExecOutput {
+	return &ExecOutput{
+		WatermarkSource: ws,
+	}
+}
+
 type Node interface {
-	Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, error)
+	Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecOutput, error)
 }
 
 type Expression interface {
@@ -75,7 +86,7 @@ func NewNodeExpression(node Node, stateStorage storage.Storage) *NodeExpression 
 func (ne *NodeExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
 	tx := ne.stateStorage.BeginTransaction()
 	// TODO: All of this has to be rewritten to be multithreaded using background jobs for the subqueries. Think about this.
-	recordStream, err := ne.node.Get(storage.InjectStateTransaction(ctx, tx), variables, GetRawStreamID())
+	recordStream, _, err := ne.node.Get(storage.InjectStateTransaction(ctx, tx), variables, GetRawStreamID())
 	if err != nil {
 		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get record stream")
 	}

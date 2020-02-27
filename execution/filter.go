@@ -18,23 +18,23 @@ func NewFilter(formula Formula, child Node) *Filter {
 	return &Filter{formula: formula, source: child}
 }
 
-func (node *Filter) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, error) {
+func (node *Filter) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecOutput, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
 	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get source stream ID")
+		return nil, nil, errors.Wrap(err, "couldn't get source stream ID")
 	}
 
-	recordStream, err := node.source.Get(ctx, variables, sourceStreamID)
+	recordStream, execOutput, err := node.source.Get(ctx, variables, sourceStreamID)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get record stream")
+		return nil, nil, errors.Wrap(err, "couldn't get record stream")
 	}
 
 	return &FilteredStream{
 		formula:   node.formula,
 		variables: variables,
 		source:    recordStream,
-	}, nil
+	}, execOutput, nil
 }
 
 type FilteredStream struct {

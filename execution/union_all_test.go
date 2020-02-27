@@ -105,7 +105,7 @@ func TestUnionAll(t *testing.T) {
 			node := &UnionAll{
 				sources: tt.fields.sources,
 			}
-			stream, err := node.Get(ctx, octosql.NoVariables(), GetRawStreamID())
+			stream, _, err := node.Get(ctx, octosql.NoVariables(), GetRawStreamID())
 			if err != nil {
 				t.Fatal(err)
 			}

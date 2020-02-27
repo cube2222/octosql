@@ -13,48 +13,50 @@ import (
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
-type Watermark struct {
+type WatermarkGenerator struct {
 	source    execution.Node
 	timeField octosql.VariableName
 }
 
-func NewWatermark(source execution.Node, timeField octosql.VariableName) *Watermark {
-	return &Watermark{
+func NewWatermarkGenerator(source execution.Node, timeField octosql.VariableName) *WatermarkGenerator {
+	return &WatermarkGenerator{
 		source:    source,
 		timeField: timeField,
 	}
 }
 
-func (w *Watermark) Document() docs.Documentation {
+func (w *WatermarkGenerator) Document() docs.Documentation {
 	panic("implement me")
 }
 
-func (w *Watermark) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, error) {
+func (w *WatermarkGenerator) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecOutput, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
 	sourceStreamID, err := execution.GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get source stream ID")
+		return nil, nil, errors.Wrap(err, "couldn't get source stream ID")
 	}
 
-	source, err := w.source.Get(ctx, variables, sourceStreamID)
+	source, _, err := w.source.Get(ctx, variables, sourceStreamID) // we don't need execOutput here since we become new watermark source
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get source")
+		return nil, nil, errors.Wrap(err, "couldn't get source")
 	}
 
-	return &WatermarkStream{
+	ws := &WatermarkGeneratorStream{
 		source:    source,
 		timeField: w.timeField,
-	}, nil
+	}
+
+	return ws, execution.NewExecOutput(ws), nil // watermark generator stream now indicates new watermark source
 }
 
-type WatermarkStream struct {
+type WatermarkGeneratorStream struct {
 	source    execution.RecordStream
 	timeField octosql.VariableName
 }
 
 var watermarkPrefix = []byte("$watermark$")
 
-func (s *WatermarkStream) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
+func (s *WatermarkGeneratorStream) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
 	watermarkStorage := storage.NewValueState(tx.WithPrefix(watermarkPrefix))
 
 	var currentWatermark octosql.Value
@@ -68,7 +70,7 @@ func (s *WatermarkStream) GetWatermark(ctx context.Context, tx storage.StateTran
 	return currentWatermark.AsTime(), nil
 }
 
-func (s *WatermarkStream) Next(ctx context.Context) (*execution.Record, error) {
+func (s *WatermarkGeneratorStream) Next(ctx context.Context) (*execution.Record, error) {
 	srcRecord, err := s.source.Next(ctx)
 	if err != nil {
 		if err == execution.ErrEndOfStream {
@@ -77,7 +79,6 @@ func (s *WatermarkStream) Next(ctx context.Context) (*execution.Record, error) {
 		return nil, errors.Wrap(err, "couldn't get source record")
 	}
 
-	// TODO - ustaw nowa wartosc watermarka
 	timeValue := srcRecord.Value(s.timeField)
 	if timeValue.GetType() != octosql.TypeTime {
 		return nil, fmt.Errorf("couldn't get time field '%v' as time, got: %v", s.timeField.String(), srcRecord.Value(s.timeField))
@@ -101,6 +102,6 @@ func (s *WatermarkStream) Next(ctx context.Context) (*execution.Record, error) {
 	return srcRecord, nil
 }
 
-func (s *WatermarkStream) Close() error {
+func (s *WatermarkGeneratorStream) Close() error {
 	return s.source.Close()
 }

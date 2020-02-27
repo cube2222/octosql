@@ -110,9 +110,8 @@ func (c *WatermarkTrigger) Materialize(ctx context.Context, matCtx *Materializat
 }
 
 type GroupBy struct {
-	Source    Node
-	Watermark Node
-	Key       []Expression
+	Source Node
+	Key    []Expression
 
 	Fields     []octosql.VariableName
 	Aggregates []Aggregate
@@ -122,8 +121,8 @@ type GroupBy struct {
 	Triggers []Trigger
 }
 
-func NewGroupBy(source Node, watermark Node, key []Expression, fields []octosql.VariableName, aggregates []Aggregate, as []octosql.VariableName, triggers []Trigger) *GroupBy {
-	return &GroupBy{Source: source, Watermark: watermark, Key: key, Fields: fields, Aggregates: aggregates, As: as, Triggers: triggers}
+func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, aggregates []Aggregate, as []octosql.VariableName, triggers []Trigger) *GroupBy {
+	return &GroupBy{Source: source, Key: key, Fields: fields, Aggregates: aggregates, As: as, Triggers: triggers}
 }
 
 func (node *GroupBy) Transform(ctx context.Context, transformers *Transformers) Node {
@@ -134,8 +133,6 @@ func (node *GroupBy) Transform(ctx context.Context, transformers *Transformers) 
 
 	source := node.Source.Transform(ctx, transformers)
 
-	watermark := node.Watermark.Transform(ctx, transformers)
-
 	triggers := make([]Trigger, len(node.Triggers))
 	for i := range node.Triggers {
 		triggers[i] = node.Triggers[i].Transform(ctx, transformers)
@@ -143,7 +140,6 @@ func (node *GroupBy) Transform(ctx context.Context, transformers *Transformers) 
 
 	var transformed Node = &GroupBy{
 		Source:     source,
-		Watermark:  watermark,
 		Key:        key,
 		Fields:     node.Fields,
 		Aggregates: node.Aggregates,
@@ -162,11 +158,6 @@ func (node *GroupBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 	source, err := node.Source.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize Source node")
-	}
-
-	watermark, err := node.Watermark.Materialize(ctx, matCtx)
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't materialize Watermark node")
 	}
 
 	key := make([]execution.Expression, len(node.Key))
@@ -207,7 +198,7 @@ func (node *GroupBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 
 	meta := node.Metadata()
 
-	return execution.NewGroupBy(matCtx.Storage, source, watermark, key, node.Fields, aggregatePrototypes, eventTimeField, node.As, meta.EventTimeField(), triggerPrototype), nil
+	return execution.NewGroupBy(matCtx.Storage, source, key, node.Fields, aggregatePrototypes, eventTimeField, node.As, meta.EventTimeField(), triggerPrototype), nil
 }
 
 func (node *GroupBy) groupingByEventTime(sourceMetadata *metadata.NodeMetadata) bool {

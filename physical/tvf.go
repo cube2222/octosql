@@ -198,7 +198,7 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 			return nil, errors.Errorf("couldn't materialize source")
 		}
 
-		return tvf.NewZeroWatermark(matSource), nil
+		return tvf.NewZeroWatermarkGenerator(matSource), nil
 
 	case "watermark":
 		source, err := node.getArgumentTable(octosql.NewVariableName("source"))
@@ -212,7 +212,7 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 			return nil, errors.Errorf("couldn't materialize source")
 		}
 
-		return tvf.NewWatermark(matSource, timeField), nil
+		return tvf.NewWatermarkGenerator(matSource, timeField), nil
 	}
 
 	return nil, errors.Errorf("invalid table valued function: %v", node.Name)

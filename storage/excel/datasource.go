@@ -82,20 +82,20 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 	return NewDataSourceBuilderFactory(), nil
 }
 
-func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, error) {
+func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecOutput, error) {
 	file, err := excelize.OpenFile(ds.path)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't open file")
+		return nil, nil, errors.Wrap(err, "couldn't open file")
 	}
 
 	rows, err := file.Rows(ds.sheet)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get sheet's rows")
+		return nil, nil, errors.Wrap(err, "couldn't get sheet's rows")
 	}
 
 	for i := 0; i <= ds.verticalOffset; i++ {
 		if !rows.Next() {
-			return nil, errors.New("root cell is lower than row count")
+			return nil, nil, errors.New("root cell is lower than row count")
 		}
 	}
 
@@ -108,7 +108,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 
 		isDone: false,
 		rows:   rows,
-	}, nil
+	}, nil, nil
 }
 
 func contains(xs []string, x string) bool {

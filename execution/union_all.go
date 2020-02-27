@@ -17,18 +17,19 @@ func NewUnionAll(sources ...Node) *UnionAll {
 	return &UnionAll{sources: sources}
 }
 
-func (node *UnionAll) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, error) {
+func (node *UnionAll) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecOutput, error) {
 	prefixedTx := storage.GetStateTransactionFromContext(ctx).WithPrefix(streamID.AsPrefix())
 
 	sourceRecordStreams := make([]RecordStream, len(node.sources))
 	for sourceIndex := range node.sources {
 		sourceStreamID, err := GetSourceStreamID(prefixedTx, octosql.MakeInt(sourceIndex))
 		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't get source stream ID for source with index %d", sourceIndex)
+			return nil, nil, errors.Wrapf(err, "couldn't get source stream ID for source with index %d", sourceIndex)
 		}
-		recordStream, err := node.sources[sourceIndex].Get(ctx, variables, sourceStreamID)
+
+		recordStream, execOutput, err := node.sources[sourceIndex].Get(ctx, variables, sourceStreamID)
 		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't get source record stream with index %d", sourceIndex)
+			return nil, nil, errors.Wrapf(err, "couldn't get source record stream with index %d", sourceIndex)
 		}
 		sourceRecordStreams[sourceIndex] = recordStream
 	}
@@ -36,7 +37,7 @@ func (node *UnionAll) Get(ctx context.Context, variables octosql.Variables, stre
 	return &UnifiedStream{
 		sources:  sourceRecordStreams,
 		streamID: streamID,
-	}, nil
+	}, nil, nil // TODO - what should be returned here instead of nil ???
 }
 
 type UnifiedStream struct {

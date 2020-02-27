@@ -42,13 +42,6 @@ type WatermarkSource interface {
 	GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error)
 }
 
-type ZeroWatermarkSource struct {
-}
-
-func (z *ZeroWatermarkSource) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
-	return time.Time{}, nil
-}
-
 type IntermediateRecordStore interface {
 	AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *Record) error
 	Next(ctx context.Context, tx storage.StateTransaction) (*Record, error)

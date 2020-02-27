@@ -45,7 +45,7 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 	programID := &execution.StreamID{Id: ""}
 
 	tx := stateStorage.BeginTransaction()
-	stream, err := exec.Get(storage.InjectStateTransaction(ctx, tx), variables, programID)
+	stream, _, err := exec.Get(storage.InjectStateTransaction(ctx, tx), variables, programID)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get record stream from execution plan")
 	}

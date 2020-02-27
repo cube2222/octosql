@@ -174,9 +174,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 			}
 		}
 
-		// TODO - replace phantom
-		phantomTvf := logical.NewTableValuedFunction("zero", nil)
-		root = logical.NewGroupBy(root, phantomTvf, key, fields, aggregates, aggregatesAs, triggers)
+		root = logical.NewGroupBy(root, key, fields, aggregates, aggregatesAs, triggers)
 	}
 
 	if statement.OrderBy != nil {

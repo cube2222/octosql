@@ -19,16 +19,16 @@ func NewMap(expressions []NamedExpression, child Node, keep bool) *Map {
 	return &Map{expressions: expressions, source: child, keep: keep}
 }
 
-func (node *Map) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, error) {
+func (node *Map) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecOutput, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
 	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get source stream ID")
+		return nil, nil, errors.Wrap(err, "couldn't get source stream ID")
 	}
 
-	recordStream, err := node.source.Get(ctx, variables, sourceStreamID)
+	recordStream, execOutput, err := node.source.Get(ctx, variables, sourceStreamID)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get record stream")
+		return nil, nil, errors.Wrap(err, "couldn't get record stream")
 	}
 
 	return &MappedStream{
@@ -36,7 +36,7 @@ func (node *Map) Get(ctx context.Context, variables octosql.Variables, streamID 
 		variables:   variables,
 		source:      recordStream,
 		keep:        node.keep,
-	}, nil
+	}, execOutput, nil
 }
 
 type MappedStream struct {

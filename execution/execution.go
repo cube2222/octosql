@@ -11,12 +11,12 @@ import (
 
 // This struct represents additional metadata to be returned with Get() and used recursively (like WatermarkSource)
 type ExecOutput struct {
-	WatermarkSource WatermarkSource
+	watermarkSource WatermarkSource
 }
 
 func NewExecOutput(ws WatermarkSource) *ExecOutput {
 	return &ExecOutput{
-		WatermarkSource: ws,
+		watermarkSource: ws,
 	}
 }
 

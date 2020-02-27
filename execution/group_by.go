@@ -95,7 +95,7 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 		variables:       variables,
 	}
 
-	groupByPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, execOutput.WatermarkSource)
+	groupByPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, execOutput.watermarkSource)
 	go groupByPullEngine.Run(ctx) // TODO: .Close() should kill this context and the goroutine.
 
 	return groupByPullEngine, NewExecOutput(groupByPullEngine), nil // groupByPullEngine now indicates new watermark source

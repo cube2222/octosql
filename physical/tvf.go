@@ -187,19 +187,6 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 
 		return tvf.NewTumble(matSource, timeField, matWindowLength, matWindowOffset), nil
 
-	case "zero":
-		source, err := node.getArgumentTable(octosql.NewVariableName("source"))
-		if err != nil {
-			return nil, err
-		}
-
-		matSource, err := source.Materialize(ctx, matCtx)
-		if err != nil {
-			return nil, errors.Errorf("couldn't materialize source")
-		}
-
-		return tvf.NewZeroWatermarkGenerator(matSource), nil
-
 	case "watermark":
 		source, err := node.getArgumentTable(octosql.NewVariableName("source"))
 		if err != nil {

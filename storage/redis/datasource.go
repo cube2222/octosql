@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/go-redis/redis"
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/execution/tvf"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/metadata"
-	"github.com/go-redis/redis"
-	"github.com/pkg/errors"
 )
 
 var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
@@ -100,7 +102,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 			isDone:     false,
 			alias:      ds.alias,
 			keyName:    ds.dbKey,
-		}, nil, nil
+		}, execution.NewExecOutput(tvf.NewZeroWatermarkGenerator()), nil
 	}
 
 	sliceKeys := make([]string, 0)
@@ -115,7 +117,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		isDone:  false,
 		alias:   ds.alias,
 		keyName: ds.dbKey,
-	}, nil, nil
+	}, execution.NewExecOutput(tvf.NewZeroWatermarkGenerator()), nil
 }
 
 type KeySpecificStream struct {

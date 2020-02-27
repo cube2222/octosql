@@ -16,6 +16,7 @@ import (
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/execution/tvf"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/metadata"
 )
@@ -86,7 +87,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		alias:           ds.alias,
 		first:           true,
 		hasColumnHeader: ds.hasColumnNames,
-	}, nil, nil
+	}, execution.NewExecOutput(tvf.NewZeroWatermarkGenerator()), nil
 }
 
 type RecordStream struct {

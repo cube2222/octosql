@@ -1,1 +1,0 @@
-(window.webpackJsonp=window.webpackJsonp||[]).push([[7],{99:function(o){o.exports=JSON.parse('{"allTagsPath":"/octosql/blog/tags","slug":"hello","name":"hello","count":2,"permalink":"/octosql/blog/tags/hello"}')}}]);

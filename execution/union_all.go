@@ -35,7 +35,7 @@ func (node *UnionAll) Get(ctx context.Context, variables octosql.Variables, stre
 		}
 
 		sourceRecordStreams[sourceIndex] = recordStream
-		sourceWatermarkSources[sourceIndex] = execOutput.watermarkSource
+		sourceWatermarkSources[sourceIndex] = execOutput.WatermarkSource
 	}
 
 	us := &UnifiedStream{

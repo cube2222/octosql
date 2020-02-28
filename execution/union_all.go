@@ -59,7 +59,7 @@ func (node *UnifiedStream) GetWatermark(ctx context.Context, tx storage.StateTra
 	for sourceIndex := range node.sources {
 		sourceWatermark, err := node.watermarkSources[sourceIndex].GetWatermark(ctx, tx)
 		if err != nil {
-			return time.Time{}, errors.Wrapf(err, "couldn't get current watermark from source %i", sourceIndex)
+			return time.Time{}, errors.Wrapf(err, "couldn't get current watermark from source %d", sourceIndex)
 		}
 
 		if sourceIndex == 0 { // earliestWatermark is not set yet

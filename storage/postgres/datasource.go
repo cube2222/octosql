@@ -166,7 +166,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		columns: columns,
 		isDone:  false,
 		alias:   ds.alias,
-	}, execution.NewExecOutput(tvf.NewZeroWatermarkGenerator()), nil
+	}, execution.NewExecOutput(execution.NewZeroWatermarkGenerator()), nil
 
 }
 

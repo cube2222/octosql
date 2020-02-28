@@ -109,7 +109,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 
 		isDone: false,
 		rows:   rows,
-	}, execution.NewExecOutput(tvf.NewZeroWatermarkGenerator()), nil
+	}, execution.NewExecOutput(execution.NewZeroWatermarkGenerator()), nil
 }
 
 func contains(xs []string, x string) bool {

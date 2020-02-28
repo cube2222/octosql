@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"time"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
@@ -18,6 +19,17 @@ func NewExecOutput(ws WatermarkSource) *ExecOutput {
 	return &ExecOutput{
 		WatermarkSource: ws,
 	}
+}
+
+type ZeroWatermarkGenerator struct {
+}
+
+func (s *ZeroWatermarkGenerator) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
+	return time.Time{}, nil
+}
+
+func NewZeroWatermarkGenerator() *ZeroWatermarkGenerator {
+	return &ZeroWatermarkGenerator{}
 }
 
 type Node interface {

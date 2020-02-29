@@ -64,7 +64,7 @@ func (r *Tumble) Get(ctx context.Context, variables octosql.Variables, streamID 
 		return nil, nil, errors.Wrap(err, "couldn't get window offset")
 	}
 	if offset.GetType() != octosql.TypeDuration {
-		return nil, nil, errors.Errorf("invalid tumble offset: %v", duration)
+		return nil, nil, errors.Errorf("invalid tumble offset: %v", offset)
 	}
 
 	return &TumbleStream{

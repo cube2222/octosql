@@ -16,12 +16,14 @@ import (
 type WatermarkGenerator struct {
 	source    execution.Node
 	timeField octosql.VariableName
+	offset    execution.Expression
 }
 
-func NewWatermarkGenerator(source execution.Node, timeField octosql.VariableName) *WatermarkGenerator {
+func NewWatermarkGenerator(source execution.Node, timeField octosql.VariableName, offset execution.Expression) *WatermarkGenerator {
 	return &WatermarkGenerator{
 		source:    source,
 		timeField: timeField,
+		offset:    offset,
 	}
 }
 
@@ -41,9 +43,18 @@ func (w *WatermarkGenerator) Get(ctx context.Context, variables octosql.Variable
 		return nil, nil, errors.Wrap(err, "couldn't get source")
 	}
 
+	offset, err := w.offset.ExpressionValue(ctx, variables)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't get watermark offset")
+	}
+	if offset.GetType() != octosql.TypeDuration {
+		return nil, nil, errors.Errorf("invalid watermark offset: %v", offset)
+	}
+
 	ws := &WatermarkGeneratorStream{
 		source:    source,
 		timeField: w.timeField,
+		offset:    offset.AsDuration(),
 	}
 
 	return ws, execution.NewExecOutput(ws), nil // watermark generator stream now indicates new watermark source
@@ -52,6 +63,7 @@ func (w *WatermarkGenerator) Get(ctx context.Context, variables octosql.Variable
 type WatermarkGeneratorStream struct {
 	source    execution.RecordStream
 	timeField octosql.VariableName
+	offset    time.Duration
 }
 
 var watermarkPrefix = []byte("$watermark$")
@@ -84,16 +96,20 @@ func (s *WatermarkGeneratorStream) Next(ctx context.Context) (*execution.Record,
 		return nil, fmt.Errorf("couldn't get time field '%v' as time, got: %v", s.timeField.String(), srcRecord.Value(s.timeField))
 	}
 
+	// watermark value stored equals to (max_record_time - offset) that's why we multiply offset by -1
+	timeValueWithOffset := timeValue.AsTime().Add(s.offset * -1)
+
 	tx := storage.GetStateTransactionFromContext(ctx)
 	currentWatermark, err := s.GetWatermark(ctx, tx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get current watermark value")
 	}
 
-	if timeValue.AsTime().After(currentWatermark) { // time in current record is bigger than current watermark - update it
+	if timeValueWithOffset.After(currentWatermark) { // time in current record is bigger than current watermark - update it
 		watermarkStorage := storage.NewValueState(tx.WithPrefix(watermarkPrefix))
 
-		err := watermarkStorage.Set(&timeValue)
+		newWatermark := octosql.MakeTime(timeValueWithOffset)
+		err := watermarkStorage.Set(&newWatermark)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't set new watermark value in storage")
 		}

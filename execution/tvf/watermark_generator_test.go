@@ -19,6 +19,7 @@ func TestWatermarkGenerator_Get(t *testing.T) {
 	type fields struct {
 		source    execution.Node
 		timeField octosql.VariableName
+		offset    execution.Expression
 	}
 	type args struct {
 		variables octosql.Variables
@@ -52,9 +53,12 @@ func TestWatermarkGenerator_Get(t *testing.T) {
 					),
 				}),
 				timeField: "time",
+				offset:    execution.NewVariable(octosql.NewVariableName("offset")),
 			},
 			args: args{
-				variables: octosql.NewVariables(map[octosql.VariableName]octosql.Value{}),
+				variables: octosql.NewVariables(map[octosql.VariableName]octosql.Value{
+					"offset": octosql.MakeDuration(time.Second * 5),
+				}),
 			},
 			want: execution.NewInMemoryStream([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
@@ -82,6 +86,7 @@ func TestWatermarkGenerator_Get(t *testing.T) {
 			wg := &WatermarkGenerator{
 				source:    tt.fields.source,
 				timeField: tt.fields.timeField,
+				offset:    tt.fields.offset,
 			}
 
 			stateStorage := execution.GetTestStorage(t)
@@ -112,7 +117,9 @@ func TestWatermarkGeneratorStream_GetWatermark(t *testing.T) {
 	ctx := context.Background()
 	baseTime := time.Date(2019, 9, 3, 12, 0, 0, 0, time.UTC)
 
-	variables := octosql.NewVariables(map[octosql.VariableName]octosql.Value{})
+	variables := octosql.NewVariables(map[octosql.VariableName]octosql.Value{
+		"offset": octosql.MakeDuration(time.Second * 5),
+	})
 
 	source := execution.NewDummyNode([]*execution.Record{
 		execution.NewRecordFromSliceWithNormalize(
@@ -133,10 +140,12 @@ func TestWatermarkGeneratorStream_GetWatermark(t *testing.T) {
 		),
 	})
 	timeField := octosql.NewVariableName("time")
+	offset := execution.NewVariable(octosql.NewVariableName("offset"))
 
 	wg := &WatermarkGenerator{
 		source:    source,
 		timeField: timeField,
+		offset:    offset,
 	}
 
 	stateStorage := execution.GetTestStorage(t)
@@ -155,19 +164,19 @@ func TestWatermarkGeneratorStream_GetWatermark(t *testing.T) {
 
 	ExpectWatermarkValue(t, ctx, ws, tx, time.Time{})
 
-	NextRecord(t, ctx, src)
+	NextRecord(t, ctx, src) // curTime = 10, maxTime = 10
 
-	ExpectWatermarkValue(t, ctx, ws, tx, baseTime.Add(time.Second*10))
+	ExpectWatermarkValue(t, ctx, ws, tx, baseTime.Add(time.Second*5)) // maxTime = 10 - 5
 
-	NextRecord(t, ctx, src)
+	NextRecord(t, ctx, src) // curTime = 0, maxTime = 10
 
-	ExpectWatermarkValue(t, ctx, ws, tx, baseTime.Add(time.Second*10))
+	ExpectWatermarkValue(t, ctx, ws, tx, baseTime.Add(time.Second*5)) // maxTime = 10 - 5
 
-	NextRecord(t, ctx, src)
+	NextRecord(t, ctx, src) // curTime = 13, maxTime = 13
 
-	ExpectWatermarkValue(t, ctx, ws, tx, baseTime.Add(time.Second*13))
+	ExpectWatermarkValue(t, ctx, ws, tx, baseTime.Add(time.Second*8)) // maxTime = 13 - 5
 
-	NextRecord(t, ctx, src)
+	NextRecord(t, ctx, src) // curTime = 8, maxTime = 13
 
-	ExpectWatermarkValue(t, ctx, ws, tx, baseTime.Add(time.Second*13))
+	ExpectWatermarkValue(t, ctx, ws, tx, baseTime.Add(time.Second*8)) // maxTime = 13 - 5
 }

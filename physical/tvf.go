@@ -192,14 +192,22 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 		if err != nil {
 			return nil, err
 		}
+		offset, err := node.getArgumentExpression(octosql.NewVariableName("offset"))
+		if err != nil {
+			return nil, err
+		}
 		timeField := source.Metadata().EventTimeField()
 
 		matSource, err := source.Materialize(ctx, matCtx)
 		if err != nil {
 			return nil, errors.Errorf("couldn't materialize source")
 		}
+		matOffset, err := offset.Materialize(ctx, matCtx)
+		if err != nil {
+			return nil, errors.Errorf("couldn't materialize watermark offset expression")
+		}
 
-		return tvf.NewWatermarkGenerator(matSource, timeField), nil
+		return tvf.NewWatermarkGenerator(matSource, timeField, matOffset), nil
 	}
 
 	return nil, errors.Errorf("invalid table valued function: %v", node.Name)

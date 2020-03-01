@@ -8,6 +8,7 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
 )
 
@@ -25,6 +26,10 @@ func (s *StubNode) Materialize(ctx context.Context, matCtx *MaterializationConte
 
 func (s *StubNode) Metadata() *metadata.NodeMetadata {
 	return s.metadata
+}
+
+func (s *StubNode) Visualize() *graph.Node {
+	panic("unreachable")
 }
 
 func TestMap_Metadata(t *testing.T) {

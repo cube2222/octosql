@@ -9,12 +9,14 @@ import (
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/execution/tvf"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
 )
 
 type TableValuedFunctionArgumentValue interface {
 	iTableValuedFunctionArgumentValue()
 	Transform(ctx context.Context, transformers *Transformers) TableValuedFunctionArgumentValue
+	graph.Visualizer
 }
 
 func (*TableValuedFunctionArgumentValueExpression) iTableValuedFunctionArgumentValue() {}
@@ -33,6 +35,10 @@ func (arg *TableValuedFunctionArgumentValueExpression) Transform(ctx context.Con
 	return &TableValuedFunctionArgumentValueExpression{Expression: arg.Expression.Transform(ctx, transformers)}
 }
 
+func (arg *TableValuedFunctionArgumentValueExpression) Visualize() *graph.Node {
+	return arg.Expression.Visualize()
+}
+
 type TableValuedFunctionArgumentValueTable struct {
 	Source Node
 }
@@ -43,6 +49,10 @@ func NewTableValuedFunctionArgumentValueTable(source Node) *TableValuedFunctionA
 
 func (arg *TableValuedFunctionArgumentValueTable) Transform(ctx context.Context, transformers *Transformers) TableValuedFunctionArgumentValue {
 	return &TableValuedFunctionArgumentValueTable{Source: arg.Source.Transform(ctx, transformers)}
+}
+
+func (arg *TableValuedFunctionArgumentValueTable) Visualize() *graph.Node {
+	return arg.Source.Visualize()
 }
 
 type TableValuedFunctionArgumentValueDescriptor struct {
@@ -61,6 +71,12 @@ func (arg *TableValuedFunctionArgumentValueDescriptor) Transform(ctx context.Con
 		transformed = transformers.TableValuedFunctionArgumentValueT(transformed)
 	}
 	return transformed
+}
+
+func (arg *TableValuedFunctionArgumentValueDescriptor) Visualize() *graph.Node {
+	n := graph.NewNode("Descriptor")
+	n.AddField("value", arg.Descriptor.String())
+	return n
 }
 
 type TableValuedFunction struct {
@@ -229,4 +245,12 @@ func (node *TableValuedFunction) Metadata() *metadata.NodeMetadata {
 	default:
 		return metadata.NewNodeMetadata(metadata.Unbounded, octosql.NewVariableName(""))
 	}
+}
+
+func (node *TableValuedFunction) Visualize() *graph.Node {
+	n := graph.NewNode(node.Name)
+	for arg, value := range node.Arguments {
+		n.AddChild(arg.String(), value.Visualize())
+	}
+	return n
 }

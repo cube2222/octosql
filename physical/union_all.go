@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/pkg/errors"
 )
@@ -42,4 +43,11 @@ func (node *UnionAll) Materialize(ctx context.Context, matCtx *MaterializationCo
 
 func (node *UnionAll) Metadata() *metadata.NodeMetadata {
 	return metadata.NewNodeMetadata(metadata.CombineCardinalities(node.First.Metadata().Cardinality(), node.Second.Metadata().Cardinality()), node.First.Metadata().EventTimeField())
+}
+
+func (node *UnionAll) Visualize() *graph.Node {
+	n := graph.NewNode("Union All")
+	n.AddChild("first", node.First.Visualize())
+	n.AddChild("second", node.Second.Visualize())
+	return n
 }

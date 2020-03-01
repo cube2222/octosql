@@ -2,10 +2,12 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/output"
 	"github.com/cube2222/octosql/physical"
@@ -19,13 +21,15 @@ type App struct {
 	cfg                  *config.Config
 	dataSourceRepository *physical.DataSourceRepository
 	out                  output.Output
+	describe             bool
 }
 
-func NewApp(cfg *config.Config, dataSourceRepository *physical.DataSourceRepository, out output.Output) *App {
+func NewApp(cfg *config.Config, dataSourceRepository *physical.DataSourceRepository, out output.Output, describe bool) *App {
 	return &App{
 		cfg:                  cfg,
 		dataSourceRepository: dataSourceRepository,
 		out:                  out,
+		describe:             describe,
 	}
 }
 
@@ -36,6 +40,11 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 	}
 
 	phys = optimizer.Optimize(ctx, optimizer.DefaultScenarios, phys)
+
+	if app.describe {
+		fmt.Print(graph.Show(phys.Visualize()).String())
+		return nil
+	}
 
 	exec, err := phys.Materialize(ctx, physical.NewMaterializationContext(app.cfg, stateStorage))
 	if err != nil {

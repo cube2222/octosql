@@ -3,9 +3,11 @@ package physical
 import (
 	"context"
 
-	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/graph"
+	"github.com/cube2222/octosql/physical/metadata"
 )
 
 type Distinct struct {
@@ -39,4 +41,10 @@ func (node *Distinct) Materialize(ctx context.Context, matCtx *MaterializationCo
 
 func (node *Distinct) Metadata() *metadata.NodeMetadata {
 	return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality(), node.Source.Metadata().EventTimeField())
+}
+
+func (node *Distinct) Visualize() *graph.Node {
+	n := graph.NewNode("Distinct")
+	n.AddChild("source", node.Source.Visualize())
+	return n
 }

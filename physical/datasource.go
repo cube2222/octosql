@@ -2,12 +2,14 @@ package physical
 
 import (
 	"context"
-
-	"github.com/pkg/errors"
+	"fmt"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
+
+	"github.com/pkg/errors"
 )
 
 // FieldType describes if a key is a primary or secondary attribute.
@@ -125,4 +127,32 @@ func (dsb *DataSourceBuilder) Materialize(ctx context.Context, matCtx *Materiali
 
 func (dsb *DataSourceBuilder) Metadata() *metadata.NodeMetadata {
 	return metadata.NewNodeMetadata(dsb.Cardinality, octosql.NewVariableName(""))
+}
+
+func (dsb *DataSourceBuilder) Visualize() *graph.Node {
+	n := graph.NewNode("Data Source Builder")
+
+	n.AddField("name", dsb.Name)
+	n.AddField("alias", dsb.Alias)
+
+	primaryKeys := make([]string, len(dsb.PrimaryKeys))
+	for i := range dsb.PrimaryKeys {
+		primaryKeys[i] = dsb.PrimaryKeys[i].String()
+	}
+
+	var primary []string
+	for filter := range dsb.AvailableFilters[Primary] {
+		primary = append(primary, string(filter))
+	}
+	var secondary []string
+	for filter := range dsb.AvailableFilters[Secondary] {
+		secondary = append(secondary, string(filter))
+	}
+	n.AddField("available primary filters", fmt.Sprintf("%+v", primary))
+	n.AddField("available secondary filters", fmt.Sprintf("%+v", secondary))
+
+	n.AddField("cardinality", string(dsb.Cardinality))
+
+	n.AddChild("filter", dsb.Filter.Visualize())
+	return n
 }

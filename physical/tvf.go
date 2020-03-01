@@ -208,11 +208,11 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 		if err != nil {
 			return nil, err
 		}
-		offset, err := node.getArgumentExpression(octosql.NewVariableName("offset"))
+		timeField, err := node.getArgumentDescriptor(octosql.NewVariableName("time_field"))
 		if err != nil {
 			return nil, err
 		}
-		timeField, err := node.getArgumentDescriptor(octosql.NewVariableName("time_field"))
+		offset, err := node.getArgumentExpression(octosql.NewVariableName("offset"))
 		if err != nil {
 			return nil, err
 		}
@@ -245,6 +245,15 @@ func (node *TableValuedFunction) Metadata() *metadata.NodeMetadata {
 			cardinality = metadata.BoundedFitsInLocalStorage
 		}
 		return metadata.NewNodeMetadata(cardinality, octosql.NewVariableName("window_end"))
+	case "max_diff_watermark":
+		var cardinality metadata.Cardinality
+		source, err := node.getArgumentTable(octosql.NewVariableName("source"))
+		if err == nil {
+			cardinality = source.Metadata().Cardinality()
+		} else {
+			cardinality = metadata.BoundedFitsInLocalStorage
+		}
+		return metadata.NewNodeMetadata(cardinality, octosql.NewVariableName("time_field"))
 	default:
 		return metadata.NewNodeMetadata(metadata.Unbounded, octosql.NewVariableName(""))
 	}

@@ -192,11 +192,14 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 		if err != nil {
 			return nil, err
 		}
+		timeField, err := node.getArgumentDescriptor(octosql.NewVariableName("time_field"))
+		if err != nil {
+			return nil, err
+		}
 		offset, err := node.getArgumentExpression(octosql.NewVariableName("offset"))
 		if err != nil {
 			return nil, err
 		}
-		timeField := source.Metadata().EventTimeField()
 
 		matSource, err := source.Materialize(ctx, matCtx)
 		if err != nil {
@@ -214,6 +217,10 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 		if err != nil {
 			return nil, err
 		}
+		timeField, err := node.getArgumentDescriptor(octosql.NewVariableName("time_field"))
+		if err != nil {
+			return nil, err
+		}
 		events, err := node.getArgumentExpression(octosql.NewVariableName("events"))
 		if err != nil {
 			return nil, err
@@ -222,7 +229,6 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 		if err != nil {
 			return nil, err
 		}
-		timeField := source.Metadata().EventTimeField()
 
 		matSource, err := source.Materialize(ctx, matCtx)
 		if err != nil {
@@ -264,7 +270,7 @@ func (node *TableValuedFunction) Metadata() *metadata.NodeMetadata {
 		} else {
 			cardinality = metadata.BoundedFitsInLocalStorage
 		}
-		return metadata.NewNodeMetadata(cardinality, octosql.NewVariableName("timeField"))
+		return metadata.NewNodeMetadata(cardinality, octosql.NewVariableName("time_field"))
 	case "percentile_watermark":
 		var cardinality metadata.Cardinality
 		source, err := node.getArgumentTable(octosql.NewVariableName("source"))
@@ -273,7 +279,7 @@ func (node *TableValuedFunction) Metadata() *metadata.NodeMetadata {
 		} else {
 			cardinality = metadata.BoundedFitsInLocalStorage
 		}
-		return metadata.NewNodeMetadata(cardinality, octosql.NewVariableName("timeField"))
+		return metadata.NewNodeMetadata(cardinality, octosql.NewVariableName("time_field"))
 	default:
 		return metadata.NewNodeMetadata(metadata.Unbounded, octosql.NewVariableName(""))
 	}

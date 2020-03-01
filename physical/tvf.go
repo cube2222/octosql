@@ -187,7 +187,7 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 
 		return tvf.NewTumble(matSource, timeField, matWindowLength, matWindowOffset), nil
 
-	case "watermark":
+	case "max_diff_watermark":
 		source, err := node.getArgumentTable(octosql.NewVariableName("source"))
 		if err != nil {
 			return nil, err
@@ -208,6 +208,36 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 		}
 
 		return tvf.NewWatermarkGenerator(matSource, timeField, matOffset), nil
+
+	case "percentile_watermark":
+		source, err := node.getArgumentTable(octosql.NewVariableName("source"))
+		if err != nil {
+			return nil, err
+		}
+		events, err := node.getArgumentExpression(octosql.NewVariableName("events"))
+		if err != nil {
+			return nil, err
+		}
+		percentile, err := node.getArgumentExpression(octosql.NewVariableName("percentile"))
+		if err != nil {
+			return nil, err
+		}
+		timeField := source.Metadata().EventTimeField()
+
+		matSource, err := source.Materialize(ctx, matCtx)
+		if err != nil {
+			return nil, errors.Errorf("couldn't materialize source")
+		}
+		matEvents, err := events.Materialize(ctx, matCtx)
+		if err != nil {
+			return nil, errors.Errorf("couldn't materialize watermark events expression")
+		}
+		matPercentile, err := percentile.Materialize(ctx, matCtx)
+		if err != nil {
+			return nil, errors.Errorf("couldn't materialize watermark percentile expression")
+		}
+
+		return tvf.NewPercentileWatermarkGenerator(matSource, timeField, matEvents, matPercentile), nil
 	}
 
 	return nil, errors.Errorf("invalid table valued function: %v", node.Name)
@@ -226,6 +256,24 @@ func (node *TableValuedFunction) Metadata() *metadata.NodeMetadata {
 			cardinality = metadata.BoundedFitsInLocalStorage
 		}
 		return metadata.NewNodeMetadata(cardinality, octosql.NewVariableName("window_end"))
+	case "max_diff_watermark":
+		var cardinality metadata.Cardinality
+		source, err := node.getArgumentTable(octosql.NewVariableName("source"))
+		if err == nil {
+			cardinality = source.Metadata().Cardinality()
+		} else {
+			cardinality = metadata.BoundedFitsInLocalStorage
+		}
+		return metadata.NewNodeMetadata(cardinality, octosql.NewVariableName("timeField"))
+	case "percentile_watermark":
+		var cardinality metadata.Cardinality
+		source, err := node.getArgumentTable(octosql.NewVariableName("source"))
+		if err == nil {
+			cardinality = source.Metadata().Cardinality()
+		} else {
+			cardinality = metadata.BoundedFitsInLocalStorage
+		}
+		return metadata.NewNodeMetadata(cardinality, octosql.NewVariableName("timeField"))
 	default:
 		return metadata.NewNodeMetadata(metadata.Unbounded, octosql.NewVariableName(""))
 	}

@@ -8,7 +8,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/streaming/storage"
 )
@@ -25,10 +24,6 @@ func NewWatermarkGenerator(source execution.Node, timeField octosql.VariableName
 		timeField: timeField,
 		offset:    offset,
 	}
-}
-
-func (w *WatermarkGenerator) Document() docs.Documentation {
-	panic("implement me")
 }
 
 func (w *WatermarkGenerator) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecOutput, error) {

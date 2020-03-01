@@ -93,7 +93,7 @@ func (s *TumbleStream) Next(ctx context.Context) (*execution.Record, error) {
 
 	timeValue := srcRecord.Value(s.timeField)
 	if timeValue.GetType() != octosql.TypeTime {
-		return nil, fmt.Errorf("couldn't get time field '%v' as time, got: %v", s.timeField.String(), srcRecord.Value(s.timeField))
+		return nil, fmt.Errorf("couldn't get time field '%v' as time, got: %v", s.timeField.String(), srcRecord.Value(s.timeField).Show())
 	}
 
 	windowStart := timeValue.AsTime().Add(-1 * s.offset).Truncate(s.windowLength).Add(s.offset)

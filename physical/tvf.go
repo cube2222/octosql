@@ -203,7 +203,7 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 
 		return tvf.NewTumble(matSource, timeField, matWindowLength, matWindowOffset), nil
 
-	case "watermark":
+	case "max_diff_watermark":
 		source, err := node.getArgumentTable(octosql.NewVariableName("source"))
 		if err != nil {
 			return nil, err
@@ -212,7 +212,10 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 		if err != nil {
 			return nil, err
 		}
-		timeField := source.Metadata().EventTimeField()
+		timeField, err := node.getArgumentDescriptor(octosql.NewVariableName("time_field"))
+		if err != nil {
+			return nil, err
+		}
 
 		matSource, err := source.Materialize(ctx, matCtx)
 		if err != nil {

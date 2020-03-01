@@ -132,6 +132,7 @@ func (s *PercentileWatermarkGeneratorStream) Next(ctx context.Context) (*executi
 
 	// TODO - well, do something clever to save new watermark value ...
 	// ...
+	// 1) easiest idea: store events in Map and then iterate through all <watermarkPlace> values to find watermark (slow)
 
 	newWatermark := octosql.MakeTime(time.Time{})
 	err = watermarkStorage.Set(&newWatermark)

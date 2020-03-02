@@ -2,25 +2,30 @@ package physical
 
 import (
 	"context"
+	"fmt"
+
+	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
-	"github.com/pkg/errors"
 )
 
 type UnionAll struct {
-	First, Second Node
+	Sources []Node
 }
 
-func NewUnionAll(first, second Node) *UnionAll {
-	return &UnionAll{First: first, Second: second}
+func NewUnionAll(sources ...Node) *UnionAll {
+	return &UnionAll{Sources: sources}
 }
 
 func (node *UnionAll) Transform(ctx context.Context, transformers *Transformers) Node {
+	transformedSources := make([]Node, len(node.Sources))
+	for i := range node.Sources {
+		transformedSources[i] = transformers.NodeT(node.Sources[i])
+	}
 	var transformed Node = &UnionAll{
-		First:  node.First.Transform(ctx, transformers),
-		Second: node.Second.Transform(ctx, transformers),
+		Sources: transformedSources,
 	}
 	if transformers.NodeT != nil {
 		transformed = transformers.NodeT(transformed)
@@ -29,25 +34,32 @@ func (node *UnionAll) Transform(ctx context.Context, transformers *Transformers)
 }
 
 func (node *UnionAll) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
-	firstNode, err := node.First.Materialize(ctx, matCtx)
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't materialize first node")
-	}
-	secondNode, err := node.Second.Materialize(ctx, matCtx)
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't materialize second node")
+	materializedSources := make([]execution.Node, len(node.Sources))
+	for i := range node.Sources {
+		matSource, err := node.Sources[i].Materialize(ctx, matCtx)
+		if err != nil {
+			return nil, errors.Wrapf(err, "couldn't materialize union all source with index %d", i)
+		}
+		materializedSources[i] = matSource
 	}
 
-	return execution.NewUnionAll(firstNode, secondNode), nil
+	return execution.NewUnionAll(materializedSources), nil
 }
 
 func (node *UnionAll) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMetadata(metadata.CombineCardinalities(node.First.Metadata().Cardinality(), node.Second.Metadata().Cardinality()), node.First.Metadata().EventTimeField())
+	cardinalities := make([]metadata.Cardinality, len(node.Sources))
+	for i := range node.Sources {
+		cardinalities[i] = node.Sources[i].Metadata().Cardinality()
+	}
+	cardinality := metadata.CombineCardinalities(cardinalities...)
+	return metadata.NewNodeMetadata(cardinality, node.Sources[0].Metadata().EventTimeField())
 }
 
 func (node *UnionAll) Visualize() *graph.Node {
 	n := graph.NewNode("Union All")
-	n.AddChild("first", node.First.Visualize())
-	n.AddChild("second", node.Second.Visualize())
+
+	for i, source := range node.Sources {
+		n.AddChild(fmt.Sprintf("source_%d", i), source.Visualize())
+	}
 	return n
 }

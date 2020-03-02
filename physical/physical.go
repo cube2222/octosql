@@ -93,9 +93,9 @@ func (v *Variable) MaterializeNamed(ctx context.Context, matCtx *Materialization
 	return execution.NewVariable(v.Name), nil
 }
 
-func (node *Variable) Visualize() *graph.Node {
+func (v *Variable) Visualize() *graph.Node {
 	n := graph.NewNode("Variable")
-	n.AddField("name", node.Name.String())
+	n.AddField("name", v.Name.String())
 	return n
 }
 

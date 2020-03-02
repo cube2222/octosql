@@ -32,7 +32,11 @@ func (creator *PhysicalPlanCreator) WithCommonTableExpression(name string, node 
 	newDataSourceRepo := creator.dataSourceRepo.WithFactory(
 		name,
 		func(name, alias string) physical.Node {
-			return physical.NewRequalifier(alias, node)
+			out := node
+			if len(alias) > 0 {
+				out = physical.NewRequalifier(alias, out)
+			}
+			return out
 		},
 	)
 

@@ -43,7 +43,7 @@ func (node *UnionAll) Materialize(ctx context.Context, matCtx *MaterializationCo
 		materializedSources[i] = matSource
 	}
 
-	return execution.NewUnionAll(materializedSources), nil
+	return execution.NewUnionAll(materializedSources...), nil
 }
 
 func (node *UnionAll) Metadata() *metadata.NodeMetadata {

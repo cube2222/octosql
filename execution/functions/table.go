@@ -48,6 +48,7 @@ var usableFunctions = []execution.Function{
 	FuncCoalesce,
 	FuncNullIf,
 	FuncParseTime,
+	FuncBinaryInt,
 }
 
 func init() {

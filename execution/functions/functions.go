@@ -1266,6 +1266,24 @@ var FuncParseTime = execution.Function{
 	},
 }
 
+var FuncBinaryInt = execution.Function{
+	Name: "binary_int",
+	ArgumentNames: [][]string{
+		{"integer", "positions"},
+	},
+	Description: docs.List(
+		docs.Text("Displays the given integer in binary format"),
+	),
+	Validator: All(
+		ExactlyNArgs(2),
+		AllArgs(TypeOf(ZeroInt())),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		formatString := fmt.Sprintf(`%%.%db`, args[1].AsInt())
+		return MakeString(fmt.Sprintf(formatString, args[0].AsInt())), nil
+	},
+}
+
 /* Auxiliary functions */
 func intMin(x, y int) int {
 	if x <= y {

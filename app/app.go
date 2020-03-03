@@ -38,7 +38,9 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 	if err != nil {
 		return errors.Wrap(err, "couldn't create physical plan")
 	}
-	var phys physical.Node = physical.NewUnionAll(sourceNodes...)
+	shuffled := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
+
+	var phys physical.Node = shuffled[0]
 
 	phys = optimizer.Optimize(ctx, optimizer.DefaultScenarios, phys)
 

@@ -75,7 +75,7 @@ func TestJSONRecordStream_Get(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ds, err := NewDataSourceBuilderFactory()("test", tt.alias).Materialize(context.Background(), &physical.MaterializationContext{
+			ds, err := NewDataSourceBuilderFactory()("test", tt.alias)[0].Materialize(context.Background(), &physical.MaterializationContext{
 				Config: &config.Config{
 					DataSources: []config.DataSourceConfig{
 						{

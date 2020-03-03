@@ -103,16 +103,16 @@ func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, ag
 	return &GroupBy{source: source, key: key, fields: fields, aggregates: aggregates, as: as, triggers: triggers}
 }
 
-func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
+func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	variables := octosql.NoVariables()
 
-	source, sourceVariables, err := node.source.Physical(ctx, physicalCreator)
+	sources, sourceVariables, err := node.source.Physical(ctx, physicalCreator)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get physical plan for group by source")
+		return nil, nil, errors.Wrap(err, "couldn't get physical plan for group by sources")
 	}
 	variables, err = variables.MergeWith(sourceVariables)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't merge variables with those of source")
+		return nil, nil, errors.Wrap(err, "couldn't merge variables with those of sources")
 	}
 
 	key := make([]physical.Expression, len(node.key))
@@ -173,5 +173,5 @@ func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlan
 		triggers[i] = out
 	}
 
-	return physical.NewGroupBy(source, key, node.fields, aggregates, node.as, triggers), variables, nil
+	return []physical.Node{physical.NewGroupBy(physical.NewUnionAll(sources...), key, node.fields, aggregates, node.as, triggers)}, variables, nil
 }

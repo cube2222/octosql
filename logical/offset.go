@@ -16,10 +16,10 @@ func NewOffset(data Node, expr Expression) Node {
 	return &Offset{data: data, offsetExpr: expr}
 }
 
-func (node *Offset) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
-	dataNode, variables, err := node.data.Physical(ctx, physicalCreator)
+func (node *Offset) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
+	sourceNodes, variables, err := node.data.Physical(ctx, physicalCreator)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get physical plan for data node")
+		return nil, nil, errors.Wrap(err, "couldn't get physical plan for source nodes")
 	}
 
 	offsetExpr, offsetVariables, err := node.offsetExpr.Physical(ctx, physicalCreator)
@@ -31,5 +31,5 @@ func (node *Offset) Physical(ctx context.Context, physicalCreator *PhysicalPlanC
 		return nil, nil, errors.Wrap(err, "couldn't get offset node variables")
 	}
 
-	return physical.NewOffset(dataNode, offsetExpr), variables, nil
+	return []physical.Node{physical.NewOffset(physical.NewUnionAll(sourceNodes...), offsetExpr)}, variables, nil
 }

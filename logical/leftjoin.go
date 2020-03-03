@@ -17,7 +17,7 @@ func NewLeftJoin(source Node, joined Node) *LeftJoin {
 	return &LeftJoin{source: source, joined: joined}
 }
 
-func (node *LeftJoin) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
+func (node *LeftJoin) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	source, sourceVariables, err := node.source.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for map source node")

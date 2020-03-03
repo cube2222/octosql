@@ -49,7 +49,7 @@ func (creator *PhysicalPlanCreator) WithCommonTableExpression(name string, node 
 }
 
 type Node interface {
-	Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error)
+	Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error)
 }
 
 type DataSource struct {
@@ -61,7 +61,7 @@ func NewDataSource(name string, alias string) *DataSource {
 	return &DataSource{name: name, alias: alias}
 }
 
-func (ds *DataSource) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
+func (ds *DataSource) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	outDs, err := physicalCreator.dataSourceRepo.Get(ds.name, ds.alias)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get data source")

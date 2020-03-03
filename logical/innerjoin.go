@@ -17,7 +17,7 @@ func NewInnerJoin(source Node, joined Node) *InnerJoin {
 	return &InnerJoin{source: source, joined: joined}
 }
 
-func (node *InnerJoin) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
+func (node *InnerJoin) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	source, sourceVariables, err := node.source.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for map source node")

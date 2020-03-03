@@ -16,11 +16,11 @@ func NewDistinct(child Node) *Distinct {
 	return &Distinct{child: child}
 }
 
-func (node *Distinct) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
-	childNode, variables, err := node.child.Physical(ctx, physicalCreator)
+func (node *Distinct) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
+	childNodes, variables, err := node.child.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get child's physical plan in distinct")
 	}
 
-	return physical.NewDistinct(childNode), variables, nil
+	return []physical.Node{physical.NewDistinct(physical.NewUnionAll(childNodes...))}, variables, nil
 }

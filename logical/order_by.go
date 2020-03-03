@@ -24,10 +24,10 @@ func NewOrderBy(expressions []Expression, directions []OrderDirection, source No
 	}
 }
 
-func (node *OrderBy) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
-	sourceNode, variables, err := node.source.Physical(ctx, physicalCreator)
+func (node *OrderBy) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
+	sourceNodes, variables, err := node.source.Physical(ctx, physicalCreator)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get physical plan of source node in order by")
+		return nil, nil, errors.Wrap(err, "couldn't get physical plan of source nodes in order by")
 	}
 
 	expressions := make([]physical.Expression, len(node.expressions))
@@ -56,5 +56,5 @@ func (node *OrderBy) Physical(ctx context.Context, physicalCreator *PhysicalPlan
 		}
 	}
 
-	return physical.NewOrderBy(expressions, directions, sourceNode), variables, nil
+	return []physical.Node{physical.NewOrderBy(expressions, directions, physical.NewUnionAll(sourceNodes...))}, variables, nil
 }

@@ -73,7 +73,7 @@ func NewTableValuedFunction(name string, arguments map[octosql.VariableName]Tabl
 	return &TableValuedFunction{name: name, arguments: arguments}
 }
 
-func (node *TableValuedFunction) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
+func (node *TableValuedFunction) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	variables := octosql.NoVariables()
 
 	physArguments := make(map[octosql.VariableName]physical.TableValuedFunctionArgumentValue)

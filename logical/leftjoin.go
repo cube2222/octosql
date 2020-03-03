@@ -33,5 +33,12 @@ func (node *LeftJoin) Physical(ctx context.Context, physicalCreator *PhysicalPla
 		return nil, nil, errors.Wrap(err, "couldn't merge variables for source and joined nodes")
 	}
 
-	return []physical.Node{physical.NewLeftJoin(physical.NewUnionAll(sourceNodes...), physical.NewUnionAll(joinedNodes...))}, variables, nil
+	sourceShuffled := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
+	joinedShuffled := physical.NewShuffle(1, joinedNodes, physical.DefaultShuffleStrategy)
+	outNodes := make([]physical.Node, len(sourceShuffled))
+	for i := range sourceShuffled {
+		outNodes[i] = physical.NewLeftJoin(sourceShuffled[i], joinedShuffled[i])
+	}
+
+	return outNodes, variables, nil
 }

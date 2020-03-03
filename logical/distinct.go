@@ -17,10 +17,15 @@ func NewDistinct(child Node) *Distinct {
 }
 
 func (node *Distinct) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
-	childNodes, variables, err := node.child.Physical(ctx, physicalCreator)
+	sourceNodes, variables, err := node.child.Physical(ctx, physicalCreator)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get child's physical plan in distinct")
+		return nil, nil, errors.Wrap(err, "couldn't get source nodes physical plan in distinct")
 	}
 
-	return []physical.Node{physical.NewDistinct(physical.NewUnionAll(childNodes...))}, variables, nil
+	outNodes := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
+	for i := range outNodes {
+		outNodes[i] = physical.NewDistinct(outNodes[i])
+	}
+
+	return outNodes, variables, nil
 }

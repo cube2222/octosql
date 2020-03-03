@@ -31,5 +31,7 @@ func (node *Offset) Physical(ctx context.Context, physicalCreator *PhysicalPlanC
 		return nil, nil, errors.Wrap(err, "couldn't get offset node variables")
 	}
 
-	return []physical.Node{physical.NewOffset(physical.NewUnionAll(sourceNodes...), offsetExpr)}, variables, nil
+	outNodes := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
+
+	return []physical.Node{physical.NewOffset(outNodes[0], offsetExpr)}, variables, nil
 }

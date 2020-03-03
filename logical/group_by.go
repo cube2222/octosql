@@ -106,7 +106,7 @@ func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, ag
 func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	variables := octosql.NoVariables()
 
-	sources, sourceVariables, err := node.source.Physical(ctx, physicalCreator)
+	sourceNodes, sourceVariables, err := node.source.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for group by sources")
 	}
@@ -173,5 +173,10 @@ func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlan
 		triggers[i] = out
 	}
 
-	return []physical.Node{physical.NewGroupBy(physical.NewUnionAll(sources...), key, node.fields, aggregates, node.as, triggers)}, variables, nil
+	outNodes := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
+	for i := range outNodes {
+		outNodes[i] = physical.NewGroupBy(outNodes[i], key, node.fields, aggregates, node.as, triggers)
+	}
+
+	return outNodes, variables, nil
 }

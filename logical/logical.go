@@ -161,7 +161,10 @@ func (ne *NodeExpression) Physical(ctx context.Context, physicalCreator *Physica
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for node expression")
 	}
-	return physical.NewNodeExpression(physical.NewUnionAll(sourceNodes...)), variables, nil
+
+	outNodes := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
+
+	return physical.NewNodeExpression(outNodes[0]), variables, nil
 }
 
 type LogicExpression struct {

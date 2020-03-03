@@ -31,5 +31,7 @@ func (node *Limit) Physical(ctx context.Context, physicalCreator *PhysicalPlanCr
 		return nil, nil, errors.Wrap(err, "couldn't get limit node variables")
 	}
 
-	return []physical.Node{physical.NewLimit(physical.NewUnionAll(sourceNodes...), limitExpr)}, variables, nil
+	outNodes := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
+
+	return []physical.Node{physical.NewLimit(outNodes[0], limitExpr)}, variables, nil
 }

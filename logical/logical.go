@@ -28,13 +28,15 @@ func (creator *PhysicalPlanCreator) GetVariableName() (out octosql.VariableName)
 	return
 }
 
-func (creator *PhysicalPlanCreator) WithCommonTableExpression(name string, node physical.Node) *PhysicalPlanCreator {
+func (creator *PhysicalPlanCreator) WithCommonTableExpression(name string, nodes []physical.Node) *PhysicalPlanCreator {
 	newDataSourceRepo := creator.dataSourceRepo.WithFactory(
 		name,
-		func(name, alias string) physical.Node {
-			out := node
+		func(name, alias string) []physical.Node {
+			out := nodes
 			if len(alias) > 0 {
-				out = physical.NewRequalifier(alias, out)
+				for i := range out {
+					out[i] = physical.NewRequalifier(alias, out[i])
+				}
 			}
 			return out
 		},
@@ -155,11 +157,11 @@ func NewNodeExpression(node Node) *NodeExpression {
 }
 
 func (ne *NodeExpression) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
-	physicalNode, variables, err := ne.node.Physical(ctx, physicalCreator)
+	sourceNodes, variables, err := ne.node.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for node expression")
 	}
-	return physical.NewNodeExpression(physicalNode), variables, nil
+	return physical.NewNodeExpression(physical.NewUnionAll(sourceNodes...)), variables, nil
 }
 
 type LogicExpression struct {

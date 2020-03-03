@@ -45,7 +45,7 @@ type DataSource struct {
 
 func NewDataSourceBuilderFactory(primaryKeys []octosql.VariableName) physical.DataSourceBuilderFactory {
 	return physical.NewDataSourceBuilderFactory(
-		func(ctx context.Context, matCtx *physical.MaterializationContext, dbConfig map[string]interface{}, filter physical.Formula, alias string) (execution.Node, error) {
+		func(ctx context.Context, matCtx *physical.MaterializationContext, dbConfig map[string]interface{}, filter physical.Formula, alias string, partitions int) (execution.Node, error) {
 			// Get execution configuration
 			host, port, err := config.GetIPAddress(dbConfig, "address", config.WithDefault([]interface{}{"localhost", 3306}))
 			if err != nil {
@@ -104,6 +104,7 @@ func NewDataSourceBuilderFactory(primaryKeys []octosql.VariableName) physical.Da
 		primaryKeys,
 		availableFilters,
 		metadata.BoundedDoesntFitInLocalStorage,
+		1,
 	)
 }
 

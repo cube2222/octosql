@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	sqlStorages "github.com/cube2222/octosql/storage/sqlStorages"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 
@@ -37,10 +38,10 @@ var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 }
 
 type DataSource struct {
-	db      *sql.DB
-	stmt    *sql.Stmt
-	aliases []execution.Expression
-	alias   string
+	db           *sql.DB
+	stmt         *sql.Stmt
+	placeholders []execution.Expression
+	alias        string
 }
 
 func NewDataSourceBuilderFactory(primaryKeys []octosql.VariableName) physical.DataSourceBuilderFactory {
@@ -76,10 +77,10 @@ func NewDataSourceBuilderFactory(primaryKeys []octosql.VariableName) physical.Da
 				return nil, errors.Wrap(err, "couldn't open connection to postgres database")
 			}
 
-			aliases := newAliases(alias)
+			placeholders := newMySQLPlaceholders(alias)
 
 			//create a query with placeholders to prepare a statement from a physical formula
-			query := formulaToSQL(filter, aliases)
+			query := sqlStorages.FormulaToSQL(filter, placeholders)
 			query = fmt.Sprintf("SELECT * FROM %s %s WHERE %s", tableName, alias, query)
 
 			stmt, err := db.Prepare(query)
@@ -87,18 +88,18 @@ func NewDataSourceBuilderFactory(primaryKeys []octosql.VariableName) physical.Da
 				return nil, errors.Wrap(err, "couldn't prepare db for query")
 			}
 
-			//materialize the created aliases
-			execAliases, err := aliases.materializeAliases(matCtx)
+			//materialize the created mySQLPlaceholders
+			execAliases, err := placeholders.MaterializePlaceholders(matCtx)
 
 			if err != nil {
-				return nil, errors.Wrap(err, "couldn't materialize aliases")
+				return nil, errors.Wrap(err, "couldn't materialize mySQLPlaceholders")
 			}
 
 			return &DataSource{
-				stmt:    stmt,
-				aliases: execAliases,
-				alias:   alias,
-				db:      db,
+				stmt:         stmt,
+				placeholders: execAliases,
+				alias:        alias,
+				db:           db,
 			}, nil
 		},
 		primaryKeys,
@@ -124,8 +125,8 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables) (execution.RecordStream, error) {
 	values := make([]interface{}, 0)
 
-	for i := range ds.aliases {
-		expression := ds.aliases[i]
+	for i := range ds.placeholders {
+		expression := ds.placeholders[i]
 
 		//since we have an execution expression, then we can evaluate it given the variables
 		value, err := expression.ExpressionValue(ctx, variables)

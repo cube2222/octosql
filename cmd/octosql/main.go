@@ -19,9 +19,9 @@ import (
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/storage/csv"
 	"github.com/cube2222/octosql/storage/json"
-	"github.com/cube2222/octosql/storage/mysql"
-	"github.com/cube2222/octosql/storage/postgres"
 	"github.com/cube2222/octosql/storage/redis"
+	"github.com/cube2222/octosql/storage/sqlStorages/mysql"
+	"github.com/cube2222/octosql/storage/sqlStorages/postgres"
 	"github.com/spf13/cobra"
 )
 

@@ -5,18 +5,19 @@ import (
 	"testing"
 
 	"github.com/cube2222/octosql/physical"
+	"github.com/cube2222/octosql/storage/sqlStorages"
 )
 
 func TestFormulaToSQL(t *testing.T) {
 	type args struct {
 		formula physical.Formula
-		aliases *aliases
+		aliases *mySQLPlaceholders
 	}
 	tests := []struct {
 		name        string
 		args        args
 		want        string
-		wantAliases *aliases
+		wantAliases *mySQLPlaceholders
 	}{
 		{
 			name: "simple formula test",
@@ -26,10 +27,10 @@ func TestFormulaToSQL(t *testing.T) {
 					physical.MoreThan,
 					physical.NewVariable("const_0"),
 				),
-				aliases: newAliases("u"),
+				aliases: newMySQLPlaceholders("u"),
 			},
 			want: "(u.id) > (?)",
-			wantAliases: &aliases{
+			wantAliases: &mySQLPlaceholders{
 				PlaceholderToExpression: []physical.Expression{
 					physical.NewVariable("const_0"),
 				},
@@ -47,10 +48,10 @@ func TestFormulaToSQL(t *testing.T) {
 						physical.NewVariable("table.age"),
 					),
 				),
-				aliases: newAliases("table"),
+				aliases: newMySQLPlaceholders("table"),
 			},
 			want: "(TRUE) AND ((?) = (table.age))",
-			wantAliases: &aliases{
+			wantAliases: &mySQLPlaceholders{
 				PlaceholderToExpression: []physical.Expression{
 					physical.NewVariable("const_0"),
 				},
@@ -70,10 +71,10 @@ func TestFormulaToSQL(t *testing.T) {
 						physical.NewConstant(false),
 					),
 				),
-				aliases: newAliases("alias"),
+				aliases: newMySQLPlaceholders("alias"),
 			},
 			want: "((alias.age) <> (alias.IQ)) OR (NOT (FALSE))",
-			wantAliases: &aliases{
+			wantAliases: &mySQLPlaceholders{
 				PlaceholderToExpression: []physical.Expression{},
 				Alias:                   "alias",
 			},
@@ -86,10 +87,10 @@ func TestFormulaToSQL(t *testing.T) {
 					physical.MoreThan,
 					physical.NewVariable("c.age"),
 				),
-				aliases: newAliases("a"),
+				aliases: newMySQLPlaceholders("a"),
 			},
 			want: "(?) > (?)",
-			wantAliases: &aliases{
+			wantAliases: &mySQLPlaceholders{
 				PlaceholderToExpression: []physical.Expression{
 					physical.NewVariable("b.age"),
 					physical.NewVariable("c.age"),
@@ -98,7 +99,7 @@ func TestFormulaToSQL(t *testing.T) {
 			},
 		},
 		{
-			name: "complicated test with different formulas and aliases",
+			name: "complicated test with different formulas and mySQLPlaceholders",
 			//((a.age > b.age AND a.sex = const_0) OR (const_1 < b.id)
 			args: args{
 				formula: physical.NewOr(
@@ -124,11 +125,11 @@ func TestFormulaToSQL(t *testing.T) {
 					),
 				),
 
-				aliases: newAliases("a"),
+				aliases: newMySQLPlaceholders("a"),
 			},
 
 			want: "(((a.age) > (?)) AND ((a.sex) = (?))) OR ((?) < (?))",
-			wantAliases: &aliases{
+			wantAliases: &mySQLPlaceholders{
 				PlaceholderToExpression: []physical.Expression{
 					physical.NewVariable("b.age"),
 					physical.NewVariable("const_0"),
@@ -141,12 +142,12 @@ func TestFormulaToSQL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := formulaToSQL(tt.args.formula, tt.args.aliases); got != tt.want {
+			if got := sqlStorages.FormulaToSQL(tt.args.formula, tt.args.aliases); got != tt.want {
 				t.Errorf("formulaToSQL() = %v, want %v", got, tt.want)
 			}
 
 			if !reflect.DeepEqual(tt.args.aliases, tt.wantAliases) {
-				t.Errorf("formulaToSQL aliases = %v, want %v", tt.args.aliases, tt.wantAliases)
+				t.Errorf("formulaToSQL mySQLPlaceholders = %v, want %v", tt.args.aliases, tt.wantAliases)
 			}
 		})
 	}

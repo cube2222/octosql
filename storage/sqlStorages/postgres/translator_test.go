@@ -5,18 +5,19 @@ import (
 	"testing"
 
 	"github.com/cube2222/octosql/physical"
+	"github.com/cube2222/octosql/storage/sqlStorages"
 )
 
 func TestFormulaToSQL(t *testing.T) {
 	type args struct {
 		formula physical.Formula
-		aliases *aliases
+		aliases *postgresPlaceholders
 	}
 	tests := []struct {
 		name        string
 		args        args
 		want        string
-		wantAliases *aliases
+		wantAliases *postgresPlaceholders
 	}{
 		{
 			name: "simple formula test",
@@ -26,10 +27,10 @@ func TestFormulaToSQL(t *testing.T) {
 					physical.MoreThan,
 					physical.NewVariable("const_0"),
 				),
-				aliases: newAliases("u"),
+				aliases: newPostgresPlaceholders("u"),
 			},
 			want: "(u.id) > ($1)",
-			wantAliases: &aliases{
+			wantAliases: &postgresPlaceholders{
 				PlaceholderToExpression: map[string]physical.Expression{
 					"$1": physical.NewVariable("const_0"),
 				},
@@ -48,10 +49,10 @@ func TestFormulaToSQL(t *testing.T) {
 						physical.NewVariable("table.age"),
 					),
 				),
-				aliases: newAliases("table"),
+				aliases: newPostgresPlaceholders("table"),
 			},
 			want: "(TRUE) AND (($1) = (table.age))",
-			wantAliases: &aliases{
+			wantAliases: &postgresPlaceholders{
 				PlaceholderToExpression: map[string]physical.Expression{
 					"$1": physical.NewVariable("const_0"),
 				},
@@ -72,10 +73,10 @@ func TestFormulaToSQL(t *testing.T) {
 						physical.NewConstant(false),
 					),
 				),
-				aliases: newAliases("alias"),
+				aliases: newPostgresPlaceholders("alias"),
 			},
 			want: "((alias.age) <> (alias.IQ)) OR (NOT (FALSE))",
-			wantAliases: &aliases{
+			wantAliases: &postgresPlaceholders{
 				PlaceholderToExpression: map[string]physical.Expression{},
 				Counter:                 1,
 				Alias:                   "alias",
@@ -89,10 +90,10 @@ func TestFormulaToSQL(t *testing.T) {
 					physical.MoreThan,
 					physical.NewVariable("c.age"),
 				),
-				aliases: newAliases("a"),
+				aliases: newPostgresPlaceholders("a"),
 			},
 			want: "($1) > ($2)",
-			wantAliases: &aliases{
+			wantAliases: &postgresPlaceholders{
 				PlaceholderToExpression: map[string]physical.Expression{
 					"$1": physical.NewVariable("b.age"),
 					"$2": physical.NewVariable("c.age"),
@@ -102,7 +103,7 @@ func TestFormulaToSQL(t *testing.T) {
 			},
 		},
 		{
-			name: "complicated test with different formulas and aliases",
+			name: "complicated test with different formulas and postgresPlaceholders",
 			//((a.age > b.age AND a.sex = const_0) OR (const_1 < b.id)
 			args: args{
 				formula: physical.NewOr(
@@ -128,11 +129,11 @@ func TestFormulaToSQL(t *testing.T) {
 					),
 				),
 
-				aliases: newAliases("a"),
+				aliases: newPostgresPlaceholders("a"),
 			},
 
 			want: "(((a.age) > ($1)) AND ((a.sex) = ($2))) OR (($3) < ($4))",
-			wantAliases: &aliases{
+			wantAliases: &postgresPlaceholders{
 				PlaceholderToExpression: map[string]physical.Expression{
 					"$1": physical.NewVariable("b.age"),
 					"$2": physical.NewVariable("const_0"),
@@ -146,12 +147,12 @@ func TestFormulaToSQL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := formulaToSQL(tt.args.formula, tt.args.aliases); got != tt.want {
+			if got := sqlStorages.FormulaToSQL(tt.args.formula, tt.args.aliases); got != tt.want {
 				t.Errorf("formulaToSQL() = %v, want %v", got, tt.want)
 			}
 
 			if !reflect.DeepEqual(tt.args.aliases, tt.wantAliases) {
-				t.Errorf("formulaToSQL aliases = %v, want %v", tt.args.aliases, tt.wantAliases)
+				t.Errorf("formulaToSQL postgresPlaceholders = %v, want %v", tt.args.aliases, tt.wantAliases)
 			}
 		})
 	}

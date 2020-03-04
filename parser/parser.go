@@ -129,6 +129,10 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		root = logical.NewFilter(filterFormula, root)
 	}
 
+	if statement.GroupBy != nil {
+		aggregating = true
+	}
+
 	if aggregating {
 		key := make([]logical.Expression, len(statement.GroupBy))
 		for i := range statement.GroupBy {

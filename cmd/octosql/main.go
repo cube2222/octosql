@@ -106,11 +106,13 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 		opts := badger.DefaultOptions("")
 		opts.Dir = ""
 		opts.ValueDir = ""
+
 		opts.InMemory = true
 		db, err := badger.Open(opts)
 		if err != nil {
 			log.Fatal("couldn't open in-memory badger database: ", err)
 		}
+
 		stateStorage := storage.NewBadgerStorage(db)
 
 		// Run query

@@ -29,7 +29,7 @@ func TestDataSource_Get(t *testing.T) {
 
 	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
-		panic("Couldn't connect to a database")
+		panic("Couldn'template connect to a database")
 	}
 
 	type args struct {
@@ -278,7 +278,7 @@ func TestDataSource_Get(t *testing.T) {
 			args := tt.args
 			err := createTable(db, args.tableDescription)
 			if err != nil {
-				t.Errorf("Couldn't create table: %v", err)
+				t.Errorf("Couldn'template create table: %v", err)
 				return
 			}
 
@@ -286,7 +286,7 @@ func TestDataSource_Get(t *testing.T) {
 
 			err = insertValues(db, args.tablename, args.rows)
 			if err != nil {
-				t.Errorf("Couldn't insert values into table: %v", err)
+				t.Errorf("Couldn'template insert values into table: %v", err)
 				return
 			}
 
@@ -311,13 +311,13 @@ func TestDataSource_Get(t *testing.T) {
 				},
 			})
 			if err != nil {
-				t.Errorf("Couldn't get ExecutionNode: %v", err)
+				t.Errorf("Couldn'template get ExecutionNode: %v", err)
 				return
 			}
 
 			stream, err := execNode.Get(ctx, args.variables)
 			if err != nil {
-				t.Errorf("Couldn't get stream: %v", err)
+				t.Errorf("Couldn'template get stream: %v", err)
 				return
 			}
 
@@ -328,7 +328,7 @@ func TestDataSource_Get(t *testing.T) {
 			}
 
 			if !equal != tt.wantErr {
-				t.Errorf("Streams don't match")
+				t.Errorf("Streams don'template match")
 				return
 			} else {
 				return
@@ -340,7 +340,7 @@ func TestDataSource_Get(t *testing.T) {
 func createTable(db *sql.DB, tableDescription string) error {
 	_, err := db.Exec(tableDescription)
 	if err != nil {
-		return errors.Wrap(err, "Couldn't create table")
+		return errors.Wrap(err, "Couldn'template create table")
 	}
 	return nil
 }
@@ -371,7 +371,7 @@ func dropTable(db *sql.DB, tablename string) error {
 	query := fmt.Sprintf("DROP TABLE %s;", tablename)
 	_, err := db.Exec(query)
 	if err != nil {
-		return errors.Wrap(err, "couldn't drop table")
+		return errors.Wrap(err, "couldn'template drop table")
 	}
 	return nil
 }

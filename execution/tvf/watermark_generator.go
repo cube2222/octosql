@@ -38,7 +38,7 @@ func (w *WatermarkGenerator) Get(ctx context.Context, variables octosql.Variable
 		return nil, nil, errors.Wrap(err, "couldn't get source stream ID")
 	}
 
-	source, _, err := w.source.Get(ctx, variables, sourceStreamID) // we don't need execOutput here since we become new watermark source
+	source, _, err := w.source.Get(ctx, variables, sourceStreamID) // we don't need execOutput here since we become the new watermark source
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get source")
 	}
@@ -48,7 +48,7 @@ func (w *WatermarkGenerator) Get(ctx context.Context, variables octosql.Variable
 		return nil, nil, errors.Wrap(err, "couldn't get watermark offset")
 	}
 	if offset.GetType() != octosql.TypeDuration {
-		return nil, nil, errors.Errorf("invalid watermark offset: %v", offset)
+		return nil, nil, errors.Errorf("invalid watermark offset type: %v", offset.GetType())
 	}
 
 	ws := &WatermarkGeneratorStream{

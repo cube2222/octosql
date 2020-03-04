@@ -103,6 +103,7 @@ func (node *TableValuedFunction) Physical(ctx context.Context, physicalCreator *
 	}
 
 	// We only want one source node with multiple partitions for a table valued function, otherwise partitioning gets nasty.
+	// So we find it here if it exists.
 	multipartitionCount := 0
 	multipartitionArgumentName := octosql.NewVariableName("")
 	for arg, argValue := range physArguments {
@@ -111,10 +112,13 @@ func (node *TableValuedFunction) Physical(ctx context.Context, physicalCreator *
 			multipartitionCount++
 		}
 	}
+
+	// If there is more that one multipartition stream input, we error.
 	if multipartitionCount > 1 {
 		return nil, octosql.NoVariables(), errors.Errorf("only one source node with multiple partitions allowed for table valued function, got %d", multipartitionCount)
 	}
 
+	// If there are not multipartition input streams, we return a single partition.
 	if multipartitionCount == 0 {
 		singleArguments := make(map[octosql.VariableName]physical.TableValuedFunctionArgumentValue)
 		for k, v := range physArguments {
@@ -127,6 +131,7 @@ func (node *TableValuedFunction) Physical(ctx context.Context, physicalCreator *
 		)}, variables, nil
 	}
 
+	// Otherwise we add one instance of this table valued function to each partition, and return the resulting partitions.
 	multipartitionSourceNodes := physArguments[multipartitionArgumentName]
 
 	outNodes := make([]physical.Node, len(multipartitionSourceNodes))

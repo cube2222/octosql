@@ -42,7 +42,7 @@ func (node *Map) Physical(ctx context.Context, physicalCreator *PhysicalPlanCrea
 
 	sourceNodes, sourceVariables, err := node.source.Physical(ctx, physicalCreator)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get physical plan for map source node")
+		return nil, nil, errors.Wrap(err, "couldn't get physical plan for map source nodes")
 	}
 
 	variables, err = sourceVariables.MergeWith(variables)

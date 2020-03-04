@@ -38,8 +38,11 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 	if err != nil {
 		return errors.Wrap(err, "couldn't create physical plan")
 	}
+
+	// We only want one partition at the end, to print the output easily.
 	shuffled := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
 
+	// Only the first partition is there.
 	var phys physical.Node = shuffled[0]
 
 	phys = optimizer.Optimize(ctx, optimizer.DefaultScenarios, phys)

@@ -21,6 +21,7 @@ type node struct {
 }
 
 type ShuffleStrategy interface {
+	// Return output partition index based on the record and output partition count.
 	CalculatePartition(record *execution.Record, outputs int) int
 }
 

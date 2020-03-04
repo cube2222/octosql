@@ -101,8 +101,8 @@ func NewDataSourceBuilderFactory(materializer DataSourceMaterializerFunc, primar
 				Filter:           NewConstant(true),
 				Name:             name,
 				Alias:            alias,
-				Cardinality:      cardinality,
 				Partition:        partition,
+				Cardinality:      cardinality,
 			}
 		}
 		return outNodes

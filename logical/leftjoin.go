@@ -20,12 +20,12 @@ func NewLeftJoin(source Node, joined Node) *LeftJoin {
 func (node *LeftJoin) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	sourceNodes, sourceVariables, err := node.source.Physical(ctx, physicalCreator)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get physical plan for left join source node")
+		return nil, nil, errors.Wrap(err, "couldn't get physical plan for left join source nodes")
 	}
 
 	joinedNodes, joinedVariables, err := node.joined.Physical(ctx, physicalCreator)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get physical plan for left join joined node")
+		return nil, nil, errors.Wrap(err, "couldn't get physical plan for left join joined nodes")
 	}
 
 	variables, err := sourceVariables.MergeWith(joinedVariables)

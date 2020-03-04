@@ -25,8 +25,9 @@ func newPostgresPlaceholders(alias string) *postgresPlaceholders {
 	}
 }
 
-func (pms *postgresPlaceholders) AddPlaceholder(physical.Expression) string {
+func (pms *postgresPlaceholders) AddPlaceholder(expression physical.Expression) string {
 	placeholder := fmt.Sprintf("$%d", pms.Counter)
+	pms.PlaceholderToExpression[placeholder] = expression
 	pms.Counter++
 
 	return placeholder

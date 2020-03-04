@@ -64,7 +64,7 @@ jobs:
       - checkout
 
       - run: sleep 4
-      - run: go test -v ./storage/mysql/...
+      - run: go test -v ./storage/sqlStorages/mysql...
 
   test-postgres:
     docker:
@@ -81,7 +81,7 @@ jobs:
     steps:
       - checkout
 
-      - run: go test -v ./storage/postgres/...
+      - run: go test -v ./storage/sqlStorages/postgres...
 
   test-redis:
     docker:

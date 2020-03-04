@@ -56,7 +56,7 @@ func (t PostgresTemplate) GetConnection(user, password, host, dbName string, por
 	// Open the connection
 	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn'template open connection to postgres database")
+		return nil, errors.Wrap(err, "couldn't open connection to postgres database")
 	}
 
 	return db, nil
@@ -76,7 +76,7 @@ func NewDataSourceBuilderFactory(primaryKeys []octosql.VariableName) physical.Da
 func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (physical.DataSourceBuilderFactory, error) {
 	primaryKeysStrings, err := config.GetStringList(dbConfig, "primaryKeys", config.WithDefault([]string{}))
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn'template get primaryKeys")
+		return nil, errors.Wrap(err, "couldn't get primaryKeys")
 	}
 	var primaryKeys []octosql.VariableName
 	for _, str := range primaryKeysStrings {

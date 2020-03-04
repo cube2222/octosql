@@ -43,12 +43,12 @@ func (pms *postgresPlaceholders) MaterializePlaceholders(matCtx *physical.Materi
 
 		expression, ok := pms.PlaceholderToExpression[placeholder]
 		if !ok {
-			return nil, errors.Errorf("couldn'template get variable name for placeholder %s", placeholder)
+			return nil, errors.Errorf("couldn't get variable name for placeholder %s", placeholder)
 		}
 
 		exec, err := expression.Materialize(ctx, matCtx)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn'template materialize expression in Postgres' MaterializePlaceholders")
+			return nil, errors.Wrap(err, "couldn't materialize expression in Postgres' MaterializePlaceholders")
 		}
 
 		result[i-1] = exec

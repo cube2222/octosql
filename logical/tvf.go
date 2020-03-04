@@ -11,7 +11,7 @@ import (
 
 type TableValuedFunctionArgumentValue interface {
 	iTableValuedFunctionArgumentValue()
-	Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.TableValuedFunctionArgumentValue, octosql.Variables, error)
+	Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.TableValuedFunctionArgumentValue, octosql.Variables, error)
 }
 
 func (*TableValuedFunctionArgumentValueExpression) iTableValuedFunctionArgumentValue() {}
@@ -26,13 +26,13 @@ func NewTableValuedFunctionArgumentValueExpression(expression Expression) *Table
 	return &TableValuedFunctionArgumentValueExpression{expression: expression}
 }
 
-func (arg *TableValuedFunctionArgumentValueExpression) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.TableValuedFunctionArgumentValue, octosql.Variables, error) {
+func (arg *TableValuedFunctionArgumentValueExpression) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.TableValuedFunctionArgumentValue, octosql.Variables, error) {
 	physExpression, variables, err := arg.expression.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical expression")
 	}
 
-	return physical.NewTableValuedFunctionArgumentValueExpression(physExpression), variables, nil
+	return []physical.TableValuedFunctionArgumentValue{physical.NewTableValuedFunctionArgumentValueExpression(physExpression)}, variables, nil
 }
 
 type TableValuedFunctionArgumentValueTable struct {
@@ -43,13 +43,18 @@ func NewTableValuedFunctionArgumentValueTable(source Node) *TableValuedFunctionA
 	return &TableValuedFunctionArgumentValueTable{source: source}
 }
 
-func (arg *TableValuedFunctionArgumentValueTable) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.TableValuedFunctionArgumentValue, octosql.Variables, error) {
-	physExpression, variables, err := arg.source.Physical(ctx, physicalCreator)
+func (arg *TableValuedFunctionArgumentValueTable) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.TableValuedFunctionArgumentValue, octosql.Variables, error) {
+	sourceNodes, variables, err := arg.source.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical node")
 	}
 
-	return physical.NewTableValuedFunctionArgumentValueTable(physExpression), variables, nil
+	outputArguments := make([]physical.TableValuedFunctionArgumentValue, len(sourceNodes))
+	for i := range sourceNodes {
+		outputArguments[i] = physical.NewTableValuedFunctionArgumentValueTable(sourceNodes[i])
+	}
+
+	return outputArguments, variables, nil
 }
 
 type TableValuedFunctionArgumentValueDescriptor struct {
@@ -60,8 +65,8 @@ func NewTableValuedFunctionArgumentValueDescriptor(descriptor octosql.VariableNa
 	return &TableValuedFunctionArgumentValueDescriptor{descriptor: descriptor}
 }
 
-func (arg *TableValuedFunctionArgumentValueDescriptor) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.TableValuedFunctionArgumentValue, octosql.Variables, error) {
-	return physical.NewTableValuedFunctionArgumentValueDescriptor(arg.descriptor), octosql.NoVariables(), nil
+func (arg *TableValuedFunctionArgumentValueDescriptor) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.TableValuedFunctionArgumentValue, octosql.Variables, error) {
+	return []physical.TableValuedFunctionArgumentValue{physical.NewTableValuedFunctionArgumentValueDescriptor(arg.descriptor)}, octosql.NoVariables(), nil
 }
 
 type TableValuedFunction struct {
@@ -73,10 +78,10 @@ func NewTableValuedFunction(name string, arguments map[octosql.VariableName]Tabl
 	return &TableValuedFunction{name: name, arguments: arguments}
 }
 
-func (node *TableValuedFunction) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
+func (node *TableValuedFunction) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	variables := octosql.NoVariables()
 
-	physArguments := make(map[octosql.VariableName]physical.TableValuedFunctionArgumentValue)
+	physArguments := make(map[octosql.VariableName][]physical.TableValuedFunctionArgumentValue)
 	for k, v := range node.arguments {
 		physArg, argVariables, err := v.Physical(ctx, physicalCreator)
 		if err != nil {
@@ -97,8 +102,54 @@ func (node *TableValuedFunction) Physical(ctx context.Context, physicalCreator *
 		physArguments[k] = physArg
 	}
 
-	return physical.NewTableValuedFunction(
-		node.name,
-		physArguments,
-	), variables, nil
+	// We only want one source node with multiple partitions for a table valued function, otherwise partitioning gets nasty.
+	// So we find it here if it exists.
+	multipartitionCount := 0
+	multipartitionArgumentName := octosql.NewVariableName("")
+	for arg, argValue := range physArguments {
+		if len(argValue) > 1 {
+			multipartitionArgumentName = arg
+			multipartitionCount++
+		}
+	}
+
+	// If there is more that one multipartition stream input, we error.
+	if multipartitionCount > 1 {
+		return nil, octosql.NoVariables(), errors.Errorf("only one source node with multiple partitions allowed for table valued function, got %d", multipartitionCount)
+	}
+
+	// If there are no multipartition input streams, we return a single partition.
+	if multipartitionCount == 0 {
+		singleArguments := make(map[octosql.VariableName]physical.TableValuedFunctionArgumentValue)
+		for k, v := range physArguments {
+			singleArguments[k] = v[0]
+		}
+
+		return []physical.Node{physical.NewTableValuedFunction(
+			node.name,
+			singleArguments,
+		)}, variables, nil
+	}
+
+	// Otherwise we add one instance of this table valued function to each partition, and return the resulting partitions.
+	multipartitionSourceNodes := physArguments[multipartitionArgumentName]
+
+	outNodes := make([]physical.Node, len(multipartitionSourceNodes))
+	for i, sourceNode := range physArguments[multipartitionArgumentName] {
+		singleArguments := make(map[octosql.VariableName]physical.TableValuedFunctionArgumentValue)
+		for k, v := range physArguments {
+			if k == multipartitionArgumentName {
+				continue
+			}
+			singleArguments[k] = v[0]
+		}
+		singleArguments[multipartitionArgumentName] = sourceNode
+
+		outNodes[i] = physical.NewTableValuedFunction(
+			node.name,
+			singleArguments,
+		)
+	}
+
+	return outNodes, variables, nil
 }

@@ -33,7 +33,7 @@ type DataSource struct {
 // dbKey is the name for hard-coded key alias used in future formulas for redis queries
 func NewDataSourceBuilderFactory(dbKey string) physical.DataSourceBuilderFactory {
 	return physical.NewDataSourceBuilderFactory(
-		func(ctx context.Context, matCtx *physical.MaterializationContext, dbConfig map[string]interface{}, filter physical.Formula, alias string) (execution.Node, error) {
+		func(ctx context.Context, matCtx *physical.MaterializationContext, dbConfig map[string]interface{}, filter physical.Formula, alias string, partitions int) (execution.Node, error) {
 			host, port, err := config.GetIPAddress(dbConfig, "address", config.WithDefault([]interface{}{"localhost", 6379}))
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't get address")
@@ -72,6 +72,7 @@ func NewDataSourceBuilderFactory(dbKey string) physical.DataSourceBuilderFactory
 		},
 		availableFilters,
 		metadata.BoundedDoesntFitInLocalStorage,
+		1,
 	)
 }
 

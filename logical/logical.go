@@ -28,13 +28,15 @@ func (creator *PhysicalPlanCreator) GetVariableName() (out octosql.VariableName)
 	return
 }
 
-func (creator *PhysicalPlanCreator) WithCommonTableExpression(name string, node physical.Node) *PhysicalPlanCreator {
+func (creator *PhysicalPlanCreator) WithCommonTableExpression(name string, nodes []physical.Node) *PhysicalPlanCreator {
 	newDataSourceRepo := creator.dataSourceRepo.WithFactory(
 		name,
-		func(name, alias string) physical.Node {
-			out := node
+		func(name, alias string) []physical.Node {
+			out := nodes
 			if len(alias) > 0 {
-				out = physical.NewRequalifier(alias, out)
+				for i := range out {
+					out[i] = physical.NewRequalifier(alias, out[i])
+				}
 			}
 			return out
 		},
@@ -49,7 +51,7 @@ func (creator *PhysicalPlanCreator) WithCommonTableExpression(name string, node 
 }
 
 type Node interface {
-	Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error)
+	Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error)
 }
 
 type DataSource struct {
@@ -61,7 +63,7 @@ func NewDataSource(name string, alias string) *DataSource {
 	return &DataSource{name: name, alias: alias}
 }
 
-func (ds *DataSource) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
+func (ds *DataSource) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	outDs, err := physicalCreator.dataSourceRepo.Get(ds.name, ds.alias)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get data source")
@@ -155,11 +157,14 @@ func NewNodeExpression(node Node) *NodeExpression {
 }
 
 func (ne *NodeExpression) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
-	physicalNode, variables, err := ne.node.Physical(ctx, physicalCreator)
+	sourceNodes, variables, err := ne.node.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for node expression")
 	}
-	return physical.NewNodeExpression(physicalNode), variables, nil
+
+	outNodes := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
+
+	return physical.NewNodeExpression(outNodes[0]), variables, nil
 }
 
 type LogicExpression struct {

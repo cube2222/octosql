@@ -17,15 +17,15 @@ func NewLeftJoin(source Node, joined Node) *LeftJoin {
 	return &LeftJoin{source: source, joined: joined}
 }
 
-func (node *LeftJoin) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
-	source, sourceVariables, err := node.source.Physical(ctx, physicalCreator)
+func (node *LeftJoin) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
+	sourceNodes, sourceVariables, err := node.source.Physical(ctx, physicalCreator)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get physical plan for map source node")
+		return nil, nil, errors.Wrap(err, "couldn't get physical plan for left join source nodes")
 	}
 
-	joined, joinedVariables, err := node.joined.Physical(ctx, physicalCreator)
+	joinedNodes, joinedVariables, err := node.joined.Physical(ctx, physicalCreator)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get physical plan for map joined node")
+		return nil, nil, errors.Wrap(err, "couldn't get physical plan for left join joined nodes")
 	}
 
 	variables, err := sourceVariables.MergeWith(joinedVariables)
@@ -33,5 +33,12 @@ func (node *LeftJoin) Physical(ctx context.Context, physicalCreator *PhysicalPla
 		return nil, nil, errors.Wrap(err, "couldn't merge variables for source and joined nodes")
 	}
 
-	return physical.NewLeftJoin(source, joined), variables, nil
+	sourceShuffled := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
+	joinedShuffled := physical.NewShuffle(1, joinedNodes, physical.DefaultShuffleStrategy)
+	outNodes := make([]physical.Node, len(sourceShuffled))
+	for i := range sourceShuffled {
+		outNodes[i] = physical.NewLeftJoin(sourceShuffled[i], joinedShuffled[i])
+	}
+
+	return outNodes, variables, nil
 }

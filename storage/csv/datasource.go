@@ -34,7 +34,7 @@ type DataSource struct {
 
 func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 	return physical.NewDataSourceBuilderFactory(
-		func(ctx context.Context, matCtx *physical.MaterializationContext, dbConfig map[string]interface{}, filter physical.Formula, alias string) (execution.Node, error) {
+		func(ctx context.Context, matCtx *physical.MaterializationContext, dbConfig map[string]interface{}, filter physical.Formula, alias string, partition int) (execution.Node, error) {
 			path, err := config.GetString(dbConfig, "path")
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't get path")
@@ -62,6 +62,7 @@ func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 		nil,
 		availableFilters,
 		metadata.BoundedFitsInLocalStorage,
+		1,
 	)
 }
 

@@ -17,14 +17,16 @@ type PercentileWatermarkGenerator struct {
 	timeField  octosql.VariableName
 	events     execution.Expression
 	percentile execution.Expression
+	frequency  execution.Expression
 }
 
-func NewPercentileWatermarkGenerator(source execution.Node, timeField octosql.VariableName, events, percentile execution.Expression) *PercentileWatermarkGenerator {
+func NewPercentileWatermarkGenerator(source execution.Node, timeField octosql.VariableName, events, percentile, frequency execution.Expression) *PercentileWatermarkGenerator {
 	return &PercentileWatermarkGenerator{
 		source:     source,
 		timeField:  timeField,
 		events:     events,
 		percentile: percentile,
+		frequency:  frequency,
 	}
 }
 
@@ -44,7 +46,7 @@ func (w *PercentileWatermarkGenerator) Get(ctx context.Context, variables octosq
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get watermark events")
 	}
-	if events.GetType() != octosql.TypeDuration || events.AsInt() < 1 {
+	if events.GetType() != octosql.TypeInt || events.AsInt() < 1 {
 		return nil, nil, errors.Errorf("invalid watermark events: %v", events)
 	}
 
@@ -52,8 +54,16 @@ func (w *PercentileWatermarkGenerator) Get(ctx context.Context, variables octosq
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get watermark percentile")
 	}
-	if percentile.GetType() != octosql.TypeDuration || percentile.AsInt() < 1 || percentile.AsInt() > 99 {
+	if percentile.GetType() != octosql.TypeInt || percentile.AsInt() < 1 || percentile.AsInt() > 99 {
 		return nil, nil, errors.Errorf("invalid watermark percentile: %v", percentile)
+	}
+
+	frequency, err := w.frequency.ExpressionValue(ctx, variables)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't get watermark frequency")
+	}
+	if frequency.GetType() != octosql.TypeInt || frequency.AsInt() < 1 {
+		return nil, nil, errors.Errorf("invalid watermark frequency: %v", frequency)
 	}
 
 	ws := &PercentileWatermarkGeneratorStream{
@@ -61,7 +71,7 @@ func (w *PercentileWatermarkGenerator) Get(ctx context.Context, variables octosq
 		timeField:  w.timeField,
 		events:     events.AsInt(),
 		percentile: percentile.AsInt(),
-		eventsSeen: 0,
+		frequency:  frequency.AsInt(),
 	}
 
 	return ws, execution.NewExecOutput(ws), nil // watermark generator stream now indicates new watermark source
@@ -72,11 +82,16 @@ type PercentileWatermarkGeneratorStream struct {
 	timeField  octosql.VariableName
 	events     int
 	percentile int
-	eventsSeen int
+	frequency  int
 }
 
-var percentileWatermarkPrefix = []byte("$percentile_watermark$")
-var percentileWatermarkEventsPrefix = []byte("$percentile_watermark_events$")
+var (
+	percentileWatermarkPrefix = []byte("$percentile_watermark$")
+
+	percentileWatermarkEventsPrefix      = []byte("$percentile_watermark_events$")
+	percentileWatermarkEventsCountPrefix = []byte("$percentile_watermark_events_count$")
+	percentileWatermarkEventsSeenPrefix  = []byte("$percentile_watermark_events_seen$")
+)
 
 func (s *PercentileWatermarkGeneratorStream) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
 	watermarkStorage := storage.NewValueState(tx.WithPrefix(percentileWatermarkPrefix))
@@ -109,38 +124,150 @@ func (s *PercentileWatermarkGeneratorStream) Next(ctx context.Context) (*executi
 	tx := storage.GetStateTransactionFromContext(ctx)
 	watermarkStorage := storage.NewValueState(tx.WithPrefix(percentileWatermarkPrefix))
 	eventsStorage := storage.NewDeque(tx.WithPrefix(percentileWatermarkEventsPrefix))
+	eventsCountStorage := storage.NewMap(tx.WithPrefix(percentileWatermarkEventsCountPrefix))
+	eventsSeenStorage := storage.NewValueState(tx.WithPrefix(percentileWatermarkEventsSeenPrefix))
 
-	var watermarkPlace int       // represents position of event in sorted list that will become new watermark
-	if s.eventsSeen < s.events { // no need to pop first element from deque
-		s.eventsSeen++
+	// Adding newest event
+	err = addNewestEvent(timeValue, tx)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't add newest event to storage")
+	}
 
-		watermarkPlace = s.percentile * s.eventsSeen / 100
-	} else {
-		watermarkPlace = s.percentile * s.events / 100
+	eventsLength, err := eventsStorage.Length()
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get events deque length")
+	}
 
-		var firstElem octosql.Value
-		err = eventsStorage.PopFront(&firstElem)
+	var eventsSeen octosql.Value
+	err = eventsSeenStorage.Get(&eventsSeen)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get events seen count")
+	}
+
+	// There are enough events seen to remove oldest event
+	if eventsLength >= s.events {
+
+		// Removing oldest event (no matter if we update watermark or not)
+		err := removeOldestEvent(tx)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't pop front oldest event from events deque")
+			return nil, errors.Wrap(err, "couldn't remove oldest event from storage")
+		}
+
+		if eventsSeen.AsInt() == s.frequency { // Updating watermark
+
+			// Clearing events seen => the reason this value is -1 is because after that scope we set it to eventsSeen.AsInt() + 1 = 0
+			eventsSeen = octosql.MakeInt(-1)
+
+			// Below declaration equals to (percentile / 100) = (events - wP) / events
+			// Using (events - wP) instead of wP, because percentile of 80% means, that 80% events can be BIGGER than watermark value
+			// so watermark position is at 20% of all events
+			watermarkPosition := ((100 - s.percentile) * s.events) / 100 // represents position (from the left) of event in sorted list that will become new watermark
+
+			// Let's begin iterating through events count map
+			eventsAlreadySeen := 0
+
+			var key, value octosql.Value
+			eventsIterator := eventsCountStorage.GetIterator()
+			for {
+				err := eventsIterator.Next(&key, &value)
+				if err == storage.ErrEndOfIterator {
+					break
+				} else if err != nil {
+					return nil, errors.Wrap(err, "couldn't get next value from iterator")
+				}
+
+				eventsAlreadySeen += value.AsInt()
+
+				if eventsAlreadySeen >= watermarkPosition { // we've passed specified percentile of all events
+					break
+				}
+			}
+
+			// Setting new watermark value
+			newWatermark := octosql.MakeTime(key.AsTime())
+			err = watermarkStorage.Set(&newWatermark)
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't set new watermark value in storage")
+			}
 		}
 	}
 
-	err = eventsStorage.PushBack(&timeValue)
+	// Updating events seen
+	eventsSeen = octosql.MakeInt(eventsSeen.AsInt() + 1)
+	err = eventsSeenStorage.Set(&eventsSeen)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't push back new event to events deque")
-	}
-
-	// TODO - well, do something clever to save new watermark value ...
-	// ...
-	// 1) easiest idea: store events in Map and then iterate through all <watermarkPlace> values to find watermark (slow)
-
-	newWatermark := octosql.MakeTime(time.Time{})
-	err = watermarkStorage.Set(&newWatermark)
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't set new watermark value in storage")
+		return nil, errors.Wrap(err, "couldn't update events seen")
 	}
 
 	return srcRecord, nil
+}
+
+func addNewestEvent(eventTimeValue octosql.Value, tx storage.StateTransaction) error {
+	eventsStorage := storage.NewDeque(tx.WithPrefix(percentileWatermarkEventsPrefix))
+	eventsCountStorage := storage.NewMap(tx.WithPrefix(percentileWatermarkEventsCountPrefix))
+
+	// Adding to events deque
+	err := eventsStorage.PushBack(&eventTimeValue)
+	if err != nil {
+		return errors.Wrap(err, "couldn't push back new event to events deque")
+	}
+
+	var oldCount octosql.Value
+	var newCount octosql.Value
+
+	// Adding to events count map
+	err = eventsCountStorage.Get(&eventTimeValue, &oldCount)
+	if err != nil {
+		if err == storage.ErrNotFound {
+			newCount = octosql.MakeInt(1)
+		} else {
+			return errors.Wrap(err, "couldn't get newest event count from events count map")
+		}
+	} else {
+		newCount = octosql.MakeInt(oldCount.AsInt() + 1)
+	}
+
+	err = eventsCountStorage.Set(&eventTimeValue, &newCount)
+	if err != nil {
+		return errors.Wrap(err, "couldn't set newest event count to events count map")
+	}
+
+	return nil
+}
+
+func removeOldestEvent(tx storage.StateTransaction) error {
+	eventsStorage := storage.NewDeque(tx.WithPrefix(percentileWatermarkEventsPrefix))
+	eventsCountStorage := storage.NewMap(tx.WithPrefix(percentileWatermarkEventsCountPrefix))
+
+	var oldestEventTimeValue octosql.Value
+
+	// Removing from events deque
+	err := eventsStorage.PopFront(&oldestEventTimeValue)
+	if err != nil {
+		return errors.Wrap(err, "couldn't pop front oldest event from events deque")
+	}
+
+	var oldestCount octosql.Value
+
+	// Removing from events count map
+	err = eventsCountStorage.Get(&oldestEventTimeValue, &oldestCount)
+	if err != nil {
+		return errors.Wrap(err, "couldn't get oldest event count from events count map")
+	}
+	if oldestCount.AsInt() == 1 {
+		err = eventsCountStorage.Delete(&oldestEventTimeValue)
+		if err != nil {
+			return errors.Wrap(err, "couldn't delete oldest event from events count map")
+		}
+	} else {
+		newCount := octosql.MakeInt(oldestCount.AsInt() - 1)
+		err = eventsCountStorage.Set(&oldestEventTimeValue, &newCount)
+		if err != nil {
+			return errors.Wrap(err, "couldn't set oldest event count to events count map")
+		}
+	}
+
+	return nil
 }
 
 func (s *PercentileWatermarkGeneratorStream) Close() error {

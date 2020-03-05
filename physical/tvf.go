@@ -280,11 +280,14 @@ func (node *TableValuedFunction) Metadata() *metadata.NodeMetadata {
 		return metadata.NewNodeMetadata(cardinality, octosql.NewVariableName("window_end"))
 	case "max_diff_watermark":
 		var cardinality metadata.Cardinality
+		var eventTimeField octosql.VariableName
 		source, err := node.getArgumentTable(octosql.NewVariableName("source"))
 		if err == nil {
 			cardinality = source.Metadata().Cardinality()
+			eventTimeField = source.Metadata().EventTimeField()
 		} else {
 			cardinality = metadata.BoundedFitsInLocalStorage
+			eventTimeField = octosql.NewVariableName("")
 		}
 		return metadata.NewNodeMetadata(cardinality, octosql.NewVariableName("time_field"))
 	case "percentile_watermark":
@@ -295,7 +298,7 @@ func (node *TableValuedFunction) Metadata() *metadata.NodeMetadata {
 		} else {
 			cardinality = metadata.BoundedFitsInLocalStorage
 		}
-		return metadata.NewNodeMetadata(cardinality, octosql.NewVariableName("time_field"))
+		return metadata.NewNodeMetadata(cardinality, eventTimeField)
 	default:
 		return metadata.NewNodeMetadata(metadata.Unbounded, octosql.NewVariableName(""))
 	}

@@ -1,14 +1,6 @@
 package execution
 
-import (
-	"context"
-	"testing"
-
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
-)
-
-func TestLeftJoinedStream_Next(t *testing.T) {
+/*func TestLeftJoinedStream_Next(t *testing.T) {
 	fieldNames := []octosql.VariableName{
 		octosql.NewVariableName("bike"),
 		octosql.NewVariableName("name"),
@@ -144,4 +136,4 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 			tx.Commit()
 		})
 	}
-}
+}*/

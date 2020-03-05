@@ -16,10 +16,10 @@ func NewLimit(data Node, expr Expression) Node {
 	return &Limit{data: data, limitExpr: expr}
 }
 
-func (node *Limit) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
-	dataNode, variables, err := node.data.Physical(ctx, physicalCreator)
+func (node *Limit) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
+	sourceNodes, variables, err := node.data.Physical(ctx, physicalCreator)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get physical plan for data node")
+		return nil, nil, errors.Wrap(err, "couldn't get physical plan for source nodes")
 	}
 
 	limitExpr, limitVariables, err := node.limitExpr.Physical(ctx, physicalCreator)
@@ -31,5 +31,8 @@ func (node *Limit) Physical(ctx context.Context, physicalCreator *PhysicalPlanCr
 		return nil, nil, errors.Wrap(err, "couldn't get limit node variables")
 	}
 
-	return physical.NewLimit(dataNode, limitExpr), variables, nil
+	// Limit operates on a single, joined stream.
+	outNodes := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
+
+	return []physical.Node{physical.NewLimit(outNodes[0], limitExpr)}, variables, nil
 }

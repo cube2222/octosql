@@ -5,10 +5,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cube2222/octosql"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/cube2222/octosql"
 )
 
 func TestDeque(t *testing.T) {
@@ -39,6 +41,12 @@ func TestDeque(t *testing.T) {
 		octosql.MakeInt(5),
 	}
 
+	length, err := queue.Length()
+	if err != nil {
+		log.Fatal(err)
+	}
+	assert.Equal(t, 0, length)
+
 	//test push back and push front
 	for i := 3; i < 6; i++ { //write 3 4 5
 		err := queue.PushBack(&values[i])
@@ -47,12 +55,24 @@ func TestDeque(t *testing.T) {
 		}
 	}
 
+	length, err = queue.Length()
+	if err != nil {
+		log.Fatal(err)
+	}
+	assert.Equal(t, 3, length)
+
 	for i := 2; i >= 0; i-- { // write 2 1 0 so the queue becomes 0 1 2 3 4 5
 		err := queue.PushFront(&values[i])
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
+
+	length, err = queue.Length()
+	if err != nil {
+		log.Fatal(err)
+	}
+	assert.Equal(t, 6, length)
 
 	// test if all values are there
 	err = queue.isEqualTo(values)
@@ -148,6 +168,12 @@ func TestDeque(t *testing.T) {
 
 	println("pop front and pop back passed")
 
+	length, err = queue.Length()
+	if err != nil {
+		log.Fatal(err)
+	}
+	assert.Equal(t, 4, length)
+
 	//try to clear the whole queue using pops (at the moment there should be 1,2,3,4 in the queue)
 	for i := 0; i < 2; i++ { //warning these constants are dependant on the original values
 		err = queue.testPopBack(values[4-i], false)
@@ -189,6 +215,12 @@ func TestDeque(t *testing.T) {
 		log.Fatal("pop back should have returned ErrNotFound", err)
 	}
 
+	length, err = queue.Length()
+	if err != nil {
+		log.Fatal(err)
+	}
+	assert.Equal(t, 0, length)
+
 	println("peeks and pops return ErrEmptyQueue correctly")
 
 	//insert the data again
@@ -198,6 +230,12 @@ func TestDeque(t *testing.T) {
 			log.Fatal("repopulation of queue: ", err)
 		}
 	}
+
+	length, err = queue.Length()
+	if err != nil {
+		log.Fatal(err)
+	}
+	assert.Equal(t, len(values), length)
 
 	//check if initialize on a queue with some data works correctly
 	secondQueue := NewDeque(txn)

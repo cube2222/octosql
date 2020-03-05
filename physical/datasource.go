@@ -21,7 +21,7 @@ const (
 )
 
 // DataSourceBuilderFactory is a function used to create a new aliased data source builder.
-type DataSourceBuilderFactory func(name, alias string) Node
+type DataSourceBuilderFactory func(name, alias string) []Node
 
 // DataSourceRepository is used to register factories for builders for any data source.
 // It can also later create a builder for any of those data source.
@@ -36,7 +36,7 @@ func NewDataSourceRepository() *DataSourceRepository {
 }
 
 // Get gets a new builder for a given data source.
-func (repo *DataSourceRepository) Get(dataSourceName, alias string) (Node, error) {
+func (repo *DataSourceRepository) Get(dataSourceName, alias string) ([]Node, error) {
 	ds, ok := repo.factories[dataSourceName]
 	if !ok {
 		var dss []string
@@ -73,31 +73,39 @@ func (repo *DataSourceRepository) WithFactory(dataSourceName string, factory Dat
 	return newRepo
 }
 
+type DataSourceMaterializerFunc func(ctx context.Context, matCtx *MaterializationContext, dbConfig map[string]interface{}, filter Formula, alias string, partition int) (execution.Node, error)
+
 // DataSourceBuilder is used to build a data source instance with an alias.
 // It may be given filters, which are later executed at the database level.
 type DataSourceBuilder struct {
-	Materializer     func(ctx context.Context, matCtx *MaterializationContext, dbConfig map[string]interface{}, filter Formula, alias string) (execution.Node, error)
+	Materializer     DataSourceMaterializerFunc
 	PrimaryKeys      []octosql.VariableName
 	AvailableFilters map[FieldType]map[Relation]struct{}
 	Filter           Formula
 	Name             string
 	Alias            string
+	Partition        int
 
 	// This field will be used to decide on join strategies or if the source is a stream.
 	Cardinality metadata.Cardinality
 }
 
-func NewDataSourceBuilderFactory(materializer func(ctx context.Context, matCtx *MaterializationContext, dbConfig map[string]interface{}, filter Formula, alias string) (execution.Node, error), primaryKeys []octosql.VariableName, availableFilters map[FieldType]map[Relation]struct{}, cardinality metadata.Cardinality) DataSourceBuilderFactory {
-	return func(name, alias string) Node {
-		return &DataSourceBuilder{
-			Materializer:     materializer,
-			PrimaryKeys:      primaryKeys,
-			AvailableFilters: availableFilters,
-			Filter:           NewConstant(true),
-			Name:             name,
-			Alias:            alias,
-			Cardinality:      cardinality,
+func NewDataSourceBuilderFactory(materializer DataSourceMaterializerFunc, primaryKeys []octosql.VariableName, availableFilters map[FieldType]map[Relation]struct{}, cardinality metadata.Cardinality, partitions int) DataSourceBuilderFactory {
+	return func(name, alias string) []Node {
+		outNodes := make([]Node, partitions)
+		for partition := 0; partition < partitions; partition++ {
+			outNodes[partition] = &DataSourceBuilder{
+				Materializer:     materializer,
+				PrimaryKeys:      primaryKeys,
+				AvailableFilters: availableFilters,
+				Filter:           NewConstant(true),
+				Name:             name,
+				Alias:            alias,
+				Partition:        partition,
+				Cardinality:      cardinality,
+			}
 		}
+		return outNodes
 	}
 }
 
@@ -122,7 +130,7 @@ func (dsb *DataSourceBuilder) Materialize(ctx context.Context, matCtx *Materiali
 		return nil, errors.Wrapf(err, "couldn't get config for database %v", dsb.Name)
 	}
 
-	return dsb.Materializer(ctx, matCtx, dbConfig, dsb.Filter, dsb.Alias)
+	return dsb.Materializer(ctx, matCtx, dbConfig, dsb.Filter, dsb.Alias, dsb.Partition)
 }
 
 func (dsb *DataSourceBuilder) Metadata() *metadata.NodeMetadata {

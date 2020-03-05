@@ -77,6 +77,12 @@ func (w *PercentileWatermarkGenerator) Get(ctx context.Context, variables octosq
 	return ws, execution.NewExecOutput(ws), nil // watermark generator stream now indicates new watermark source
 }
 
+// The way this watermark generator is working is following:
+// - events (must be positive) - represents amount of (most recent) events stored
+// - percentile (must be between 1 and 99) - represents percentile of recently stored events that are BIGGER than watermark value
+// 		ex. if percentile = 35 then 35% of events stored must be bigger than watermark value, so watermark position is at
+//			65th percentile of events stored (in sorted way)
+// - frequency (must be positive) - represents amount of events to be seen to initiate updating watermark process
 type PercentileWatermarkGeneratorStream struct {
 	source     execution.RecordStream
 	timeField  octosql.VariableName

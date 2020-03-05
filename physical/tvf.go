@@ -245,6 +245,10 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 		if err != nil {
 			return nil, err
 		}
+		frequency, err := node.getArgumentExpression(octosql.NewVariableName("frequency"))
+		if err != nil {
+			return nil, err
+		}
 
 		matSource, err := source.Materialize(ctx, matCtx)
 		if err != nil {
@@ -258,8 +262,12 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 		if err != nil {
 			return nil, errors.Errorf("couldn't materialize watermark percentile expression")
 		}
+		matFrequency, err := frequency.Materialize(ctx, matCtx)
+		if err != nil {
+			return nil, errors.Errorf("couldn't materialize watermark frequency expression")
+		}
 
-		return tvf.NewPercentileWatermarkGenerator(matSource, timeField, matEvents, matPercentile), nil
+		return tvf.NewPercentileWatermarkGenerator(matSource, timeField, matEvents, matPercentile, matFrequency), nil
 	}
 
 	return nil, errors.Errorf("invalid table valued function: %v", node.Name)
@@ -289,14 +297,17 @@ func (node *TableValuedFunction) Metadata() *metadata.NodeMetadata {
 			cardinality = metadata.BoundedFitsInLocalStorage
 			eventTimeField = octosql.NewVariableName("")
 		}
-		return metadata.NewNodeMetadata(cardinality, octosql.NewVariableName("time_field"))
+		return metadata.NewNodeMetadata(cardinality, eventTimeField)
 	case "percentile_watermark":
 		var cardinality metadata.Cardinality
+		var eventTimeField octosql.VariableName
 		source, err := node.getArgumentTable(octosql.NewVariableName("source"))
 		if err == nil {
 			cardinality = source.Metadata().Cardinality()
+			eventTimeField = source.Metadata().EventTimeField()
 		} else {
 			cardinality = metadata.BoundedFitsInLocalStorage
+			eventTimeField = octosql.NewVariableName("")
 		}
 		return metadata.NewNodeMetadata(cardinality, eventTimeField)
 	default:

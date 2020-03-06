@@ -135,6 +135,16 @@ func (s *PercentileWatermarkGeneratorStream) Next(ctx context.Context) (*executi
 	eventsCountStorage := storage.NewMap(tx.WithPrefix(percentileWatermarkEventsCountPrefix))
 	eventsSeenStorage := storage.NewValueState(tx.WithPrefix(percentileWatermarkEventsSeenPrefix))
 
+	// Extracting eventsSeen value (remember: this equals to number of events seen before watermark update)
+	var eventsSeen octosql.Value
+	err = eventsSeenStorage.Get(&eventsSeen)
+	if err == storage.ErrNotFound {
+		eventsSeen = octosql.MakeInt(0)
+	} else if err != nil {
+		return nil, errors.Wrap(err, "couldn't get events seen count")
+	}
+	eventsSeen = octosql.MakeInt(eventsSeen.AsInt() + 1) // Adding +1 as we've just extracted next record from source
+
 	// Adding newest event
 	err = addNewestEvent(timeValue, tx)
 	if err != nil {
@@ -146,69 +156,61 @@ func (s *PercentileWatermarkGeneratorStream) Next(ctx context.Context) (*executi
 		return nil, errors.Wrap(err, "couldn't get events deque length")
 	}
 
-	var eventsSeen octosql.Value
-	err = eventsSeenStorage.Get(&eventsSeen)
-	if err == storage.ErrNotFound {
-		eventsSeen = octosql.MakeInt(0)
-	} else if err != nil {
-		return nil, errors.Wrap(err, "couldn't get events seen count")
-	}
-	eventsSeen = octosql.MakeInt(eventsSeen.AsInt() + 1) // Adding +1 as we've just extracted next record from source
-
-	// There are enough events seen to remove oldest event
-	if eventsLength >= s.events {
-
-		// Removing oldest event (no matter if we update watermark or not)
+	// In this situation we need to remove oldest event => this doesn't occur only when the oldest event seen is the first ever and length = 5 (update watermark but DON't remove oldest one)
+	if eventsLength > s.events { // TODO - which is more readable: this or 'eventsLength == s.events + 1' ?
 		err := removeOldestEvent(tx)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't remove oldest event from storage")
 		}
+	}
 
-		// Updating watermark
-		// '>=' because if <events> is bigger than <frequency>, then we want to update watermark when deque length reaches <events>
-		if eventsSeen.AsInt() >= s.frequency {
+	// Updating watermark; enough events stored in deque AND frequency level reached
+	// '>=' for the case when we doesn't remove oldest event (explained above)
+	if eventsLength >= s.events && eventsSeen.AsInt() >= s.frequency {
 
-			// Clearing events seen
-			eventsSeen = octosql.MakeInt(0)
+		// Clearing events seen
+		eventsSeen = octosql.MakeInt(0)
 
-			// Below declaration equals to (percentile / 100) = (events - wP) / events
-			// Using (events - wP) instead of wP, because percentile of 80% means, that 80% events can be BIGGER than watermark value
-			// so watermark position is at 20% of all events
-			watermarkPosition := ((100 - s.percentile) * s.events) / 100 // represents position (from the left) of event in sorted list that will become new watermark
+		// Below declaration equals to (percentile / 100) = (events - wP) / events
+		// Using (events - wP) instead of wP, because percentile of 80% means, that 80% events can be BIGGER than watermark value
+		// so watermark position is at 20% of all events
+		watermarkPosition := ((100 - s.percentile) * s.events) / 100 // represents position (from the left) of event in sorted list that will become new watermark
 
-			// Let's begin iterating through events count map
-			eventsAlreadySeen := 0
+		// Let's begin iterating through events count map
+		eventsAlreadySeen := 0
 
-			var key, value octosql.Value
-			eventsIterator := eventsCountStorage.GetIterator()
-			for {
-				err := eventsIterator.Next(&key, &value)
-				if err == storage.ErrEndOfIterator {
-					break
-				} else if err != nil {
-					return nil, errors.Wrap(err, "couldn't get next value from iterator")
-				}
-
-				eventsAlreadySeen += value.AsInt()
-
-				if eventsAlreadySeen >= watermarkPosition { // we've passed specified percentile of all events
-					break
-				}
+		var key, value octosql.Value
+		eventsIterator := eventsCountStorage.GetIterator()
+		for {
+			err := eventsIterator.Next(&key, &value)
+			if err == storage.ErrEndOfIterator {
+				break
+			} else if err != nil {
+				return nil, errors.Wrap(err, "couldn't get next value from events count map iterator")
 			}
 
-			// Setting new watermark value
-			oldWatermark, err := s.GetWatermark(ctx, tx)
+			eventsAlreadySeen += value.AsInt()
+
+			if eventsAlreadySeen >= watermarkPosition { // we've passed specified percentile of all events
+				break
+			}
+		}
+		err = eventsIterator.Close()
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't close events count map iterator")
+		}
+
+		// Setting new watermark value
+		oldWatermark, err := s.GetWatermark(ctx, tx)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't get old watermark value from storage")
+		}
+
+		newWatermark := octosql.MakeTime(key.AsTime())
+		if newWatermark.AsTime().After(oldWatermark) { // watermarks can't decrease
+			err = watermarkStorage.Set(&newWatermark)
 			if err != nil {
-				return nil, errors.Wrap(err, "couldn't get old watermark value from storage")
-			}
-
-			newWatermark := octosql.MakeTime(key.AsTime())
-
-			if newWatermark.AsTime().After(oldWatermark) { // watermarks can't decrease
-				err = watermarkStorage.Set(&newWatermark)
-				if err != nil {
-					return nil, errors.Wrap(err, "couldn't set new watermark value in storage")
-				}
+				return nil, errors.Wrap(err, "couldn't set new watermark value in storage")
 			}
 		}
 	}

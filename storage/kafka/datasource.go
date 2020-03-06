@@ -3,6 +3,7 @@ package kafka
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -137,12 +138,25 @@ type RecordStream struct {
 var outputQueuePrefix = []byte("$output_queue$")
 
 func (rs *RecordStream) RunWorker(ctx context.Context) {
+	if err := rs.RunWorkerInternal(ctx); err != nil {
+
+		outputQueue := execution.NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
+
+	}
+
+}
+
+func (rs *RecordStream) RunWorkerInternal(ctx context.Context) error {
 
 	// On error reload old offset
 	for {
 		tx := rs.stateStorage.BeginTransaction()
 		for i := 0; i < rs.batchSize; i++ {
-			msg, err := rs.kafkaReader.ReadMessage(ctx)
+			for i := 0; i <
+				msg, err := rs.kafkaReader.ReadMessage(ctx)
+			if err != nil {
+				log.Println(err)
+			}
 		}
 	}
 

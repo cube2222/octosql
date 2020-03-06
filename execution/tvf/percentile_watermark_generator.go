@@ -148,7 +148,9 @@ func (s *PercentileWatermarkGeneratorStream) Next(ctx context.Context) (*executi
 
 	var eventsSeen octosql.Value
 	err = eventsSeenStorage.Get(&eventsSeen)
-	if err != nil {
+	if err == storage.ErrNotFound {
+		eventsSeen = octosql.MakeInt(0)
+	} else if err != nil {
 		return nil, errors.Wrap(err, "couldn't get events seen count")
 	}
 
@@ -192,10 +194,18 @@ func (s *PercentileWatermarkGeneratorStream) Next(ctx context.Context) (*executi
 			}
 
 			// Setting new watermark value
-			newWatermark := octosql.MakeTime(key.AsTime())
-			err = watermarkStorage.Set(&newWatermark)
+			oldWatermark, err := s.GetWatermark(ctx, tx)
 			if err != nil {
-				return nil, errors.Wrap(err, "couldn't set new watermark value in storage")
+				return nil, errors.Wrap(err, "couldn't get old watermark value from storage")
+			}
+
+			newWatermark := octosql.MakeTime(key.AsTime())
+
+			if newWatermark.AsTime().After(oldWatermark) { // watermarks can't decrease
+				err = watermarkStorage.Set(&newWatermark)
+				if err != nil {
+					return nil, errors.Wrap(err, "couldn't set new watermark value in storage")
+				}
 			}
 		}
 	}

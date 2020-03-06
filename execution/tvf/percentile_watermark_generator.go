@@ -153,6 +153,7 @@ func (s *PercentileWatermarkGeneratorStream) Next(ctx context.Context) (*executi
 	} else if err != nil {
 		return nil, errors.Wrap(err, "couldn't get events seen count")
 	}
+	eventsSeen = octosql.MakeInt(eventsSeen.AsInt() + 1) // Adding +1 as we've just extracted next record from source
 
 	// There are enough events seen to remove oldest event
 	if eventsLength >= s.events {
@@ -163,10 +164,12 @@ func (s *PercentileWatermarkGeneratorStream) Next(ctx context.Context) (*executi
 			return nil, errors.Wrap(err, "couldn't remove oldest event from storage")
 		}
 
-		if eventsSeen.AsInt() == s.frequency { // Updating watermark
+		// Updating watermark
+		// '>=' because if <events> is bigger than <frequency>, then we want to update watermark when deque length reaches <events>
+		if eventsSeen.AsInt() >= s.frequency {
 
-			// Clearing events seen => the reason this value is -1 is because after that scope we set it to eventsSeen.AsInt() + 1 = 0
-			eventsSeen = octosql.MakeInt(-1)
+			// Clearing events seen
+			eventsSeen = octosql.MakeInt(0)
 
 			// Below declaration equals to (percentile / 100) = (events - wP) / events
 			// Using (events - wP) instead of wP, because percentile of 80% means, that 80% events can be BIGGER than watermark value
@@ -211,7 +214,6 @@ func (s *PercentileWatermarkGeneratorStream) Next(ctx context.Context) (*executi
 	}
 
 	// Updating events seen
-	eventsSeen = octosql.MakeInt(eventsSeen.AsInt() + 1)
 	err = eventsSeenStorage.Set(&eventsSeen)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't update events seen")

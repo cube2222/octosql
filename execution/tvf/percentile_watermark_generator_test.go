@@ -268,7 +268,7 @@ func TestPercentileWatermarkGeneratorStream_GetWatermark(t *testing.T) {
 
 	variables := octosql.NewVariables(map[octosql.VariableName]octosql.Value{
 		"events":     octosql.MakeInt(5),
-		"percentile": octosql.MakeFloat(60.1), // 60.1% events bigger than watermark => watermark at 39.9% => watermarkPosition = (39.9*1000/100*1000) * 5 = 1.995 ~ 2
+		"percentile": octosql.MakeFloat(59.9), // 59.9% events bigger than watermark => watermark at 40.1% => watermarkPosition = (40.1*1000/100*1000) * 5 = 2.005 => = 2 (cutting down decimal part)
 		"frequency":  octosql.MakeInt(2),
 	})
 

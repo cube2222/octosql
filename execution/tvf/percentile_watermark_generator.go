@@ -79,7 +79,7 @@ func (w *PercentileWatermarkGenerator) Get(ctx context.Context, variables octosq
 
 // The way this watermark generator is working is following:
 // - events (must be positive) - represents amount of (most recent) events stored
-// - percentile (must be positive and lesser than 100.0) - represents percentile of recently stored events that are BIGGER than watermark value
+// - percentile (must be positive and less than 100.0) - represents percentile of recently stored events that are BIGGER than watermark value
 // 		ex. if percentile = 35 then 35% of events stored must be bigger than watermark value, so watermark position is at
 //			65th percentile of events stored (in sorted way)
 // - frequency (must be positive) - represents amount of events to be seen before initiating next watermark update
@@ -175,7 +175,7 @@ func (s *PercentileWatermarkGeneratorStream) Next(ctx context.Context) (*executi
 		// Using (events - wP) instead of wP, because percentile of 80% means, that 80% events can be BIGGER than watermark value
 		// so watermark position is at 20% of all events
 		// Multiplying percentile by 1000 to allow float values like 99.9%
-		watermarkPosition := float64((100000-int(s.percentile*1000))*s.events) / 100000 // represents position (from the left) of event in sorted list that will become new watermark
+		watermarkPosition := ((100000 - int(s.percentile*1000)) * s.events) / 100000 // represents position (from the left) of event in sorted list that will become new watermark
 
 		// Let's begin iterating through events count map
 		eventsAlreadySeen := 0
@@ -192,7 +192,7 @@ func (s *PercentileWatermarkGeneratorStream) Next(ctx context.Context) (*executi
 
 			eventsAlreadySeen += value.AsInt()
 
-			if float64(eventsAlreadySeen) >= watermarkPosition { // we've passed specified percentile of all events
+			if eventsAlreadySeen >= watermarkPosition { // we've passed specified percentile of all events
 				break
 			}
 		}

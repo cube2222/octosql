@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
@@ -15,7 +14,7 @@ var (
 	eps = octosql.MakeFloat(0.00000001).AsFloat()
 )
 
-func ExpectValue(t *testing.T, ctx context.Context, aggr execution.Aggregate, tx storage.StateTransaction, expected octosql.Value) {
+func ExpectValue(t *testing.T, ctx context.Context, aggr Aggregate, tx storage.StateTransaction, expected octosql.Value) {
 	val, err := aggr.GetValue(ctx, tx)
 	assert.NotNil(t, val)
 	assert.Equal(t, expected.GetType(), val.GetType())
@@ -53,28 +52,28 @@ func ExpectValue(t *testing.T, ctx context.Context, aggr execution.Aggregate, tx
 	assert.Nil(t, err)
 }
 
-func ExpectZeroValue(t *testing.T, ctx context.Context, aggr execution.Aggregate, tx storage.StateTransaction) {
+func ExpectZeroValue(t *testing.T, ctx context.Context, aggr Aggregate, tx storage.StateTransaction) {
 	val, _ := aggr.GetValue(ctx, tx)
 	assert.NotNil(t, val)
 	assert.Equal(t, octosql.ZeroValue().GetType(), val.GetType())
 }
 
-func AddValue(t *testing.T, ctx context.Context, aggr execution.Aggregate, tx storage.StateTransaction, value octosql.Value) {
+func AddValue(t *testing.T, ctx context.Context, aggr Aggregate, tx storage.StateTransaction, value octosql.Value) {
 	err := aggr.AddValue(ctx, tx, value)
 	assert.Nil(t, err)
 }
 
-func AddValueError(t *testing.T, ctx context.Context, aggr execution.Aggregate, tx storage.StateTransaction, value octosql.Value) {
+func AddValueError(t *testing.T, ctx context.Context, aggr Aggregate, tx storage.StateTransaction, value octosql.Value) {
 	err := aggr.AddValue(ctx, tx, value)
 	assert.NotNil(t, err)
 }
 
-func RetractValue(t *testing.T, ctx context.Context, aggr execution.Aggregate, tx storage.StateTransaction, value octosql.Value) {
+func RetractValue(t *testing.T, ctx context.Context, aggr Aggregate, tx storage.StateTransaction, value octosql.Value) {
 	err := aggr.RetractValue(ctx, tx, value)
 	assert.Nil(t, err)
 }
 
-func RetractValueError(t *testing.T, ctx context.Context, aggr execution.Aggregate, tx storage.StateTransaction, value octosql.Value) {
+func RetractValueError(t *testing.T, ctx context.Context, aggr Aggregate, tx storage.StateTransaction, value octosql.Value) {
 	err := aggr.RetractValue(ctx, tx, value)
 	assert.NotNil(t, err)
 }

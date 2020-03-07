@@ -7,17 +7,16 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
 var currentDistinctPrefix = []byte("$current_distinct$")
 
 type Distinct struct {
-	underlying execution.Aggregate
+	underlying Aggregate
 }
 
-func NewDistinctAggregate(aggr execution.Aggregate) *Distinct {
+func NewDistinctAggregate(aggr Aggregate) *Distinct {
 	return &Distinct{
 		underlying: aggr,
 	}

@@ -87,7 +87,8 @@ func (engine *PullEngine) Run(ctx context.Context) {
 			err := tx.Commit()
 			if err != nil {
 				log.Println("couldn't commit: ", err)
-				return
+				tx = engine.storage.BeginTransaction()
+				continue
 			}
 			tx = engine.storage.BeginTransaction()
 		}

@@ -249,7 +249,7 @@ func GetIPAddressList(config map[string]interface{}, field string, opts ...Optio
 			defaults := options.defaultValue.([]interface{})
 			return defaults[0].([]string), defaults[1].([]int), nil
 		}
-		return nil, nil, errors.Wrapf(err, "couldn't get map[string]interface{}")
+		return nil, nil, errors.Wrapf(err, "couldn't get []interface{}")
 	}
 
 	var outHosts []string
@@ -258,7 +258,7 @@ func GetIPAddressList(config map[string]interface{}, field string, opts ...Optio
 	for i := range out {
 		addressMap, ok := out[i].(map[string]interface{})
 		if !ok {
-			return nil, nil, errors.Errorf("expected map slice, got %v at index %v", reflect.TypeOf(out[i]), i)
+			return nil, nil, errors.Errorf("expected map, got %v at index %v", reflect.TypeOf(out[i]), i)
 		}
 		hostInterface, ok := addressMap["host"]
 		if !ok {
@@ -273,7 +273,7 @@ func GetIPAddressList(config map[string]interface{}, field string, opts ...Optio
 		if !ok {
 			return nil, nil, errors.Errorf("couldn't find port in map: %+v", addressMap)
 		}
-		port, ok := hostInterface.(int)
+		port, ok := portInterface.(int)
 		if !ok {
 			return nil, nil, errors.Errorf("expected port integer, got %v of type %v at index %d", portInterface, reflect.TypeOf(portInterface), i)
 		}

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/pkg/errors"
@@ -42,5 +43,33 @@ func ReadConfig(path string) (*Config, error) {
 		return nil, errors.Wrap(err, "couldn't decode yaml configuration")
 	}
 
+	for i := range config.DataSources {
+		cleanupMaps(config.DataSources[i].Config)
+	}
+
 	return &config, nil
+}
+
+func cleanupMaps(config map[string]interface{}) {
+	for k, v := range config {
+		config[k] = cleanupMapsRecursive(v)
+	}
+	return
+}
+
+func cleanupMapsRecursive(config interface{}) interface{} {
+	switch config := config.(type) {
+	case map[interface{}]interface{}:
+		out := make(map[string]interface{})
+		for k, v := range config {
+			out[fmt.Sprintf("%v", k)] = cleanupMapsRecursive(v)
+		}
+		return out
+	case []interface{}:
+		for i := range config {
+			config[i] = cleanupMapsRecursive(config[i])
+		}
+	}
+
+	return config
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/middleware"
 
 	"github.com/cube2222/octosql/storage/excel"
+	"github.com/cube2222/octosql/storage/kafka"
 	"github.com/cube2222/octosql/streaming/storage"
 
 	"github.com/spf13/cobra"
@@ -64,6 +65,7 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 				"postgres": postgres.NewDataSourceBuilderFactoryFromConfig,
 				"redis":    redis.NewDataSourceBuilderFactoryFromConfig,
 				"excel":    excel.NewDataSourceBuilderFactoryFromConfig,
+				"kafka":    kafka.NewDataSourceBuilderFactoryFromConfig,
 			},
 			cfg,
 		)
@@ -129,7 +131,7 @@ func main() {
 	go func() {
 		r := chi.NewRouter()
 		r.Mount("/debug", middleware.Profiler())
-		log.Fatal(http.ListenAndServe(":3000", r))
+		log.Fatal(http.ListenAndServe(":3003", r))
 	}()
 
 	if err := rootCmd.Execute(); err != nil {

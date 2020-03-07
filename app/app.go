@@ -57,7 +57,7 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		return errors.Wrap(err, "couldn't materialize the physical plan into an execution plan")
 	}
 
-	programID := &execution.StreamID{Id: ""}
+	programID := &execution.StreamID{Id: "root"}
 
 	tx := stateStorage.BeginTransaction()
 	stream, err := exec.Get(storage.InjectStateTransaction(ctx, tx), variables, programID)
@@ -77,7 +77,8 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		if err == execution.ErrEndOfStream {
 			err := tx.Commit()
 			if err != nil {
-				return errors.Wrap(err, "couldn't commit transaction")
+				log.Printf("couldn't commit transaction: %s", err)
+				continue
 			}
 			break
 		} else if errors.Cause(err) == execution.ErrNewTransactionRequired {
@@ -114,7 +115,8 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 
 		err := tx.Commit()
 		if err != nil {
-			return errors.Wrap(err, "couldn't commit transaction")
+			log.Printf("couldn't commit transaction: %s", err)
+			continue
 		}
 
 		err = app.out.WriteRecord(rec)

@@ -54,7 +54,7 @@ func (w *PercentileWatermarkGenerator) Get(ctx context.Context, variables octosq
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get watermark percentile")
 	}
-	if percentile.GetType() != octosql.TypeInt || percentile.AsInt() < 1 || percentile.AsInt() > 99 {
+	if percentile.GetType() != octosql.TypeFloat || percentile.AsFloat() < 0.0 || percentile.AsFloat() > 100.0 {
 		return nil, nil, errors.Errorf("invalid watermark percentile: %v", percentile)
 	}
 
@@ -70,7 +70,7 @@ func (w *PercentileWatermarkGenerator) Get(ctx context.Context, variables octosq
 		source:     source,
 		timeField:  w.timeField,
 		events:     events.AsInt(),
-		percentile: percentile.AsInt(),
+		percentile: percentile.AsFloat(),
 		frequency:  frequency.AsInt(),
 	}
 
@@ -79,7 +79,7 @@ func (w *PercentileWatermarkGenerator) Get(ctx context.Context, variables octosq
 
 // The way this watermark generator is working is following:
 // - events (must be positive) - represents amount of (most recent) events stored
-// - percentile (must be between 1 and 99) - represents percentile of recently stored events that are BIGGER than watermark value
+// - percentile (must be positive and lesser than 100.0) - represents percentile of recently stored events that are BIGGER than watermark value
 // 		ex. if percentile = 35 then 35% of events stored must be bigger than watermark value, so watermark position is at
 //			65th percentile of events stored (in sorted way)
 // - frequency (must be positive) - represents amount of events to be seen before initiating next watermark update
@@ -89,7 +89,7 @@ type PercentileWatermarkGeneratorStream struct {
 	source     execution.RecordStream
 	timeField  octosql.VariableName
 	events     int
-	percentile int
+	percentile float64
 	frequency  int
 }
 
@@ -171,10 +171,11 @@ func (s *PercentileWatermarkGeneratorStream) Next(ctx context.Context) (*executi
 		// Resetting events seen
 		eventsSeen = octosql.MakeInt(0)
 
-		// Below declaration equals to (percentile / 100) = (events - wP) / events
+		// Below declaration equals to (percentile*1000 / 100*1000) = (events - wP) / events
 		// Using (events - wP) instead of wP, because percentile of 80% means, that 80% events can be BIGGER than watermark value
 		// so watermark position is at 20% of all events
-		watermarkPosition := ((100 - s.percentile) * s.events) / 100 // represents position (from the left) of event in sorted list that will become new watermark
+		// Multiplying percentile by 1000 to allow float values like 99.9%
+		watermarkPosition := float64((100000-int(s.percentile*1000))*s.events) / 100000 // represents position (from the left) of event in sorted list that will become new watermark
 
 		// Let's begin iterating through events count map
 		eventsAlreadySeen := 0
@@ -191,7 +192,7 @@ func (s *PercentileWatermarkGeneratorStream) Next(ctx context.Context) (*executi
 
 			eventsAlreadySeen += value.AsInt()
 
-			if eventsAlreadySeen >= watermarkPosition { // we've passed specified percentile of all events
+			if float64(eventsAlreadySeen) >= watermarkPosition { // we've passed specified percentile of all events
 				break
 			}
 		}

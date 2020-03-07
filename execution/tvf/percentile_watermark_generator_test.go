@@ -50,7 +50,7 @@ func TestPercentileWatermarkGenerator_Get(t *testing.T) {
 			args: args{
 				variables: octosql.NewVariables(map[octosql.VariableName]octosql.Value{
 					"events":     octosql.MakeInt(10),
-					"percentile": octosql.MakeInt(40),
+					"percentile": octosql.MakeFloat(0.001),
 					"frequency":  octosql.MakeInt(5),
 				}),
 			},
@@ -73,7 +73,7 @@ func TestPercentileWatermarkGenerator_Get(t *testing.T) {
 			args: args{
 				variables: octosql.NewVariables(map[octosql.VariableName]octosql.Value{
 					"events":     octosql.MakeInt(0),
-					"percentile": octosql.MakeInt(40),
+					"percentile": octosql.MakeFloat(40),
 					"frequency":  octosql.MakeInt(5),
 				}),
 			},
@@ -96,7 +96,7 @@ func TestPercentileWatermarkGenerator_Get(t *testing.T) {
 			args: args{
 				variables: octosql.NewVariables(map[octosql.VariableName]octosql.Value{
 					"events":     octosql.MakeInt(10),
-					"percentile": octosql.MakeInt(101),
+					"percentile": octosql.MakeFloat(100.1),
 					"frequency":  octosql.MakeInt(5),
 				}),
 			},
@@ -119,7 +119,7 @@ func TestPercentileWatermarkGenerator_Get(t *testing.T) {
 			args: args{
 				variables: octosql.NewVariables(map[octosql.VariableName]octosql.Value{
 					"events":     octosql.MakeInt(10),
-					"percentile": octosql.MakeInt(99),
+					"percentile": octosql.MakeFloat(99.9),
 					"frequency":  octosql.MakeInt(-1),
 				}),
 			},
@@ -203,7 +203,7 @@ func TestPercentileWatermarkGenerator_Stream(t *testing.T) {
 			args: args{
 				variables: octosql.NewVariables(map[octosql.VariableName]octosql.Value{
 					"events":     octosql.MakeInt(10),
-					"percentile": octosql.MakeInt(40),
+					"percentile": octosql.MakeFloat(40),
 					"frequency":  octosql.MakeInt(5),
 				}),
 			},
@@ -268,7 +268,7 @@ func TestPercentileWatermarkGeneratorStream_GetWatermark(t *testing.T) {
 
 	variables := octosql.NewVariables(map[octosql.VariableName]octosql.Value{
 		"events":     octosql.MakeInt(5),
-		"percentile": octosql.MakeInt(60), // 60% events bigger than watermark => watermark at 40% => watermarkPosition = (40/100) * 5 = 2
+		"percentile": octosql.MakeFloat(60.1), // 60.1% events bigger than watermark => watermark at 39.9% => watermarkPosition = (39.9*1000/100*1000) * 5 = 1.995 ~ 2
 		"frequency":  octosql.MakeInt(2),
 	})
 

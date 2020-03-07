@@ -82,7 +82,7 @@ func (w *PercentileWatermarkGenerator) Get(ctx context.Context, variables octosq
 // - percentile (must be between 1 and 99) - represents percentile of recently stored events that are BIGGER than watermark value
 // 		ex. if percentile = 35 then 35% of events stored must be bigger than watermark value, so watermark position is at
 //			65th percentile of events stored (in sorted way)
-// - frequency (must be positive) - represents amount of events to be seen to initiate updating watermark process
+// - frequency (must be positive) - represents amount of events to be seen before initiating next watermark update
 // Generator stores recent events in deque, their counts in map and number of events seen before watermark update in value state
 // After <frequency> number of events it updates watermark
 type PercentileWatermarkGeneratorStream struct {
@@ -156,8 +156,8 @@ func (s *PercentileWatermarkGeneratorStream) Next(ctx context.Context) (*executi
 		return nil, errors.Wrap(err, "couldn't get events deque length")
 	}
 
-	// In this situation we need to remove oldest event => this doesn't occur only when the oldest event seen is the first ever and length = 5 (update watermark but DON't remove oldest one)
-	if eventsLength > s.events { // TODO - which is more readable: this or 'eventsLength == s.events + 1' ?
+	// In this situation we need to remove oldest event => this doesn't occur only when the oldest event seen is the first ever and length = <events> (update watermark but DON'T remove oldest one)
+	if eventsLength > s.events {
 		err := removeOldestEvent(tx)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't remove oldest event from storage")
@@ -168,7 +168,7 @@ func (s *PercentileWatermarkGeneratorStream) Next(ctx context.Context) (*executi
 	// '>=' for the case when we doesn't remove oldest event (explained above)
 	if eventsLength >= s.events && eventsSeen.AsInt() >= s.frequency {
 
-		// Clearing events seen
+		// Resetting events seen
 		eventsSeen = octosql.MakeInt(0)
 
 		// Below declaration equals to (percentile / 100) = (events - wP) / events
@@ -195,6 +195,7 @@ func (s *PercentileWatermarkGeneratorStream) Next(ctx context.Context) (*executi
 				break
 			}
 		}
+
 		err = eventsIterator.Close()
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't close events count map iterator")
@@ -276,6 +277,7 @@ func removeOldestEvent(tx storage.StateTransaction) error {
 	if err != nil {
 		return errors.Wrap(err, "couldn't get oldest event count from events count map")
 	}
+
 	if oldestCount.AsInt() == 1 {
 		err = eventsCountStorage.Delete(&oldestEventTimeValue)
 		if err != nil {

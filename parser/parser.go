@@ -75,8 +75,8 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 	nonStarExpressions := make([]sqlparser.SelectExpr, 0)
 	starExpressions := make([]*sqlparser.StarExpr, 0)
 
-	for _, expr := range statement.SelectExprs {
-		if expr, ok := expr.(*sqlparser.StarExpr); ok {
+	for i := range statement.SelectExprs {
+		if expr, ok := statement.SelectExprs[i].(*sqlparser.StarExpr); ok {
 			starExpressions = append(starExpressions, expr)
 		} else {
 			nonStarExpressions = append(nonStarExpressions, expr)

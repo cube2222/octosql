@@ -62,6 +62,52 @@ type NamedExpression interface {
 	MaterializeNamed(ctx context.Context, matCtx *MaterializationContext) (execution.NamedExpression, error)
 }
 
+type StarExpression struct {
+	qualifier string
+}
+
+func NewStarExpression(qualifier string) *StarExpression {
+	return &StarExpression{qualifier: qualifier}
+}
+
+func (se *StarExpression) Transform(ctx context.Context, transformers *Transformers) Expression {
+	return se.TransformNamed(ctx, transformers)
+}
+
+func (se *StarExpression) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Expression, error) {
+	return se.MaterializeNamed(ctx, matCtx)
+}
+
+func (se *StarExpression) TransformNamed(ctx context.Context, transformers *Transformers) NamedExpression {
+	var expr NamedExpression = &StarExpression{
+		qualifier: se.qualifier,
+	}
+
+	if transformers.NamedExprT != nil {
+		expr = transformers.NamedExprT(expr)
+	}
+
+	return expr
+}
+
+func (se *StarExpression) MaterializeNamed(ctx context.Context, matCtx *MaterializationContext) (execution.NamedExpression, error) {
+	return execution.NewStarExpression(se.qualifier), nil
+}
+
+func (se *StarExpression) Visualize() *graph.Node {
+	n := graph.NewNode("StarExpression")
+	n.AddField("name", se.name())
+	return n
+}
+
+func (se *StarExpression) name() string {
+	if se.qualifier == "" {
+		return octosql.StarExpressionName
+	}
+
+	return fmt.Sprintf("%s_%s", se.qualifier, octosql.StarExpressionName)
+}
+
 // Variables describes a variable Name.
 type Variable struct {
 	Name octosql.VariableName

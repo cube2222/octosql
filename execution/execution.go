@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
@@ -20,6 +21,38 @@ type Expression interface {
 type NamedExpression interface {
 	Expression
 	Name() octosql.VariableName
+}
+
+type StarExpression struct {
+	qualifier string
+}
+
+func NewStarExpression(qualifier string) *StarExpression {
+	return &StarExpression{qualifier: qualifier}
+}
+
+func (se *StarExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
+	values := make([]octosql.Value, 0)
+
+	for key, value := range variables {
+		if se.doesVariableMatch(key) {
+			values = append(values, value)
+		}
+	}
+
+	return octosql.MakeTuple(values), nil
+}
+
+func (se *StarExpression) Name() octosql.VariableName {
+	if se.qualifier == "" {
+		return octosql.StarExpressionName
+	}
+
+	return octosql.NewVariableName(fmt.Sprintf("%s_%s", se.qualifier, octosql.StarExpressionName))
+}
+
+func (se *StarExpression) doesVariableMatch(vname octosql.VariableName) bool {
+	return se.qualifier == "" || se.qualifier == vname.Source()
 }
 
 type Variable struct {

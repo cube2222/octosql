@@ -265,6 +265,25 @@ func (dq *Deque) Clear() error {
 	return nil
 }
 
+func (dq *Deque) Length() (int, error) {
+	if !dq.initializedFront {
+		err := dq.initializeFront()
+		if err != nil {
+			return 0, errors.Wrap(err, "failed to initialize front in Length")
+		}
+	}
+
+	if !dq.initializedBack {
+		err := dq.initializeBack()
+		if err != nil {
+			return 0, errors.Wrap(err, "failed to initialize back in Length")
+		}
+	}
+
+	// first front > first back (ALWAYS) so we need to sub 1 (base case: front = 0, back = 1, length = 0)
+	return dq.firstFreeBackSpot - dq.firstFreeFrontSpot - 1, nil
+}
+
 func (dq *Deque) GetIterator(opts ...IteratorOption) *DequeIterator {
 	allOpts := []IteratorOption{WithDefault(), WithPrefix(dequeValueKeyPrefix)}
 	allOpts = append(allOpts, opts...)

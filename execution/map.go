@@ -72,13 +72,33 @@ func (stream *MappedStream) Next(ctx context.Context) (*Record, error) {
 	fieldNames := make([]octosql.VariableName, 0)
 	outValues := make(map[octosql.VariableName]octosql.Value)
 	for _, expr := range stream.expressions {
-		fieldNames = append(fieldNames, expr.Name())
+		expressionName := expr.Name(variables)
 
-		value, err := expr.ExpressionValue(ctx, variables)
-		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't get expression %v", expr.Name())
+		switch expr := expr.(type) {
+		case *StarExpression:
+			for _, name := range expressionName {
+				value, _ := variables.Get(name) //TODO: err is always nil, handle it anyways?
+
+				outValues[name] = value
+			}
+
+			fieldNames = append(fieldNames, expressionName...)
+
+		default: // anything else than a star expression
+			if len(expressionName) != 1 {
+				return nil, errors.Errorf("expected exactly one expressionName for NamedExpression in map, got %v", len(expressionName))
+			}
+
+			actualName := expressionName[0]
+
+			fieldNames = append(fieldNames, actualName)
+
+			value, err := expr.ExpressionValue(ctx, variables)
+			if err != nil {
+				return nil, errors.Wrapf(err, "couldn't get expression %v", actualName)
+			}
+			outValues[actualName] = value
 		}
-		outValues[expr.Name()] = value
 	}
 
 	if stream.keep {

@@ -2,7 +2,6 @@ package execution
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
@@ -20,7 +19,7 @@ type Expression interface {
 
 type NamedExpression interface {
 	Expression
-	Name() octosql.VariableName
+	Name(variables octosql.Variables) []octosql.VariableName
 }
 
 type StarExpression struct {
@@ -43,12 +42,15 @@ func (se *StarExpression) ExpressionValue(ctx context.Context, variables octosql
 	return octosql.MakeTuple(values), nil
 }
 
-func (se *StarExpression) Name() octosql.VariableName {
-	if se.qualifier == "" {
-		return octosql.StarExpressionName
+func (se *StarExpression) Name(variables octosql.Variables) []octosql.VariableName {
+	fields := make([]octosql.VariableName, 0)
+	for key := range variables {
+		if se.doesVariableMatch(key) {
+			fields = append(fields, key)
+		}
 	}
 
-	return octosql.NewVariableName(fmt.Sprintf("%s_%s", se.qualifier, octosql.StarExpressionName))
+	return fields
 }
 
 func (se *StarExpression) doesVariableMatch(vname octosql.VariableName) bool {
@@ -71,8 +73,8 @@ func (v *Variable) ExpressionValue(ctx context.Context, variables octosql.Variab
 	return val, nil
 }
 
-func (v *Variable) Name() octosql.VariableName {
-	return v.name
+func (v *Variable) Name(variables octosql.Variables) []octosql.VariableName {
+	return []octosql.VariableName{v.name}
 }
 
 type TupleExpression struct {
@@ -177,6 +179,6 @@ func (alExpr *AliasedExpression) ExpressionValue(ctx context.Context, variables 
 	return alExpr.expr.ExpressionValue(ctx, variables)
 }
 
-func (alExpr *AliasedExpression) Name() octosql.VariableName {
-	return alExpr.name
+func (alExpr *AliasedExpression) Name(variables octosql.Variables) []octosql.VariableName {
+	return []octosql.VariableName{alExpr.name}
 }

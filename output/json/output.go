@@ -24,6 +24,7 @@ func NewOutput(w io.Writer) output.Output {
 	}
 }
 
+//TODO: should the json version be changed so that we get repeated columns (doesn't seem to make sense tbh)
 func (o *Output) WriteRecord(record *execution.Record) error {
 	if !o.firstRecordWritten {
 		o.firstRecordWritten = true
@@ -51,11 +52,8 @@ func (o *Output) WriteRecord(record *execution.Record) error {
 
 func (o *Output) Close() error {
 	n, err := o.w.Write([]byte{']'})
-	if err != nil {
+	if err != nil || n != 1 {
 		return errors.Wrap(err, "couldn't write trailing square bracket")
-	}
-	if n != 1 {
-		return errors.Errorf("couldn't write trailing square bracket")
 	}
 
 	return nil

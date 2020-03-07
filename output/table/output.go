@@ -29,18 +29,13 @@ func (o *Output) WriteRecord(record *execution.Record) error {
 }
 
 func (o *Output) Close() error {
-	var fields []string
-	for _, record := range o.records {
-		for _, field := range record.ShowFields() {
-			found := false
-			for i := range fields {
-				if fields[i] == field.Name.String() {
-					found = true
-				}
-			}
-			if !found {
-				fields = append(fields, field.Name.String())
-			}
+	fieldMap := output.FindFieldsCount(o.records)
+	fields := make([]string, 0)
+
+	for field, count := range fieldMap {
+		fieldName := field.Name.String()
+		for i := 0; i < count; i++ {
+			fields = append(fields, fieldName)
 		}
 	}
 

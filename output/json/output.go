@@ -28,19 +28,13 @@ func (o *Output) WriteRecord(record *execution.Record) error {
 	if !o.firstRecordWritten {
 		o.firstRecordWritten = true
 		n, err := o.w.Write([]byte{'['})
-		if err != nil {
+		if err != nil || n != 1 {
 			return errors.Wrap(err, "couldn't write leading square bracket")
-		}
-		if n != 1 {
-			return errors.Errorf("couldn't write leading square bracket")
 		}
 	} else {
 		n, err := o.w.Write([]byte{','})
-		if err != nil {
+		if err != nil || n != 1 {
 			return errors.Wrap(err, "couldn't write separating comma")
-		}
-		if n != 1 {
-			return errors.Errorf("couldn't write separating comma")
 		}
 	}
 	kvs := make(map[string]interface{})

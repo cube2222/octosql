@@ -30,18 +30,13 @@ func (o *Output) WriteRecord(record *execution.Record) error {
 }
 
 func (o *Output) Close() error {
-	var fields []string
-	for _, record := range o.records {
-		for _, field := range record.ShowFields() {
-			found := false
-			for i := range fields {
-				if fields[i] == field.Name.String() {
-					found = true
-				}
-			}
-			if !found {
-				fields = append(fields, field.Name.String())
-			}
+	fieldMap := output.FindFieldsCount(o.records)
+	fields := make([]string, 0)
+
+	for field, count := range fieldMap {
+		fieldName := field.Name.String()
+		for i := 0; i < count; i++ {
+			fields = append(fields, fieldName)
 		}
 	}
 
@@ -54,10 +49,14 @@ func (o *Output) Close() error {
 
 	for _, record := range o.records {
 		var row []string
-		for _, field := range fields {
-			value := record.Value(octosql.NewVariableName(field))
-			row = append(row, value.Show())
+		for field, count := range fieldMap {
+			value := record.Value(octosql.NewVariableName(field.Name.String()))
+
+			for i := 0; i < count; i++ {
+				row = append(row, value.Show())
+			}
 		}
+
 		err := out.Write(row)
 		if err != nil {
 			return errors.Wrap(err, "couldn't write row")

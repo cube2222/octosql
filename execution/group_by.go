@@ -5,19 +5,11 @@ import (
 	"fmt"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/streaming/aggregate"
 	"github.com/cube2222/octosql/streaming/storage"
 
 	"github.com/pkg/errors"
 )
-
-type AggregatePrototype func() Aggregate
-
-type Aggregate interface {
-	AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error
-	RetractValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error
-	GetValue(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error)
-	String() string
-}
 
 type GroupBy struct {
 	storage storage.Storage
@@ -25,7 +17,7 @@ type GroupBy struct {
 	key     []Expression
 
 	fields              []octosql.VariableName
-	aggregatePrototypes []AggregatePrototype
+	aggregatePrototypes []aggregate.AggregatePrototype
 	eventTimeField      octosql.VariableName
 
 	as                []octosql.VariableName
@@ -34,7 +26,7 @@ type GroupBy struct {
 	triggerPrototype TriggerPrototype
 }
 
-func NewGroupBy(storage storage.Storage, source Node, key []Expression, fields []octosql.VariableName, aggregatePrototypes []AggregatePrototype, eventTimeField octosql.VariableName, as []octosql.VariableName, outEventTimeField octosql.VariableName, triggerPrototype TriggerPrototype) *GroupBy {
+func NewGroupBy(storage storage.Storage, source Node, key []Expression, fields []octosql.VariableName, aggregatePrototypes []aggregate.AggregatePrototype, eventTimeField octosql.VariableName, as []octosql.VariableName, outEventTimeField octosql.VariableName, triggerPrototype TriggerPrototype) *GroupBy {
 	return &GroupBy{storage: storage, source: source, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, eventTimeField: eventTimeField, as: as, outEventTimeField: outEventTimeField, triggerPrototype: triggerPrototype}
 }
 
@@ -50,7 +42,7 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 		return nil, errors.Wrap(err, "couldn't get stream for source in group by")
 	}
 
-	aggregates := make([]Aggregate, len(node.aggregatePrototypes))
+	aggregates := make([]aggregate.Aggregate, len(node.aggregatePrototypes))
 	for i := range node.aggregatePrototypes {
 		aggregates[i] = node.aggregatePrototypes[i]()
 	}
@@ -79,14 +71,24 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 		return nil, errors.Wrap(err, "couldn't get trigger from trigger prototype")
 	}
 
+	// We need to remember star expressions in GroupByStream to fill in missing aggregates
+	starExpressions := make([]*StarExpression, 0)
+	for _, expr := range node.key {
+		if expr, ok := expr.(*StarExpression); ok {
+			starExpressions = append(starExpressions, expr)
+		}
+	}
+
 	groupBy := &GroupByStream{
 		prefixes:             prefixes,
-		inputFields:          node.fields,
 		eventTimeField:       node.eventTimeField,
-		outputEventTimeField: node.outEventTimeField,
+		inputFields:          node.fields,
 		aggregates:           aggregates,
+		starExpressions:      starExpressions,
 		outputFieldNames:     outputFieldNames,
+		outputEventTimeField: node.outEventTimeField,
 	}
+
 	processFunc := &ProcessByKey{
 		eventTimeField:  node.eventTimeField,
 		trigger:         trigger,
@@ -94,6 +96,7 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 		processFunction: groupBy,
 		variables:       variables,
 	}
+
 	groupByPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, &ZeroWatermarkSource{})
 	go groupByPullEngine.Run(ctx) // TODO: .Close() should kill this context and the goroutine.
 
@@ -103,9 +106,10 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 type GroupByStream struct {
 	prefixes [][]byte
 
-	eventTimeField octosql.VariableName // Empty if not grouping by event time
-	inputFields    []octosql.VariableName
-	aggregates     []Aggregate
+	eventTimeField  octosql.VariableName // Empty if not grouping by event time
+	inputFields     []octosql.VariableName
+	aggregates      []aggregate.Aggregate
+	starExpressions []*StarExpression
 
 	outputFieldNames     []octosql.VariableName
 	outputEventTimeField octosql.VariableName
@@ -150,18 +154,42 @@ func (gb *GroupByStream) AddRecord(ctx context.Context, tx storage.StateTransact
 		}
 	}
 
-	// Update aggregates
-	for i := range gb.aggregates {
-		var value octosql.Value
-		if gb.inputFields[i] == octosql.StarExpressionName {
-			mapping := make(map[string]octosql.Value, len(record.Fields()))
-			for _, field := range record.Fields() {
-				mapping[field.Name.String()] = record.Value(field.Name)
-			}
-			value = octosql.MakeObject(mapping)
-		} else {
-			value = record.Value(gb.inputFields[i])
+	// Create values and aggregates for the record
+	// This needs to be done here, because different records might result in different values
+	// from star expressions (i.e with different number of fields)
+
+	recordVariables := record.AsVariables()
+
+	fieldCount := len(gb.inputFields)
+	values := make([]octosql.Value, fieldCount)
+
+	for i, fieldName := range gb.inputFields {
+		value := record.Value(fieldName)
+		values[i] = value
+	}
+
+	// Create the full list of aggregates
+	aggregates := make([]aggregate.Aggregate, 0)
+	aggregates = append(aggregates, gb.aggregates...) // add existing aggregates
+
+	for _, expr := range gb.starExpressions { // handle star expressions
+		value, err := expr.ExpressionValue(ctx, recordVariables)
+		if err != nil { // this should never happen but in case the implementation changes later, it's better to handle
+			return errors.Wrap(err, "couldn't get value of star expression in group by")
 		}
+
+		valueSlice := value.AsSlice()
+		values = append(values, valueSlice...)
+
+		for i := 0; i < len(valueSlice); i++ {
+			aggregates = append(aggregates, &aggregate.First{}) // TODO: should this be key?
+		}
+	}
+
+	// Update aggregates once we have full info
+	for i := range aggregates {
+		value := values[i]
+
 		if !record.IsUndo() {
 			err := gb.aggregates[i].AddValue(ctx, txByKey.WithPrefix(gb.prefixes[i]), value)
 			if err != nil {

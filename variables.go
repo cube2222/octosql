@@ -6,6 +6,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const StarExpressionName = "*star*"
+
 type VariableName string
 
 func NewVariableName(varname string) VariableName {

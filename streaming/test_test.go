@@ -121,7 +121,7 @@ func TestStream(t *testing.T) {
 
 	groupBy := &GroupBy{
 		prefixes:         [][]byte{nil, []byte("$agg1$")},
-		inputFields:      []octosql.VariableName{"window_end", "*star*"},
+		inputFields:      []octosql.VariableName{"window_end", octosql.StarExpressionName},
 		eventTimeField:   "window_end",
 		aggregates:       []Aggregate{&aggregate.First{}, &aggregate.Count{}},
 		outputFieldNames: []octosql.VariableName{"window_end", "*star*_count"},

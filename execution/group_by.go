@@ -153,7 +153,7 @@ func (gb *GroupByStream) AddRecord(ctx context.Context, tx storage.StateTransact
 	// Update aggregates
 	for i := range gb.aggregates {
 		var value octosql.Value
-		if gb.inputFields[i] == "*star*" {
+		if gb.inputFields[i] == octosql.StarExpressionName {
 			mapping := make(map[string]octosql.Value, len(record.Fields()))
 			for _, field := range record.Fields() {
 				mapping[field.Name.String()] = record.Value(field.Name)

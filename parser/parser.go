@@ -150,7 +150,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 			if !aggregateStars[i] {
 				fields[i] = expressions[i].Name()
 			} else {
-				fields[i] = "*star*"
+				fields[i] = octosql.StarExpressionName
 			}
 		}
 
@@ -204,7 +204,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 						if !aggregateStars[i] {
 							nameExpressions[i] = logical.NewVariable(octosql.NewVariableName(fmt.Sprintf("%v_%v", expressions[i].Name(), aggregates[i])))
 						} else {
-							nameExpressions[i] = logical.NewVariable(octosql.NewVariableName(fmt.Sprintf("%v_%v", "*star*", aggregates[i])))
+							nameExpressions[i] = logical.NewVariable(octosql.NewVariableName(fmt.Sprintf("%v_%v", octosql.StarExpressionName, aggregates[i])))
 						}
 					}
 				}

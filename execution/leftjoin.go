@@ -19,17 +19,17 @@ func NewLeftJoin(prefetchCount int, source Node, joined Node) *LeftJoin {
 	return &LeftJoin{prefetchCount: prefetchCount, source: source, joined: joined}
 }
 
-func (node *LeftJoin) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, error) {
-	recordStream, err := node.source.Get(ctx, variables, streamID)
+func (node *LeftJoin) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
+	recordStream, execOutput, err := node.source.Get(ctx, variables, streamID)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get record stream")
+		return nil, nil, errors.Wrap(err, "couldn't get record stream")
 	}
 
 	return &LeftJoinedStream{
 		joiner:          NewJoiner(node.prefetchCount, variables, recordStream, node.joined),
 		curRecord:       nil,
 		curJoinedStream: nil,
-	}, nil
+	}, execOutput, nil
 }
 
 type LeftJoinedStream struct {

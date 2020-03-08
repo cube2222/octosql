@@ -17,19 +17,19 @@ func NewDistinct(child Node) *Distinct {
 	return &Distinct{child: child}
 }
 
-func (node *Distinct) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, error) {
+func (node *Distinct) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
 	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get source stream ID")
+		return nil, nil, errors.Wrap(err, "couldn't get source stream ID")
 	}
 
-	stream, err := node.child.Get(ctx, variables, sourceStreamID)
+	stream, execOutput, err := node.child.Get(ctx, variables, sourceStreamID)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get stream for child node in distinct")
+		return nil, nil, errors.Wrap(err, "couldn't get stream for child node in distinct")
 	}
 
-	return NewDistinctStream(stream, variables, newRecordSet()), nil
+	return NewDistinctStream(stream, variables, newRecordSet()), execOutput, nil
 }
 
 type DistinctStream struct {

@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/go-redis/redis"
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/metadata"
-	"github.com/go-redis/redis"
-	"github.com/pkg/errors"
 )
 
 var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
@@ -86,10 +87,10 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 	return NewDataSourceBuilderFactory(dbKey), nil
 }
 
-func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, error) {
+func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
 	keysWanted, err := ds.keyFormula.getAllKeys(ctx, variables)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get all keys from filter")
+		return nil, nil, errors.Wrap(err, "couldn't get all keys from filter")
 	}
 
 	if len(keysWanted.keys) == 0 {
@@ -101,7 +102,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 			isDone:     false,
 			alias:      ds.alias,
 			keyName:    ds.dbKey,
-		}, nil
+		}, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), nil
 	}
 
 	sliceKeys := make([]string, 0)
@@ -116,7 +117,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		isDone:  false,
 		alias:   ds.alias,
 		keyName: ds.dbKey,
-	}, nil
+	}, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), nil
 }
 
 type KeySpecificStream struct {

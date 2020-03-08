@@ -51,24 +51,24 @@ func isSorteable(x octosql.Value) bool {
 	panic("unreachable")
 }
 
-func (ob *OrderBy) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, error) {
+func (ob *OrderBy) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
 	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get source stream ID")
+		return nil, nil, errors.Wrap(err, "couldn't get source stream ID")
 	}
 
-	sourceStream, err := ob.source.Get(ctx, variables, sourceStreamID)
+	sourceStream, _, err := ob.source.Get(ctx, variables, sourceStreamID)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get underlying stream in order by")
+		return nil, nil, errors.Wrap(err, "couldn't get underlying stream in order by")
 	}
 
 	orderedStream, err := createOrderedStream(ctx, ob.expressions, ob.directions, variables, sourceStream)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't create ordered stream from source stream")
+		return nil, nil, errors.Wrap(err, "couldn't create ordered stream from source stream")
 	}
 
-	return orderedStream, nil
+	return orderedStream, NewExecutionOutput(NewZeroWatermarkGenerator()), nil
 }
 
 func createOrderedStream(ctx context.Context, expressions []Expression, directions []OrderDirection, variables octosql.Variables, sourceStream RecordStream) (stream RecordStream, outErr error) {

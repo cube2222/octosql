@@ -15,7 +15,7 @@ import (
 
 type SQLSourceTemplate interface {
 	GetIPAddress(dbConfig map[string]interface{}) (string, int, error)
-	GetConnection(user, password, host, dbName string, port int) (*sql.DB, error)
+	GetDSNAndDriverName(user, password, host, dbName string, port int) (string, string)
 	GetPlaceholders(alias string) PlaceholderMap
 	GetAvailableFilters() map[physical.FieldType]map[physical.Relation]struct{}
 }
@@ -57,14 +57,16 @@ func NewDataSourceBuilderFactoryFromTemplate(template SQLSourceTemplate) func([]
 					return nil, errors.Wrap(err, "couldn't get password")
 				}
 
-				db, err := template.GetConnection(user, password, host, databaseName, port)
+				dsn, driver := template.GetDSNAndDriverName(user, password, host, databaseName, port)
+
+				db, err := sql.Open(driver, dsn)
 				if err != nil {
-					return nil, errors.Wrap(err, "couldn't open connection to postgres database")
+					return nil, errors.Wrap(err, "couldn't connect to the database")
 				}
 
 				placeholders := template.GetPlaceholders(alias)
 
-				//create a query with placeholders to prepare a statement from a physical formula
+				// Create a query with placeholders to prepare a statement from a physical formula
 				query := FormulaToSQL(filter, placeholders)
 				query = fmt.Sprintf("SELECT * FROM %s %s WHERE %s", tableName, alias, query)
 
@@ -73,11 +75,11 @@ func NewDataSourceBuilderFactoryFromTemplate(template SQLSourceTemplate) func([]
 					return nil, errors.Wrap(err, "couldn't prepare db for query")
 				}
 
-				//materialize the created postgresPlaceholders
+				// Materialize the created placeholders
 				execAliases, err := placeholders.MaterializePlaceholders(matCtx)
 
 				if err != nil {
-					return nil, errors.Wrap(err, "couldn't materialize postgresPlaceholders")
+					return nil, errors.Wrap(err, "couldn't materialize placeholders")
 				}
 
 				return &DataSource{
@@ -98,7 +100,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables) (exe
 	values := make([]interface{}, 0)
 
 	for _, expression := range ds.placeholders {
-		//since we have an execution expression, then we can evaluate it given the variables
+		// Since we have an execution expression, then we can evaluate it given the variables
 		value, err := expression.ExpressionValue(ctx, variables)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't get actual value from variables")
@@ -136,7 +138,7 @@ type RecordStream struct {
 func (rs *RecordStream) Close() error {
 	err := rs.rows.Close()
 	if err != nil {
-		return errors.Wrap(err, "Couldn't close underlying SQL rows")
+		return errors.Wrap(err, "couldn't close underlying SQL rows")
 	}
 
 	return nil

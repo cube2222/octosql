@@ -1,11 +1,10 @@
 package mysql
 
 import (
-	"database/sql"
 	"fmt"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/storage/sqlStorages"
+	"github.com/cube2222/octosql/storage/sql"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 
@@ -42,16 +41,11 @@ func (t MySQLTemplate) GetIPAddress(dbConfig map[string]interface{}) (string, in
 	return config.GetIPAddress(dbConfig, "address", config.WithDefault([]interface{}{"localhost", 3306}))
 }
 
-func (t MySQLTemplate) GetConnection(user, password, host, dbName string, port int) (*sql.DB, error) {
+func (t MySQLTemplate) GetDSNAndDriverName(user, password, host, dbName string, port int) (string, string) {
 	// Build dsn
 	mysqlInfo := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true", user, password, host, port, dbName)
 
-	db, err := sql.Open("mysql", mysqlInfo)
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn'template open connection to postgres database")
-	}
-
-	return db, nil
+	return mysqlInfo, "mysql"
 }
 
 func (t MySQLTemplate) GetPlaceholders(alias string) sqlStorages.PlaceholderMap {
@@ -68,8 +62,9 @@ func NewDataSourceBuilderFactory(primaryKeys []octosql.VariableName) physical.Da
 func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (physical.DataSourceBuilderFactory, error) {
 	primaryKeysStrings, err := config.GetStringList(dbConfig, "primaryKeys", config.WithDefault([]string{}))
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn'template get primaryKeys")
+		return nil, errors.Wrap(err, "couldn't get primaryKeys")
 	}
+
 	var primaryKeys []octosql.VariableName
 	for _, str := range primaryKeysStrings {
 		primaryKeys = append(primaryKeys, octosql.NewVariableName(str))

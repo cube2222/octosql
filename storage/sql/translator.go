@@ -13,21 +13,6 @@ type PlaceholderMap interface {
 	GetAlias() string
 }
 
-func expressionToSQL(expression physical.Expression, pm PlaceholderMap) string {
-	switch expression := expression.(type) {
-	case *physical.Variable: //if it's a variable, then check if it's a column name for alias
-		if expression.Name.Source() == pm.GetAlias() {
-			return expression.Name.String()
-		}
-
-		placeholder := pm.AddPlaceholder(expression)
-		return placeholder
-	default:
-		placeholder := pm.AddPlaceholder(expression)
-		return placeholder
-	}
-}
-
 func FormulaToSQL(formula physical.Formula, pm PlaceholderMap) string {
 	switch formula := formula.(type) {
 	case *physical.And:
@@ -67,6 +52,25 @@ func FormulaToSQL(formula physical.Formula, pm PlaceholderMap) string {
 	}
 }
 
+func parenthesize(s string) string {
+	return fmt.Sprintf("(%s)", s)
+}
+
+func expressionToSQL(expression physical.Expression, pm PlaceholderMap) string {
+	switch expression := expression.(type) {
+	case *physical.Variable: // if it's a variable, then check if it's a column name for alias
+		if expression.Name.Source() == pm.GetAlias() {
+			return expression.Name.String()
+		}
+
+		placeholder := pm.AddPlaceholder(expression)
+		return placeholder
+	default:
+		placeholder := pm.AddPlaceholder(expression)
+		return placeholder
+	}
+}
+
 func relationToSQL(rel physical.Relation) string {
 	switch rel {
 	case physical.Equal:
@@ -88,8 +92,4 @@ func relationToSQL(rel physical.Relation) string {
 	default:
 		panic("Invalid physical relation")
 	}
-}
-
-func parenthesize(s string) string {
-	return fmt.Sprintf("(%s)", s)
 }

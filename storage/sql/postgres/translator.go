@@ -9,8 +9,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-//A structure that stores the relation $n -> expression
-//that will be later used to put specific values into a SQL query
+// A structure that stores the relation $n -> expression
+// that will be later used to put specific values into a SQL query
 type postgresPlaceholders struct {
 	PlaceholderToExpression map[string]physical.Expression
 	Counter                 int
@@ -33,7 +33,7 @@ func (pms *postgresPlaceholders) AddPlaceholder(expression physical.Expression) 
 	return placeholder
 }
 
-//materializes the values in the map so that one can later call EvaluateExpression on them
+// Materializes the values in the map so that one can later call EvaluateExpression on them
 func (pms *postgresPlaceholders) MaterializePlaceholders(matCtx *physical.MaterializationContext) ([]execution.Expression, error) {
 	result := make([]execution.Expression, pms.Counter-1)
 
@@ -44,15 +44,15 @@ func (pms *postgresPlaceholders) MaterializePlaceholders(matCtx *physical.Materi
 
 		expression, ok := pms.PlaceholderToExpression[placeholder]
 		if !ok {
-			return nil, errors.Errorf("couldn't get variable name for placeholder %s", placeholder)
+			return nil, errors.Errorf("couldn't get expression for placeholder %s", placeholder)
 		}
 
-		exec, err := expression.Materialize(ctx, matCtx)
+		materializedExpression, err := expression.Materialize(ctx, matCtx)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't materialize expression in Postgres' MaterializePlaceholders")
+			return nil, errors.Wrap(err, "couldn't materialize expression in MaterializePlaceholders")
 		}
 
-		result[i-1] = exec
+		result[i-1] = materializedExpression
 	}
 
 	return result, nil

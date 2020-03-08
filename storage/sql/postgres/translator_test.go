@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/cube2222/octosql/physical"
-	"github.com/cube2222/octosql/storage/sqlStorages"
+	"github.com/cube2222/octosql/storage/sql"
 )
 
 func TestFormulaToSQL(t *testing.T) {
@@ -104,25 +104,25 @@ func TestFormulaToSQL(t *testing.T) {
 		},
 		{
 			name: "complicated test with different formulas and postgresPlaceholders",
-			//((a.age > b.age AND a.sex = const_0) OR (const_1 < b.id)
+			// ((a.age > b.age AND a.sex = const_0) OR (const_1 < b.id)
 			args: args{
 				formula: physical.NewOr(
 
 					physical.NewAnd(
-						physical.NewPredicate( //a.age > b.age
+						physical.NewPredicate( // a.age > b.age
 							physical.NewVariable("a.age"),
 							physical.MoreThan,
 							physical.NewVariable("b.age"),
 						),
 
-						physical.NewPredicate( //a.age = const_0
+						physical.NewPredicate( // a.age = const_0
 							physical.NewVariable("a.sex"),
 							physical.Equal,
 							physical.NewVariable("const_0"),
 						),
 					),
 
-					physical.NewPredicate( //const_1 < b.id
+					physical.NewPredicate( // const_1 < b.id
 						physical.NewVariable("const_1"),
 						physical.LessThan,
 						physical.NewVariable("b.id"),

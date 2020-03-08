@@ -20,8 +20,8 @@ import (
 	"github.com/cube2222/octosql/storage/csv"
 	"github.com/cube2222/octosql/storage/json"
 	"github.com/cube2222/octosql/storage/redis"
-	"github.com/cube2222/octosql/storage/sqlStorages/mysql"
-	"github.com/cube2222/octosql/storage/sqlStorages/postgres"
+	"github.com/cube2222/octosql/storage/sql/mysql"
+	"github.com/cube2222/octosql/storage/sql/postgres"
 	"github.com/spf13/cobra"
 )
 

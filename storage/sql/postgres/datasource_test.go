@@ -1,4 +1,4 @@
-package mysql
+package postgres
 
 import (
 	"context"
@@ -19,16 +19,16 @@ import (
 func TestDataSource_Get(t *testing.T) {
 	ctx := context.Background()
 	host := "localhost"
-	port := 3306
+	port := 5432
 	user := "root"
 	password := "toor"
 	dbname := "mydb"
 
-	mysqlInfo := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true", user, password, host, port, dbname)
+	psqlInfo, driver := PostgresTemplate{}.GetDSNAndDriverName(user, password, host, dbname, port)
 
-	db, err := sql.Open("mysql", mysqlInfo)
+	db, err := sql.Open(driver, psqlInfo)
 	if err != nil {
-		panic("Couldn'template connect to a database")
+		panic("Couldn't connect to the database")
 	}
 
 	type args struct {
@@ -277,15 +277,15 @@ func TestDataSource_Get(t *testing.T) {
 			args := tt.args
 			err := createTable(db, args.tableDescription)
 			if err != nil {
-				t.Errorf("Couldn'template create table: %v", err)
+				t.Errorf("Couldn't create table: %v", err)
 				return
 			}
 
-			defer dropTable(db, args.tablename) //unhandled error
+			defer dropTable(db, args.tablename)
 
 			err = insertValues(db, args.tablename, args.rows)
 			if err != nil {
-				t.Errorf("Couldn'template insert values into table: %v", err)
+				t.Errorf("Couldn't insert values into table: %v", err)
 				return
 			}
 
@@ -310,24 +310,24 @@ func TestDataSource_Get(t *testing.T) {
 				},
 			})
 			if err != nil {
-				t.Errorf("Couldn'template get ExecutionNode: %v", err)
+				t.Errorf("Couldn't get ExecutionNode: %v", err)
 				return
 			}
 
 			stream, err := execNode.Get(ctx, args.variables)
 			if err != nil {
-				t.Errorf("Couldn'template get stream: %v", err)
+				t.Errorf("Couldn't get stream: %v", err)
 				return
 			}
 
-			equal, err := execution.AreStreamsEqual(context.Background(), stream, tt.want)
+			equal, err := execution.AreStreamsEqualNoOrdering(context.Background(), stream, tt.want)
 			if err != nil {
 				t.Errorf("Error in AreStreamsEqual(): %v", err)
 				return
 			}
 
 			if !equal != tt.wantErr {
-				t.Errorf("Streams don'template match: %v", err)
+				t.Errorf("Streams don't match")
 				return
 			} else {
 				return
@@ -339,7 +339,7 @@ func TestDataSource_Get(t *testing.T) {
 func createTable(db *sql.DB, tableDescription string) error {
 	_, err := db.Exec(tableDescription)
 	if err != nil {
-		return errors.Wrap(err, "Couldn'template create table")
+		return errors.Wrap(err, "couldn't create table")
 	}
 	return nil
 }
@@ -370,7 +370,7 @@ func dropTable(db *sql.DB, tablename string) error {
 	query := fmt.Sprintf("DROP TABLE %s;", tablename)
 	_, err := db.Exec(query)
 	if err != nil {
-		return errors.Wrap(err, "couldn'template drop table")
+		return errors.Wrap(err, "couldn't drop table")
 	}
 	return nil
 }

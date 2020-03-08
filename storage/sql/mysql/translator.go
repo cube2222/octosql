@@ -8,8 +8,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-//A structure that stores the relation ? -> expression
-//that will be later used to put specific values into a SQL query
+// A structure that stores the relation ? -> expression
+// that will be later used to put specific values into a SQL query
 type mySQLPlaceholders struct {
 	PlaceholderToExpression []physical.Expression
 	Alias                   string
@@ -28,19 +28,19 @@ func (mps *mySQLPlaceholders) AddPlaceholder(expression physical.Expression) str
 	return "?"
 }
 
-//materializes the values in the map so that one can later call EvaluateExpression on them
+// Materializes the values in the map so that one can later call EvaluateExpression on them
 func (mps *mySQLPlaceholders) MaterializePlaceholders(matCtx *physical.MaterializationContext) ([]execution.Expression, error) {
 	result := make([]execution.Expression, len(mps.PlaceholderToExpression))
 
 	ctx := context.Background()
 
 	for index, expression := range mps.PlaceholderToExpression {
-		exec, err := expression.Materialize(ctx, matCtx)
+		materializedExpression, err := expression.Materialize(ctx, matCtx)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn'template materialize expression in MySQL's MaterializePlaceholders")
+			return nil, errors.Wrap(err, "couldn't materialize expression in MySQL's MaterializePlaceholders")
 		}
 
-		result[index] = exec
+		result[index] = materializedExpression
 	}
 
 	return result, nil

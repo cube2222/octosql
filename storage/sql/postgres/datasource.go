@@ -1,14 +1,13 @@
 package postgres
 
 import (
-	"database/sql"
 	"fmt"
 	"strings"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/physical"
-	"github.com/cube2222/octosql/storage/sqlStorages"
+	"github.com/cube2222/octosql/storage/sql"
 	_ "github.com/lib/pq"
 	"github.com/pkg/errors"
 )
@@ -42,7 +41,7 @@ func (t PostgresTemplate) GetIPAddress(dbConfig map[string]interface{}) (string,
 	return config.GetIPAddress(dbConfig, "address", config.WithDefault([]interface{}{"localhost", 5432}))
 }
 
-func (t PostgresTemplate) GetConnection(user, password, host, dbName string, port int) (*sql.DB, error) {
+func (t PostgresTemplate) GetDSNAndDriverName(user, password, host, dbName string, port int) (string, string) {
 	// Build dsn
 	sb := &strings.Builder{}
 	sb.WriteString(fmt.Sprintf("host=%s port=%d user=%s ", host, port, user))
@@ -53,13 +52,7 @@ func (t PostgresTemplate) GetConnection(user, password, host, dbName string, por
 
 	psqlInfo := sb.String()
 
-	// Open the connection
-	db, err := sql.Open("postgres", psqlInfo)
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't open connection to postgres database")
-	}
-
-	return db, nil
+	return psqlInfo, "postgres"
 }
 
 func (t PostgresTemplate) GetPlaceholders(alias string) sqlStorages.PlaceholderMap {
@@ -78,6 +71,7 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get primaryKeys")
 	}
+
 	var primaryKeys []octosql.VariableName
 	for _, str := range primaryKeysStrings {
 		primaryKeys = append(primaryKeys, octosql.NewVariableName(str))

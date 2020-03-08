@@ -37,7 +37,7 @@ func (mps *mySQLPlaceholders) MaterializePlaceholders(matCtx *physical.Materiali
 	for index, expression := range mps.PlaceholderToExpression {
 		materializedExpression, err := expression.Materialize(ctx, matCtx)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't materialize expression in MySQL's MaterializePlaceholders")
+			return nil, errors.Wrap(err, "couldn't materialize expression in MaterializePlaceholders")
 		}
 
 		result[index] = materializedExpression

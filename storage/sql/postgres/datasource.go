@@ -14,7 +14,7 @@ import (
 
 type PostgresTemplate struct{}
 
-func (t PostgresTemplate) GetAvailableFilters() map[physical.FieldType]map[physical.Relation]struct{} {
+func (t *PostgresTemplate) GetAvailableFilters() map[physical.FieldType]map[physical.Relation]struct{} {
 	return map[physical.FieldType]map[physical.Relation]struct{}{
 		physical.Primary: {
 			physical.Equal:        {},
@@ -37,11 +37,11 @@ func (t PostgresTemplate) GetAvailableFilters() map[physical.FieldType]map[physi
 	}
 }
 
-func (t PostgresTemplate) GetIPAddress(dbConfig map[string]interface{}) (string, int, error) {
+func (t *PostgresTemplate) GetIPAddress(dbConfig map[string]interface{}) (string, int, error) {
 	return config.GetIPAddress(dbConfig, "address", config.WithDefault([]interface{}{"localhost", 5432}))
 }
 
-func (t PostgresTemplate) GetDSNAndDriverName(user, password, host, dbName string, port int) (string, string) {
+func (t *PostgresTemplate) GetDSNAndDriverName(user, password, host, dbName string, port int) (string, string) {
 	// Build dsn
 	sb := &strings.Builder{}
 	sb.WriteString(fmt.Sprintf("host=%s port=%d user=%s ", host, port, user))
@@ -55,14 +55,14 @@ func (t PostgresTemplate) GetDSNAndDriverName(user, password, host, dbName strin
 	return psqlInfo, "postgres"
 }
 
-func (t PostgresTemplate) GetPlaceholders(alias string) sqlStorages.PlaceholderMap {
+func (t *PostgresTemplate) GetPlaceholders(alias string) sqlStorages.PlaceholderMap {
 	return newPostgresPlaceholders(alias)
 }
 
 var template PostgresTemplate = struct{}{}
 
 func NewDataSourceBuilderFactory(primaryKeys []octosql.VariableName) physical.DataSourceBuilderFactory {
-	return sqlStorages.NewDataSourceBuilderFactoryFromTemplate(template)(primaryKeys)
+	return sqlStorages.NewDataSourceBuilderFactoryFromTemplate(&template)(primaryKeys)
 }
 
 // NewDataSourceBuilderFactoryFromConfig creates a data source builder factory using the configuration.

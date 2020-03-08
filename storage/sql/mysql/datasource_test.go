@@ -24,7 +24,7 @@ func TestDataSource_Get(t *testing.T) {
 	password := "toor"
 	dbname := "mydb"
 
-	mysqlInfo, driver := MySQLTemplate{}.GetDSNAndDriverName(user, password, host, dbname, port)
+	mysqlInfo, driver := template.GetDSNAndDriverName(user, password, host, dbname, port)
 
 	db, err := sql.Open(driver, mysqlInfo)
 	if err != nil {
@@ -327,7 +327,7 @@ func TestDataSource_Get(t *testing.T) {
 			}
 
 			if !equal != tt.wantErr {
-				t.Errorf("Streams don'template match: %v", err)
+				t.Errorf("Streams don't match: %v", err)
 				return
 			} else {
 				return

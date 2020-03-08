@@ -52,10 +52,10 @@ func (t *MySQLTemplate) GetPlaceholders(alias string) sqlStorages.PlaceholderMap
 	return newMySQLPlaceholders(alias)
 }
 
-var template MySQLTemplate = struct{}{}
+var template = &MySQLTemplate{}
 
 func NewDataSourceBuilderFactory(primaryKeys []octosql.VariableName) physical.DataSourceBuilderFactory {
-	return sqlStorages.NewDataSourceBuilderFactoryFromTemplate(&template)(primaryKeys)
+	return sqlStorages.NewDataSourceBuilderFactoryFromTemplate(template)(primaryKeys)
 }
 
 // NewDataSourceBuilderFactoryFromConfig creates a data source builder factory using the configuration.

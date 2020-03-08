@@ -59,10 +59,10 @@ func (t *PostgresTemplate) GetPlaceholders(alias string) sqlStorages.Placeholder
 	return newPostgresPlaceholders(alias)
 }
 
-var template PostgresTemplate = struct{}{}
+var template = &PostgresTemplate{}
 
 func NewDataSourceBuilderFactory(primaryKeys []octosql.VariableName) physical.DataSourceBuilderFactory {
-	return sqlStorages.NewDataSourceBuilderFactoryFromTemplate(&template)(primaryKeys)
+	return sqlStorages.NewDataSourceBuilderFactoryFromTemplate(template)(primaryKeys)
 }
 
 // NewDataSourceBuilderFactoryFromConfig creates a data source builder factory using the configuration.

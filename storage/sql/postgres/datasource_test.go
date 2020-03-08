@@ -24,7 +24,7 @@ func TestDataSource_Get(t *testing.T) {
 	password := "toor"
 	dbname := "mydb"
 
-	psqlInfo, driver := PostgresTemplate{}.GetDSNAndDriverName(user, password, host, dbname, port)
+	psqlInfo, driver := template.GetDSNAndDriverName(user, password, host, dbname, port)
 
 	db, err := sql.Open(driver, psqlInfo)
 	if err != nil {

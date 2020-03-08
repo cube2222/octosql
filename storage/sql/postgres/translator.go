@@ -39,8 +39,8 @@ func (pms *postgresPlaceholders) MaterializePlaceholders(matCtx *physical.Materi
 
 	ctx := context.Background()
 
-	for i := 1; i < pms.Counter; i++ {
-		placeholder := fmt.Sprintf("$%d", i)
+	for index := 1; index < pms.Counter; index++ {
+		placeholder := fmt.Sprintf("$%d", index)
 
 		expression, ok := pms.PlaceholderToExpression[placeholder]
 		if !ok {
@@ -52,7 +52,7 @@ func (pms *postgresPlaceholders) MaterializePlaceholders(matCtx *physical.Materi
 			return nil, errors.Wrap(err, "couldn't materialize expression in MaterializePlaceholders")
 		}
 
-		result[i-1] = materializedExpression
+		result[index-1] = materializedExpression
 	}
 
 	return result, nil

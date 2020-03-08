@@ -21,7 +21,7 @@ func NewRequalifier(qualifier string, child Node) *Requalifier {
 	return &Requalifier{qualifier: qualifier, source: child}
 }
 
-func (node *Requalifier) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecOutput, error) {
+func (node *Requalifier) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
 	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {

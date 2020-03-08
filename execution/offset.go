@@ -18,7 +18,7 @@ func NewOffset(data Node, offsetExpr Expression) *Offset {
 	return &Offset{data: data, offsetExpr: offsetExpr}
 }
 
-func (node *Offset) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecOutput, error) {
+func (node *Offset) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
 	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {

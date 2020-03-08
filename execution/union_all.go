@@ -18,7 +18,7 @@ func NewUnionAll(sources ...Node) *UnionAll {
 	return &UnionAll{sources: sources}
 }
 
-func (node *UnionAll) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecOutput, error) {
+func (node *UnionAll) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
 	prefixedTx := storage.GetStateTransactionFromContext(ctx).WithPrefix(streamID.AsPrefix())
 
 	sourceRecordStreams := make([]RecordStream, len(node.sources))
@@ -44,7 +44,7 @@ func (node *UnionAll) Get(ctx context.Context, variables octosql.Variables, stre
 		streamID:         streamID,
 	}
 
-	return us, NewExecOutput(us), nil
+	return us, NewExecutionOutput(us), nil
 }
 
 type UnifiedStream struct {

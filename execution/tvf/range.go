@@ -31,7 +31,7 @@ func (r *Range) Document() docs.Documentation {
 	)
 }
 
-func (r *Range) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecOutput, error) {
+func (r *Range) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
 	start, err := r.start.ExpressionValue(ctx, variables)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get range start point")
@@ -51,7 +51,7 @@ func (r *Range) Get(ctx context.Context, variables octosql.Variables, streamID *
 	return &RangeStream{
 		current:      start.AsInt(),
 		endExclusive: end.AsInt(),
-	}, execution.NewExecOutput(execution.NewZeroWatermarkGenerator()), nil
+	}, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), nil
 }
 
 type RangeStream struct {

@@ -87,7 +87,7 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 	return NewDataSourceBuilderFactory(dbKey), nil
 }
 
-func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecOutput, error) {
+func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
 	keysWanted, err := ds.keyFormula.getAllKeys(ctx, variables)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get all keys from filter")
@@ -102,7 +102,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 			isDone:     false,
 			alias:      ds.alias,
 			keyName:    ds.dbKey,
-		}, execution.NewExecOutput(execution.NewZeroWatermarkGenerator()), nil
+		}, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), nil
 	}
 
 	sliceKeys := make([]string, 0)
@@ -117,7 +117,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		isDone:  false,
 		alias:   ds.alias,
 		keyName: ds.dbKey,
-	}, execution.NewExecOutput(execution.NewZeroWatermarkGenerator()), nil
+	}, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), nil
 }
 
 type KeySpecificStream struct {

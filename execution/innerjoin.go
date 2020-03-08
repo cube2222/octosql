@@ -19,7 +19,7 @@ func NewInnerJoin(prefetchCount int, source Node, joined Node) *InnerJoin {
 	return &InnerJoin{prefetchCount: prefetchCount, source: source, joined: joined}
 }
 
-func (node *InnerJoin) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecOutput, error) {
+func (node *InnerJoin) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
 	recordStream, execOutput, err := node.source.Get(ctx, variables, streamID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get record stream")

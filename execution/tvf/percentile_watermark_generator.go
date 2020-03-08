@@ -30,7 +30,7 @@ func NewPercentileWatermarkGenerator(source execution.Node, timeField octosql.Va
 	}
 }
 
-func (w *PercentileWatermarkGenerator) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecOutput, error) {
+func (w *PercentileWatermarkGenerator) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
 	sourceStreamID, err := execution.GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {
@@ -74,7 +74,7 @@ func (w *PercentileWatermarkGenerator) Get(ctx context.Context, variables octosq
 		frequency:  frequency.AsInt(),
 	}
 
-	return ws, execution.NewExecOutput(ws), nil // watermark generator stream now indicates new watermark source
+	return ws, execution.NewExecutionOutput(ws), nil // watermark generator stream now indicates new watermark source
 }
 
 // The way this watermark generator is working is following:

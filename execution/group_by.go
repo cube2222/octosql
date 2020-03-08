@@ -38,7 +38,7 @@ func NewGroupBy(storage storage.Storage, source Node, key []Expression, fields [
 	return &GroupBy{storage: storage, source: source, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, eventTimeField: eventTimeField, as: as, outEventTimeField: outEventTimeField, triggerPrototype: triggerPrototype}
 }
 
-func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecOutput, error) {
+func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
 	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {
@@ -98,7 +98,7 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 	groupByPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, execOutput.WatermarkSource)
 	go groupByPullEngine.Run(ctx) // TODO: .Close() should kill this context and the goroutine.
 
-	return groupByPullEngine, NewExecOutput(groupByPullEngine), nil // groupByPullEngine now indicates new watermark source
+	return groupByPullEngine, NewExecutionOutput(groupByPullEngine), nil // groupByPullEngine now indicates new watermark source
 }
 
 type GroupByStream struct {

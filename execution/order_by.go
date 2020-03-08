@@ -51,7 +51,7 @@ func isSorteable(x octosql.Value) bool {
 	panic("unreachable")
 }
 
-func (ob *OrderBy) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecOutput, error) {
+func (ob *OrderBy) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
 	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {
@@ -68,7 +68,7 @@ func (ob *OrderBy) Get(ctx context.Context, variables octosql.Variables, streamI
 		return nil, nil, errors.Wrap(err, "couldn't create ordered stream from source stream")
 	}
 
-	return orderedStream, NewExecOutput(NewZeroWatermarkGenerator()), nil
+	return orderedStream, NewExecutionOutput(NewZeroWatermarkGenerator()), nil
 }
 
 func createOrderedStream(ctx context.Context, expressions []Expression, directions []OrderDirection, variables octosql.Variables, sourceStream RecordStream) (stream RecordStream, outErr error) {

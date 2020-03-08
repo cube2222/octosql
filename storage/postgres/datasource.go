@@ -132,7 +132,7 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 	return NewDataSourceBuilderFactory(primaryKeys), nil
 }
 
-func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecOutput, error) {
+func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
 	values := make([]interface{}, 0)
 
 	for i := 0; i < len(ds.aliases); i++ {
@@ -166,7 +166,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		columns: columns,
 		isDone:  false,
 		alias:   ds.alias,
-	}, execution.NewExecOutput(execution.NewZeroWatermarkGenerator()), nil
+	}, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), nil
 
 }
 

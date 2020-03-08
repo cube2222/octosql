@@ -11,12 +11,12 @@ import (
 )
 
 // This struct represents additional metadata to be returned with Get() and used recursively (like WatermarkSource)
-type ExecOutput struct {
+type ExecutionOutput struct {
 	WatermarkSource WatermarkSource
 }
 
-func NewExecOutput(ws WatermarkSource) *ExecOutput {
-	return &ExecOutput{
+func NewExecutionOutput(ws WatermarkSource) *ExecutionOutput {
+	return &ExecutionOutput{
 		WatermarkSource: ws,
 	}
 }
@@ -33,7 +33,7 @@ func NewZeroWatermarkGenerator() *ZeroWatermarkGenerator {
 }
 
 type Node interface {
-	Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecOutput, error)
+	Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error)
 }
 
 type Expression interface {

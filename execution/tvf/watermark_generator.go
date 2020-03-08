@@ -31,7 +31,7 @@ func (w *WatermarkGenerator) Document() docs.Documentation {
 	panic("implement me")
 }
 
-func (w *WatermarkGenerator) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecOutput, error) {
+func (w *WatermarkGenerator) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
 	sourceStreamID, err := execution.GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {
@@ -57,7 +57,7 @@ func (w *WatermarkGenerator) Get(ctx context.Context, variables octosql.Variable
 		offset:    offset.AsDuration(),
 	}
 
-	return ws, execution.NewExecOutput(ws), nil // watermark generator stream now indicates new watermark source
+	return ws, execution.NewExecutionOutput(ws), nil // watermark generator stream now indicates new watermark source
 }
 
 type WatermarkGeneratorStream struct {
@@ -97,7 +97,7 @@ func (s *WatermarkGeneratorStream) Next(ctx context.Context) (*execution.Record,
 	}
 
 	// watermark value stored equals to (max_record_time - offset) that's why we multiply offset by -1
-	timeValueWithOffset := timeValue.AsTime().Add(s.offset * -1)
+	timeValueWithOffset := timeValue.AsTime().Add(-1 * s.offset)
 
 	tx := storage.GetStateTransactionFromContext(ctx)
 	currentWatermark, err := s.GetWatermark(ctx, tx)

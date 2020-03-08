@@ -83,7 +83,7 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 	return NewDataSourceBuilderFactory(), nil
 }
 
-func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecOutput, error) {
+func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
 	file, err := excelize.OpenFile(ds.path)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't open file")
@@ -109,7 +109,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 
 		isDone: false,
 		rows:   rows,
-	}, execution.NewExecOutput(execution.NewZeroWatermarkGenerator()), nil
+	}, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), nil
 }
 
 func contains(xs []string, x string) bool {

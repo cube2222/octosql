@@ -88,6 +88,7 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 }
 
 var offsetPrefix = []byte("$kafka_offset$")
+var tokenQueuePrefix = []byte("$token_queue$")
 
 func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, error) {
 	tx := storage.GetStateTransactionFromContext(ctx).WithPrefix(streamID.AsPrefix())
@@ -119,7 +120,23 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		return nil, errors.Wrapf(err, "couldn't load kafka partition %d offset", ds.partition)
 	}
 
-	go rs.RunWorker(ctx)
+	tokenQueue := execution.NewOutputQueue(tx.WithPrefix(tokenQueuePrefix))
+	for i := 0; i < 5; i++ {
+		token := octosql.MakePhantom()
+		err := tokenQueue.Push(ctx, &token)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't push batch token to queue")
+		}
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	rs.workerCtxCancel = cancel
+	rs.workerCloseErrChan = make(chan error)
+
+	go func() {
+		rs.RunWorker(ctx)
+		log.Println("worker done")
+	}()
 
 	return rs, nil
 }
@@ -140,25 +157,59 @@ var outputQueuePrefix = []byte("$output_queue$")
 
 func (rs *RecordStream) RunWorker(ctx context.Context) {
 	for {
-		if err := rs.RunWorkerInternal(ctx); err != nil {
-			log.Printf("error running kafka read messages worker: %s, reinitializing from storage", err.Error())
+		select {
+		case <-ctx.Done():
+			rs.workerCloseErrChan <- ctx.Err()
+		default:
+		}
+
+		tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
+
+		err := rs.RunWorkerInternal(ctx, tx)
+		if errors.Cause(err) == execution.ErrNewTransactionRequired {
+			tx.Abort()
+			continue
+		} else if waitableError := execution.GetErrWaitForChanges(err); waitableError != nil {
+			tx.Abort()
+			err = waitableError.ListenForChanges(ctx)
+			if err != nil {
+				log.Println("kafka worker: couldn't listen for changes: ", err)
+			}
+			err = waitableError.Close()
+			if err != nil {
+				log.Println("kafka worker: couldn't close storage changes subscription: ", err)
+			}
+			continue
+		} else if err != nil {
+			tx.Abort()
+			log.Printf("kafka worker: error running kafka read messages worker: %s, reinitializing from storage", err)
 			tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
 			if err := rs.loadOffset(tx); err != nil {
-				log.Fatalf("couldn't reinitialize offset for kafka read messages worker: %s", err)
+				log.Fatalf("kafka worker: couldn't reinitialize offset for kafka read messages worker: %s", err)
 				return
 			}
 			tx.Abort() // We only read data above, no need to risk failing now.
+			continue
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			log.Println("kafka worker: couldn't commit transaction: ", err)
+			continue
 		}
 	}
 }
 
-func (rs *RecordStream) RunWorkerInternal(ctx context.Context) error {
-	tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
-	defer tx.Abort()
+func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateTransaction) error {
 	outputQueue := execution.NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
+	tokenQueue := execution.NewOutputQueue(tx.WithPrefix(tokenQueuePrefix))
 
-	// TODO: Remove
-	time.Sleep(time.Second)
+	// The worker needs a token to read a batch.
+	var token octosql.Value
+	err := tokenQueue.Pop(ctx, &token)
+	if err != nil {
+		return errors.Wrap(err, "couldn't get batch token from token queue")
+	}
 
 	batch := make([]*execution.Record, rs.batchSize)
 	for i := 0; i < rs.batchSize; i++ {
@@ -207,10 +258,6 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context) error {
 		return errors.Wrap(err, "couldn't save kafka offset")
 	}
 
-	if err := tx.Commit(); err != nil {
-		return errors.Wrap(err, "couldn't commit kafka read transaction")
-	}
-
 	return nil
 }
 
@@ -244,9 +291,13 @@ func (rs *RecordStream) saveOffset(tx storage.StateTransaction) error {
 	return nil
 }
 
+var readMessagesCountPrefix = []byte("$read_count$")
+
 func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 	tx := storage.GetStateTransactionFromContext(ctx).WithPrefix(rs.streamID.AsPrefix())
 	outputQueue := execution.NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
+	readCount := storage.NewValueState(tx.WithPrefix(readMessagesCountPrefix))
+	tokenQueue := execution.NewOutputQueue(tx.WithPrefix(tokenQueuePrefix))
 
 	var queueElement QueueElement
 	err := outputQueue.Pop(ctx, &queueElement)
@@ -255,6 +306,32 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 	}
 	switch queueElement := queueElement.Type.(type) {
 	case *QueueElement_Record:
+		var count octosql.Value
+		err := readCount.Get(&count)
+		if err == storage.ErrNotFound {
+			count = octosql.MakeInt(0)
+		} else if err != nil {
+			return nil, errors.Wrap(err, "couldn't read current read messages count")
+		}
+
+		newCount := count.AsInt() + 1
+
+		// If we're done with a batch, send back a token.
+		if newCount%rs.batchSize == 0 {
+			newCount = 0
+			token := octosql.MakePhantom()
+			err := tokenQueue.Push(ctx, &token)
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't push batch token to queue")
+			}
+		}
+
+		count = octosql.MakeInt(newCount)
+		err = readCount.Set(&count)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't save current read messages count")
+		}
+
 		return queueElement.Record, nil
 	case *QueueElement_Error:
 		return nil, errors.New(queueElement.Error)

@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"math/rand"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
@@ -61,8 +62,11 @@ func (node *UnifiedStream) Next(ctx context.Context) (*Record, error) {
 	tx := storage.GetStateTransactionFromContext(ctx).WithPrefix(node.streamID.AsPrefix())
 	endOfStreamsMap := storage.NewMap(tx.WithPrefix(endsOfStreamsPrefix))
 
+	// We want to randomize the order so we don't always read from the first input if records are available.
+	sourceOrder := rand.Perm(len(node.sources))
+
 	changeSubscriptions := make([]*storage.Subscription, len(node.sources))
-	for sourceIndex := range node.sources { // TODO: Think about randomizing order.
+	for orderIndex, sourceIndex := range sourceOrder {
 		// Here we try to get a record from the sourceIndex'th source stream.
 
 		// First check if this stream hasn't been closed already.
@@ -98,13 +102,13 @@ func (node *UnifiedStream) Next(ctx context.Context) (*Record, error) {
 		}
 
 		// We got a record, so we close all the received subscriptions from the previous streams.
-		for i := 0; i < sourceIndex; i++ {
-			if changeSubscriptions[i] == nil {
+		for _, sourceIndexToClose := range sourceOrder[:orderIndex] {
+			if changeSubscriptions[sourceIndexToClose] == nil {
 				continue
 			}
-			err := changeSubscriptions[i].Close()
+			err := changeSubscriptions[sourceIndexToClose].Close()
 			if err != nil {
-				return nil, errors.Wrapf(err, "couldn't close changes subscription for source stream with index %d", i)
+				return nil, errors.Wrapf(err, "couldn't close changes subscription for source stream with index %d", sourceIndexToClose)
 			}
 		}
 

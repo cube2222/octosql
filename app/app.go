@@ -94,6 +94,10 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 			err := tx.Commit()
 			if err != nil {
 				log.Println("main couldn't commit: ", err)
+				err = waitableError.Close()
+				if err != nil {
+					log.Println("couldn't close subscription: ", err)
+				}
 				continue
 			}
 			log.Println("main listening for changes")
@@ -101,6 +105,7 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 			if err != nil {
 				log.Println("couldn't listen for changes: ", err)
 			}
+			log.Println("main received change")
 			err = waitableError.Close()
 			if err != nil {
 				log.Println("couldn't close subscription: ", err)

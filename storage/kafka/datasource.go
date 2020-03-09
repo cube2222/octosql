@@ -214,11 +214,8 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 	batch := make([]*execution.Record, rs.batchSize)
 	for i := 0; i < rs.batchSize; i++ {
 		msg, err := rs.kafkaReader.ReadMessage(ctx)
-		for err != nil {
-			// Check if recoverable error.
-			retryDuration := 5 * time.Second
-			log.Printf("kafka read message error %s, retrying after %s", err.Error(), retryDuration)
-			msg, err = rs.kafkaReader.ReadMessage(ctx)
+		if err != nil {
+			return errors.Wrap(err, "couldn't read message from kafka")
 		}
 
 		fields := []octosql.VariableName{octosql.NewVariableName(fmt.Sprintf("%s.key", rs.alias))}
@@ -343,7 +340,8 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 func (rs *RecordStream) Close() error {
 	rs.workerCtxCancel()
 	err := <-rs.workerCloseErrChan
-	if err != nil {
+	if err == context.Canceled {
+	} else if err != nil {
 		return errors.Wrap(err, "couldn't stop worker")
 	}
 

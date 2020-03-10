@@ -218,8 +218,14 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 			return errors.Wrap(err, "couldn't read message from kafka")
 		}
 
-		fields := []octosql.VariableName{octosql.NewVariableName(fmt.Sprintf("%s.key", rs.alias))}
-		values := []octosql.Value{octosql.MakeString(string(msg.Key))}
+		fields := []octosql.VariableName{
+			octosql.NewVariableName(fmt.Sprintf("%s.key", rs.alias)),
+			octosql.NewVariableName(fmt.Sprintf("%s.offset", rs.alias)),
+		}
+		values := []octosql.Value{
+			octosql.MakeString(string(msg.Key)),
+			octosql.MakeInt(int(msg.Offset)),
+		}
 		if !rs.decodeAsJSON {
 			fields = append(fields, octosql.NewVariableName(fmt.Sprintf("%s.value", rs.alias)))
 			values = append(values, octosql.MakeString(string(msg.Value)))

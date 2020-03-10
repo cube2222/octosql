@@ -1,0 +1,141 @@
+package kafka
+
+import (
+	"context"
+	"log"
+	"testing"
+	"time"
+
+	"github.com/segmentio/kafka-go"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/streaming/storage"
+)
+
+type KafkaMessage struct {
+	Key, Value string
+}
+
+func TestRecordStream_Next(t *testing.T) {
+	tests := []struct {
+		topic        string
+		decodeAsJSON bool
+		messages     []KafkaMessage
+		want         []*execution.Record
+		wantErr      bool
+	}{
+		{
+			topic: "topic0",
+			messages: []KafkaMessage{
+				{
+					Key:   "key0",
+					Value: "value0",
+				},
+				{
+					Key:   "key1",
+					Value: "value1",
+				},
+				{
+					Key:   "key2",
+					Value: "value2",
+				},
+			},
+			want: []*execution.Record{
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{octosql.NewVariableName("e.key"), octosql.NewVariableName("e.offset"), octosql.NewVariableName("e.value")},
+					[]interface{}{"key0", 0, "value0"},
+				),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{octosql.NewVariableName("e.key"), octosql.NewVariableName("e.offset"), octosql.NewVariableName("e.value")},
+					[]interface{}{"key1", 1, "value1"},
+				),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{octosql.NewVariableName("e.key"), octosql.NewVariableName("e.offset"), octosql.NewVariableName("e.value")},
+					[]interface{}{"key2", 2, "value2"},
+				),
+			},
+		},
+		/*{
+			topic: "topic2",
+			messages: []KafkaMessage{
+				{
+					Key:   "key1",
+					Value: "value1",
+				},
+				{
+					Key:   "key2",
+					Value: "value2",
+				},
+				{
+					Key:   "key3",
+					Value: "value3",
+				},
+			},
+		},*/
+	}
+	for _, tt := range tests {
+		t.Run("kafka test", func(t *testing.T) {
+			ctx := context.Background()
+			stateStorage := execution.GetTestStorage(t)
+			brokers := []string{"localhost:9092"}
+
+			kafkaMessages := make([]kafka.Message, len(tt.messages))
+			for i, msg := range tt.messages {
+				kafkaMessages[i] = kafka.Message{
+					Key:   []byte(msg.Key),
+					Value: []byte(msg.Value),
+				}
+			}
+
+			log.Println(t.Name())
+			writerConfig := kafka.WriterConfig{
+				Brokers: brokers,
+				Topic:   tt.topic,
+				Dialer: &kafka.Dialer{
+					Timeout:   10 * time.Second,
+					DualStack: true,
+				},
+				BatchSize: 1,
+				Async:     false,
+			}
+			w := kafka.NewWriter(writerConfig)
+
+			var err error
+			for err = w.WriteMessages(ctx, kafkaMessages...); err == kafka.LeaderNotAvailable; err = w.WriteMessages(ctx, kafkaMessages...) {
+				t.Log("waiting for topic leader to emerge")
+				time.Sleep(time.Second)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			node := &DataSource{
+				brokers:      brokers,
+				topic:        tt.topic,
+				partition:    0,
+				batchSize:    1,
+				decodeAsJSON: tt.decodeAsJSON,
+				alias:        "e",
+				stateStorage: stateStorage,
+			}
+
+			tx := stateStorage.BeginTransaction()
+			rs, err := node.Get(storage.InjectStateTransaction(ctx, tx), octosql.NoVariables(), execution.GetRawStreamID())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := tx.Commit(); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := execution.AreStreamsEqualNoOrderingWithCount(context.Background(), stateStorage, rs, execution.NewInMemoryStream(tt.want), len(tt.want)); err != nil {
+				t.Errorf("Streams aren't equal: %v", err)
+				return
+			}
+		})
+	}
+}

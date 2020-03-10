@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -43,6 +44,27 @@ func (rms *recordMultiSet) GetCount(rec *Record) int {
 	}
 
 	return 0
+}
+
+func (rms *recordMultiSet) isContained(other *recordMultiSet) bool {
+	for i, rec := range rms.set {
+		myCount := rms.count[i]
+		otherCount := other.GetCount(rec)
+		if otherCount != myCount {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (rms *recordMultiSet) Show() string {
+	recordStrings := make([]string, len(rms.set))
+	for i := range rms.set {
+		recordStrings[i] = fmt.Sprintf("%s: %d", rms.set[i].Show(), rms.count[i])
+	}
+
+	return fmt.Sprintf("{%s}", strings.Join(recordStrings, "\n"))
 }
 
 type entity struct {
@@ -137,16 +159,33 @@ func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage
 	return true, nil
 }
 
-func (rms *recordMultiSet) isContained(other *recordMultiSet) bool {
-	for i, rec := range rms.set {
-		myCount := rms.count[i]
-		otherCount := other.GetCount(rec)
-		if otherCount != myCount {
-			return false
-		}
+func AreStreamsEqualNoOrderingWithCount(ctx context.Context, stateStorage storage.Storage, first, second RecordStream, count int) error {
+	firstMultiSet := newMultiSet()
+	secondMultiSet := newMultiSet()
+
+	firstRecords, err := ReadAllWithCount(ctx, stateStorage, first, count)
+	if err != nil {
+		return errors.Wrap(err, "couldn't read first stream records")
+	}
+	for _, rec := range firstRecords {
+		firstMultiSet.Insert(rec)
 	}
 
-	return true
+	secondRecords, err := ReadAllWithCount(ctx, stateStorage, second, count)
+	if err != nil {
+		return errors.Wrap(err, "couldn't read second stream records")
+	}
+	for _, rec := range secondRecords {
+		secondMultiSet.Insert(rec)
+	}
+
+	firstContained := firstMultiSet.isContained(secondMultiSet)
+	secondContained := secondMultiSet.isContained(firstMultiSet)
+	if !(firstContained && secondContained) {
+		return errors.Errorf("different sets: %s and %s", firstMultiSet.Show(), secondMultiSet.Show())
+	}
+
+	return nil
 }
 
 func NewRecordFromSliceWithNormalize(fields []octosql.VariableName, data []interface{}, opts ...RecordOption) *Record {
@@ -231,6 +270,55 @@ func ReadAll(ctx context.Context, stateStorage storage.Storage, stream RecordStr
 			return nil, errors.Wrap(err, "couldn't commit transaction")
 		}
 
+		records = append(records, rec)
+	}
+
+	return records, nil
+}
+
+func ReadAllWithCount(ctx context.Context, stateStorage storage.Storage, stream RecordStream, count int) ([]*Record, error) {
+	var records []*Record
+	for i := 0; i < count; {
+		tx := stateStorage.BeginTransaction()
+		ctx := storage.InjectStateTransaction(ctx, tx)
+
+		rec, err := stream.Next(ctx)
+		if err == ErrEndOfStream {
+			err := tx.Commit()
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't commit transaction")
+			}
+			break
+		} else if errors.Cause(err) == ErrNewTransactionRequired {
+			err := tx.Commit()
+			if err != nil {
+				continue
+			}
+			continue
+		} else if waitableError := GetErrWaitForChanges(err); waitableError != nil {
+			err := tx.Commit()
+			if err != nil {
+				continue
+			}
+			err = waitableError.ListenForChanges(ctx)
+			if err != nil {
+				log.Println("couldn't listen for changes: ", err)
+			}
+			err = waitableError.Close()
+			if err != nil {
+				log.Println("couldn't close subscription: ", err)
+			}
+			continue
+		} else if err != nil {
+			return nil, errors.Wrap(err, "couldn't get next record")
+		}
+
+		err = tx.Commit()
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't commit transaction")
+		}
+
+		i++
 		records = append(records, rec)
 	}
 

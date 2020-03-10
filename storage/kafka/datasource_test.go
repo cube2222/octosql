@@ -147,7 +147,7 @@ func TestRecordStream_Next(t *testing.T) {
 			}
 
 			tx := stateStorage.BeginTransaction()
-			rs, err := node.Get(storage.InjectStateTransaction(ctx, tx), octosql.NoVariables(), execution.GetRawStreamID())
+			rs, _, err := node.Get(storage.InjectStateTransaction(ctx, tx), octosql.NoVariables(), execution.GetRawStreamID())
 			if err != nil {
 				t.Fatal(err)
 			}

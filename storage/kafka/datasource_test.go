@@ -83,8 +83,8 @@ func TestRecordStream_Next(t *testing.T) {
 			},
 			want: []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{octosql.NewVariableName("e.key"), octosql.NewVariableName("e.offset"), octosql.NewVariableName("e.id"), octosql.NewVariableName("e.color")},
-					[]interface{}{"key0", 0, 0.0, "red"},
+					[]octosql.VariableName{octosql.NewVariableName("e.key"), octosql.NewVariableName("e.offset"), octosql.NewVariableName("e.color"), octosql.NewVariableName("e.id")},
+					[]interface{}{"key0", 0, "red", 0.0},
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{octosql.NewVariableName("e.key"), octosql.NewVariableName("e.offset"), octosql.NewVariableName("e.value")},

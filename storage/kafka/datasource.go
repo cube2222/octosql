@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sort"
 	"time"
 
 	"github.com/pkg/errors"
@@ -230,6 +231,7 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 			fields = append(fields, octosql.NewVariableName(fmt.Sprintf("%s.value", rs.alias)))
 			values = append(values, octosql.MakeString(string(msg.Value)))
 		} else {
+			// TODO: Sort
 			object := make(map[string]interface{})
 			err := json.Unmarshal(msg.Value, &object)
 			if err != nil {
@@ -237,9 +239,16 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 				fields = append(fields, octosql.NewVariableName(fmt.Sprintf("%s.value", rs.alias)))
 				values = append(values, octosql.MakeString(string(msg.Value)))
 			} else {
-				for k, v := range object {
+				keys := make([]string, 0, len(object))
+				for k := range object {
+					keys = append(keys, k)
+				}
+				sort.Slice(keys, func(i, j int) bool {
+					return keys[i] < keys[j]
+				})
+				for _, k := range keys {
 					fields = append(fields, octosql.NewVariableName(fmt.Sprintf("%s.%s", rs.alias, k)))
-					values = append(values, octosql.NormalizeType(v))
+					values = append(values, octosql.NormalizeType(object[k]))
 				}
 			}
 		}

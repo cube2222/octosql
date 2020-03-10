@@ -7,6 +7,7 @@ workflows:
       - test-mysql
       - test-postgres
       - test-redis
+      - test-kafka
       - release:
           requires:
             - lint
@@ -14,6 +15,7 @@ workflows:
             - test-mysql
             - test-postgres
             - test-redis
+            - test-kafka
 
 version: 2
 jobs:
@@ -95,6 +97,19 @@ jobs:
       - checkout
 
       - run: go test -v ./storage/redis/...
+
+  test-kafka:
+    docker:
+      - image: circleci/golang:1.12
+        environment:
+          GO111MODULE: "on"
+      - image: spotify/kafka:latest
+
+    working_directory: /go/src/github.com/cube2222/octosql
+    steps:
+      - checkout
+
+      - run: go test -v ./storage/kafka/...
 
   release:
     docker:

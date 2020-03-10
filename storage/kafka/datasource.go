@@ -234,7 +234,7 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 			err := json.Unmarshal(msg.Value, &object)
 			if err != nil {
 				log.Printf("couldn't decode value as json: %s, passing along as raw bytes", err)
-				fields = append(fields, octosql.NewVariableName("value"))
+				fields = append(fields, octosql.NewVariableName(fmt.Sprintf("%s.value", rs.alias)))
 				values = append(values, octosql.MakeString(string(msg.Value)))
 			} else {
 				for k, v := range object {

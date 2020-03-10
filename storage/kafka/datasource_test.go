@@ -40,6 +40,10 @@ func TestRecordStream_Next(t *testing.T) {
 					Key:   "key2",
 					Value: "value2",
 				},
+				{
+					Key:   "key3",
+					Value: "value3",
+				},
 			},
 			want: []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
@@ -54,25 +58,44 @@ func TestRecordStream_Next(t *testing.T) {
 					[]octosql.VariableName{octosql.NewVariableName("e.key"), octosql.NewVariableName("e.offset"), octosql.NewVariableName("e.value")},
 					[]interface{}{"key2", 2, "value2"},
 				),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{octosql.NewVariableName("e.key"), octosql.NewVariableName("e.offset"), octosql.NewVariableName("e.value")},
+					[]interface{}{"key3", 3, "value3"},
+				),
 			},
 		},
-		/*{
-			topic: "topic2",
+		{
+			decodeAsJSON: true,
+			topic:        "topic1",
 			messages: []KafkaMessage{
 				{
+					Key:   "key0",
+					Value: `{"id": 0, "color": "red"}`,
+				},
+				{
 					Key:   "key1",
-					Value: "value1",
+					Value: `{"id": 1, "color": invalid_json}`,
 				},
 				{
 					Key:   "key2",
-					Value: "value2",
-				},
-				{
-					Key:   "key3",
-					Value: "value3",
+					Value: `{"id": 2, "wheels": 3}`,
 				},
 			},
-		},*/
+			want: []*execution.Record{
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{octosql.NewVariableName("e.key"), octosql.NewVariableName("e.offset"), octosql.NewVariableName("e.id"), octosql.NewVariableName("e.color")},
+					[]interface{}{"key0", 0, 0.0, "red"},
+				),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{octosql.NewVariableName("e.key"), octosql.NewVariableName("e.offset"), octosql.NewVariableName("e.value")},
+					[]interface{}{"key1", 1, `{"id": 1, "color": invalid_json}`},
+				),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{octosql.NewVariableName("e.key"), octosql.NewVariableName("e.offset"), octosql.NewVariableName("e.id"), octosql.NewVariableName("e.wheels")},
+					[]interface{}{"key2", 2, 2.0, 3.0},
+				),
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run("kafka test", func(t *testing.T) {

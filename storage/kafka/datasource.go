@@ -243,7 +243,6 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 			fields = append(fields, octosql.NewVariableName(fmt.Sprintf("%s.value", rs.alias)))
 			values = append(values, octosql.MakeString(string(msg.Value)))
 		} else {
-			// TODO: Sort
 			object := make(map[string]interface{})
 			err := json.Unmarshal(msg.Value, &object)
 			if err != nil {

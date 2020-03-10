@@ -240,7 +240,7 @@ func GetIPAddress(config map[string]interface{}, field string, opts ...Option) (
 	return parts[0], int(port), nil
 }
 
-// GetIPAddress gets an ip address from the given field.
+// GetIPAddress gets an ip address list, as a list of hosts and a list of ports from the given field.
 func GetIPAddressList(config map[string]interface{}, field string, opts ...Option) ([]string, []int, error) {
 	options := getOptions(opts...)
 	out, err := GetInterfaceList(config, field)

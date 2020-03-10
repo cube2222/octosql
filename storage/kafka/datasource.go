@@ -29,6 +29,7 @@ type DataSource struct {
 	brokers      []string
 	topic        string
 	partition    int
+	startOffset  int
 	batchSize    int
 	decodeAsJSON bool
 	alias        string
@@ -46,6 +47,10 @@ func NewDataSourceBuilderFactory(partitions int) physical.DataSourceBuilderFacto
 			topic, err := config.GetString(dbConfig, "topic")
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't get topic")
+			}
+			startOffset, err := config.GetInt(dbConfig, "startOffset", config.WithDefault(-1))
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't get start offset")
 			}
 			batchSize, err := config.GetInt(dbConfig, "batchSize", config.WithDefault(1))
 			if err != nil {
@@ -65,6 +70,7 @@ func NewDataSourceBuilderFactory(partitions int) physical.DataSourceBuilderFacto
 				brokers:      brokers,
 				topic:        topic,
 				partition:    partition,
+				startOffset:  startOffset,
 				batchSize:    batchSize,
 				decodeAsJSON: decodeAsJSON,
 				alias:        alias,
@@ -91,6 +97,8 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 var offsetPrefix = []byte("$kafka_offset$")
 var tokenQueuePrefix = []byte("$token_queue$")
 
+const initialTokenCount = 5
+
 func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, error) {
 	tx := storage.GetStateTransactionFromContext(ctx).WithPrefix(streamID.AsPrefix())
 
@@ -99,19 +107,22 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		DualStack: true,
 	}
 
-	r := kafka.NewReader(kafka.ReaderConfig{
+	kafkaConfig := kafka.ReaderConfig{
 		Brokers:   ds.brokers,
 		Topic:     ds.topic,
 		Dialer:    dialer,
 		Partition: ds.partition,
 		MinBytes:  10e1,
 		MaxBytes:  10e7,
-	})
+	}
+
+	r := kafka.NewReader(kafkaConfig)
 
 	rs := &RecordStream{
 		stateStorage: ds.stateStorage,
 		streamID:     streamID,
 		kafkaReader:  r,
+		startOffset:  ds.startOffset,
 		batchSize:    ds.batchSize,
 		decodeAsJSON: ds.decodeAsJSON,
 		alias:        ds.alias,
@@ -122,7 +133,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 	}
 
 	tokenQueue := execution.NewOutputQueue(tx.WithPrefix(tokenQueuePrefix))
-	for i := 0; i < 5; i++ {
+	for i := 0; i < initialTokenCount; i++ {
 		token := octosql.MakePhantom()
 		err := tokenQueue.Push(ctx, &token)
 		if err != nil {
@@ -146,6 +157,7 @@ type RecordStream struct {
 	stateStorage storage.Storage
 	streamID     *execution.StreamID
 	kafkaReader  *kafka.Reader
+	startOffset  int
 	batchSize    int
 	decodeAsJSON bool
 	alias        string
@@ -279,6 +291,12 @@ func (rs *RecordStream) loadOffset(tx storage.StateTransaction) error {
 	var offset octosql.Value
 	err := offsetState.Get(&offset)
 	if err == storage.ErrNotFound {
+		if rs.startOffset != -1 {
+			err := rs.kafkaReader.SetOffset(int64(rs.startOffset))
+			if err != nil {
+				return errors.Wrap(err, "couldn't set initial kafka offset based on start offset")
+			}
+		}
 	} else if err != nil {
 		return errors.Wrap(err, "couldn't load kafka partition offset from state storage")
 	} else {

@@ -83,7 +83,6 @@ func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, source 
 func (engine *PullEngine) Run(ctx context.Context) {
 	tx := engine.storage.BeginTransaction()
 
-	i := 0
 	for {
 		err := engine.loop(ctx, tx)
 		if err == ErrEndOfStream {
@@ -126,9 +125,7 @@ func (engine *PullEngine) Run(ctx context.Context) {
 			return // TODO: Error propagation? Add this to the underlying queue as an ErrorElement? How to do this well? Send it to the underlying IRS like a watermark?
 		}
 
-		i++
 		if !engine.batchSizeManager.ShouldTakeNextRecord() {
-			i = 0
 			err := tx.Commit()
 			if err != nil {
 				if errors.Cause(err) == badger.ErrTxnTooBig {

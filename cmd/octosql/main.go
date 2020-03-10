@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -37,6 +38,7 @@ import (
 
 var configPath string
 var outputFormat string
+var storageDirectory string
 var describe bool
 
 var rootCmd = &cobra.Command{
@@ -105,10 +107,15 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 			log.Fatal("couldn't parse query: ", err)
 		}
 
-		opts := badger.DefaultOptions("testdb")
-		// opts.Dir = ""
-		// opts.ValueDir = ""
-		// opts.InMemory = true
+		if storageDirectory == "" {
+			tempDir, err := ioutil.TempDir("", "octosql")
+			if err != nil {
+				log.Fatal("couldn't create temporary directory: ", err)
+			}
+			storageDirectory = tempDir
+		}
+
+		opts := badger.DefaultOptions(storageDirectory)
 		db, err := badger.Open(opts)
 		if err != nil {
 			log.Fatal("couldn't open in-memory badger database: ", err)
@@ -121,12 +128,18 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 		if err != nil {
 			log.Fatal("couldn't run plan: ", err)
 		}
+
+		err = os.RemoveAll(storageDirectory)
+		if err != nil {
+			log.Fatal("couldn't remove temporary directory: ", err)
+		}
 	},
 }
 
 func main() {
 	rootCmd.Flags().StringVarP(&configPath, "config", "c", os.Getenv("OCTOSQL_CONFIG"), "data source configuration path, defaults to $OCTOSQL_CONFIG")
 	rootCmd.Flags().StringVarP(&outputFormat, "output", "o", "table", "output format, one of [table json csv tabbed table_row_separated]")
+	rootCmd.Flags().StringVar(&storageDirectory, "storage-directory", "", "directory to store state storage in")
 	rootCmd.Flags().BoolVar(&describe, "describe", false, "Print out the physical query plan in graphviz format. You can use a command like \"dot -Tpng file > output.png\" to view it.")
 
 	go func() {

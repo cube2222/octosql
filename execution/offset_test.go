@@ -2,11 +2,10 @@ package execution
 
 import (
 	"context"
+	"testing"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
-
-	"testing"
 )
 
 func TestOffset_Get(t *testing.T) {
@@ -119,7 +118,7 @@ func TestOffset_Get(t *testing.T) {
 			tx := stateStorage.BeginTransaction()
 			ctx := storage.InjectStateTransaction(ctx, tx)
 
-			rs, err := tt.node.Get(ctx, tt.vars, GetRawStreamID())
+			rs, _, err := tt.node.Get(ctx, tt.vars, GetRawStreamID())
 
 			if (err == nil) != (tt.wantError == NO_ERROR) {
 				t.Errorf("exactly one of test.wantError, tt.node.Get() is not nil")

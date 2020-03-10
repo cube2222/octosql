@@ -155,7 +155,7 @@ func TestRange_Get(t *testing.T) {
 			tx := stateStorage.BeginTransaction()
 			ctx := storage.InjectStateTransaction(ctx, tx)
 
-			got, err := r.Get(ctx, tt.args.variables, execution.GetRawStreamID())
+			got, _, err := r.Get(ctx, tt.args.variables, execution.GetRawStreamID())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Range.Get() error = %v, wantErr %v", err, tt.wantErr)
 				return

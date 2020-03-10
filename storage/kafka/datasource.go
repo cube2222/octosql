@@ -99,7 +99,7 @@ var tokenQueuePrefix = []byte("$token_queue$")
 
 const initialTokenCount = 5
 
-func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, error) {
+func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
 	tx := storage.GetStateTransactionFromContext(ctx).WithPrefix(streamID.AsPrefix())
 
 	dialer := &kafka.Dialer{
@@ -129,7 +129,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 	}
 	err := rs.loadOffset(tx)
 	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't load kafka partition %d offset", ds.partition)
+		return nil, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), errors.Wrapf(err, "couldn't load kafka partition %d offset", ds.partition)
 	}
 
 	tokenQueue := execution.NewOutputQueue(tx.WithPrefix(tokenQueuePrefix))
@@ -137,7 +137,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		token := octosql.MakePhantom()
 		err := tokenQueue.Push(ctx, &token)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't push batch token to queue")
+			return nil, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), errors.Wrap(err, "couldn't push batch token to queue")
 		}
 	}
 
@@ -150,7 +150,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		log.Println("worker done")
 	}()
 
-	return rs, nil
+	return rs, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), nil
 }
 
 type RecordStream struct {

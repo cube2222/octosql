@@ -113,6 +113,7 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 		if err != nil {
 			log.Fatal("couldn't open in-memory badger database: ", err)
 		}
+
 		stateStorage := storage.NewBadgerStorage(db)
 
 		// Run query
@@ -131,7 +132,7 @@ func main() {
 	go func() {
 		r := chi.NewRouter()
 		r.Mount("/debug", middleware.Profiler())
-		log.Fatal(http.ListenAndServe(":3003", r))
+		log.Fatal(http.ListenAndServe(":3000", r))
 	}()
 
 	if err := rootCmd.Execute(); err != nil {

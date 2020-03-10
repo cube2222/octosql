@@ -798,7 +798,7 @@ func TestDataSource_Get(t *testing.T) {
 				return
 			}
 
-			stream, err := execNode.Get(ctx, tt.args.variables, execution.GetRawStreamID())
+			stream, _, err := execNode.Get(ctx, tt.args.variables, execution.GetRawStreamID())
 			if err != nil && !tt.wantErr {
 				t.Errorf("Error in Get: %v", err)
 				return

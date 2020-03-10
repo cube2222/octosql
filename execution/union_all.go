@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"math/rand"
+	"time"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
@@ -18,31 +19,58 @@ func NewUnionAll(sources ...Node) *UnionAll {
 	return &UnionAll{sources: sources}
 }
 
-func (node *UnionAll) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, error) {
+func (node *UnionAll) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
 	prefixedTx := storage.GetStateTransactionFromContext(ctx).WithPrefix(streamID.AsPrefix())
 
 	sourceRecordStreams := make([]RecordStream, len(node.sources))
+	sourceWatermarkSources := make([]WatermarkSource, len(node.sources))
 	for sourceIndex := range node.sources {
 		sourceStreamID, err := GetSourceStreamID(prefixedTx, octosql.MakeInt(sourceIndex))
 		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't get source stream ID for source with index %d", sourceIndex)
+			return nil, nil, errors.Wrapf(err, "couldn't get source stream ID for source with index %d", sourceIndex)
 		}
-		recordStream, err := node.sources[sourceIndex].Get(ctx, variables, sourceStreamID)
+
+		recordStream, execOutput, err := node.sources[sourceIndex].Get(ctx, variables, sourceStreamID)
 		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't get source record stream with index %d", sourceIndex)
+			return nil, nil, errors.Wrapf(err, "couldn't get source record stream with index %d", sourceIndex)
 		}
+
 		sourceRecordStreams[sourceIndex] = recordStream
+		sourceWatermarkSources[sourceIndex] = execOutput.WatermarkSource
 	}
 
-	return &UnifiedStream{
-		sources:  sourceRecordStreams,
-		streamID: streamID,
-	}, nil
+	us := &UnifiedStream{
+		sources:          sourceRecordStreams,
+		watermarkSources: sourceWatermarkSources,
+		streamID:         streamID,
+	}
+
+	return us, NewExecutionOutput(us), nil
 }
 
 type UnifiedStream struct {
-	sources  []RecordStream
-	streamID *StreamID
+	sources          []RecordStream
+	watermarkSources []WatermarkSource
+	streamID         *StreamID
+}
+
+func (node *UnifiedStream) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
+	var earliestWatermark time.Time
+
+	for sourceIndex := range node.sources {
+		sourceWatermark, err := node.watermarkSources[sourceIndex].GetWatermark(ctx, tx)
+		if err != nil {
+			return time.Time{}, errors.Wrapf(err, "couldn't get current watermark from source %d", sourceIndex)
+		}
+
+		if sourceIndex == 0 { // earliestWatermark is not set yet
+			earliestWatermark = sourceWatermark
+		} else if sourceWatermark.Before(earliestWatermark) {
+			earliestWatermark = sourceWatermark
+		}
+	}
+
+	return earliestWatermark, nil
 }
 
 func (node *UnifiedStream) Close() error {

@@ -8,12 +8,13 @@ import (
 	"sort"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/metadata"
-	"github.com/pkg/errors"
 )
 
 var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
@@ -57,10 +58,10 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 	return NewDataSourceBuilderFactory(), nil
 }
 
-func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, error) {
+func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
 	file, err := os.Open(ds.path)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't open file")
+		return nil, nil, errors.Wrap(err, "couldn't open file")
 	}
 
 	return &RecordStream{
@@ -70,7 +71,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		decoder:                       json.NewDecoder(file),
 		isDone:                        false,
 		alias:                         ds.alias,
-	}, nil
+	}, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), nil
 }
 
 type RecordStream struct {

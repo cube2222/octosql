@@ -203,6 +203,71 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 
 		return tvf.NewTumble(matSource, timeField, matWindowLength, matWindowOffset), nil
 
+	case "max_diff_watermark":
+		source, err := node.getArgumentTable(octosql.NewVariableName("source"))
+		if err != nil {
+			return nil, err
+		}
+		timeField, err := node.getArgumentDescriptor(octosql.NewVariableName("time_field"))
+		if err != nil {
+			return nil, err
+		}
+		offset, err := node.getArgumentExpression(octosql.NewVariableName("offset"))
+		if err != nil {
+			return nil, err
+		}
+
+		matSource, err := source.Materialize(ctx, matCtx)
+		if err != nil {
+			return nil, errors.Errorf("couldn't materialize source")
+		}
+		matOffset, err := offset.Materialize(ctx, matCtx)
+		if err != nil {
+			return nil, errors.Errorf("couldn't materialize watermark offset expression")
+		}
+
+		return tvf.NewWatermarkGenerator(matSource, timeField, matOffset), nil
+
+	case "percentile_watermark":
+		source, err := node.getArgumentTable(octosql.NewVariableName("source"))
+		if err != nil {
+			return nil, err
+		}
+		timeField, err := node.getArgumentDescriptor(octosql.NewVariableName("time_field"))
+		if err != nil {
+			return nil, err
+		}
+		events, err := node.getArgumentExpression(octosql.NewVariableName("events"))
+		if err != nil {
+			return nil, err
+		}
+		percentile, err := node.getArgumentExpression(octosql.NewVariableName("percentile"))
+		if err != nil {
+			return nil, err
+		}
+		frequency, err := node.getArgumentExpression(octosql.NewVariableName("frequency"))
+		if err != nil {
+			return nil, err
+		}
+
+		matSource, err := source.Materialize(ctx, matCtx)
+		if err != nil {
+			return nil, errors.Errorf("couldn't materialize source")
+		}
+		matEvents, err := events.Materialize(ctx, matCtx)
+		if err != nil {
+			return nil, errors.Errorf("couldn't materialize watermark events expression")
+		}
+		matPercentile, err := percentile.Materialize(ctx, matCtx)
+		if err != nil {
+			return nil, errors.Errorf("couldn't materialize watermark percentile expression")
+		}
+		matFrequency, err := frequency.Materialize(ctx, matCtx)
+		if err != nil {
+			return nil, errors.Errorf("couldn't materialize watermark frequency expression")
+		}
+
+		return tvf.NewPercentileWatermarkGenerator(matSource, timeField, matEvents, matPercentile, matFrequency), nil
 	}
 
 	return nil, errors.Errorf("invalid table valued function: %v", node.Name)
@@ -221,6 +286,30 @@ func (node *TableValuedFunction) Metadata() *metadata.NodeMetadata {
 			cardinality = metadata.BoundedFitsInLocalStorage
 		}
 		return metadata.NewNodeMetadata(cardinality, octosql.NewVariableName("window_end"))
+	case "max_diff_watermark":
+		var cardinality metadata.Cardinality
+		var eventTimeField octosql.VariableName
+		source, err := node.getArgumentTable(octosql.NewVariableName("source"))
+		if err == nil {
+			cardinality = source.Metadata().Cardinality()
+			eventTimeField = source.Metadata().EventTimeField()
+		} else {
+			cardinality = metadata.BoundedFitsInLocalStorage
+			eventTimeField = octosql.NewVariableName("")
+		}
+		return metadata.NewNodeMetadata(cardinality, eventTimeField)
+	case "percentile_watermark":
+		var cardinality metadata.Cardinality
+		var eventTimeField octosql.VariableName
+		source, err := node.getArgumentTable(octosql.NewVariableName("source"))
+		if err == nil {
+			cardinality = source.Metadata().Cardinality()
+			eventTimeField = source.Metadata().EventTimeField()
+		} else {
+			cardinality = metadata.BoundedFitsInLocalStorage
+			eventTimeField = octosql.NewVariableName("")
+		}
+		return metadata.NewNodeMetadata(cardinality, eventTimeField)
 	default:
 		return metadata.NewNodeMetadata(metadata.Unbounded, octosql.NewVariableName(""))
 	}

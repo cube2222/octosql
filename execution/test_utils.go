@@ -290,7 +290,7 @@ func ReadAllWithCount(ctx context.Context, stateStorage storage.Storage, stream 
 			}
 			break
 		} else if errors.Cause(err) == ErrNewTransactionRequired {
-			_ := tx.Commit()
+			_ = tx.Commit()
 			continue
 		} else if waitableError := GetErrWaitForChanges(err); waitableError != nil {
 			err := tx.Commit()

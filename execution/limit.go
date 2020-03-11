@@ -100,12 +100,6 @@ func (node *LimitedStream) Next(ctx context.Context) (*Record, error) {
 	}
 
 	limit--
-	if limit == 0 {
-		err := node.rs.Close()
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't close source stream")
-		}
-	}
 
 	limitValue = octosql.MakeInt(limit)
 	err = limitState.Set(&limitValue)

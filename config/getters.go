@@ -134,6 +134,30 @@ func GetString(config map[string]interface{}, field string, opts ...Option) (str
 	return outString, nil
 }
 
+// GetStringList gets a string list from the given field.
+func GetStringList(config map[string]interface{}, field string, opts ...Option) ([]string, error) {
+	options := getOptions(opts...)
+	out, err := GetInterfaceList(config, field)
+	if err != nil {
+		if options.withDefault && errors.Cause(err) == ErrNotFound {
+			return options.defaultValue.([]string), nil
+		}
+		return nil, errors.Wrapf(err, "couldn't get []interface{}")
+	}
+
+	var outStrings []string
+
+	for i := range out {
+		outString, ok := out[i].(string)
+		if !ok {
+			return nil, errors.Errorf("expected string slice, got %v at index %v", reflect.TypeOf(out[i]), i)
+		}
+		outStrings = append(outStrings, outString)
+	}
+
+	return outStrings, nil
+}
+
 // GetInt gets an int from the given field.
 func GetInt(config map[string]interface{}, field string, opts ...Option) (int, error) {
 	options := getOptions(opts...)
@@ -216,26 +240,47 @@ func GetIPAddress(config map[string]interface{}, field string, opts ...Option) (
 	return parts[0], int(port), nil
 }
 
-// GetStringList gets a string list from the given field.
-func GetStringList(config map[string]interface{}, field string, opts ...Option) ([]string, error) {
+// GetIPAddress gets an ip address list, as a list of hosts and a list of ports from the given field.
+func GetIPAddressList(config map[string]interface{}, field string, opts ...Option) ([]string, []int, error) {
 	options := getOptions(opts...)
 	out, err := GetInterfaceList(config, field)
 	if err != nil {
 		if options.withDefault && errors.Cause(err) == ErrNotFound {
-			return options.defaultValue.([]string), nil
+			defaults := options.defaultValue.([]interface{})
+			return defaults[0].([]string), defaults[1].([]int), nil
 		}
-		return nil, errors.Wrapf(err, "couldn't get []interface{}")
+		return nil, nil, errors.Wrapf(err, "couldn't get []interface{}")
 	}
 
-	var outStrings []string
+	var outHosts []string
+	var outPorts []int
 
 	for i := range out {
-		outString, ok := out[i].(string)
+		addressMap, ok := out[i].(map[string]interface{})
 		if !ok {
-			return nil, errors.Errorf("expected string slice, got %v at index %v", reflect.TypeOf(out[i]), i)
+			return nil, nil, errors.Errorf("expected map, got %v at index %v", reflect.TypeOf(out[i]), i)
 		}
-		outStrings = append(outStrings, outString)
+		hostInterface, ok := addressMap["host"]
+		if !ok {
+			return nil, nil, errors.Errorf("couldn't find host in map: %+v", addressMap)
+		}
+		host, ok := hostInterface.(string)
+		if !ok {
+			return nil, nil, errors.Errorf("expected host string, got %v of type %v at index %d", hostInterface, reflect.TypeOf(hostInterface), i)
+		}
+
+		portInterface, ok := addressMap["port"]
+		if !ok {
+			return nil, nil, errors.Errorf("couldn't find port in map: %+v", addressMap)
+		}
+		port, ok := portInterface.(int)
+		if !ok {
+			return nil, nil, errors.Errorf("expected port integer, got %v of type %v at index %d", portInterface, reflect.TypeOf(portInterface), i)
+		}
+
+		outHosts = append(outHosts, host)
+		outPorts = append(outPorts, port)
 	}
 
-	return outStrings, nil
+	return outHosts, outPorts, nil
 }

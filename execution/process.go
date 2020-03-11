@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/pkg/errors"
 
@@ -117,8 +118,8 @@ func (p *ProcessByKey) Next(ctx context.Context, tx storage.StateTransaction) (*
 		return nil, ErrEndOfStream
 	}
 
-	var element *QueueElement
-	for element, err = outputQueue.Pop(ctx); err == nil; element, err = outputQueue.Pop(ctx) {
+	var element QueueElement
+	for err = outputQueue.Pop(ctx, &element); err == nil; err = outputQueue.Pop(ctx, &element) {
 		switch payload := element.Type.(type) {
 		case *QueueElement_EndOfStream:
 			octoEndOfStream := octosql.MakeBool(true)
@@ -212,7 +213,7 @@ func NewOutputQueue(tx storage.StateTransaction) *OutputQueue {
 
 var queueElementsPrefix = []byte("$queue_elements$")
 
-func (q *OutputQueue) Push(ctx context.Context, element *QueueElement) error {
+func (q *OutputQueue) Push(ctx context.Context, element proto.Message) error {
 	queueElements := storage.NewDeque(q.tx.WithPrefix(queueElementsPrefix))
 
 	err := queueElements.PushBack(element)
@@ -222,11 +223,10 @@ func (q *OutputQueue) Push(ctx context.Context, element *QueueElement) error {
 	return nil
 }
 
-func (q *OutputQueue) Pop(ctx context.Context) (*QueueElement, error) {
+func (q *OutputQueue) Pop(ctx context.Context, msg proto.Message) error {
 	queueElements := storage.NewDeque(q.tx.WithPrefix(queueElementsPrefix))
 
-	var element QueueElement
-	err := queueElements.PopFront(&element)
+	err := queueElements.PopFront(msg)
 	if err == storage.ErrNotFound {
 		subscription := q.tx.GetUnderlyingStorage().Subscribe(ctx)
 
@@ -234,23 +234,22 @@ func (q *OutputQueue) Pop(ctx context.Context) (*QueueElement, error) {
 		defer curTx.Abort()
 		curQueueElements := storage.NewDeque(curTx.WithPrefix(queueElementsPrefix))
 
-		var element QueueElement
-		err := curQueueElements.PeekFront(&element)
+		err := curQueueElements.PeekFront(msg)
 		if err == storage.ErrNotFound {
-			return nil, NewErrWaitForChanges(subscription)
+			return NewErrWaitForChanges(subscription)
 		} else {
 			if subErr := subscription.Close(); subErr != nil {
-				return nil, errors.Wrap(subErr, "couldn't close subscription")
+				return errors.Wrap(subErr, "couldn't close subscription")
 			}
 			if err == nil {
-				return nil, ErrNewTransactionRequired
+				return ErrNewTransactionRequired
 			} else {
-				return nil, errors.Wrap(err, "couldn't check if there are elements in the queue out of transaction")
+				return errors.Wrap(err, "couldn't check if there are elements in the queue out of transaction")
 			}
 		}
 	} else if err != nil {
-		return nil, errors.Wrap(err, "couldn't pop element from queue")
+		return errors.Wrap(err, "couldn't pop element from queue")
 	}
 
-	return &element, nil
+	return nil
 }

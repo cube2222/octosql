@@ -129,7 +129,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 	}
 	err := rs.loadOffset(tx)
 	if err != nil {
-		return nil, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), errors.Wrapf(err, "couldn't load kafka partition %d offset", ds.partition)
+		return nil, nil, errors.Wrapf(err, "couldn't load kafka partition %d offset", ds.partition)
 	}
 
 	tokenQueue := execution.NewOutputQueue(tx.WithPrefix(tokenQueuePrefix))
@@ -137,7 +137,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		token := octosql.MakePhantom()
 		err := tokenQueue.Push(ctx, &token)
 		if err != nil {
-			return nil, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), errors.Wrap(err, "couldn't push batch token to queue")
+			return nil, nil, errors.Wrap(err, "couldn't push batch token to queue")
 		}
 	}
 
@@ -239,6 +239,7 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 			octosql.MakeString(string(msg.Key)),
 			octosql.MakeInt(int(msg.Offset)),
 		}
+
 		if !rs.decodeAsJSON {
 			fields = append(fields, octosql.NewVariableName(fmt.Sprintf("%s.value", rs.alias)))
 			values = append(values, octosql.MakeString(string(msg.Value)))

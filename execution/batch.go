@@ -23,6 +23,8 @@ func NewBatchSizeManager(latencyTarget time.Duration) *BatchSizeManager {
 }
 
 func (bsm *BatchSizeManager) CommitSuccessful() {
+	// if we surpass the latency target we increase the batch size by 10%
+	// otherwise we reduce it by 10%
 	delta := bsm.batchSize / 10
 	if delta == 0 {
 		delta = 1
@@ -43,6 +45,7 @@ func (bsm *BatchSizeManager) CommitAborted() {
 }
 
 func (bsm *BatchSizeManager) CommitTooBig() {
+	// if the commit was too big, we halve the batch size
 	bsm.batchSize = bsm.batchSize / 2
 	if bsm.batchSize == 0 {
 		bsm.batchSize = 1
@@ -52,7 +55,12 @@ func (bsm *BatchSizeManager) CommitTooBig() {
 
 func (bsm *BatchSizeManager) ShouldTakeNextRecord() bool {
 	if time.Since(bsm.lastCommit) > bsm.latencyTarget {
+		// If we surpass the latency target during a batch,
+		// then we set the batch size to 90% of the current batch size.
 		bsm.batchSize = (bsm.curBatchSize * 9) / 10
+		if bsm.batchSize == 0 {
+			bsm.batchSize = 1
+		}
 		return false
 	}
 	if bsm.curBatchSize >= bsm.batchSize {

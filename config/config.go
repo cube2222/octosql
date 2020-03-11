@@ -50,6 +50,8 @@ func ReadConfig(path string) (*Config, error) {
 	return &config, nil
 }
 
+// The yaml decoder creates maps of type map[interface{}]interface{}.
+// cleanupMaps will change them to map[string]interface{}.
 func cleanupMaps(config map[string]interface{}) {
 	for k, v := range config {
 		config[k] = cleanupMapsRecursive(v)

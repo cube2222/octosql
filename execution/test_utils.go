@@ -46,11 +46,11 @@ func (rms *recordMultiSet) GetCount(rec *Record) int {
 	return 0
 }
 
-func (rms *recordMultiSet) isContained(other *recordMultiSet) bool {
+func (rms *recordMultiSet) isContainedIn(other *recordMultiSet) bool {
 	for i, rec := range rms.set {
 		myCount := rms.count[i]
 		otherCount := other.GetCount(rec)
-		if otherCount != myCount {
+		if myCount > otherCount {
 			return false
 		}
 	}
@@ -150,8 +150,8 @@ func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage
 		secondMultiSet.Insert(rec)
 	}
 
-	firstContained := firstMultiSet.isContained(secondMultiSet)
-	secondContained := secondMultiSet.isContained(firstMultiSet)
+	firstContained := firstMultiSet.isContainedIn(secondMultiSet)
+	secondContained := secondMultiSet.isContainedIn(firstMultiSet)
 	if !(firstContained && secondContained) {
 		return false, nil
 	}
@@ -179,8 +179,8 @@ func AreStreamsEqualNoOrderingWithCount(ctx context.Context, stateStorage storag
 		secondMultiSet.Insert(rec)
 	}
 
-	firstContained := firstMultiSet.isContained(secondMultiSet)
-	secondContained := secondMultiSet.isContained(firstMultiSet)
+	firstContained := firstMultiSet.isContainedIn(secondMultiSet)
+	secondContained := secondMultiSet.isContainedIn(firstMultiSet)
 	if !(firstContained && secondContained) {
 		return errors.Errorf("different sets: %s and %s", firstMultiSet.Show(), secondMultiSet.Show())
 	}
@@ -290,10 +290,7 @@ func ReadAllWithCount(ctx context.Context, stateStorage storage.Storage, stream 
 			}
 			break
 		} else if errors.Cause(err) == ErrNewTransactionRequired {
-			err := tx.Commit()
-			if err != nil {
-				continue
-			}
+			_ := tx.Commit()
 			continue
 		} else if waitableError := GetErrWaitForChanges(err); waitableError != nil {
 			err := tx.Commit()

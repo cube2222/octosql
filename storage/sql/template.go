@@ -30,7 +30,7 @@ type DataSource struct {
 func NewDataSourceBuilderFactoryFromTemplate(template SQLSourceTemplate) func([]octosql.VariableName) physical.DataSourceBuilderFactory {
 	return func(primaryKeys []octosql.VariableName) physical.DataSourceBuilderFactory {
 		return physical.NewDataSourceBuilderFactory(
-			func(ctx context.Context, matCtx *physical.MaterializationContext, dbConfig map[string]interface{}, filter physical.Formula, alias string) (execution.Node, error) {
+			func(ctx context.Context, matCtx *physical.MaterializationContext, dbConfig map[string]interface{}, filter physical.Formula, alias string, partitions int) (execution.Node, error) {
 				// Get execution configuration
 				host, port, err := template.GetIPAddress(dbConfig)
 				if err != nil {
@@ -92,18 +92,19 @@ func NewDataSourceBuilderFactoryFromTemplate(template SQLSourceTemplate) func([]
 			primaryKeys,
 			template.GetAvailableFilters(),
 			metadata.BoundedDoesntFitInLocalStorage,
+			1,
 		)
 	}
 }
 
-func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables) (execution.RecordStream, error) {
+func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
 	values := make([]interface{}, 0)
 
 	for _, expression := range ds.placeholders {
 		// Since we have an execution expression, then we can evaluate it given the variables
 		value, err := expression.ExpressionValue(ctx, variables)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't get actual value from variables")
+			return nil, nil, errors.Wrap(err, "couldn't get actual value from variables")
 		}
 
 		values = append(values, value.ToRawValue())
@@ -111,12 +112,12 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables) (exe
 
 	rows, err := ds.stmt.QueryContext(ctx, values...)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't query statement")
+		return nil, nil, errors.Wrap(err, "couldn't query statement")
 	}
 
 	columns, err := rows.Columns()
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get columns from rows")
+		return nil, nil, errors.Wrap(err, "couldn't get columns from rows")
 	}
 
 	return &RecordStream{
@@ -124,7 +125,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables) (exe
 		columns: columns,
 		isDone:  false,
 		alias:   ds.alias,
-	}, nil
+	}, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), nil
 
 }
 

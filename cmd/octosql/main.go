@@ -31,9 +31,9 @@ import (
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/storage/csv"
 	"github.com/cube2222/octosql/storage/json"
-	"github.com/cube2222/octosql/storage/mysql"
-	"github.com/cube2222/octosql/storage/postgres"
 	"github.com/cube2222/octosql/storage/redis"
+	"github.com/cube2222/octosql/storage/sql/mysql"
+	"github.com/cube2222/octosql/storage/sql/postgres"
 )
 
 var configPath string

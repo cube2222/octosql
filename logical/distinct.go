@@ -39,6 +39,7 @@ func (node *Distinct) Physical(ctx context.Context, physicalCreator *PhysicalPla
 	}
 
 	groupByNode := NewGroupBy(typed, castExpressions, names, aggregates, as, nil)
+	//TODO: what trigger(s) should be added here? CountingTrigger(1)?
 
 	return groupByNode.Physical(ctx, physicalCreator)
 

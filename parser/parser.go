@@ -73,15 +73,17 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 
 	// Separate star expressions so we can put them at last positions
 	nonStarExpressions := make([]sqlparser.SelectExpr, 0)
-	starExpressions := make([]*sqlparser.StarExpr, 0)
+	starExpressions := make([]sqlparser.SelectExpr, 0)
 
 	for i := range statement.SelectExprs {
-		if expr, ok := statement.SelectExprs[i].(*sqlparser.StarExpr); ok {
-			starExpressions = append(starExpressions, expr)
+		if _, ok := statement.SelectExprs[i].(*sqlparser.StarExpr); ok {
+			starExpressions = append(starExpressions, statement.SelectExprs[i])
 		} else {
-			nonStarExpressions = append(nonStarExpressions, expr)
+			nonStarExpressions = append(nonStarExpressions, statement.SelectExprs[i])
 		}
 	}
+
+	statement.SelectExprs = append(nonStarExpressions, starExpressions...)
 
 	// A WHERE clause needs to have access to those variables, so this map comes first, keeping the old variables.
 	expressions := make([]logical.NamedExpression, len(statement.SelectExprs))
@@ -91,7 +93,16 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 	aggregating := false
 
 	if len(statement.SelectExprs) >= 1 {
-		for i := range nonStarExpressions {
+		for i := range statement.SelectExprs {
+			if starExpr, ok := statement.SelectExprs[i].(*sqlparser.StarExpr); ok {
+				expressions[i], err = ParseStarExpression(starExpr)
+				if err != nil { // just in case ParseStarExpression changes in the future
+					return nil, errors.Wrap(err, "couldn't parse star expression")
+				}
+
+				continue
+			}
+
 			aliasedExpression, ok := statement.SelectExprs[i].(*sqlparser.AliasedExpr)
 			if !ok {
 				return nil, errors.Errorf("expected aliased expression in select on index %v, got %v %v",
@@ -221,7 +232,8 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		}
 
 		for _, expr := range starExpressions {
-			nameExpressions = append(nameExpressions, logical.NewStarExpression(expr.TableName.Name.String()))
+			exprTyped := expr.(*sqlparser.StarExpr) // this won't error since we only have *StarExprs here
+			nameExpressions = append(nameExpressions, logical.NewStarExpression(exprTyped.TableName.Name.String()))
 		}
 
 		root = logical.NewMap(nameExpressions, root, false)
@@ -441,7 +453,7 @@ func ParseAggregate(expr sqlparser.Expr) (logical.Aggregate, logical.NamedExpres
 				return "", nil, errors.Wrap(err, "couldn't parse aggregate argument")
 			}
 
-		case *sqlparser.StarExpr:
+		case *sqlparser.StarExpr: //TODO: not sure this is reachable tbh
 			parsedArg = nil
 
 		default:
@@ -493,6 +505,10 @@ func ParseAliasedExpression(expr *sqlparser.AliasedExpr) (logical.NamedExpressio
 		return nil, errors.Errorf("expressions in select statement and aggregate expressions must be named")
 	}
 	return logical.NewAliasedExpression(octosql.NewVariableName(expr.As.String()), subExpr), nil
+}
+
+func ParseStarExpression(expr *sqlparser.StarExpr) (logical.NamedExpression, error) {
+	return logical.NewStarExpression(expr.TableName.Name.String()), nil
 }
 
 func ParseFunctionArgument(expr *sqlparser.AliasedExpr) (logical.Expression, error) {

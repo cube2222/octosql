@@ -49,6 +49,7 @@ type IntermediateRecordStore interface {
 	UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error
 	GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error)
 	MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error
+	MarkError(ctx context.Context, tx storage.StateTransaction, err error) error
 	Close() error
 }
 
@@ -85,8 +86,7 @@ func (engine *PullEngine) Run(ctx context.Context) {
 			}
 			log.Println("engine: end of stream, stopping loop")
 			return
-		}
-		if errors.Cause(err) == ErrNewTransactionRequired {
+		} else if errors.Cause(err) == ErrNewTransactionRequired {
 			log.Println("engine: new transaction required")
 			err := tx.Commit()
 			if err != nil {
@@ -115,7 +115,15 @@ func (engine *PullEngine) Run(ctx context.Context) {
 		} else if err != nil {
 			tx.Abort()
 			log.Println("engine: ", err)
-			return // TODO: Error propagation? Add this to the underlying queue as an ErrorElement? How to do this well? Send it to the underlying IRS like a watermark?
+			tx = engine.storage.BeginTransaction()
+			err := engine.irs.MarkError(ctx, tx.WithPrefix(engine.streamID.AsPrefix()), err)
+			if err != nil {
+				log.Fatalf("couldn't mark error on intermediate record store: %s", err)
+			}
+			if err := tx.Commit(); err != nil {
+				log.Fatalf("couldn't commit marking error on intermediate record store: %s", err)
+			}
+			return
 		}
 
 		if !engine.batchSizeManager.ShouldTakeNextRecord() {

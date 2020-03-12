@@ -197,12 +197,12 @@ func (r *Record) EventTime() octosql.Value {
 	return r.Value(eventVarName)
 }
 
-func (r *Record) ID() ID {
+func (r *Record) ID() *ID {
 	if r.Metadata != nil {
-		return *r.Metadata.Id
+		return r.Metadata.Id
 	}
 
-	return ID{}
+	return &ID{}
 }
 
 func (r *Record) EventTimeField() octosql.VariableName {
@@ -226,6 +226,20 @@ func (r *Record) Hash() (uint64, error) {
 	}
 
 	return hashstructure.Hash(append(values, fields...), nil)
+}
+
+// This is a helper function to use a record ID as a storage prefix.
+func (id *ID) AsPrefix() []byte {
+	return []byte("$" + id.ID + "$")
+}
+
+func (id *ID) MonotonicMarshal() []byte {
+	return []byte(id.ID)
+}
+
+func (id *ID) MonotonicUnmarshal(data []byte) error {
+	id.ID = string(data)
+	return nil
 }
 
 type RecordStream interface {

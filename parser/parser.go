@@ -134,6 +134,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 
 		filteredExpressions := make([]logical.NamedExpression, 0, len(expressions))
 		// Filter out the stars, keep is true, so all values will stay anyways
+		// TODO: the stars don't get filtered now because of the if at the beginning of the loop
 		for i := range expressions {
 			if expressions[i] != nil {
 				filteredExpressions = append(filteredExpressions, expressions[i])

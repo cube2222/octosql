@@ -6,7 +6,7 @@ require (
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible // indirect
 	github.com/bradleyjkemp/memmap v0.2.2 // indirect
 	github.com/bradleyjkemp/memviz v0.2.2
-	github.com/dgraph-io/badger/v2 v2.0.1
+	github.com/dgraph-io/badger/v2 v2.0.2
 	github.com/go-chi/chi v4.0.3+incompatible
 	github.com/go-redis/redis v6.15.2+incompatible
 	github.com/go-sql-driver/mysql v1.4.1
@@ -19,6 +19,7 @@ require (
 	github.com/onsi/ginkgo v1.8.0 // indirect
 	github.com/onsi/gomega v1.5.0 // indirect
 	github.com/pkg/errors v0.8.1
+	github.com/segmentio/kafka-go v0.3.5
 	github.com/spf13/cobra v0.0.5
 	github.com/stretchr/testify v1.4.0
 	golang.org/x/net v0.0.0-20190620200207-3b0461eec859

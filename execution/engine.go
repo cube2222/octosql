@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/dgraph-io/badger/v2"
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql/streaming/storage"
@@ -42,13 +43,6 @@ type WatermarkSource interface {
 	GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error)
 }
 
-type ZeroWatermarkSource struct {
-}
-
-func (z *ZeroWatermarkSource) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
-	return time.Time{}, nil
-}
-
 type IntermediateRecordStore interface {
 	AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *Record) error
 	Next(ctx context.Context, tx storage.StateTransaction) (*Record, error)
@@ -65,69 +59,76 @@ type PullEngine struct {
 	watermarkSource        WatermarkSource
 	storage                storage.Storage
 	streamID               *StreamID
+	batchSizeManager       *BatchSizeManager
 }
 
 func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, source RecordStream, streamID *StreamID, watermarkSource WatermarkSource) *PullEngine {
 	return &PullEngine{
-		irs:             irs,
-		storage:         storage,
-		source:          source,
-		streamID:        streamID,
-		watermarkSource: watermarkSource,
+		irs:              irs,
+		storage:          storage,
+		source:           source,
+		streamID:         streamID,
+		watermarkSource:  watermarkSource,
+		batchSizeManager: NewBatchSizeManager(time.Second),
 	}
 }
 
 func (engine *PullEngine) Run(ctx context.Context) {
 	tx := engine.storage.BeginTransaction()
 
-	i := 0
 	for {
-		i++
-		if i%1 == 0 {
-			err := tx.Commit()
-			if err != nil {
-				log.Println("couldn't commit: ", err)
-				return
-			}
-			tx = engine.storage.BeginTransaction()
-		}
 		err := engine.loop(ctx, tx)
 		if err == ErrEndOfStream {
 			err := tx.Commit()
 			if err != nil {
-				log.Println("couldn't commit: ", err)
+				log.Println("engine: couldn't commit: ", err)
 			}
-			log.Println("end of stream, stopping loop")
+			log.Println("engine: end of stream, stopping loop")
 			return
 		}
 		if errors.Cause(err) == ErrNewTransactionRequired {
-			log.Println("engine new transaction required")
+			log.Println("engine: new transaction required")
 			err := tx.Commit()
 			if err != nil {
-				log.Println("couldn't commit: ", err)
-				return
+				log.Println("engine: couldn't commit: ", err)
 			}
+			engine.batchSizeManager.CommitSuccessful()
 			tx = engine.storage.BeginTransaction()
 		} else if waitableError := GetErrWaitForChanges(err); waitableError != nil {
+			log.Println("engine: listening for changes")
 			err := tx.Commit()
 			if err != nil {
-				log.Println("couldn't commit: ", err)
-				return
+				log.Println("engine: couldn't commit: ", err)
 			}
-			log.Println("engine listening for changes")
+			engine.batchSizeManager.CommitSuccessful()
 			err = waitableError.ListenForChanges(ctx)
 			if err != nil {
-				log.Println("couldn't listen for changes: ", err)
+				log.Println("engine: couldn't listen for changes: ", err)
 			}
+			log.Println("engine: received change")
 			err = waitableError.Close()
 			if err != nil {
-				log.Println("couldn't close listening for changes: ", err)
+				log.Println("engine: couldn't close listening for changes: ", err)
 			}
+			engine.batchSizeManager.Reset()
 			tx = engine.storage.BeginTransaction()
 		} else if err != nil {
 			tx.Abort()
-			log.Println(err)
+			log.Println("engine: ", err)
 			return // TODO: Error propagation? Add this to the underlying queue as an ErrorElement? How to do this well? Send it to the underlying IRS like a watermark?
+		}
+
+		if !engine.batchSizeManager.ShouldTakeNextRecord() {
+			err := tx.Commit()
+			if err != nil {
+				if errors.Cause(err) == badger.ErrTxnTooBig {
+					engine.batchSizeManager.CommitTooBig()
+				}
+				log.Println("engine: couldn't commit: ", err)
+			} else {
+				engine.batchSizeManager.CommitSuccessful()
+			}
+			tx = engine.storage.BeginTransaction()
 		}
 	}
 }

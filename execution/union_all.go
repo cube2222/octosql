@@ -2,6 +2,8 @@ package execution
 
 import (
 	"context"
+	"math/rand"
+	"time"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
@@ -17,31 +19,58 @@ func NewUnionAll(sources ...Node) *UnionAll {
 	return &UnionAll{sources: sources}
 }
 
-func (node *UnionAll) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, error) {
+func (node *UnionAll) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
 	prefixedTx := storage.GetStateTransactionFromContext(ctx).WithPrefix(streamID.AsPrefix())
 
 	sourceRecordStreams := make([]RecordStream, len(node.sources))
+	sourceWatermarkSources := make([]WatermarkSource, len(node.sources))
 	for sourceIndex := range node.sources {
 		sourceStreamID, err := GetSourceStreamID(prefixedTx, octosql.MakeInt(sourceIndex))
 		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't get source stream ID for source with index %d", sourceIndex)
+			return nil, nil, errors.Wrapf(err, "couldn't get source stream ID for source with index %d", sourceIndex)
 		}
-		recordStream, err := node.sources[sourceIndex].Get(ctx, variables, sourceStreamID)
+
+		recordStream, execOutput, err := node.sources[sourceIndex].Get(ctx, variables, sourceStreamID)
 		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't get source record stream with index %d", sourceIndex)
+			return nil, nil, errors.Wrapf(err, "couldn't get source record stream with index %d", sourceIndex)
 		}
+
 		sourceRecordStreams[sourceIndex] = recordStream
+		sourceWatermarkSources[sourceIndex] = execOutput.WatermarkSource
 	}
 
-	return &UnifiedStream{
-		sources:  sourceRecordStreams,
-		streamID: streamID,
-	}, nil
+	us := &UnifiedStream{
+		sources:          sourceRecordStreams,
+		watermarkSources: sourceWatermarkSources,
+		streamID:         streamID,
+	}
+
+	return us, NewExecutionOutput(us), nil
 }
 
 type UnifiedStream struct {
-	sources  []RecordStream
-	streamID *StreamID
+	sources          []RecordStream
+	watermarkSources []WatermarkSource
+	streamID         *StreamID
+}
+
+func (node *UnifiedStream) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
+	var earliestWatermark time.Time
+
+	for sourceIndex := range node.sources {
+		sourceWatermark, err := node.watermarkSources[sourceIndex].GetWatermark(ctx, tx)
+		if err != nil {
+			return time.Time{}, errors.Wrapf(err, "couldn't get current watermark from source %d", sourceIndex)
+		}
+
+		if sourceIndex == 0 { // earliestWatermark is not set yet
+			earliestWatermark = sourceWatermark
+		} else if sourceWatermark.Before(earliestWatermark) {
+			earliestWatermark = sourceWatermark
+		}
+	}
+
+	return earliestWatermark, nil
 }
 
 func (node *UnifiedStream) Close() error {
@@ -61,8 +90,11 @@ func (node *UnifiedStream) Next(ctx context.Context) (*Record, error) {
 	tx := storage.GetStateTransactionFromContext(ctx).WithPrefix(node.streamID.AsPrefix())
 	endOfStreamsMap := storage.NewMap(tx.WithPrefix(endsOfStreamsPrefix))
 
+	// We want to randomize the order so we don't always read from the first input if records are available.
+	sourceOrder := rand.Perm(len(node.sources))
+
 	changeSubscriptions := make([]*storage.Subscription, len(node.sources))
-	for sourceIndex := range node.sources { // TODO: Think about randomizing order.
+	for orderIndex, sourceIndex := range sourceOrder {
 		// Here we try to get a record from the sourceIndex'th source stream.
 
 		// First check if this stream hasn't been closed already.
@@ -98,13 +130,13 @@ func (node *UnifiedStream) Next(ctx context.Context) (*Record, error) {
 		}
 
 		// We got a record, so we close all the received subscriptions from the previous streams.
-		for i := 0; i < sourceIndex; i++ {
-			if changeSubscriptions[i] == nil {
+		for _, sourceIndexToClose := range sourceOrder[:orderIndex] {
+			if changeSubscriptions[sourceIndexToClose] == nil {
 				continue
 			}
-			err := changeSubscriptions[i].Close()
+			err := changeSubscriptions[sourceIndexToClose].Close()
 			if err != nil {
-				return nil, errors.Wrapf(err, "couldn't close changes subscription for source stream with index %d", i)
+				return nil, errors.Wrapf(err, "couldn't close changes subscription for source stream with index %d", sourceIndexToClose)
 			}
 		}
 

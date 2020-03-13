@@ -49,7 +49,7 @@ func TestGroupBy_SimpleBatch(t *testing.T) {
 	)
 
 	tx := stateStorage.BeginTransaction()
-	stream, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
+	stream, _, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestGroupBy_BatchWithUndos(t *testing.T) {
 	)
 
 	tx := stateStorage.BeginTransaction()
-	stream, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
+	stream, _, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +191,7 @@ func TestGroupBy_WithOutputUndos(t *testing.T) {
 	)
 
 	tx := stateStorage.BeginTransaction()
-	stream, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NewVariables(variables), GetRawStreamID())
+	stream, _, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NewVariables(variables), GetRawStreamID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestGroupBy_newRecordsNoChanges(t *testing.T) {
 	)
 
 	tx := stateStorage.BeginTransaction()
-	stream, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), variables, GetRawStreamID())
+	stream, _, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), variables, GetRawStreamID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -340,7 +340,7 @@ func TestGroupBy_EventTimes(t *testing.T) {
 	)
 
 	tx := stateStorage.BeginTransaction()
-	stream, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
+	stream, _, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
 	if err != nil {
 		t.Fatal(err)
 	}

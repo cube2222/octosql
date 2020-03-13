@@ -57,10 +57,10 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		return errors.Wrap(err, "couldn't materialize the physical plan into an execution plan")
 	}
 
-	programID := &execution.StreamID{Id: ""}
+	programID := &execution.StreamID{Id: "root"}
 
 	tx := stateStorage.BeginTransaction()
-	stream, err := exec.Get(storage.InjectStateTransaction(ctx, tx), variables, programID)
+	stream, _, err := exec.Get(storage.InjectStateTransaction(ctx, tx), variables, programID)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get record stream from execution plan")
 	}
@@ -77,7 +77,8 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		if err == execution.ErrEndOfStream {
 			err := tx.Commit()
 			if err != nil {
-				return errors.Wrap(err, "couldn't commit transaction")
+				log.Printf("couldn't commit transaction: %s", err)
+				continue
 			}
 			break
 		} else if errors.Cause(err) == execution.ErrNewTransactionRequired {
@@ -93,6 +94,10 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 			err := tx.Commit()
 			if err != nil {
 				log.Println("main couldn't commit: ", err)
+				err = waitableError.Close()
+				if err != nil {
+					log.Println("couldn't close subscription: ", err)
+				}
 				continue
 			}
 			log.Println("main listening for changes")
@@ -100,6 +105,7 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 			if err != nil {
 				log.Println("couldn't listen for changes: ", err)
 			}
+			log.Println("main received change")
 			err = waitableError.Close()
 			if err != nil {
 				log.Println("couldn't close subscription: ", err)
@@ -114,7 +120,8 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 
 		err := tx.Commit()
 		if err != nil {
-			return errors.Wrap(err, "couldn't commit transaction")
+			log.Printf("couldn't commit transaction: %s", err)
+			continue
 		}
 
 		err = app.out.WriteRecord(rec)

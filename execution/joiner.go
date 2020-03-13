@@ -59,7 +59,7 @@ func (joiner *Joiner) fillPending(ctx context.Context) error {
 		joiner.elements++
 
 		go func() {
-			joinedStream, err := joiner.joined.Get(ctx, variables, GetRawStreamID()) // TODO: This needs to be changed in the new joiner implementation.
+			joinedStream, _, err := joiner.joined.Get(ctx, variables, GetRawStreamID()) // TODO: This needs to be changed in the new joiner implementation.
 			if err != nil {
 				joiner.errors <- errors.Wrap(err, "couldn't get joined stream")
 			}

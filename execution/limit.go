@@ -20,40 +20,40 @@ func NewLimit(data Node, limit Expression) *Limit {
 
 var limitPrefix = []byte("$limit$")
 
-func (node *Limit) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, error) {
+func (node *Limit) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
 	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get source stream ID")
+		return nil, nil, errors.Wrap(err, "couldn't get source stream ID")
 	}
 
-	dataStream, err := node.data.Get(ctx, variables, sourceStreamID)
+	dataStream, execOutput, err := node.data.Get(ctx, variables, sourceStreamID)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get data RecordStream")
+		return nil, nil, errors.Wrap(err, "couldn't get data RecordStream")
 	}
 
 	limit, err := node.limitExpr.ExpressionValue(ctx, variables)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't extract value from limit subexpression")
+		return nil, nil, errors.Wrap(err, "couldn't extract value from limit subexpression")
 	}
 
 	if limit.GetType() != octosql.TypeInt {
-		return nil, errors.New("limit value not int")
+		return nil, nil, errors.New("limit value not int")
 	}
 	if limit.AsInt() < 0 {
-		return nil, errors.New("negative limit value")
+		return nil, nil, errors.New("negative limit value")
 	}
 
 	limitState := storage.NewValueState(tx.WithPrefix(streamID.AsPrefix()).WithPrefix(limitPrefix))
 	err = limitState.Set(&limit)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't set limit state")
+		return nil, nil, errors.Wrap(err, "couldn't set limit state")
 	}
 
 	return &LimitedStream{
 		rs:       dataStream,
 		streamID: streamID,
-	}, nil
+	}, execOutput, nil
 }
 
 type LimitedStream struct {
@@ -100,12 +100,6 @@ func (node *LimitedStream) Next(ctx context.Context) (*Record, error) {
 	}
 
 	limit--
-	if limit == 0 {
-		err := node.rs.Close()
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't close source stream")
-		}
-	}
 
 	limitValue = octosql.MakeInt(limit)
 	err = limitState.Set(&limitValue)

@@ -71,10 +71,10 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 	return NewDataSourceBuilderFactory(), nil
 }
 
-func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, error) {
+func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
 	file, err := os.Open(ds.path)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't open file")
+		return nil, nil, errors.Wrap(err, "couldn't open file")
 	}
 	r := csv.NewReader(file)
 	r.Comma = ds.separator
@@ -87,7 +87,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		alias:           ds.alias,
 		first:           true,
 		hasColumnHeader: ds.hasColumnNames,
-	}, nil
+	}, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), nil
 }
 
 type RecordStream struct {

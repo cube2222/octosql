@@ -92,7 +92,7 @@ func TestJSONRecordStream_Get(t *testing.T) {
 				t.Errorf("Error creating data source: %v", err)
 			}
 
-			got, err := ds.Get(ctx, octosql.NoVariables(), execution.GetRawStreamID())
+			got, _, err := ds.Get(ctx, octosql.NoVariables(), execution.GetRawStreamID())
 			if err != nil {
 				t.Errorf("DataSource.Get() error: %v", err)
 				return

@@ -31,27 +31,27 @@ func (r *Range) Document() docs.Documentation {
 	)
 }
 
-func (r *Range) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, error) {
+func (r *Range) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
 	start, err := r.start.ExpressionValue(ctx, variables)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get range start point")
+		return nil, nil, errors.Wrap(err, "couldn't get range start point")
 	}
 	if start.GetType() != octosql.TypeInt {
-		return nil, errors.Errorf("invalid range start point: %v", start)
+		return nil, nil, errors.Errorf("invalid range start point: %v", start)
 	}
 
 	end, err := r.end.ExpressionValue(ctx, variables)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get range end point")
+		return nil, nil, errors.Wrap(err, "couldn't get range end point")
 	}
 	if end.GetType() != octosql.TypeInt {
-		return nil, errors.Errorf("invalid range start point: %v", end)
+		return nil, nil, errors.Errorf("invalid range start point: %v", end)
 	}
 
 	return &RangeStream{
 		current:      start.AsInt(),
 		endExclusive: end.AsInt(),
-	}, nil
+	}, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), nil
 }
 
 type RangeStream struct {

@@ -30,16 +30,16 @@ func NewGroupBy(storage storage.Storage, source Node, key []Expression, fields [
 	return &GroupBy{storage: storage, source: source, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, eventTimeField: eventTimeField, as: as, outEventTimeField: outEventTimeField, triggerPrototype: triggerPrototype}
 }
 
-func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, error) {
+func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
 	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get source stream ID")
+		return nil, nil, errors.Wrap(err, "couldn't get source stream ID")
 	}
 
-	source, err := node.source.Get(ctx, variables, sourceStreamID)
+	source, execOutput, err := node.source.Get(ctx, variables, sourceStreamID)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get stream for source in group by")
+		return nil, nil, errors.Wrap(err, "couldn't get stream for source in group by")
 	}
 
 	aggregates := make([]aggregate.Aggregate, len(node.aggregatePrototypes))
@@ -68,7 +68,7 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 
 	trigger, err := node.triggerPrototype.Get(ctx, variables)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get trigger from trigger prototype")
+		return nil, nil, errors.Wrap(err, "couldn't get trigger from trigger prototype")
 	}
 
 	// We need to remember star expressions in GroupByStream to fill in missing aggregates
@@ -97,10 +97,11 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 		variables:       variables,
 	}
 
-	groupByPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, &ZeroWatermarkSource{})
+	groupByPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, execOutput.WatermarkSource)
+
 	go groupByPullEngine.Run(ctx) // TODO: .Close() should kill this context and the goroutine.
 
-	return groupByPullEngine, nil
+	return groupByPullEngine, NewExecutionOutput(groupByPullEngine), nil // groupByPullEngine now indicates new watermark source
 }
 
 type GroupByStream struct {

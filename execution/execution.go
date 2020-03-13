@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"time"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
@@ -9,8 +10,30 @@ import (
 	"github.com/pkg/errors"
 )
 
+// This struct represents additional metadata to be returned with Get() and used recursively (like WatermarkSource)
+type ExecutionOutput struct {
+	WatermarkSource WatermarkSource
+}
+
+func NewExecutionOutput(ws WatermarkSource) *ExecutionOutput {
+	return &ExecutionOutput{
+		WatermarkSource: ws,
+	}
+}
+
+type ZeroWatermarkGenerator struct {
+}
+
+func (s *ZeroWatermarkGenerator) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
+	return time.Time{}, nil
+}
+
+func NewZeroWatermarkGenerator() *ZeroWatermarkGenerator {
+	return &ZeroWatermarkGenerator{}
+}
+
 type Node interface {
-	Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, error)
+	Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error)
 }
 
 type Expression interface {
@@ -113,7 +136,7 @@ func NewNodeExpression(node Node, stateStorage storage.Storage) *NodeExpression 
 func (ne *NodeExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
 	tx := ne.stateStorage.BeginTransaction()
 	// TODO: All of this has to be rewritten to be multithreaded using background jobs for the subqueries. Think about this.
-	recordStream, err := ne.node.Get(storage.InjectStateTransaction(ctx, tx), variables, GetRawStreamID())
+	recordStream, _, err := ne.node.Get(storage.InjectStateTransaction(ctx, tx), variables, GetRawStreamID())
 	if err != nil {
 		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get record stream")
 	}

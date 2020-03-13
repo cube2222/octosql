@@ -34,9 +34,10 @@ var watermarkElement = &QueueElement{Type: &QueueElement_Watermark{Watermark: pt
 var eosElement = &QueueElement{Type: &QueueElement_EndOfStream{EndOfStream: true}}
 
 func GetElementAssertNoError(t *testing.T, ctx context.Context, queue *OutputQueue) *QueueElement {
-	element, err := queue.Pop(ctx)
+	var element QueueElement
+	err := queue.Pop(ctx, &element)
 	assert.Nil(t, err)
-	return element
+	return &element
 }
 
 func TestOutputQueue_Ok(t *testing.T) {
@@ -154,7 +155,8 @@ func TestOutputQueue_NewTransactionRequired(t *testing.T) {
 			assert.Nil(t, writeTx.Commit())
 		}
 
-		_, err := readQueue.Pop(ctx)
+		var element QueueElement
+		err := readQueue.Pop(ctx, &element)
 		assert.Equal(t, err, ErrNewTransactionRequired)
 		readTx.Abort()
 

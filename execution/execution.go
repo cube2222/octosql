@@ -33,8 +33,11 @@ func NewStarExpression(qualifier string) *StarExpression {
 func (se *StarExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
 	values := make([]octosql.Value, 0)
 
-	for key, value := range variables {
+	keys := variables.DeterministicOrder()
+
+	for _, key := range keys {
 		if se.doesVariableMatch(key) {
+			value, _ := variables.Get(key) // ignore error since it surely is in map
 			values = append(values, value)
 		}
 	}
@@ -44,7 +47,7 @@ func (se *StarExpression) ExpressionValue(ctx context.Context, variables octosql
 
 func (se *StarExpression) Name(variables octosql.Variables) []octosql.VariableName {
 	fields := make([]octosql.VariableName, 0)
-	for key := range variables {
+	for _, key := range variables.DeterministicOrder() {
 		if se.doesVariableMatch(key) {
 			fields = append(fields, key)
 		}

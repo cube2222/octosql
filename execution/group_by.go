@@ -85,7 +85,7 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 		inputFields:          node.fields,
 		aggregates:           aggregates,
 		starExpressions:      starExpressions,
-		outputFieldNames:     outputFieldNames,
+		outputFields:         newGroupByOutputFields(outputFieldNames),
 		outputEventTimeField: node.outEventTimeField,
 	}
 
@@ -111,7 +111,7 @@ type GroupByStream struct {
 	aggregates      []aggregate.Aggregate
 	starExpressions []*StarExpression
 
-	outputFieldNames     []octosql.VariableName
+	outputFields         *groupByOutputFields
 	outputEventTimeField octosql.VariableName
 }
 
@@ -161,16 +161,15 @@ func (gb *GroupByStream) AddRecord(ctx context.Context, tx storage.StateTransact
 	recordVariables := record.AsVariables()
 
 	fieldCount := len(gb.inputFields)
+
 	values := make([]octosql.Value, fieldCount)
+	outputFields := make([]octosql.VariableName, fieldCount)
 
 	for i, fieldName := range gb.inputFields {
 		value := record.Value(fieldName)
 		values[i] = value
+		outputFields[i] = fieldName
 	}
-
-	// Create the full list of aggregates
-	aggregates := make([]aggregate.Aggregate, 0)
-	aggregates = append(aggregates, gb.aggregates...) // add existing aggregates
 
 	for _, expr := range gb.starExpressions { // handle star expressions
 		value, err := expr.ExpressionValue(ctx, recordVariables)
@@ -178,16 +177,21 @@ func (gb *GroupByStream) AddRecord(ctx context.Context, tx storage.StateTransact
 			return errors.Wrap(err, "couldn't get value of star expression in group by")
 		}
 
-		valueSlice := value.AsSlice()
-		values = append(values, valueSlice...)
+		values = append(values, value.AsSlice()...)
+		outputFields = append(outputFields, expr.Name(recordVariables)...)
+	}
 
-		for i := 0; i < len(valueSlice); i++ {
-			aggregates = append(aggregates, &aggregate.First{}) // TODO: should this be key?
-		}
+	gb.outputFields.extendByFields(outputFields)
+
+	// Add necessary aggregates
+	currentAggregateCount := len(gb.aggregates)
+	for i := 0; i < len(values)-currentAggregateCount; i++ {
+		gb.prefixes = append(gb.prefixes, []byte(fmt.Sprintf("$agg_%d$", currentAggregateCount+i)))
+		gb.aggregates = append(gb.aggregates, &aggregate.First{})
 	}
 
 	// Update aggregates once we have full info
-	for i := range aggregates {
+	for i := range gb.aggregates {
 		value := values[i]
 
 		if !record.IsUndo() {
@@ -234,7 +238,7 @@ func (gb *GroupByStream) Trigger(ctx context.Context, tx storage.StateTransactio
 	var previouslyTriggered octosql.Value
 	err := previouslyTriggeredValues.Get(&previouslyTriggered)
 	if err == nil {
-		output = append(output, NewRecordFromSlice(gb.outputFieldNames, previouslyTriggered.AsSlice(), append(opts[:len(opts):len(opts)], WithUndo())...))
+		output = append(output, NewRecordFromSlice(gb.outputFields.outputFields, previouslyTriggered.AsSlice(), append(opts[:len(opts):len(opts)], WithUndo())...))
 	} else if err != storage.ErrNotFound {
 		return nil, errors.Wrap(err, "couldn't get previously triggered value for key")
 	}
@@ -259,7 +263,7 @@ func (gb *GroupByStream) Trigger(ctx context.Context, tx storage.StateTransactio
 				return nil, errors.Wrapf(err, "couldn't get value of aggregate %s with index %d", gb.aggregates[i].String(), i)
 			}
 		}
-		output = append(output, NewRecordFromSlice(gb.outputFieldNames, values, opts...))
+		output = append(output, NewRecordFromSlice(gb.outputFields.outputFields, values, opts...))
 
 		// Save currently triggered record
 		newPreviouslyTriggeredValuesTuple := octosql.MakeTuple(values)
@@ -285,4 +289,50 @@ func (gb *GroupByStream) Trigger(ctx context.Context, tx storage.StateTransactio
 	}
 
 	return output, nil
+}
+
+type groupByOutputFields struct {
+	countMap     map[octosql.VariableName]int
+	outputFields []octosql.VariableName
+}
+
+func newGroupByOutputFields(initialFields []octosql.VariableName) *groupByOutputFields {
+	f := &groupByOutputFields{
+		countMap:     make(map[octosql.VariableName]int),
+		outputFields: make([]octosql.VariableName, 0),
+	}
+
+	for _, field := range initialFields {
+		f.addField(field)
+	}
+
+	return f
+}
+
+func (f *groupByOutputFields) getCount(field octosql.VariableName) int {
+	count, ok := f.countMap[field]
+	if !ok {
+		return 0
+	}
+
+	return count
+}
+
+func (f *groupByOutputFields) addField(field octosql.VariableName) {
+	f.outputFields = append(f.outputFields, field)
+	f.countMap[field] = f.getCount(field) + 1
+}
+
+func (f *groupByOutputFields) extendByFields(fields []octosql.VariableName) {
+	fieldsMapped := newGroupByOutputFields(fields)
+
+	for field, count := range fieldsMapped.countMap {
+		fieldCount := f.getCount(field)
+
+		if count > fieldCount {
+			for i := 0; i < count-fieldCount; i++ {
+				f.addField(field)
+			}
+		}
+	}
 }

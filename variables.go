@@ -1,6 +1,7 @@
 package octosql
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -78,6 +79,24 @@ func (vs Variables) MergeWith(other Variables) (Variables, error) {
 		out[k] = v
 	}
 	return out, nil
+}
+
+// TODO: for now this must do, in order to make it better one would have to change
+// the whole structure of octosql.Variables
+func (vs Variables) DeterministicOrder() []VariableName {
+	variables := make([]VariableName, len(vs))
+
+	i := 0
+	for key := range vs {
+		variables[i] = key
+		i++
+	}
+
+	sort.Slice(variables, func(i, j int) bool {
+		return variables[i] < variables[j]
+	})
+
+	return variables
 }
 
 func StringsToVariableNames(strings []string) []VariableName {

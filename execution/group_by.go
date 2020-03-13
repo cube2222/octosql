@@ -163,14 +163,14 @@ func (gb *GroupByStream) AddRecord(ctx context.Context, tx storage.StateTransact
 	fieldCount := len(gb.inputFields)
 
 	values := make([]octosql.Value, fieldCount)
-	outputFields := make([]octosql.VariableName, fieldCount)
 
 	for i, fieldName := range gb.inputFields {
 		value := record.Value(fieldName)
 		values[i] = value
-		outputFields[i] = fieldName
 	}
 
+	// we don't add the outputFields from gb.inputFields because they are already there
+	outputFields := make([]octosql.VariableName, 0)
 	for _, expr := range gb.starExpressions { // handle star expressions
 		value, err := expr.ExpressionValue(ctx, recordVariables)
 		if err != nil { // this should never happen but in case the implementation changes later, it's better to handle
@@ -326,13 +326,13 @@ func (f *groupByOutputFields) addField(field octosql.VariableName) {
 func (f *groupByOutputFields) extendByFields(fields []octosql.VariableName) {
 	fieldsMapped := newGroupByOutputFields(fields)
 
-	for field, count := range fieldsMapped.countMap {
-		fieldCount := f.getCount(field)
+	// This isn't very optimal, but it keeps the order intact
+	for _, field := range fields {
+		fieldCountAlready := f.getCount(field)
+		fieldCount := fieldsMapped.getCount(field)
 
-		if count > fieldCount {
-			for i := 0; i < count-fieldCount; i++ {
-				f.addField(field)
-			}
+		if fieldCount > fieldCountAlready {
+			f.addField(field)
 		}
 	}
 }

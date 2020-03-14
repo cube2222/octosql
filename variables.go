@@ -81,7 +81,7 @@ func (vs Variables) MergeWith(other Variables) (Variables, error) {
 func StringsToVariableNames(strings []string) []VariableName {
 	result := make([]VariableName, len(strings))
 	for i, s := range strings {
-		result[i] = VariableName(s) //TODO: it can be either this, or NewVariableName
+		result[i] = NewVariableName(s)
 	}
 
 	return result

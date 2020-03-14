@@ -17,8 +17,8 @@ type Field struct {
 	Name octosql.VariableName
 }
 
-func NewID(id string) ID {
-	return ID{
+func NewID(id string) *ID {
+	return &ID{
 		ID: id,
 	}
 }
@@ -53,9 +53,9 @@ func WithMetadataFrom(base *Record) RecordOption {
 	}
 }
 
-func WithID(id ID) RecordOption {
+func WithID(id *ID) RecordOption {
 	return func(rec *Record) {
-		rec.Metadata.Id = &id
+		rec.Metadata.Id = id
 	}
 }
 

@@ -3,12 +3,12 @@ package physical
 import (
 	"context"
 
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
-	"github.com/pkg/errors"
 )
 
 type LeftJoin struct {
@@ -32,11 +32,6 @@ func (node *LeftJoin) Transform(ctx context.Context, transformers *Transformers)
 }
 
 func (node *LeftJoin) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
-	prefetchCount, err := config.GetInt(matCtx.Config.Execution, "lookupJoinPrefetchCount", config.WithDefault(32))
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get lookupJoinPrefetchCount configuration")
-	}
-
 	materializedSource, err := node.Source.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize source node")
@@ -47,7 +42,7 @@ func (node *LeftJoin) Materialize(ctx context.Context, matCtx *MaterializationCo
 		return nil, errors.Wrap(err, "couldn't materialize joined node")
 	}
 
-	return execution.NewLeftJoin(prefetchCount, materializedSource, materializedJoined), nil
+	return execution.NewLookupJoin(matCtx.Storage, materializedSource, materializedJoined), nil
 }
 
 func (node *LeftJoin) Metadata() *metadata.NodeMetadata {

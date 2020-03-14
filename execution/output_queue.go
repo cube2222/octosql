@@ -31,6 +31,19 @@ func (q *OutputQueue) Push(ctx context.Context, element proto.Message) error {
 	return nil
 }
 
+func (q *OutputQueue) Peek(ctx context.Context, msg proto.Message) error {
+	queueElements := storage.NewDeque(q.tx.WithPrefix(queueElementsPrefix))
+
+	err := queueElements.PeekFront(msg)
+	if err == storage.ErrNotFound {
+		return storage.ErrNotFound
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't pop element from queue")
+	}
+
+	return nil
+}
+
 func (q *OutputQueue) Pop(ctx context.Context, msg proto.Message) error {
 	queueElements := storage.NewDeque(q.tx.WithPrefix(queueElementsPrefix))
 

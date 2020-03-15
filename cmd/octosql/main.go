@@ -129,6 +129,11 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 			log.Fatal("couldn't run plan: ", err)
 		}
 
+		err = db.Close()
+		if err != nil {
+			log.Fatal("couldn't close the database: ", err)
+		}
+
 		err = os.RemoveAll(storageDirectory)
 		if err != nil {
 			log.Fatal("couldn't remove temporary directory: ", err)

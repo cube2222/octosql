@@ -34,6 +34,8 @@ type DataSource struct {
 	batchSize    int
 }
 
+var offsetPlaceholderName = octosql.VariableName("$0ffset_pl4ceholder$") // SURELY nobody is going to use it, right?
+
 func NewDataSourceBuilderFactoryFromTemplate(template SQLSourceTemplate) func([]octosql.VariableName) physical.DataSourceBuilderFactory {
 	return func(primaryKeys []octosql.VariableName) physical.DataSourceBuilderFactory {
 		return physical.NewDataSourceBuilderFactory(
@@ -82,7 +84,7 @@ func NewDataSourceBuilderFactoryFromTemplate(template SQLSourceTemplate) func([]
 				query := FormulaToSQL(filter, placeholders)
 
 				// Adding Offset placeholder
-				offsetPlaceholder := placeholders.AddPlaceholder(physical.NewVariable(octosql.NewVariableName("offset")))
+				offsetPlaceholder := placeholders.AddPlaceholder(physical.NewVariable(offsetPlaceholderName))
 
 				query = fmt.Sprintf("SELECT * FROM %s %s WHERE %s OFFSET %s", tableName, alias, query, offsetPlaceholder)
 
@@ -129,11 +131,11 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 	}
 	err := rs.loadOffset(tx)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't sql offset")
+		return nil, nil, errors.Wrap(err, "couldn't load sql offset")
 	}
 
 	// Adding offset value to variables
-	offsetVariable := octosql.NewVariables(map[octosql.VariableName]octosql.Value{"offset": octosql.MakeInt(rs.offset)})
+	offsetVariable := octosql.NewVariables(map[octosql.VariableName]octosql.Value{offsetPlaceholderName: octosql.MakeInt(rs.offset)})
 	variables, err = variables.MergeWith(offsetVariable)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't merge given variables with offset variable")
@@ -228,10 +230,13 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 			tx.Abort()
 			log.Printf("sql worker: error running sql read batch worker: %s, reinitializing from storage", err)
 			tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
-			if err := rs.loadOffset(tx); err != nil {
+
+			err := rs.loadOffset(tx)
+			if err != nil {
 				log.Fatalf("sql worker: couldn't reinitialize offset for sql read batch worker: %s", err)
 				return
 			}
+
 			tx.Abort() // We only read data above, no need to risk failing now.
 			continue
 		}

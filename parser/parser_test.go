@@ -47,6 +47,51 @@ func TestParseNode(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "columns and qualified star expression combined",
+			args: args{
+				statement: `SELECT d.*, d.name FROM dogs d`,
+			},
+			want: logical.NewMap(
+				[]logical.NamedExpression{
+					logical.NewVariable("d.name"),
+					logical.NewStarExpression("d"),
+				},
+				logical.NewMap(
+					[]logical.NamedExpression{
+						logical.NewVariable("d.name"),
+					},
+					logical.NewDataSource("dogs", "d"),
+					true,
+				),
+				false,
+			),
+			wantErr: false,
+		},
+		{
+			name: "multiple stars and columns",
+			args: args{
+				statement: `SELECT p.*, p.name, d.*, d.age FROM dogs d`,
+			},
+			want: logical.NewMap(
+				[]logical.NamedExpression{
+					logical.NewVariable("p.name"),
+					logical.NewVariable("d.age"),
+					logical.NewStarExpression("p"),
+					logical.NewStarExpression("d"),
+				},
+				logical.NewMap(
+					[]logical.NamedExpression{
+						logical.NewVariable("p.name"),
+						logical.NewVariable("d.age"),
+					},
+					logical.NewDataSource("dogs", "d"),
+					true,
+				),
+				false,
+			),
+			wantErr: false,
+		},
+		{
 			name: "simple union",
 			args: args{
 				`(SELECT p.id, p.name, p.surname FROM people p WHERE p.surname = 'Kowalski')

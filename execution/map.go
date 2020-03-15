@@ -64,7 +64,9 @@ func (stream *MappedStream) Next(ctx context.Context) (*Record, error) {
 		return nil, errors.Wrap(err, "couldn't get source record")
 	}
 
-	variables, err := stream.variables.MergeWith(srcRecord.AsVariables())
+	recordVariables := srcRecord.AsVariables()
+
+	variables, err := stream.variables.MergeWith(recordVariables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't merge given variables with record variables")
 	}
@@ -72,10 +74,11 @@ func (stream *MappedStream) Next(ctx context.Context) (*Record, error) {
 	fieldNames := make([]octosql.VariableName, 0)
 	outValues := make(map[octosql.VariableName]octosql.Value)
 	for _, expr := range stream.expressions {
-		expressionName := expr.Name(variables)
-
 		switch expr := expr.(type) {
 		case *StarExpression:
+			// A star expression is based only on the incoming record
+			expressionName := expr.Name(recordVariables)
+
 			for _, name := range expressionName {
 				value, _ := variables.Get(name) //TODO: err is always nil, handle it anyways?
 
@@ -85,6 +88,8 @@ func (stream *MappedStream) Next(ctx context.Context) (*Record, error) {
 			fieldNames = append(fieldNames, expressionName...)
 
 		default: // anything else than a star expression
+			expressionName := expr.Name(variables) // based on all variables
+
 			if len(expressionName) != 1 {
 				return nil, errors.Errorf("expected exactly one expressionName for NamedExpression in map, got %v", len(expressionName))
 			}

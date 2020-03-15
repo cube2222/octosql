@@ -376,31 +376,31 @@ func TestParseNode(t *testing.T) {
 			args: args{
 				statement: "SELECT * FROM people p2 WHERE TRUE AND FALSE OR TRUE AND NOT TRUE",
 			},
-			want: logical.NewFilter(
-				logical.NewInfixOperator(
+			want: logical.NewMap(
+				[]logical.NamedExpression{
+					logical.NewStarExpression(""),
+				},
+				logical.NewFilter(
 					logical.NewInfixOperator(
-						logical.NewBooleanConstant(true),
-						logical.NewBooleanConstant(false),
-						"AND",
+						logical.NewInfixOperator(
+							logical.NewBooleanConstant(true),
+							logical.NewBooleanConstant(false),
+							"AND",
+						),
+						logical.NewInfixOperator(
+							logical.NewBooleanConstant(true),
+							logical.NewPrefixOperator(logical.NewBooleanConstant(true), "NOT"),
+							"AND",
+						),
+						"OR",
 					),
-					logical.NewInfixOperator(
-						logical.NewBooleanConstant(true),
-						logical.NewPrefixOperator(logical.NewBooleanConstant(true), "NOT"),
-						"AND",
-					),
-					"OR",
-				),
-				logical.NewMap(
-					[]logical.NamedExpression{
-						logical.NewStarExpression(""),
-					},
 					logical.NewMap(
 						[]logical.NamedExpression{},
 						logical.NewDataSource("people", "p2"),
 						true,
 					),
-					false,
 				),
+				false,
 			),
 			wantErr: false,
 		},
@@ -566,7 +566,17 @@ WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age`,
 						},
 						logical.NewRequalifier(
 							"p3",
-							logical.NewDataSource("people", "p4"),
+							logical.NewMap(
+								[]logical.NamedExpression{
+									logical.NewStarExpression(""),
+								},
+								logical.NewMap(
+									[]logical.NamedExpression{},
+									logical.NewDataSource("people", "p4"),
+									true,
+								),
+								false,
+							),
 						),
 						true,
 					),
@@ -615,7 +625,7 @@ SELECT p.name FROM people p LEFT JOIN cities c ON p.city = c.name AND p.favorite
 			wantErr: false,
 		},
 		{
-			name: "right join",
+			name: "right join 1",
 			args: args{
 				statement: `
 SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorite_city = c.name`,
@@ -654,34 +664,54 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 			wantErr: false,
 		},
 		{
-			name: "right join",
+			name: "select IN",
 			args: args{
 				statement: `SELECT * FROM people p WHERE p.age IN (1, 2, 3, 4) AND ('Jacob', 3) IN (SELECT * FROM people p)`,
 			},
-			want: logical.NewFilter(
-				logical.NewInfixOperator(
-					logical.NewPredicate(
-						logical.NewVariable("p.age"),
-						logical.In,
-						logical.NewTuple([]logical.Expression{
-							logical.NewConstant(1),
-							logical.NewConstant(2),
-							logical.NewConstant(3),
-							logical.NewConstant(4),
-						}),
-					),
-					logical.NewPredicate(
-						logical.NewTuple([]logical.Expression{
-							logical.NewConstant("Jacob"),
-							logical.NewConstant(3),
-						}),
-						logical.In,
-						logical.NewNodeExpression(
-							logical.NewDataSource("people", "p"),
+			want: logical.NewMap(
+				[]logical.NamedExpression{
+					logical.NewStarExpression(""),
+				},
+				logical.NewFilter(
+					logical.NewInfixOperator(
+						logical.NewPredicate(
+							logical.NewVariable("p.age"),
+							logical.In,
+							logical.NewTuple([]logical.Expression{
+								logical.NewConstant(1),
+								logical.NewConstant(2),
+								logical.NewConstant(3),
+								logical.NewConstant(4),
+							}),
 						),
+						logical.NewPredicate(
+							logical.NewTuple([]logical.Expression{
+								logical.NewConstant("Jacob"),
+								logical.NewConstant(3),
+							}),
+							logical.In,
+							logical.NewNodeExpression(
+								logical.NewMap(
+									[]logical.NamedExpression{
+										logical.NewStarExpression(""),
+									},
+									logical.NewMap(
+										[]logical.NamedExpression{},
+										logical.NewDataSource("people", "p"),
+										true,
+									),
+									false,
+								),
+							),
+						),
+						"AND"),
+					logical.NewMap(
+						[]logical.NamedExpression{},
+						logical.NewDataSource("people", "p"),
+						true,
 					),
-					"AND"),
-				logical.NewDataSource("people", "p"),
+				),
+				false,
 			),
 			wantErr: false,
 		},
@@ -769,10 +799,22 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 								arg4=>DESCRIPTOR(test2.test3)) x`,
 			},
 			want: logical.NewRequalifier("x",
-				logical.NewTableValuedFunction(
+				logical.NewTableValuedFunction( //test1
 					"func",
 					map[octosql.VariableName]logical.TableValuedFunctionArgumentValue{
-						octosql.NewVariableName("arg0"): logical.NewTableValuedFunctionArgumentValueTable(logical.NewDataSource("test1", "")),
+						octosql.NewVariableName("arg0"): logical.NewTableValuedFunctionArgumentValueTable(
+							logical.NewMap(
+								[]logical.NamedExpression{
+									logical.NewStarExpression(""),
+								},
+								logical.NewMap(
+									[]logical.NamedExpression{},
+									logical.NewDataSource("test1", ""),
+									true,
+								),
+								false,
+							),
+						),
 						octosql.NewVariableName("arg1"): logical.NewTableValuedFunctionArgumentValueExpression(logical.NewConstant("test")),
 						octosql.NewVariableName("arg2"): logical.NewTableValuedFunctionArgumentValueExpression(logical.NewConstant(2)),
 						octosql.NewVariableName("arg3"): logical.NewTableValuedFunctionArgumentValueExpression(logical.NewInterval(

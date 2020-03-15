@@ -798,37 +798,35 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 								arg3=> interval 2 hour,
 								arg4=>DESCRIPTOR(test2.test3)) x`,
 			},
-			want: logical.NewRequalifier("x",
-				logical.NewTableValuedFunction( //test1
-					"func",
-					map[octosql.VariableName]logical.TableValuedFunctionArgumentValue{
-						octosql.NewVariableName("arg0"): logical.NewTableValuedFunctionArgumentValueTable(
-							logical.NewMap(
-								[]logical.NamedExpression{
-									logical.NewStarExpression(""),
-								},
-								logical.NewMap(
-									[]logical.NamedExpression{},
-									logical.NewDataSource("test1", ""),
-									true,
-								),
-								false,
-							),
+			want: logical.NewMap(
+				[]logical.NamedExpression{
+					logical.NewStarExpression(""),
+				},
+				logical.NewMap(
+					[]logical.NamedExpression{},
+					logical.NewRequalifier("x",
+						logical.NewTableValuedFunction( //test1
+							"func",
+							map[octosql.VariableName]logical.TableValuedFunctionArgumentValue{
+								octosql.NewVariableName("arg0"): logical.NewTableValuedFunctionArgumentValueTable(logical.NewDataSource("test1", "")),
+								octosql.NewVariableName("arg1"): logical.NewTableValuedFunctionArgumentValueExpression(logical.NewConstant("test")),
+								octosql.NewVariableName("arg2"): logical.NewTableValuedFunctionArgumentValueExpression(logical.NewConstant(2)),
+								octosql.NewVariableName("arg3"): logical.NewTableValuedFunctionArgumentValueExpression(logical.NewInterval(
+									logical.NewConstant(2),
+									logical.NewConstant("hour"),
+								)),
+								octosql.NewVariableName("arg4"): logical.NewTableValuedFunctionArgumentValueDescriptor("test2.test3"),
+							},
 						),
-						octosql.NewVariableName("arg1"): logical.NewTableValuedFunctionArgumentValueExpression(logical.NewConstant("test")),
-						octosql.NewVariableName("arg2"): logical.NewTableValuedFunctionArgumentValueExpression(logical.NewConstant(2)),
-						octosql.NewVariableName("arg3"): logical.NewTableValuedFunctionArgumentValueExpression(logical.NewInterval(
-							logical.NewConstant(2),
-							logical.NewConstant("hour"),
-						)),
-						octosql.NewVariableName("arg4"): logical.NewTableValuedFunctionArgumentValueDescriptor("test2.test3"),
-					},
+					),
+					true,
 				),
+				false,
 			),
 			wantErr: false,
 		},
 		{
-			name: "table valued function",
+			name: "table valued function 1",
 			args: args{
 				statement: `WITH xtab AS (SELECT * FROM tab t), ytab AS (SELECT * FROM xtab x) SELECT * FROM ytab y`,
 			},
@@ -838,10 +836,40 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 					"ytab",
 				},
 				[]logical.Node{
-					logical.NewDataSource("tab", "t"),
-					logical.NewDataSource("xtab", "x"),
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewStarExpression(""),
+						},
+						logical.NewMap(
+							[]logical.NamedExpression{},
+							logical.NewDataSource("tab", "t"),
+							true,
+						),
+						false,
+					),
+					logical.NewMap(
+						[]logical.NamedExpression{
+							logical.NewStarExpression(""),
+						},
+						logical.NewMap(
+							[]logical.NamedExpression{},
+							logical.NewDataSource("xtab", "x"),
+							true,
+						),
+						false,
+					),
 				},
-				logical.NewDataSource("ytab", "y"),
+				logical.NewMap(
+					[]logical.NamedExpression{
+						logical.NewStarExpression(""),
+					},
+					logical.NewMap(
+						[]logical.NamedExpression{},
+						logical.NewDataSource("ytab", "y"),
+						true,
+					),
+					false,
+				),
 			),
 			wantErr: false,
 		},

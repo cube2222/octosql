@@ -290,7 +290,7 @@ func (rs *LookupJoinStream) HandleControlMessages(ctx context.Context, tx storag
 		}
 
 		switch typedMsg := msg.Type.(type) {
-		case *QueueElement_Record: // Records which don't have a corresponding job are cleared elsewhere.
+		case *QueueElement_Record:
 			var jobs = storage.NewMap(tx.WithPrefix(jobsPrefix))
 			var phantom octosql.Value
 			err := jobs.Get(typedMsg.Record.ID(), &phantom)
@@ -426,7 +426,7 @@ func (rs *LookupJoinStream) GetNextRecord(ctx context.Context, tx storage.StateT
 func (rs *LookupJoinStream) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
 	var toBeJoinedQueue = NewOutputQueue(tx.WithPrefix(toBeJoinedQueuePrefix))
 
-	t, err := ptypes.TimestampProto(maxWatermark)
+	t, err := ptypes.TimestampProto(watermark)
 	if err != nil {
 		return errors.Wrapf(err, "couldn't convert Time %s to proto.Timestamp", watermark)
 	}

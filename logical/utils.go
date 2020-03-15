@@ -64,6 +64,10 @@ func EqualNodes(node1, node2 Node) error {
 			if err := EqualNodes(node1.source, node2.source); err != nil {
 				return errors.Wrap(err, "sources not equal")
 			}
+
+			if node1.keep != node2.keep {
+				return errors.New("keep values don't match")
+			}
 			return nil
 		}
 
@@ -351,7 +355,14 @@ func EqualExpressions(expr1, expr2 Expression) error {
 			}
 			return nil
 		}
+	case *StarExpression:
+		if expr2, ok := expr2.(*StarExpression); ok {
+			if expr1.qualifier != expr2.qualifier {
+				return errors.Errorf("qualifiers of star expressions don't match: %v vs %v", expr1.qualifier, expr2.qualifier)
+			}
 
+			return nil
+		}
 	default:
 		log.Fatalf("Unsupported equality comparison %v and %v", reflect.TypeOf(expr1), reflect.TypeOf(expr2))
 	}

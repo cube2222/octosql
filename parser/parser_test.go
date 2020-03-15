@@ -25,6 +25,28 @@ func TestParseNode(t *testing.T) {
 		wantErr bool
 	}{
 		{
+			name: "simple select - no stars, no filter",
+			args: args{
+				statement: `SELECT a.age, a.name FROM anacondas a`,
+			},
+			want: logical.NewMap(
+				[]logical.NamedExpression{
+					logical.NewVariable("a.age"),
+					logical.NewVariable("a.name"),
+				},
+				logical.NewMap(
+					[]logical.NamedExpression{
+						logical.NewVariable("a.age"),
+						logical.NewVariable("a.name"),
+					},
+					logical.NewDataSource("anacondas", "a"),
+					true,
+				),
+				false,
+			),
+			wantErr: false,
+		},
+		{
 			name: "simple union",
 			args: args{
 				`(SELECT p.id, p.name, p.surname FROM people p WHERE p.surname = 'Kowalski')
@@ -51,20 +73,26 @@ func TestParseNode(t *testing.T) {
 								logical.NewVariable("p.surname"),
 							},
 							logical.NewDataSource("people", "p"),
-							false),
+							true),
 					),
 					false,
 				),
-				logical.NewFilter(
-					logical.NewPredicate(
-						logical.NewVariable("a.exp"),
-						logical.LessThan,
-						logical.NewConstant(2),
+				logical.NewMap(
+					[]logical.NamedExpression{
+						logical.NewStarExpression(""),
+					},
+					logical.NewFilter(
+						logical.NewPredicate(
+							logical.NewVariable("a.exp"),
+							logical.LessThan,
+							logical.NewConstant(2),
+						),
+						logical.NewMap(
+							[]logical.NamedExpression{},
+							logical.NewDataSource("admins", "a"),
+							true),
 					),
-					logical.NewDataSource(
-						"admins",
-						"a",
-					),
+					false,
 				),
 			),
 			wantErr: false,
@@ -362,39 +390,63 @@ func TestParseNode(t *testing.T) {
 					),
 					"OR",
 				),
-				logical.NewDataSource("people", "p2"),
+				logical.NewMap(
+					[]logical.NamedExpression{
+						logical.NewStarExpression(""),
+					},
+					logical.NewMap(
+						[]logical.NamedExpression{},
+						logical.NewDataSource("people", "p2"),
+						true,
+					),
+					false,
+				),
 			),
 			wantErr: false,
 		},
 		{
 			name: "all relations",
 			args: args{
-				statement: `
-SELECT * 
-FROM people p2 
-WHERE p2.age > 3 AND p2.age = 3 AND p2.age < 3 AND p2.age <> 3 AND p2.age != 3 AND p2.age IN (SELECT * FROM people p3)`,
+				statement: `SELECT * FROM people p2 
+							WHERE 	p2.age > 3 AND 
+									p2.age = 3 AND 
+									p2.age < 3 AND 
+									p2.age <> 3 AND 
+									p2.age != 3 AND 
+									p2.age IN (SELECT * FROM people p3)`,
 			},
-			want: logical.NewFilter(
-				logical.NewInfixOperator(
+			want: logical.NewMap(
+				[]logical.NamedExpression{
+					logical.NewStarExpression(""),
+				},
+				logical.NewFilter(
 					logical.NewInfixOperator(
 						logical.NewInfixOperator(
 							logical.NewInfixOperator(
 								logical.NewInfixOperator(
-									logical.NewPredicate(
-										logical.NewVariable("p2.age"),
-										logical.MoreThan,
-										logical.NewConstant(3),
+									logical.NewInfixOperator(
+										logical.NewPredicate(
+											logical.NewVariable("p2.age"),
+											logical.MoreThan,
+											logical.NewConstant(3),
+										),
+										logical.NewPredicate(
+											logical.NewVariable("p2.age"),
+											logical.Equal,
+											logical.NewConstant(3),
+										),
+										"AND",
 									),
 									logical.NewPredicate(
 										logical.NewVariable("p2.age"),
-										logical.Equal,
+										logical.LessThan,
 										logical.NewConstant(3),
 									),
 									"AND",
 								),
 								logical.NewPredicate(
 									logical.NewVariable("p2.age"),
-									logical.LessThan,
+									logical.NotEqual,
 									logical.NewConstant(3),
 								),
 								"AND",
@@ -408,19 +460,30 @@ WHERE p2.age > 3 AND p2.age = 3 AND p2.age < 3 AND p2.age <> 3 AND p2.age != 3 A
 						),
 						logical.NewPredicate(
 							logical.NewVariable("p2.age"),
-							logical.NotEqual,
-							logical.NewConstant(3),
+							logical.In,
+							logical.NewNodeExpression(
+								logical.NewMap(
+									[]logical.NamedExpression{
+										logical.NewStarExpression(""),
+									},
+									logical.NewMap(
+										[]logical.NamedExpression{},
+										logical.NewDataSource("people", "p3"),
+										true,
+									),
+									false,
+								),
+							),
 						),
 						"AND",
 					),
-					logical.NewPredicate(
-						logical.NewVariable("p2.age"),
-						logical.In,
-						logical.NewNodeExpression(logical.NewDataSource("people", "p3")),
+					logical.NewMap(
+						[]logical.NamedExpression{},
+						logical.NewDataSource("people", "p2"),
+						true,
 					),
-					"AND",
 				),
-				logical.NewDataSource("people", "p2"),
+				false,
 			),
 			wantErr: false,
 		},

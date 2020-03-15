@@ -174,7 +174,7 @@ func (gb *GroupByStream) AddRecord(ctx context.Context, tx storage.StateTransact
 	outputFields := make([]octosql.VariableName, 0)
 	for _, expr := range gb.starExpressions { // handle star expressions
 		value, err := expr.ExpressionValue(ctx, recordVariables)
-		if err != nil { // this should never happen but in case the implementation changes later, it's better to handle
+		if err != nil {
 			return errors.Wrap(err, "couldn't get value of star expression in group by")
 		}
 

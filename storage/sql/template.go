@@ -175,6 +175,8 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 			return
 		}
 
+		tx.Abort() // We only read data above, no need to risk failing now.
+
 		// Adding offset value to variables
 		offsetVariable := octosql.NewVariables(map[octosql.VariableName]octosql.Value{offsetPlaceholderName: octosql.MakeInt(rs.offset)})
 		rs.variables, err = rs.variables.MergeWith(offsetVariable)
@@ -217,10 +219,12 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 			default:
 			}
 
+			tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
+
 			err := rs.RunWorkerInternal(ctx, tx)
 			if errors.Cause(err) == execution.ErrNewTransactionRequired {
 				tx.Abort()
-				break
+				continue
 			} else if waitableError := execution.GetErrWaitForChanges(err); waitableError != nil {
 				tx.Abort()
 				err = waitableError.ListenForChanges(ctx)
@@ -231,7 +235,7 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 				if err != nil {
 					log.Println("sql worker: couldn't close storage changes subscription: ", err)
 				}
-				break
+				continue
 			} else if err != nil {
 				tx.Abort()
 				log.Printf("sql worker: error running sql read batch worker: %s, reinitializing from storage", err)

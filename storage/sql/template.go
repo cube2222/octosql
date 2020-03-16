@@ -120,50 +120,16 @@ func NewDataSourceBuilderFactoryFromTemplate(template SQLSourceTemplate) func([]
 var offsetPrefix = []byte("sql_offset")
 
 func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
-	tx := storage.GetStateTransactionFromContext(ctx).WithPrefix(streamID.AsPrefix())
-
 	rs := &RecordStream{
 		stateStorage: ds.stateStorage,
 		streamID:     streamID,
 		isDone:       false,
 		alias:        ds.alias,
+		stmt:         ds.stmt,
+		variables:    variables,
+		placeholders: ds.placeholders,
 		batchSize:    ds.batchSize,
 	}
-	err := rs.loadOffset(tx)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't load sql offset")
-	}
-
-	// Adding offset value to variables
-	offsetVariable := octosql.NewVariables(map[octosql.VariableName]octosql.Value{offsetPlaceholderName: octosql.MakeInt(rs.offset)})
-	variables, err = variables.MergeWith(offsetVariable)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't merge given variables with offset variable")
-	}
-
-	values := make([]interface{}, 0)
-
-	for _, expression := range ds.placeholders {
-		// Since we have an execution expression, then we can evaluate it given the variables
-		value, err := expression.ExpressionValue(ctx, variables)
-		if err != nil {
-			return nil, nil, errors.Wrap(err, "couldn't get actual value from variables")
-		}
-
-		values = append(values, value.ToRawValue())
-	}
-
-	rows, err := ds.stmt.QueryContext(ctx, values...)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't query statement")
-	}
-	rs.rows = rows
-
-	columns, err := rows.Columns()
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get columns from rows")
-	}
-	rs.columns = columns
 
 	ctx, cancel := context.WithCancel(ctx)
 	rs.workerCtxCancel = cancel
@@ -185,66 +151,98 @@ type RecordStream struct {
 	isDone       bool
 	alias        string
 
-	batchSize int
-	offset    int
+	stmt         *sql.Stmt
+	variables    octosql.Variables
+	placeholders []execution.Expression
+	offset       int
+	batchSize    int
 
 	workerCtxCancel    func()
 	workerCloseErrChan chan error
 }
 
 func (rs *RecordStream) Close() error {
-	err := rs.rows.Close()
-	if err != nil {
-		return errors.Wrap(err, "couldn't close underlying SQL rows")
-	}
-
 	return nil
 }
 
 func (rs *RecordStream) RunWorker(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			rs.workerCloseErrChan <- ctx.Err()
-		default:
-		}
-
+	for { // outer for is loading offset value and creating rows
 		tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
 
-		err := rs.RunWorkerInternal(ctx, tx)
-		if errors.Cause(err) == execution.ErrNewTransactionRequired {
-			tx.Abort()
-			continue
-		} else if waitableError := execution.GetErrWaitForChanges(err); waitableError != nil {
-			tx.Abort()
-			err = waitableError.ListenForChanges(ctx)
-			if err != nil {
-				log.Println("sql worker: couldn't listen for changes: ", err)
-			}
-			err = waitableError.Close()
-			if err != nil {
-				log.Println("sql worker: couldn't close storage changes subscription: ", err)
-			}
-			continue
-		} else if err != nil {
-			tx.Abort()
-			log.Printf("sql worker: error running sql read batch worker: %s, reinitializing from storage", err)
-			tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
+		err := rs.loadOffset(tx)
+		if err != nil {
+			log.Fatalf("sql worker: couldn't reinitialize offset for sql read batch worker: %s", err)
+			return
+		}
 
-			err := rs.loadOffset(tx)
+		// Adding offset value to variables
+		offsetVariable := octosql.NewVariables(map[octosql.VariableName]octosql.Value{offsetPlaceholderName: octosql.MakeInt(rs.offset)})
+		rs.variables, err = rs.variables.MergeWith(offsetVariable)
+		if err != nil {
+			log.Fatalf("sql worker: couldn't merge variables with offset variable: %s", err)
+			return
+		}
+
+		values := make([]interface{}, 0)
+
+		for _, expression := range rs.placeholders {
+			// Since we have an execution expression, then we can evaluate it given the variables
+			value, err := expression.ExpressionValue(ctx, rs.variables)
 			if err != nil {
-				log.Fatalf("sql worker: couldn't reinitialize offset for sql read batch worker: %s", err)
+				log.Fatalf("sql worker: couldn't get actual value from variables: %s", err)
 				return
 			}
 
-			tx.Abort() // We only read data above, no need to risk failing now.
-			continue
+			values = append(values, value.ToRawValue())
 		}
 
-		err = tx.Commit()
+		rows, err := rs.stmt.QueryContext(ctx, values...)
 		if err != nil {
-			log.Println("sql worker: couldn't commit transaction: ", err)
-			continue
+			log.Fatalf("sql worker: couldn't query statement: %s", err)
+			return
+		}
+		rs.rows = rows
+
+		columns, err := rows.Columns()
+		if err != nil {
+			log.Fatalf("sql worker: couldn't get columns from rows: %s", err)
+			return
+		}
+		rs.columns = columns
+
+		for { // inner for is calling RunWorkerInternal
+			select {
+			case <-ctx.Done():
+				rs.workerCloseErrChan <- ctx.Err()
+			default:
+			}
+
+			err := rs.RunWorkerInternal(ctx, tx)
+			if errors.Cause(err) == execution.ErrNewTransactionRequired {
+				tx.Abort()
+				break
+			} else if waitableError := execution.GetErrWaitForChanges(err); waitableError != nil {
+				tx.Abort()
+				err = waitableError.ListenForChanges(ctx)
+				if err != nil {
+					log.Println("sql worker: couldn't listen for changes: ", err)
+				}
+				err = waitableError.Close()
+				if err != nil {
+					log.Println("sql worker: couldn't close storage changes subscription: ", err)
+				}
+				break
+			} else if err != nil {
+				tx.Abort()
+				log.Printf("sql worker: error running sql read batch worker: %s, reinitializing from storage", err)
+				break
+			}
+
+			err = tx.Commit()
+			if err != nil {
+				log.Println("sql worker: couldn't commit transaction: ", err)
+				continue
+			}
 		}
 	}
 }
@@ -253,6 +251,17 @@ var outputQueuePrefix = []byte("$output_queue$")
 
 func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateTransaction) error {
 	outputQueue := execution.NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
+
+	if rs.isDone {
+		err := outputQueue.Push(ctx, &kafka.QueueElement{
+			Type: &kafka.QueueElement_Error{
+				Error: execution.ErrEndOfStream.Error(),
+			},
+		})
+		if err != nil {
+			return errors.Wrapf(err, "couldn't push sql EndOfStream to output record queue")
+		}
+	}
 
 	batch := make([]*execution.Record, rs.batchSize)
 	for i := 0; i < rs.batchSize; i++ {
@@ -295,18 +304,6 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 		})
 		if err != nil {
 			return errors.Wrapf(err, "couldn't push sql record with index %d in batch to output record queue", i)
-		}
-	}
-
-	// TODO - something like that to put EndOfStream ?
-	if rs.isDone {
-		err := outputQueue.Push(ctx, &kafka.QueueElement{
-			Type: &kafka.QueueElement_Error{
-				Error: execution.ErrEndOfStream.Error(),
-			},
-		})
-		if err != nil {
-			return errors.Wrapf(err, "couldn't push sql EndOfStream to output record queue")
 		}
 	}
 

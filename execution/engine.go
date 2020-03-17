@@ -44,6 +44,9 @@ type WatermarkSource interface {
 }
 
 type IntermediateRecordStore interface {
+	// ReadyForMore is used to check if the intermediate record store is able to consume more data.
+	// This allows it to communicate back-pressure.
+	ReadyForMore(ctx context.Context, tx storage.StateTransaction) error
 	AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *Record) error
 	Next(ctx context.Context, tx storage.StateTransaction) (*Record, error)
 	UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error
@@ -158,6 +161,10 @@ func (engine *PullEngine) loop(ctx context.Context, tx storage.StateTransaction)
 		}
 		engine.lastCommittedWatermark = watermark // TODO: last _commited_ watermark :( this is not committed
 		return nil
+	}
+
+	if err := engine.irs.ReadyForMore(ctx, prefixedTx); err != nil {
+		return errors.Wrap(err, "couldn't check if intermediate record store can take more records")
 	}
 
 	record, err := engine.source.Next(storage.InjectStateTransaction(ctx, tx))

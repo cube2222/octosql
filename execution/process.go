@@ -207,6 +207,10 @@ func (p *ProcessByKey) MarkError(ctx context.Context, tx storage.StateTransactio
 	return nil
 }
 
+func (p *ProcessByKey) ReadyForMore(ctx context.Context, tx storage.StateTransaction) error {
+	return nil
+}
+
 func (p *ProcessByKey) Close() error {
 	return nil // TODO: Close this, remove state
 }

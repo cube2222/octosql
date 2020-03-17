@@ -2,7 +2,9 @@ package execution
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"sync/atomic"
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
@@ -12,15 +14,19 @@ import (
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
+var jobCount int64
+
 type LookupJoin struct {
+	maxJobsCount   int
 	source, joined Node
 	stateStorage   storage.Storage
 
 	isLeftJoin bool
 }
 
-func NewLookupJoin(stateStorage storage.Storage, source Node, joined Node, isLeftJoin bool) *LookupJoin {
+func NewLookupJoin(maxJobsCount int, stateStorage storage.Storage, source Node, joined Node, isLeftJoin bool) *LookupJoin {
 	return &LookupJoin{
+		maxJobsCount: maxJobsCount,
 		source:       source,
 		joined:       joined,
 		stateStorage: stateStorage,
@@ -29,6 +35,12 @@ func NewLookupJoin(stateStorage storage.Storage, source Node, joined Node, isLef
 }
 
 func (node *LookupJoin) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
+	go func() {
+		for range time.Tick(time.Second) {
+			fmt.Printf("current job count: %d\n", atomic.LoadInt64(&jobCount))
+		}
+	}()
+
 	tx := storage.GetStateTransactionFromContext(ctx)
 	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {
@@ -38,6 +50,15 @@ func (node *LookupJoin) Get(ctx context.Context, variables octosql.Variables, st
 	sourceStream, execOutput, err := node.source.Get(ctx, variables, sourceStreamID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get source record stream")
+	}
+
+	// Fill the token queue with initial tokens.
+	tokenQueue := NewOutputQueue(tx.WithPrefix(streamID.AsPrefix()).WithPrefix(jobTokenQueuePrefix))
+	token := octosql.MakePhantom()
+	for i := 0; i < node.maxJobsCount; i++ {
+		if err := tokenQueue.Push(ctx, &token); err != nil {
+			return nil, nil, errors.Wrap(err, "couldn't push job token to token queue")
+		}
 	}
 
 	rs := &LookupJoinStream{
@@ -75,6 +96,7 @@ var jobsPrefix = []byte("$jobs$")
 var sourceRecordPrefix = []byte("$source_record$")
 var controlMessagesQueuePrefix = []byte("$control_messages$")
 var alreadyJoinedForRecordPrefix = []byte("$already_joined_for_record$")
+var jobTokenQueuePrefix = []byte("$job_tokens$")
 
 // The scheduler takes records from the toBeJoined queue, and starts jobs to do joins.
 // Control messages (records too, to satisfy the initial ordering of messages) are put on a controlMessages queue,
@@ -213,6 +235,8 @@ func (rs *LookupJoinStream) RunWorker(ctx context.Context, id *ID) error {
 }
 
 func (rs *LookupJoinStream) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *Record) error {
+	atomic.AddInt64(&jobCount, 1)
+
 	var toBeJoinedQueue = NewOutputQueue(tx.WithPrefix(toBeJoinedQueuePrefix))
 
 	err := toBeJoinedQueue.Push(ctx, &QueueElement{
@@ -349,6 +373,17 @@ func (rs *LookupJoinStream) HandleControlMessages(ctx context.Context, tx storag
 	}
 }
 
+func (rs *LookupJoinStream) ReadyForMore(ctx context.Context, tx storage.StateTransaction) error {
+	tokenQueue := NewOutputQueue(tx.WithPrefix(jobTokenQueuePrefix))
+
+	var token octosql.Value
+	if err := tokenQueue.Pop(ctx, &token); err != nil {
+		return errors.Wrap(err, "couldn't get job token from token queue")
+	}
+
+	return nil
+}
+
 func (rs *LookupJoinStream) GetNextRecord(ctx context.Context, tx storage.StateTransaction) (*Record, error) {
 	var jobs = storage.NewMap(tx.WithPrefix(jobsPrefix))
 
@@ -471,6 +506,12 @@ func (rs *LookupJoinStream) GetNextRecord(ctx context.Context, tx storage.StateT
 
 			if err := recordsQueue.Clear(); err != nil {
 				return nil, errors.Wrapf(err, "couldn't clear joined record queue for job with recordID %s", jobRecordID.Show())
+			}
+
+			tokenQueue := NewOutputQueue(tx.WithPrefix(jobTokenQueuePrefix))
+			token := octosql.MakePhantom()
+			if err := tokenQueue.Push(ctx, &token); err != nil {
+				return nil, errors.Wrap(err, "couldn't push job token to token queue")
 			}
 
 			err := rs.HandleControlMessages(ctx, tx)
@@ -599,6 +640,7 @@ func (j *JobOutputQueueIntermediateRecordStore) GetWatermark(ctx context.Context
 }
 
 func (j *JobOutputQueueIntermediateRecordStore) MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error {
+	atomic.AddInt64(&jobCount, -1)
 	outputQueue := storage.NewDeque(tx.WithPrefix(outputPrefix).WithPrefix(j.recordID.AsPrefix()))
 
 	element := QueueElement{
@@ -627,6 +669,10 @@ func (j *JobOutputQueueIntermediateRecordStore) MarkError(ctx context.Context, t
 		return errors.Wrapf(err, "couldn't mark error on output queue for source record id %s", j.recordID.Show())
 	}
 
+	return nil
+}
+
+func (j *JobOutputQueueIntermediateRecordStore) ReadyForMore(ctx context.Context, tx storage.StateTransaction) error {
 	return nil
 }
 

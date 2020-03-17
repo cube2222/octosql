@@ -52,13 +52,30 @@ func (node *LookupJoin) Get(ctx context.Context, variables octosql.Variables, st
 		return nil, nil, errors.Wrap(err, "couldn't get source record stream")
 	}
 
-	// Fill the token queue with initial tokens.
-	tokenQueue := NewOutputQueue(tx.WithPrefix(streamID.AsPrefix()).WithPrefix(jobTokenQueuePrefix))
-	token := octosql.MakePhantom()
-	for i := 0; i < node.maxJobsCount; i++ {
-		if err := tokenQueue.Push(ctx, &token); err != nil {
-			return nil, nil, errors.Wrap(err, "couldn't push job token to token queue")
+	isInitialized := storage.NewValueState(tx.WithPrefix(streamID.AsPrefix()).WithPrefix(isInitializedPrefix))
+	var phantom octosql.Value
+
+	err = isInitialized.Get(&phantom)
+	if err == storage.ErrNotFound {
+		fmt.Println("initializing")
+		// Not initialized, initialize here.
+
+		// Fill the token queue with initial tokens.
+		tokenQueue := NewOutputQueue(tx.WithPrefix(streamID.AsPrefix()).WithPrefix(jobTokenQueuePrefix))
+		token := octosql.MakePhantom()
+		for i := 0; i < node.maxJobsCount; i++ {
+			if err := tokenQueue.Push(ctx, &token); err != nil {
+				return nil, nil, errors.Wrap(err, "couldn't push job token to token queue")
+			}
 		}
+
+		phantom = octosql.MakePhantom()
+		err := isInitialized.Set(&phantom)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "couldn't save initialization status of lookup join")
+		}
+	} else if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't get initialization status of lookup join")
 	}
 
 	rs := &LookupJoinStream{
@@ -97,6 +114,7 @@ var sourceRecordPrefix = []byte("$source_record$")
 var controlMessagesQueuePrefix = []byte("$control_messages$")
 var alreadyJoinedForRecordPrefix = []byte("$already_joined_for_record$")
 var jobTokenQueuePrefix = []byte("$job_tokens$")
+var isInitializedPrefix = []byte("$initialized$")
 
 // The scheduler takes records from the toBeJoined queue, and starts jobs to do joins.
 // Control messages (records too, to satisfy the initial ordering of messages) are put on a controlMessages queue,

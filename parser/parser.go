@@ -242,15 +242,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 	}
 
 	if len(statement.Distinct) > 0 {
-		triggers := make([]logical.Trigger, len(statement.Trigger))
-		for i := range statement.Trigger {
-			triggers[i], err = ParseTrigger(statement.Trigger[i])
-			if err != nil {
-				return nil, errors.Wrapf(err, "couldn't parse trigger with index %d", i)
-			}
-		}
-
-		root = logical.NewDistinct(root, triggers)
+		root = logical.NewDistinct(root)
 	}
 
 	if statement.Limit != nil {

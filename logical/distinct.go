@@ -9,15 +9,11 @@ import (
 )
 
 type Distinct struct {
-	child    Node
-	triggers []Trigger
+	child Node
 }
 
-func NewDistinct(child Node, triggers []Trigger) *Distinct {
-	return &Distinct{
-		child:    child,
-		triggers: triggers,
-	}
+func NewDistinct(child Node) *Distinct {
+	return &Distinct{child: child}
 }
 
 func (node *Distinct) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
@@ -42,6 +38,8 @@ func (node *Distinct) Physical(ctx context.Context, physicalCreator *PhysicalPla
 		castExpressions[i] = expr.(Expression)
 	}
 
-	groupByNode := NewGroupBy(typed, castExpressions, names, aggregates, as, node.triggers)
+	trigger := NewCountingTrigger(NewConstant(1))
+
+	groupByNode := NewGroupBy(typed, castExpressions, names, aggregates, as, []Trigger{trigger})
 	return groupByNode.Physical(ctx, physicalCreator)
 }

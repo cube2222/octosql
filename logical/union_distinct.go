@@ -15,5 +15,5 @@ func NewUnionDistinct(first, second Node) *UnionDistinct {
 }
 
 func (node *UnionDistinct) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
-	return NewDistinct(NewUnionAll(node.first, node.second), nil).Physical(ctx, physicalCreator)
+	return NewDistinct(NewUnionAll(node.first, node.second)).Physical(ctx, physicalCreator)
 }

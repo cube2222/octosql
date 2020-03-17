@@ -178,11 +178,18 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 		tx.Abort() // We only read data above, no need to risk failing now.
 
 		// Adding offset value to variables
-		offsetVariable := octosql.NewVariables(map[octosql.VariableName]octosql.Value{offsetPlaceholderName: octosql.MakeInt(rs.offset)})
-		rs.variables, err = rs.variables.MergeWith(offsetVariable)
-		if err != nil {
-			log.Fatalf("sql worker: couldn't merge variables with offset variable: %s", err)
-			return
+		newOffsetValue := octosql.MakeInt(rs.offset)
+
+		offsetValue, err := rs.variables.Get(offsetPlaceholderName)
+		if offsetValue.GetType() == octosql.TypeNull { // the variable doesn't exist, merge it with variables
+			offsetVariable := octosql.NewVariables(map[octosql.VariableName]octosql.Value{offsetPlaceholderName: newOffsetValue})
+			rs.variables, err = rs.variables.MergeWith(offsetVariable)
+			if err != nil {
+				log.Fatalf("sql worker: couldn't merge variables with offset variable: %s", err)
+				return
+			}
+		} else { // just update value in variables // TODO - maybe think about some Set() method on variables? MergeWith returns error when exists
+			rs.variables[offsetPlaceholderName] = newOffsetValue
 		}
 
 		values := make([]interface{}, 0)
@@ -256,17 +263,6 @@ var outputQueuePrefix = []byte("$output_queue$")
 func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateTransaction) error {
 	outputQueue := execution.NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
 
-	if rs.isDone {
-		err := outputQueue.Push(ctx, &kafka.QueueElement{
-			Type: &kafka.QueueElement_Error{
-				Error: execution.ErrEndOfStream.Error(),
-			},
-		})
-		if err != nil {
-			return errors.Wrapf(err, "couldn't push sql EndOfStream to output record queue")
-		}
-	}
-
 	batch := make([]*execution.Record, rs.batchSize)
 	for i := 0; i < rs.batchSize; i++ {
 		if rs.isDone {
@@ -298,6 +294,19 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 		}
 
 		batch[i] = execution.NewRecord(fields, resultMap)
+	}
+
+	if rs.isDone {
+		err := outputQueue.Push(ctx, &kafka.QueueElement{
+			Type: &kafka.QueueElement_Error{
+				Error: execution.ErrEndOfStream.Error(),
+			},
+		})
+		if err != nil {
+			return errors.Wrapf(err, "couldn't push sql EndOfStream to output record queue")
+		}
+
+		return nil
 	}
 
 	for i := range batch {

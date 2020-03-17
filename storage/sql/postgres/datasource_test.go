@@ -8,12 +8,13 @@ import (
 	"testing"
 	"time"
 
+	_ "github.com/lib/pq"
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
-	_ "github.com/lib/pq"
-	"github.com/pkg/errors"
 )
 
 func TestDataSource_Get(t *testing.T) {
@@ -304,10 +305,12 @@ func TestDataSource_Get(t *testing.T) {
 								"password":     password,
 								"databaseName": dbname,
 								"tableName":    args.tablename,
+								"batchSize":    2,
 							},
 						},
 					},
 				},
+				Storage: execution.GetTestStorage(t),
 			})
 			if err != nil {
 				t.Errorf("Couldn't get ExecutionNode: %v", err)

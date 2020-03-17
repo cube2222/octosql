@@ -49,7 +49,7 @@ func (node *LookupJoin) Get(ctx context.Context, variables octosql.Variables, st
 
 	err = isInitialized.Get(&phantom)
 	if err == storage.ErrNotFound {
-		fmt.Println("initializing")
+		log.Println("initializing")
 		// Not initialized, initialize here.
 
 		// Fill the token queue with initial tokens.

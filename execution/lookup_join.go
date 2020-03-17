@@ -2,9 +2,7 @@ package execution
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"sync/atomic"
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
@@ -49,8 +47,8 @@ func (node *LookupJoin) Get(ctx context.Context, variables octosql.Variables, st
 
 	err = isInitialized.Get(&phantom)
 	if err == storage.ErrNotFound {
-		log.Println("initializing")
 		// Not initialized, initialize here.
+		log.Println("initializing")
 
 		// Fill the token queue with initial tokens.
 		tokenQueue := NewOutputQueue(tx.WithPrefix(streamID.AsPrefix()).WithPrefix(jobTokenQueuePrefix))

@@ -9,11 +9,15 @@ import (
 )
 
 type Distinct struct {
-	child Node
+	child    Node
+	triggers []Trigger
 }
 
-func NewDistinct(child Node) *Distinct {
-	return &Distinct{child: child}
+func NewDistinct(child Node, triggers []Trigger) *Distinct {
+	return &Distinct{
+		child:    child,
+		triggers: triggers,
+	}
 }
 
 func (node *Distinct) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
@@ -38,20 +42,6 @@ func (node *Distinct) Physical(ctx context.Context, physicalCreator *PhysicalPla
 		castExpressions[i] = expr.(Expression)
 	}
 
-	groupByNode := NewGroupBy(typed, castExpressions, names, aggregates, as, nil)
-	//TODO: what trigger(s) should be added here? CountingTrigger(1)?
-
+	groupByNode := NewGroupBy(typed, castExpressions, names, aggregates, as, node.triggers)
 	return groupByNode.Physical(ctx, physicalCreator)
-
-	//sourceNodes, variables, err := node.child.Physical(ctx, physicalCreator)
-	//if err != nil {
-	//	return nil, nil, errors.Wrap(err, "couldn't get source nodes physical plan in distinct")
-	//}
-	//
-	//outNodes := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
-	//for i := range outNodes {
-	//	outNodes[i] = physical.NewDistinct(outNodes[i])
-	//}
-	//
-	//return outNodes, variables, nil
 }

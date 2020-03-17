@@ -5,7 +5,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
@@ -42,11 +41,11 @@ func (node *LeftJoin) Materialize(ctx context.Context, matCtx *MaterializationCo
 		return nil, errors.Wrap(err, "couldn't materialize joined node")
 	}
 
-	return execution.NewLookupJoin(matCtx.Storage, materializedSource, materializedJoined), nil
+	return execution.NewLookupJoin(matCtx.Storage, materializedSource, materializedJoined, true), nil
 }
 
 func (node *LeftJoin) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMetadata(metadata.CombineCardinalities(node.Source.Metadata().Cardinality(), node.Joined.Metadata().Cardinality()), octosql.NewVariableName(""))
+	return metadata.NewNodeMetadata(metadata.CombineCardinalities(node.Source.Metadata().Cardinality(), node.Joined.Metadata().Cardinality()), node.Source.Metadata().EventTimeField())
 }
 
 func (node *LeftJoin) Visualize() *graph.Node {

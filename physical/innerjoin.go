@@ -3,12 +3,11 @@ package physical
 import (
 	"context"
 
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/config"
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
-	"github.com/pkg/errors"
 )
 
 type InnerJoin struct {
@@ -32,10 +31,10 @@ func (node *InnerJoin) Transform(ctx context.Context, transformers *Transformers
 }
 
 func (node *InnerJoin) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
-	prefetchCount, err := config.GetInt(matCtx.Config.Execution, "lookupJoinPrefetchCount", config.WithDefault(32))
+	/*prefetchCount, err := config.GetInt(matCtx.Config.Execution, "lookupJoinPrefetchCount", config.WithDefault(32))
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get lookupJoinPrefetchCount configuration")
-	}
+	}*/
 
 	materializedSource, err := node.Source.Materialize(ctx, matCtx)
 	if err != nil {
@@ -47,11 +46,11 @@ func (node *InnerJoin) Materialize(ctx context.Context, matCtx *MaterializationC
 		return nil, errors.Wrap(err, "couldn't materialize joined node")
 	}
 
-	return execution.NewInnerJoin(prefetchCount, materializedSource, materializedJoined), nil
+	return execution.NewLookupJoin(matCtx.Storage, materializedSource, materializedJoined, false), nil
 }
 
 func (node *InnerJoin) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMetadata(metadata.CombineCardinalities(node.Source.Metadata().Cardinality(), node.Joined.Metadata().Cardinality()), octosql.NewVariableName(""))
+	return metadata.NewNodeMetadata(metadata.CombineCardinalities(node.Source.Metadata().Cardinality(), node.Joined.Metadata().Cardinality()), node.Source.Metadata().EventTimeField())
 }
 
 func (node *InnerJoin) Visualize() *graph.Node {

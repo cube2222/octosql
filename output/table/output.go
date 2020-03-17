@@ -2,6 +2,7 @@ package table
 
 import (
 	"io"
+	"log"
 
 	"github.com/olekukonko/tablewriter"
 
@@ -29,6 +30,7 @@ func (o *Output) WriteRecord(record *execution.Record) error {
 }
 
 func (o *Output) Close() error {
+	log.Println("closed")
 	var fields []string
 	for _, record := range o.records {
 		for _, field := range record.ShowFields() {

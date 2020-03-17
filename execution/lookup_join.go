@@ -15,13 +15,16 @@ import (
 type LookupJoin struct {
 	source, joined Node
 	stateStorage   storage.Storage
+
+	isLeftJoin bool
 }
 
-func NewLookupJoin(stateStorage storage.Storage, source Node, joined Node) *LookupJoin {
+func NewLookupJoin(stateStorage storage.Storage, source Node, joined Node, isLeftJoin bool) *LookupJoin {
 	return &LookupJoin{
 		source:       source,
 		joined:       joined,
 		stateStorage: stateStorage,
+		isLeftJoin:   isLeftJoin,
 	}
 }
 
@@ -41,7 +44,10 @@ func (node *LookupJoin) Get(ctx context.Context, variables octosql.Variables, st
 		stateStorage: node.stateStorage,
 		variables:    variables,
 		streamID:     streamID,
-		joinedNode:   node.joined,
+
+		isLeftJoin: node.isLeftJoin,
+
+		joinedNode: node.joined,
 	}
 
 	go rs.RunScheduler(ctx)
@@ -57,6 +63,9 @@ type LookupJoinStream struct {
 	variables    octosql.Variables
 	streamID     *StreamID
 
+	// isLeftJoin dictates if we send the source record alone if there are no records to join with it.
+	isLeftJoin bool
+
 	joinedNode Node
 }
 
@@ -65,6 +74,7 @@ var toBeJoinedQueuePrefix = []byte("$to_be_joined$")
 var jobsPrefix = []byte("$jobs$")
 var sourceRecordPrefix = []byte("$source_record$")
 var controlMessagesQueuePrefix = []byte("$control_messages$")
+var alreadyJoinedForRecordPrefix = []byte("$already_joined_for_record$")
 
 // The scheduler takes records from the toBeJoined queue, and starts jobs to do joins.
 // Control messages (records too, to satisfy the initial ordering of messages) are put on a controlMessages queue,
@@ -130,7 +140,7 @@ func (rs *LookupJoinStream) loopScheduler(ctx context.Context) error {
 		// Run the worker.
 		// If we crash after committing, but before running the worker,
 		// then the worker will be started on stream creation.
-		go rs.RunWorker(ctx, recordID)
+		go rs.RunWorker(ctx, recordID) // TODO: Worker restart on app start.
 
 		return nil
 
@@ -348,18 +358,80 @@ func (rs *LookupJoinStream) GetNextRecord(ctx context.Context, tx storage.StateT
 	var phantom octosql.Value
 	var err error
 	for err = iter.Next(&jobRecordID, &phantom); err == nil; err = iter.Next(&jobRecordID, &phantom) {
+		sourceRecordState := storage.NewValueState(tx.WithPrefix(jobRecordID.AsPrefix()).WithPrefix(sourceRecordPrefix))
 		recordsQueue := storage.NewDeque(tx.WithPrefix(outputPrefix).WithPrefix(jobRecordID.AsPrefix()))
 
 		var outputElement QueueElement
-		err := recordsQueue.PopFront(&outputElement)
+
+		if rs.isLeftJoin {
+			err := recordsQueue.PeekFront(&outputElement)
+			if err == storage.ErrNotFound {
+				log.Printf("next record for job %s: not found", jobRecordID.Show())
+				continue
+			} else if err != nil {
+				return nil, errors.Wrapf(err, "couldn't peek element from output queue for job with recordID %s", jobRecordID.Show())
+			}
+			switch outputElement.Type.(type) {
+			case *QueueElement_Record:
+				// If this is a left join, save that we've now joined a record for this source record if we haven't already.
+				if rs.isLeftJoin {
+					alreadyJoinedSomethingForRecordState := storage.NewValueState(tx.WithPrefix(jobRecordID.AsPrefix()).WithPrefix(alreadyJoinedForRecordPrefix))
+					var phantom octosql.Value
+					err := alreadyJoinedSomethingForRecordState.Get(&phantom)
+					if err == storage.ErrNotFound {
+						phantom = octosql.MakePhantom()
+						if err := alreadyJoinedSomethingForRecordState.Set(&phantom); err != nil {
+							return nil, errors.Wrapf(err, "couldn't save that a record was now joined for job with recordID %s", jobRecordID.Show())
+						}
+					} else if err != nil {
+						return nil, errors.Wrapf(err, "couldn't check if any record was already joined for job with recordID %s", jobRecordID.Show())
+					}
+				}
+
+			case *QueueElement_EndOfStream:
+				// If this is a left join and we haven't joined anything for this source record,
+				// then send the record without anything attached.
+				if rs.isLeftJoin {
+					alreadyJoinedSomethingForRecordState := storage.NewValueState(tx.WithPrefix(jobRecordID.AsPrefix()).WithPrefix(alreadyJoinedForRecordPrefix))
+					var phantom octosql.Value
+					err := alreadyJoinedSomethingForRecordState.Get(&phantom)
+					if err == storage.ErrNotFound {
+						phantom = octosql.MakePhantom()
+						if err := alreadyJoinedSomethingForRecordState.Set(&phantom); err != nil {
+							return nil, errors.Wrapf(err, "couldn't save that a record was now joined for job with recordID %s", jobRecordID.Show())
+						}
+
+						var sourceRecord Record
+						if err = sourceRecordState.Get(&sourceRecord); err != nil {
+							return nil, errors.Wrapf(err, "couldn't get source record for job with recordID %s", jobRecordID.Show())
+						}
+
+						if err := iter.Close(); err != nil {
+							return nil, errors.Wrap(err, "couldn't close jobs iterator")
+						}
+
+						return &sourceRecord, nil
+					} else if err != nil {
+						return nil, errors.Wrapf(err, "couldn't check if any record was already joined for job with recordID %s", jobRecordID.Show())
+					} else if err == nil {
+						// We've already sent an output record for this source record, so we can clear the state.
+						if err := alreadyJoinedSomethingForRecordState.Clear(); err != nil {
+							return nil, errors.Wrapf(err, "couldn't clear information about already having sent a record for job with recordID %s", jobRecordID.Show())
+						}
+					}
+				}
+
+			default:
+			}
+		}
+
+		err = recordsQueue.PopFront(&outputElement)
 		if err == storage.ErrNotFound {
 			log.Printf("next record for job %s: not found", jobRecordID.Show())
 			continue
 		} else if err != nil {
 			return nil, errors.Wrapf(err, "couldn't get element from output queue for job with recordID %s", jobRecordID.Show())
 		}
-
-		sourceRecordState := storage.NewValueState(tx.WithPrefix(jobRecordID.AsPrefix()).WithPrefix(sourceRecordPrefix))
 
 		log.Printf("next record for job %s: %s", jobRecordID.Show(), outputElement.String())
 
@@ -395,6 +467,10 @@ func (rs *LookupJoinStream) GetNextRecord(ctx context.Context, tx storage.StateT
 
 			if err := jobs.Delete(&jobRecordID); err != nil {
 				return nil, errors.Wrapf(err, "couldn't delete job with recordID %s from jobs list", jobRecordID.Show())
+			}
+
+			if err := recordsQueue.Clear(); err != nil {
+				return nil, errors.Wrapf(err, "couldn't clear joined record queue for job with recordID %s", jobRecordID.Show())
 			}
 
 			err := rs.HandleControlMessages(ctx, tx)

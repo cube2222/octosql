@@ -14,8 +14,6 @@ import (
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
-var jobCount int64
-
 type LookupJoin struct {
 	maxJobsCount   int
 	source, joined Node
@@ -35,12 +33,6 @@ func NewLookupJoin(maxJobsCount int, stateStorage storage.Storage, source Node, 
 }
 
 func (node *LookupJoin) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
-	go func() {
-		for range time.Tick(time.Second) {
-			fmt.Printf("current job count: %d\n", atomic.LoadInt64(&jobCount))
-		}
-	}()
-
 	tx := storage.GetStateTransactionFromContext(ctx)
 	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {
@@ -253,8 +245,6 @@ func (rs *LookupJoinStream) RunWorker(ctx context.Context, id *ID) error {
 }
 
 func (rs *LookupJoinStream) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *Record) error {
-	atomic.AddInt64(&jobCount, 1)
-
 	var toBeJoinedQueue = NewOutputQueue(tx.WithPrefix(toBeJoinedQueuePrefix))
 
 	err := toBeJoinedQueue.Push(ctx, &QueueElement{
@@ -658,7 +648,6 @@ func (j *JobOutputQueueIntermediateRecordStore) GetWatermark(ctx context.Context
 }
 
 func (j *JobOutputQueueIntermediateRecordStore) MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error {
-	atomic.AddInt64(&jobCount, -1)
 	outputQueue := storage.NewDeque(tx.WithPrefix(outputPrefix).WithPrefix(j.recordID.AsPrefix()))
 
 	element := QueueElement{

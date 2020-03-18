@@ -3,14 +3,20 @@ package execution
 import "context"
 
 type InMemoryStream struct {
-	data  []*Record
-	index int
+	data     []*Record
+	index    int
+	streamID *StreamID
 }
 
 func NewInMemoryStream(data []*Record) *InMemoryStream {
+	streamID := GetRawStreamID()
+
+	outputQueue := NewOutputQueue()
+
 	return &InMemoryStream{
-		data:  data,
-		index: 0,
+		data:     data,
+		index:    0,
+		streamID: streamID,
 	}
 }
 

@@ -23,6 +23,7 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 		source      Node
 		joined      Node
 		maxJobCount int
+		isLeftJoin  bool
 	}
 	tests := []struct {
 		name    string
@@ -34,6 +35,7 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 			name: "simple left join",
 			fields: fields{
 				maxJobCount: 1,
+				isLeftJoin:  true,
 				variables: map[octosql.VariableName]octosql.Value{
 					octosql.NewVariableName("const"): octosql.MakeInt(3),
 				},
@@ -122,6 +124,7 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 			name: "simple left join",
 			fields: fields{
 				maxJobCount: 2,
+				isLeftJoin:  true,
 				variables: map[octosql.VariableName]octosql.Value{
 					octosql.NewVariableName("const"): octosql.MakeInt(3),
 				},
@@ -207,9 +210,90 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "simple inner join",
+			fields: fields{
+				maxJobCount: 1,
+				isLeftJoin:  false,
+				variables: map[octosql.VariableName]octosql.Value{
+					octosql.NewVariableName("const"): octosql.MakeInt(3),
+				},
+				source: NewDummyNode(
+					[]*Record{
+						NewRecordFromSliceWithNormalize(
+							fieldNames,
+							[]interface{}{"red", "test"},
+							WithID(NewRecordID("00")),
+						),
+						NewRecordFromSliceWithNormalize(
+							fieldNames,
+							[]interface{}{"blue", "test2"},
+							WithID(NewRecordID("01")),
+						),
+						NewRecordFromSliceWithNormalize(
+							fieldNames,
+							[]interface{}{"green", "test3"},
+							WithID(NewRecordID("02")),
+						),
+					},
+				),
+				joined: NewFilter(
+					NewAnd(
+						NewPredicate(
+							NewVariable("score"),
+							&MoreThan{},
+							NewVariable("const"),
+						),
+						NewPredicate(
+							NewVariable("bike"),
+							&Equal{},
+							NewVariable("color"),
+						),
+					),
+					NewDummyNode([]*Record{
+						NewRecordFromSliceWithNormalize(
+							fieldNames2,
+							[]interface{}{"green", 7},
+						),
+						NewRecordFromSliceWithNormalize(
+							fieldNames2,
+							[]interface{}{"red", 5},
+						),
+						NewRecordFromSliceWithNormalize(
+							fieldNames2,
+							[]interface{}{"green", 4},
+						),
+						NewRecordFromSliceWithNormalize(
+							fieldNames2,
+							[]interface{}{"green", 2},
+						),
+					})),
+			},
+			want: NewInMemoryStream(
+				[]*Record{
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"bike", "name", "color", "score"},
+						[]interface{}{"red", "test", "red", 5},
+						WithID(NewRecordID("11")),
+					),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"bike", "name", "color", "score"},
+						[]interface{}{"green", "test3", "green", 7},
+						WithID(NewRecordID("10")),
+					),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"bike", "name", "color", "score"},
+						[]interface{}{"green", "test3", "green", 4},
+						WithID(NewRecordID("12")),
+					),
+				},
+			),
+			wantErr: false,
+		},
+		{
 			name: "empty stream",
 			fields: fields{
 				maxJobCount: 1,
+				isLeftJoin:  true,
 				variables: map[octosql.VariableName]octosql.Value{
 					octosql.NewVariableName("const"): octosql.MakeInt(3),
 				},
@@ -226,7 +310,7 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 			tx := stateStorage.BeginTransaction()
 			ctx := storage.InjectStateTransaction(context.Background(), tx)
 
-			stream := NewLookupJoin(tt.fields.maxJobCount, stateStorage, tt.fields.source, tt.fields.joined, true)
+			stream := NewLookupJoin(tt.fields.maxJobCount, stateStorage, tt.fields.source, tt.fields.joined, tt.fields.isLeftJoin)
 
 			rs, _, err := stream.Get(ctx, tt.fields.variables, GetRawStreamID())
 			if err != nil {
@@ -239,7 +323,7 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 
 			err = AreStreamsEqualNoOrdering(ctx, stateStorage, rs, tt.want)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("LeftJoinedStream.Next() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("LookupJoin error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 		})

@@ -31,8 +31,11 @@ func (node *Distinct) Physical(ctx context.Context, physicalCreator *PhysicalPla
 
 	for i, expr := range typed.expressions {
 		if _, ok := expr.(*StarExpression); !ok {
+			name := expr.Name()
+
 			aggregates = append(aggregates, First)
-			names = append(names, expr.Name())
+			names = append(names, name)
+			as[i] = name
 		}
 
 		castExpressions[i] = expr.(Expression)

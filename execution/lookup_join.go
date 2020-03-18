@@ -248,7 +248,7 @@ func (rs *LookupJoinStream) RunWorker(ctx context.Context, id *RecordID) error {
 
 	jobVariables, err := sourceRecord.AsVariables().MergeWith(rs.variables)
 	if err != nil {
-		return errors.Wrapf(err, "couldn't merge node variables with current record variables: %s and %s", rs.variables, sourceRecord.Show())
+		return errors.Wrapf(err, "couldn't merge node variables with current record variables: %v and %s", rs.variables, sourceRecord.Show())
 	}
 
 	joinedStream, _, err := rs.joinedNode.Get(storage.InjectStateTransaction(ctx, tx), jobVariables, sourceStreamID)

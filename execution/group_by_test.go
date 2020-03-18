@@ -64,12 +64,9 @@ func TestGroupBy_SimpleBatch(t *testing.T) {
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{5, 9.0, 1}),
 	}
 
-	ok, err := AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(expectedOutput), stream)
+	err = AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(expectedOutput), stream)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if !ok {
-		t.Fatal("streams not equal")
 	}
 }
 
@@ -133,12 +130,9 @@ func TestGroupBy_BatchWithUndos(t *testing.T) {
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{5, 9.0, 1}),
 	}
 
-	ok, err := AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(expectedOutput), stream)
+	err = AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(expectedOutput), stream)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if !ok {
-		t.Fatal("streams not equal")
 	}
 }
 
@@ -218,12 +212,9 @@ func TestGroupBy_WithOutputUndos(t *testing.T) {
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{3, 5.0, 2}),
 	}
 
-	ok, err := AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(expectedOutput), stream)
+	err = AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(expectedOutput), stream)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if !ok {
-		t.Fatal("streams not equal")
 	}
 }
 
@@ -276,12 +267,9 @@ func TestGroupBy_newRecordsNoChanges(t *testing.T) {
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{3, 5.0}),
 	}
 
-	ok, err := AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(expectedOutput), stream)
+	err = AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(expectedOutput), stream)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if !ok {
-		t.Fatal("streams not equal")
 	}
 }
 
@@ -359,11 +347,8 @@ func TestGroupBy_EventTimes(t *testing.T) {
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{thirdWindow, 3, 4.5, 2}, WithEventTimeField(octosql.NewVariableName("renamed_t"))),
 	}
 
-	ok, err := AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(expectedOutput), stream)
+	err = AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(expectedOutput), stream)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if !ok {
-		t.Fatal("streams not equal")
 	}
 }

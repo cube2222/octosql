@@ -130,13 +130,13 @@ func AreStreamsEqual(ctx context.Context, first, second RecordStream) (bool, err
 	return true, nil
 }
 
-func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage, first, second RecordStream) (bool, error) {
+func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage, first, second RecordStream) error {
 	firstMultiSet := newMultiSet()
 	secondMultiSet := newMultiSet()
 
 	firstRecords, err := ReadAll(ctx, stateStorage, first)
 	if err != nil {
-		return false, errors.Wrap(err, "couldn't read first stream records")
+		return errors.Wrap(err, "couldn't read first stream records")
 	}
 	for _, rec := range firstRecords {
 		firstMultiSet.Insert(rec)
@@ -144,7 +144,7 @@ func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage
 
 	secondRecords, err := ReadAll(ctx, stateStorage, second)
 	if err != nil {
-		return false, errors.Wrap(err, "couldn't read second stream records")
+		return errors.Wrap(err, "couldn't read second stream records")
 	}
 	for _, rec := range secondRecords {
 		secondMultiSet.Insert(rec)
@@ -153,10 +153,10 @@ func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage
 	firstContained := firstMultiSet.isContainedIn(secondMultiSet)
 	secondContained := secondMultiSet.isContainedIn(firstMultiSet)
 	if !(firstContained && secondContained) {
-		return false, nil
+		return errors.Errorf("different sets: %s and %s", firstMultiSet.Show(), secondMultiSet.Show())
 	}
 
-	return true, nil
+	return nil
 }
 
 func AreStreamsEqualNoOrderingWithCount(ctx context.Context, stateStorage storage.Storage, first, second RecordStream, count int) error {

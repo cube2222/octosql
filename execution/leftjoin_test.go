@@ -1,6 +1,14 @@
 package execution
 
-/*func TestLeftJoinedStream_Next(t *testing.T) {
+import (
+	"context"
+	"testing"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/streaming/storage"
+)
+
+func TestLeftJoinedStream_Next(t *testing.T) {
 	fieldNames := []octosql.VariableName{
 		octosql.NewVariableName("bike"),
 		octosql.NewVariableName("name"),
@@ -12,7 +20,7 @@ package execution
 
 	type fields struct {
 		variables octosql.Variables
-		source    RecordStream
+		source    Node
 		joined    Node
 	}
 	tests := []struct {
@@ -27,19 +35,22 @@ package execution
 				variables: map[octosql.VariableName]octosql.Value{
 					octosql.NewVariableName("const"): octosql.MakeInt(3),
 				},
-				source: NewInMemoryStream(
+				source: NewDummyNode(
 					[]*Record{
 						NewRecordFromSliceWithNormalize(
 							fieldNames,
 							[]interface{}{"red", "test"},
+							WithID(NewRecordID("00")),
 						),
 						NewRecordFromSliceWithNormalize(
 							fieldNames,
 							[]interface{}{"blue", "test2"},
+							WithID(NewRecordID("01")),
 						),
 						NewRecordFromSliceWithNormalize(
 							fieldNames,
 							[]interface{}{"green", "test3"},
+							WithID(NewRecordID("02")),
 						),
 					},
 				),
@@ -60,18 +71,22 @@ package execution
 						NewRecordFromSliceWithNormalize(
 							fieldNames2,
 							[]interface{}{"green", 7},
+							WithID(NewRecordID("10")),
 						),
 						NewRecordFromSliceWithNormalize(
 							fieldNames2,
 							[]interface{}{"red", 5},
+							WithID(NewRecordID("11")),
 						),
 						NewRecordFromSliceWithNormalize(
 							fieldNames2,
 							[]interface{}{"green", 4},
+							WithID(NewRecordID("12")),
 						),
 						NewRecordFromSliceWithNormalize(
 							fieldNames2,
 							[]interface{}{"green", 2},
+							WithID(NewRecordID("13")),
 						),
 					})),
 			},
@@ -80,18 +95,22 @@ package execution
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"bike", "name", "color", "score"},
 						[]interface{}{"red", "test", "red", 5},
+						WithID(NewRecordID("11")),
 					),
 					NewRecordFromSliceWithNormalize(
 						fieldNames,
 						[]interface{}{"blue", "test2"},
+						WithID(NewRecordID("01")),
 					),
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"bike", "name", "color", "score"},
 						[]interface{}{"green", "test3", "green", 7},
+						WithID(NewRecordID("10")),
 					),
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"bike", "name", "color", "score"},
 						[]interface{}{"green", "test3", "green", 4},
+						WithID(NewRecordID("12")),
 					),
 				},
 			),
@@ -103,7 +122,7 @@ package execution
 				variables: map[octosql.VariableName]octosql.Value{
 					octosql.NewVariableName("const"): octosql.MakeInt(3),
 				},
-				source: NewInMemoryStream(nil),
+				source: NewDummyNode(nil),
 				joined: NewDummyNode(nil),
 			},
 			want:    NewInMemoryStream(nil),
@@ -112,28 +131,26 @@ package execution
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stream := &LeftJoinedStream{
-				joiner: NewJoiner(
-					2,
-					tt.fields.variables,
-					tt.fields.source,
-					tt.fields.joined,
-				),
-			}
 			stateStorage := GetTestStorage(t)
 			tx := stateStorage.BeginTransaction()
 			ctx := storage.InjectStateTransaction(context.Background(), tx)
 
-			equal, err := AreStreamsEqual(ctx, stream, tt.want)
+			stream := NewLookupJoin(2, stateStorage, tt.fields.source, tt.fields.joined, true)
+
+			rs, _, err := stream.Get(ctx, tt.fields.variables, GetRawStreamID())
+			if err != nil {
+				t.Fatal("couldn't get record stream: ", err)
+			}
+
+			if err := tx.Commit(); err != nil {
+				t.Fatal(err)
+			}
+
+			err = AreStreamsEqualNoOrdering(ctx, stateStorage, rs, tt.want)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LeftJoinedStream.Next() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if err == nil && !equal {
-				t.Errorf("LeftJoinedStream.Next() streams not equal")
-			}
-
-			tx.Commit()
 		})
 	}
-}*/
+}

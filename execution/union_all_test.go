@@ -110,13 +110,10 @@ func TestUnionAll(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			equal, err := AreStreamsEqualNoOrdering(context.Background(), stateStorage, stream, tt.want)
+			err = AreStreamsEqualNoOrdering(context.Background(), stateStorage, stream, tt.want)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("UnionAll.Next() error = %v, wantErr %v", err, tt.wantErr)
 				return
-			}
-			if err == nil && !equal {
-				t.Errorf("UnionAll.Next() streams not equal")
 			}
 		})
 	}

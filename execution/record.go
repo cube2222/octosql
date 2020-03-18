@@ -232,6 +232,13 @@ func (r *Record) Hash() (uint64, error) {
 }
 
 // GetRandomRecordID can be used to get a new random RecordID.
+func NewRecordID(id string) *RecordID {
+	return &RecordID{
+		ID: id,
+	}
+}
+
+// GetRandomRecordID can be used to get a new random RecordID.
 func GetRandomRecordID() *RecordID {
 	id := ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader)
 	return &RecordID{

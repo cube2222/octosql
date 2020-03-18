@@ -490,14 +490,9 @@ func TestDistinct_Get(t *testing.T) {
 
 			stateStorage := GetTestStorage(t)
 
-			equal, err := AreStreamsEqualNoOrdering(context.Background(), stateStorage, tt.want, distinct)
+			err := AreStreamsEqualNoOrdering(context.Background(), stateStorage, tt.want, distinct)
 			if err != nil {
 				t.Errorf("Error in AreStreamsEqual()")
-				return
-			}
-
-			if !equal {
-				t.Errorf("Streams don't match")
 				return
 			}
 		})

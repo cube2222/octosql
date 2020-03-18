@@ -27,7 +27,7 @@ func TestTumble_Get(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    execution.RecordStream
+		want    execution.Node
 		wantErr bool
 	}{
 		{
@@ -61,7 +61,7 @@ func TestTumble_Get(t *testing.T) {
 					"offset":        octosql.MakeDuration(time.Second * 3),
 				}),
 			},
-			want: execution.NewInMemoryStream(ctx, []*execution.Record{
+			want: execution.NewDummyNode([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time", "window_start", "window_end"},
 					[]interface{}{1, baseTime, baseTime.Add(time.Second * -7), baseTime.Add(time.Second * 3)},
@@ -116,7 +116,7 @@ func TestTumble_Get(t *testing.T) {
 					"offset":        octosql.MakeDuration(0),
 				}),
 			},
-			want: execution.NewInMemoryStream(ctx, []*execution.Record{
+			want: execution.NewDummyNode([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time", "window_start", "window_end"},
 					[]interface{}{1, baseTime, baseTime, baseTime.Add(time.Second * 10)},
@@ -159,7 +159,12 @@ func TestTumble_Get(t *testing.T) {
 				t.Errorf("Tumble.Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			eq, err := execution.AreStreamsEqual(ctx, got, tt.want)
+			want, _, err := tt.want.Get(ctx, tt.args.variables, execution.GetRawStreamID())
+			if err != nil {
+				t.Errorf("Range.Get() error = %v", err)
+				return
+			}
+			eq, err := execution.AreStreamsEqual(ctx, got, want)
 			if err != nil {
 				t.Errorf("Tumble.Get() AreStreamsEqual error = %v", err)
 			}

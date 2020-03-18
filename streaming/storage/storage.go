@@ -11,6 +11,7 @@ type Storage interface {
 	BeginTransaction() StateTransaction
 	WithPrefix(prefix []byte) Storage
 	Subscribe(ctx context.Context) *Subscription
+	Close() error
 }
 
 type BadgerStorage struct {
@@ -52,4 +53,8 @@ func (bs *BadgerStorage) Subscribe(ctx context.Context) *Subscription {
 			return nil
 		}, bs.prefix)
 	})
+}
+
+func (bs *BadgerStorage) Close() error {
+	return bs.db.Close()
 }

@@ -10,6 +10,7 @@ import (
 
 func TestFilteredStream_Next(t *testing.T) {
 	stateStorage := GetTestStorage(t)
+	defer stateStorage.Close()
 	tx := stateStorage.BeginTransaction()
 	defer tx.Abort()
 	ctx := storage.InjectStateTransaction(context.Background(), tx)

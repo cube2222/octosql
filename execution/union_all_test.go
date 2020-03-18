@@ -10,6 +10,7 @@ import (
 
 func TestUnionAll(t *testing.T) {
 	stateStorage := GetTestStorage(t)
+	defer stateStorage.Close()
 	tx := stateStorage.BeginTransaction()
 	defer tx.Abort()
 	ctx := storage.InjectStateTransaction(context.Background(), tx)
@@ -102,6 +103,7 @@ func TestUnionAll(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stateStorage := GetTestStorage(t)
+			defer stateStorage.Close()
 			tx := stateStorage.BeginTransaction()
 			ctx := storage.InjectStateTransaction(context.Background(), tx)
 

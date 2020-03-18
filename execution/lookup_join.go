@@ -455,7 +455,6 @@ func (rs *LookupJoinStream) GetNextRecord(ctx context.Context, tx storage.StateT
 		if rs.isLeftJoin {
 			err := recordsQueue.PeekFront(&outputElement)
 			if err == storage.ErrNotFound {
-				log.Printf("next record for job %s: not found", jobRecordID.Show())
 				continue
 			} else if err != nil {
 				return nil, errors.Wrapf(err, "couldn't peek element from output queue for job with recordID %s", jobRecordID.Show())
@@ -516,7 +515,6 @@ func (rs *LookupJoinStream) GetNextRecord(ctx context.Context, tx storage.StateT
 
 		err = recordsQueue.PopFront(&outputElement)
 		if err == storage.ErrNotFound {
-			log.Printf("next record for job %s: not found", jobRecordID.Show())
 			continue
 		} else if err != nil {
 			return nil, errors.Wrapf(err, "couldn't get element from output queue for job with recordID %s", jobRecordID.Show())

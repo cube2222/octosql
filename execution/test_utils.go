@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
+	"os"
 	"sort"
 	"strings"
 	"testing"
@@ -134,6 +136,7 @@ func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage
 	firstMultiSet := newMultiSet()
 	secondMultiSet := newMultiSet()
 
+	log.Println("first stream")
 	firstRecords, err := ReadAll(ctx, stateStorage, first)
 	if err != nil {
 		return errors.Wrap(err, "couldn't read first stream records")
@@ -141,7 +144,9 @@ func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage
 	for _, rec := range firstRecords {
 		firstMultiSet.Insert(rec)
 	}
+	log.Println("read first stream")
 
+	log.Println("second stream")
 	secondRecords, err := ReadAll(ctx, stateStorage, second)
 	if err != nil {
 		return errors.Wrap(err, "couldn't read second stream records")
@@ -149,6 +154,7 @@ func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage
 	for _, rec := range secondRecords {
 		secondMultiSet.Insert(rec)
 	}
+	log.Println("read second stream")
 
 	firstContained := firstMultiSet.isContainedIn(secondMultiSet)
 	secondContained := secondMultiSet.isContainedIn(firstMultiSet)
@@ -235,11 +241,18 @@ func ReadAll(ctx context.Context, stateStorage storage.Storage, stream RecordStr
 		ctx := storage.InjectStateTransaction(ctx, tx)
 
 		rec, err := stream.Next(ctx)
+		if rec != nil {
+			log.Println(rec.Show())
+		} else {
+			log.Println("no record: ", err)
+		}
 		if err == ErrEndOfStream {
+			log.Println("breaking")
 			err := tx.Commit()
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't commit transaction")
 			}
+			log.Println("committed")
 			break
 		} else if errors.Cause(err) == ErrNewTransactionRequired {
 			err := tx.Commit()
@@ -323,10 +336,14 @@ func ReadAllWithCount(ctx context.Context, stateStorage storage.Storage, stream 
 }
 
 func GetTestStorage(t *testing.T) storage.Storage {
-	opts := badger.DefaultOptions("")
-	opts.Dir = ""
-	opts.ValueDir = ""
-	opts.InMemory = true
+	dirname := fmt.Sprintf("testdb/%d", rand.Int())
+	err := os.MkdirAll(dirname, os.ModePerm)
+	if err != nil {
+		t.Fatal("couldn't create temporary directory: ", err)
+	}
+
+	opts := badger.DefaultOptions(dirname)
+	opts.CompactL0OnClose = false
 	db, err := badger.Open(opts)
 	if err != nil {
 		t.Fatal("couldn't open in-memory badger database: ", err)

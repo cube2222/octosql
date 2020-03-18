@@ -12,7 +12,9 @@ import (
 
 func TestOrderBy_Get(t *testing.T) {
 	stateStorage := GetTestStorage(t)
-	defer stateStorage.Close()
+	defer func() {
+		go stateStorage.Close()
+	}()
 	tx := stateStorage.BeginTransaction()
 	defer tx.Abort()
 	ctx := storage.InjectStateTransaction(context.Background(), tx)

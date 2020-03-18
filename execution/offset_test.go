@@ -114,7 +114,9 @@ func TestOffset_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stateStorage := GetTestStorage(t)
-			defer stateStorage.Close()
+			defer func() {
+				go stateStorage.Close()
+			}()
 			tx := stateStorage.BeginTransaction()
 			ctx := storage.InjectStateTransaction(ctx, tx)
 

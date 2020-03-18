@@ -202,7 +202,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 			}
 		}
 
-		root = logical.NewGroupBy(root, key, fields, aggregates, aggregatesAs, triggers)
+		root = logical.NewGroupBy(root, key, fields, aggregates, aggregatesAs, triggers, false)
 	}
 
 	if statement.OrderBy != nil {

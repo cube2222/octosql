@@ -43,6 +43,6 @@ func (node *Distinct) Physical(ctx context.Context, physicalCreator *PhysicalPla
 
 	trigger := NewCountingTrigger(NewConstant(1))
 
-	groupByNode := NewGroupBy(typed, castExpressions, names, aggregates, as, []Trigger{trigger})
+	groupByNode := NewGroupBy(typed, castExpressions, names, aggregates, as, []Trigger{trigger}, true)
 	return groupByNode.Physical(ctx, physicalCreator)
 }

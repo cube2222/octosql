@@ -27,17 +27,17 @@ const (
 )
 
 var AggregateFunctions = map[Aggregate]struct{}{
-	Avg:           struct{}{},
-	AvgDistinct:   struct{}{},
-	Count:         struct{}{},
-	CountDistinct: struct{}{},
-	First:         struct{}{},
-	Key:           struct{}{},
-	Last:          struct{}{},
-	Max:           struct{}{},
-	Min:           struct{}{},
-	Sum:           struct{}{},
-	SumDistinct:   struct{}{},
+	Avg:           {},
+	AvgDistinct:   {},
+	Count:         {},
+	CountDistinct: {},
+	First:         {},
+	Key:           {},
+	Last:          {},
+	Max:           {},
+	Min:           {},
+	Sum:           {},
+	SumDistinct:   {},
 }
 
 type Trigger interface {
@@ -96,11 +96,12 @@ type GroupBy struct {
 
 	as []octosql.VariableName
 
-	triggers []Trigger
+	triggers          []Trigger
+	createdByDistinct bool
 }
 
-func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, aggregates []Aggregate, as []octosql.VariableName, triggers []Trigger) *GroupBy {
-	return &GroupBy{source: source, key: key, fields: fields, aggregates: aggregates, as: as, triggers: triggers}
+func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, aggregates []Aggregate, as []octosql.VariableName, triggers []Trigger, createdByDistinct bool) *GroupBy {
+	return &GroupBy{source: source, key: key, fields: fields, aggregates: aggregates, as: as, triggers: triggers, createdByDistinct: createdByDistinct}
 }
 
 func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
@@ -175,7 +176,7 @@ func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlan
 
 	outNodes := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
 	for i := range outNodes {
-		outNodes[i] = physical.NewGroupBy(outNodes[i], key, node.fields, aggregates, node.as, triggers)
+		outNodes[i] = physical.NewGroupBy(outNodes[i], key, node.fields, aggregates, node.as, triggers, node.createdByDistinct)
 	}
 
 	return outNodes, variables, nil

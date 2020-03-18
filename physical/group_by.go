@@ -139,10 +139,12 @@ type GroupBy struct {
 	As []octosql.VariableName
 
 	Triggers []Trigger
+
+	CreatedByDistinct bool // this field is used when creating the names of output fields
 }
 
-func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, aggregates []Aggregate, as []octosql.VariableName, triggers []Trigger) *GroupBy {
-	return &GroupBy{Source: source, Key: key, Fields: fields, Aggregates: aggregates, As: as, Triggers: triggers}
+func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, aggregates []Aggregate, as []octosql.VariableName, triggers []Trigger, createdByDistinct bool) *GroupBy {
+	return &GroupBy{Source: source, Key: key, Fields: fields, Aggregates: aggregates, As: as, Triggers: triggers, CreatedByDistinct: createdByDistinct}
 }
 
 func (node *GroupBy) Transform(ctx context.Context, transformers *Transformers) Node {
@@ -159,12 +161,13 @@ func (node *GroupBy) Transform(ctx context.Context, transformers *Transformers) 
 	}
 
 	var transformed Node = &GroupBy{
-		Source:     source,
-		Key:        key,
-		Fields:     node.Fields,
-		Aggregates: node.Aggregates,
-		As:         node.As,
-		Triggers:   triggers,
+		Source:            source,
+		Key:               key,
+		Fields:            node.Fields,
+		Aggregates:        node.Aggregates,
+		As:                node.As,
+		Triggers:          triggers,
+		CreatedByDistinct: node.CreatedByDistinct,
 	}
 
 	if transformers.NodeT != nil {
@@ -218,7 +221,7 @@ func (node *GroupBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 
 	meta := node.Metadata()
 
-	return execution.NewGroupBy(matCtx.Storage, source, key, node.Fields, aggregatePrototypes, eventTimeField, node.As, meta.EventTimeField(), triggerPrototype), nil
+	return execution.NewGroupBy(matCtx.Storage, source, key, node.Fields, aggregatePrototypes, eventTimeField, node.As, meta.EventTimeField(), triggerPrototype, node.CreatedByDistinct), nil
 }
 
 func (node *GroupBy) groupingByEventTime(sourceMetadata *metadata.NodeMetadata) bool {

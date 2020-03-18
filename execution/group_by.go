@@ -23,11 +23,12 @@ type GroupBy struct {
 	as                []octosql.VariableName
 	outEventTimeField octosql.VariableName
 
-	triggerPrototype TriggerPrototype
+	triggerPrototype  TriggerPrototype
+	CreatedByDistinct bool
 }
 
-func NewGroupBy(storage storage.Storage, source Node, key []Expression, fields []octosql.VariableName, aggregatePrototypes []aggregate.AggregatePrototype, eventTimeField octosql.VariableName, as []octosql.VariableName, outEventTimeField octosql.VariableName, triggerPrototype TriggerPrototype) *GroupBy {
-	return &GroupBy{storage: storage, source: source, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, eventTimeField: eventTimeField, as: as, outEventTimeField: outEventTimeField, triggerPrototype: triggerPrototype}
+func NewGroupBy(storage storage.Storage, source Node, key []Expression, fields []octosql.VariableName, aggregatePrototypes []aggregate.AggregatePrototype, eventTimeField octosql.VariableName, as []octosql.VariableName, outEventTimeField octosql.VariableName, triggerPrototype TriggerPrototype, createdByDistinct bool) *GroupBy {
+	return &GroupBy{storage: storage, source: source, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, eventTimeField: eventTimeField, as: as, outEventTimeField: outEventTimeField, triggerPrototype: triggerPrototype, CreatedByDistinct: createdByDistinct}
 }
 
 func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
@@ -56,13 +57,17 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 		if len(node.as[i]) > 0 {
 			outputFieldNames[i] = node.as[i]
 		} else {
-			outputFieldNames[i] = octosql.NewVariableName(
-				fmt.Sprintf(
-					"%s_%s",
-					node.fields[i].String(),
-					aggregates[i].String(),
-				),
-			)
+			if node.CreatedByDistinct {
+				outputFieldNames[i] = node.fields[i]
+			} else {
+				outputFieldNames[i] = octosql.NewVariableName(
+					fmt.Sprintf(
+						"%s_%s",
+						node.fields[i].String(),
+						aggregates[i].String(),
+					),
+				)
+			}
 		}
 	}
 

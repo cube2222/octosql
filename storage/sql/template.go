@@ -34,7 +34,12 @@ type DataSource struct {
 	batchSize    int
 }
 
-var offsetPlaceholderName = octosql.VariableName("$0ffset_pl4ceholder$") // SURELY nobody is going to use it, right?
+var (
+	offsetPlaceholderName = octosql.VariableName("$0ffset_pl4ceholder$") // SURELY nobody is going to use it, right?
+
+	// this is limit for postgres' bigint, mysql's is 2 times bigger but we want to fill the template pattern
+	maxLimit = "9223372036854775807" // well, big thanks to mySQL for that!
+)
 
 func NewDataSourceBuilderFactoryFromTemplate(template SQLSourceTemplate) func([]octosql.VariableName) physical.DataSourceBuilderFactory {
 	return func(primaryKeys []octosql.VariableName) physical.DataSourceBuilderFactory {
@@ -86,7 +91,7 @@ func NewDataSourceBuilderFactoryFromTemplate(template SQLSourceTemplate) func([]
 				// Adding Offset placeholder
 				offsetPlaceholder := placeholders.AddPlaceholder(physical.NewVariable(offsetPlaceholderName))
 
-				query = fmt.Sprintf("SELECT * FROM %s %s WHERE %s OFFSET %s", tableName, alias, query, offsetPlaceholder)
+				query = fmt.Sprintf("SELECT * FROM %s %s WHERE %s LIMIT %s OFFSET %s", tableName, alias, query, maxLimit, offsetPlaceholder)
 
 				stmt, err := db.Prepare(query)
 				if err != nil {
@@ -136,6 +141,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 	rs.workerCloseErrChan = make(chan error)
 
 	go func() {
+		log.Println("worker start")
 		rs.RunWorker(ctx)
 		log.Println("worker done")
 	}()
@@ -243,6 +249,13 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 					log.Println("sql worker: couldn't close storage changes subscription: ", err)
 				}
 				continue
+			} else if err == execution.ErrEndOfStream {
+				err = tx.Commit()
+				if err != nil {
+					log.Println("sql worker: couldn't commit transaction: ", err)
+					continue
+				}
+				return
 			} else if err != nil {
 				tx.Abort()
 				log.Printf("sql worker: error running sql read batch worker: %s, reinitializing from storage", err)
@@ -263,7 +276,21 @@ var outputQueuePrefix = []byte("$output_queue$")
 func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateTransaction) error {
 	outputQueue := execution.NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
 
-	batch := make([]*execution.Record, rs.batchSize)
+	if rs.isDone {
+		err := outputQueue.Push(ctx, &kafka.QueueElement{
+			Type: &kafka.QueueElement_Error{
+				Error: execution.ErrEndOfStream.Error(),
+			},
+		})
+		if err != nil {
+			return errors.Wrapf(err, "couldn't push sql EndOfStream to output record queue")
+		}
+
+		log.Println("sql worker: ErrEndOfStream pushed")
+		return execution.ErrEndOfStream
+	}
+
+	batch := make([]*execution.Record, 0)
 	for i := 0; i < rs.batchSize; i++ {
 		if rs.isDone {
 			break
@@ -293,20 +320,7 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 			resultMap[newName] = octosql.NormalizeType(cols[i])
 		}
 
-		batch[i] = execution.NewRecord(fields, resultMap)
-	}
-
-	if rs.isDone {
-		err := outputQueue.Push(ctx, &kafka.QueueElement{
-			Type: &kafka.QueueElement_Error{
-				Error: execution.ErrEndOfStream.Error(),
-			},
-		})
-		if err != nil {
-			return errors.Wrapf(err, "couldn't push sql EndOfStream to output record queue")
-		}
-
-		return nil
+		batch = append(batch, execution.NewRecord(fields, resultMap))
 	}
 
 	for i := range batch {
@@ -318,6 +332,8 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 		if err != nil {
 			return errors.Wrapf(err, "couldn't push sql record with index %d in batch to output record queue", i)
 		}
+
+		log.Println("sql worker: record pushed: ", batch[i])
 	}
 
 	if err := rs.saveOffset(tx, len(batch)); err != nil {

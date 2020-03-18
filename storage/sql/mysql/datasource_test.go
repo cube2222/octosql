@@ -4,16 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 	"testing"
 	"time"
+
+	_ "github.com/lib/pq"
+	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
-	_ "github.com/lib/pq"
-	"github.com/pkg/errors"
 )
 
 func TestDataSource_Get(t *testing.T) {
@@ -275,6 +277,7 @@ func TestDataSource_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			args := tt.args
+			stateStorage := execution.GetTestStorage(t)
 			err := createTable(db, args.tableDescription)
 			if err != nil {
 				t.Errorf("Couldn't create table: %v", err)
@@ -304,10 +307,12 @@ func TestDataSource_Get(t *testing.T) {
 								"password":     password,
 								"databaseName": dbname,
 								"tableName":    args.tablename,
+								"batchSize":    2,
 							},
 						},
 					},
 				},
+				Storage: stateStorage,
 			})
 			if err != nil {
 				t.Errorf("Couldn't get ExecutionNode: %v", err)
@@ -320,14 +325,14 @@ func TestDataSource_Get(t *testing.T) {
 				return
 			}
 
-			equal, err := execution.AreStreamsEqual(context.Background(), stream, tt.want)
+			equal, err := execution.AreStreamsEqualNoOrdering(context.Background(), stateStorage, stream, tt.want)
 			if err != nil {
 				t.Errorf("Error in AreStreamsEqual(): %v", err)
 				return
 			}
 
 			if !equal != tt.wantErr {
-				t.Errorf("Streams don't match: %v", err)
+				t.Errorf("Streams don't match")
 				return
 			} else {
 				return
@@ -341,6 +346,8 @@ func createTable(db *sql.DB, tableDescription string) error {
 	if err != nil {
 		return errors.Wrap(err, "couldn't create table")
 	}
+
+	log.Println("created table: ", tableDescription)
 	return nil
 }
 
@@ -372,6 +379,8 @@ func dropTable(db *sql.DB, tablename string) error {
 	if err != nil {
 		return errors.Wrap(err, "couldn't drop table")
 	}
+
+	log.Println("dropped table: ", tablename)
 	return nil
 }
 

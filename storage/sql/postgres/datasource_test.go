@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 	"testing"
 	"time"
@@ -276,6 +277,7 @@ func TestDataSource_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			args := tt.args
+			stateStorage := execution.GetTestStorage(t)
 			err := createTable(db, args.tableDescription)
 			if err != nil {
 				t.Errorf("Couldn't create table: %v", err)
@@ -310,7 +312,7 @@ func TestDataSource_Get(t *testing.T) {
 						},
 					},
 				},
-				Storage: execution.GetTestStorage(t),
+				Storage: stateStorage,
 			})
 			if err != nil {
 				t.Errorf("Couldn't get ExecutionNode: %v", err)
@@ -323,7 +325,7 @@ func TestDataSource_Get(t *testing.T) {
 				return
 			}
 
-			equal, err := execution.AreStreamsEqualNoOrdering(context.Background(), execution.GetTestStorage(t), stream, tt.want)
+			equal, err := execution.AreStreamsEqualNoOrdering(context.Background(), stateStorage, stream, tt.want)
 			if err != nil {
 				t.Errorf("Error in AreStreamsEqual(): %v", err)
 				return
@@ -344,6 +346,8 @@ func createTable(db *sql.DB, tableDescription string) error {
 	if err != nil {
 		return errors.Wrap(err, "couldn't create table")
 	}
+
+	log.Println("created table: ", tableDescription)
 	return nil
 }
 
@@ -375,6 +379,8 @@ func dropTable(db *sql.DB, tablename string) error {
 	if err != nil {
 		return errors.Wrap(err, "couldn't drop table")
 	}
+
+	log.Println("dropped table: ", tablename)
 	return nil
 }
 

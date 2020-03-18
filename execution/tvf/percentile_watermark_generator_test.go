@@ -171,7 +171,7 @@ func TestPercentileWatermarkGenerator_Stream(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    execution.RecordStream
+		want    execution.Node
 		wantErr bool
 	}{
 		{
@@ -207,7 +207,7 @@ func TestPercentileWatermarkGenerator_Stream(t *testing.T) {
 					"frequency":  octosql.MakeInt(5),
 				}),
 			},
-			want: execution.NewInMemoryStream(ctx, []*execution.Record{
+			want: execution.NewDummyNode([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time"},
 					[]interface{}{1, baseTime},
@@ -247,7 +247,12 @@ func TestPercentileWatermarkGenerator_Stream(t *testing.T) {
 				t.Errorf("PercentileWatermarkGenerator.Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			eq, err := execution.AreStreamsEqual(ctx, got, tt.want)
+			wanted, _, err := tt.want.Get(ctx, tt.args.variables, execution.GetRawStreamID())
+			if err != nil {
+				t.Errorf("PercentileWatermarkGenerator.Get() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			eq, err := execution.AreStreamsEqual(ctx, got, wanted)
 			if err != nil {
 				t.Errorf("PercentileWatermarkGenerator.Get() AreStreamsEqual error = %v", err)
 			}

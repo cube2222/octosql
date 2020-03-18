@@ -81,6 +81,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 	r.TrimLeadingSpace = true
 
 	return &RecordStream{
+		streamID:        streamID,
 		file:            file,
 		r:               r,
 		isDone:          false,
@@ -91,6 +92,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 }
 
 type RecordStream struct {
+	streamID        *execution.StreamID
 	file            *os.File
 	r               *csv.Reader
 	isDone          bool
@@ -98,6 +100,7 @@ type RecordStream struct {
 	aliasedFields   []octosql.VariableName
 	first           bool
 	hasColumnHeader bool
+	offset          int
 }
 
 func (rs *RecordStream) Close() error {
@@ -197,5 +200,11 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 		aliasedRecord[rs.aliasedFields[i]] = execution.ParseType(v)
 	}
 
-	return execution.NewRecord(rs.aliasedFields, aliasedRecord), nil
+	curOffset := rs.offset
+	rs.offset++
+	return execution.NewRecord(
+		rs.aliasedFields,
+		aliasedRecord,
+		execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(rs.streamID, curOffset)),
+	), nil
 }

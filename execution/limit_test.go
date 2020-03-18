@@ -13,25 +13,25 @@ func TestLimit_Get(t *testing.T) {
 	const NO_ERROR = ""
 
 	tests := []struct {
-		name       string
-		vars       octosql.Variables
-		node       *Limit
-		wantStream *InMemoryStream
-		wantError  string
+		name      string
+		vars      octosql.Variables
+		node      *Limit
+		want      Node
+		wantError string
 	}{
 		{
-			name:       "negative limit value",
-			vars:       octosql.NoVariables(),
-			node:       NewLimit(NewDummyNode(nil), NewDummyValue(octosql.MakeInt(-42))),
-			wantStream: nil,
-			wantError:  "negative limit value",
+			name:      "negative limit value",
+			vars:      octosql.NoVariables(),
+			node:      NewLimit(NewDummyNode(nil), NewDummyValue(octosql.MakeInt(-42))),
+			want:      nil,
+			wantError: "negative limit value",
 		},
 		{
-			name:       "limit value not int",
-			vars:       octosql.NoVariables(),
-			node:       NewLimit(NewDummyNode(nil), NewDummyValue(octosql.MakeFloat(2.0))),
-			wantStream: nil,
-			wantError:  "limit value not int",
+			name:      "limit value not int",
+			vars:      octosql.NoVariables(),
+			node:      NewLimit(NewDummyNode(nil), NewDummyValue(octosql.MakeFloat(2.0))),
+			want:      nil,
+			wantError: "limit value not int",
 		},
 		{
 			name: "normal limit get",
@@ -68,7 +68,7 @@ func TestLimit_Get(t *testing.T) {
 						}),
 				},
 			}, NewDummyValue(octosql.MakeInt(3))),
-			wantStream: NewInMemoryStream([]*Record{
+			want: NewDummyNode([]*Record{
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{
 						"num",
@@ -107,8 +107,8 @@ func TestLimit_Get(t *testing.T) {
 						}),
 				},
 			}, NewDummyValue(octosql.MakeInt(0))),
-			wantStream: NewInMemoryStream([]*Record{}),
-			wantError:  NO_ERROR,
+			want:      NewDummyNode([]*Record{}),
+			wantError: NO_ERROR,
 		},
 	}
 
@@ -132,7 +132,7 @@ func TestLimit_Get(t *testing.T) {
 				return
 			}
 
-			equal, err := AreStreamsEqual(ctx, rs, tt.wantStream)
+			equal, err := AreStreamsEqual(ctx, rs, tt.want)
 			if !equal {
 				t.Errorf("limitedStream doesn't work as expected")
 			}

@@ -68,7 +68,7 @@ func TestDataSource_Get(t *testing.T) {
 					"const_0": octosql.MakeString("key0"),
 				},
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecord(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]octosql.Value{
@@ -79,8 +79,7 @@ func TestDataSource_Get(t *testing.T) {
 						"r.surname": octosql.MakeString("k"),
 					},
 				),
-			},
-			),
+			}),
 			wantErr: false,
 		},
 		{
@@ -110,7 +109,7 @@ func TestDataSource_Get(t *testing.T) {
 					"const_0": octosql.MakeString("key0"),
 				},
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecord(
 					[]octosql.VariableName{"r.some_other_key_name", "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]octosql.Value{
@@ -121,8 +120,7 @@ func TestDataSource_Get(t *testing.T) {
 						"r.surname":             octosql.MakeString("k"),
 					},
 				),
-			},
-			),
+			}),
 			wantErr: false,
 		},
 		{
@@ -171,7 +169,7 @@ func TestDataSource_Get(t *testing.T) {
 					"const_1": octosql.MakeString("key1"),
 				},
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecord(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]octosql.Value{
@@ -192,8 +190,7 @@ func TestDataSource_Get(t *testing.T) {
 						"r.surname": octosql.MakeString("ch"),
 					},
 				),
-			},
-			),
+			}),
 			wantErr: false,
 		},
 		{
@@ -230,7 +227,7 @@ func TestDataSource_Get(t *testing.T) {
 					"const_1": octosql.MakeString("key1"),
 				},
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecord(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]octosql.Value{
@@ -241,8 +238,7 @@ func TestDataSource_Get(t *testing.T) {
 						"r.surname": octosql.MakeString("k"),
 					},
 				),
-			},
-			),
+			}),
 			wantErr: false,
 		},
 		{
@@ -285,7 +281,7 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{},
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecord(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]octosql.Value{
@@ -326,8 +322,7 @@ func TestDataSource_Get(t *testing.T) {
 						"r.surname": octosql.MakeString("cz"),
 					},
 				),
-			},
-			),
+			}),
 			wantErr: false,
 		},
 		{
@@ -403,7 +398,7 @@ func TestDataSource_Get(t *testing.T) {
 					"const_3": octosql.MakeString("key3"),
 				},
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecord(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]octosql.Value{
@@ -424,8 +419,7 @@ func TestDataSource_Get(t *testing.T) {
 						"r.surname": octosql.MakeString("ch"),
 					},
 				),
-			},
-			),
+			}),
 			wantErr: false,
 		},
 		{
@@ -494,7 +488,7 @@ func TestDataSource_Get(t *testing.T) {
 					"const_2": octosql.MakeString("key2"),
 				},
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecord(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]octosql.Value{
@@ -505,8 +499,7 @@ func TestDataSource_Get(t *testing.T) {
 						"r.surname": octosql.MakeString("ch"),
 					},
 				),
-			},
-			),
+			}),
 			wantErr: false,
 		},
 		{
@@ -561,7 +554,7 @@ func TestDataSource_Get(t *testing.T) {
 					"const_2": octosql.MakeString("key2"),
 				},
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecord(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
 					map[octosql.VariableName]octosql.Value{
@@ -592,8 +585,7 @@ func TestDataSource_Get(t *testing.T) {
 						"r.surname": octosql.MakeString("m"),
 					},
 				),
-			},
-			),
+			}),
 			wantErr: false,
 		},
 		{
@@ -621,7 +613,7 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{},
 			},
-			want:    execution.NewInMemoryStream(nil),
+			want:    execution.NewInMemoryStream(ctx, nil),
 			wantErr: true,
 		},
 		{
@@ -644,7 +636,7 @@ func TestDataSource_Get(t *testing.T) {
 					"const_0": octosql.MakeString("key0"),
 				},
 			},
-			want:    execution.NewInMemoryStream(nil),
+			want:    execution.NewInMemoryStream(ctx, nil),
 			wantErr: true,
 		},
 		{
@@ -667,7 +659,7 @@ func TestDataSource_Get(t *testing.T) {
 					"const_0": octosql.MakeString("key0"),
 				},
 			},
-			want:    execution.NewInMemoryStream(nil),
+			want:    execution.NewInMemoryStream(ctx, nil),
 			wantErr: true,
 		},
 		{
@@ -690,7 +682,7 @@ func TestDataSource_Get(t *testing.T) {
 					"const_0": octosql.MakeString("key0"),
 				},
 			},
-			want:    execution.NewInMemoryStream(nil),
+			want:    execution.NewInMemoryStream(ctx, nil),
 			wantErr: true,
 		},
 		{
@@ -713,7 +705,7 @@ func TestDataSource_Get(t *testing.T) {
 					"const_0": octosql.MakeString("key0"),
 				},
 			},
-			want:    execution.NewInMemoryStream(nil),
+			want:    execution.NewInMemoryStream(ctx, nil),
 			wantErr: true,
 		},
 		{
@@ -731,7 +723,7 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{},
 			},
-			want:    execution.NewInMemoryStream(nil),
+			want:    execution.NewInMemoryStream(ctx, nil),
 			wantErr: true,
 		},
 	}

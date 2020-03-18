@@ -60,7 +60,7 @@ func TestWatermarkGenerator_Get(t *testing.T) {
 					"offset": octosql.MakeDuration(time.Second * 5),
 				}),
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time"},
 					[]interface{}{1, baseTime},

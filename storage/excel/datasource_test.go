@@ -172,7 +172,7 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				variables: octosql.NoVariables(),
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.name", "t.surname", "t.age"},
 					[]interface{}{"Jan", "Chomiak", 20},
@@ -203,7 +203,7 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				variables: octosql.NoVariables(),
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.col1", "t.col2"},
 					[]interface{}{"Warsaw", 1700000},
@@ -238,7 +238,7 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				variables: octosql.NoVariables(),
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.id", "t.points"},
 					[]interface{}{1, 10},
@@ -269,7 +269,7 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				variables: octosql.NoVariables(),
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.name", "t.age", "t.id"},
 					[]interface{}{"Bob", 13, 1},
@@ -301,7 +301,7 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				variables: octosql.NoVariables(),
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.col1", "t.col2"},
 					[]interface{}{time.Date(2017, 3, 14, 13, 0, 0, 0, time.UTC), 1},
@@ -333,7 +333,7 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				variables: octosql.NoVariables(),
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.date", "t.points"},
 					[]interface{}{time.Date(2017, 3, 14, 13, 0, 0, 0, time.UTC), 101},

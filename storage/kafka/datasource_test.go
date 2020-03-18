@@ -155,7 +155,7 @@ func TestRecordStream_Next(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if err := execution.AreStreamsEqualNoOrderingWithCount(context.Background(), stateStorage, rs, execution.NewInMemoryStream(tt.want), len(tt.want)); err != nil {
+			if err := execution.AreStreamsEqualNoOrderingWithCount(context.Background(), stateStorage, rs, execution.NewInMemoryStream(ctx, tt.want), len(tt.want)); err != nil {
 				t.Errorf("Streams aren't equal: %v", err)
 				return
 			}

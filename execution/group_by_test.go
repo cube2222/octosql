@@ -64,7 +64,7 @@ func TestGroupBy_SimpleBatch(t *testing.T) {
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{5, 9.0, 1}),
 	}
 
-	err = AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(expectedOutput), stream)
+	err = AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(ctx, expectedOutput), stream)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +130,7 @@ func TestGroupBy_BatchWithUndos(t *testing.T) {
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{5, 9.0, 1}),
 	}
 
-	err = AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(expectedOutput), stream)
+	err = AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(ctx, expectedOutput), stream)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +212,7 @@ func TestGroupBy_WithOutputUndos(t *testing.T) {
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{3, 5.0, 2}),
 	}
 
-	err = AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(expectedOutput), stream)
+	err = AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(ctx, expectedOutput), stream)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,7 +267,7 @@ func TestGroupBy_newRecordsNoChanges(t *testing.T) {
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{3, 5.0}),
 	}
 
-	err = AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(expectedOutput), stream)
+	err = AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(ctx, expectedOutput), stream)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -347,7 +347,7 @@ func TestGroupBy_EventTimes(t *testing.T) {
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{thirdWindow, 3, 4.5, 2}, WithEventTimeField(octosql.NewVariableName("renamed_t"))),
 	}
 
-	err = AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(expectedOutput), stream)
+	err = AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(ctx, expectedOutput), stream)
 	if err != nil {
 		t.Fatal(err)
 	}

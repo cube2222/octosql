@@ -61,7 +61,7 @@ func TestTumble_Get(t *testing.T) {
 					"offset":        octosql.MakeDuration(time.Second * 3),
 				}),
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time", "window_start", "window_end"},
 					[]interface{}{1, baseTime, baseTime.Add(time.Second * -7), baseTime.Add(time.Second * 3)},
@@ -116,7 +116,7 @@ func TestTumble_Get(t *testing.T) {
 					"offset":        octosql.MakeDuration(0),
 				}),
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time", "window_start", "window_end"},
 					[]interface{}{1, baseTime, baseTime, baseTime.Add(time.Second * 10)},

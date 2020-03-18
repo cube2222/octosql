@@ -207,7 +207,7 @@ func TestPercentileWatermarkGenerator_Stream(t *testing.T) {
 					"frequency":  octosql.MakeInt(5),
 				}),
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time"},
 					[]interface{}{1, baseTime},

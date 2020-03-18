@@ -208,10 +208,10 @@ type DummyNode struct {
 
 func (dn *DummyNode) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
 	if dn.data == nil {
-		return NewInMemoryStream([]*Record{}), NewExecutionOutput(NewZeroWatermarkGenerator()), nil
+		return NewInMemoryStream(ctx, []*Record{}), NewExecutionOutput(NewZeroWatermarkGenerator()), nil
 	}
 
-	return NewInMemoryStream(dn.data), NewExecutionOutput(NewZeroWatermarkGenerator()), nil
+	return NewInMemoryStream(ctx, dn.data), NewExecutionOutput(NewZeroWatermarkGenerator()), nil
 }
 
 func NewDummyValue(value octosql.Value) *DummyValue {

@@ -63,7 +63,7 @@ func TestDataSource_Get(t *testing.T) {
 				},
 				tableDescription: "CREATE TABLE animals(name VARCHAR(20) PRIMARY KEY, population INTEGER);",
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"a.name", "a.population"},
 					[]interface{}{"human", 7000000},
@@ -80,8 +80,7 @@ func TestDataSource_Get(t *testing.T) {
 					[]octosql.VariableName{"a.name", "a.population"},
 					[]interface{}{"zebra", 5000},
 				),
-			},
-			),
+			}),
 			wantErr: false,
 		},
 
@@ -105,7 +104,7 @@ func TestDataSource_Get(t *testing.T) {
 				},
 				tableDescription: "CREATE TABLE animals(name VARCHAR(20) PRIMARY KEY, population INTEGER);",
 			},
-			want:    execution.NewInMemoryStream([]*execution.Record{}),
+			want:    execution.NewInMemoryStream(ctx, []*execution.Record{}),
 			wantErr: false,
 		},
 
@@ -131,7 +130,7 @@ func TestDataSource_Get(t *testing.T) {
 				},
 				tableDescription: "CREATE TABLE animals(name VARCHAR(20) PRIMARY KEY, population INTEGER);",
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"a.name", "a.population"},
 					[]interface{}{"panda", 500},
@@ -162,7 +161,7 @@ func TestDataSource_Get(t *testing.T) {
 				},
 				tableDescription: "CREATE TABLE people(id INTEGER PRIMARY KEY, name VARCHAR(20));",
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{2, "Kuba"},
@@ -210,7 +209,7 @@ func TestDataSource_Get(t *testing.T) {
 				},
 				tableDescription: "CREATE TABLE people(id INTEGER PRIMARY KEY, name VARCHAR(20));",
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{2, "Kuba"},
@@ -254,7 +253,7 @@ func TestDataSource_Get(t *testing.T) {
 				},
 				tableDescription: "CREATE TABLE people(id INTEGER PRIMARY KEY, name VARCHAR(20));",
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{1, "Janek"},

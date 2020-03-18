@@ -68,7 +68,7 @@ func TestOffset_Get(t *testing.T) {
 						}),
 				},
 			}, NewDummyValue(octosql.MakeInt(2))),
-			wantStream: NewInMemoryStream([]*Record{
+			wantStream: NewInMemoryStream(ctx, []*Record{
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{
 						"flag",
@@ -107,7 +107,7 @@ func TestOffset_Get(t *testing.T) {
 						}),
 				},
 			}, NewDummyValue(octosql.MakeInt(4))),
-			wantStream: NewInMemoryStream([]*Record{}),
+			wantStream: NewInMemoryStream(ctx, []*Record{}),
 			wantError:  NO_ERROR,
 		},
 	}

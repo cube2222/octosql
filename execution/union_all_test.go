@@ -9,6 +9,11 @@ import (
 )
 
 func TestUnionAll(t *testing.T) {
+	stateStorage := GetTestStorage(t)
+	tx := stateStorage.BeginTransaction()
+	defer tx.Abort()
+	ctx := storage.InjectStateTransaction(context.Background(), tx)
+
 	fieldNames := []octosql.VariableName{
 		octosql.NewVariableName("age"),
 		octosql.NewVariableName("something"),
@@ -65,34 +70,32 @@ func TestUnionAll(t *testing.T) {
 					),
 				},
 			},
-			want: NewInMemoryStream(
-				[]*Record{
-					NewRecordFromSliceWithNormalize(
-						fieldNames,
-						[]interface{}{4, "test2"},
-					),
-					NewRecordFromSliceWithNormalize(
-						fieldNames,
-						[]interface{}{3, "test3"},
-					),
-					NewRecordFromSliceWithNormalize(
-						fieldNames,
-						[]interface{}{5, "test"},
-					),
-					NewRecordFromSliceWithNormalize(
-						fieldNames,
-						[]interface{}{3, "test33"},
-					),
-					NewRecordFromSliceWithNormalize(
-						fieldNames,
-						[]interface{}{2, "test2"},
-					),
-					NewRecordFromSliceWithNormalize(
-						fieldNames,
-						[]interface{}{5, "test"},
-					),
-				},
-			),
+			want: NewInMemoryStream(ctx, []*Record{
+				NewRecordFromSliceWithNormalize(
+					fieldNames,
+					[]interface{}{4, "test2"},
+				),
+				NewRecordFromSliceWithNormalize(
+					fieldNames,
+					[]interface{}{3, "test3"},
+				),
+				NewRecordFromSliceWithNormalize(
+					fieldNames,
+					[]interface{}{5, "test"},
+				),
+				NewRecordFromSliceWithNormalize(
+					fieldNames,
+					[]interface{}{3, "test33"},
+				),
+				NewRecordFromSliceWithNormalize(
+					fieldNames,
+					[]interface{}{2, "test2"},
+				),
+				NewRecordFromSliceWithNormalize(
+					fieldNames,
+					[]interface{}{5, "test"},
+				),
+			}),
 			wantErr: false,
 		},
 	}

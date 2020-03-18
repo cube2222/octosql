@@ -28,7 +28,7 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 	tests := []struct {
 		name    string
 		fields  fields
-		want    RecordStream
+		want    Node
 		wantErr bool
 	}{
 		{
@@ -94,30 +94,28 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 						),
 					})),
 			},
-			want: NewInMemoryStream(
-				[]*Record{
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"bike", "name", "color", "score"},
-						[]interface{}{"red", "test", "red", 5},
-						WithID(NewRecordID("11")),
-					),
-					NewRecordFromSliceWithNormalize(
-						fieldNames,
-						[]interface{}{"blue", "test2"},
-						WithID(NewRecordID("01")),
-					),
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"bike", "name", "color", "score"},
-						[]interface{}{"green", "test3", "green", 7},
-						WithID(NewRecordID("10")),
-					),
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"bike", "name", "color", "score"},
-						[]interface{}{"green", "test3", "green", 4},
-						WithID(NewRecordID("12")),
-					),
-				},
-			),
+			want: NewDummyNode([]*Record{
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"bike", "name", "color", "score"},
+					[]interface{}{"red", "test", "red", 5},
+					WithID(NewRecordID("11")),
+				),
+				NewRecordFromSliceWithNormalize(
+					fieldNames,
+					[]interface{}{"blue", "test2"},
+					WithID(NewRecordID("01")),
+				),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"bike", "name", "color", "score"},
+					[]interface{}{"green", "test3", "green", 7},
+					WithID(NewRecordID("10")),
+				),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"bike", "name", "color", "score"},
+					[]interface{}{"green", "test3", "green", 4},
+					WithID(NewRecordID("12")),
+				),
+			}),
 			wantErr: false,
 		},
 		{
@@ -183,30 +181,28 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 						),
 					})),
 			},
-			want: NewInMemoryStream(
-				[]*Record{
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"bike", "name", "color", "score"},
-						[]interface{}{"red", "test", "red", 5},
-						WithID(NewRecordID("11")),
-					),
-					NewRecordFromSliceWithNormalize(
-						fieldNames,
-						[]interface{}{"blue", "test2"},
-						WithID(NewRecordID("01")),
-					),
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"bike", "name", "color", "score"},
-						[]interface{}{"green", "test3", "green", 7},
-						WithID(NewRecordID("10")),
-					),
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"bike", "name", "color", "score"},
-						[]interface{}{"green", "test3", "green", 4},
-						WithID(NewRecordID("12")),
-					),
-				},
-			),
+			want: NewDummyNode([]*Record{
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"bike", "name", "color", "score"},
+					[]interface{}{"red", "test", "red", 5},
+					WithID(NewRecordID("11")),
+				),
+				NewRecordFromSliceWithNormalize(
+					fieldNames,
+					[]interface{}{"blue", "test2"},
+					WithID(NewRecordID("01")),
+				),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"bike", "name", "color", "score"},
+					[]interface{}{"green", "test3", "green", 7},
+					WithID(NewRecordID("10")),
+				),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"bike", "name", "color", "score"},
+					[]interface{}{"green", "test3", "green", 4},
+					WithID(NewRecordID("12")),
+				),
+			}),
 			wantErr: false,
 		},
 		{
@@ -253,40 +249,42 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 						NewRecordFromSliceWithNormalize(
 							fieldNames2,
 							[]interface{}{"green", 7},
+							WithID(NewRecordID("10")),
 						),
 						NewRecordFromSliceWithNormalize(
 							fieldNames2,
 							[]interface{}{"red", 5},
+							WithID(NewRecordID("11")),
 						),
 						NewRecordFromSliceWithNormalize(
 							fieldNames2,
 							[]interface{}{"green", 4},
+							WithID(NewRecordID("12")),
 						),
 						NewRecordFromSliceWithNormalize(
 							fieldNames2,
 							[]interface{}{"green", 2},
+							WithID(NewRecordID("13")),
 						),
 					})),
 			},
-			want: NewInMemoryStream(
-				[]*Record{
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"bike", "name", "color", "score"},
-						[]interface{}{"red", "test", "red", 5},
-						WithID(NewRecordID("11")),
-					),
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"bike", "name", "color", "score"},
-						[]interface{}{"green", "test3", "green", 7},
-						WithID(NewRecordID("10")),
-					),
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"bike", "name", "color", "score"},
-						[]interface{}{"green", "test3", "green", 4},
-						WithID(NewRecordID("12")),
-					),
-				},
-			),
+			want: NewDummyNode([]*Record{
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"bike", "name", "color", "score"},
+					[]interface{}{"red", "test", "red", 5},
+					WithID(NewRecordID("11")),
+				),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"bike", "name", "color", "score"},
+					[]interface{}{"green", "test3", "green", 7},
+					WithID(NewRecordID("10")),
+				),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"bike", "name", "color", "score"},
+					[]interface{}{"green", "test3", "green", 4},
+					WithID(NewRecordID("12")),
+				),
+			}),
 			wantErr: false,
 		},
 		{
@@ -300,7 +298,7 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 				source: NewDummyNode(nil),
 				joined: NewDummyNode(nil),
 			},
-			want:    NewInMemoryStream(nil),
+			want:    NewDummyNode(nil),
 			wantErr: false,
 		},
 	}
@@ -314,14 +312,19 @@ func TestLeftJoinedStream_Next(t *testing.T) {
 
 			rs, _, err := stream.Get(ctx, tt.fields.variables, GetRawStreamID())
 			if err != nil {
-				t.Fatal("couldn't get record stream: ", err)
+				t.Fatal("couldn't get actual record stream: ", err)
+			}
+
+			want, _, err := tt.want.Get(ctx, tt.fields.variables, GetRawStreamID())
+			if err != nil {
+				t.Fatal("couldn't get wanted record stream: ", err)
 			}
 
 			if err := tx.Commit(); err != nil {
 				t.Fatal(err)
 			}
 
-			err = AreStreamsEqualNoOrdering(ctx, stateStorage, rs, tt.want)
+			err = AreStreamsEqualNoOrdering(ctx, stateStorage, rs, want)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LookupJoin error = %v, wantErr %v", err, tt.wantErr)
 				return

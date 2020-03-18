@@ -37,7 +37,7 @@ func TestRange_Get(t *testing.T) {
 					"end":   octosql.MakeInt(10),
 				}),
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"i"},
 					[]interface{}{1},
@@ -89,7 +89,7 @@ func TestRange_Get(t *testing.T) {
 					"end":   octosql.MakeInt(10),
 				}),
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewInMemoryStream(ctx, []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"i"},
 					[]interface{}{5},
@@ -125,7 +125,7 @@ func TestRange_Get(t *testing.T) {
 					"end":   octosql.MakeInt(3),
 				}),
 			},
-			want:    execution.NewInMemoryStream([]*execution.Record{}),
+			want:    execution.NewInMemoryStream(ctx, []*execution.Record{}),
 			wantErr: false,
 		},
 		{
@@ -140,7 +140,7 @@ func TestRange_Get(t *testing.T) {
 					"end":   octosql.MakeInt(3),
 				}),
 			},
-			want:    execution.NewInMemoryStream([]*execution.Record{}),
+			want:    execution.NewInMemoryStream(ctx, []*execution.Record{}),
 			wantErr: false,
 		},
 	}

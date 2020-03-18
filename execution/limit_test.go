@@ -10,33 +10,32 @@ import (
 
 func TestLimit_Get(t *testing.T) {
 	ctx := context.Background()
-	const NO_ERROR = ""
 
 	tests := []struct {
 		name      string
 		vars      octosql.Variables
 		node      *Limit
 		want      Node
-		wantError string
+		wantError bool
 	}{
 		{
 			name:      "negative limit value",
 			vars:      octosql.NoVariables(),
 			node:      NewLimit(NewDummyNode(nil), NewDummyValue(octosql.MakeInt(-42))),
 			want:      nil,
-			wantError: "negative limit value",
+			wantError: true,
 		},
 		{
 			name:      "limit value not int",
 			vars:      octosql.NoVariables(),
 			node:      NewLimit(NewDummyNode(nil), NewDummyValue(octosql.MakeFloat(2.0))),
 			want:      nil,
-			wantError: "limit value not int",
+			wantError: true,
 		},
 		{
 			name: "normal limit get",
 			vars: octosql.NoVariables(),
-			node: NewLimit(&DummyNode{
+			node: NewLimit(NewDummyNode(
 				[]*Record{
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{
@@ -67,7 +66,7 @@ func TestLimit_Get(t *testing.T) {
 							2.23e7,
 						}),
 				},
-			}, NewDummyValue(octosql.MakeInt(3))),
+			), NewDummyValue(octosql.MakeInt(3))),
 			want: NewDummyNode([]*Record{
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{
@@ -91,7 +90,7 @@ func TestLimit_Get(t *testing.T) {
 						false,
 					}),
 			}),
-			wantError: NO_ERROR,
+			wantError: false,
 		},
 		{
 			name: "zero limit get",
@@ -108,7 +107,7 @@ func TestLimit_Get(t *testing.T) {
 				},
 			}, NewDummyValue(octosql.MakeInt(0))),
 			want:      NewDummyNode([]*Record{}),
-			wantError: NO_ERROR,
+			wantError: false,
 		},
 	}
 
@@ -119,28 +118,26 @@ func TestLimit_Get(t *testing.T) {
 			ctx := storage.InjectStateTransaction(ctx, tx)
 
 			rs, _, err := tt.node.Get(ctx, tt.vars, GetRawStreamID())
-
-			if (err == nil) != (tt.wantError == NO_ERROR) {
-				t.Errorf("exactly one of test.wantError, tt.node.Get() is not nil")
+			if (err != nil) != tt.wantError {
+				t.Errorf("Unexpected error %v, wanted: %v", err, tt.wantError)
+				return
+			} else if tt.wantError {
 				return
 			}
 
+			want, _, err := tt.want.Get(ctx, tt.vars, GetRawStreamID())
 			if err != nil {
-				if err.Error() != tt.wantError {
-					t.Errorf("Unexpected error %v, wanted: %v", err.Error(), tt.wantError)
-				}
-				return
+				t.Fatal("couldn't get wanted record stream: ", err)
 			}
 
-			equal, err := AreStreamsEqual(ctx, rs, tt.want)
-			if !equal {
-				t.Errorf("limitedStream doesn't work as expected")
+			if err := tx.Commit(); err != nil {
+				t.Fatal(err)
 			}
+
+			err = AreStreamsEqualNoOrdering(ctx, stateStorage, rs, want)
 			if err != nil {
 				t.Errorf("limitedStream comparison error: %v", err)
 			}
-
-			tx.Commit()
 		})
 	}
 }

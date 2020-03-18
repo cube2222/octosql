@@ -48,15 +48,6 @@ func TestGroupBy_SimpleBatch(t *testing.T) {
 		NewWatermarkTrigger(),
 	)
 
-	tx := stateStorage.BeginTransaction()
-	stream, _, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatal(err)
-	}
-
 	outFields := []octosql.VariableName{"ownerid", "livesleft_avg", "livesleft_count"}
 	expectedOutput := []*Record{
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{3, 4.0, 3}),
@@ -64,7 +55,17 @@ func TestGroupBy_SimpleBatch(t *testing.T) {
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{5, 9.0, 1}),
 	}
 
-	err = AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(ctx, expectedOutput), stream)
+	tx := stateStorage.BeginTransaction()
+	stream, _, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := NewInMemoryStream(storage.InjectStateTransaction(context.Background(), tx), expectedOutput)
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	err = AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,15 +115,6 @@ func TestGroupBy_BatchWithUndos(t *testing.T) {
 		NewWatermarkTrigger(),
 	)
 
-	tx := stateStorage.BeginTransaction()
-	stream, _, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatal(err)
-	}
-
 	outFields := []octosql.VariableName{"ownerid", "livesleft_avg", "livesleft_count"}
 	expectedOutput := []*Record{
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{3, 5.0, 2}),
@@ -130,7 +122,17 @@ func TestGroupBy_BatchWithUndos(t *testing.T) {
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{5, 9.0, 1}),
 	}
 
-	err = AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(ctx, expectedOutput), stream)
+	tx := stateStorage.BeginTransaction()
+	stream, _, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := NewInMemoryStream(storage.InjectStateTransaction(context.Background(), tx), expectedOutput)
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	err = AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,15 +186,6 @@ func TestGroupBy_WithOutputUndos(t *testing.T) {
 		NewCountingTrigger(NewVariable(octosql.NewVariableName("count"))),
 	)
 
-	tx := stateStorage.BeginTransaction()
-	stream, _, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NewVariables(variables), GetRawStreamID())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatal(err)
-	}
-
 	outFields := []octosql.VariableName{"ownerid", "livesleft_avg", "livesleft_count"}
 	expectedOutput := []*Record{
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{5, 9.0, 1}),
@@ -212,7 +205,17 @@ func TestGroupBy_WithOutputUndos(t *testing.T) {
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{3, 5.0, 2}),
 	}
 
-	err = AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(ctx, expectedOutput), stream)
+	tx := stateStorage.BeginTransaction()
+	stream, _, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NewVariables(variables), GetRawStreamID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := NewInMemoryStream(storage.InjectStateTransaction(context.Background(), tx), expectedOutput)
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	err = AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,21 +256,22 @@ func TestGroupBy_newRecordsNoChanges(t *testing.T) {
 		NewCountingTrigger(NewVariable(octosql.NewVariableName("count"))),
 	)
 
-	tx := stateStorage.BeginTransaction()
-	stream, _, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), variables, GetRawStreamID())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatal(err)
-	}
-
 	outFields := []octosql.VariableName{"ownerid", "livesleft_avg"}
 	expectedOutput := []*Record{
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{3, 5.0}),
 	}
 
-	err = AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(ctx, expectedOutput), stream)
+	tx := stateStorage.BeginTransaction()
+	stream, _, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), variables, GetRawStreamID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := NewInMemoryStream(storage.InjectStateTransaction(context.Background(), tx), expectedOutput)
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	err = AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -327,15 +331,6 @@ func TestGroupBy_EventTimes(t *testing.T) {
 		NewWatermarkTrigger(),
 	)
 
-	tx := stateStorage.BeginTransaction()
-	stream, _, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatal(err)
-	}
-
 	outFields := []octosql.VariableName{"renamed_t", "ownerid", "livesleft_avg", "livesleft_count"}
 	expectedOutput := []*Record{
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{firstWindow, 5, 9.0, 1}, WithEventTimeField(octosql.NewVariableName("renamed_t"))),
@@ -347,7 +342,17 @@ func TestGroupBy_EventTimes(t *testing.T) {
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{thirdWindow, 3, 4.5, 2}, WithEventTimeField(octosql.NewVariableName("renamed_t"))),
 	}
 
-	err = AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(ctx, expectedOutput), stream)
+	tx := stateStorage.BeginTransaction()
+	stream, _, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := NewInMemoryStream(storage.InjectStateTransaction(context.Background(), tx), expectedOutput)
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	err = AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream)
 	if err != nil {
 		t.Fatal(err)
 	}

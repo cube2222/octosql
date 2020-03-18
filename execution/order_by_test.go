@@ -7,10 +7,14 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/docs"
+	"github.com/cube2222/octosql/streaming/storage"
 )
 
 func TestOrderBy_Get(t *testing.T) {
-	ctx := context.Background()
+	stateStorage := GetTestStorage(t)
+	tx := stateStorage.BeginTransaction()
+	defer tx.Abort()
+	ctx := storage.InjectStateTransaction(context.Background(), tx)
 	now := time.Now()
 
 	type args struct {
@@ -258,7 +262,7 @@ func TestOrderBy_Get(t *testing.T) {
 				return
 			}
 
-			equal, err := AreStreamsEqual(context.Background(), tt.want, ordered)
+			equal, err := AreStreamsEqual(ctx, tt.want, ordered)
 			if err != nil {
 				t.Errorf("Error in AreStreamsEqual(): %v", err)
 				return

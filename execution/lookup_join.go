@@ -42,31 +42,9 @@ func (node *LookupJoin) Get(ctx context.Context, variables octosql.Variables, st
 		return nil, nil, errors.Wrap(err, "couldn't get source record stream")
 	}
 
+	// We only want to do the initialization routine once, even in case of restarts.
 	isInitialized := storage.NewValueState(tx.WithPrefix(streamID.AsPrefix()).WithPrefix(isInitializedPrefix))
 	var phantom octosql.Value
-
-	err = isInitialized.Get(&phantom)
-	if err == storage.ErrNotFound {
-		// Not initialized, initialize here.
-		log.Println("initializing")
-
-		// Fill the token queue with initial tokens.
-		tokenQueue := NewOutputQueue(tx.WithPrefix(streamID.AsPrefix()).WithPrefix(jobTokenQueuePrefix))
-		token := octosql.MakePhantom()
-		for i := 0; i < node.maxJobsCount; i++ {
-			if err := tokenQueue.Push(ctx, &token); err != nil {
-				return nil, nil, errors.Wrap(err, "couldn't push job token to token queue")
-			}
-		}
-
-		phantom = octosql.MakePhantom()
-		err := isInitialized.Set(&phantom)
-		if err != nil {
-			return nil, nil, errors.Wrap(err, "couldn't save initialization status of lookup join")
-		}
-	} else if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get initialization status of lookup join")
-	}
 
 	rs := &LookupJoinStream{
 		stateStorage: node.stateStorage,
@@ -78,8 +56,56 @@ func (node *LookupJoin) Get(ctx context.Context, variables octosql.Variables, st
 		joinedNode: node.joined,
 	}
 
+	err = isInitialized.Get(&phantom)
+	if err == storage.ErrNotFound {
+		// Not initialized, initialize here.
+
+		// Fill the token queue with initial tokens.
+		tokenQueue := NewOutputQueue(tx.WithPrefix(streamID.AsPrefix()).WithPrefix(jobTokenQueuePrefix))
+		token := octosql.MakePhantom()
+		for i := 0; i < node.maxJobsCount; i++ {
+			if err := tokenQueue.Push(ctx, &token); err != nil {
+				return nil, nil, errors.Wrap(err, "couldn't push job token to token queue")
+			}
+		}
+
+		// Save that we've done the initialization routine.
+		phantom = octosql.MakePhantom()
+		err := isInitialized.Set(&phantom)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "couldn't save initialization status of lookup join")
+		}
+	} else if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't get initialization status of lookup join")
+	} else if err == nil {
+		// Run workers for existing jobs.
+		var jobs = storage.NewMap(tx.WithPrefix(streamID.AsPrefix()).WithPrefix(jobsPrefix))
+
+		iter := jobs.GetIterator()
+		var err error
+		var jobID ID
+		var phantom octosql.Value
+		for err = iter.Next(&jobID, &phantom); err == nil; err = iter.Next(&jobID, &phantom) {
+			go func() {
+				err = rs.RunWorker(ctx, &jobID)
+				for err != nil {
+					log.Printf("couldn't run worker for job ID %s: %s, retrying", jobID.Show(), err.Error())
+					err = rs.RunWorker(ctx, &jobID)
+				}
+			}()
+		}
+		if err != storage.ErrEndOfIterator {
+			return nil, nil, errors.Wrap(err, "couldn't iterate over existing join jobs")
+		}
+		if err := iter.Close(); err != nil {
+			return nil, nil, errors.Wrap(err, "couldn't close iterator over existing join jobs")
+		}
+	}
+
+	// Run the scheduler which will start workers for new join jobs.
 	go rs.RunScheduler(ctx)
 
+	// Run the pull engine which supplies this lookup join with records which are in need of joining.
 	engine := NewPullEngine(rs, node.stateStorage, sourceStream, streamID, execOutput.WatermarkSource)
 	go engine.Run(ctx)
 
@@ -111,9 +137,8 @@ var isInitializedPrefix = []byte("$initialized$")
 // where they will be handled by the receiver.
 func (rs *LookupJoinStream) RunScheduler(ctx context.Context) {
 	for {
-		log.Println("scheduler loop")
 		err := rs.loopScheduler(ctx)
-		if err == ErrNewTransactionRequired {
+		if errors.Cause(err) == ErrNewTransactionRequired {
 			continue
 		} else if errWait := GetErrWaitForChanges(err); errWait != nil {
 			if err := errWait.ListenForChanges(ctx); err != nil {
@@ -123,7 +148,7 @@ func (rs *LookupJoinStream) RunScheduler(ctx context.Context) {
 				log.Println("couldn't close changes listener: ", err)
 			}
 		} else if err != nil {
-			log.Fatal(err)
+			log.Printf("couldn't run lookup join scheduler loop: %s, retrying", err.Error())
 		}
 	}
 }
@@ -141,6 +166,7 @@ func (rs *LookupJoinStream) loopScheduler(ctx context.Context) error {
 
 	switch typedElement := element.Type.(type) {
 	case *QueueElement_Record:
+		// In case it's a record, we need to start a join job for it.
 		var jobs = storage.NewMap(tx.WithPrefix(jobsPrefix))
 
 		recordID := typedElement.Record.ID()
@@ -170,11 +196,18 @@ func (rs *LookupJoinStream) loopScheduler(ctx context.Context) error {
 		// Run the worker.
 		// If we crash after committing, but before running the worker,
 		// then the worker will be started on stream creation.
-		go rs.RunWorker(ctx, recordID) // TODO: Worker restart on app start.
+		go func() {
+			err = rs.RunWorker(ctx, recordID)
+			for err != nil {
+				log.Printf("couldn't run worker for job ID %s: %s, retrying", recordID.Show(), err.Error())
+				err = rs.RunWorker(ctx, recordID)
+			}
+		}()
 
 		return nil
 
 	case *QueueElement_Watermark, *QueueElement_EndOfStream, *QueueElement_Error:
+		// If it's a control message, pass it to the control messages queue.
 		var controlMessagesQueue = NewOutputQueue(tx.WithPrefix(outputPrefix).WithPrefix(controlMessagesQueuePrefix))
 
 		// Save the message to the control messages queue
@@ -258,6 +291,7 @@ func (rs *LookupJoinStream) AddRecord(ctx context.Context, tx storage.StateTrans
 }
 
 func (rs *LookupJoinStream) Next(ctx context.Context, tx storage.StateTransaction) (*Record, error) {
+	// Check if this stream isn't done already.
 	var endOfStreamState = storage.NewValueState(tx.WithPrefix(endOfStreamPrefix))
 	var eos octosql.Value
 	err := endOfStreamState.Get(&eos)
@@ -268,6 +302,7 @@ func (rs *LookupJoinStream) Next(ctx context.Context, tx storage.StateTransactio
 		return nil, ErrEndOfStream
 	}
 
+	// Handle any possible output control messages.
 	err = rs.HandleControlMessages(ctx, tx)
 	if err == ErrEndOfStream {
 		return nil, ErrEndOfStream
@@ -275,6 +310,7 @@ func (rs *LookupJoinStream) Next(ctx context.Context, tx storage.StateTransactio
 		return nil, errors.Wrap(err, "couldn't handle control messages")
 	}
 
+	// Get the next output record from any of the active join jobs.
 	record, err := rs.GetNextRecord(ctx, tx)
 	if err == nil {
 		return record, nil
@@ -286,6 +322,8 @@ func (rs *LookupJoinStream) Next(ctx context.Context, tx storage.StateTransactio
 
 	// We didn't get anything to return
 	// Now we check if a new transaction would return something
+	// If yes, we tell the caller to create a new transaction
+	// Otherwise, we return a storage subscription to wait on
 
 	outputStorage := rs.stateStorage.WithPrefix(rs.streamID.AsPrefix()).WithPrefix(outputPrefix)
 	sub := outputStorage.Subscribe(ctx)
@@ -342,7 +380,7 @@ func (rs *LookupJoinStream) HandleControlMessages(ctx context.Context, tx storag
 			// We only handle record id control messages if the corresponding job doesn't exist anymore
 
 		default:
-			// Other messages get always handled
+			// Other messages always get handled
 		}
 
 		err = controlMessagesQueue.Pop(ctx, &msg)
@@ -353,7 +391,14 @@ func (rs *LookupJoinStream) HandleControlMessages(ctx context.Context, tx storag
 		switch payload := msg.Type.(type) {
 		case *QueueElement_Record:
 			// This message can safely be discarded as the corresponding job doesn't exists.
+			// As these jobs are done now, we can respond with tokens.
+			tokenQueue := NewOutputQueue(tx.WithPrefix(jobTokenQueuePrefix))
+			token := octosql.MakePhantom()
+			if err := tokenQueue.Push(ctx, &token); err != nil {
+				return errors.Wrap(err, "couldn't push job token to token queue")
+			}
 		case *QueueElement_Watermark:
+			// Update the current output watermark state
 			outputWatermarkState := storage.NewValueState(tx.WithPrefix(outputWatermarkPrefix))
 			watermark, err := ptypes.Timestamp(payload.Watermark)
 			if err != nil {
@@ -365,6 +410,7 @@ func (rs *LookupJoinStream) HandleControlMessages(ctx context.Context, tx storag
 				return errors.Wrap(err, "couldn't update output watermark")
 			}
 		case *QueueElement_EndOfStream:
+			// Update the current end of stream state
 			octoEndOfStream := octosql.MakeBool(true)
 			err := endOfStreamState.Set(&octoEndOfStream)
 			if err != nil {
@@ -380,6 +426,7 @@ func (rs *LookupJoinStream) HandleControlMessages(ctx context.Context, tx storag
 }
 
 func (rs *LookupJoinStream) ReadyForMore(ctx context.Context, tx storage.StateTransaction) error {
+	// We limit the amount of records received using an internal token queue.
 	tokenQueue := NewOutputQueue(tx.WithPrefix(jobTokenQueuePrefix))
 
 	var token octosql.Value
@@ -398,6 +445,7 @@ func (rs *LookupJoinStream) GetNextRecord(ctx context.Context, tx storage.StateT
 	var jobRecordID ID
 	var phantom octosql.Value
 	var err error
+	// Go over all jobs in order and try to get records to return from any of them.
 	for err = iter.Next(&jobRecordID, &phantom); err == nil; err = iter.Next(&jobRecordID, &phantom) {
 		sourceRecordState := storage.NewValueState(tx.WithPrefix(jobRecordID.AsPrefix()).WithPrefix(sourceRecordPrefix))
 		recordsQueue := storage.NewDeque(tx.WithPrefix(outputPrefix).WithPrefix(jobRecordID.AsPrefix()))
@@ -474,10 +522,9 @@ func (rs *LookupJoinStream) GetNextRecord(ctx context.Context, tx storage.StateT
 			return nil, errors.Wrapf(err, "couldn't get element from output queue for job with recordID %s", jobRecordID.Show())
 		}
 
-		log.Printf("next record for job %s: %s", jobRecordID.Show(), outputElement.String())
-
 		switch typedElement := outputElement.Type.(type) {
 		case *QueueElement_Record:
+			// If it's a record, just return it, with the source record for this job joined with it.
 			joinedRecord := typedElement.Record
 
 			var sourceRecord Record
@@ -502,6 +549,7 @@ func (rs *LookupJoinStream) GetNextRecord(ctx context.Context, tx storage.StateT
 			return NewRecord(fields, allVariableValues, WithMetadataFrom(&sourceRecord), WithID(joinedRecord.ID())), nil
 
 		case *QueueElement_EndOfStream:
+			// If it's an end of stream, then we can delete this job.
 			if err := sourceRecordState.Clear(); err != nil {
 				return nil, errors.Wrapf(err, "couldn't clear source record for job with recordID %s", jobRecordID.Show())
 			}
@@ -512,12 +560,6 @@ func (rs *LookupJoinStream) GetNextRecord(ctx context.Context, tx storage.StateT
 
 			if err := recordsQueue.Clear(); err != nil {
 				return nil, errors.Wrapf(err, "couldn't clear joined record queue for job with recordID %s", jobRecordID.Show())
-			}
-
-			tokenQueue := NewOutputQueue(tx.WithPrefix(jobTokenQueuePrefix))
-			token := octosql.MakePhantom()
-			if err := tokenQueue.Push(ctx, &token); err != nil {
-				return nil, errors.Wrap(err, "couldn't push job token to token queue")
 			}
 
 			err := rs.HandleControlMessages(ctx, tx)

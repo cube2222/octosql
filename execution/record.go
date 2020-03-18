@@ -2,15 +2,12 @@ package execution
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/mitchellh/hashstructure"
-	"github.com/oklog/ulid"
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
@@ -112,6 +109,8 @@ func SystemField(field string) octosql.VariableName {
 func (r *Record) Value(field octosql.VariableName) octosql.Value {
 	if field.Source() == SystemSource {
 		switch field.Name() {
+		case "id":
+			return octosql.MakeString(r.ID().Show())
 		case "undo":
 			return octosql.MakeBool(r.IsUndo())
 		case "event_time_field":
@@ -165,6 +164,8 @@ func (r *Record) AsVariables() octosql.Variables {
 	for i := range r.FieldNames {
 		out[octosql.NewVariableName(r.FieldNames[i])] = *r.Data[i]
 	}
+	out[octosql.NewVariableName("sys.undo")] = octosql.MakeBool(r.IsUndo())
+	out[octosql.NewVariableName("sys.id")] = octosql.MakeString(r.ID().Show())
 
 	return out
 }
@@ -202,7 +203,9 @@ func (r *Record) EventTime() octosql.Value {
 
 func (r *Record) ID() *RecordID {
 	if r.Metadata != nil {
-		return r.Metadata.Id
+		if r.Metadata.Id != nil {
+			return r.Metadata.Id
+		}
 	}
 
 	return &RecordID{}
@@ -238,11 +241,10 @@ func NewRecordID(id string) *RecordID {
 	}
 }
 
-// GetRandomRecordID can be used to get a new random RecordID.
-func GetRandomRecordID() *RecordID {
-	id := ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader)
+// NewRecordIDFromStreamIDWithOffset can be used to get a new RecordID deterministically based on the streamID and record offset.
+func NewRecordIDFromStreamIDWithOffset(streamID *StreamID, offset int) *RecordID {
 	return &RecordID{
-		ID: id.String(),
+		ID: fmt.Sprintf("%s.%d", streamID.Id, offset),
 	}
 }
 

@@ -71,6 +71,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		decoder:                       json.NewDecoder(file),
 		isDone:                        false,
 		alias:                         ds.alias,
+		streamID:                      streamID,
 	}, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), nil
 }
 
@@ -81,6 +82,8 @@ type RecordStream struct {
 	decoder                       *json.Decoder
 	isDone                        bool
 	alias                         string
+	offset                        int
+	streamID                      *execution.StreamID
 }
 
 func (rs *RecordStream) Close() error {
@@ -140,5 +143,11 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 		return fields[i] < fields[j]
 	})
 
-	return execution.NewRecord(fields, aliasedRecord, execution.WithID(execution.GetRandomRecordID())), nil
+	curOffset := rs.offset
+	rs.offset++
+	return execution.NewRecord(
+		fields,
+		aliasedRecord,
+		execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(rs.streamID, curOffset)),
+	), nil
 }

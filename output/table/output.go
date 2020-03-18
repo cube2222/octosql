@@ -47,6 +47,7 @@ func (o *Output) Close() error {
 	}
 
 	table := tablewriter.NewWriter(o.w)
+	table.SetColWidth(64)
 	table.SetRowLine(o.rowLines)
 	table.SetHeader(fields)
 	table.SetAutoFormatHeaders(false)

@@ -2,12 +2,15 @@ package execution
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/mitchellh/hashstructure"
+	"github.com/oklog/ulid"
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
@@ -17,13 +20,13 @@ type Field struct {
 	Name octosql.VariableName
 }
 
-func NewID(id string) *ID {
-	return &ID{
+func NewID(id string) *RecordID {
+	return &RecordID{
 		ID: id,
 	}
 }
 
-func (id ID) Show() string {
+func (id RecordID) Show() string {
 	return id.ID
 }
 
@@ -53,7 +56,7 @@ func WithMetadataFrom(base *Record) RecordOption {
 	}
 }
 
-func WithID(id *ID) RecordOption {
+func WithID(id *RecordID) RecordOption {
 	return func(rec *Record) {
 		rec.Metadata.Id = id
 	}
@@ -197,12 +200,12 @@ func (r *Record) EventTime() octosql.Value {
 	return r.Value(eventVarName)
 }
 
-func (r *Record) ID() *ID {
+func (r *Record) ID() *RecordID {
 	if r.Metadata != nil {
 		return r.Metadata.Id
 	}
 
-	return &ID{}
+	return &RecordID{}
 }
 
 func (r *Record) EventTimeField() octosql.VariableName {
@@ -228,16 +231,24 @@ func (r *Record) Hash() (uint64, error) {
 	return hashstructure.Hash(append(values, fields...), nil)
 }
 
+// GetRandomRecordID can be used to get a new random RecordID.
+func GetRandomRecordID() *RecordID {
+	id := ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader)
+	return &RecordID{
+		ID: id.String(),
+	}
+}
+
 // This is a helper function to use a record ID as a storage prefix.
-func (id *ID) AsPrefix() []byte {
+func (id *RecordID) AsPrefix() []byte {
 	return []byte("$" + id.ID + "$")
 }
 
-func (id *ID) MonotonicMarshal() []byte {
+func (id *RecordID) MonotonicMarshal() []byte {
 	return []byte(id.ID)
 }
 
-func (id *ID) MonotonicUnmarshal(data []byte) error {
+func (id *RecordID) MonotonicUnmarshal(data []byte) error {
 	id.ID = string(data)
 	return nil
 }

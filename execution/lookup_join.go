@@ -83,7 +83,7 @@ func (node *LookupJoin) Get(ctx context.Context, variables octosql.Variables, st
 
 		iter := jobs.GetIterator()
 		var err error
-		var jobID ID
+		var jobID RecordID
 		var phantom octosql.Value
 		for err = iter.Next(&jobID, &phantom); err == nil; err = iter.Next(&jobID, &phantom) {
 			go func() {
@@ -228,7 +228,7 @@ func (rs *LookupJoinStream) loopScheduler(ctx context.Context) error {
 
 // The worker drives streams to completion, puts received records to output queues scoped by record id.
 // In the end, it puts an EndOfStream message on the queue.
-func (rs *LookupJoinStream) RunWorker(ctx context.Context, id *ID) error {
+func (rs *LookupJoinStream) RunWorker(ctx context.Context, id *RecordID) error {
 	tx := rs.stateStorage.BeginTransaction()
 	prefixedTx := tx.WithPrefix(rs.streamID.AsPrefix())
 	recordPrefixedTx := prefixedTx.WithPrefix(id.AsPrefix())
@@ -442,7 +442,7 @@ func (rs *LookupJoinStream) GetNextRecord(ctx context.Context, tx storage.StateT
 
 	iter := jobs.GetIterator()
 
-	var jobRecordID ID
+	var jobRecordID RecordID
 	var phantom octosql.Value
 	var err error
 	// Go over all jobs in order and try to get records to return from any of them.
@@ -656,7 +656,7 @@ func (rs *LookupJoinStream) Close() error {
 }
 
 type JobOutputQueueIntermediateRecordStore struct {
-	recordID *ID
+	recordID *RecordID
 }
 
 func (j *JobOutputQueueIntermediateRecordStore) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *Record) error {

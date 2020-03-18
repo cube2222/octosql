@@ -140,5 +140,5 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 		return fields[i] < fields[j]
 	})
 
-	return execution.NewRecord(fields, aliasedRecord, execution.WithID(execution.NewID(execution.GetRawStreamID().Id))), nil
+	return execution.NewRecord(fields, aliasedRecord, execution.WithID(execution.GetRandomRecordID())), nil
 }

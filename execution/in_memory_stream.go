@@ -10,8 +10,6 @@ import (
 )
 
 type InMemoryStream struct {
-	data     []*Record
-	index    int
 	streamID *StreamID
 }
 
@@ -28,8 +26,6 @@ func NewInMemoryStream(ctx context.Context, data []*Record) *InMemoryStream {
 	}
 
 	return &InMemoryStream{
-		data:     data,
-		index:    0,
 		streamID: streamID,
 	}
 }

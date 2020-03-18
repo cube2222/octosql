@@ -1,24 +1,10 @@
 package mysql
 
 import (
-	"context"
-	"database/sql"
-	"fmt"
-	"strings"
-	"testing"
-	"time"
-
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/config"
-	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/physical"
-	"github.com/cube2222/octosql/streaming/storage"
-
 	_ "github.com/lib/pq"
-	"github.com/pkg/errors"
 )
 
-func TestDataSource_Get(t *testing.T) {
+/*func TestDataSource_Get(t *testing.T) {
 	stateStorage := execution.GetTestStorage(t)
 	defer func() {
 		go stateStorage.Close()
@@ -401,4 +387,4 @@ func sliceToString(values []interface{}) []string {
 	}
 
 	return result
-}
+}*/

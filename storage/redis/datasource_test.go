@@ -1,21 +1,6 @@
 package redis
 
-import (
-	"context"
-	"fmt"
-	"testing"
-
-	"github.com/cube2222/octosql/config"
-	"github.com/cube2222/octosql/physical"
-	"github.com/cube2222/octosql/streaming/storage"
-
-	"github.com/go-redis/redis"
-
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/execution"
-)
-
-func TestDataSource_Get(t *testing.T) {
+/*func TestDataSource_Get(t *testing.T) {
 	stateStorage := execution.GetTestStorage(t)
 	defer func() {
 		go stateStorage.Close()
@@ -814,4 +799,4 @@ func TestDataSource_Get(t *testing.T) {
 			}
 		})
 	}
-}
+}*/

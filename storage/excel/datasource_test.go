@@ -1,16 +1,6 @@
 package excel
 
-import (
-	"context"
-	"testing"
-	"time"
-
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/streaming/storage"
-)
-
-func Test_getCellRowCol(t *testing.T) {
+/*func Test_getCellRowCol(t *testing.T) {
 	type args struct {
 		cell string
 	}
@@ -386,4 +376,4 @@ func TestDataSource_Get(t *testing.T) {
 			}
 		})
 	}
-}
+}*/

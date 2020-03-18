@@ -7,6 +7,7 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/streaming/storage"
 )
 
 func Test_getCellRowCol(t *testing.T) {
@@ -137,7 +138,14 @@ func Test_getRowColCoords(t *testing.T) {
 }
 
 func TestDataSource_Get(t *testing.T) {
-	ctx := context.Background()
+	stateStorage := execution.GetTestStorage(t)
+	defer func() {
+		go stateStorage.Close()
+	}()
+	tx := stateStorage.BeginTransaction()
+	defer tx.Abort()
+	ctx := storage.InjectStateTransaction(context.Background(), tx)
+
 	type fields struct {
 		path             string
 		alias            string
@@ -367,7 +375,7 @@ func TestDataSource_Get(t *testing.T) {
 				return
 			}
 
-			areEqual, err := execution.AreStreamsEqual(context.Background(), got, tt.want)
+			areEqual, err := execution.AreStreamsEqual(ctx, got, tt.want)
 			if err != nil {
 				t.Errorf("Error in areStreamsEqual %v", err)
 				return

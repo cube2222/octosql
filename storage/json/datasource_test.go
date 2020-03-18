@@ -8,10 +8,18 @@ import (
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
+	"github.com/cube2222/octosql/streaming/storage"
 )
 
 func TestJSONRecordStream_Get(t *testing.T) {
-	ctx := context.Background()
+	stateStorage := execution.GetTestStorage(t)
+	defer func() {
+		go stateStorage.Close()
+	}()
+	tx := stateStorage.BeginTransaction()
+	defer tx.Abort()
+	ctx := storage.InjectStateTransaction(context.Background(), tx)
+
 	tests := []struct {
 		name        string
 		path        string
@@ -94,7 +102,7 @@ func TestJSONRecordStream_Get(t *testing.T) {
 				return
 			}
 
-			if ok, err := execution.AreStreamsEqual(context.Background(), tt.want, got); !ok {
+			if err := execution.AreStreamsEqualNoOrdering(ctx, stateStorage, tt.want, got); err != nil {
 				t.Errorf("Streams aren't equal: %v", err)
 				return
 			}

@@ -12,12 +12,21 @@ import (
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
+	"github.com/cube2222/octosql/streaming/storage"
+
 	_ "github.com/lib/pq"
 	"github.com/pkg/errors"
 )
 
 func TestDataSource_Get(t *testing.T) {
-	ctx := context.Background()
+	stateStorage := execution.GetTestStorage(t)
+	defer func() {
+		go stateStorage.Close()
+	}()
+	tx := stateStorage.BeginTransaction()
+	defer tx.Abort()
+	ctx := storage.InjectStateTransaction(context.Background(), tx)
+
 	host := "localhost"
 	port := 3306
 	user := "root"
@@ -319,7 +328,7 @@ func TestDataSource_Get(t *testing.T) {
 				return
 			}
 
-			equal, err := execution.AreStreamsEqual(context.Background(), stream, tt.want)
+			equal, err := execution.AreStreamsEqual(ctx, stream, tt.want)
 			if err != nil {
 				t.Errorf("Error in AreStreamsEqual(): %v", err)
 				return

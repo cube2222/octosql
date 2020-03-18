@@ -7,6 +7,8 @@ import (
 
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/physical"
+	"github.com/cube2222/octosql/streaming/storage"
+
 	"github.com/go-redis/redis"
 
 	"github.com/cube2222/octosql"
@@ -14,7 +16,14 @@ import (
 )
 
 func TestDataSource_Get(t *testing.T) {
-	ctx := context.Background()
+	stateStorage := execution.GetTestStorage(t)
+	defer func() {
+		go stateStorage.Close()
+	}()
+	tx := stateStorage.BeginTransaction()
+	defer tx.Abort()
+	ctx := storage.InjectStateTransaction(context.Background(), tx)
+
 	hostname := "localhost"
 	password := ""
 	port := 6379
@@ -798,20 +807,9 @@ func TestDataSource_Get(t *testing.T) {
 				return
 			}
 
-			equal, err := execution.AreStreamsEqualNoOrdering(context.Background(), execution.GetTestStorage(t), stream, tt.want)
-			if err != nil && !tt.wantErr {
+			err = execution.AreStreamsEqualNoOrdering(ctx, execution.GetTestStorage(t), stream, tt.want)
+			if err != nil {
 				t.Errorf("AreStreamsEqual() error: %s", err)
-				return
-			} else if err != nil {
-				return
-			}
-
-			if tt.wantErr {
-				t.Errorf("wanted error, but none received")
-			}
-
-			if !equal {
-				t.Errorf("ERROR: Streams are not equal")
 				return
 			}
 		})

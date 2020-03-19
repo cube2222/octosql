@@ -11,6 +11,166 @@ import (
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
+// This tests the group by that is created from
+// "SELECT DISTINCT * FROM ..."
+func TestGroupBy_StarExpressionKey(t *testing.T) {
+	stateStorage := GetTestStorage(t)
+
+	ctx := context.Background()
+	fields := []octosql.VariableName{"cat", "livesleft", "ownerid"}
+	records := []*Record{
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Buster", 9, 5}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 6, 4}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Nala", 5, 3}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Tiger", 4, 3}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"Lucy", 3, 3}),
+	}
+
+	source := NewDummyNode(records)
+
+	gb := NewGroupBy(stateStorage,
+		source,
+		[]Expression{NewStarExpression("")},
+		[]octosql.VariableName{},
+		[]aggregate.AggregatePrototype{},
+		octosql.NewVariableName(""),
+		[]octosql.VariableName{},
+		octosql.NewVariableName(""),
+		NewWatermarkTrigger(),
+		true,
+	)
+
+	tx := stateStorage.BeginTransaction()
+	stream, _, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	ok, err := AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(records), stream)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("streams not equal")
+	}
+}
+
+// This tests the group by that is created from
+// "SELECT DISTINCT d.* FROM ..."
+func TestGroupBy_QualifiedStarExpression(t *testing.T) {
+	stateStorage := GetTestStorage(t)
+
+	ctx := context.Background()
+
+	allFields := []octosql.VariableName{"d.cat", "d.livesleft", "ownerid"}
+	source := NewDummyNode([]*Record{
+		NewRecordFromSliceWithNormalize(allFields, []interface{}{"Buster", 9, 5}),
+		NewRecordFromSliceWithNormalize(allFields, []interface{}{"Precious", 6, 4}),
+		NewRecordFromSliceWithNormalize(allFields, []interface{}{"Nala", 5, 3}),
+		NewRecordFromSliceWithNormalize(allFields, []interface{}{"Tiger", 4, 3}),
+		NewRecordFromSliceWithNormalize(allFields, []interface{}{"Lucy", 3, 3}),
+	})
+
+	gb := NewGroupBy(stateStorage,
+		source,
+		[]Expression{NewStarExpression("d")},
+		[]octosql.VariableName{},
+		[]aggregate.AggregatePrototype{},
+		octosql.NewVariableName(""),
+		[]octosql.VariableName{},
+		octosql.NewVariableName(""),
+		NewWatermarkTrigger(),
+		true,
+	)
+
+	tx := stateStorage.BeginTransaction()
+	stream, _, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	qualifiedFields := []octosql.VariableName{"d.cat", "d.livesleft"}
+	expectedOutput := []*Record{
+		NewRecordFromSliceWithNormalize(qualifiedFields, []interface{}{"Buster", 9}),
+		NewRecordFromSliceWithNormalize(qualifiedFields, []interface{}{"Precious", 6}),
+		NewRecordFromSliceWithNormalize(qualifiedFields, []interface{}{"Nala", 5}),
+		NewRecordFromSliceWithNormalize(qualifiedFields, []interface{}{"Tiger", 4}),
+		NewRecordFromSliceWithNormalize(qualifiedFields, []interface{}{"Lucy", 3}),
+	}
+
+	ok, err := AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(expectedOutput), stream)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("streams not equal")
+	}
+}
+
+// This tests the group by that is created from
+// "SELECT DISTINCT d.a, d.* FROM ..."
+func TestGroupBy_VariablesAndStars(t *testing.T) {
+	stateStorage := GetTestStorage(t)
+
+	ctx := context.Background()
+
+	fields := []octosql.VariableName{"d.a", "d.b"}
+	source := NewDummyNode([]*Record{
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"a", 1}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"a", 2}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"a", 1}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"a", 2}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"b", 1}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"b", 2}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"b", 2}),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"c", 1}),
+	})
+
+	gb := NewGroupBy(stateStorage,
+		source,
+		[]Expression{NewVariable("d.a"), NewStarExpression("d")},
+		[]octosql.VariableName{"d.a"},
+		[]aggregate.AggregatePrototype{aggregate.AggregateTable["first"]},
+		octosql.NewVariableName(""),
+		[]octosql.VariableName{"d.a"},
+		octosql.NewVariableName(""),
+		NewWatermarkTrigger(),
+		true,
+	)
+
+	tx := stateStorage.BeginTransaction()
+	stream, _, err := gb.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	outFields := []octosql.VariableName{"d.a", "d.a", "d.b"}
+	expectedOutput := []*Record{
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{"a", "a", 1}),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{"a", "a", 2}),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{"b", "b", 1}),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{"b", "b", 2}),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{"c", "c", 1}),
+	}
+
+	ok, err := AreStreamsEqualNoOrdering(ctx, stateStorage, NewInMemoryStream(expectedOutput), stream)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("streams not equal")
+	}
+}
+
 func TestGroupBy_SimpleBatch(t *testing.T) {
 	stateStorage := GetTestStorage(t)
 
@@ -46,6 +206,7 @@ func TestGroupBy_SimpleBatch(t *testing.T) {
 		},
 		octosql.NewVariableName(""),
 		NewWatermarkTrigger(),
+		false,
 	)
 
 	tx := stateStorage.BeginTransaction()
@@ -115,6 +276,7 @@ func TestGroupBy_BatchWithUndos(t *testing.T) {
 		},
 		octosql.NewVariableName(""),
 		NewWatermarkTrigger(),
+		false,
 	)
 
 	tx := stateStorage.BeginTransaction()
@@ -188,6 +350,7 @@ func TestGroupBy_WithOutputUndos(t *testing.T) {
 		},
 		octosql.NewVariableName(""),
 		NewCountingTrigger(NewVariable(octosql.NewVariableName("count"))),
+		false,
 	)
 
 	tx := stateStorage.BeginTransaction()
@@ -260,6 +423,7 @@ func TestGroupBy_newRecordsNoChanges(t *testing.T) {
 		},
 		octosql.NewVariableName(""),
 		NewCountingTrigger(NewVariable(octosql.NewVariableName("count"))),
+		false,
 	)
 
 	tx := stateStorage.BeginTransaction()
@@ -337,6 +501,7 @@ func TestGroupBy_EventTimes(t *testing.T) {
 		},
 		octosql.NewVariableName("renamed_t"),
 		NewWatermarkTrigger(),
+		false,
 	)
 
 	tx := stateStorage.BeginTransaction()

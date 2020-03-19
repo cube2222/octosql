@@ -91,6 +91,7 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 		aggregates:           aggregates,
 		starExpressions:      starExpressions,
 		outputFields:         newGroupByOutputFields(outputFieldNames),
+		originalOutputFields: outputFieldNames,
 		outputEventTimeField: node.outEventTimeField,
 	}
 
@@ -118,6 +119,7 @@ type GroupByStream struct {
 	starExpressions []*StarExpression
 
 	outputFields         *groupByOutputFields
+	originalOutputFields []octosql.VariableName
 	outputEventTimeField octosql.VariableName
 }
 
@@ -175,8 +177,7 @@ func (gb *GroupByStream) AddRecord(ctx context.Context, tx storage.StateTransact
 		values[i] = value
 	}
 
-	// we don't add the outputFields from gb.inputFields because they are already there
-	outputFields := make([]octosql.VariableName, 0)
+	outputFields := gb.originalOutputFields
 	for _, expr := range gb.starExpressions { // handle star expressions
 		value, err := expr.ExpressionValue(ctx, recordVariables)
 		if err != nil {

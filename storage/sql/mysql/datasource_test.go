@@ -16,6 +16,7 @@ import (
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
+	"github.com/cube2222/octosql/streaming/storage"
 )
 
 func TestDataSource_Get(t *testing.T) {
@@ -46,7 +47,7 @@ func TestDataSource_Get(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    *execution.InMemoryStream
+		want    []*execution.Record
 		wantErr bool
 	}{
 		{
@@ -65,7 +66,7 @@ func TestDataSource_Get(t *testing.T) {
 				},
 				tableDescription: "CREATE TABLE animals(name VARCHAR(20) PRIMARY KEY, population INTEGER);",
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"a.name", "a.population"},
 					[]interface{}{"human", 7000000},
@@ -83,7 +84,6 @@ func TestDataSource_Get(t *testing.T) {
 					[]interface{}{"zebra", 5000},
 				),
 			},
-			),
 			wantErr: false,
 		},
 
@@ -107,7 +107,7 @@ func TestDataSource_Get(t *testing.T) {
 				},
 				tableDescription: "CREATE TABLE animals(name VARCHAR(20) PRIMARY KEY, population INTEGER);",
 			},
-			want:    execution.NewInMemoryStream([]*execution.Record{}),
+			want:    []*execution.Record{},
 			wantErr: false,
 		},
 
@@ -133,12 +133,12 @@ func TestDataSource_Get(t *testing.T) {
 				},
 				tableDescription: "CREATE TABLE animals(name VARCHAR(20) PRIMARY KEY, population INTEGER);",
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"a.name", "a.population"},
 					[]interface{}{"panda", 500},
 				),
-			}),
+			},
 			wantErr: false,
 		},
 
@@ -164,7 +164,7 @@ func TestDataSource_Get(t *testing.T) {
 				},
 				tableDescription: "CREATE TABLE people(id INTEGER PRIMARY KEY, name VARCHAR(20));",
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{2, "Kuba"},
@@ -177,7 +177,7 @@ func TestDataSource_Get(t *testing.T) {
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{4, "Adam"},
 				),
-			}),
+			},
 			wantErr: false,
 		},
 
@@ -212,7 +212,7 @@ func TestDataSource_Get(t *testing.T) {
 				},
 				tableDescription: "CREATE TABLE people(id INTEGER PRIMARY KEY, name VARCHAR(20));",
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{2, "Kuba"},
@@ -221,7 +221,7 @@ func TestDataSource_Get(t *testing.T) {
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{3, "Wojtek"},
 				),
-			}),
+			},
 			wantErr: false,
 		},
 
@@ -256,7 +256,7 @@ func TestDataSource_Get(t *testing.T) {
 				},
 				tableDescription: "CREATE TABLE people(id INTEGER PRIMARY KEY, name VARCHAR(20));",
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{1, "Janek"},
@@ -269,7 +269,7 @@ func TestDataSource_Get(t *testing.T) {
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{4, "Adam"},
 				),
-			}),
+			},
 			wantErr: false,
 		},
 	}
@@ -319,13 +319,19 @@ func TestDataSource_Get(t *testing.T) {
 				return
 			}
 
-			stream, _, err := execNode.Get(ctx, args.variables, execution.GetRawStreamID())
+			tx := stateStorage.BeginTransaction()
+			stream, _, err := execNode.Get(storage.InjectStateTransaction(ctx, tx), args.variables, execution.GetRawStreamID())
 			if err != nil {
 				t.Errorf("Couldn't get stream: %v", err)
 				return
 			}
 
-			equal, err := execution.AreStreamsEqualNoOrdering(context.Background(), stateStorage, stream, tt.want)
+			want, _, err := execution.NewDummyNode(tt.want).Get(storage.InjectStateTransaction(ctx, tx), args.variables, execution.GetRawStreamID())
+			if err := tx.Commit(); err != nil {
+				t.Fatal(err)
+			}
+
+			equal, err := execution.AreStreamsEqualNoOrdering(storage.InjectStateTransaction(ctx, tx), stateStorage, stream, want)
 			if err != nil {
 				t.Errorf("Error in AreStreamsEqual(): %v", err)
 				return

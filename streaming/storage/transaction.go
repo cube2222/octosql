@@ -18,6 +18,7 @@ type StateTransaction interface {
 	Commit() error
 	Abort()
 	GetUnderlyingStorage() Storage
+	Prefix() string
 }
 
 type stateTransactionKey struct{}
@@ -84,6 +85,10 @@ func (tx *badgerTransaction) WithPrefix(prefix []byte) StateTransaction {
 		prefix:  tx.getKeyWithPrefix(prefix),
 		storage: tx.storage.WithPrefix(prefix),
 	}
+}
+
+func (tx *badgerTransaction) Prefix() string {
+	return string(tx.prefix)
 }
 
 func (tx *badgerTransaction) Iterator(opts ...IteratorOption) Iterator {

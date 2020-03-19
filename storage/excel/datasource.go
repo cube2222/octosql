@@ -101,6 +101,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 	}
 
 	return &RecordStream{
+		streamID:         streamID,
 		first:            true,
 		hasHeaderRow:     ds.hasHeaderRow,
 		timeColumnNames:  ds.timeColumns,
@@ -122,6 +123,7 @@ func contains(xs []string, x string) bool {
 }
 
 type RecordStream struct {
+	streamID         *execution.StreamID
 	first            bool
 	hasHeaderRow     bool
 	timeColumnNames  []string
@@ -132,6 +134,7 @@ type RecordStream struct {
 	columnNames []octosql.VariableName
 	timeColumns []bool
 	rows        *excelize.Rows
+	offset      int
 }
 
 func (rs *RecordStream) Close() error {
@@ -188,7 +191,13 @@ func (rs *RecordStream) Next(context.Context) (*execution.Record, error) {
 		return nil, execution.ErrEndOfStream
 	}
 
-	out := execution.NewRecordFromSlice(rs.columnNames, row)
+	curOffset := rs.offset
+	rs.offset++
+	out := execution.NewRecordFromSlice(
+		rs.columnNames,
+		row,
+		execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(rs.streamID, curOffset)),
+	)
 
 	if !rs.rows.Next() {
 		rs.isDone = true

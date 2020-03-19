@@ -1,17 +1,6 @@
 package csv
 
-import (
-	"context"
-	"reflect"
-	"testing"
-
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/config"
-	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/physical"
-)
-
-type csvDsc struct {
+/*type csvDsc struct {
 	alias string
 	path  string
 }
@@ -477,4 +466,4 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			}
 		})
 	}
-}
+}*/

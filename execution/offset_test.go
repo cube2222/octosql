@@ -10,33 +10,32 @@ import (
 
 func TestOffset_Get(t *testing.T) {
 	ctx := context.Background()
-	const NO_ERROR = ""
 
 	tests := []struct {
-		name       string
-		vars       octosql.Variables
-		node       *Offset
-		wantStream *InMemoryStream
-		wantError  string
+		name      string
+		vars      octosql.Variables
+		node      *Offset
+		want      Node
+		wantError bool
 	}{
 		{
-			name:       "negative offset value",
-			vars:       octosql.NoVariables(),
-			node:       NewOffset(NewDummyNode(nil), NewDummyValue(octosql.MakeInt(-42))),
-			wantStream: nil,
-			wantError:  "negative offset value",
+			name:      "negative offset value",
+			vars:      octosql.NoVariables(),
+			node:      NewOffset(NewDummyNode(nil), NewDummyValue(octosql.MakeInt(-42))),
+			want:      nil,
+			wantError: true,
 		},
 		{
-			name:       "offset value not int",
-			vars:       octosql.NoVariables(),
-			node:       NewOffset(NewDummyNode(nil), NewDummyValue(octosql.MakeFloat(2.0))),
-			wantStream: nil,
-			wantError:  "offset value not int",
+			name:      "offset value not int",
+			vars:      octosql.NoVariables(),
+			node:      NewOffset(NewDummyNode(nil), NewDummyValue(octosql.MakeFloat(2.0))),
+			want:      nil,
+			wantError: true,
 		},
 		{
 			name: "normal offset get",
 			vars: octosql.NoVariables(),
-			node: NewOffset(&DummyNode{
+			node: NewOffset(NewDummyNode(
 				[]*Record{
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{
@@ -67,8 +66,8 @@ func TestOffset_Get(t *testing.T) {
 							2.23e7,
 						}),
 				},
-			}, NewDummyValue(octosql.MakeInt(2))),
-			wantStream: NewInMemoryStream([]*Record{
+			), NewDummyValue(octosql.MakeInt(2))),
+			want: NewDummyNode([]*Record{
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{
 						"flag",
@@ -84,7 +83,7 @@ func TestOffset_Get(t *testing.T) {
 						2.23e7,
 					}),
 			}),
-			wantError: NO_ERROR,
+			wantError: false,
 		},
 		{
 			name: "offset bigger than number of rows",
@@ -107,40 +106,41 @@ func TestOffset_Get(t *testing.T) {
 						}),
 				},
 			}, NewDummyValue(octosql.MakeInt(4))),
-			wantStream: NewInMemoryStream([]*Record{}),
-			wantError:  NO_ERROR,
+			want:      NewDummyNode([]*Record{}),
+			wantError: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stateStorage := GetTestStorage(t)
+			defer func() {
+				go stateStorage.Close()
+			}()
 			tx := stateStorage.BeginTransaction()
 			ctx := storage.InjectStateTransaction(ctx, tx)
 
 			rs, _, err := tt.node.Get(ctx, tt.vars, GetRawStreamID())
-
-			if (err == nil) != (tt.wantError == NO_ERROR) {
-				t.Errorf("exactly one of test.wantError, tt.node.Get() is not nil")
+			if (err != nil) != tt.wantError {
+				t.Errorf("Unexpected error %v, wanted: %v", err, tt.wantError)
+				return
+			} else if tt.wantError {
 				return
 			}
 
+			want, _, err := tt.want.Get(ctx, tt.vars, GetRawStreamID())
 			if err != nil {
-				if err.Error() != tt.wantError {
-					t.Errorf("Unexpected error %v, wanted: %v", err.Error(), tt.wantError)
-				}
-				return
+				t.Fatal("couldn't get wanted record stream: ", err)
 			}
 
-			equal, err := AreStreamsEqual(context.Background(), rs, tt.wantStream)
-			if !equal {
-				t.Errorf("limitedStream doesn't work as expected")
-			}
-			if err != nil {
-				t.Errorf("limitedStream comparison error: %v", err)
+			if err := tx.Commit(); err != nil {
+				t.Fatal(err)
 			}
 
-			tx.Commit()
+			err = AreStreamsEqualNoOrdering(ctx, stateStorage, rs, want)
+			if err != nil {
+				t.Errorf("offsetStream comparison error: %v", err)
+			}
 		})
 	}
 }

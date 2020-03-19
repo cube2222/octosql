@@ -17,13 +17,13 @@ type Field struct {
 	Name octosql.VariableName
 }
 
-func NewID(id string) ID {
-	return ID{
+func NewID(id string) *RecordID {
+	return &RecordID{
 		ID: id,
 	}
 }
 
-func (id ID) Show() string {
+func (id RecordID) Show() string {
 	return id.ID
 }
 
@@ -53,9 +53,9 @@ func WithMetadataFrom(base *Record) RecordOption {
 	}
 }
 
-func WithID(id ID) RecordOption {
+func WithID(id *RecordID) RecordOption {
 	return func(rec *Record) {
-		rec.Metadata.Id = &id
+		rec.Metadata.Id = id
 	}
 }
 
@@ -109,6 +109,8 @@ func SystemField(field string) octosql.VariableName {
 func (r *Record) Value(field octosql.VariableName) octosql.Value {
 	if field.Source() == SystemSource {
 		switch field.Name() {
+		case "id":
+			return octosql.MakeString(r.ID().Show())
 		case "undo":
 			return octosql.MakeBool(r.IsUndo())
 		case "event_time_field":
@@ -162,6 +164,8 @@ func (r *Record) AsVariables() octosql.Variables {
 	for i := range r.FieldNames {
 		out[octosql.NewVariableName(r.FieldNames[i])] = *r.Data[i]
 	}
+	out[octosql.NewVariableName("sys.undo")] = octosql.MakeBool(r.IsUndo())
+	out[octosql.NewVariableName("sys.id")] = octosql.MakeString(r.ID().Show())
 
 	return out
 }
@@ -197,12 +201,14 @@ func (r *Record) EventTime() octosql.Value {
 	return r.Value(eventVarName)
 }
 
-func (r *Record) ID() ID {
+func (r *Record) ID() *RecordID {
 	if r.Metadata != nil {
-		return *r.Metadata.Id
+		if r.Metadata.Id != nil {
+			return r.Metadata.Id
+		}
 	}
 
-	return ID{}
+	return &RecordID{}
 }
 
 func (r *Record) EventTimeField() octosql.VariableName {
@@ -226,6 +232,34 @@ func (r *Record) Hash() (uint64, error) {
 	}
 
 	return hashstructure.Hash(append(values, fields...), nil)
+}
+
+// GetRandomRecordID can be used to get a new random RecordID.
+func NewRecordID(id string) *RecordID {
+	return &RecordID{
+		ID: id,
+	}
+}
+
+// NewRecordIDFromStreamIDWithOffset can be used to get a new RecordID deterministically based on the streamID and record offset.
+func NewRecordIDFromStreamIDWithOffset(streamID *StreamID, offset int) *RecordID {
+	return &RecordID{
+		ID: fmt.Sprintf("%s.%d", streamID.Id, offset),
+	}
+}
+
+// This is a helper function to use a record ID as a storage prefix.
+func (id *RecordID) AsPrefix() []byte {
+	return []byte("$" + id.ID + "$")
+}
+
+func (id *RecordID) MonotonicMarshal() []byte {
+	return []byte(id.ID)
+}
+
+func (id *RecordID) MonotonicUnmarshal(data []byte) error {
+	id.ID = string(data)
+	return nil
 }
 
 type RecordStream interface {

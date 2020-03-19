@@ -151,11 +151,12 @@ func TestRecordStream_Next(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			want, _, err := execution.NewDummyNode(tt.want).Get(storage.InjectStateTransaction(ctx, tx), octosql.NoVariables(), execution.GetRawStreamID())
 			if err := tx.Commit(); err != nil {
 				t.Fatal(err)
 			}
 
-			if err := execution.AreStreamsEqualNoOrderingWithCount(context.Background(), stateStorage, rs, execution.NewInMemoryStream(tt.want), len(tt.want)); err != nil {
+			if err := execution.AreStreamsEqualNoOrderingWithCount(context.Background(), stateStorage, rs, want, len(tt.want)); err != nil {
 				t.Errorf("Streams aren't equal: %v", err)
 				return
 			}

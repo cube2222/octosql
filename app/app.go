@@ -60,7 +60,7 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 	programID := &execution.StreamID{Id: "root"}
 
 	tx := stateStorage.BeginTransaction()
-	stream, _, err := exec.Get(storage.InjectStateTransaction(ctx, tx), variables, programID)
+	stream, execOutput, err := exec.Get(storage.InjectStateTransaction(ctx, tx), variables, programID)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get record stream from execution plan")
 	}
@@ -73,8 +73,15 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		tx := stateStorage.BeginTransaction()
 		ctx := storage.InjectStateTransaction(ctx, tx)
 
+		watermark, err := execOutput.WatermarkSource.GetWatermark(ctx, tx)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("current output watermark:", watermark)
+
 		rec, err = stream.Next(ctx)
 		if err == execution.ErrEndOfStream {
+			log.Println("main end of stream")
 			err := tx.Commit()
 			if err != nil {
 				log.Printf("couldn't commit transaction: %s", err)
@@ -114,11 +121,10 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 			continue
 		} else if err != nil {
 			tx.Abort()
-			log.Println(err)
-			break // TODO: Error propagation?
+			return errors.Wrap(err, "couldn't get next record")
 		}
 
-		err := tx.Commit()
+		err = tx.Commit()
 		if err != nil {
 			log.Printf("couldn't commit transaction: %s", err)
 			continue
@@ -128,9 +134,6 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		if err != nil {
 			return errors.Wrap(err, "couldn't write record")
 		}
-	}
-	if err != execution.ErrEndOfStream {
-		return errors.Wrap(err, "couldn't get next record")
 	}
 
 	err = app.out.Close()

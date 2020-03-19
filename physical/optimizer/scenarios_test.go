@@ -9,6 +9,67 @@ import (
 	"github.com/cube2222/octosql/physical"
 )
 
+func TestRemoveEmptyMaps(t *testing.T) {
+	type args struct {
+		plan physical.Node
+	}
+	tests := []struct {
+		name string
+		args args
+		want physical.Node
+	}{
+		{
+			name: "no match - existing expressions",
+			args: args{
+				physical.NewMap(
+					[]physical.NamedExpression{physical.NewVariable("age")},
+					&PlaceholderNode{Name: "stub"},
+					false,
+				),
+			},
+			want: physical.NewMap(
+				[]physical.NamedExpression{physical.NewVariable("age")},
+				&PlaceholderNode{Name: "stub"},
+				false,
+			),
+		},
+		{
+			name: "no match - no expressions, keep is false",
+			args: args{
+				physical.NewMap(
+					[]physical.NamedExpression{},
+					&PlaceholderNode{Name: "stub"},
+					false,
+				),
+			},
+			want: physical.NewMap(
+				[]physical.NamedExpression{},
+				&PlaceholderNode{Name: "stub"},
+				false,
+			),
+		},
+		{
+			name: "match - no expressions, keep is true",
+			args: args{
+				physical.NewMap(
+					[]physical.NamedExpression{},
+					&PlaceholderNode{Name: "stub"},
+					true,
+				),
+			},
+			want: &PlaceholderNode{Name: "stub"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := Optimize(context.Background(), []Scenario{RemoveEmptyMaps}, tt.args.plan); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("RemoveEmptyMaps() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestMergeRequalifiers(t *testing.T) {
 	type args struct {
 		plan physical.Node
@@ -710,42 +771,45 @@ func TestMultiOptimization(t *testing.T) {
 			name: "multiple optimizations",
 			args: args{
 				plan: &physical.Map{
-					Expressions: []physical.NamedExpression{physical.NewVariable("expr")},
-					Source: &physical.Requalifier{
-						Qualifier: "a",
+					Expressions: []physical.NamedExpression{},
+					Source: &physical.Map{
+						Expressions: []physical.NamedExpression{physical.NewVariable("expr")},
 						Source: &physical.Requalifier{
-							Qualifier: "b",
-							Source: &physical.Filter{
-								Formula: physical.NewConstant(true),
+							Qualifier: "a",
+							Source: &physical.Requalifier{
+								Qualifier: "b",
 								Source: &physical.Filter{
-									Formula: physical.NewConstant(false),
+									Formula: physical.NewConstant(true),
 									Source: &physical.Filter{
-										Formula: physical.NewConstant(true),
-										Source: &physical.Requalifier{
-											Qualifier: "a",
+										Formula: physical.NewConstant(false),
+										Source: &physical.Filter{
+											Formula: physical.NewConstant(true),
 											Source: &physical.Requalifier{
-												Qualifier: "b",
-												Source: &physical.DataSourceBuilder{
-													Materializer: nil,
-													PrimaryKeys:  []octosql.VariableName{octosql.NewVariableName("a")},
-													AvailableFilters: map[physical.FieldType]map[physical.Relation]struct{}{
-														physical.Primary: {
-															physical.Equal:    struct{}{},
-															physical.NotEqual: struct{}{},
+												Qualifier: "a",
+												Source: &physical.Requalifier{
+													Qualifier: "b",
+													Source: &physical.DataSourceBuilder{
+														Materializer: nil,
+														PrimaryKeys:  []octosql.VariableName{octosql.NewVariableName("a")},
+														AvailableFilters: map[physical.FieldType]map[physical.Relation]struct{}{
+															physical.Primary: {
+																physical.Equal:    struct{}{},
+																physical.NotEqual: struct{}{},
+															},
+															physical.Secondary: {
+																physical.Equal:    struct{}{},
+																physical.NotEqual: struct{}{},
+																physical.MoreThan: struct{}{},
+																physical.LessThan: struct{}{},
+															},
 														},
-														physical.Secondary: {
-															physical.Equal:    struct{}{},
-															physical.NotEqual: struct{}{},
-															physical.MoreThan: struct{}{},
-															physical.LessThan: struct{}{},
-														},
+														Filter: physical.NewAnd(
+															physical.NewConstant(true),
+															physical.NewConstant(false),
+														),
+														Name:  "baz",
+														Alias: "c",
 													},
-													Filter: physical.NewAnd(
-														physical.NewConstant(true),
-														physical.NewConstant(false),
-													),
-													Name:  "baz",
-													Alias: "c",
 												},
 											},
 										},
@@ -754,6 +818,7 @@ func TestMultiOptimization(t *testing.T) {
 							},
 						},
 					},
+					Keep: true,
 				},
 			},
 			want: &physical.Map{
@@ -803,6 +868,7 @@ func TestMultiOptimization(t *testing.T) {
 					MergeRequalifiers,
 					MergeFilters,
 					MergeDataSourceBuilderWithRequalifier,
+					RemoveEmptyMaps,
 				},
 				tt.args.plan,
 			); !reflect.DeepEqual(got, tt.want) {

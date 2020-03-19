@@ -11,6 +11,7 @@ import (
 
 var DefaultScenarios = []Scenario{
 	MergeRequalifiers,
+	RemoveEmptyMaps,
 	MergeFilters,
 	MergeDataSourceBuilderWithRequalifier,
 	MergeDataSourceBuilderWithFilter,
@@ -35,6 +36,31 @@ var MergeRequalifiers = Scenario{
 			Qualifier: match.Strings["qualifier"],
 			Source:    match.Nodes["source"],
 		}
+	},
+}
+
+var RemoveEmptyMaps = Scenario{
+	Name:        "remove empty maps",
+	Description: "Removes maps that have no expressions and keep set to true",
+	CandidateMatcher: &MapMatcher{
+		Keep:        &AnyPrimitiveMatcher{Name: "keep"},
+		Expressions: &AnyNamedExpressionListMatcher{Name: "expressions"},
+		Source:      &AnyNodeMatcher{Name: "source"},
+	},
+
+	CandidateApprover: func(match *Match) bool {
+		expressions := match.NamedExpressionLists["expressions"]
+		keep := match.Primitives["keep"]
+		keepCast, ok := keep.(bool)
+		if !ok {
+			return false
+		}
+
+		return len(expressions) == 0 && keepCast
+	},
+
+	Reassembler: func(match *Match) physical.Node {
+		return match.Nodes["source"]
 	},
 }
 

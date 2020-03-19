@@ -320,7 +320,10 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 			resultMap[newName] = octosql.NormalizeType(cols[i])
 		}
 
-		batch = append(batch, execution.NewRecord(fields, resultMap))
+		batch = append(batch, execution.NewRecord(
+			fields,
+			resultMap,
+			execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(rs.streamID, rs.offset+i))))
 	}
 
 	for i := range batch {
@@ -362,7 +365,9 @@ func (rs *RecordStream) loadOffset(tx storage.StateTransaction) error {
 func (rs *RecordStream) saveOffset(tx storage.StateTransaction, curBatchSize int) error {
 	offsetState := storage.NewValueState(tx.WithPrefix(offsetPrefix))
 
-	offset := octosql.MakeInt(rs.offset + curBatchSize)
+	rs.offset = rs.offset + curBatchSize
+
+	offset := octosql.MakeInt(rs.offset)
 	err := offsetState.Set(&offset)
 	if err != nil {
 		return errors.Wrap(err, "couldn't save sql offset to state storage")

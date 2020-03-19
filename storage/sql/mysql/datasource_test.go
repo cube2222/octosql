@@ -21,6 +21,8 @@ import (
 
 func TestDataSource_Get(t *testing.T) {
 	ctx := context.Background()
+	streamId := execution.GetRawStreamID()
+
 	host := "localhost"
 	port := 3306
 	user := "root"
@@ -70,18 +72,22 @@ func TestDataSource_Get(t *testing.T) {
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"a.name", "a.population"},
 					[]interface{}{"human", 7000000},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"a.name", "a.population"},
 					[]interface{}{"mammoth", 0},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"a.name", "a.population"},
 					[]interface{}{"panda", 500},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"a.name", "a.population"},
 					[]interface{}{"zebra", 5000},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 3)),
 				),
 			},
 			wantErr: false,
@@ -137,6 +143,7 @@ func TestDataSource_Get(t *testing.T) {
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"a.name", "a.population"},
 					[]interface{}{"panda", 500},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0)),
 				),
 			},
 			wantErr: false,
@@ -168,14 +175,17 @@ func TestDataSource_Get(t *testing.T) {
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{2, "Kuba"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{3, "Wojtek"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{4, "Adam"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
 			},
 			wantErr: false,
@@ -216,10 +226,12 @@ func TestDataSource_Get(t *testing.T) {
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{2, "Kuba"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{3, "Wojtek"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1)),
 				),
 			},
 			wantErr: false,
@@ -260,14 +272,17 @@ func TestDataSource_Get(t *testing.T) {
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{1, "Janek"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{3, "Wojtek"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{4, "Adam"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
 			},
 			wantErr: false,
@@ -320,27 +335,20 @@ func TestDataSource_Get(t *testing.T) {
 			}
 
 			tx := stateStorage.BeginTransaction()
-			stream, _, err := execNode.Get(storage.InjectStateTransaction(ctx, tx), args.variables, execution.GetRawStreamID())
+			stream, _, err := execNode.Get(storage.InjectStateTransaction(ctx, tx), args.variables, streamId)
 			if err != nil {
 				t.Errorf("Couldn't get stream: %v", err)
 				return
 			}
 
-			want, _, err := execution.NewDummyNode(tt.want).Get(storage.InjectStateTransaction(ctx, tx), args.variables, execution.GetRawStreamID())
+			want, _, err := execution.NewDummyNode(tt.want).Get(storage.InjectStateTransaction(ctx, tx), args.variables, streamId)
 			if err := tx.Commit(); err != nil {
 				t.Fatal(err)
 			}
 
-			equal, err := execution.AreStreamsEqualNoOrdering(storage.InjectStateTransaction(ctx, tx), stateStorage, stream, want)
+			err = execution.AreStreamsEqualNoOrdering(storage.InjectStateTransaction(ctx, tx), stateStorage, stream, want)
 			if err != nil {
 				t.Errorf("Error in AreStreamsEqual(): %v", err)
-				return
-			}
-
-			if !equal != tt.wantErr {
-				t.Errorf("Streams don't match")
-				return
-			} else {
 				return
 			}
 		})

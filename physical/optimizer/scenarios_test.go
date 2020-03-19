@@ -370,6 +370,92 @@ func TestMergeDataSourceWithRequalifier(t *testing.T) {
 		want physical.Node
 	}{
 		{
+			name: "merge with filter in datasource",
+			args: args{
+				plan: &physical.Requalifier{
+					Qualifier: "a",
+					Source: &physical.DataSourceBuilder{
+						Materializer: nil,
+						PrimaryKeys:  []octosql.VariableName{octosql.NewVariableName("a")},
+						AvailableFilters: map[physical.FieldType]map[physical.Relation]struct{}{
+							physical.Primary: {
+								physical.Equal:    struct{}{},
+								physical.NotEqual: struct{}{},
+							},
+							physical.Secondary: {
+								physical.Equal:    struct{}{},
+								physical.NotEqual: struct{}{},
+								physical.MoreThan: struct{}{},
+								physical.LessThan: struct{}{},
+							},
+						},
+						Filter: physical.NewAnd(
+							physical.NewOr(
+								physical.NewPredicate(
+									physical.NewVariable("const_1"),
+									physical.LessEqual,
+									physical.NewVariable("b.a"),
+								),
+								physical.NewNot(
+									physical.NewPredicate(
+										physical.NewVariable("const_2"),
+										physical.MoreThan,
+										physical.NewVariable("b.a"),
+									),
+								),
+							),
+							physical.NewPredicate(
+								physical.NewVariable("b.a"),
+								physical.Equal,
+								physical.NewVariable("const_0"),
+							),
+						),
+						Name:  "baz",
+						Alias: "b",
+					},
+				},
+			},
+			want: &physical.DataSourceBuilder{
+				Materializer: nil,
+				PrimaryKeys:  []octosql.VariableName{octosql.NewVariableName("a")},
+				AvailableFilters: map[physical.FieldType]map[physical.Relation]struct{}{
+					physical.Primary: {
+						physical.Equal:    struct{}{},
+						physical.NotEqual: struct{}{},
+					},
+					physical.Secondary: {
+						physical.Equal:    struct{}{},
+						physical.NotEqual: struct{}{},
+						physical.MoreThan: struct{}{},
+						physical.LessThan: struct{}{},
+					},
+				},
+				Filter: physical.NewAnd(
+					physical.NewOr(
+						physical.NewPredicate(
+							physical.NewVariable("const_1"),
+							physical.LessEqual,
+							physical.NewVariable("a.a"),
+						),
+						physical.NewNot(
+							physical.NewPredicate(
+								physical.NewVariable("const_2"),
+								physical.MoreThan,
+								physical.NewVariable("a.a"),
+							),
+						),
+					),
+					physical.NewPredicate(
+						physical.NewVariable("a.a"),
+						physical.Equal,
+						physical.NewVariable("const_0"),
+					),
+				),
+				Name:  "baz",
+				Alias: "a",
+			},
+		},
+		{
 			name: "simple single merge",
 			args: args{
 				plan: &physical.Requalifier{

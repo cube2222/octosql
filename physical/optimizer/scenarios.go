@@ -2,6 +2,7 @@ package optimizer
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/cube2222/octosql"
@@ -102,11 +103,28 @@ var MergeDataSourceBuilderWithRequalifier = Scenario{
 	Reassembler: func(match *Match) physical.Node {
 		dataSourceBuilder := match.Nodes["data_source_builder"].(*physical.DataSourceBuilder)
 
+		newFilter := dataSourceBuilder.Filter.Transform(
+			context.Background(),
+			&physical.Transformers{
+				NamedExprT: func(expr physical.NamedExpression) physical.NamedExpression {
+					switch expr := expr.(type) {
+					case *physical.Variable:
+						if expr.Name.Source() == "" {
+							return expr
+						}
+						newName := octosql.NewVariableName(fmt.Sprintf("%s.%s", match.Strings["qualifier"], expr.Name.Name()))
+						return physical.NewVariable(newName)
+					default:
+						return expr
+					}
+				},
+			})
+
 		return &physical.DataSourceBuilder{
 			Materializer:     dataSourceBuilder.Materializer,
 			PrimaryKeys:      dataSourceBuilder.PrimaryKeys,
 			AvailableFilters: dataSourceBuilder.AvailableFilters,
-			Filter:           dataSourceBuilder.Filter, // TODO: fixme variable names
+			Filter:           newFilter,
 			Name:             dataSourceBuilder.Name,
 			Alias:            match.Strings["qualifier"],
 		}

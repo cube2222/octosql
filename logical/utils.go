@@ -187,6 +187,10 @@ func EqualNodes(node1, node2 Node) error {
 				}
 			}
 
+			if node1.createdByDistinct != node2.createdByDistinct {
+				return errors.New("'createdByDistinct' field not equal")
+			}
+
 			return nil
 		}
 

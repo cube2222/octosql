@@ -42,14 +42,14 @@ type ColStrIter struct {
 
 	values interface{}
 
-	dLevels []uint16
-	rLevels []uint16
+	dLevels []uint16 // definition levels
+	rLevels []uint16 // repetition levels
 
-	cr *parquet.ColumnChunkReader
-	rg int
-	n  int
-	i  int
-	vi int
+	cr                  *parquet.ColumnChunkReader
+	rg                  int // row groups
+	n                   int // number of loaded elements
+	descriptionIterator int
+	dataIterator        int
 }
 
 func NewColStrIter(f *parquet.File, col parquet.Column) *ColStrIter {
@@ -90,56 +90,101 @@ func NewColStrIter(f *parquet.File, col parquet.Column) *ColStrIter {
 	return &it
 }
 
+
 func (it *ColStrIter) Next() (interface{}, error) {
 	var err error
-	if it.cr == nil {
-		if it.rg == len(it.f.MetaData.RowGroups) {
-			return nil, io.EOF
-		}
-		it.cr, err = it.f.NewReader(it.col, it.rg)
-		if err != nil {
-			return nil, err
-		}
-		it.rg++
-	}
-
-	if it.i >= it.n {
-		it.n, err = it.cr.Read(it.values, it.dLevels, it.rLevels)
-		if err == parquet.EndOfChunk {
-			it.cr = nil
-			return it.Next()
-		}
-		if err != nil {
-			return nil, err
-		}
-		it.i = 0
-		it.vi = 0
-	}
-
 	var s interface{}
 	s = nil
-	if it.dLevels[it.i] == it.col.MaxD() {
-		switch it.col.Type() {
-		case parquetformat.Type_BOOLEAN:
-			s = it.bools[it.vi]
-		case parquetformat.Type_INT32:
-			s = it.int32s[it.vi]
-		case parquetformat.Type_INT64:
-			s = it.int64s[it.vi]
-		case parquetformat.Type_INT96:
-			s = it.int96s[it.vi]
-		case parquetformat.Type_FLOAT:
-			s = it.float32s[it.vi]
-		case parquetformat.Type_DOUBLE:
-			s = it.float64s[it.vi]
-		case parquetformat.Type_BYTE_ARRAY, parquetformat.Type_FIXED_LEN_BYTE_ARRAY:
-			s = it.byteArrays[it.vi]
-		default:
-			panic("unknown type")
+	elements := make([]interface{}, 0)
+	for {
+		if it.cr == nil {
+			if it.rg == len(it.f.MetaData.RowGroups) {
+				if len(elements) > 0 {
+					return elements, nil
+				}
+				return nil, io.EOF
+			}
+			it.cr, err = it.f.NewReader(it.col, it.rg)
+			if err != nil {
+				return nil, err
+			}
+			it.rg++
 		}
-		it.vi++
+
+		if it.descriptionIterator >= it.n {
+			it.n, err = it.cr.Read(it.values, it.dLevels, it.rLevels)
+			if err == parquet.EndOfChunk {
+				it.cr = nil
+				return it.Next()
+			}
+			if err != nil {
+				return nil, err
+			}
+			it.descriptionIterator = 0
+			it.dataIterator = 0
+		}
+
+		if it.rLevels[it.descriptionIterator] == 0 && len(elements) > 0 {
+			break;
+		}
+
+		if it.dLevels[it.descriptionIterator] == it.col.MaxD() {
+			if it.col.MaxR() == 0 {
+				switch it.col.Type() {
+				case parquetformat.Type_BOOLEAN:
+					s = it.bools[it.dataIterator]
+				case parquetformat.Type_INT32:
+					s = it.int32s[it.dataIterator]
+				case parquetformat.Type_INT64:
+					s = it.int64s[it.dataIterator]
+				case parquetformat.Type_INT96:
+					s = it.int96s[it.dataIterator]
+				case parquetformat.Type_FLOAT:
+					s = it.float32s[it.dataIterator]
+				case parquetformat.Type_DOUBLE:
+					s = it.float64s[it.dataIterator]
+				case parquetformat.Type_BYTE_ARRAY, parquetformat.Type_FIXED_LEN_BYTE_ARRAY:
+					s = it.byteArrays[it.dataIterator]
+				default:
+					panic("unknown type")
+				}
+			} else {
+				switch it.col.Type() {
+				case parquetformat.Type_BOOLEAN:
+					elements = append(elements, it.bools[it.dataIterator])
+				case parquetformat.Type_INT32:
+					elements = append(elements, it.int32s[it.dataIterator])
+				case parquetformat.Type_INT64:
+					elements = append(elements, it.int64s[it.dataIterator])
+				case parquetformat.Type_INT96:
+					elements = append(elements, it.int96s[it.dataIterator])
+				case parquetformat.Type_FLOAT:
+					elements = append(elements, it.float32s[it.dataIterator])
+				case parquetformat.Type_DOUBLE:
+					elements = append(elements, it.float64s[it.dataIterator])
+				case parquetformat.Type_BYTE_ARRAY, parquetformat.Type_FIXED_LEN_BYTE_ARRAY:
+					elements = append(elements, it.byteArrays[it.dataIterator])
+				default:
+					panic("unknown type")
+				}
+			}
+
+			it.dataIterator++
+		} else {
+			elements = append(elements, nil)
+		}
+
+
+		it.descriptionIterator++
+
+		if it.col.MaxR() == 0 {
+			break;
+		}
 	}
-	it.i++
+
+	if it.col.MaxR() > 0 {
+		s = elements
+	}
 	return s, nil
 }
 
@@ -175,8 +220,8 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables) (exe
 	columns := file.Schema.Columns()
 	n := len(columns)
 	for _, col := range columns {
-		if col.MaxR() != 0 {
-			return nil, fmt.Errorf("column '%s' has repeated elements", col)
+		if col.MaxR() > 1 {
+			return nil, fmt.Errorf("column '%s' has nested repeated elements", col)
 		}
 	}
 
@@ -205,7 +250,7 @@ type RecordStream struct {
 func (rs *RecordStream) Close() error {
 	err := rs.file.Close()
 	if err != nil {
-		return errors.Wrap(err, "Couldn't close underlying file")
+		return errors.Wrap(err, "couldn't close underlying file")
 	}
 
 	return nil
@@ -215,27 +260,35 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 	if rs.isDone {
 		err := rs.file.Close()
 		if err != nil {
-			return nil, errors.Wrap(err, "Couldn't close underlying file")
+			return nil, errors.Wrap(err, "couldn't close underlying file")
 		}
 		return nil, execution.ErrEndOfStream
 	}
 
 	m := make(map[string]interface{})
+
+	rs.isDone = true
+
 	for i, it := range rs.columnIterators {
 		s, err := it.Next()
 		if err != nil {
 			if err == io.EOF {
-				rs.isDone = true
-				err = rs.file.Close()
-				if err != nil {
-					return nil, errors.Wrap(err, "Couldn't close underlying file")
-				}
-				return nil, execution.ErrEndOfStream
+				s = nil
 			} else {
 				return nil, errors.Wrap(err, "couldn't decode parquet record")
 			}
+		} else {
+			rs.isDone = false
 		}
 		m[rs.columns[i].String()] = s
+	}
+
+	if rs.isDone == true {
+		err := rs.file.Close()
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't close underlying file")
+		}
+		return nil, execution.ErrEndOfStream
 	}
 
 	aliasedRecord := make(map[octosql.VariableName]octosql.Value)

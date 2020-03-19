@@ -179,13 +179,13 @@ func (gb *GroupByStream) AddRecord(ctx context.Context, tx storage.StateTransact
 
 	outputFields := gb.originalOutputFields
 	for _, expr := range gb.starExpressions { // handle star expressions
-		value, err := expr.ExpressionValue(ctx, recordVariables)
+		starValues, starFields, err := expr.ValueAndName(ctx, recordVariables)
 		if err != nil {
-			return errors.Wrap(err, "couldn't get value of star expression in group by")
+			return errors.Wrap(err, "couldn't get value of star expression")
 		}
 
-		values = append(values, value.AsSlice()...)
-		outputFields = append(outputFields, expr.Name(recordVariables)...)
+		outputFields = append(outputFields, starFields...)
+		values = append(values, starValues...)
 	}
 
 	gb.outputFields.extendByFields(outputFields)

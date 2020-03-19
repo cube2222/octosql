@@ -53,28 +53,33 @@ func NewStarExpression(qualifier string) *StarExpression {
 	return &StarExpression{qualifier: qualifier}
 }
 
-func (se *StarExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
+// In ValueAndName, ExpressionValue and Name we ignore errors from Get
+// because we know that the fields we get are the ones that are surely
+// in the variables. Maybe we can panic here.
+func (se *StarExpression) ValueAndName(ctx context.Context, variables octosql.Variables) ([]octosql.Value, []octosql.VariableName, error) {
 	values := make([]octosql.Value, 0)
-
+	fields := make([]octosql.VariableName, 0)
 	keys := variables.DeterministicOrder()
 
 	for _, key := range keys {
 		if se.doesVariableMatch(key) {
-			value, _ := variables.Get(key) // ignore error since it surely is in map
+			value, _ := variables.Get(key) // we ignore the error
 			values = append(values, value)
+			fields = append(fields, key)
 		}
 	}
 
+	return values, fields, nil
+}
+
+func (se *StarExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
+	values, _, _ := se.ValueAndName(ctx, variables)
 	return octosql.MakeTuple(values), nil
 }
 
 func (se *StarExpression) Name(variables octosql.Variables) []octosql.VariableName {
-	fields := make([]octosql.VariableName, 0)
-	for _, key := range variables.DeterministicOrder() {
-		if se.doesVariableMatch(key) {
-			fields = append(fields, key)
-		}
-	}
+	ctx := context.Background()
+	_, fields, _ := se.ValueAndName(ctx, variables)
 
 	return fields
 }

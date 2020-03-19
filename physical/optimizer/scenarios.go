@@ -52,10 +52,7 @@ var RemoveEmptyMaps = Scenario{
 	CandidateApprover: func(match *Match) bool {
 		expressions := match.NamedExpressionLists["expressions"]
 		keep := match.Primitives["keep"]
-		keepCast, ok := keep.(bool)
-		if !ok {
-			return false
-		}
+		keepCast := keep.(bool)
 
 		return len(expressions) == 0 && keepCast
 	},

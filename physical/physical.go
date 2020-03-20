@@ -63,11 +63,11 @@ type NamedExpression interface {
 }
 
 type StarExpression struct {
-	qualifier string
+	Qualifier string
 }
 
 func NewStarExpression(qualifier string) *StarExpression {
-	return &StarExpression{qualifier: qualifier}
+	return &StarExpression{Qualifier: qualifier}
 }
 
 func (se *StarExpression) Transform(ctx context.Context, transformers *Transformers) Expression {
@@ -80,7 +80,7 @@ func (se *StarExpression) Materialize(ctx context.Context, matCtx *Materializati
 
 func (se *StarExpression) TransformNamed(ctx context.Context, transformers *Transformers) NamedExpression {
 	var expr NamedExpression = &StarExpression{
-		qualifier: se.qualifier,
+		Qualifier: se.Qualifier,
 	}
 
 	if transformers.NamedExprT != nil {
@@ -91,7 +91,7 @@ func (se *StarExpression) TransformNamed(ctx context.Context, transformers *Tran
 }
 
 func (se *StarExpression) MaterializeNamed(ctx context.Context, matCtx *MaterializationContext) (execution.NamedExpression, error) {
-	return execution.NewStarExpression(se.qualifier), nil
+	return execution.NewStarExpression(se.Qualifier), nil
 }
 
 func (se *StarExpression) Visualize() *graph.Node {
@@ -101,11 +101,11 @@ func (se *StarExpression) Visualize() *graph.Node {
 }
 
 func (se *StarExpression) name() string {
-	if se.qualifier == "" {
+	if se.Qualifier == "" {
 		return octosql.StarExpressionName
 	}
 
-	return fmt.Sprintf("%s_%s", se.qualifier, octosql.StarExpressionName)
+	return fmt.Sprintf("%s_%s", se.Qualifier, octosql.StarExpressionName)
 }
 
 // Variables describes a variable Name.

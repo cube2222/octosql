@@ -82,19 +82,19 @@ type NamedExpression interface {
 }
 
 type StarExpression struct {
-	Qualifier string
+	qualifier string
 }
 
 func NewStarExpression(qualifier string) *StarExpression {
-	return &StarExpression{Qualifier: qualifier}
+	return &StarExpression{qualifier: qualifier}
 }
 
 func (se *StarExpression) Name() octosql.VariableName {
-	if se.Qualifier == "" {
+	if se.qualifier == "" {
 		return octosql.StarExpressionName
 	}
 
-	return octosql.NewVariableName(fmt.Sprintf("%s.%s", se.Qualifier, octosql.StarExpressionName))
+	return octosql.NewVariableName(fmt.Sprintf("%s.%s", se.qualifier, octosql.StarExpressionName))
 }
 
 func (se *StarExpression) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
@@ -102,7 +102,7 @@ func (se *StarExpression) Physical(ctx context.Context, physicalCreator *Physica
 }
 
 func (se *StarExpression) PhysicalNamed(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.NamedExpression, octosql.Variables, error) {
-	return physical.NewStarExpression(se.Qualifier), octosql.NoVariables(), nil
+	return physical.NewStarExpression(se.qualifier), octosql.NoVariables(), nil
 }
 
 type Variable struct {

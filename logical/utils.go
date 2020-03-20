@@ -284,8 +284,8 @@ func EqualExpressions(expr1, expr2 Expression) error {
 	switch expr1 := expr1.(type) {
 	case *StarExpression:
 		if expr2, ok := expr2.(*StarExpression); ok {
-			if expr1.Qualifier != expr2.Qualifier {
-				return errors.Errorf("qualifiers not equal: %v %v", expr1.Qualifier, expr2.Qualifier)
+			if expr1.Name() != expr2.Name() {
+				return errors.Errorf("qualifiers not equal: %v %v", expr1.Name().Source(), expr2.Name().Source())
 			}
 
 			return nil

@@ -54,21 +54,6 @@ func NewStarExpression(qualifier string) *StarExpression {
 	return &StarExpression{qualifier: qualifier}
 }
 
-// In FieldsAndValues, ExpressionValue and Name we ignore errors from Get
-// because we know that the fields we get are the ones that are surely
-// in the variables. Maybe we can panic here.
-func (se *StarExpression) FieldsAndValues(variables octosql.Variables) ([]octosql.VariableName, []octosql.Value) {
-	values := make([]octosql.Value, 0)
-	fields := se.Fields(variables)
-
-	for _, field := range fields {
-		value, _ := variables.Get(field)
-		values = append(values, value)
-	}
-
-	return fields, values
-}
-
 func (se *StarExpression) Fields(variables octosql.Variables) []octosql.VariableName {
 	keys := variables.DeterministicOrder()
 	fields := make([]octosql.VariableName, 0)
@@ -83,7 +68,17 @@ func (se *StarExpression) Fields(variables octosql.Variables) []octosql.Variable
 }
 
 func (se *StarExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
-	_, values := se.FieldsAndValues(variables)
+	fields := se.Fields(variables)
+	values := make([]octosql.Value, len(fields))
+
+	for i := range fields {
+		value, err := variables.Get(fields[i])
+		if err != nil { // this shouldn't happen, but we might as well check
+			return octosql.MakeNull(), errors.Wrap(err, "couldn't get value from variables")
+		}
+		values[i] = value
+	}
+
 	return octosql.MakeTuple(values), nil
 }
 

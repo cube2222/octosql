@@ -78,14 +78,13 @@ func (stream *MappedStream) Next(ctx context.Context) (*Record, error) {
 		case *StarExpression:
 			// A star expression is based only on the incoming record
 			expressionName := expr.Fields(recordVariables)
+			fieldNames = append(fieldNames, expressionName...)
 
 			for _, name := range expressionName {
 				value, _ := variables.Get(name) //TODO: err is always nil, handle it anyways?
 
 				outValues[name] = value
 			}
-
-			fieldNames = append(fieldNames, expressionName...)
 
 		default: // anything else than a star expression
 			expressionName := expr.Name()

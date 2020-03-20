@@ -27,17 +27,17 @@ const (
 )
 
 var AggregateFunctions = map[Aggregate]struct{}{
-	Avg:           struct{}{},
-	AvgDistinct:   struct{}{},
-	Count:         struct{}{},
-	CountDistinct: struct{}{},
-	First:         struct{}{},
-	Key:           struct{}{},
-	Last:          struct{}{},
-	Max:           struct{}{},
-	Min:           struct{}{},
-	Sum:           struct{}{},
-	SumDistinct:   struct{}{},
+	Avg:           {},
+	AvgDistinct:   {},
+	Count:         {},
+	CountDistinct: {},
+	First:         {},
+	Last:          {},
+	Max:           {},
+	Key:           {},
+	Min:           {},
+	Sum:           {},
+	SumDistinct:   {},
 }
 
 type Trigger interface {

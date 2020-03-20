@@ -36,7 +36,7 @@ func (node *Distinct) Materialize(ctx context.Context, matCtx *MaterializationCo
 		return nil, errors.Wrap(err, "couldn't materialize source node in distinct")
 	}
 
-	return execution.NewDistinct(childNode), nil
+	return execution.NewDistinct(matCtx.Storage, childNode), nil
 }
 
 func (node *Distinct) Metadata() *metadata.NodeMetadata {

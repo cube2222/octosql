@@ -219,3 +219,9 @@ func (alExpr *AliasedExpression) ExpressionValue(ctx context.Context, variables 
 func (alExpr *AliasedExpression) Name() octosql.VariableName {
 	return alExpr.name
 }
+
+type RecordExpression struct{}
+
+func (re *RecordExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
+	return octosql.MakeObjectFromVariables(variables), nil
+}

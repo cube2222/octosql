@@ -247,6 +247,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		for i := len(nonStarExpressions); i < len(statement.SelectExprs); i++ {
 			qualifier := expressions[i].Name().Source()
 
+			// TODO: Actually it's not that simple, because "SELECT *, p.name as mename FROM people p" is legit
 			if qualifier == "" { // a * expression collides with anything else
 				if len(statement.SelectExprs) > 1 {
 					return nil, errors.New("select expressions contain a non-qualified star expression and some other fields")
@@ -479,7 +480,7 @@ func ParseAggregate(expr sqlparser.Expr) (logical.Aggregate, logical.NamedExpres
 				return "", nil, errors.Wrap(err, "couldn't parse aggregate argument")
 			}
 
-		case *sqlparser.StarExpr: //TODO: not sure this is reachable tbh
+		case *sqlparser.StarExpr:
 			parsedArg = nil
 
 		default:

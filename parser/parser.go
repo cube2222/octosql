@@ -243,7 +243,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 			}
 		}
 
-		// Handle star expressions
+		// Handle star expressions collisions
 		for i := len(nonStarExpressions); i < len(statement.SelectExprs); i++ {
 			qualifier := expressions[i].Name().Source()
 

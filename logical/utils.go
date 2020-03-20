@@ -64,6 +64,11 @@ func EqualNodes(node1, node2 Node) error {
 			if err := EqualNodes(node1.source, node2.source); err != nil {
 				return errors.Wrap(err, "sources not equal")
 			}
+
+			if node1.keep != node2.keep {
+				return errors.New("keep values for maps are not equal")
+			}
+
 			return nil
 		}
 
@@ -277,6 +282,14 @@ func EqualFormula(expr1, expr2 Formula) error {
 
 func EqualExpressions(expr1, expr2 Expression) error {
 	switch expr1 := expr1.(type) {
+	case *StarExpression:
+		if expr2, ok := expr2.(*StarExpression); ok {
+			if expr1.Qualifier != expr2.Qualifier {
+				return errors.Errorf("qualifiers not equal: %v %v", expr1.Qualifier, expr2.Qualifier)
+			}
+
+			return nil
+		}
 	case *Constant:
 		if expr2, ok := expr2.(*Constant); ok {
 			if expr1.value != expr2.value {

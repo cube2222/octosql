@@ -81,6 +81,30 @@ type NamedExpression interface {
 	PhysicalNamed(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.NamedExpression, octosql.Variables, error)
 }
 
+type StarExpression struct {
+	Qualifier string
+}
+
+func NewStarExpression(qualifier string) *StarExpression {
+	return &StarExpression{Qualifier: qualifier}
+}
+
+func (se *StarExpression) Name() octosql.VariableName {
+	if se.Qualifier == "" {
+		return octosql.StarExpressionName
+	}
+
+	return octosql.NewVariableName(fmt.Sprintf("%s.%s", se.Qualifier, octosql.StarExpressionName))
+}
+
+func (se *StarExpression) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
+	return se.PhysicalNamed(ctx, physicalCreator)
+}
+
+func (se *StarExpression) PhysicalNamed(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.NamedExpression, octosql.Variables, error) {
+	return physical.NewStarExpression(se.Qualifier), octosql.NoVariables(), nil
+}
+
 type Variable struct {
 	name octosql.VariableName
 }

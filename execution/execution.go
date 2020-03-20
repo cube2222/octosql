@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/cube2222/octosql"
@@ -43,6 +44,59 @@ type Expression interface {
 type NamedExpression interface {
 	Expression
 	Name() octosql.VariableName
+}
+
+type StarExpression struct {
+	qualifier string
+}
+
+func NewStarExpression(qualifier string) *StarExpression {
+	return &StarExpression{qualifier: qualifier}
+}
+
+// In FieldsAndValues, ExpressionValue and Name we ignore errors from Get
+// because we know that the fields we get are the ones that are surely
+// in the variables. Maybe we can panic here.
+func (se *StarExpression) FieldsAndValues(variables octosql.Variables) ([]octosql.VariableName, []octosql.Value) {
+	values := make([]octosql.Value, 0)
+	fields := se.Fields(variables)
+
+	for _, field := range fields {
+		value, _ := variables.Get(field)
+		values = append(values, value)
+	}
+
+	return fields, values
+}
+
+func (se *StarExpression) Fields(variables octosql.Variables) []octosql.VariableName {
+	keys := variables.DeterministicOrder()
+	fields := make([]octosql.VariableName, 0)
+
+	for _, key := range keys {
+		if se.doesVariableMatch(key) {
+			fields = append(fields, key)
+		}
+	}
+
+	return fields
+}
+
+func (se *StarExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
+	_, values := se.FieldsAndValues(variables)
+	return octosql.MakeTuple(values), nil
+}
+
+func (se *StarExpression) Name() octosql.VariableName {
+	if se.qualifier == "" {
+		return octosql.StarExpressionName
+	}
+
+	return octosql.NewVariableName(fmt.Sprintf("%s.%s", se.qualifier, octosql.StarExpressionName))
+}
+
+func (se *StarExpression) doesVariableMatch(vname octosql.VariableName) bool {
+	return se.qualifier == "" || se.qualifier == vname.Source()
 }
 
 type Variable struct {

@@ -1,4 +1,4 @@
-package sqlStorages
+package sql
 
 import (
 	"fmt"

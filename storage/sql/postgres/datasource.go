@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"strings"
 
+	_ "github.com/lib/pq"
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/storage/sql"
-	_ "github.com/lib/pq"
-	"github.com/pkg/errors"
 )
 
 type PostgresTemplate struct{}
@@ -55,14 +56,14 @@ func (t *PostgresTemplate) GetDSNAndDriverName(user, password, host, dbName stri
 	return psqlInfo, "postgres"
 }
 
-func (t *PostgresTemplate) GetPlaceholders(alias string) sqlStorages.PlaceholderMap {
+func (t *PostgresTemplate) GetPlaceholders(alias string) sql.PlaceholderMap {
 	return newPostgresPlaceholders(alias)
 }
 
 var template = &PostgresTemplate{}
 
 func NewDataSourceBuilderFactory(primaryKeys []octosql.VariableName) physical.DataSourceBuilderFactory {
-	return sqlStorages.NewDataSourceBuilderFactoryFromTemplate(template)(primaryKeys)
+	return sql.NewDataSourceBuilderFactoryFromTemplate(template)(primaryKeys)
 }
 
 // NewDataSourceBuilderFactoryFromConfig creates a data source builder factory using the configuration.

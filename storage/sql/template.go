@@ -1,4 +1,4 @@
-package sqlStorages
+package sql
 
 import (
 	"context"
@@ -13,7 +13,6 @@ import (
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/metadata"
-	"github.com/cube2222/octosql/storage/kafka"
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
@@ -277,8 +276,8 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 	outputQueue := execution.NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
 
 	if rs.isDone {
-		err := outputQueue.Push(ctx, &kafka.QueueElement{
-			Type: &kafka.QueueElement_Error{
+		err := outputQueue.Push(ctx, &QueueElement{
+			Type: &QueueElement_Error{
 				Error: execution.ErrEndOfStream.Error(),
 			},
 		})
@@ -327,8 +326,8 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 	}
 
 	for i := range batch {
-		err := outputQueue.Push(ctx, &kafka.QueueElement{
-			Type: &kafka.QueueElement_Record{
+		err := outputQueue.Push(ctx, &QueueElement{
+			Type: &QueueElement_Record{
 				Record: batch[i],
 			},
 		})
@@ -380,16 +379,16 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 	tx := storage.GetStateTransactionFromContext(ctx).WithPrefix(rs.streamID.AsPrefix())
 	outputQueue := execution.NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
 
-	var queueElement kafka.QueueElement
+	var queueElement QueueElement
 	err := outputQueue.Pop(ctx, &queueElement)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't pop queue element")
 	}
 
 	switch queueElement := queueElement.Type.(type) {
-	case *kafka.QueueElement_Record:
+	case *QueueElement_Record:
 		return queueElement.Record, nil
-	case *kafka.QueueElement_Error:
+	case *QueueElement_Error:
 		if queueElement.Error == execution.ErrEndOfStream.Error() {
 			return nil, execution.ErrEndOfStream
 		}

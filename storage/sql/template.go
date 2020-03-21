@@ -167,6 +167,10 @@ type RecordStream struct {
 }
 
 func (rs *RecordStream) Close() error {
+	if err := rs.rows.Close(); err != nil {
+		return errors.Wrap(err, "couldn't close underlying SQL rows")
+	}
+
 	return nil
 }
 

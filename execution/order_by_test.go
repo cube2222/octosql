@@ -265,14 +265,9 @@ func TestOrderBy_Get(t *testing.T) {
 				return
 			}
 
-			equal, err := AreStreamsEqual(ctx, tt.want, ordered)
+			err = AreStreamsEqual(ctx, tt.want, ordered)
 			if err != nil {
 				t.Errorf("Error in AreStreamsEqual(): %v", err)
-				return
-			}
-
-			if !equal {
-				t.Errorf("Streams don't match")
 				return
 			}
 		})

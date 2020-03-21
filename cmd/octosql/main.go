@@ -31,9 +31,9 @@ import (
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/storage/csv"
 	"github.com/cube2222/octosql/storage/json"
-	"github.com/cube2222/octosql/storage/mysql"
-	"github.com/cube2222/octosql/storage/postgres"
 	"github.com/cube2222/octosql/storage/redis"
+	"github.com/cube2222/octosql/storage/sql/mysql"
+	"github.com/cube2222/octosql/storage/sql/postgres"
 )
 
 var configPath string
@@ -127,6 +127,11 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 		err = app.RunPlan(ctx, stateStorage, plan)
 		if err != nil {
 			log.Fatal("couldn't run plan: ", err)
+		}
+
+		err = db.Close()
+		if err != nil {
+			log.Fatal("couldn't close the database: ", err)
 		}
 
 		err = os.RemoveAll(storageDirectory)

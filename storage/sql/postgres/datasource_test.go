@@ -1,17 +1,27 @@
 package postgres
 
 import (
+	"context"
+	"database/sql"
+	"fmt"
+	"log"
+	"strings"
+	"testing"
+	"time"
+
 	_ "github.com/lib/pq"
+	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/config"
+	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/physical"
+	"github.com/cube2222/octosql/streaming/storage"
 )
 
-/*func TestDataSource_Get(t *testing.T) {
-	stateStorage := execution.GetTestStorage(t)
-	defer func() {
-		go stateStorage.Close()
-	}()
-	tx := stateStorage.BeginTransaction()
-	defer tx.Abort()
-	ctx := storage.InjectStateTransaction(context.Background(), tx)
+func TestDataSource_Get(t *testing.T) {
+	ctx := context.Background()
+	streamId := execution.GetRawStreamID()
 
 	host := "localhost"
 	port := 5432
@@ -19,12 +29,11 @@ import (
 	password := "toor"
 	dbname := "mydb"
 
-	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
-		"password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
+	psqlInfo, driver := template.GetDSNAndDriverName(user, password, host, dbname, port)
 
-	db, err := sql.Open("postgres", psqlInfo)
+	db, err := sql.Open(driver, psqlInfo)
 	if err != nil {
-		panic("Couldn't connect to a database")
+		panic("Couldn't connect to the database")
 	}
 
 	type args struct {
@@ -40,7 +49,7 @@ import (
 	tests := []struct {
 		name    string
 		args    args
-		want    *execution.InMemoryStream
+		want    []*execution.Record
 		wantErr bool
 	}{
 		{
@@ -59,24 +68,28 @@ import (
 				},
 				tableDescription: "CREATE TABLE animals(name VARCHAR(20) PRIMARY KEY, population INTEGER);",
 			},
-			want: execution.NewInMemoryStream(ctx, []*execution.Record{
+			want: []*execution.Record{
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"a.name", "a.population"},
+					[]interface{}{"panda", 500},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0)),
+				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"a.name", "a.population"},
 					[]interface{}{"human", 7000000},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"a.name", "a.population"},
 					[]interface{}{"mammoth", 0},
-				),
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"a.name", "a.population"},
-					[]interface{}{"panda", 500},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"a.name", "a.population"},
 					[]interface{}{"zebra", 5000},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 3)),
 				),
-			}),
+			},
 			wantErr: false,
 		},
 
@@ -100,7 +113,7 @@ import (
 				},
 				tableDescription: "CREATE TABLE animals(name VARCHAR(20) PRIMARY KEY, population INTEGER);",
 			},
-			want:    execution.NewInMemoryStream(ctx, []*execution.Record{}),
+			want:    []*execution.Record{},
 			wantErr: false,
 		},
 
@@ -126,12 +139,13 @@ import (
 				},
 				tableDescription: "CREATE TABLE animals(name VARCHAR(20) PRIMARY KEY, population INTEGER);",
 			},
-			want: execution.NewInMemoryStream(ctx, []*execution.Record{
+			want: []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"a.name", "a.population"},
 					[]interface{}{"panda", 500},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0)),
 				),
-			}),
+			},
 			wantErr: false,
 		},
 
@@ -157,20 +171,23 @@ import (
 				},
 				tableDescription: "CREATE TABLE people(id INTEGER PRIMARY KEY, name VARCHAR(20));",
 			},
-			want: execution.NewInMemoryStream(ctx, []*execution.Record{
+			want: []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{2, "Kuba"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{3, "Wojtek"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{4, "Adam"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
-			}),
+			},
 			wantErr: false,
 		},
 
@@ -205,16 +222,18 @@ import (
 				},
 				tableDescription: "CREATE TABLE people(id INTEGER PRIMARY KEY, name VARCHAR(20));",
 			},
-			want: execution.NewInMemoryStream(ctx, []*execution.Record{
+			want: []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{2, "Kuba"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{3, "Wojtek"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1)),
 				),
-			}),
+			},
 			wantErr: false,
 		},
 
@@ -249,20 +268,23 @@ import (
 				},
 				tableDescription: "CREATE TABLE people(id INTEGER PRIMARY KEY, name VARCHAR(20));",
 			},
-			want: execution.NewInMemoryStream(ctx, []*execution.Record{
+			want: []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{1, "Janek"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{3, "Wojtek"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"p.id", "p.name"},
 					[]interface{}{4, "Adam"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
-			}),
+			},
 			wantErr: false,
 		},
 	}
@@ -270,13 +292,14 @@ import (
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			args := tt.args
+			stateStorage := execution.GetTestStorage(t)
 			err := createTable(db, args.tableDescription)
 			if err != nil {
 				t.Errorf("Couldn't create table: %v", err)
 				return
 			}
 
-			defer dropTable(db, args.tablename) //unhandled error
+			defer dropTable(db, args.tablename)
 
 			err = insertValues(db, args.tablename, args.rows)
 			if err != nil {
@@ -299,23 +322,31 @@ import (
 								"password":     password,
 								"databaseName": dbname,
 								"tableName":    args.tablename,
+								"batchSize":    2,
 							},
 						},
 					},
 				},
+				Storage: stateStorage,
 			})
 			if err != nil {
 				t.Errorf("Couldn't get ExecutionNode: %v", err)
 				return
 			}
 
-			stream, _, err := execNode.Get(ctx, args.variables, execution.GetRawStreamID())
+			tx := stateStorage.BeginTransaction()
+			stream, _, err := execNode.Get(storage.InjectStateTransaction(ctx, tx), args.variables, streamId)
 			if err != nil {
 				t.Errorf("Couldn't get stream: %v", err)
 				return
 			}
 
-			err = execution.AreStreamsEqualNoOrdering(ctx, execution.GetTestStorage(t), stream, tt.want)
+			want, _, err := execution.NewDummyNode(tt.want).Get(storage.InjectStateTransaction(ctx, tx), args.variables, streamId)
+			if err := tx.Commit(); err != nil {
+				t.Fatal(err)
+			}
+
+			err = execution.AreStreamsEqualNoOrdering(storage.InjectStateTransaction(ctx, tx), stateStorage, stream, want)
 			if err != nil {
 				t.Errorf("Error in AreStreamsEqual(): %v", err)
 				return
@@ -327,8 +358,10 @@ import (
 func createTable(db *sql.DB, tableDescription string) error {
 	_, err := db.Exec(tableDescription)
 	if err != nil {
-		return errors.Wrap(err, "Couldn't create table")
+		return errors.Wrap(err, "couldn't create table")
 	}
+
+	log.Println("created table: ", tableDescription)
 	return nil
 }
 
@@ -360,6 +393,8 @@ func dropTable(db *sql.DB, tablename string) error {
 	if err != nil {
 		return errors.Wrap(err, "couldn't drop table")
 	}
+
+	log.Println("dropped table: ", tablename)
 	return nil
 }
 
@@ -381,4 +416,4 @@ func sliceToString(values []interface{}) []string {
 	}
 
 	return result
-}*/
+}

@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
@@ -366,172 +367,235 @@ func TestDistinct_Get(t *testing.T) {
 					WithID(NewID("id3"))),
 			}),
 		},
-		/*
-			{
-				name: "the ultimate test",
-				args: args{
-					source: NewDummyNode([]*Record{
-						NewRecordFromSliceWithNormalize( //unique
-							[]octosql.VariableName{"map", "numbers", "number", "name"},
-							[]interface{}{map[string]interface{}{
-								"0": "aaa",
-								"1": "bbb",
-								"2": "ccc",
-							}, []interface{}{1, 2}, 7, "nazwa"}),
-						NewRecordFromSliceWithNormalize( //unique - different column order
-							[]octosql.VariableName{"map", "name", "number", "numbers"},
-							[]interface{}{map[string]interface{}{
-								"0": "aaa",
-								"1": "bbb",
-								"2": "ccc",
-							}, "nazwa", 7, []interface{}{1, 2}}),
-						NewRecordFromSliceWithNormalize( //unique - diff in numbers
-							[]octosql.VariableName{"map", "numbers", "number", "name"},
-							[]interface{}{map[string]interface{}{
-								"0": "aaa",
-								"1": "bbb",
-								"2": "ccc",
-							}, []interface{}{1, 3}, 7, "nazwa"}),
-						NewRecordFromSliceWithNormalize( //unique diff in number
-							[]octosql.VariableName{"map", "numbers", "number", "name"},
-							[]interface{}{map[string]interface{}{
-								"0": "aaa",
-								"1": "bbb",
-								"2": "ccc",
-							}, []interface{}{1, 3}, 8, "nazwa"}),
-						NewRecordFromSliceWithNormalize( //unique - diff in name
-							[]octosql.VariableName{"map", "numbers", "number", "name"},
-							[]interface{}{map[string]interface{}{
-								"0": "aaa",
-								"1": "bbb",
-								"2": "ccc",
-							}, []interface{}{1, 3}, 7, "nazwa0"}),
-						NewRecordFromSliceWithNormalize( //unique - diff in map
-							[]octosql.VariableName{"map", "numbers", "number", "name"},
-							[]interface{}{map[string]interface{}{
-								"0": "aaa",
-								"1": "bbb",
-								"2": "cccc",
-							}, []interface{}{1, 3}, 7, "nazwa"}),
-						NewRecordFromSliceWithNormalize( //repetition of diff in number
-							[]octosql.VariableName{"map", "numbers", "number", "name"},
-							[]interface{}{map[string]interface{}{
-								"0": "aaa",
-								"1": "bbb",
-								"2": "ccc",
-							}, []interface{}{1, 3}, 8, "nazwa"}),
-						NewRecordFromSliceWithNormalize( //unique - second row template
-							[]octosql.VariableName{"id", "age", "scores"},
-							[]interface{}{1, 17, []interface{}{1, 9, 11}}),
-						NewRecordFromSliceWithNormalize( //unique - second row template; diff in scores
-							[]octosql.VariableName{"id", "age", "scores"},
-							[]interface{}{1, 17, []interface{}{9, 1, 11}}),
-						NewRecordFromSliceWithNormalize( //repetition - second row template;
-							[]octosql.VariableName{"id", "age", "scores"},
-							[]interface{}{1, 17, []interface{}{1, 9, 11}}),
-						NewRecordFromSliceWithNormalize( //unique - second row template; mixed columns same values
-							[]octosql.VariableName{"id", "scores", "age"},
-							[]interface{}{[]interface{}{9, 1, 11}, 1, 17}),
-					}),
-				},
 
-				want: NewInMemoryStream([]*Record{
+		{
+			name: "the ultimate test",
+			args: args{
+				source: NewDummyNode([]*Record{
 					NewRecordFromSliceWithNormalize( //unique
 						[]octosql.VariableName{"map", "numbers", "number", "name"},
 						[]interface{}{map[string]interface{}{
 							"0": "aaa",
 							"1": "bbb",
 							"2": "ccc",
-						}, []interface{}{1, 2}, 7, "nazwa"}),
-					NewRecordFromSliceWithNormalize( //unique - different column order
-						[]octosql.VariableName{"map", "name", "number", "numbers"},
+						}, []interface{}{1, 2}, 7, "nazwa"},
+						WithID(NewID("id1"))),
+					NewRecordFromSliceWithNormalize( //repetition - different column order
+						[]octosql.VariableName{"map", "numbers", "name", "number"},
 						[]interface{}{map[string]interface{}{
 							"0": "aaa",
 							"1": "bbb",
 							"2": "ccc",
-						}, "nazwa", 7, []interface{}{1, 2}}),
+						}, []interface{}{1, 2}, "nazwa", 7},
+						WithID(NewID("id2"))),
 					NewRecordFromSliceWithNormalize( //unique - diff in numbers
 						[]octosql.VariableName{"map", "numbers", "number", "name"},
 						[]interface{}{map[string]interface{}{
 							"0": "aaa",
 							"1": "bbb",
 							"2": "ccc",
-						}, []interface{}{1, 3}, 7, "nazwa"}),
+						}, []interface{}{1, 3}, 7, "nazwa"},
+						WithID(NewID("id3"))),
 					NewRecordFromSliceWithNormalize( //unique diff in number
 						[]octosql.VariableName{"map", "numbers", "number", "name"},
 						[]interface{}{map[string]interface{}{
 							"0": "aaa",
 							"1": "bbb",
 							"2": "ccc",
-						}, []interface{}{1, 3}, 8, "nazwa"}),
+						}, []interface{}{1, 3}, 8, "nazwa"},
+						WithID(NewID("id4"))),
 					NewRecordFromSliceWithNormalize( //unique - diff in name
 						[]octosql.VariableName{"map", "numbers", "number", "name"},
 						[]interface{}{map[string]interface{}{
 							"0": "aaa",
 							"1": "bbb",
 							"2": "ccc",
-						}, []interface{}{1, 3}, 7, "nazwa0"}),
+						}, []interface{}{1, 3}, 7, "nazwa0"},
+						WithID(NewID("id5"))),
 					NewRecordFromSliceWithNormalize( //unique - diff in map
 						[]octosql.VariableName{"map", "numbers", "number", "name"},
 						[]interface{}{map[string]interface{}{
 							"0": "aaa",
 							"1": "bbb",
 							"2": "cccc",
-						}, []interface{}{1, 3}, 7, "nazwa"}),
+						}, []interface{}{1, 3}, 7, "nazwa"},
+						WithID(NewID("id6"))),
+					NewRecordFromSliceWithNormalize( //repetition of diff in number
+						[]octosql.VariableName{"map", "numbers", "number", "name"},
+						[]interface{}{map[string]interface{}{
+							"0": "aaa",
+							"1": "bbb",
+							"2": "ccc",
+						}, []interface{}{1, 3}, 8, "nazwa"},
+						WithID(NewID("id7"))),
 					NewRecordFromSliceWithNormalize( //unique - second row template
 						[]octosql.VariableName{"id", "age", "scores"},
-						[]interface{}{1, 17, []interface{}{1, 9, 11}}),
+						[]interface{}{1, 17, []interface{}{1, 9, 11}},
+						WithID(NewID("id8"))),
 					NewRecordFromSliceWithNormalize( //unique - second row template; diff in scores
 						[]octosql.VariableName{"id", "age", "scores"},
-						[]interface{}{1, 17, []interface{}{9, 1, 11}}),
+						[]interface{}{1, 17, []interface{}{9, 1, 11}},
+						WithID(NewID("id9"))),
+					NewRecordFromSliceWithNormalize( //repetition - second row template;
+						[]octosql.VariableName{"id", "age", "scores"},
+						[]interface{}{1, 17, []interface{}{1, 9, 11}},
+						WithID(NewID("id10"))),
 					NewRecordFromSliceWithNormalize( //unique - second row template; mixed columns same values
 						[]octosql.VariableName{"id", "scores", "age"},
-						[]interface{}{[]interface{}{9, 1, 11}, 1, 17}),
+						[]interface{}{[]interface{}{9, 1, 11}, 1, 17},
+						WithID(NewID("id11"))),
 				}),
 			},
 
-			{
-				name: "time.Time",
-				args: args{
-					source: NewDummyNode([]*Record{
-						NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"date"},
-							[]interface{}{time.Date(2019, 11, 28, 0, 0, 0, 0, time.FixedZone("Poland", 0))}),
-						NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"date"},
-							[]interface{}{time.Date(2019, 11, 28, 0, 0, 0, 0, time.FixedZone("Poland", 0))}),
-						NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"date"},
-							[]interface{}{time.Date(2019, 11, 28, 0, 0, 2, 0, time.FixedZone("Poland", 0))}),
-						NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"date"},
-							[]interface{}{time.Date(2018, 11, 28, 0, 0, 0, 0, time.FixedZone("Poland", 0))}),
-						NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"date"},
-							[]interface{}{time.Date(2019, 12, 28, 0, 0, 0, 0, time.FixedZone("Poland", 0))}),
-						NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"date"},
-							[]interface{}{time.Date(2019, 11, 27, 0, 0, 2, 0, time.FixedZone("Poland", 0))}),
-					}),
-				},
-				want: NewInMemoryStream([]*Record{
+			want: NewInMemoryStream([]*Record{
+				NewRecordFromSliceWithNormalize( //unique
+					[]octosql.VariableName{"map", "numbers", "number", "name"},
+					[]interface{}{map[string]interface{}{
+						"0": "aaa",
+						"1": "bbb",
+						"2": "ccc",
+					}, []interface{}{1, 2}, 7, "nazwa"},
+					WithID(NewID("id1"))),
+				NewRecordFromSliceWithNormalize( //unique - diff in numbers
+					[]octosql.VariableName{"map", "numbers", "number", "name"},
+					[]interface{}{map[string]interface{}{
+						"0": "aaa",
+						"1": "bbb",
+						"2": "ccc",
+					}, []interface{}{1, 3}, 7, "nazwa"},
+					WithID(NewID("id3"))),
+				NewRecordFromSliceWithNormalize( //unique diff in number
+					[]octosql.VariableName{"map", "numbers", "number", "name"},
+					[]interface{}{map[string]interface{}{
+						"0": "aaa",
+						"1": "bbb",
+						"2": "ccc",
+					}, []interface{}{1, 3}, 8, "nazwa"},
+					WithID(NewID("id4"))),
+				NewRecordFromSliceWithNormalize( //unique - diff in name
+					[]octosql.VariableName{"map", "numbers", "number", "name"},
+					[]interface{}{map[string]interface{}{
+						"0": "aaa",
+						"1": "bbb",
+						"2": "ccc",
+					}, []interface{}{1, 3}, 7, "nazwa0"},
+					WithID(NewID("id5"))),
+				NewRecordFromSliceWithNormalize( //unique - diff in map
+					[]octosql.VariableName{"map", "numbers", "number", "name"},
+					[]interface{}{map[string]interface{}{
+						"0": "aaa",
+						"1": "bbb",
+						"2": "cccc",
+					}, []interface{}{1, 3}, 7, "nazwa"},
+					WithID(NewID("id6"))),
+				NewRecordFromSliceWithNormalize( //unique - second row template
+					[]octosql.VariableName{"id", "age", "scores"},
+					[]interface{}{1, 17, []interface{}{1, 9, 11}},
+					WithID(NewID("id8"))),
+				NewRecordFromSliceWithNormalize( //unique - second row template; diff in scores
+					[]octosql.VariableName{"id", "age", "scores"},
+					[]interface{}{1, 17, []interface{}{9, 1, 11}},
+					WithID(NewID("id9"))),
+				NewRecordFromSliceWithNormalize( //unique - second row template; mixed columns same values
+					[]octosql.VariableName{"id", "scores", "age"},
+					[]interface{}{[]interface{}{9, 1, 11}, 1, 17},
+					WithID(NewID("id11"))),
+			}),
+		},
+
+		{
+			name: "time.Time",
+			args: args{
+				source: NewDummyNode([]*Record{ // base is 2018/4/20/1/1/1/1
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"date"},
-						[]interface{}{time.Date(2018, 11, 28, 0, 0, 0, 0, time.FixedZone("Poland", 0))}),
+						[]octosql.VariableName{"date"}, // unique year
+						[]interface{}{time.Date(2019, 4, 20, 1, 1, 1, 1, time.FixedZone("Poland", 0))},
+						WithID(NewID("id1"))),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"date"},
-						[]interface{}{time.Date(2019, 12, 28, 0, 0, 0, 0, time.FixedZone("Poland", 0))}),
+						[]octosql.VariableName{"date"}, // unique month
+						[]interface{}{time.Date(2018, 5, 20, 1, 1, 1, 1, time.FixedZone("Poland", 0))},
+						WithID(NewID("id2"))),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"date"},
-						[]interface{}{time.Date(2019, 11, 27, 0, 0, 2, 0, time.FixedZone("Poland", 0))}),
+						[]octosql.VariableName{"date"}, // unique day
+						[]interface{}{time.Date(2018, 4, 21, 1, 1, 1, 1, time.FixedZone("Poland", 0))},
+						WithID(NewID("id3"))),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"date"},
-						[]interface{}{time.Date(2019, 11, 28, 0, 0, 0, 0, time.FixedZone("Poland", 0))}),
+						[]octosql.VariableName{"date"}, // unique hour
+						[]interface{}{time.Date(2018, 4, 20, 2, 1, 1, 1, time.FixedZone("Poland", 0))},
+						WithID(NewID("id4"))),
 					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"date"},
-						[]interface{}{time.Date(2019, 11, 28, 0, 0, 2, 0, time.FixedZone("Poland", 0))}),
+						[]octosql.VariableName{"date"}, // unique minute
+						[]interface{}{time.Date(2018, 4, 20, 1, 2, 1, 1, time.FixedZone("Poland", 0))},
+						WithID(NewID("id5"))),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"date"}, // unique second
+						[]interface{}{time.Date(2018, 4, 20, 1, 1, 2, 1, time.FixedZone("Poland", 0))},
+						WithID(NewID("id6"))),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"date"}, // unique nanosecond
+						[]interface{}{time.Date(2018, 4, 20, 1, 1, 1, 2, time.FixedZone("Poland", 0))},
+						WithID(NewID("id7"))),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"date"}, // year repetition
+						[]interface{}{time.Date(2019, 4, 20, 1, 1, 1, 1, time.FixedZone("Poland", 0))},
+						WithID(NewID("id8"))),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"date"}, // month repetition
+						[]interface{}{time.Date(2018, 5, 20, 1, 1, 1, 1, time.FixedZone("Poland", 0))},
+						WithID(NewID("id9"))),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"date"}, // day repetition
+						[]interface{}{time.Date(2018, 4, 21, 1, 1, 1, 1, time.FixedZone("Poland", 0))},
+						WithID(NewID("id10"))),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"date"}, // hour repetition
+						[]interface{}{time.Date(2018, 4, 20, 2, 1, 1, 1, time.FixedZone("Poland", 0))},
+						WithID(NewID("id11"))),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"date"}, // minute repetition
+						[]interface{}{time.Date(2018, 4, 20, 1, 2, 1, 1, time.FixedZone("Poland", 0))},
+						WithID(NewID("id12"))),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"date"}, // second repetition
+						[]interface{}{time.Date(2018, 4, 20, 1, 1, 2, 1, time.FixedZone("Poland", 0))},
+						WithID(NewID("id13"))),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"date"}, // nanosecond repetition
+						[]interface{}{time.Date(2018, 4, 20, 1, 1, 1, 2, time.FixedZone("Poland", 0))},
+						WithID(NewID("id14"))),
 				}),
-			}, */
+			},
+			want: NewInMemoryStream([]*Record{
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"date"}, // unique year
+					[]interface{}{time.Date(2019, 4, 20, 1, 1, 1, 1, time.FixedZone("Poland", 0))},
+					WithID(NewID("id1"))),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"date"}, // unique month
+					[]interface{}{time.Date(2018, 5, 20, 1, 1, 1, 1, time.FixedZone("Poland", 0))},
+					WithID(NewID("id2"))),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"date"}, // unique day
+					[]interface{}{time.Date(2018, 4, 21, 1, 1, 1, 1, time.FixedZone("Poland", 0))},
+					WithID(NewID("id3"))),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"date"}, // unique hour
+					[]interface{}{time.Date(2018, 4, 20, 2, 1, 1, 1, time.FixedZone("Poland", 0))},
+					WithID(NewID("id4"))),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"date"}, // unique minute
+					[]interface{}{time.Date(2018, 4, 20, 1, 2, 1, 1, time.FixedZone("Poland", 0))},
+					WithID(NewID("id5"))),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"date"}, // unique second
+					[]interface{}{time.Date(2018, 4, 20, 1, 1, 2, 1, time.FixedZone("Poland", 0))},
+					WithID(NewID("id6"))),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"date"}, // unique nanosecond
+					[]interface{}{time.Date(2018, 4, 20, 1, 1, 1, 2, time.FixedZone("Poland", 0))},
+					WithID(NewID("id7"))),
+			}),
+		},
 	}
 
 	for _, tt := range tests {

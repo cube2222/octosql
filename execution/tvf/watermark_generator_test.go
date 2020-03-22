@@ -28,7 +28,7 @@ func TestWatermarkGenerator_Get(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    execution.RecordStream
+		want    execution.Node
 		wantErr bool
 	}{
 		{
@@ -60,7 +60,7 @@ func TestWatermarkGenerator_Get(t *testing.T) {
 					"offset": octosql.MakeDuration(time.Second * 5),
 				}),
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewDummyNode([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time"},
 					[]interface{}{1, baseTime},
@@ -98,7 +98,12 @@ func TestWatermarkGenerator_Get(t *testing.T) {
 				t.Errorf("WatermarkGenerator.Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			eq, err := execution.AreStreamsEqual(ctx, got, tt.want)
+			want, _, err := tt.want.Get(ctx, tt.args.variables, execution.GetRawStreamID())
+			if err != nil {
+				t.Errorf("WatermarkGenerator.Get() error = %v", err)
+				return
+			}
+			eq, err := execution.AreStreamsEqual(ctx, got, want)
 			if err != nil {
 				t.Errorf("WatermarkGenerator.Get() AreStreamsEqual error = %v", err)
 			}

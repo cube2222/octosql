@@ -99,7 +99,7 @@ func (vs Variables) DeterministicOrder() []VariableName {
 func StringsToVariableNames(strings []string) []VariableName {
 	result := make([]VariableName, len(strings))
 	for i, s := range strings {
-		result[i] = VariableName(s) //TODO: it can be either this, or NewVariableName
+		result[i] = NewVariableName(s)
 	}
 
 	return result

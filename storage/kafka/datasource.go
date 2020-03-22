@@ -264,7 +264,11 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 				}
 			}
 		}
-		batch[i] = execution.NewRecordFromSlice(fields, values)
+		batch[i] = execution.NewRecordFromSlice(
+			fields,
+			values,
+			execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(rs.streamID, int(msg.Offset))),
+		)
 	}
 
 	for i := range batch {

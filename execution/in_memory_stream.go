@@ -1,16 +1,32 @@
 package execution
 
-import "context"
+import (
+	"context"
+	"log"
+
+	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql/streaming/storage"
+)
 
 type InMemoryStream struct {
-	data  []*Record
-	index int
+	streamID *StreamID
 }
 
-func NewInMemoryStream(data []*Record) *InMemoryStream {
+func NewInMemoryStream(ctx context.Context, data []*Record) *InMemoryStream {
+	streamID := GetRawStreamID()
+
+	outputQueue := storage.NewDeque(storage.GetStateTransactionFromContext(ctx).WithPrefix(streamID.AsPrefix()).WithPrefix(outputQueuePrefix))
+
+	for i := range data {
+		err := outputQueue.PushBack(data[i])
+		if err != nil {
+			log.Fatal("couldn't push record to output queue in inMemory stream: ", err)
+		}
+	}
+
 	return &InMemoryStream{
-		data:  data,
-		index: 0,
+		streamID: streamID,
 	}
 }
 
@@ -19,12 +35,15 @@ func (ims *InMemoryStream) Close() error {
 }
 
 func (ims *InMemoryStream) Next(ctx context.Context) (*Record, error) {
-	if ims.index >= len(ims.data) {
+	outputQueue := storage.NewDeque(storage.GetStateTransactionFromContext(ctx).WithPrefix(ims.streamID.AsPrefix()).WithPrefix(outputQueuePrefix))
+
+	var outRecord Record
+	err := outputQueue.PopFront(&outRecord)
+	if err == storage.ErrNotFound {
 		return nil, ErrEndOfStream
+	} else if err != nil {
+		return nil, errors.Wrap(err, "couldn't pop record from output queue")
 	}
 
-	recordToReturn := ims.data[ims.index]
-	ims.index++
-
-	return recordToReturn, nil
+	return &outRecord, nil
 }

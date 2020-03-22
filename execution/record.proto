@@ -3,12 +3,12 @@ package execution;
 option go_package = "github.com/cube2222/octosql/execution";
 import "values.proto";
 
-message ID {
+message RecordID {
     string ID = 1;
 }
 
 message Metadata {
-    ID id = 1;
+    RecordID id = 1;
     bool undo = 2;
     string eventTimeField = 3;
 }

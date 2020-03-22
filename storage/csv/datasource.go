@@ -107,10 +107,6 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		return nil, nil, errors.Wrapf(err, "couldn't load csv offset")
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-	rs.workerCtxCancel = cancel
-	rs.workerCloseErrChan = make(chan error)
-
 	go func() {
 		log.Println("worker start")
 		rs.RunWorker(ctx)
@@ -132,9 +128,6 @@ type RecordStream struct {
 	hasColumnHeader bool
 	offset          int
 	batchSize       int
-
-	workerCtxCancel    func()
-	workerCloseErrChan chan error
 }
 
 func (rs *RecordStream) Close() error {
@@ -149,55 +142,106 @@ func (rs *RecordStream) Close() error {
 var offsetPrefix = []byte("csv_offset")
 
 func (rs *RecordStream) RunWorker(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			rs.workerCloseErrChan <- ctx.Err()
-		default:
-		}
-
+	for { // outer for is loading offset value and moving file iterator
 		tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
 
-		err := rs.RunWorkerInternal(ctx, tx)
-		if errors.Cause(err) == execution.ErrNewTransactionRequired {
-			tx.Abort()
-			continue
-		} else if waitableError := execution.GetErrWaitForChanges(err); waitableError != nil {
-			tx.Abort()
-			err = waitableError.ListenForChanges(ctx)
-			if err != nil {
-				log.Println("csv worker: couldn't listen for changes: ", err)
+		err := rs.loadOffset(tx)
+		if err != nil {
+			log.Fatalf("csv worker: couldn't reinitialize offset for csv read batch worker: %s", err)
+			return
+		}
+
+		tx.Abort() // We only read data above, no need to risk failing now.
+
+		// Moving file iterator by `rs.offset`
+		for i := 0; i < rs.offset; i++ {
+			_, err := rs.readRecordFromFileWithInitialize()
+			if err == execution.ErrEndOfStream {
+				return
+			} else if err != nil {
+				log.Fatalf("csv worker: couldn't move csv file iterator by %d offset: %s", rs.offset, err)
+				return
 			}
-			err = waitableError.Close()
-			if err != nil {
-				log.Println("csv worker: couldn't close storage changes subscription: ", err)
+		}
+
+		for { // inner for is calling RunWorkerInternal
+			tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
+
+			err := rs.RunWorkerInternal(ctx, tx)
+			if errors.Cause(err) == execution.ErrNewTransactionRequired {
+				tx.Abort()
+				continue
+			} else if waitableError := execution.GetErrWaitForChanges(err); waitableError != nil {
+				tx.Abort()
+				err = waitableError.ListenForChanges(ctx)
+				if err != nil {
+					log.Println("csv worker: couldn't listen for changes: ", err)
+				}
+				err = waitableError.Close()
+				if err != nil {
+					log.Println("csv worker: couldn't close storage changes subscription: ", err)
+				}
+				continue
+			} else if err == execution.ErrEndOfStream {
+				err = tx.Commit()
+				if err != nil {
+					log.Println("csv worker: couldn't commit transaction: ", err)
+					continue
+				}
+				return
+			} else if err != nil {
+				tx.Abort()
+				log.Printf("csv worker: error running csv read batch worker: %s, reinitializing from storage", err)
+				break
 			}
-			continue
-		} else if err == execution.ErrEndOfStream {
+
 			err = tx.Commit()
 			if err != nil {
 				log.Println("csv worker: couldn't commit transaction: ", err)
 				continue
 			}
-			return
-		} else if err != nil {
-			tx.Abort()
-			log.Printf("csv worker: error running csv read batch worker: %s, reinitializing from storage", err)
-			tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
-			if err := rs.loadOffset(tx); err != nil {
-				log.Fatalf("csv worker: couldn't reinitialize offset for csv worker: %s", err)
-				return
-			}
-			tx.Abort() // We only read data above, no need to risk failing now.
-			continue
-		}
-
-		err = tx.Commit()
-		if err != nil {
-			log.Println("csv worker: couldn't commit transaction: ", err)
-			continue
 		}
 	}
+}
+
+func (rs *RecordStream) readRecordFromFileWithInitialize() (map[octosql.VariableName]octosql.Value, error) {
+	if rs.first && rs.offset == 0 {
+		if rs.hasColumnHeader {
+			err := rs.initializeColumnsWithHeaderRow()
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't initialize columns for record stream")
+			}
+
+			// unfortunately, we can't set this in the beginning, because if initializing fails we have to initialize again
+			// also, we cant set this after if because of early return
+			rs.first = false
+			return rs.readRecordFromFileWithInitialize()
+		} else {
+			aliasedRecord, err := rs.initializeColumnsWithoutHeaderRow()
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't initialize columns for record stream")
+			}
+
+			rs.first = false
+			return aliasedRecord, nil
+		}
+	}
+
+	line, err := rs.r.Read()
+	if err == io.EOF {
+		rs.isDone = true
+		rs.file.Close()
+		return nil, execution.ErrEndOfStream
+	} else if err != nil {
+		return nil, errors.Wrap(err, "couldn't read record")
+	}
+
+	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
+	for i, v := range line {
+		aliasedRecord[rs.aliasedFields[i]] = execution.ParseType(v)
+	}
+
+	return aliasedRecord, nil
 }
 
 var outputQueuePrefix = []byte("$output_queue$")
@@ -220,37 +264,12 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 	}
 
 	batch := make([]*execution.Record, 0)
-
-	if rs.first && rs.offset == 0 { // offset == 0 cause when we got crashed rs.first will be by default 0 but offset won't
-		if rs.hasColumnHeader {
-			err := rs.initializeColumnsWithHeaderRow()
-			if err != nil {
-				return errors.Wrap(err, "couldn't initialize columns for record stream")
-			}
-		} else {
-			record, err := rs.initializeColumnsWithoutHeaderRow()
-			if err != nil {
-				return errors.Wrap(err, "couldn't initialize columns for record stream")
-			}
-
-			batch = append(batch, record)
-		}
-	}
-	rs.first = false
-
-	for i := len(batch); i < rs.batchSize; i++ {
-		line, err := rs.r.Read()
-		if err == io.EOF {
-			rs.isDone = true
-			rs.file.Close()
+	for i := 0; i < rs.batchSize; i++ {
+		aliasedRecord, err := rs.readRecordFromFileWithInitialize()
+		if err == execution.ErrEndOfStream {
 			break
 		} else if err != nil {
-			return errors.Wrap(err, "couldn't read record")
-		}
-
-		aliasedRecord := make(map[octosql.VariableName]octosql.Value)
-		for i, v := range line {
-			aliasedRecord[rs.aliasedFields[i]] = execution.ParseType(v)
+			return errors.Wrap(err, "couldn't read record from csv file")
 		}
 
 		batch = append(batch, execution.NewRecord(
@@ -303,19 +322,23 @@ func (rs *RecordStream) initializeColumnsWithHeaderRow() error {
 	return nil
 }
 
-func (rs *RecordStream) initializeColumnsWithoutHeaderRow() (*execution.Record, error) {
-	row, err := rs.r.Read()
+func (rs *RecordStream) initializeColumnsWithoutHeaderRow() (map[octosql.VariableName]octosql.Value, error) {
+	line, err := rs.r.Read()
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't read row")
 	}
 
-	rs.aliasedFields = make([]octosql.VariableName, len(row))
-	for i := range row {
+	rs.aliasedFields = make([]octosql.VariableName, len(line))
+	for i := range line {
 		rs.aliasedFields[i] = octosql.NewVariableName(fmt.Sprintf("%s.col%d", rs.alias, i+1))
 	}
 
-	return execution.NewRecordFromSlice(rs.aliasedFields, parseDataTypes(row),
-		execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(rs.streamID, 0))), nil
+	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
+	for i, v := range line {
+		aliasedRecord[rs.aliasedFields[i]] = execution.ParseType(v)
+	}
+
+	return aliasedRecord, nil
 }
 
 func parseDataTypes(row []string) []octosql.Value {

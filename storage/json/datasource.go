@@ -132,55 +132,99 @@ func (rs *RecordStream) Close() error {
 var offsetPrefix = []byte("json_offset")
 
 func (rs *RecordStream) RunWorker(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			rs.workerCloseErrChan <- ctx.Err()
-		default:
-		}
-
+	for { // outer for is loading offset value and moving file iterator
 		tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
 
-		err := rs.RunWorkerInternal(ctx, tx)
-		if errors.Cause(err) == execution.ErrNewTransactionRequired {
-			tx.Abort()
-			continue
-		} else if waitableError := execution.GetErrWaitForChanges(err); waitableError != nil {
-			tx.Abort()
-			err = waitableError.ListenForChanges(ctx)
-			if err != nil {
-				log.Println("json worker: couldn't listen for changes: ", err)
+		err := rs.loadOffset(tx)
+		if err != nil {
+			log.Fatalf("json worker: couldn't reinitialize offset for json read batch worker: %s", err)
+			return
+		}
+
+		tx.Abort() // We only read data above, no need to risk failing now.
+
+		// Moving file iterator by `rs.offset`
+		for i := 0; i < rs.offset; i++ {
+			_, err := rs.readRecordFromFile()
+			if err == execution.ErrEndOfStream {
+				return
+			} else if err != nil {
+				log.Fatalf("json worker: couldn't move json file iterator by %d offset: %s", rs.offset, err)
+				return
 			}
-			err = waitableError.Close()
-			if err != nil {
-				log.Println("json worker: couldn't close storage changes subscription: ", err)
+		}
+
+		for { // inner for is calling RunWorkerInternal
+			select {
+			case <-ctx.Done():
+				rs.workerCloseErrChan <- ctx.Err()
+			default:
 			}
-			continue
-		} else if err == execution.ErrEndOfStream {
+
+			tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
+
+			err := rs.RunWorkerInternal(ctx, tx)
+			if errors.Cause(err) == execution.ErrNewTransactionRequired {
+				tx.Abort()
+				continue
+			} else if waitableError := execution.GetErrWaitForChanges(err); waitableError != nil {
+				tx.Abort()
+				err = waitableError.ListenForChanges(ctx)
+				if err != nil {
+					log.Println("json worker: couldn't listen for changes: ", err)
+				}
+				err = waitableError.Close()
+				if err != nil {
+					log.Println("json worker: couldn't close storage changes subscription: ", err)
+				}
+				continue
+			} else if err == execution.ErrEndOfStream {
+				err = tx.Commit()
+				if err != nil {
+					log.Println("json worker: couldn't commit transaction: ", err)
+					continue
+				}
+				return
+			} else if err != nil {
+				tx.Abort()
+				log.Printf("json worker: error running json read batch worker: %s, reinitializing from storage", err)
+				break
+			}
+
 			err = tx.Commit()
 			if err != nil {
 				log.Println("json worker: couldn't commit transaction: ", err)
 				continue
 			}
-			return
-		} else if err != nil {
-			tx.Abort()
-			log.Printf("json worker: error running json read batch worker: %s, reinitializing from storage", err)
-			tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
-			if err := rs.loadOffset(tx); err != nil {
-				log.Fatalf("json worker: couldn't reinitialize offset for json worker: %s", err)
-				return
-			}
-			tx.Abort() // We only read data above, no need to risk failing now.
-			continue
-		}
-
-		err = tx.Commit()
-		if err != nil {
-			log.Println("json worker: couldn't commit transaction: ", err)
-			continue
 		}
 	}
+}
+
+func (rs *RecordStream) readRecordFromFile() (map[octosql.VariableName]interface{}, error) {
+	if rs.arrayFormat && !rs.arrayFormatOpeningBracketRead {
+		tok, err := rs.decoder.Token() // Read opening [
+		if tok != json.Delim('[') {
+			return nil, errors.Errorf("expected [ as first json token, got %v", tok)
+		}
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't read json opening bracket")
+		}
+		rs.arrayFormatOpeningBracketRead = true
+	}
+
+	if !rs.decoder.More() {
+		rs.isDone = true
+		rs.file.Close()
+		return nil, execution.ErrEndOfStream
+	}
+
+	var record map[octosql.VariableName]interface{}
+	err := rs.decoder.Decode(&record)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't decode json record")
+	}
+
+	return record, nil
 }
 
 var outputQueuePrefix = []byte("$output_queue$")
@@ -204,27 +248,11 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 
 	batch := make([]*execution.Record, 0)
 	for i := 0; i < rs.batchSize; i++ {
-		if rs.arrayFormat && !rs.arrayFormatOpeningBracketRead {
-			tok, err := rs.decoder.Token() // Read opening [
-			if tok != json.Delim('[') {
-				return errors.Errorf("expected [ as first json token, got %v", tok)
-			}
-			if err != nil {
-				return errors.Wrap(err, "couldn't read json opening bracket")
-			}
-			rs.arrayFormatOpeningBracketRead = true
-		}
-
-		if !rs.decoder.More() {
-			rs.isDone = true
-			rs.file.Close()
+		record, err := rs.readRecordFromFile()
+		if err == execution.ErrEndOfStream {
 			break
-		}
-
-		var record map[octosql.VariableName]interface{}
-		err := rs.decoder.Decode(&record)
-		if err != nil {
-			return errors.Wrap(err, "couldn't decode json record")
+		} else if err != nil {
+			return errors.Wrap(err, "couldn't read record from json file")
 		}
 
 		aliasedRecord := make(map[octosql.VariableName]octosql.Value)

@@ -69,11 +69,11 @@ var recordStoragePrefix = []byte("$record_value_state$")
 
 func (ds *DistinctStream) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, key octosql.Value, record *Record) error {
 	if inputIndex > 0 {
-		panic("only one input stream allowed for group by")
+		panic("only one input stream allowed for distinct")
 	}
 
 	if record.Metadata.Id == nil {
-		panic("no id") // TODO: This can either be panic, error, or assigning an ID here
+		panic("no id for record in distinct")
 	}
 
 	keyPrefix := append(append([]byte("$"), key.MonotonicMarshal()...), '$')

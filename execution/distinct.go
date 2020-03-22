@@ -10,14 +10,16 @@ import (
 )
 
 type Distinct struct {
-	storage storage.Storage
-	source  Node
+	storage        storage.Storage
+	source         Node
+	eventTimeField octosql.VariableName
 }
 
-func NewDistinct(storage storage.Storage, source Node) *Distinct {
+func NewDistinct(storage storage.Storage, source Node, eventTimeField octosql.VariableName) *Distinct {
 	return &Distinct{
-		storage: storage,
-		source:  source,
+		storage:        storage,
+		source:         source,
+		eventTimeField: eventTimeField,
 	}
 }
 
@@ -33,6 +35,8 @@ func (node *Distinct) Get(ctx context.Context, variables octosql.Variables, stre
 		return nil, nil, errors.Wrap(err, "couldn't get stream for source node in distinct")
 	}
 
+	// The trigger for distinct is counting trigger with value 1, because triggering of Distinct
+	// is strongly related to triggering of the underlying source, so that's the simplest approach
 	trigger, err := NewCountingTrigger(NewDummyValue(octosql.MakeInt(1))).Get(ctx, variables)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't create trigger for distinct")
@@ -43,7 +47,7 @@ func (node *Distinct) Get(ctx context.Context, variables octosql.Variables, stre
 	}
 
 	processFunc := &ProcessByKey{
-		eventTimeField:  "", // TODO: what about this?
+		eventTimeField:  node.eventTimeField,
 		trigger:         trigger,
 		keyExpression:   []Expression{&RecordExpression{}},
 		processFunction: distinct,
@@ -60,10 +64,18 @@ type DistinctStream struct {
 	variables octosql.Variables
 }
 
+var idStoragePrefix = []byte("$id_value_state$")
+var recordStoragePrefix = []byte("$record_value_state$")
+
 func (ds *DistinctStream) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, key octosql.Value, record *Record) error {
 	if inputIndex > 0 {
 		panic("only one input stream allowed for group by")
 	}
+
+	if record.Metadata.Id == nil {
+		panic("no id") // TODO: This can either be panic, error, or assigning an ID here
+	}
+
 	keyPrefix := append(append([]byte("$"), key.MonotonicMarshal()...), '$')
 	txByKey := tx.WithPrefix(keyPrefix)
 
@@ -84,17 +96,36 @@ func (ds *DistinctStream) AddRecord(ctx context.Context, tx storage.StateTransac
 		newRecordCount = recordCount.AsInt() - 1
 	}
 
+	recordID := octosql.MakeString(record.ID().ID)
+	keyIDState := storage.NewValueState(txByKey.WithPrefix(idStoragePrefix))
+	keyRecordState := storage.NewValueState(txByKey.WithPrefix(recordStoragePrefix))
+
 	if newRecordCount != 0 {
 		newRecordCountValue := octosql.MakeInt(newRecordCount)
 		err := recordCountState.Set(&newRecordCountValue)
 		if err != nil {
 			return errors.Wrap(err, "couldn't save record count")
 		}
+
+		// If it's the first record with given key, we store its ID and the record itself
+		if newRecordCount == 1 {
+			err = keyIDState.Set(&recordID)
+			if err != nil {
+				return errors.Wrap(err, "couldn't save records ID")
+			}
+
+			err = keyRecordState.Set(record)
+			if err != nil {
+				return errors.Wrap(err, "couldn't save record")
+			}
+		}
 	} else {
 		err := recordCountState.Clear()
 		if err != nil {
 			return errors.Wrap(err, "couldn't clear record count")
 		}
+
+		// We don't clear the keyIDState since we might need it in Trigger()
 	}
 
 	return nil
@@ -119,13 +150,6 @@ func (ds *DistinctStream) Trigger(ctx context.Context, tx storage.StateTransacti
 		return nil, errors.Wrap(err, "couldn't check whether record was already triggered")
 	}
 
-	keyTuple := key.AsSlice()
-	if len(keyTuple) == 0 { // empty record
-		return nil, nil
-	}
-
-	recordMap := keyTuple[0].AsMap()
-
 	// Check whether record is present
 	recordCountState := storage.NewValueState(txByKey.WithPrefix(recordCountPrefix))
 	var isRecordPresent bool
@@ -139,6 +163,23 @@ func (ds *DistinctStream) Trigger(ctx context.Context, tx storage.StateTransacti
 		return nil, errors.Wrap(err, "couldn't check whether record is present in state")
 	}
 
+	// Get the ID for this key
+	var recordID octosql.Value
+	keyIDState := storage.NewValueState(txByKey.WithPrefix(idStoragePrefix))
+
+	err = keyIDState.Get(&recordID)
+	if err != nil && err != storage.ErrNotFound {
+		return nil, errors.Wrap(err, "couldn't read ID for key")
+	}
+
+	keyRecordState := storage.NewValueState(txByKey.WithPrefix(recordStoragePrefix))
+	var record Record
+
+	err = keyRecordState.Get(&record)
+	if err != nil && err != storage.ErrNotFound {
+		return nil, errors.Wrap(err, "couldn't read record")
+	}
+
 	if !wasRecordTriggered && isRecordPresent {
 		// This is the first time that record is triggered and it is present, so we send it
 
@@ -148,8 +189,7 @@ func (ds *DistinctStream) Trigger(ctx context.Context, tx storage.StateTransacti
 			return nil, errors.Wrap(err, "couldn't mark record as retracted")
 		}
 
-		record := recordFromMap(recordMap, false)
-		return []*Record{record}, nil
+		return []*Record{NewRecordFromRecord(&record, WithNoUndo(), WithID(NewID(recordID.AsString())))}, nil
 
 	} else if wasRecordTriggered && !isRecordPresent {
 		// The record was triggered, but it isn't present
@@ -160,30 +200,41 @@ func (ds *DistinctStream) Trigger(ctx context.Context, tx storage.StateTransacti
 			return nil, errors.Wrap(err, "couldn't reset that record was triggered")
 		}
 
+		// The record was triggered but it was retracted so we have to clear its ID and the record here
+		err = keyIDState.Clear()
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't clear id for key")
+		}
+
+		err = keyRecordState.Clear()
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't clear record for key")
+		}
+
 		// Send the retraction
-		record := recordFromMap(recordMap, true)
-		return []*Record{record}, nil
+		return []*Record{NewRecordFromRecord(&record, WithUndo(), WithID(NewID(recordID.AsString())))}, nil
+
 	}
 
 	// Otherwise we the record was triggered and it's still present, so we don't do anything
 	return nil, nil
 }
 
-// TODO: move this somewhere else?
-func recordFromMap(m map[string]octosql.Value, isUndo bool) *Record {
-	fields := make([]octosql.VariableName, len(m))
-	values := make([]octosql.Value, len(m))
+type RecordExpression struct{}
 
-	i := 0
-	for k, v := range m {
-		fields[i] = octosql.NewVariableName(k)
+func (re *RecordExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
+	fields := variables.DeterministicOrder()
+	fieldValues := make([]octosql.Value, len(fields))
+	values := make([]octosql.Value, len(fields))
+
+	for i, f := range fields {
+		v, _ := variables.Get(f)
 		values[i] = v
-		i++
+		fieldValues[i] = octosql.MakeString(f.String())
 	}
 
-	if isUndo {
-		return NewRecordFromSlice(fields, values, WithUndo())
-	} else {
-		return NewRecordFromSlice(fields, values, WithNoUndo())
-	}
+	fieldTuple := octosql.MakeTuple(fieldValues)
+	valueTuple := octosql.MakeTuple(values)
+
+	return octosql.MakeTuple([]octosql.Value{fieldTuple, valueTuple}), nil
 }

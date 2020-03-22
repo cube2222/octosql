@@ -228,129 +228,145 @@ func TestDistinct_Get(t *testing.T) {
 					WithID(NewID("id3"))),
 			}),
 		},
+
+		{
+			name: "advanced data (slice) - repetitions",
+			args: args{
+				source: NewDummyNode([]*Record{
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"numbers"},
+						[]interface{}{[]interface{}{1, 2, 3}},
+						WithID(NewID("id1"))),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"numbers"},
+						[]interface{}{[]interface{}{1, 2, 3}},
+						WithID(NewID("id2"))),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"numbers"},
+						[]interface{}{[]interface{}{7, 8}},
+						WithID(NewID("id3"))),
+				}),
+			},
+			want: NewInMemoryStream([]*Record{
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"numbers"},
+					[]interface{}{[]interface{}{1, 2, 3}},
+					WithID(NewID("id1"))),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"numbers"},
+					[]interface{}{[]interface{}{7, 8}},
+					WithID(NewID("id3"))),
+			}),
+		},
+
+		{
+			name: "advanced (map) - repetitions",
+			args: args{
+				source: NewDummyNode([]*Record{
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"map"},
+						[]interface{}{map[string]interface{}{
+							"0": "aaa",
+							"1": "bbb",
+							"2": "ccc",
+						}},
+						WithID(NewID("id1"))),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"map"},
+						[]interface{}{map[string]interface{}{
+							"1": "bbb",
+							"0": "aaa",
+							"2": "ccc",
+						}},
+						WithID(NewID("id2"))),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"map"},
+						[]interface{}{map[string]interface{}{
+							"0": "aaa",
+							"1": "bbb",
+							"2": "ccd",
+						}},
+						WithID(NewID("id3"))),
+				}),
+			},
+			want: NewInMemoryStream([]*Record{
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"map"},
+					[]interface{}{map[string]interface{}{
+						"1": "bbb",
+						"0": "aaa",
+						"2": "ccc",
+					}},
+					WithID(NewID("id1"))),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"map"},
+					[]interface{}{map[string]interface{}{
+						"0": "aaa",
+						"1": "bbb",
+						"2": "ccd",
+					}},
+					WithID(NewID("id3"))),
+			}),
+		},
+
+		{
+			name: "advanced (map + slice) - no repetitions",
+			args: args{
+				source: NewDummyNode([]*Record{
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"map", "numbers"},
+						[]interface{}{map[string]interface{}{
+							"0": "aaa",
+							"1": "bbb",
+							"2": "ccc",
+						}, []interface{}{1, 2}},
+						WithID(NewID("id1"))),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"map", "numbers"},
+						[]interface{}{map[string]interface{}{
+							"1": "bbb",
+							"0": "aaa",
+							"2": "ccc",
+						}, []interface{}{1, 3}},
+						WithID(NewID("id2"))),
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{"map", "numbers"},
+						[]interface{}{map[string]interface{}{
+							"0": "aaa",
+							"1": "bbb",
+							"2": "ccd",
+						}, []interface{}{1, 2}},
+						WithID(NewID("id3"))),
+				}),
+			},
+			want: NewInMemoryStream([]*Record{
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"map", "numbers"},
+					[]interface{}{map[string]interface{}{
+						"0": "aaa",
+						"1": "bbb",
+						"2": "ccc",
+					}, []interface{}{1, 2}},
+					WithID(NewID("id1"))),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"map", "numbers"},
+					[]interface{}{map[string]interface{}{
+						"1": "bbb",
+						"0": "aaa",
+						"2": "ccc",
+					}, []interface{}{1, 3}},
+					WithID(NewID("id2"))),
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"map", "numbers"},
+					[]interface{}{map[string]interface{}{
+						"0": "aaa",
+						"1": "bbb",
+						"2": "ccd",
+					}, []interface{}{1, 2}},
+					WithID(NewID("id3"))),
+			}),
+		},
 		/*
-			{
-				name: "advanced data (slice) - repetitions",
-				args: args{
-					source: NewDummyNode([]*Record{
-						NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"numbers"},
-							[]interface{}{[]interface{}{1, 2, 3}}),
-						NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"numbers"},
-							[]interface{}{[]interface{}{1, 2, 3}}),
-						NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"numbers"},
-							[]interface{}{[]interface{}{7, 8}}),
-					}),
-				},
-				want: NewInMemoryStream([]*Record{
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"numbers"},
-						[]interface{}{[]interface{}{1, 2, 3}}),
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"numbers"},
-						[]interface{}{[]interface{}{7, 8}}),
-				}),
-			},
-
-			{
-				name: "advanced (map) - repetitions",
-				args: args{
-					source: NewDummyNode([]*Record{
-						NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"map"},
-							[]interface{}{map[string]interface{}{
-								"0": "aaa",
-								"1": "bbb",
-								"2": "ccc",
-							}}),
-						NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"map"},
-							[]interface{}{map[string]interface{}{
-								"1": "bbb",
-								"0": "aaa",
-								"2": "ccc",
-							}}),
-						NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"map"},
-							[]interface{}{map[string]interface{}{
-								"0": "aaa",
-								"1": "bbb",
-								"2": "ccd",
-							}}),
-					}),
-				},
-				want: NewInMemoryStream([]*Record{
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"map"},
-						[]interface{}{map[string]interface{}{
-							"1": "bbb",
-							"0": "aaa",
-							"2": "ccc",
-						}}),
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"map"},
-						[]interface{}{map[string]interface{}{
-							"0": "aaa",
-							"1": "bbb",
-							"2": "ccd",
-						}}),
-				}),
-			},
-
-			{
-				name: "advanced (map + slice) - no repetitions",
-				args: args{
-					source: NewDummyNode([]*Record{
-						NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"map", "numbers"},
-							[]interface{}{map[string]interface{}{
-								"0": "aaa",
-								"1": "bbb",
-								"2": "ccc",
-							}, []interface{}{1, 2}}),
-						NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"map", "numbers"},
-							[]interface{}{map[string]interface{}{
-								"1": "bbb",
-								"0": "aaa",
-								"2": "ccc",
-							}, []interface{}{1, 3}}),
-						NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{"map", "numbers"},
-							[]interface{}{map[string]interface{}{
-								"0": "aaa",
-								"1": "bbb",
-								"2": "ccd",
-							}, []interface{}{1, 2}}),
-					}),
-				},
-				want: NewInMemoryStream([]*Record{
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"map", "numbers"},
-						[]interface{}{map[string]interface{}{
-							"0": "aaa",
-							"1": "bbb",
-							"2": "ccc",
-						}, []interface{}{1, 2}}),
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"map", "numbers"},
-						[]interface{}{map[string]interface{}{
-							"1": "bbb",
-							"0": "aaa",
-							"2": "ccc",
-						}, []interface{}{1, 3}}),
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{"map", "numbers"},
-						[]interface{}{map[string]interface{}{
-							"0": "aaa",
-							"1": "bbb",
-							"2": "ccd",
-						}, []interface{}{1, 2}}),
-				}),
-			},
-
 			{
 				name: "the ultimate test",
 				args: args{

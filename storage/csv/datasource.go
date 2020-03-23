@@ -139,8 +139,6 @@ func (rs *RecordStream) Close() error {
 	return nil
 }
 
-var offsetPrefix = []byte("csv_offset")
-
 func (rs *RecordStream) RunWorker(ctx context.Context) {
 	for { // outer for is loading offset value and moving file iterator
 		tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
@@ -204,46 +202,6 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 	}
 }
 
-func (rs *RecordStream) readRecordFromFileWithInitialize() (map[octosql.VariableName]octosql.Value, error) {
-	if rs.first && rs.offset == 0 {
-		if rs.hasColumnHeader {
-			err := rs.initializeColumnsWithHeaderRow()
-			if err != nil {
-				return nil, errors.Wrap(err, "couldn't initialize columns for record stream")
-			}
-
-			// unfortunately, we can't set this in the beginning, because if initializing fails we have to initialize again
-			// also, we cant set this after if because of early return
-			rs.first = false
-			return rs.readRecordFromFileWithInitialize()
-		} else {
-			aliasedRecord, err := rs.initializeColumnsWithoutHeaderRow()
-			if err != nil {
-				return nil, errors.Wrap(err, "couldn't initialize columns for record stream")
-			}
-
-			rs.first = false
-			return aliasedRecord, nil
-		}
-	}
-
-	line, err := rs.r.Read()
-	if err == io.EOF {
-		rs.isDone = true
-		rs.file.Close()
-		return nil, execution.ErrEndOfStream
-	} else if err != nil {
-		return nil, errors.Wrap(err, "couldn't read record")
-	}
-
-	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
-	for i, v := range line {
-		aliasedRecord[rs.aliasedFields[i]] = execution.ParseType(v)
-	}
-
-	return aliasedRecord, nil
-}
-
 var outputQueuePrefix = []byte("$output_queue$")
 
 func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateTransaction) error {
@@ -298,6 +256,46 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 	return nil
 }
 
+func (rs *RecordStream) readRecordFromFileWithInitialize() (map[octosql.VariableName]octosql.Value, error) {
+	if rs.first && rs.offset == 0 {
+		if rs.hasColumnHeader {
+			err := rs.initializeColumnsWithHeaderRow()
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't initialize columns for record stream")
+			}
+
+			// unfortunately, we can't set this in the beginning, because if initializing fails we have to initialize again
+			// also, we cant set this after if because of early return
+			rs.first = false
+			return rs.readRecordFromFileWithInitialize()
+		} else {
+			aliasedRecord, err := rs.initializeColumnsWithoutHeaderRow()
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't initialize columns for record stream")
+			}
+
+			rs.first = false
+			return aliasedRecord, nil
+		}
+	}
+
+	line, err := rs.r.Read()
+	if err == io.EOF {
+		rs.isDone = true
+		rs.file.Close()
+		return nil, execution.ErrEndOfStream
+	} else if err != nil {
+		return nil, errors.Wrap(err, "couldn't read record")
+	}
+
+	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
+	for i, v := range line {
+		aliasedRecord[rs.aliasedFields[i]] = execution.ParseType(v)
+	}
+
+	return aliasedRecord, nil
+}
+
 func (rs *RecordStream) initializeColumnsWithHeaderRow() error {
 	columns, err := rs.r.Read()
 	if err != nil {
@@ -349,6 +347,8 @@ func parseDataTypes(row []string) []octosql.Value {
 
 	return resultRow
 }
+
+var offsetPrefix = []byte("csv_offset")
 
 func (rs *RecordStream) loadOffset(tx storage.StateTransaction) error {
 	offsetState := storage.NewValueState(tx.WithPrefix(offsetPrefix))

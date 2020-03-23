@@ -122,8 +122,6 @@ func (rs *RecordStream) Close() error {
 	return nil
 }
 
-var offsetPrefix = []byte("json_offset")
-
 func (rs *RecordStream) RunWorker(ctx context.Context) {
 	for { // outer for is loading offset value and moving file iterator
 		tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
@@ -185,33 +183,6 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 			}
 		}
 	}
-}
-
-func (rs *RecordStream) readRecordFromFile() (map[octosql.VariableName]interface{}, error) {
-	if rs.arrayFormat && !rs.arrayFormatOpeningBracketRead {
-		tok, err := rs.decoder.Token() // Read opening [
-		if tok != json.Delim('[') {
-			return nil, errors.Errorf("expected [ as first json token, got %v", tok)
-		}
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't read json opening bracket")
-		}
-		rs.arrayFormatOpeningBracketRead = true
-	}
-
-	if !rs.decoder.More() {
-		rs.isDone = true
-		rs.file.Close()
-		return nil, execution.ErrEndOfStream
-	}
-
-	var record map[octosql.VariableName]interface{}
-	err := rs.decoder.Decode(&record)
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't decode json record")
-	}
-
-	return record, nil
 }
 
 var outputQueuePrefix = []byte("$output_queue$")
@@ -287,6 +258,35 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 
 	return nil
 }
+
+func (rs *RecordStream) readRecordFromFile() (map[octosql.VariableName]interface{}, error) {
+	if rs.arrayFormat && !rs.arrayFormatOpeningBracketRead {
+		tok, err := rs.decoder.Token() // Read opening [
+		if tok != json.Delim('[') {
+			return nil, errors.Errorf("expected [ as first json token, got %v", tok)
+		}
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't read json opening bracket")
+		}
+		rs.arrayFormatOpeningBracketRead = true
+	}
+
+	if !rs.decoder.More() {
+		rs.isDone = true
+		rs.file.Close()
+		return nil, execution.ErrEndOfStream
+	}
+
+	var record map[octosql.VariableName]interface{}
+	err := rs.decoder.Decode(&record)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't decode json record")
+	}
+
+	return record, nil
+}
+
+var offsetPrefix = []byte("json_offset")
 
 func (rs *RecordStream) loadOffset(tx storage.StateTransaction) error {
 	offsetState := storage.NewValueState(tx.WithPrefix(offsetPrefix))

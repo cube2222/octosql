@@ -265,7 +265,7 @@ func (rs *RecordStream) readRecordFromFileWithInitialize() (map[octosql.Variable
 			}
 
 			// unfortunately, we can't set this in the beginning, because if initializing fails we have to initialize again
-			// also, we cant set this after if because of early return
+			// also, we can't set this after if because of early return
 			rs.first = false
 			return rs.readRecordFromFileWithInitialize()
 		} else {
@@ -358,7 +358,7 @@ func (rs *RecordStream) loadOffset(tx storage.StateTransaction) error {
 	if err == storage.ErrNotFound {
 		offset = octosql.MakeInt(0)
 	} else if err != nil {
-		return errors.Wrap(err, "couldn't load json offset from state storage")
+		return errors.Wrap(err, "couldn't load csv offset from state storage")
 	}
 
 	rs.offset = offset.AsInt()
@@ -374,7 +374,7 @@ func (rs *RecordStream) saveOffset(tx storage.StateTransaction, curBatchSize int
 	offset := octosql.MakeInt(rs.offset)
 	err := offsetState.Set(&offset)
 	if err != nil {
-		return errors.Wrap(err, "couldn't save json offset to state storage")
+		return errors.Wrap(err, "couldn't save vsc offset to state storage")
 	}
 
 	return nil

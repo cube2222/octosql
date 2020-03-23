@@ -114,6 +114,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 	}
 
 	rs := &RecordStream{
+		stateStorage:     ds.stateStorage,
 		streamID:         streamID,
 		first:            true,
 		hasHeaderRow:     ds.hasHeaderRow,

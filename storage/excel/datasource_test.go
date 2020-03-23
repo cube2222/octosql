@@ -149,7 +149,7 @@ func TestDataSource_Get(t *testing.T) {
 		hasHeaderRow bool
 		sheet        string
 		rootCell     string
-		timeColumns  []string
+		timeColumns  []interface{}
 	}
 	type args struct {
 		variables octosql.Variables
@@ -169,6 +169,7 @@ func TestDataSource_Get(t *testing.T) {
 				hasHeaderRow: true,
 				sheet:        "Sheet1",
 				rootCell:     "A1",
+				timeColumns:  []interface{}{},
 			},
 			args: args{
 				variables: octosql.NoVariables(),
@@ -177,14 +178,17 @@ func TestDataSource_Get(t *testing.T) {
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.name", "t.surname", "t.age"},
 					[]interface{}{"Jan", "Chomiak", 20},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.name", "t.surname", "t.age"},
 					[]interface{}{"Kuba", "Martin", 21},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.name", "t.surname", "t.age"},
 					[]interface{}{"Wojtek", "Kuźmiński", 21},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
 			},
 			wantErr: false,
@@ -198,6 +202,7 @@ func TestDataSource_Get(t *testing.T) {
 				hasHeaderRow: false,
 				sheet:        "CustomSheet",
 				rootCell:     "B3",
+				timeColumns:  []interface{}{},
 			},
 			args: args{
 				variables: octosql.NoVariables(),
@@ -206,18 +211,22 @@ func TestDataSource_Get(t *testing.T) {
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.col1", "t.col2"},
 					[]interface{}{"Warsaw", 1700000},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.col1", "t.col2"},
 					[]interface{}{"Atlanta", 2000},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.col1", "t.col2"},
 					[]interface{}{"New York", 2},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.col1", "t.col2"},
 					[]interface{}{"Miami", -5},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 3)),
 				),
 			},
 			wantErr: false,
@@ -231,6 +240,7 @@ func TestDataSource_Get(t *testing.T) {
 				hasHeaderRow: true,
 				sheet:        "CustomSheet",
 				rootCell:     "E2",
+				timeColumns:  []interface{}{},
 			},
 			args: args{
 				variables: octosql.NoVariables(),
@@ -239,14 +249,17 @@ func TestDataSource_Get(t *testing.T) {
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.id", "t.points"},
 					[]interface{}{1, 10},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.id", "t.points"},
 					[]interface{}{2, 4},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.id", "t.points"},
 					[]interface{}{3, 19},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
 			},
 			wantErr: false,
@@ -260,6 +273,7 @@ func TestDataSource_Get(t *testing.T) {
 				hasHeaderRow: true,
 				sheet:        "CustomSheet",
 				rootCell:     "A9",
+				timeColumns:  []interface{}{},
 			},
 			args: args{
 				variables: octosql.NoVariables(),
@@ -268,14 +282,17 @@ func TestDataSource_Get(t *testing.T) {
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.name", "t.age", "t.id"},
 					[]interface{}{"Bob", 13, 1},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.name", "t.age", "t.id"},
 					[]interface{}{"Ally", nil, 2},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.name", "t.age", "t.id"},
 					[]interface{}{nil, 7, nil},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
 			},
 			wantErr: false,
@@ -289,7 +306,7 @@ func TestDataSource_Get(t *testing.T) {
 				hasHeaderRow: false,
 				sheet:        "DateSheet",
 				rootCell:     "A2",
-				timeColumns:  []string{"col1"},
+				timeColumns:  []interface{}{"col1"},
 			},
 			args: args{
 				variables: octosql.NoVariables(),
@@ -298,14 +315,17 @@ func TestDataSource_Get(t *testing.T) {
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.col1", "t.col2"},
 					[]interface{}{time.Date(2017, 3, 14, 13, 0, 0, 0, time.UTC), 1},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.col1", "t.col2"},
 					[]interface{}{time.Date(2017, 3, 15, 13, 0, 0, 0, time.UTC), 2},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.col1", "t.col2"},
 					[]interface{}{time.Date(2019, 5, 19, 14, 0, 0, 0, time.UTC), 3},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
 			},
 			wantErr: false,
@@ -319,7 +339,7 @@ func TestDataSource_Get(t *testing.T) {
 				hasHeaderRow: true,
 				sheet:        "DateSheet",
 				rootCell:     "D3",
-				timeColumns:  []string{"date"},
+				timeColumns:  []interface{}{"date"},
 			},
 			args: args{
 				variables: octosql.NoVariables(),
@@ -328,14 +348,17 @@ func TestDataSource_Get(t *testing.T) {
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.date", "t.points"},
 					[]interface{}{time.Date(2017, 3, 14, 13, 0, 0, 0, time.UTC), 101},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.date", "t.points"},
 					[]interface{}{time.Date(2017, 3, 15, 13, 0, 0, 0, time.UTC), 102},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.date", "t.points"},
 					[]interface{}{time.Date(2019, 5, 19, 14, 0, 0, 0, time.UTC), 103},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
 			},
 			wantErr: false,
@@ -344,14 +367,13 @@ func TestDataSource_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stateStorage := execution.GetTestStorage(t)
-			ds, err := NewDataSourceBuilderFactory()("test", "")[0].Materialize(context.Background(), &physical.MaterializationContext{
+			ds, err := NewDataSourceBuilderFactory()("test", tt.fields.alias)[0].Materialize(context.Background(), &physical.MaterializationContext{
 				Config: &config.Config{
 					DataSources: []config.DataSourceConfig{
 						{
 							Name: "test",
 							Config: map[string]interface{}{
 								"path":        tt.fields.path,
-								"alias":       tt.fields.alias,
 								"headerRow":   tt.fields.hasHeaderRow,
 								"sheet":       tt.fields.sheet,
 								"rootCell":    tt.fields.rootCell,

@@ -60,7 +60,7 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 	programID := &execution.StreamID{Id: "root"}
 
 	tx := stateStorage.BeginTransaction()
-	stream, execOutput, err := exec.Get(storage.InjectStateTransaction(ctx, tx), variables, programID)
+	stream, _, err := exec.Get(storage.InjectStateTransaction(ctx, tx), variables, programID)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get record stream from execution plan")
 	}
@@ -73,15 +73,14 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		tx := stateStorage.BeginTransaction()
 		ctx := storage.InjectStateTransaction(ctx, tx)
 
-		watermark, err := execOutput.WatermarkSource.GetWatermark(ctx, tx)
+		/*watermark, err := execOutput.WatermarkSource.GetWatermark(ctx, tx)
 		if err != nil {
 			log.Fatal(err)
-		}
-		fmt.Println("current output watermark:", watermark)
+		}*/
+		// fmt.Println("current output watermark:", watermark)
 
 		rec, err = stream.Next(ctx)
 		if err == execution.ErrEndOfStream {
-			log.Println("main end of stream")
 			err := tx.Commit()
 			if err != nil {
 				log.Printf("couldn't commit transaction: %s", err)
@@ -97,7 +96,6 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 			}
 			continue
 		} else if waitableError := execution.GetErrWaitForChanges(err); waitableError != nil {
-			log.Println("main wait for changes: ", err)
 			err := tx.Commit()
 			if err != nil {
 				log.Println("main couldn't commit: ", err)
@@ -107,17 +105,14 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 				}
 				continue
 			}
-			log.Println("main listening for changes")
 			err = waitableError.ListenForChanges(ctx)
 			if err != nil {
 				log.Println("couldn't listen for changes: ", err)
 			}
-			log.Println("main received change")
 			err = waitableError.Close()
 			if err != nil {
 				log.Println("couldn't close subscription: ", err)
 			}
-			log.Println("main received change")
 			continue
 		} else if err != nil {
 			tx.Abort()

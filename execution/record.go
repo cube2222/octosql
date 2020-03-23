@@ -164,8 +164,8 @@ func (r *Record) AsVariables() octosql.Variables {
 	for i := range r.FieldNames {
 		out[octosql.NewVariableName(r.FieldNames[i])] = *r.Data[i]
 	}
-	out[octosql.NewVariableName("sys.undo")] = octosql.MakeBool(r.IsUndo())
-	out[octosql.NewVariableName("sys.id")] = octosql.MakeString(r.ID().Show())
+	// out[octosql.NewVariableName("sys.undo")] = octosql.MakeBool(r.IsUndo())
+	// out[octosql.NewVariableName("sys.id")] = octosql.MakeString(r.ID().Show())
 
 	return out
 }

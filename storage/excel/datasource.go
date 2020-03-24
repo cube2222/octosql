@@ -322,6 +322,10 @@ func (rs *RecordStream) readRecordFromFileWithInitialize() ([]octosql.Value, err
 		return nil, execution.ErrEndOfStream
 	}
 
+	if !rs.rows.Next() {
+		rs.isDone = true
+	}
+
 	return row, nil
 }
 

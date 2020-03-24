@@ -5,9 +5,18 @@ import (
 	"testing"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/streaming/storage"
 )
 
 func TestAreStreamsEqual(t *testing.T) {
+	stateStorage := GetTestStorage(t)
+	defer func() {
+		go stateStorage.Close()
+	}()
+	tx := stateStorage.BeginTransaction()
+	defer tx.Abort()
+	ctx := storage.InjectStateTransaction(context.Background(), tx)
+
 	type args struct {
 		first  RecordStream
 		second RecordStream
@@ -21,8 +30,8 @@ func TestAreStreamsEqual(t *testing.T) {
 		{
 			name: "empty streams",
 			args: args{
-				first:  NewInMemoryStream([]*Record{}),
-				second: NewInMemoryStream([]*Record{}),
+				first:  NewInMemoryStream(ctx, []*Record{}),
+				second: NewInMemoryStream(ctx, []*Record{}),
 			},
 			want:    true,
 			wantErr: false,
@@ -30,18 +39,14 @@ func TestAreStreamsEqual(t *testing.T) {
 		{
 			name: "identical streams",
 			args: args{
-				first: NewInMemoryStream(
-					[]*Record{
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"age"}, []interface{}{7}),
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"age"}, []interface{}{10}),
-					},
-				),
-				second: NewInMemoryStream(
-					[]*Record{
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"age"}, []interface{}{7}),
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"age"}, []interface{}{10}),
-					},
-				),
+				first: NewInMemoryStream(ctx, []*Record{
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"age"}, []interface{}{7}),
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"age"}, []interface{}{10}),
+				}),
+				second: NewInMemoryStream(ctx, []*Record{
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"age"}, []interface{}{7}),
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"age"}, []interface{}{10}),
+				}),
 			},
 			want:    true,
 			wantErr: false,
@@ -49,16 +54,12 @@ func TestAreStreamsEqual(t *testing.T) {
 		{
 			name: "indentical streams with different column order",
 			args: args{
-				first: NewInMemoryStream(
-					[]*Record{
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"name", "age"}, []interface{}{"Janek", 4}),
-					},
-				),
-				second: NewInMemoryStream(
-					[]*Record{
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"age", "name"}, []interface{}{4, "Janek"}),
-					},
-				),
+				first: NewInMemoryStream(ctx, []*Record{
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"name", "age"}, []interface{}{"Janek", 4}),
+				}),
+				second: NewInMemoryStream(ctx, []*Record{
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"age", "name"}, []interface{}{4, "Janek"}),
+				}),
 			},
 			want:    false,
 			wantErr: true,
@@ -66,18 +67,14 @@ func TestAreStreamsEqual(t *testing.T) {
 		{
 			name: "different order streams",
 			args: args{
-				first: NewInMemoryStream(
-					[]*Record{
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"age"}, []interface{}{10}),
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"age"}, []interface{}{7}),
-					},
-				),
-				second: NewInMemoryStream(
-					[]*Record{
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"age"}, []interface{}{7}),
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"age"}, []interface{}{10}),
-					},
-				),
+				first: NewInMemoryStream(ctx, []*Record{
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"age"}, []interface{}{10}),
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"age"}, []interface{}{7}),
+				}),
+				second: NewInMemoryStream(ctx, []*Record{
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"age"}, []interface{}{7}),
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"age"}, []interface{}{10}),
+				}),
 			},
 			want:    false,
 			wantErr: true,
@@ -85,18 +82,14 @@ func TestAreStreamsEqual(t *testing.T) {
 		{
 			name: "very complex test",
 			args: args{
-				first: NewInMemoryStream(
-					[]*Record{
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"age", "name"}, []interface{}{10, "Janek"}),
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"name", "age"}, []interface{}{"Wojtek", 7}),
-					},
-				),
-				second: NewInMemoryStream(
-					[]*Record{
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"age", "name"}, []interface{}{10, "Janek"}),
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"name", "age"}, []interface{}{"Wojtek", 7}),
-					},
-				),
+				first: NewInMemoryStream(ctx, []*Record{
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"age", "name"}, []interface{}{10, "Janek"}),
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"name", "age"}, []interface{}{"Wojtek", 7}),
+				}),
+				second: NewInMemoryStream(ctx, []*Record{
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"age", "name"}, []interface{}{10, "Janek"}),
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"name", "age"}, []interface{}{"Wojtek", 7}),
+				}),
 			},
 			want:    true,
 			wantErr: false,
@@ -104,18 +97,14 @@ func TestAreStreamsEqual(t *testing.T) {
 		{
 			name: "not equal streams - mismatched record",
 			args: args{
-				first: NewInMemoryStream(
-					[]*Record{
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"age", "name"}, []interface{}{10, "Janek"}),
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"name", "age"}, []interface{}{"Wojtek", 7}),
-					},
-				),
-				second: NewInMemoryStream(
-					[]*Record{
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"age", "name"}, []interface{}{7, "Wojtek"}),
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"name", "age"}, []interface{}{"Janek", 12}),
-					},
-				),
+				first: NewInMemoryStream(ctx, []*Record{
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"age", "name"}, []interface{}{10, "Janek"}),
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"name", "age"}, []interface{}{"Wojtek", 7}),
+				}),
+				second: NewInMemoryStream(ctx, []*Record{
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"age", "name"}, []interface{}{7, "Wojtek"}),
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"name", "age"}, []interface{}{"Janek", 12}),
+				}),
 			},
 			want:    false,
 			wantErr: true,
@@ -123,18 +112,14 @@ func TestAreStreamsEqual(t *testing.T) {
 		{
 			name: "mismatched column name",
 			args: args{
-				first: NewInMemoryStream(
-					[]*Record{
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"age"}, []interface{}{10}),
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"age"}, []interface{}{7}),
-					},
-				),
-				second: NewInMemoryStream(
-					[]*Record{
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"age"}, []interface{}{7}),
-						NewRecordFromSliceWithNormalize([]octosql.VariableName{"ageButBetter"}, []interface{}{10}),
-					},
-				),
+				first: NewInMemoryStream(ctx, []*Record{
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"age"}, []interface{}{10}),
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"age"}, []interface{}{7}),
+				}),
+				second: NewInMemoryStream(ctx, []*Record{
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"age"}, []interface{}{7}),
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"ageButBetter"}, []interface{}{10}),
+				}),
 			},
 			want:    false,
 			wantErr: true,
@@ -142,7 +127,7 @@ func TestAreStreamsEqual(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := AreStreamsEqual(context.Background(), tt.args.first, tt.args.second)
+			got, err := AreStreamsEqual(ctx, tt.args.first, tt.args.second)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("AreStreamsEqual() error = %v, wantErr %v", err, tt.wantErr)
 				return

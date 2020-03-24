@@ -5,7 +5,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/pkg/errors"
 
@@ -121,13 +120,6 @@ func (p *ProcessByKey) Next(ctx context.Context, tx storage.StateTransaction) (*
 	var element QueueElement
 	for err = outputQueue.Pop(ctx, &element); err == nil; err = outputQueue.Pop(ctx, &element) {
 		switch payload := element.Type.(type) {
-		case *QueueElement_EndOfStream:
-			octoEndOfStream := octosql.MakeBool(true)
-			err := endOfStreamState.Set(&octoEndOfStream)
-			if err != nil {
-				return nil, errors.Wrap(err, "couldn't update end of stream state")
-			}
-			return nil, ErrEndOfStream
 		case *QueueElement_Record:
 			return payload.Record, nil
 		case *QueueElement_Watermark:
@@ -141,6 +133,15 @@ func (p *ProcessByKey) Next(ctx context.Context, tx storage.StateTransaction) (*
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't update output watermark")
 			}
+		case *QueueElement_EndOfStream:
+			octoEndOfStream := octosql.MakeBool(true)
+			err := endOfStreamState.Set(&octoEndOfStream)
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't update end of stream state")
+			}
+			return nil, ErrEndOfStream
+		case *QueueElement_Error:
+			return nil, errors.New(payload.Error)
 		default:
 			panic("invalid queue element type")
 		}
@@ -197,59 +198,26 @@ func (p *ProcessByKey) MarkEndOfStream(ctx context.Context, tx storage.StateTran
 	return nil
 }
 
+func (p *ProcessByKey) MarkError(ctx context.Context, tx storage.StateTransaction, err error) error {
+	outputQueue := NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
+	err = outputQueue.Push(
+		ctx,
+		&QueueElement{
+			Type: &QueueElement_Error{
+				Error: err.Error(),
+			},
+		},
+	)
+	if err != nil {
+		return errors.Wrap(err, "couldn't push error to output queue")
+	}
+	return nil
+}
+
+func (p *ProcessByKey) ReadyForMore(ctx context.Context, tx storage.StateTransaction) error {
+	return nil
+}
+
 func (p *ProcessByKey) Close() error {
 	return nil // TODO: Close this, remove state
-}
-
-type OutputQueue struct {
-	tx storage.StateTransaction
-}
-
-func NewOutputQueue(tx storage.StateTransaction) *OutputQueue {
-	return &OutputQueue{
-		tx: tx,
-	}
-}
-
-var queueElementsPrefix = []byte("$queue_elements$")
-
-func (q *OutputQueue) Push(ctx context.Context, element proto.Message) error {
-	queueElements := storage.NewDeque(q.tx.WithPrefix(queueElementsPrefix))
-
-	err := queueElements.PushBack(element)
-	if err != nil {
-		return errors.Wrap(err, "couldn't append element to queue")
-	}
-	return nil
-}
-
-func (q *OutputQueue) Pop(ctx context.Context, msg proto.Message) error {
-	queueElements := storage.NewDeque(q.tx.WithPrefix(queueElementsPrefix))
-
-	err := queueElements.PopFront(msg)
-	if err == storage.ErrNotFound {
-		subscription := q.tx.GetUnderlyingStorage().Subscribe(ctx)
-
-		curTx := q.tx.GetUnderlyingStorage().BeginTransaction()
-		defer curTx.Abort()
-		curQueueElements := storage.NewDeque(curTx.WithPrefix(queueElementsPrefix))
-
-		err := curQueueElements.PeekFront(msg)
-		if err == storage.ErrNotFound {
-			return NewErrWaitForChanges(subscription)
-		} else {
-			if subErr := subscription.Close(); subErr != nil {
-				return errors.Wrap(subErr, "couldn't close subscription")
-			}
-			if err == nil {
-				return ErrNewTransactionRequired
-			} else {
-				return errors.Wrap(err, "couldn't check if there are elements in the queue out of transaction")
-			}
-		}
-	} else if err != nil {
-		return errors.Wrap(err, "couldn't pop element from queue")
-	}
-
-	return nil
 }

@@ -147,7 +147,7 @@ func TestFormulaToSQL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := sqlStorages.FormulaToSQL(tt.args.formula, tt.args.aliases); got != tt.want {
+			if got := sql.FormulaToSQL(tt.args.formula, tt.args.aliases); got != tt.want {
 				t.Errorf("formulaToSQL() = %v, want %v", got, tt.want)
 			}
 

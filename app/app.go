@@ -73,6 +73,12 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		tx := stateStorage.BeginTransaction()
 		ctx := storage.InjectStateTransaction(ctx, tx)
 
+		/*watermark, err := execOutput.WatermarkSource.GetWatermark(ctx, tx)
+		if err != nil {
+			log.Fatal(err)
+		}*/
+		// fmt.Println("current output watermark:", watermark)
+
 		rec, err = stream.Next(ctx)
 		if err == execution.ErrEndOfStream {
 			err := tx.Commit()
@@ -90,7 +96,6 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 			}
 			continue
 		} else if waitableError := execution.GetErrWaitForChanges(err); waitableError != nil {
-			log.Println("main wait for changes: ", err)
 			err := tx.Commit()
 			if err != nil {
 				log.Println("main couldn't commit: ", err)
@@ -100,25 +105,21 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 				}
 				continue
 			}
-			log.Println("main listening for changes")
 			err = waitableError.ListenForChanges(ctx)
 			if err != nil {
 				log.Println("couldn't listen for changes: ", err)
 			}
-			log.Println("main received change")
 			err = waitableError.Close()
 			if err != nil {
 				log.Println("couldn't close subscription: ", err)
 			}
-			log.Println("main received change")
 			continue
 		} else if err != nil {
 			tx.Abort()
-			log.Println(err)
-			break // TODO: Error propagation?
+			return errors.Wrap(err, "couldn't get next record")
 		}
 
-		err := tx.Commit()
+		err = tx.Commit()
 		if err != nil {
 			log.Printf("couldn't commit transaction: %s", err)
 			continue
@@ -128,9 +129,6 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		if err != nil {
 			return errors.Wrap(err, "couldn't write record")
 		}
-	}
-	if err != execution.ErrEndOfStream {
-		return errors.Wrap(err, "couldn't get next record")
 	}
 
 	err = app.out.Close()

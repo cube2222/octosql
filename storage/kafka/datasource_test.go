@@ -18,6 +18,8 @@ type KafkaMessage struct {
 }
 
 func TestRecordStream_Next(t *testing.T) {
+	streamID := execution.NewStreamID("test")
+
 	tests := []struct {
 		topic        string
 		decodeAsJSON bool
@@ -49,18 +51,22 @@ func TestRecordStream_Next(t *testing.T) {
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{octosql.NewVariableName("e.key"), octosql.NewVariableName("e.offset"), octosql.NewVariableName("e.value")},
 					[]interface{}{"key0", 0, "value0"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamID, 0)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{octosql.NewVariableName("e.key"), octosql.NewVariableName("e.offset"), octosql.NewVariableName("e.value")},
 					[]interface{}{"key1", 1, "value1"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamID, 1)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{octosql.NewVariableName("e.key"), octosql.NewVariableName("e.offset"), octosql.NewVariableName("e.value")},
 					[]interface{}{"key2", 2, "value2"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamID, 2)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{octosql.NewVariableName("e.key"), octosql.NewVariableName("e.offset"), octosql.NewVariableName("e.value")},
 					[]interface{}{"key3", 3, "value3"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamID, 3)),
 				),
 			},
 		},
@@ -85,14 +91,17 @@ func TestRecordStream_Next(t *testing.T) {
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{octosql.NewVariableName("e.key"), octosql.NewVariableName("e.offset"), octosql.NewVariableName("e.color"), octosql.NewVariableName("e.id")},
 					[]interface{}{"key0", 0, "red", 0.0},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamID, 0)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{octosql.NewVariableName("e.key"), octosql.NewVariableName("e.offset"), octosql.NewVariableName("e.value")},
 					[]interface{}{"key1", 1, `{"id": 1, "color": invalid_json}`},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamID, 1)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{octosql.NewVariableName("e.key"), octosql.NewVariableName("e.offset"), octosql.NewVariableName("e.id"), octosql.NewVariableName("e.wheels")},
 					[]interface{}{"key2", 2, 2.0, 3.0},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamID, 2)),
 				),
 			},
 		},
@@ -147,15 +156,16 @@ func TestRecordStream_Next(t *testing.T) {
 			}
 
 			tx := stateStorage.BeginTransaction()
-			rs, _, err := node.Get(storage.InjectStateTransaction(ctx, tx), octosql.NoVariables(), execution.GetRawStreamID())
+			rs, _, err := node.Get(storage.InjectStateTransaction(ctx, tx), octosql.NoVariables(), streamID)
 			if err != nil {
 				t.Fatal(err)
 			}
+			want, _, err := execution.NewDummyNode(tt.want).Get(storage.InjectStateTransaction(ctx, tx), octosql.NoVariables(), execution.GetRawStreamID())
 			if err := tx.Commit(); err != nil {
 				t.Fatal(err)
 			}
 
-			if err := execution.AreStreamsEqualNoOrderingWithCount(context.Background(), stateStorage, rs, execution.NewInMemoryStream(tt.want), len(tt.want)); err != nil {
+			if err := execution.AreStreamsEqualNoOrderingWithCount(context.Background(), stateStorage, rs, want, len(tt.want)); err != nil {
 				t.Errorf("Streams aren't equal: %v", err)
 				return
 			}

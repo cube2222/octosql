@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
+	"os"
 	"sort"
 	"strings"
 	"testing"
@@ -130,33 +132,37 @@ func AreStreamsEqual(ctx context.Context, first, second RecordStream) (bool, err
 	return true, nil
 }
 
-func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage, first, second RecordStream) (bool, error) {
+func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage, first, second RecordStream) error {
 	firstMultiSet := newMultiSet()
 	secondMultiSet := newMultiSet()
 
+	log.Println("first stream")
 	firstRecords, err := ReadAll(ctx, stateStorage, first)
 	if err != nil {
-		return false, errors.Wrap(err, "couldn't read first stream records")
+		return errors.Wrap(err, "couldn't read first stream records")
 	}
 	for _, rec := range firstRecords {
 		firstMultiSet.Insert(rec)
 	}
+	log.Println("read first stream")
 
+	log.Println("second stream")
 	secondRecords, err := ReadAll(ctx, stateStorage, second)
 	if err != nil {
-		return false, errors.Wrap(err, "couldn't read second stream records")
+		return errors.Wrap(err, "couldn't read second stream records")
 	}
 	for _, rec := range secondRecords {
 		secondMultiSet.Insert(rec)
 	}
+	log.Println("read second stream")
 
 	firstContained := firstMultiSet.isContainedIn(secondMultiSet)
 	secondContained := secondMultiSet.isContainedIn(firstMultiSet)
 	if !(firstContained && secondContained) {
-		return false, nil
+		return errors.Errorf("different sets: %s and %s", firstMultiSet.Show(), secondMultiSet.Show())
 	}
 
-	return true, nil
+	return nil
 }
 
 func AreStreamsEqualNoOrderingWithCount(ctx context.Context, stateStorage storage.Storage, first, second RecordStream, count int) error {
@@ -208,10 +214,10 @@ type DummyNode struct {
 
 func (dn *DummyNode) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
 	if dn.data == nil {
-		return NewInMemoryStream([]*Record{}), NewExecutionOutput(NewZeroWatermarkGenerator()), nil
+		return NewInMemoryStream(ctx, []*Record{}), NewExecutionOutput(NewZeroWatermarkGenerator()), nil
 	}
 
-	return NewInMemoryStream(dn.data), NewExecutionOutput(NewZeroWatermarkGenerator()), nil
+	return NewInMemoryStream(ctx, dn.data), NewExecutionOutput(NewZeroWatermarkGenerator()), nil
 }
 
 func NewDummyValue(value octosql.Value) *DummyValue {
@@ -235,11 +241,18 @@ func ReadAll(ctx context.Context, stateStorage storage.Storage, stream RecordStr
 		ctx := storage.InjectStateTransaction(ctx, tx)
 
 		rec, err := stream.Next(ctx)
+		if rec != nil {
+			log.Println(rec.Show())
+		} else {
+			log.Println("no record: ", err)
+		}
 		if err == ErrEndOfStream {
+			log.Println("breaking")
 			err := tx.Commit()
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't commit transaction")
 			}
+			log.Println("committed")
 			break
 		} else if errors.Cause(err) == ErrNewTransactionRequired {
 			err := tx.Commit()
@@ -323,10 +336,14 @@ func ReadAllWithCount(ctx context.Context, stateStorage storage.Storage, stream 
 }
 
 func GetTestStorage(t *testing.T) storage.Storage {
-	opts := badger.DefaultOptions("")
-	opts.Dir = ""
-	opts.ValueDir = ""
-	opts.InMemory = true
+	dirname := fmt.Sprintf("testdb/%d", rand.Int())
+	err := os.MkdirAll(dirname, os.ModePerm)
+	if err != nil {
+		t.Fatal("couldn't create temporary directory: ", err)
+	}
+
+	opts := badger.DefaultOptions(dirname)
+	opts.CompactL0OnClose = false
 	db, err := badger.Open(opts)
 	if err != nil {
 		t.Fatal("couldn't open in-memory badger database: ", err)

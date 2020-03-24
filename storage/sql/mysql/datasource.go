@@ -3,10 +3,11 @@ package mysql
 import (
 	"fmt"
 
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/storage/sql"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/storage/sql"
 
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/physical"
@@ -48,14 +49,14 @@ func (t *MySQLTemplate) GetDSNAndDriverName(user, password, host, dbName string,
 	return mysqlInfo, "mysql"
 }
 
-func (t *MySQLTemplate) GetPlaceholders(alias string) sqlStorages.PlaceholderMap {
+func (t *MySQLTemplate) GetPlaceholders(alias string) sql.PlaceholderMap {
 	return newMySQLPlaceholders(alias)
 }
 
 var template = &MySQLTemplate{}
 
 func NewDataSourceBuilderFactory(primaryKeys []octosql.VariableName) physical.DataSourceBuilderFactory {
-	return sqlStorages.NewDataSourceBuilderFactoryFromTemplate(template)(primaryKeys)
+	return sql.NewDataSourceBuilderFactoryFromTemplate(template)(primaryKeys)
 }
 
 // NewDataSourceBuilderFactoryFromConfig creates a data source builder factory using the configuration.

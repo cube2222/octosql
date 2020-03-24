@@ -145,5 +145,5 @@ func createOrderedStream(ctx context.Context, expressions []Expression, directio
 		return false
 	})
 
-	return NewInMemoryStream(records), nil
+	return NewInMemoryStream(ctx, records), nil
 }

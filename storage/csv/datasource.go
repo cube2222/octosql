@@ -187,7 +187,7 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 					continue
 				}
 				return
-			} else if err != nil {
+			} else if err != nil { // TODO - should this close worker? This could be a case where file is somehow faulty (question in PR)
 				tx.Abort()
 				log.Printf("csv worker: error running csv read batch worker: %s, reinitializing from storage", err)
 				break

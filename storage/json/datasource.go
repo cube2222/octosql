@@ -170,7 +170,7 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 					continue
 				}
 				return
-			} else if err != nil {
+			} else if err != nil { // TODO - same as with csv file
 				tx.Abort()
 				log.Printf("json worker: error running json read batch worker: %s, reinitializing from storage", err)
 				break

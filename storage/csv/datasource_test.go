@@ -140,7 +140,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 		},
 		{
 			// TODO - in this case we didn't push first record, because second one returned error.
-			// For batchSize = 1 this test would actually return 1 record (what to do about it?)
+			// For batchSize = 1 this test would actually return 1 record (what to do about it? - question in PR)
 			name:            "wrong numbers of columns in a row",
 			csvName:         "wrongCount",
 			hasColumnHeader: true,

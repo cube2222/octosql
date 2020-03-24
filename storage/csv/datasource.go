@@ -226,7 +226,7 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 		aliasedRecord, err := rs.readRecordFromFileWithInitialize()
 		if err == execution.ErrEndOfStream {
 			break
-		} else if err != nil {
+		} else if err != nil { // TODO - do we want to return err instantly here or push current batch? (question in PR)
 			return errors.Wrap(err, "couldn't read record from csv file")
 		}
 

@@ -209,7 +209,7 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 		record, err := rs.readRecordFromFile()
 		if err == execution.ErrEndOfStream {
 			break
-		} else if err != nil {
+		} else if err != nil { // TODO - same as with csv
 			return errors.Wrap(err, "couldn't read record from json file")
 		}
 

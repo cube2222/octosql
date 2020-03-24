@@ -45,7 +45,7 @@ func TestStream(t *testing.T) {
 				record: execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "color", "window_end"},
 					[]interface{}{"Kuba", "red", now.Add(time.Second * 5)},
-					execution.WithID(execution.NewID("123")),
+					execution.WithID(execution.NewRecordID()("123")),
 					execution.WithEventTimeField("window_end"),
 				),
 			},*/
@@ -53,7 +53,7 @@ func TestStream(t *testing.T) {
 				record: execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "color", "window_end"},
 					[]interface{}{"Janek", "blue", now.Add(time.Second * 5)},
-					execution.WithID(execution.NewID("124")),
+					execution.WithID(execution.NewRecordID("124")),
 					execution.WithEventTimeField("window_end"),
 				),
 			},
@@ -61,7 +61,7 @@ func TestStream(t *testing.T) {
 				record: execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "color", "window_end"},
 					[]interface{}{"Janek", "blue", now.Add(time.Second * 5)},
-					execution.WithID(execution.NewID("124")),
+					execution.WithID(execution.NewRecordID("124")),
 					execution.WithEventTimeField("window_end"),
 				),
 			},
@@ -69,7 +69,7 @@ func TestStream(t *testing.T) {
 				record: execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "color", "window_end"},
 					[]interface{}{"Janek", "blue", now.Add(time.Second * 10)},
-					execution.WithID(execution.NewID("124")),
+					execution.WithID(execution.NewRecordID("124")),
 					execution.WithEventTimeField("window_end"),
 				),
 			},
@@ -77,7 +77,7 @@ func TestStream(t *testing.T) {
 				record: execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "color", "window_end"},
 					[]interface{}{"Janek", "blue", now.Add(time.Second * 5)},
-					execution.WithID(execution.NewID("124")),
+					execution.WithID(execution.NewRecordID("124")),
 					execution.WithEventTimeField("window_end"),
 				),
 			},
@@ -88,7 +88,7 @@ func TestStream(t *testing.T) {
 				record: execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "color", "window_end"},
 					[]interface{}{"Janek", "blue", now.Add(time.Second * 10)},
-					execution.WithID(execution.NewID("124")),
+					execution.WithID(execution.NewRecordID("124")),
 					execution.WithEventTimeField("window_end"),
 				),
 			},
@@ -96,7 +96,7 @@ func TestStream(t *testing.T) {
 				record: execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "color", "window_end"},
 					[]interface{}{"Janek", "blue", now.Add(time.Second * 5)},
-					execution.WithID(execution.NewID("124")),
+					execution.WithID(execution.NewRecordID("124")),
 					execution.WithEventTimeField("window_end"),
 				),
 			},
@@ -104,7 +104,7 @@ func TestStream(t *testing.T) {
 				record: execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "color", "window_end"},
 					[]interface{}{"Janek", "blue", now.Add(time.Second * 10)},
-					execution.WithID(execution.NewID("124")),
+					execution.WithID(execution.NewRecordID("124")),
 					execution.WithEventTimeField("window_end"),
 				),
 			},
@@ -112,7 +112,7 @@ func TestStream(t *testing.T) {
 				record: execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "color", "window_end"},
 					[]interface{}{"Wojtek", "greeeen", now.Add(time.Second * 15)},
-					execution.WithID(execution.NewID("121")),
+					execution.WithID(execution.NewRecordID()("121")),
 					execution.WithEventTimeField("window_end"),
 				),
 			},*/

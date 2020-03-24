@@ -17,12 +17,6 @@ type Field struct {
 	Name octosql.VariableName
 }
 
-func NewID(id string) *RecordID {
-	return &RecordID{
-		ID: id,
-	}
-}
-
 func (id RecordID) Show() string {
 	return id.ID
 }
@@ -164,8 +158,8 @@ func (r *Record) AsVariables() octosql.Variables {
 	for i := range r.FieldNames {
 		out[octosql.NewVariableName(r.FieldNames[i])] = *r.Data[i]
 	}
-	out[octosql.NewVariableName("sys.undo")] = octosql.MakeBool(r.IsUndo())
-	out[octosql.NewVariableName("sys.id")] = octosql.MakeString(r.ID().Show())
+	// out[octosql.NewVariableName("sys.undo")] = octosql.MakeBool(r.IsUndo())
+	// out[octosql.NewVariableName("sys.id")] = octosql.MakeString(r.ID().Show())
 
 	return out
 }

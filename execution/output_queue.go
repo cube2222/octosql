@@ -28,6 +28,7 @@ func (q *OutputQueue) Push(ctx context.Context, element proto.Message) error {
 	if err != nil {
 		return errors.Wrap(err, "couldn't append element to queue")
 	}
+
 	return nil
 }
 
@@ -49,6 +50,10 @@ func (q *OutputQueue) Pop(ctx context.Context, msg proto.Message) error {
 
 	err := queueElements.PopFront(msg)
 	if err == storage.ErrNotFound {
+		// Now we create a storage subscription so we don't miss anything
+		// Then we create a new transaction at the present time to see if any data is there
+		// If not, we return the subscription to wait for any changes
+		// If yes, we return an error indicating the need for a new transaction
 		subscription := q.tx.GetUnderlyingStorage().Subscribe(ctx)
 
 		curTx := q.tx.GetUnderlyingStorage().BeginTransaction()

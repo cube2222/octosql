@@ -615,7 +615,7 @@ func (rs *LookupJoinStream) GetWatermark(ctx context.Context, tx storage.StateTr
 	if err == storage.ErrNotFound {
 		return time.Time{}, nil
 	} else if err != nil {
-		return time.Time{}, errors.Wrap(err, "couldni trzeba't get output watermark")
+		return time.Time{}, errors.Wrap(err, "couldn't get output watermark")
 	}
 
 	return octoWatermark.AsTime(), nil

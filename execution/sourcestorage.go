@@ -23,8 +23,13 @@ var inputStreamIDPrefix = []byte("$input$")
 // GetRawStreamID can be used to get a new StreamID without saving it.
 func GetRawStreamID() *StreamID {
 	id := ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader)
+	return NewStreamID(id.String())
+}
+
+// GetRawStreamID can be used to get a new StreamID without saving it.
+func NewStreamID(str string) *StreamID {
 	return &StreamID{
-		Id: id.String(),
+		Id: str,
 	}
 }
 

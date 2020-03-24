@@ -12,6 +12,15 @@ import (
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
+var isInitializedPrefix = []byte("$initialized$")
+var toBeJoinedQueuePrefix = []byte("$to_be_joined$")
+var controlMessagesQueuePrefix = []byte("$control_messages$")
+var jobsPrefix = []byte("$jobs$")
+var sourceRecordPrefix = []byte("$source_record$")
+var alreadyJoinedForRecordPrefix = []byte("$already_joined_for_record$")
+var outputPrefix = []byte("$output$")
+var jobTokenQueuePrefix = []byte("$job_tokens$")
+
 type LookupJoin struct {
 	maxJobsCount   int
 	source, joined Node
@@ -42,10 +51,6 @@ func (node *LookupJoin) Get(ctx context.Context, variables octosql.Variables, st
 		return nil, nil, errors.Wrap(err, "couldn't get source record stream")
 	}
 
-	// We only want to do the initialization routine once, even in case of restarts.
-	isInitialized := storage.NewValueState(tx.WithPrefix(streamID.AsPrefix()).WithPrefix(isInitializedPrefix))
-	var phantom octosql.Value
-
 	rs := &LookupJoinStream{
 		stateStorage: node.stateStorage,
 		variables:    variables,
@@ -55,6 +60,10 @@ func (node *LookupJoin) Get(ctx context.Context, variables octosql.Variables, st
 
 		joinedNode: node.joined,
 	}
+
+	// We only want to do the initialization routine once, even in case of restarts.
+	isInitialized := storage.NewValueState(tx.WithPrefix(streamID.AsPrefix()).WithPrefix(isInitializedPrefix))
+	var phantom octosql.Value
 
 	err = isInitialized.Get(&phantom)
 	if err == storage.ErrNotFound {
@@ -70,7 +79,6 @@ func (node *LookupJoin) Get(ctx context.Context, variables octosql.Variables, st
 		}
 
 		// Save that we've done the initialization routine.
-		phantom = octosql.MakePhantom()
 		err := isInitialized.Set(&phantom)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "couldn't save initialization status of lookup join")
@@ -122,15 +130,6 @@ type LookupJoinStream struct {
 
 	joinedNode Node
 }
-
-var outputPrefix = []byte("$output$")
-var toBeJoinedQueuePrefix = []byte("$to_be_joined$")
-var jobsPrefix = []byte("$jobs$")
-var sourceRecordPrefix = []byte("$source_record$")
-var controlMessagesQueuePrefix = []byte("$control_messages$")
-var alreadyJoinedForRecordPrefix = []byte("$already_joined_for_record$")
-var jobTokenQueuePrefix = []byte("$job_tokens$")
-var isInitializedPrefix = []byte("$initialized$")
 
 // The scheduler takes records from the toBeJoined queue, and starts jobs to do joins.
 // Control messages (records too, to satisfy the initial ordering of messages) are put on a controlMessages queue,
@@ -371,6 +370,7 @@ func (rs *LookupJoinStream) HandleControlMessages(ctx context.Context, tx storag
 		case *QueueElement_Record:
 			var jobs = storage.NewMap(tx.WithPrefix(jobsPrefix))
 			var phantom octosql.Value
+
 			err := jobs.Get(typedMsg.Record.ID(), &phantom)
 			if err == nil {
 				return nil // The job exists, we don't want to pop this control message yet
@@ -385,38 +385,41 @@ func (rs *LookupJoinStream) HandleControlMessages(ctx context.Context, tx storag
 
 		err = controlMessagesQueue.Pop(ctx, &msg)
 		if err != nil {
-			return errors.Wrap(err, "couldn't pop control messages queue")
+			return errors.Wrap(err, "couldn't pop from control messages queue")
 		}
 
 		switch payload := msg.Type.(type) {
 		case *QueueElement_Record:
-			// This message can safely be discarded as the corresponding job doesn't exists.
+			// This message can safely be discarded as the corresponding job doesn't exist.
 			// As these jobs are done now, we can respond with tokens.
 			tokenQueue := NewOutputQueue(tx.WithPrefix(jobTokenQueuePrefix))
+
 			token := octosql.MakePhantom()
 			if err := tokenQueue.Push(ctx, &token); err != nil {
 				return errors.Wrap(err, "couldn't push job token to token queue")
 			}
+
 		case *QueueElement_Watermark:
 			// Update the current output watermark state
 			outputWatermarkState := storage.NewValueState(tx.WithPrefix(outputWatermarkPrefix))
+
 			watermark, err := ptypes.Timestamp(payload.Watermark)
 			if err != nil {
 				return errors.Wrap(err, "couldn't parse watermark timestamp")
 			}
 			octoWatermark := octosql.MakeTime(watermark)
-			err = outputWatermarkState.Set(&octoWatermark)
-			if err != nil {
+			if err := outputWatermarkState.Set(&octoWatermark); err != nil {
 				return errors.Wrap(err, "couldn't update output watermark")
 			}
+
 		case *QueueElement_EndOfStream:
 			// Update the current end of stream state
 			octoEndOfStream := octosql.MakeBool(true)
-			err := endOfStreamState.Set(&octoEndOfStream)
-			if err != nil {
+			if err := endOfStreamState.Set(&octoEndOfStream); err != nil {
 				return errors.Wrap(err, "couldn't update end of stream state")
 			}
 			return ErrEndOfStream
+
 		case *QueueElement_Error:
 			return errors.New(payload.Error)
 		default:
@@ -459,53 +462,52 @@ func (rs *LookupJoinStream) GetNextRecord(ctx context.Context, tx storage.StateT
 			} else if err != nil {
 				return nil, errors.Wrapf(err, "couldn't peek element from output queue for job with recordID %s", jobRecordID.Show())
 			}
+
 			switch outputElement.Type.(type) {
 			case *QueueElement_Record:
 				// If this is a left join, save that we've now joined a record for this source record if we haven't already.
-				if rs.isLeftJoin {
-					alreadyJoinedSomethingForRecordState := storage.NewValueState(tx.WithPrefix(jobRecordID.AsPrefix()).WithPrefix(alreadyJoinedForRecordPrefix))
-					var phantom octosql.Value
-					err := alreadyJoinedSomethingForRecordState.Get(&phantom)
-					if err == storage.ErrNotFound {
-						phantom = octosql.MakePhantom()
-						if err := alreadyJoinedSomethingForRecordState.Set(&phantom); err != nil {
-							return nil, errors.Wrapf(err, "couldn't save that a record was now joined for job with recordID %s", jobRecordID.Show())
-						}
-					} else if err != nil {
-						return nil, errors.Wrapf(err, "couldn't check if any record was already joined for job with recordID %s", jobRecordID.Show())
+				alreadyJoinedSomethingForRecordState := storage.NewValueState(tx.WithPrefix(jobRecordID.AsPrefix()).WithPrefix(alreadyJoinedForRecordPrefix))
+				var phantom octosql.Value
+
+				err := alreadyJoinedSomethingForRecordState.Get(&phantom)
+				if err == storage.ErrNotFound {
+					phantom = octosql.MakePhantom()
+					if err := alreadyJoinedSomethingForRecordState.Set(&phantom); err != nil {
+						return nil, errors.Wrapf(err, "couldn't save that a record was now joined for job with recordID %s", jobRecordID.Show())
 					}
+				} else if err != nil {
+					return nil, errors.Wrapf(err, "couldn't check if any record was already joined for job with recordID %s", jobRecordID.Show())
 				}
 
 			case *QueueElement_EndOfStream:
 				// If this is a left join and we haven't joined anything for this source record,
 				// then send the record without anything attached.
-				if rs.isLeftJoin {
-					alreadyJoinedSomethingForRecordState := storage.NewValueState(tx.WithPrefix(jobRecordID.AsPrefix()).WithPrefix(alreadyJoinedForRecordPrefix))
-					var phantom octosql.Value
-					err := alreadyJoinedSomethingForRecordState.Get(&phantom)
-					if err == storage.ErrNotFound {
-						phantom = octosql.MakePhantom()
-						if err := alreadyJoinedSomethingForRecordState.Set(&phantom); err != nil {
-							return nil, errors.Wrapf(err, "couldn't save that a record was now joined for job with recordID %s", jobRecordID.Show())
-						}
+				alreadyJoinedSomethingForRecordState := storage.NewValueState(tx.WithPrefix(jobRecordID.AsPrefix()).WithPrefix(alreadyJoinedForRecordPrefix))
+				var phantom octosql.Value
 
-						var sourceRecord Record
-						if err = sourceRecordState.Get(&sourceRecord); err != nil {
-							return nil, errors.Wrapf(err, "couldn't get source record for job with recordID %s", jobRecordID.Show())
-						}
+				err := alreadyJoinedSomethingForRecordState.Get(&phantom)
+				if err == storage.ErrNotFound {
+					phantom = octosql.MakePhantom()
+					if err := alreadyJoinedSomethingForRecordState.Set(&phantom); err != nil {
+						return nil, errors.Wrapf(err, "couldn't save that a record was now joined for job with recordID %s", jobRecordID.Show())
+					}
 
-						if err := iter.Close(); err != nil {
-							return nil, errors.Wrap(err, "couldn't close jobs iterator")
-						}
+					var sourceRecord Record
+					if err = sourceRecordState.Get(&sourceRecord); err != nil {
+						return nil, errors.Wrapf(err, "couldn't get source record for job with recordID %s", jobRecordID.Show())
+					}
 
-						return &sourceRecord, nil
-					} else if err != nil {
-						return nil, errors.Wrapf(err, "couldn't check if any record was already joined for job with recordID %s", jobRecordID.Show())
-					} else if err == nil {
-						// We've already sent an output record for this source record, so we can clear the state.
-						if err := alreadyJoinedSomethingForRecordState.Clear(); err != nil {
-							return nil, errors.Wrapf(err, "couldn't clear information about already having sent a record for job with recordID %s", jobRecordID.Show())
-						}
+					if err := iter.Close(); err != nil {
+						return nil, errors.Wrap(err, "couldn't close jobs iterator")
+					}
+
+					return &sourceRecord, nil
+				} else if err != nil {
+					return nil, errors.Wrapf(err, "couldn't check if any record was already joined for job with recordID %s", jobRecordID.Show())
+				} else if err == nil {
+					// We've already sent an output record for this source record, so we can clear the state.
+					if err := alreadyJoinedSomethingForRecordState.Clear(); err != nil {
+						return nil, errors.Wrapf(err, "couldn't clear information about already having sent a record for job with recordID %s", jobRecordID.Show())
 					}
 				}
 
@@ -613,7 +615,7 @@ func (rs *LookupJoinStream) GetWatermark(ctx context.Context, tx storage.StateTr
 	if err == storage.ErrNotFound {
 		return time.Time{}, nil
 	} else if err != nil {
-		return time.Time{}, errors.Wrap(err, "couldn't get output watermark")
+		return time.Time{}, errors.Wrap(err, "couldni trzeba't get output watermark")
 	}
 
 	return octoWatermark.AsTime(), nil

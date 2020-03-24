@@ -17,12 +17,6 @@ type Field struct {
 	Name octosql.VariableName
 }
 
-func NewID(id string) *RecordID {
-	return &RecordID{
-		ID: id,
-	}
-}
-
 func (id RecordID) Show() string {
 	return id.ID
 }

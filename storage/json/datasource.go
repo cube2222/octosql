@@ -65,17 +65,18 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 	}
 
 	return &RecordStream{
+		streamID:                      streamID,
 		arrayFormat:                   ds.arrayFormat,
 		arrayFormatOpeningBracketRead: false,
 		file:                          file,
 		decoder:                       json.NewDecoder(file),
 		isDone:                        false,
 		alias:                         ds.alias,
-		streamID:                      streamID,
 	}, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), nil
 }
 
 type RecordStream struct {
+	streamID                      *execution.StreamID
 	arrayFormat                   bool
 	arrayFormatOpeningBracketRead bool
 	file                          *os.File
@@ -83,7 +84,6 @@ type RecordStream struct {
 	isDone                        bool
 	alias                         string
 	offset                        int
-	streamID                      *execution.StreamID
 }
 
 func (rs *RecordStream) Close() error {

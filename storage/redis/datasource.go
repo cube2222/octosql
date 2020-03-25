@@ -105,42 +105,29 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		return nil, nil, errors.Wrap(err, "couldn't get all keys from filter")
 	}
 
-	var rs execution.RecordStream
+	rs := &RecordStream{
+		stateStorage: ds.stateStorage,
+		streamID:     streamID,
+		client:       ds.client,
+		alias:        ds.alias,
+		keyName:      ds.dbKey,
+		batchSize:    ds.batchSize,
+	}
+	if err = rs.loadOffset(tx); err != nil {
+		return nil, nil, errors.Wrapf(err, "couldn't load redis offset")
+	}
+	if err = rs.loadCursor(tx); err != nil {
+		return nil, nil, errors.Wrapf(err, "couldn't load redis cursor")
+	}
 
-	if len(keysWanted.keys) == 0 {
-		allKeys := ds.client.Scan(0, "*", 0)
-
-		rs := &EntireDatabaseStream{
-			stateStorage: ds.stateStorage,
-			streamID:     streamID,
-			client:       ds.client,
-			dbIterator:   allKeys.Iterator(),
-			isDone:       false,
-			alias:        ds.alias,
-			keyName:      ds.dbKey,
-			batchSize:    ds.batchSize,
-		}
-	} else {
+	if len(keysWanted.keys) == 0 { // EntireDatabaseStream
+		rs.isEntireDatabaseStream = true
+	} else { // KeySpecificStream
 		sliceKeys := make([]string, 0)
 		for k := range keysWanted.keys {
 			sliceKeys = append(sliceKeys, k)
 		}
-
-		rs := &KeySpecificStream{
-			stateStorage: ds.stateStorage,
-			streamID:     streamID,
-			client:       ds.client,
-			keys:         sliceKeys,
-			counter:      0,
-			isDone:       false,
-			alias:        ds.alias,
-			keyName:      ds.dbKey,
-			batchSize:    ds.batchSize,
-		}
-	}
-
-	if err = rs.loadOffset(tx); err != nil {
-		return nil, nil, errors.Wrapf(err, "couldn't load csv offset")
+		rs.keys = sliceKeys
 	}
 
 	go func() {
@@ -152,19 +139,27 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 	return rs, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), nil
 }
 
-type EntireDatabaseStream struct {
+type RecordStream struct {
 	stateStorage storage.Storage
 	streamID     *execution.StreamID
 	client       *redis.Client
-	dbIterator   *redis.ScanIterator
 	isDone       bool
 	alias        string
 	keyName      string
 	offset       int
 	batchSize    int
+
+	isEntireDatabaseStream bool
+
+	// Field used by EntireDatabaseStream
+	cursor uint64 // cursor is the parameter for scan which indicates a place where next scan should continue
+
+	// Fields used by KeySpecificStream
+	keys    []string
+	counter int
 }
 
-func (rs *EntireDatabaseStream) Close() error {
+func (rs *RecordStream) Close() error {
 	err := rs.client.Close()
 	if err != nil {
 		return errors.Wrap(err, "Couldn't close underlying client")
@@ -173,31 +168,12 @@ func (rs *EntireDatabaseStream) Close() error {
 	return nil
 }
 
-func (rs *EntireDatabaseStream) Next(ctx context.Context) (*execution.Record, error) {
-	for {
-		if rs.isDone {
-			return nil, execution.ErrEndOfStream
-		}
+func (rs *RecordStream) RunWorker(ctx context.Context) {
+	panic("implement me")
+}
 
-		if !rs.dbIterator.Next() {
-			if rs.dbIterator.Err() != nil {
-				return nil, rs.dbIterator.Err()
-			}
-			rs.isDone = true
-			return nil, execution.ErrEndOfStream
-		}
-		key := rs.dbIterator.Val()
-
-		record, err := getNewRecord(rs.client, rs.keyName, key, rs.alias)
-		if err != nil {
-			if err == ErrNotFound { // key was not in redis database so we skip it
-				continue
-			}
-			return nil, err
-		}
-
-		return record, nil
-	}
+func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateTransaction) error {
+	panic("implement me")
 }
 
 func getNewRecord(client *redis.Client, keyName, key, alias string) (*execution.Record, error) {
@@ -235,42 +211,137 @@ func getNewRecord(client *redis.Client, keyName, key, alias string) (*execution.
 	return execution.NewRecord(fieldNames, aliasedRecord), nil
 }
 
-type KeySpecificStream struct {
-	stateStorage storage.Storage
-	streamID     *execution.StreamID
-	client       *redis.Client
-	keys         []string
-	counter      int
-	isDone       bool
-	alias        string
-	keyName      string
-	offset       int
-	batchSize    int
+var cursorPrefix = []byte("redis_cursor")
+
+func (rs *RecordStream) loadCursor(tx storage.StateTransaction) error {
+	cursorState := storage.NewValueState(tx.WithPrefix(cursorPrefix))
+
+	var cursor octosql.Value
+	err := cursorState.Get(&cursor)
+	if err == storage.ErrNotFound {
+		cursor = octosql.MakeInt(0)
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't load redis cursor from state storage")
+	}
+
+	rs.cursor = uint64(cursor.AsInt())
+
+	return nil
 }
 
-func (rs *KeySpecificStream) Close() error {
-	err := rs.client.Close()
+func (rs *RecordStream) saveCursor(tx storage.StateTransaction, cursor uint64) error {
+	cursorState := storage.NewValueState(tx.WithPrefix(offsetPrefix))
+
+	rs.cursor = cursor
+
+	cursorValue := octosql.MakeInt(int(cursor))
+	err := cursorState.Set(&cursorValue)
 	if err != nil {
-		return errors.Wrap(err, "Couldn't close underlying client")
+		return errors.Wrap(err, "couldn't save redis cursor to state storage")
 	}
 
 	return nil
 }
 
-func (rs *KeySpecificStream) Next(ctx context.Context) (*execution.Record, error) {
-	if rs.isDone {
-		return nil, execution.ErrEndOfStream
+var offsetPrefix = []byte("redis_offset")
+
+func (rs *RecordStream) loadOffset(tx storage.StateTransaction) error {
+	offsetState := storage.NewValueState(tx.WithPrefix(offsetPrefix))
+
+	var offset octosql.Value
+	err := offsetState.Get(&offset)
+	if err == storage.ErrNotFound {
+		offset = octosql.MakeInt(0)
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't load redis offset from state storage")
 	}
 
-	if rs.counter == len(rs.keys) {
-		rs.isDone = true
-		return nil, execution.ErrEndOfStream
-	}
+	rs.offset = offset.AsInt()
 
-	key := rs.keys[rs.counter]
-	rs.counter++
-
-	return getNewRecord(rs.client, rs.keyName, key, rs.alias)
+	return nil
 }
+
+func (rs *RecordStream) saveOffset(tx storage.StateTransaction, curBatchSize int) error {
+	offsetState := storage.NewValueState(tx.WithPrefix(offsetPrefix))
+
+	rs.offset = rs.offset + curBatchSize
+
+	offset := octosql.MakeInt(rs.offset)
+	err := offsetState.Set(&offset)
+	if err != nil {
+		return errors.Wrap(err, "couldn't save redis offset to state storage")
+	}
+
+	return nil
+}
+
+var outputQueuePrefix = []byte("$output_queue$")
+
+func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
+	tx := storage.GetStateTransactionFromContext(ctx).WithPrefix(rs.streamID.AsPrefix())
+	outputQueue := execution.NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
+
+	var queueElement QueueElement
+	err := outputQueue.Pop(ctx, &queueElement)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't pop queue element")
+	}
+
+	switch queueElement := queueElement.Type.(type) {
+	case *QueueElement_Record:
+		return queueElement.Record, nil
+	case *QueueElement_Error:
+		if queueElement.Error == execution.ErrEndOfStream.Error() {
+			return nil, execution.ErrEndOfStream
+		}
+
+		return nil, errors.New(queueElement.Error)
+	default:
+		panic("invalid queue element type")
+	}
+}
+
+//func (rs *EntireDatabaseStream) Next(ctx context.Context) (*execution.Record, error) {
+//	for {
+//		if rs.isDone {
+//			return nil, execution.ErrEndOfStream
+//		}
+//
+//		if !rs.dbIterator.Next() {
+//			if rs.dbIterator.Err() != nil {
+//				return nil, rs.dbIterator.Err()
+//			}
+//			rs.isDone = true
+//			return nil, execution.ErrEndOfStream
+//		}
+//		key := rs.dbIterator.Val()
+//
+//		record, err := getNewRecord(rs.client, rs.keyName, key, rs.alias)
+//		if err != nil {
+//			if err == ErrNotFound { // key was not in redis database so we skip it
+//				continue
+//			}
+//			return nil, err
+//		}
+//
+//		return record, nil
+//	}
+//}
+
+//func (rs *KeySpecificStream) Next(ctx context.Context) (*execution.Record, error) {
+//	if rs.isDone {
+//		return nil, execution.ErrEndOfStream
+//	}
+//
+//	if rs.counter == len(rs.keys) {
+//		rs.isDone = true
+//		return nil, execution.ErrEndOfStream
+//	}
+//
+//	key := rs.keys[rs.counter]
+//	rs.counter++
+//
+//	return getNewRecord(rs.client, rs.keyName, key, rs.alias)
+//}
 
 var ErrNotFound = errors.New("redis key not found")

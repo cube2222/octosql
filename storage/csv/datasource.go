@@ -374,7 +374,7 @@ func (rs *RecordStream) saveOffset(tx storage.StateTransaction, curBatchSize int
 	offset := octosql.MakeInt(rs.offset)
 	err := offsetState.Set(&offset)
 	if err != nil {
-		return errors.Wrap(err, "couldn't save vsc offset to state storage")
+		return errors.Wrap(err, "couldn't save csv offset to state storage")
 	}
 
 	return nil

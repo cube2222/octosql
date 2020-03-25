@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
 )
@@ -14,6 +15,17 @@ type OrderBy struct {
 	expressions []Expression
 	directions  []OrderDirection
 	source      Node
+}
+
+func (orderBy *OrderBy) Visualize() *graph.Node {
+	n := graph.NewNode("Order By")
+	if orderBy.source != nil {
+		n.AddChild("source", orderBy.source.Visualize())
+	}
+	for i := range n.Children {
+		n.AddChild(string(orderBy.directions[i]), orderBy.expressions[i].Visualize())
+	}
+	return n
 }
 
 func NewOrderBy(expressions []Expression, directions []OrderDirection, source Node) *OrderBy {

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
 )
@@ -11,6 +12,17 @@ import (
 type LeftJoin struct {
 	source Node
 	joined Node
+}
+
+func (leftJoin *LeftJoin) Visualize() *graph.Node {
+	n := graph.NewNode("LeftJoin")
+	if leftJoin.source != nil {
+		n.AddChild("source", leftJoin.source.Visualize())
+	}
+	if leftJoin.joined != nil {
+		n.AddChild("joined", leftJoin.joined.Visualize())
+	}
+	return n
 }
 
 func NewLeftJoin(source Node, joined Node) *LeftJoin {

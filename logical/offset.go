@@ -2,7 +2,9 @@ package logical
 
 import (
 	"context"
+
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
 )
@@ -10,6 +12,17 @@ import (
 type Offset struct {
 	data       Node
 	offsetExpr Expression
+}
+
+func (offset *Offset) Visualize() *graph.Node {
+	n := graph.NewNode("Offset")
+	if offset.data != nil {
+		n.AddChild("data", offset.data.Visualize())
+	}
+	if offset.offsetExpr != nil {
+		n.AddChild("offset", offset.offsetExpr.Visualize())
+	}
+	return n
 }
 
 func NewOffset(data Node, expr Expression) Node {

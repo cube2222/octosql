@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"fmt"
+	"log"
 	"sort"
 
 	"github.com/go-redis/redis"
@@ -13,6 +14,7 @@ import (
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/metadata"
+	"github.com/cube2222/octosql/streaming/storage"
 )
 
 var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
@@ -24,10 +26,12 @@ var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 }
 
 type DataSource struct {
-	client     *redis.Client
-	keyFormula KeyFormula
-	alias      string
-	dbKey      string
+	client       *redis.Client
+	keyFormula   KeyFormula
+	alias        string
+	dbKey        string
+	batchSize    int
+	stateStorage storage.Storage
 }
 
 // NewDataSourceBuilderFactory creates a new datasource builder factory for a redis database.
@@ -47,6 +51,10 @@ func NewDataSourceBuilderFactory(dbKey string) physical.DataSourceBuilderFactory
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't get password")
 			}
+			batchSize, err := config.GetInt(dbConfig, "batchSize", config.WithDefault(1000))
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't get batch size")
+			}
 
 			client := redis.NewClient(
 				&redis.Options{
@@ -62,10 +70,12 @@ func NewDataSourceBuilderFactory(dbKey string) physical.DataSourceBuilderFactory
 			}
 
 			return &DataSource{
-				client:     client,
-				keyFormula: keyFormula,
-				alias:      alias,
-				dbKey:      dbKey,
+				client:       client,
+				keyFormula:   keyFormula,
+				alias:        alias,
+				dbKey:        dbKey,
+				batchSize:    batchSize,
+				stateStorage: matCtx.Storage,
 			}, nil
 		},
 		[]octosql.VariableName{
@@ -88,78 +98,70 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 }
 
 func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
+	tx := storage.GetStateTransactionFromContext(ctx).WithPrefix(streamID.AsPrefix())
+
 	keysWanted, err := ds.keyFormula.getAllKeys(ctx, variables)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get all keys from filter")
 	}
 
+	var rs execution.RecordStream
+
 	if len(keysWanted.keys) == 0 {
 		allKeys := ds.client.Scan(0, "*", 0)
 
-		return &EntireDatabaseStream{
-			client:     ds.client,
-			dbIterator: allKeys.Iterator(),
-			isDone:     false,
-			alias:      ds.alias,
-			keyName:    ds.dbKey,
-		}, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), nil
+		rs := &EntireDatabaseStream{
+			stateStorage: ds.stateStorage,
+			streamID:     streamID,
+			client:       ds.client,
+			dbIterator:   allKeys.Iterator(),
+			isDone:       false,
+			alias:        ds.alias,
+			keyName:      ds.dbKey,
+			batchSize:    ds.batchSize,
+		}
+	} else {
+		sliceKeys := make([]string, 0)
+		for k := range keysWanted.keys {
+			sliceKeys = append(sliceKeys, k)
+		}
+
+		rs := &KeySpecificStream{
+			stateStorage: ds.stateStorage,
+			streamID:     streamID,
+			client:       ds.client,
+			keys:         sliceKeys,
+			counter:      0,
+			isDone:       false,
+			alias:        ds.alias,
+			keyName:      ds.dbKey,
+			batchSize:    ds.batchSize,
+		}
 	}
 
-	sliceKeys := make([]string, 0)
-	for k := range keysWanted.keys {
-		sliceKeys = append(sliceKeys, k)
+	if err = rs.loadOffset(tx); err != nil {
+		return nil, nil, errors.Wrapf(err, "couldn't load csv offset")
 	}
 
-	return &KeySpecificStream{
-		client:  ds.client,
-		keys:    sliceKeys,
-		counter: 0,
-		isDone:  false,
-		alias:   ds.alias,
-		keyName: ds.dbKey,
-	}, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), nil
-}
+	go func() {
+		log.Println("worker start")
+		rs.RunWorker(ctx)
+		log.Println("worker done")
+	}()
 
-type KeySpecificStream struct {
-	client  *redis.Client
-	keys    []string
-	counter int
-	isDone  bool
-	alias   string
-	keyName string
+	return rs, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), nil
 }
 
 type EntireDatabaseStream struct {
-	client     *redis.Client
-	dbIterator *redis.ScanIterator
-	isDone     bool
-	alias      string
-	keyName    string
-}
-
-func (rs *KeySpecificStream) Close() error {
-	err := rs.client.Close()
-	if err != nil {
-		return errors.Wrap(err, "Couldn't close underlying client")
-	}
-
-	return nil
-}
-
-func (rs *KeySpecificStream) Next(ctx context.Context) (*execution.Record, error) {
-	if rs.isDone {
-		return nil, execution.ErrEndOfStream
-	}
-
-	if rs.counter == len(rs.keys) {
-		rs.isDone = true
-		return nil, execution.ErrEndOfStream
-	}
-
-	key := rs.keys[rs.counter]
-	rs.counter++
-
-	return GetNewRecord(rs.client, rs.keyName, key, rs.alias)
+	stateStorage storage.Storage
+	streamID     *execution.StreamID
+	client       *redis.Client
+	dbIterator   *redis.ScanIterator
+	isDone       bool
+	alias        string
+	keyName      string
+	offset       int
+	batchSize    int
 }
 
 func (rs *EntireDatabaseStream) Close() error {
@@ -186,7 +188,7 @@ func (rs *EntireDatabaseStream) Next(ctx context.Context) (*execution.Record, er
 		}
 		key := rs.dbIterator.Val()
 
-		record, err := GetNewRecord(rs.client, rs.keyName, key, rs.alias)
+		record, err := getNewRecord(rs.client, rs.keyName, key, rs.alias)
 		if err != nil {
 			if err == ErrNotFound { // key was not in redis database so we skip it
 				continue
@@ -198,7 +200,7 @@ func (rs *EntireDatabaseStream) Next(ctx context.Context) (*execution.Record, er
 	}
 }
 
-func GetNewRecord(client *redis.Client, keyName, key, alias string) (*execution.Record, error) {
+func getNewRecord(client *redis.Client, keyName, key, alias string) (*execution.Record, error) {
 	recordValues, err := client.HGetAll(key).Result()
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("could't get hash for key %s", key))
@@ -231,6 +233,44 @@ func GetNewRecord(client *redis.Client, keyName, key, alias string) (*execution.
 	})
 
 	return execution.NewRecord(fieldNames, aliasedRecord), nil
+}
+
+type KeySpecificStream struct {
+	stateStorage storage.Storage
+	streamID     *execution.StreamID
+	client       *redis.Client
+	keys         []string
+	counter      int
+	isDone       bool
+	alias        string
+	keyName      string
+	offset       int
+	batchSize    int
+}
+
+func (rs *KeySpecificStream) Close() error {
+	err := rs.client.Close()
+	if err != nil {
+		return errors.Wrap(err, "Couldn't close underlying client")
+	}
+
+	return nil
+}
+
+func (rs *KeySpecificStream) Next(ctx context.Context) (*execution.Record, error) {
+	if rs.isDone {
+		return nil, execution.ErrEndOfStream
+	}
+
+	if rs.counter == len(rs.keys) {
+		rs.isDone = true
+		return nil, execution.ErrEndOfStream
+	}
+
+	key := rs.keys[rs.counter]
+	rs.counter++
+
+	return getNewRecord(rs.client, rs.keyName, key, rs.alias)
 }
 
 var ErrNotFound = errors.New("redis key not found")

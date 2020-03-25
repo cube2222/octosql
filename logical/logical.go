@@ -13,10 +13,10 @@ import (
 
 type PhysicalPlanCreator struct {
 	variableCounter int
-	dataSourceRepo  *physical.DataSourceRepository
+	dataSourceRepo  physical.DataSourceRepository
 }
 
-func NewPhysicalPlanCreator(repo *physical.DataSourceRepository) *PhysicalPlanCreator {
+func NewPhysicalPlanCreator(repo physical.DataSourceRepository) *PhysicalPlanCreator {
 	return &PhysicalPlanCreator{
 		variableCounter: 0,
 		dataSourceRepo:  repo,

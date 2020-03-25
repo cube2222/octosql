@@ -25,18 +25,22 @@ type DataSourceBuilderFactory func(name, alias string) *DataSourceBuilder
 
 // DataSourceRepository is used to register factories for builders for any data source.
 // It can also later create a builder for any of those data source.
-type DataSourceRepository struct {
+type DataSourceRepository interface {
+	Get(dataSourceName, alias string) (*DataSourceBuilder, error)
+}
+
+type dataSourceRepository struct {
 	factories map[string]DataSourceBuilderFactory
 }
 
-func NewDataSourceRepository() *DataSourceRepository {
-	return &DataSourceRepository{
+func NewDataSourceRepository() *dataSourceRepository {
+	return &dataSourceRepository{
 		factories: make(map[string]DataSourceBuilderFactory),
 	}
 }
 
 // Get gets a new builder for a given data source.
-func (repo *DataSourceRepository) Get(dataSourceName, alias string) (*DataSourceBuilder, error) {
+func (repo *dataSourceRepository) Get(dataSourceName, alias string) (*DataSourceBuilder, error) {
 	ds, ok := repo.factories[dataSourceName]
 	if !ok {
 		var dss []string
@@ -50,7 +54,7 @@ func (repo *DataSourceRepository) Get(dataSourceName, alias string) (*DataSource
 }
 
 // Register registers a builder factory for the given data source ColumnName.
-func (repo *DataSourceRepository) Register(dataSourceName string, factory DataSourceBuilderFactory) error {
+func (repo *dataSourceRepository) Register(dataSourceName string, factory DataSourceBuilderFactory) error {
 	_, ok := repo.factories[dataSourceName]
 	if ok {
 		return errors.Errorf("data Source with ColumnName %s already registered", dataSourceName)

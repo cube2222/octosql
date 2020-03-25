@@ -10,7 +10,7 @@ type Factory func(dbConfig map[string]interface{}) (DataSourceBuilderFactory, er
 // CreateDataSourceRepositoryFromConfig creates a DataSourceRepository from a config,
 // using the given configuration reading data source factories.
 // The map should be given as databaseType -> Factory.
-func CreateDataSourceRepositoryFromConfig(factories map[string]Factory, config *config.Config) (*DataSourceRepository, error) {
+func CreateDataSourceRepositoryFromConfig(factories map[string]Factory, config *config.Config) (DataSourceRepository, error) {
 	repo := NewDataSourceRepository()
 	for _, dsConfig := range config.DataSources {
 		factory, ok := factories[dsConfig.Type]

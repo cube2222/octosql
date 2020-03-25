@@ -1,10 +1,13 @@
 package octosql
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
 )
+
+const StarExpressionName = "*star*"
 
 type VariableName string
 
@@ -76,6 +79,21 @@ func (vs Variables) MergeWith(other Variables) (Variables, error) {
 		out[k] = v
 	}
 	return out, nil
+}
+
+func (vs Variables) DeterministicOrder() []VariableName {
+	fields := make([]VariableName, len(vs))
+	i := 0
+	for field := range vs {
+		fields[i] = field
+		i++
+	}
+
+	sort.Slice(fields, func(i, j int) bool {
+		return fields[i] < fields[j]
+	})
+
+	return fields
 }
 
 func StringsToVariableNames(strings []string) []VariableName {

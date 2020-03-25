@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/cube2222/octosql"
@@ -43,6 +44,54 @@ type Expression interface {
 type NamedExpression interface {
 	Expression
 	Name() octosql.VariableName
+}
+
+type StarExpression struct {
+	qualifier string
+}
+
+func NewStarExpression(qualifier string) *StarExpression {
+	return &StarExpression{qualifier: qualifier}
+}
+
+func (se *StarExpression) Fields(variables octosql.Variables) []octosql.VariableName {
+	keys := variables.DeterministicOrder()
+	fields := make([]octosql.VariableName, 0)
+
+	for _, key := range keys {
+		if se.doesVariableMatch(key) {
+			fields = append(fields, key)
+		}
+	}
+
+	return fields
+}
+
+func (se *StarExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
+	fields := se.Fields(variables)
+	values := make([]octosql.Value, len(fields))
+
+	for i := range fields {
+		value, err := variables.Get(fields[i])
+		if err != nil {
+			panic("failed to read star expression")
+		}
+		values[i] = value
+	}
+
+	return octosql.MakeTuple(values), nil
+}
+
+func (se *StarExpression) Name() octosql.VariableName {
+	if se.qualifier == "" {
+		return octosql.StarExpressionName
+	}
+
+	return octosql.NewVariableName(fmt.Sprintf("%s.%s", se.qualifier, octosql.StarExpressionName))
+}
+
+func (se *StarExpression) doesVariableMatch(vname octosql.VariableName) bool {
+	return se.qualifier == "" || se.qualifier == vname.Source()
 }
 
 type Variable struct {

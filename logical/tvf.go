@@ -3,13 +3,15 @@ package logical
 import (
 	"context"
 
-	"github.com/pkg/errors"
-
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
+	"github.com/pkg/errors"
 )
 
 type TableValuedFunctionArgumentValue interface {
+	graph.Visualizer
+
 	iTableValuedFunctionArgumentValue()
 	Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.TableValuedFunctionArgumentValue, octosql.Variables, error)
 }
@@ -20,6 +22,14 @@ func (*TableValuedFunctionArgumentValueDescriptor) iTableValuedFunctionArgumentV
 
 type TableValuedFunctionArgumentValueExpression struct {
 	expression Expression
+}
+
+func (tvfave *TableValuedFunctionArgumentValueExpression) Visualize() *graph.Node {
+	n := graph.NewNode("TableValuedFunctionArgumentValueExpression")
+	if tvfave.expression != nil {
+		n.AddChild("expression", tvfave.expression.Visualize())
+	}
+	return n
 }
 
 func NewTableValuedFunctionArgumentValueExpression(expression Expression) *TableValuedFunctionArgumentValueExpression {
@@ -39,6 +49,14 @@ type TableValuedFunctionArgumentValueTable struct {
 	source Node
 }
 
+func (tvfavt *TableValuedFunctionArgumentValueTable) Visualize() *graph.Node {
+	n := graph.NewNode("TableValuedFunctionArgumentValueTable")
+	if tvfavt.source != nil {
+		n.AddChild("source", tvfavt.source.Visualize())
+	}
+	return n
+}
+
 func NewTableValuedFunctionArgumentValueTable(source Node) *TableValuedFunctionArgumentValueTable {
 	return &TableValuedFunctionArgumentValueTable{source: source}
 }
@@ -56,6 +74,12 @@ type TableValuedFunctionArgumentValueDescriptor struct {
 	descriptor octosql.VariableName
 }
 
+func (tvfavd *TableValuedFunctionArgumentValueDescriptor) Visualize() *graph.Node {
+	n := graph.NewNode("TableValuedFunctionArgumentValueDescriptor")
+	n.AddField("descriptor", string(tvfavd.descriptor))
+	return n
+}
+
 func NewTableValuedFunctionArgumentValueDescriptor(descriptor octosql.VariableName) *TableValuedFunctionArgumentValueDescriptor {
 	return &TableValuedFunctionArgumentValueDescriptor{descriptor: descriptor}
 }
@@ -67,6 +91,15 @@ func (arg *TableValuedFunctionArgumentValueDescriptor) Physical(ctx context.Cont
 type TableValuedFunction struct {
 	name      string
 	arguments map[octosql.VariableName]TableValuedFunctionArgumentValue
+}
+
+func (tvf *TableValuedFunction) Visualize() *graph.Node {
+	n := graph.NewNode("TableValuedFunction(" + tvf.name + ")")
+	n.AddField("name", tvf.name)
+	for name, tvfav := range tvf.arguments {
+		n.AddChild(name.String(), tvfav.Visualize())
+	}
+	return n
 }
 
 func NewTableValuedFunction(name string, arguments map[octosql.VariableName]TableValuedFunctionArgumentValue) *TableValuedFunction {

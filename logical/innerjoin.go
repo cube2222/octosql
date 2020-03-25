@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
 )
@@ -11,6 +12,17 @@ import (
 type InnerJoin struct {
 	source Node
 	joined Node
+}
+
+func (innerJoin *InnerJoin) Visualize() *graph.Node {
+	n := graph.NewNode("Inner Join")
+	if innerJoin.source != nil {
+		n.AddChild("source", innerJoin.source.Visualize())
+	}
+	if innerJoin.joined != nil {
+		n.AddChild("joined", innerJoin.joined.Visualize())
+	}
+	return n
 }
 
 func NewInnerJoin(source Node, joined Node) *InnerJoin {

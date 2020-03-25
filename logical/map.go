@@ -2,8 +2,11 @@ package logical
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
 )
@@ -12,6 +15,21 @@ type Map struct {
 	expressions []NamedExpression
 	source      Node
 	keep        bool
+}
+
+func (mapNode *Map) Visualize() *graph.Node {
+	n := graph.NewNode("Map")
+	n.AddField("keep", fmt.Sprint(mapNode.keep))
+
+	if mapNode.source != nil {
+		n.AddChild("source", mapNode.source.Visualize())
+	}
+	if len(mapNode.expressions) != 0 {
+		for idx, expr := range mapNode.expressions {
+			n.AddChild("expr_"+strconv.Itoa(idx), expr.Visualize())
+		}
+	}
+	return n
 }
 
 func NewMap(expressions []NamedExpression, child Node, keep bool) *Map {

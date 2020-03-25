@@ -4,12 +4,21 @@ import (
 	"context"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
 )
 
 type Distinct struct {
 	child Node
+}
+
+func (node *Distinct) Visualize() *graph.Node {
+	n := graph.NewNode("Distinct")
+	if node.child != nil {
+		n.AddChild("source", node.child.Visualize())
+	}
+	return n
 }
 
 func NewDistinct(child Node) *Distinct {

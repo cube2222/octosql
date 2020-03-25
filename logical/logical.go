@@ -3,8 +3,10 @@ package logical
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
 )
@@ -28,12 +30,21 @@ func (creator *PhysicalPlanCreator) GetVariableName() (out octosql.VariableName)
 }
 
 type Node interface {
+	graph.Visualizer
+
 	Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error)
 }
 
 type DataSource struct {
 	name  string
 	alias string
+}
+
+func (dataSource *DataSource) Visualize() *graph.Node {
+	n := graph.NewNode("DataSource")
+	n.AddField("name", dataSource.name)
+	n.AddField("alias", dataSource.alias)
+	return n
 }
 
 func NewDataSource(name string, alias string) *DataSource {
@@ -49,6 +60,8 @@ func (ds *DataSource) Physical(ctx context.Context, physicalCreator *PhysicalPla
 }
 
 type Expression interface {
+	graph.Visualizer
+
 	Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error)
 }
 
@@ -60,6 +73,12 @@ type NamedExpression interface {
 
 type Variable struct {
 	name octosql.VariableName
+}
+
+func (variable *Variable) Visualize() *graph.Node {
+	n := graph.NewNode("Variable")
+	n.AddField("name", string(variable.name))
+	return n
 }
 
 func NewVariable(name octosql.VariableName) *Variable {
@@ -82,6 +101,12 @@ type Constant struct {
 	value interface{}
 }
 
+func (constant *Constant) Visualize() *graph.Node {
+	n := graph.NewNode("Constant")
+	n.AddField("value", fmt.Sprintf("%T %v", constant.value, constant.value))
+	return n
+}
+
 func NewConstant(value interface{}) *Constant {
 	return &Constant{value: value}
 }
@@ -95,6 +120,16 @@ func (v *Constant) Physical(ctx context.Context, physicalCreator *PhysicalPlanCr
 
 type Tuple struct {
 	expressions []Expression
+}
+
+func (tuple *Tuple) Visualize() *graph.Node {
+	n := graph.NewNode("Tuple")
+	if len(tuple.expressions) != 0 {
+		for idx, expr := range tuple.expressions {
+			n.AddChild("expr_"+strconv.Itoa(idx), expr.Visualize())
+		}
+	}
+	return n
 }
 
 func NewTuple(expressions []Expression) *Tuple {
@@ -129,6 +164,14 @@ type NodeExpression struct {
 	node Node
 }
 
+func (nodeExpression *NodeExpression) Visualize() *graph.Node {
+	n := graph.NewNode("Node Expression")
+	if nodeExpression.node != nil {
+		n.AddChild("source", nodeExpression.node.Visualize())
+	}
+	return n
+}
+
 func NewNodeExpression(node Node) *NodeExpression {
 	return &NodeExpression{node: node}
 }
@@ -143,6 +186,14 @@ func (ne *NodeExpression) Physical(ctx context.Context, physicalCreator *Physica
 
 type LogicExpression struct {
 	formula Formula
+}
+
+func (logicExpression *LogicExpression) Visualize() *graph.Node {
+	n := graph.NewNode("Logic Expression")
+	if logicExpression.formula != nil {
+		n.AddChild("source", logicExpression.formula.Visualize())
+	}
+	return n
 }
 
 func NewLogicExpression(formula Formula) *LogicExpression {
@@ -160,6 +211,15 @@ func (le *LogicExpression) Physical(ctx context.Context, physicalCreator *Physic
 type AliasedExpression struct {
 	name octosql.VariableName
 	expr Expression
+}
+
+func (aliasedExpression *AliasedExpression) Visualize() *graph.Node {
+	n := graph.NewNode("Aliased Expression")
+	n.AddField("alias", string(aliasedExpression.name))
+	if aliasedExpression.expr != nil {
+		n.AddChild("expr", aliasedExpression.expr.Visualize())
+	}
+	return n
 }
 
 func NewAliasedExpression(name octosql.VariableName, expr Expression) NamedExpression {

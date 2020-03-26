@@ -323,13 +323,13 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 		}
 
 		if newCursor == 0 { // Whole database scanned
-			return execution.ErrEndOfStream
+			rs.isDone = true
 		}
 	} else {
 		rs.keys = rs.keys[len(batch):]
 
 		if len(rs.keys) == 0 { // All keys handled
-			return execution.ErrEndOfStream
+			rs.isDone = true
 		}
 	}
 

@@ -45,6 +45,117 @@ func TestDataSource_Get(t *testing.T) {
 		wantErr bool
 	}{
 		{
+			name: "bigger test - no filter",
+			fields: fields{
+				hostname: hostname,
+				password: password,
+				port:     port,
+				dbIndex:  dbIndex,
+				dbKey:    dbKey,
+				filter:   physical.NewConstant(true),
+				alias:    "r",
+				queries: map[string]map[string]interface{}{
+					"key1":  {"value": "dummy"},
+					"key2":  {"value": "dummy"},
+					"key3":  {"value": "dummy"},
+					"key4":  {"value": "dummy"},
+					"key5":  {"value": "dummy"},
+					"key6":  {"value": "dummy"},
+					"key7":  {"value": "dummy"},
+					"key8":  {"value": "dummy"},
+					"key9":  {"value": "dummy"},
+					"key10": {"value": "dummy"},
+					"key11": {"value": "dummy"},
+					"key12": {"value": "dummy"},
+					"key13": {"value": "dummy"},
+					"key14": {"value": "dummy"},
+					"key15": {"value": "dummy"},
+				},
+			},
+			args: args{
+				variables: map[octosql.VariableName]octosql.Value{
+					"const_1":  octosql.MakeString("key1"),
+					"const_2":  octosql.MakeString("key2"),
+					"const_3":  octosql.MakeString("key3"),
+					"const_4":  octosql.MakeString("key4"),
+					"const_5":  octosql.MakeString("key5"),
+					"const_6":  octosql.MakeString("key6"),
+					"const_7":  octosql.MakeString("key7"),
+					"const_8":  octosql.MakeString("key8"),
+					"const_9":  octosql.MakeString("key9"),
+					"const_10": octosql.MakeString("key10"),
+					"const_11": octosql.MakeString("key11"),
+					"const_12": octosql.MakeString("key12"),
+					"const_13": octosql.MakeString("key13"),
+					"const_14": octosql.MakeString("key14"),
+					"const_15": octosql.MakeString("key15"),
+				},
+			},
+			want: []*execution.Record{
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"r.key", "r.value"},
+					[]interface{}{"key1", "dummy"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0))),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"r.key", "r.value"},
+					[]interface{}{"key2", "dummy"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1))),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"r.key", "r.value"},
+					[]interface{}{"key3", "dummy"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2))),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"r.key", "r.value"},
+					[]interface{}{"key4", "dummy"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 3))),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"r.key", "r.value"},
+					[]interface{}{"key5", "dummy"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 4))),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"r.key", "r.value"},
+					[]interface{}{"key6", "dummy"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 5))),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"r.key", "r.value"},
+					[]interface{}{"key7", "dummy"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 6))),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"r.key", "r.value"},
+					[]interface{}{"key8", "dummy"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 7))),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"r.key", "r.value"},
+					[]interface{}{"key9", "dummy"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 8))),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"r.key", "r.value"},
+					[]interface{}{"key10", "dummy"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 9))),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"r.key", "r.value"},
+					[]interface{}{"key11", "dummy"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 10))),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"r.key", "r.value"},
+					[]interface{}{"key12", "dummy"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 11))),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"r.key", "r.value"},
+					[]interface{}{"key13", "dummy"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 12))),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"r.key", "r.value"},
+					[]interface{}{"key14", "dummy"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 13))),
+				execution.NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{"r.key", "r.value"},
+					[]interface{}{"key15", "dummy"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 14))),
+			},
+			wantErr: false,
+		},
+		{
 			name: "simple test",
 			fields: fields{
 				hostname: hostname,
@@ -529,7 +640,7 @@ func TestDataSource_Get(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 		},
-		{
+		/*{
 			name: "wrong password",
 			fields: fields{
 				hostname: hostname,
@@ -638,7 +749,7 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want:    []*execution.Record{},
 			wantErr: true,
-		},
+		},*/
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -691,6 +802,7 @@ func TestDataSource_Get(t *testing.T) {
 								"address":       fmt.Sprintf("%v:%v", tt.fields.hostname, tt.fields.port),
 								"password":      tt.fields.password,
 								"databaseIndex": tt.fields.dbIndex,
+								"batchSize":     2,
 							},
 						},
 					},

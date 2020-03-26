@@ -94,51 +94,51 @@ func TestDataSource_Get(t *testing.T) {
 			want: []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.value"},
-					[]interface{}{"key1", "dummy"},
+					[]interface{}{"key10", "dummy"},
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0))),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.value"},
-					[]interface{}{"key2", "dummy"},
+					[]interface{}{"key11", "dummy"},
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1))),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.value"},
-					[]interface{}{"key3", "dummy"},
+					[]interface{}{"key1", "dummy"},
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2))),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.value"},
-					[]interface{}{"key4", "dummy"},
+					[]interface{}{"key8", "dummy"},
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 3))),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.value"},
-					[]interface{}{"key5", "dummy"},
+					[]interface{}{"key12", "dummy"},
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 4))),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.value"},
-					[]interface{}{"key6", "dummy"},
+					[]interface{}{"key4", "dummy"},
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 5))),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.value"},
-					[]interface{}{"key7", "dummy"},
+					[]interface{}{"key5", "dummy"},
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 6))),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.value"},
-					[]interface{}{"key8", "dummy"},
+					[]interface{}{"key15", "dummy"},
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 7))),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.value"},
-					[]interface{}{"key9", "dummy"},
+					[]interface{}{"key14", "dummy"},
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 8))),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.value"},
-					[]interface{}{"key10", "dummy"},
+					[]interface{}{"key2", "dummy"},
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 9))),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.value"},
-					[]interface{}{"key11", "dummy"},
+					[]interface{}{"key6", "dummy"},
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 10))),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.value"},
-					[]interface{}{"key12", "dummy"},
+					[]interface{}{"key3", "dummy"},
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 11))),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.value"},
@@ -146,11 +146,11 @@ func TestDataSource_Get(t *testing.T) {
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 12))),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.value"},
-					[]interface{}{"key14", "dummy"},
+					[]interface{}{"key7", "dummy"},
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 13))),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.value"},
-					[]interface{}{"key15", "dummy"},
+					[]interface{}{"key9", "dummy"},
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 14))),
 			},
 			wantErr: false,
@@ -368,19 +368,19 @@ func TestDataSource_Get(t *testing.T) {
 			want: []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					[]interface{}{"key0", "3", "warsaw", "wojtek", "k"},
+					[]interface{}{"key1", "4", "zacisze", "janek", "ch"},
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0))),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					[]interface{}{"key1", "4", "zacisze", "janek", "ch"},
+					[]interface{}{"key0", "3", "warsaw", "wojtek", "k"},
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1))),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					[]interface{}{"key2", "2", "warsaw", "kuba", "m"},
+					[]interface{}{"key3", "1", "ciechanow", "adam", "cz"},
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2))),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					[]interface{}{"key3", "1", "ciechanow", "adam", "cz"},
+					[]interface{}{"key2", "2", "warsaw", "kuba", "m"},
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 3))),
 			},
 			wantErr: false,

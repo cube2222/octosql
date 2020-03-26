@@ -15,13 +15,8 @@ import (
 )
 
 func TestDataSource_Get(t *testing.T) {
-	stateStorage := execution.GetTestStorage(t)
-	defer func() {
-		go stateStorage.Close()
-	}()
-	tx := stateStorage.BeginTransaction()
-	defer tx.Abort()
-	ctx := storage.InjectStateTransaction(context.Background(), tx)
+	ctx := context.Background()
+	streamId := execution.GetRawStreamID()
 
 	hostname := "localhost"
 	password := ""
@@ -46,7 +41,7 @@ func TestDataSource_Get(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    execution.RecordStream
+		want    []*execution.Record
 		wantErr bool
 	}{
 		{
@@ -76,18 +71,12 @@ func TestDataSource_Get(t *testing.T) {
 					"const_0": octosql.MakeString("key0"),
 				},
 			},
-			want: execution.NewInMemoryStream(ctx, []*execution.Record{
-				execution.NewRecord(
+			want: []*execution.Record{
+				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key0"),
-						"r.age":     octosql.MakeString("3"),
-						"r.city":    octosql.MakeString("warsaw"),
-						"r.name":    octosql.MakeString("wojtek"),
-						"r.surname": octosql.MakeString("k"),
-					},
-				),
-			}),
+					[]interface{}{"key0", "3", "warsaw", "wojtek", "k"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0))),
+			},
 			wantErr: false,
 		},
 		{
@@ -117,18 +106,12 @@ func TestDataSource_Get(t *testing.T) {
 					"const_0": octosql.MakeString("key0"),
 				},
 			},
-			want: execution.NewInMemoryStream(ctx, []*execution.Record{
-				execution.NewRecord(
+			want: []*execution.Record{
+				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.some_other_key_name", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]octosql.Value{
-						"r.some_other_key_name": octosql.MakeString("key0"),
-						"r.age":                 octosql.MakeString("3"),
-						"r.city":                octosql.MakeString("warsaw"),
-						"r.name":                octosql.MakeString("wojtek"),
-						"r.surname":             octosql.MakeString("k"),
-					},
-				),
-			}),
+					[]interface{}{"key0", "3", "warsaw", "wojtek", "k"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0))),
+			},
 			wantErr: false,
 		},
 		{
@@ -177,28 +160,16 @@ func TestDataSource_Get(t *testing.T) {
 					"const_1": octosql.MakeString("key1"),
 				},
 			},
-			want: execution.NewInMemoryStream(ctx, []*execution.Record{
-				execution.NewRecord(
+			want: []*execution.Record{
+				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key0"),
-						"r.age":     octosql.MakeString("3"),
-						"r.city":    octosql.MakeString("warsaw"),
-						"r.name":    octosql.MakeString("wojtek"),
-						"r.surname": octosql.MakeString("k"),
-					},
-				),
-				execution.NewRecord(
+					[]interface{}{"key0", "3", "warsaw", "wojtek", "k"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0))),
+				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key1"),
-						"r.age":     octosql.MakeString("4"),
-						"r.city":    octosql.MakeString("zacisze"),
-						"r.name":    octosql.MakeString("janek"),
-						"r.surname": octosql.MakeString("ch"),
-					},
-				),
-			}),
+					[]interface{}{"key1", "4", "zacisze", "janek", "ch"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1))),
+			},
 			wantErr: false,
 		},
 		{
@@ -235,18 +206,12 @@ func TestDataSource_Get(t *testing.T) {
 					"const_1": octosql.MakeString("key1"),
 				},
 			},
-			want: execution.NewInMemoryStream(ctx, []*execution.Record{
-				execution.NewRecord(
+			want: []*execution.Record{
+				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key0"),
-						"r.age":     octosql.MakeString("3"),
-						"r.city":    octosql.MakeString("warsaw"),
-						"r.name":    octosql.MakeString("wojtek"),
-						"r.surname": octosql.MakeString("k"),
-					},
-				),
-			}),
+					[]interface{}{"key0", "3", "warsaw", "wojtek", "k"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0))),
+			},
 			wantErr: false,
 		},
 		{
@@ -289,48 +254,24 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{},
 			},
-			want: execution.NewInMemoryStream(ctx, []*execution.Record{
-				execution.NewRecord(
+			want: []*execution.Record{
+				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key0"),
-						"r.age":     octosql.MakeString("3"),
-						"r.city":    octosql.MakeString("warsaw"),
-						"r.name":    octosql.MakeString("wojtek"),
-						"r.surname": octosql.MakeString("k"),
-					},
-				),
-				execution.NewRecord(
+					[]interface{}{"key0", "3", "warsaw", "wojtek", "k"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0))),
+				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key1"),
-						"r.age":     octosql.MakeString("4"),
-						"r.city":    octosql.MakeString("zacisze"),
-						"r.name":    octosql.MakeString("janek"),
-						"r.surname": octosql.MakeString("ch"),
-					},
-				),
-				execution.NewRecord(
+					[]interface{}{"key1", "4", "zacisze", "janek", "ch"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1))),
+				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key2"),
-						"r.age":     octosql.MakeString("2"),
-						"r.city":    octosql.MakeString("warsaw"),
-						"r.name":    octosql.MakeString("kuba"),
-						"r.surname": octosql.MakeString("m"),
-					},
-				),
-				execution.NewRecord(
+					[]interface{}{"key2", "2", "warsaw", "kuba", "m"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2))),
+				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key3"),
-						"r.age":     octosql.MakeString("1"),
-						"r.city":    octosql.MakeString("ciechanow"),
-						"r.name":    octosql.MakeString("adam"),
-						"r.surname": octosql.MakeString("cz"),
-					},
-				),
-			}),
+					[]interface{}{"key3", "1", "ciechanow", "adam", "cz"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 3))),
+			},
 			wantErr: false,
 		},
 		{
@@ -406,28 +347,16 @@ func TestDataSource_Get(t *testing.T) {
 					"const_3": octosql.MakeString("key3"),
 				},
 			},
-			want: execution.NewInMemoryStream(ctx, []*execution.Record{
-				execution.NewRecord(
+			want: []*execution.Record{
+				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key0"),
-						"r.age":     octosql.MakeString("3"),
-						"r.city":    octosql.MakeString("warsaw"),
-						"r.name":    octosql.MakeString("wojtek"),
-						"r.surname": octosql.MakeString("k"),
-					},
-				),
-				execution.NewRecord(
+					[]interface{}{"key0", "3", "warsaw", "wojtek", "k"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0))),
+				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key1"),
-						"r.age":     octosql.MakeString("4"),
-						"r.city":    octosql.MakeString("zacisze"),
-						"r.name":    octosql.MakeString("janek"),
-						"r.surname": octosql.MakeString("ch"),
-					},
-				),
-			}),
+					[]interface{}{"key1", "4", "zacisze", "janek", "ch"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1))),
+			},
 			wantErr: false,
 		},
 		{
@@ -496,18 +425,12 @@ func TestDataSource_Get(t *testing.T) {
 					"const_2": octosql.MakeString("key2"),
 				},
 			},
-			want: execution.NewInMemoryStream(ctx, []*execution.Record{
-				execution.NewRecord(
+			want: []*execution.Record{
+				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key1"),
-						"r.age":     octosql.MakeString("4"),
-						"r.city":    octosql.MakeString("zacisze"),
-						"r.name":    octosql.MakeString("janek"),
-						"r.surname": octosql.MakeString("ch"),
-					},
-				),
-			}),
+					[]interface{}{"key1", "4", "zacisze", "janek", "ch"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0))),
+			},
 			wantErr: false,
 		},
 		{
@@ -562,38 +485,20 @@ func TestDataSource_Get(t *testing.T) {
 					"const_2": octosql.MakeString("key2"),
 				},
 			},
-			want: execution.NewInMemoryStream(ctx, []*execution.Record{
-				execution.NewRecord(
+			want: []*execution.Record{
+				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key0"),
-						"r.age":     octosql.MakeString("3"),
-						"r.city":    octosql.MakeString("warsaw"),
-						"r.name":    octosql.MakeString("wojtek"),
-						"r.surname": octosql.MakeString("k"),
-					},
-				),
-				execution.NewRecord(
+					[]interface{}{"key0", "3", "warsaw", "wojtek", "k"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0))),
+				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key1"),
-						"r.age":     octosql.MakeString("4"),
-						"r.city":    octosql.MakeString("zacisze"),
-						"r.name":    octosql.MakeString("janek"),
-						"r.surname": octosql.MakeString("ch"),
-					},
-				),
-				execution.NewRecord(
+					[]interface{}{"key1", "4", "zacisze", "janek", "ch"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1))),
+				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					map[octosql.VariableName]octosql.Value{
-						"r.key":     octosql.MakeString("key2"),
-						"r.age":     octosql.MakeString("2"),
-						"r.city":    octosql.MakeString("warsaw"),
-						"r.name":    octosql.MakeString("kuba"),
-						"r.surname": octosql.MakeString("m"),
-					},
-				),
-			}),
+					[]interface{}{"key2", "2", "warsaw", "kuba", "m"},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2))),
+			},
 			wantErr: false,
 		},
 		{
@@ -621,7 +526,7 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{},
 			},
-			want:    execution.NewInMemoryStream(ctx, nil),
+			want:    nil,
 			wantErr: true,
 		},
 		{
@@ -644,7 +549,7 @@ func TestDataSource_Get(t *testing.T) {
 					"const_0": octosql.MakeString("key0"),
 				},
 			},
-			want:    execution.NewInMemoryStream(ctx, nil),
+			want:    []*execution.Record{},
 			wantErr: true,
 		},
 		{
@@ -667,7 +572,7 @@ func TestDataSource_Get(t *testing.T) {
 					"const_0": octosql.MakeString("key0"),
 				},
 			},
-			want:    execution.NewInMemoryStream(ctx, nil),
+			want:    []*execution.Record{},
 			wantErr: true,
 		},
 		{
@@ -690,7 +595,7 @@ func TestDataSource_Get(t *testing.T) {
 					"const_0": octosql.MakeString("key0"),
 				},
 			},
-			want:    execution.NewInMemoryStream(ctx, nil),
+			want:    []*execution.Record{},
 			wantErr: true,
 		},
 		{
@@ -713,7 +618,7 @@ func TestDataSource_Get(t *testing.T) {
 					"const_0": octosql.MakeString("key0"),
 				},
 			},
-			want:    execution.NewInMemoryStream(ctx, nil),
+			want:    []*execution.Record{},
 			wantErr: true,
 		},
 		{
@@ -731,19 +636,19 @@ func TestDataSource_Get(t *testing.T) {
 			args: args{
 				variables: map[octosql.VariableName]octosql.Value{},
 			},
-			want:    execution.NewInMemoryStream(ctx, nil),
+			want:    []*execution.Record{},
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fields := tt.fields
+			stateStorage := execution.GetTestStorage(t)
 
 			client := redis.NewClient(
 				&redis.Options{
-					Addr:     fmt.Sprintf("%s:%d", fields.hostname, fields.port),
-					Password: fields.password,
-					DB:       fields.dbIndex,
+					Addr:     fmt.Sprintf("%s:%d", tt.fields.hostname, tt.fields.port),
+					Password: tt.fields.password,
+					DB:       tt.fields.dbIndex,
 				},
 			)
 
@@ -756,7 +661,7 @@ func TestDataSource_Get(t *testing.T) {
 			}
 
 			defer func() {
-				for k := range fields.queries {
+				for k := range tt.fields.queries {
 					_, err := client.Del(k).Result()
 					if err != nil {
 						t.Errorf("Couldn't delete key %s from database", k)
@@ -765,7 +670,7 @@ func TestDataSource_Get(t *testing.T) {
 				}
 			}()
 
-			for k, v := range fields.queries {
+			for k, v := range tt.fields.queries {
 				_, err := client.HMSet(k, v).Result()
 				if err != nil {
 					t.Errorf("couldn't set hash values in database")
@@ -773,23 +678,24 @@ func TestDataSource_Get(t *testing.T) {
 				}
 			}
 
-			dsFactory := NewDataSourceBuilderFactory(fields.dbKey)
-			dsBuilder := dsFactory("test", fields.alias)[0].(*physical.DataSourceBuilder)
-			dsBuilder.Filter = physical.NewAnd(dsBuilder.Filter, fields.filter)
+			dsFactory := NewDataSourceBuilderFactory(tt.fields.dbKey)
+			dsBuilder := dsFactory("test", tt.fields.alias)[0].(*physical.DataSourceBuilder)
+			dsBuilder.Filter = physical.NewAnd(dsBuilder.Filter, tt.fields.filter)
 
-			execNode, err := dsBuilder.Materialize(context.Background(), &physical.MaterializationContext{
+			ds, err := dsBuilder.Materialize(context.Background(), &physical.MaterializationContext{
 				Config: &config.Config{
 					DataSources: []config.DataSourceConfig{
 						{
 							Name: "test",
 							Config: map[string]interface{}{
-								"address":       fmt.Sprintf("%v:%v", fields.hostname, fields.port),
-								"password":      fields.password,
-								"databaseIndex": fields.dbIndex,
+								"address":       fmt.Sprintf("%v:%v", tt.fields.hostname, tt.fields.port),
+								"password":      tt.fields.password,
+								"databaseIndex": tt.fields.dbIndex,
 							},
 						},
 					},
 				},
+				Storage: stateStorage,
 			})
 			if err != nil && !tt.wantErr {
 				t.Errorf("%v : while executing datasource builder", err)
@@ -798,17 +704,24 @@ func TestDataSource_Get(t *testing.T) {
 				return
 			}
 
-			stream, _, err := execNode.Get(ctx, tt.args.variables, execution.GetRawStreamID())
+			tx := stateStorage.BeginTransaction()
+			defer tx.Abort()
+
+			got, _, err := ds.Get(storage.InjectStateTransaction(ctx, tx), tt.args.variables, streamId)
 			if err != nil && !tt.wantErr {
-				t.Errorf("Error in Get: %v", err)
+				t.Errorf("DataSource.Get() error: %v", err)
 				return
 			} else if err != nil {
 				return
 			}
 
-			err = execution.AreStreamsEqualNoOrdering(ctx, execution.GetTestStorage(t), stream, tt.want)
-			if err != nil {
-				t.Errorf("AreStreamsEqual() error: %s", err)
+			want, _, err := execution.NewDummyNode(tt.want).Get(storage.InjectStateTransaction(ctx, tx), octosql.NoVariables(), streamId)
+			if err := tx.Commit(); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := execution.AreStreamsEqualNoOrdering(storage.InjectStateTransaction(ctx, tx), stateStorage, want, got); err != nil {
+				t.Errorf("Streams aren't equal: %v", err)
 				return
 			}
 		})

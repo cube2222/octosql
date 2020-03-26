@@ -107,13 +107,8 @@ func (ds *DistinctStream) AddRecord(ctx context.Context, tx storage.StateTransac
 			return errors.Wrap(err, "couldn't save record count")
 		}
 
-		// If it's the first record with given key, we store its ID and the record itself
+		// If it's the first record with given key, we store the record
 		if newRecordCount == 1 {
-			err = keyIDState.Set(&recordID)
-			if err != nil {
-				return errors.Wrap(err, "couldn't save records ID")
-			}
-
 			err = keyRecordState.Set(record)
 			if err != nil {
 				return errors.Wrap(err, "couldn't save record")
@@ -125,7 +120,17 @@ func (ds *DistinctStream) AddRecord(ctx context.Context, tx storage.StateTransac
 			return errors.Wrap(err, "couldn't clear record count")
 		}
 
-		// We don't clear the keyIDState since we might need it in Trigger()
+	}
+
+	// Now if the count is zero it means we just got a retraction that dropped us to zero, so
+	// we store this ID as the one who will retract the whole key later in Trigger(). If it's
+	// one, then we just got our first record with this specific key, so its ID will be used to
+	// send the record through in Trigger()
+	if newRecordCount == 0 || newRecordCount == 1 {
+		err := keyIDState.Set(&recordID)
+		if err != nil {
+			return errors.Wrap(err, "couldn't save records ID")
+		}
 	}
 
 	return nil
@@ -190,7 +195,6 @@ func (ds *DistinctStream) Trigger(ctx context.Context, tx storage.StateTransacti
 		}
 
 		return []*Record{NewRecordFromRecord(&record, WithNoUndo(), WithID(NewID(recordID.AsString())))}, nil
-
 	} else if wasRecordTriggered && !isRecordPresent {
 		// The record was triggered, but it isn't present
 

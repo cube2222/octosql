@@ -98,8 +98,6 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 }
 
 func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
-	tx := storage.GetStateTransactionFromContext(ctx).WithPrefix(streamID.AsPrefix())
-
 	keysWanted, err := ds.keyFormula.getAllKeys(ctx, variables)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get all keys from filter")
@@ -112,12 +110,6 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		alias:        ds.alias,
 		keyName:      ds.dbKey,
 		batchSize:    ds.batchSize,
-	}
-	if err = rs.loadOffset(tx); err != nil {
-		return nil, nil, errors.Wrapf(err, "couldn't load redis offset")
-	}
-	if err = rs.loadCursor(tx); err != nil {
-		return nil, nil, errors.Wrapf(err, "couldn't load redis cursor")
 	}
 
 	if len(keysWanted.keys) == 0 { // EntireDatabaseStream
@@ -154,9 +146,8 @@ type RecordStream struct {
 	// Field used by EntireDatabaseStream
 	cursor uint64 // cursor is the parameter for scan which indicates a place where next scan should continue
 
-	// Fields used by KeySpecificStream
-	keys    []string
-	counter int
+	// Field used by KeySpecificStream
+	keys []string
 }
 
 func (rs *RecordStream) Close() error {
@@ -169,75 +160,177 @@ func (rs *RecordStream) Close() error {
 }
 
 func (rs *RecordStream) RunWorker(ctx context.Context) {
-	panic("implement me")
+	for { // outer for is loading offset value and moving file iterator
+		tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
+
+		if err := rs.loadOffset(tx); err != nil {
+			log.Fatalf("redis worker: couldn't reinitialize offset for redis read batch worker: %s", err)
+			return
+		}
+
+		// Moving file iterator by `rs.offset`
+		if rs.isEntireDatabaseStream {
+			// Here we do full database scan so all we need to do is load last returned cursor value
+			if err := rs.loadCursor(tx); err != nil {
+				log.Fatalf("redis worker: couldn't load redis cursor: %s", err)
+				return
+			}
+		} else {
+			// Here we just drop first `rs.offset` from keys slice
+			rs.keys = rs.keys[rs.offset:]
+		}
+
+		tx.Abort() // We only read data above, no need to risk failing now.
+
+		for { // inner for is calling RunWorkerInternal
+			tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
+
+			err := rs.RunWorkerInternal(ctx, tx)
+			if errors.Cause(err) == execution.ErrNewTransactionRequired {
+				tx.Abort()
+				continue
+			} else if waitableError := execution.GetErrWaitForChanges(err); waitableError != nil {
+				tx.Abort()
+				err = waitableError.ListenForChanges(ctx)
+				if err != nil {
+					log.Println("redis worker: couldn't listen for changes: ", err)
+				}
+				err = waitableError.Close()
+				if err != nil {
+					log.Println("redis worker: couldn't close storage changes subscription: ", err)
+				}
+				continue
+			} else if err == execution.ErrEndOfStream {
+				err = tx.Commit()
+				if err != nil {
+					log.Println("redis worker: couldn't commit transaction: ", err)
+					continue
+				}
+				return
+			} else if err != nil {
+				tx.Abort()
+				log.Printf("redis worker: error running redis read batch worker: %s, reinitializing from storage", err)
+				break
+			}
+
+			err = tx.Commit()
+			if err != nil {
+				log.Println("redis worker: couldn't commit transaction: ", err)
+				continue
+			}
+		}
+	}
 }
+
+var outputQueuePrefix = []byte("$output_queue$")
 
 func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateTransaction) error {
-	panic("implement me")
-}
+	outputQueue := execution.NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
 
-func getNewRecord(client *redis.Client, keyName, key, alias string) (*execution.Record, error) {
-	recordValues, err := client.HGetAll(key).Result()
-	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("could't get hash for key %s", key))
+	if rs.isDone {
+		err := outputQueue.Push(ctx, &QueueElement{
+			Type: &QueueElement_Error{
+				Error: execution.ErrEndOfStream.Error(),
+			},
+		})
+		if err != nil {
+			return errors.Wrapf(err, "couldn't push csv EndOfStream to output record queue")
+		}
+
+		log.Println("csv worker: ErrEndOfStream pushed")
+		return execution.ErrEndOfStream
 	}
 
-	// We skip this record
-	if len(recordValues) == 0 {
-		return nil, ErrNotFound
+	var allKeysForThisBatch []string
+	var newCursor uint64
+	var err error
+
+	if rs.isEntireDatabaseStream {
+		// Performing scan from cursor -> extracting `rs.batchSize` new elements
+		allKeysForThisBatch, newCursor, err = rs.client.Scan(rs.cursor, "*", int64(rs.batchSize)).Result()
+		if err != nil {
+			return errors.Wrapf(err, "couldn't scan new batch for redis worker")
+		}
+	} else {
+		// Taking first `rs.batchSize` elements from all keys needed
+		if len(rs.keys) < rs.batchSize {
+			allKeysForThisBatch = rs.keys
+		} else {
+			allKeysForThisBatch = rs.keys[:rs.batchSize]
+		}
 	}
 
-	keyVariableName := octosql.NewVariableName(fmt.Sprintf("%s.%s", alias, keyName))
+	batch := make([]*execution.Record, 0)
+	for i := 0; i < len(allKeysForThisBatch); i++ {
+		key := allKeysForThisBatch[i]
+		recordValues, err := rs.client.HGetAll(key).Result()
+		if err != nil {
+			return errors.Wrapf(err, "could't get hash for key %s", key)
+		}
 
-	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
-	for k, v := range recordValues {
-		fieldName := octosql.NewVariableName(fmt.Sprintf("%s.%s", alias, k))
-		aliasedRecord[fieldName] = octosql.NormalizeType(v)
+		// We skip this record
+		if len(recordValues) == 0 {
+			return ErrNotFound
+		}
+
+		keyVariableName := octosql.NewVariableName(fmt.Sprintf("%s.%s", rs.alias, rs.keyName))
+
+		aliasedRecord := make(map[octosql.VariableName]octosql.Value)
+		for k, v := range recordValues {
+			fieldName := octosql.NewVariableName(fmt.Sprintf("%s.%s", rs.alias, k))
+			aliasedRecord[fieldName] = octosql.NormalizeType(v)
+		}
+
+		fieldNames := make([]octosql.VariableName, 0)
+		fieldNames = append(fieldNames, keyVariableName)
+		for k := range aliasedRecord {
+			fieldNames = append(fieldNames, k)
+		}
+
+		aliasedRecord[keyVariableName] = octosql.NormalizeType(key)
+
+		// The key is always the first record field
+		sort.Slice(fieldNames[1:], func(i, j int) bool {
+			return fieldNames[i+1] < fieldNames[j+1]
+		})
+
+		batch = append(batch, execution.NewRecord(
+			fieldNames,
+			aliasedRecord,
+			execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(rs.streamID, rs.offset+i))))
 	}
 
-	fieldNames := make([]octosql.VariableName, 0)
-	fieldNames = append(fieldNames, keyVariableName)
-	for k := range aliasedRecord {
-		fieldNames = append(fieldNames, k)
+	for i := range batch {
+		err := outputQueue.Push(ctx, &QueueElement{
+			Type: &QueueElement_Record{
+				Record: batch[i],
+			},
+		})
+		if err != nil {
+			return errors.Wrapf(err, "couldn't push redis record with index %d in batch to output record queue", i)
+		}
+
+		log.Println("redis worker: record pushed: ", batch[i])
 	}
 
-	aliasedRecord[keyVariableName] = octosql.NormalizeType(key)
-
-	// The key is always the first record field
-	sort.Slice(fieldNames[1:], func(i, j int) bool {
-		return fieldNames[i+1] < fieldNames[j+1]
-	})
-
-	return execution.NewRecord(fieldNames, aliasedRecord), nil
-}
-
-var cursorPrefix = []byte("redis_cursor")
-
-func (rs *RecordStream) loadCursor(tx storage.StateTransaction) error {
-	cursorState := storage.NewValueState(tx.WithPrefix(cursorPrefix))
-
-	var cursor octosql.Value
-	err := cursorState.Get(&cursor)
-	if err == storage.ErrNotFound {
-		cursor = octosql.MakeInt(0)
-	} else if err != nil {
-		return errors.Wrap(err, "couldn't load redis cursor from state storage")
+	if err := rs.saveOffset(tx, len(batch)); err != nil {
+		return errors.Wrap(err, "couldn't save redis offset")
 	}
 
-	rs.cursor = uint64(cursor.AsInt())
+	if rs.isEntireDatabaseStream {
+		if err := rs.saveCursor(tx, newCursor); err != nil {
+			return errors.Wrap(err, "couldn't save redis cursor")
+		}
 
-	return nil
-}
+		if newCursor == 0 { // Whole database scanned
+			return execution.ErrEndOfStream
+		}
+	} else {
+		rs.keys = rs.keys[len(batch):]
 
-func (rs *RecordStream) saveCursor(tx storage.StateTransaction, cursor uint64) error {
-	cursorState := storage.NewValueState(tx.WithPrefix(offsetPrefix))
-
-	rs.cursor = cursor
-
-	cursorValue := octosql.MakeInt(int(cursor))
-	err := cursorState.Set(&cursorValue)
-	if err != nil {
-		return errors.Wrap(err, "couldn't save redis cursor to state storage")
+		if len(rs.keys) == 0 { // All keys handled
+			return execution.ErrEndOfStream
+		}
 	}
 
 	return nil
@@ -275,7 +368,37 @@ func (rs *RecordStream) saveOffset(tx storage.StateTransaction, curBatchSize int
 	return nil
 }
 
-var outputQueuePrefix = []byte("$output_queue$")
+var cursorPrefix = []byte("redis_cursor")
+
+func (rs *RecordStream) loadCursor(tx storage.StateTransaction) error {
+	cursorState := storage.NewValueState(tx.WithPrefix(cursorPrefix))
+
+	var cursor octosql.Value
+	err := cursorState.Get(&cursor)
+	if err == storage.ErrNotFound {
+		cursor = octosql.MakeInt(0)
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't load redis cursor from state storage")
+	}
+
+	rs.cursor = uint64(cursor.AsInt())
+
+	return nil
+}
+
+func (rs *RecordStream) saveCursor(tx storage.StateTransaction, cursor uint64) error {
+	cursorState := storage.NewValueState(tx.WithPrefix(cursorPrefix))
+
+	rs.cursor = cursor
+
+	cursorValue := octosql.MakeInt(int(cursor))
+	err := cursorState.Set(&cursorValue)
+	if err != nil {
+		return errors.Wrap(err, "couldn't save redis cursor to state storage")
+	}
+
+	return nil
+}
 
 func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 	tx := storage.GetStateTransactionFromContext(ctx).WithPrefix(rs.streamID.AsPrefix())

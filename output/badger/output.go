@@ -17,6 +17,7 @@ type Output struct {
 }
 
 var recordsPrefix = []byte("$records$")
+var watermarkPrefix = []byte("$watermark$")
 var errorPrefix = []byte("$error$")
 var endOfStreamPrefix = []byte("$end_of_stream$")
 
@@ -73,19 +74,78 @@ func (o *Output) Next(ctx context.Context, tx storage.StateTransaction) (*execut
 }
 
 func (o *Output) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
+	watermarkState := storage.NewValueState(tx.WithPrefix(watermarkPrefix))
+
+	octoWatermark := octosql.MakeTime(watermark)
+	if err := watermarkState.Set(&octoWatermark); err != nil {
+		return errors.Wrap(err, "couldn't save new watermark value")
+	}
+
 	return nil
 }
 
 func (o *Output) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
-	panic("implement me")
+	watermarkState := storage.NewValueState(tx.WithPrefix(watermarkPrefix))
+
+	var octoWatermark octosql.Value
+	err := watermarkState.Get(&octoWatermark)
+	if err == storage.ErrNotFound {
+		return time.Time{}, nil
+	} else if err != nil {
+		return time.Time{}, errors.Wrap(err, "couldn't get current watermark value")
+	}
+
+	return octoWatermark.AsTime(), nil
 }
 
 func (o *Output) MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error {
+	endOfStreamState := storage.NewValueState(tx.WithPrefix(endOfStreamPrefix))
+
+	phantom := octosql.MakePhantom()
+	if err := endOfStreamState.Set(&phantom); err != nil {
+		return errors.Wrap(err, "couldn't mark end of stream")
+	}
+
 	return nil
 }
 
+func (o *Output) GetEndOfStream(ctx context.Context, tx storage.StateTransaction) (bool, error) {
+	endOfStreamState := storage.NewValueState(tx.WithPrefix(endOfStreamPrefix))
+
+	var octoEndOfStream octosql.Value
+	err := endOfStreamState.Get(&octoEndOfStream)
+	if err == storage.ErrNotFound {
+		return false, nil
+	} else if err != nil {
+		return false, errors.Wrap(err, "couldn't get end of stream value")
+	}
+
+	return true, nil
+}
+
 func (o *Output) MarkError(ctx context.Context, tx storage.StateTransaction, err error) error {
+	endOfStreamState := storage.NewValueState(tx.WithPrefix(errorPrefix))
+
+	octoError := octosql.MakeString(err.Error())
+	if err := endOfStreamState.Set(&octoError); err != nil {
+		return errors.Wrap(err, "couldn't mark error")
+	}
+
 	return nil
+}
+
+func (o *Output) GetErrorMessage(ctx context.Context, tx storage.StateTransaction) (string, error) {
+	errorState := storage.NewValueState(tx.WithPrefix(errorPrefix))
+
+	var octoError octosql.Value
+	err := errorState.Get(&octoError)
+	if err == storage.ErrNotFound {
+		return "", nil
+	} else if err != nil {
+		return "", errors.Wrap(err, "couldn't get error message")
+	}
+
+	return octoError.AsString(), nil
 }
 
 func (o *Output) Close() error {

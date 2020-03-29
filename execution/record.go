@@ -150,6 +150,10 @@ func (r *Record) ShowFields() []Field {
 		})
 	}
 
+	fields = append(fields, Field{
+		Name: octosql.NewVariableName("sys.id"),
+	})
+
 	return fields
 }
 
@@ -179,7 +183,7 @@ func (r *Record) Show() string {
 		parts[i] = fmt.Sprintf("%s: %s", field.Name, r.Value(field.Name).Show())
 	}
 
-	return fmt.Sprintf("{%s, %s}", r.Metadata.Id, strings.Join(parts, ", "))
+	return fmt.Sprintf("{%s}", strings.Join(parts, ", "))
 }
 
 func (r *Record) IsUndo() bool {

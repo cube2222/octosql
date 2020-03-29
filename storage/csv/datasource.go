@@ -82,29 +82,16 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 }
 
 func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
-	tx := storage.GetStateTransactionFromContext(ctx).WithPrefix(streamID.AsPrefix())
-
-	file, err := os.Open(ds.path)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't open file")
-	}
-	r := csv.NewReader(file)
-	r.Comma = ds.separator
-	r.TrimLeadingSpace = true
-
 	rs := &RecordStream{
 		stateStorage:    ds.stateStorage,
 		streamID:        streamID,
-		file:            file,
-		r:               r,
+		filePath:        ds.path,
+		separator:       ds.separator,
 		isDone:          false,
 		alias:           ds.alias,
 		first:           true,
 		hasColumnHeader: ds.hasColumnNames,
 		batchSize:       ds.batchSize,
-	}
-	if err = rs.loadOffset(tx); err != nil {
-		return nil, nil, errors.Wrapf(err, "couldn't load csv offset")
 	}
 
 	go func() {
@@ -119,6 +106,8 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 type RecordStream struct {
 	stateStorage    storage.Storage
 	streamID        *execution.StreamID
+	filePath        string
+	separator       rune
 	file            *os.File
 	r               *csv.Reader
 	isDone          bool
@@ -143,13 +132,25 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 	for { // outer for is loading offset value and moving file iterator
 		tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
 
-		err := rs.loadOffset(tx)
-		if err != nil {
+		if err := rs.loadOffset(tx); err != nil {
 			log.Fatalf("csv worker: couldn't reinitialize offset for csv read batch worker: %s", err)
 			return
 		}
 
 		tx.Abort() // We only read data above, no need to risk failing now.
+
+		// Load/Reload file
+		file, err := os.Open(rs.filePath)
+		if err != nil {
+			log.Fatalf("csv worker: couldn't open file: %s", err)
+			return
+		}
+		r := csv.NewReader(file)
+		r.Comma = rs.separator
+		r.TrimLeadingSpace = true
+
+		rs.file = file
+		rs.r = r
 
 		// Moving file iterator by `rs.offset`
 		for i := 0; i < rs.offset; i++ {
@@ -187,7 +188,7 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 					continue
 				}
 				return
-			} else if err != nil { // TODO - should this close worker? This could be a case where file is somehow faulty (question in PR)
+			} else if err != nil {
 				tx.Abort()
 				log.Printf("csv worker: error running csv read batch worker: %s, reinitializing from storage", err)
 				break
@@ -209,8 +210,8 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 
 	if rs.isDone {
 		err := outputQueue.Push(ctx, &QueueElement{
-			Type: &QueueElement_Error{
-				Error: execution.ErrEndOfStream.Error(),
+			Type: &QueueElement_EndOfStream{
+				EndOfStream: true,
 			},
 		})
 		if err != nil {
@@ -226,7 +227,7 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 		aliasedRecord, err := rs.readRecordFromFileWithInitialize()
 		if err == execution.ErrEndOfStream {
 			break
-		} else if err != nil { // TODO - do we want to return err instantly here or push current batch? (question in PR)
+		} else if err != nil {
 			return errors.Wrap(err, "couldn't read record from csv file")
 		}
 
@@ -249,7 +250,8 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 		log.Println("csv worker: record pushed: ", batch[i])
 	}
 
-	if err := rs.saveOffset(tx, len(batch)); err != nil {
+	rs.offset = rs.offset + len(batch)
+	if err := rs.saveOffset(tx); err != nil {
 		return errors.Wrap(err, "couldn't save csv offset")
 	}
 
@@ -366,10 +368,8 @@ func (rs *RecordStream) loadOffset(tx storage.StateTransaction) error {
 	return nil
 }
 
-func (rs *RecordStream) saveOffset(tx storage.StateTransaction, curBatchSize int) error {
+func (rs *RecordStream) saveOffset(tx storage.StateTransaction) error {
 	offsetState := storage.NewValueState(tx.WithPrefix(offsetPrefix))
-
-	rs.offset = rs.offset + curBatchSize
 
 	offset := octosql.MakeInt(rs.offset)
 	err := offsetState.Set(&offset)
@@ -393,11 +393,9 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 	switch queueElement := queueElement.Type.(type) {
 	case *QueueElement_Record:
 		return queueElement.Record, nil
+	case *QueueElement_EndOfStream:
+		return nil, execution.ErrEndOfStream
 	case *QueueElement_Error:
-		if queueElement.Error == execution.ErrEndOfStream.Error() {
-			return nil, execution.ErrEndOfStream
-		}
-
 		return nil, errors.New(queueElement.Error)
 	default:
 		panic("invalid queue element type")

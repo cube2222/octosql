@@ -230,8 +230,8 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 
 	if rs.isDone {
 		err := outputQueue.Push(ctx, &QueueElement{
-			Type: &QueueElement_Error{
-				Error: execution.ErrEndOfStream.Error(),
+			Type: &QueueElement_EndOfStream{
+				EndOfStream: true,
 			},
 		})
 		if err != nil {
@@ -374,11 +374,9 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 	switch queueElement := queueElement.Type.(type) {
 	case *QueueElement_Record:
 		return queueElement.Record, nil
+	case *QueueElement_EndOfStream:
+		return nil, execution.ErrEndOfStream
 	case *QueueElement_Error:
-		if queueElement.Error == execution.ErrEndOfStream.Error() {
-			return nil, execution.ErrEndOfStream
-		}
-
 		return nil, errors.New(queueElement.Error)
 	default:
 		panic("invalid queue element type")

@@ -155,11 +155,10 @@ func TestDataSource_Get(t *testing.T) {
 		variables octosql.Variables
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    []*execution.Record
-		wantErr bool
+		name   string
+		fields fields
+		args   args
+		want   []*execution.Record
 	}{
 		{
 			name: "simple default config test",
@@ -191,7 +190,6 @@ func TestDataSource_Get(t *testing.T) {
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
 			},
-			wantErr: false,
 		},
 
 		{
@@ -229,7 +227,6 @@ func TestDataSource_Get(t *testing.T) {
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 3)),
 				),
 			},
-			wantErr: false,
 		},
 
 		{
@@ -262,7 +259,6 @@ func TestDataSource_Get(t *testing.T) {
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
 			},
-			wantErr: false,
 		},
 
 		{
@@ -295,7 +291,6 @@ func TestDataSource_Get(t *testing.T) {
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
 			},
-			wantErr: false,
 		},
 
 		{
@@ -328,7 +323,6 @@ func TestDataSource_Get(t *testing.T) {
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
 			},
-			wantErr: false,
 		},
 
 		{
@@ -361,7 +355,6 @@ func TestDataSource_Get(t *testing.T) {
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
 			},
-			wantErr: false,
 		},
 	}
 	for _, tt := range tests {

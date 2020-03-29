@@ -95,39 +95,19 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 }
 
 func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
-	tx := storage.GetStateTransactionFromContext(ctx).WithPrefix(streamID.AsPrefix())
-
-	file, err := excelize.OpenFile(ds.path)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't open file")
-	}
-
-	rows, err := file.Rows(ds.sheet)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get sheet's rows")
-	}
-
-	for i := 0; i <= ds.verticalOffset; i++ {
-		if !rows.Next() {
-			return nil, nil, errors.New("root cell is lower than row count")
-		}
-	}
-
 	rs := &RecordStream{
 		stateStorage:     ds.stateStorage,
 		streamID:         streamID,
 		first:            true,
+		filePath:         ds.path,
+		sheet:            ds.sheet,
 		hasHeaderRow:     ds.hasHeaderRow,
 		timeColumnNames:  ds.timeColumns,
 		alias:            ds.alias,
 		horizontalOffset: ds.horizontalOffset,
-
-		isDone:    false,
-		rows:      rows,
-		batchSize: ds.batchSize,
-	}
-	if err = rs.loadOffset(tx); err != nil {
-		return nil, nil, errors.Wrapf(err, "couldn't load excel offset")
+		verticalOffset:   ds.verticalOffset,
+		isDone:           false,
+		batchSize:        ds.batchSize,
 	}
 
 	go func() {
@@ -143,10 +123,13 @@ type RecordStream struct {
 	stateStorage     storage.Storage
 	streamID         *execution.StreamID
 	first            bool
+	filePath         string
+	sheet            string
 	hasHeaderRow     bool
 	timeColumnNames  []string
 	alias            string
 	horizontalOffset int
+	verticalOffset   int
 
 	isDone      bool
 	columnNames []octosql.VariableName
@@ -164,13 +147,34 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 	for { // outer for is loading offset value and moving file iterator
 		tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
 
-		err := rs.loadOffset(tx)
-		if err != nil {
+		if err := rs.loadOffset(tx); err != nil {
 			log.Fatalf("excel worker: couldn't reinitialize offset for excel read batch worker: %s", err)
 			return
 		}
 
 		tx.Abort() // We only read data above, no need to risk failing now.
+
+		// Load/Reload file
+		file, err := excelize.OpenFile(rs.filePath)
+		if err != nil {
+			log.Fatalf("excel worker: couldn't open file: %s", err)
+			return
+		}
+
+		rows, err := file.Rows(rs.sheet)
+		if err != nil {
+			log.Fatalf("excel worker: couldn't get sheet's rows: %s", err)
+			return
+		}
+
+		for i := 0; i <= rs.verticalOffset; i++ {
+			if !rows.Next() {
+				log.Fatalf("excel worker: root cell is lower than row count: %s", err)
+				return
+			}
+		}
+
+		rs.rows = rows
 
 		// Moving file iterator by `rs.offset`
 		for i := 0; i < rs.offset; i++ {
@@ -270,7 +274,8 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 		log.Println("excel worker: record pushed: ", batch[i])
 	}
 
-	if err := rs.saveOffset(tx, len(batch)); err != nil {
+	rs.offset = rs.offset + len(batch)
+	if err := rs.saveOffset(tx); err != nil {
 		return errors.Wrap(err, "couldn't save excel offset")
 	}
 
@@ -347,10 +352,8 @@ func (rs *RecordStream) loadOffset(tx storage.StateTransaction) error {
 	return nil
 }
 
-func (rs *RecordStream) saveOffset(tx storage.StateTransaction, curBatchSize int) error {
+func (rs *RecordStream) saveOffset(tx storage.StateTransaction) error {
 	offsetState := storage.NewValueState(tx.WithPrefix(offsetPrefix))
-
-	rs.offset = rs.offset + curBatchSize
 
 	offset := octosql.MakeInt(rs.offset)
 	err := offsetState.Set(&offset)

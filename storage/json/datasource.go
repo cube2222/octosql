@@ -69,26 +69,15 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 }
 
 func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
-	tx := storage.GetStateTransactionFromContext(ctx).WithPrefix(streamID.AsPrefix())
-
-	file, err := os.Open(ds.path)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't open file")
-	}
-
 	rs := &RecordStream{
 		stateStorage:                  ds.stateStorage,
 		streamID:                      streamID,
 		arrayFormat:                   ds.arrayFormat,
 		arrayFormatOpeningBracketRead: false,
-		file:                          file,
-		decoder:                       json.NewDecoder(file),
+		filePath:                      ds.path,
 		isDone:                        false,
 		alias:                         ds.alias,
 		batchSize:                     ds.batchSize,
-	}
-	if err = rs.loadOffset(tx); err != nil {
-		return nil, nil, errors.Wrapf(err, "couldn't load json offset")
 	}
 
 	go func() {
@@ -105,6 +94,7 @@ type RecordStream struct {
 	streamID                      *execution.StreamID
 	arrayFormat                   bool
 	arrayFormatOpeningBracketRead bool
+	filePath                      string
 	file                          *os.File
 	decoder                       *json.Decoder
 	isDone                        bool
@@ -126,13 +116,22 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 	for { // outer for is loading offset value and moving file iterator
 		tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
 
-		err := rs.loadOffset(tx)
-		if err != nil {
+		if err := rs.loadOffset(tx); err != nil {
 			log.Fatalf("json worker: couldn't reinitialize offset for json read batch worker: %s", err)
 			return
 		}
 
 		tx.Abort() // We only read data above, no need to risk failing now.
+
+		// Load/Reload file
+		file, err := os.Open(rs.filePath)
+		if err != nil {
+			log.Fatalf("json worker: couldn't open file: %s", err)
+			return
+		}
+
+		rs.file = file
+		rs.decoder = json.NewDecoder(file)
 
 		// Moving file iterator by `rs.offset`
 		for i := 0; i < rs.offset; i++ {
@@ -170,7 +169,7 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 					continue
 				}
 				return
-			} else if err != nil { // TODO - same as with csv file
+			} else if err != nil {
 				tx.Abort()
 				log.Printf("json worker: error running json read batch worker: %s, reinitializing from storage", err)
 				break
@@ -209,7 +208,7 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 		record, err := rs.readRecordFromFile()
 		if err == execution.ErrEndOfStream {
 			break
-		} else if err != nil { // TODO - same as with csv
+		} else if err != nil {
 			return errors.Wrap(err, "couldn't read record from json file")
 		}
 
@@ -252,7 +251,8 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 		log.Println("json worker: record pushed: ", batch[i])
 	}
 
-	if err := rs.saveOffset(tx, len(batch)); err != nil {
+	rs.offset = rs.offset + len(batch)
+	if err := rs.saveOffset(tx); err != nil {
 		return errors.Wrap(err, "couldn't save json offset")
 	}
 
@@ -304,10 +304,8 @@ func (rs *RecordStream) loadOffset(tx storage.StateTransaction) error {
 	return nil
 }
 
-func (rs *RecordStream) saveOffset(tx storage.StateTransaction, curBatchSize int) error {
+func (rs *RecordStream) saveOffset(tx storage.StateTransaction) error {
 	offsetState := storage.NewValueState(tx.WithPrefix(offsetPrefix))
-
-	rs.offset = rs.offset + curBatchSize
 
 	offset := octosql.MakeInt(rs.offset)
 	err := offsetState.Set(&offset)

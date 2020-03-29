@@ -44,6 +44,29 @@ func TestDataSource_Get(t *testing.T) {
 		want    []*execution.Record
 		wantErr bool
 	}{
+		//{ // Infinite loop, because error in getting key occurs (key not found)
+		//	name: "test - record not in base",
+		//	fields: fields{
+		//		hostname: hostname,
+		//		password: password,
+		//		port:     port,
+		//		dbIndex:  dbIndex,
+		//		dbKey:    dbKey,
+		//		filter: physical.NewPredicate(
+		//			physical.NewVariable("r.key"),
+		//			physical.NewRelation("equal"),
+		//			physical.NewVariable("const_0")),
+		//		alias: "r",
+		//		queries: map[string]map[string]interface{}{},
+		//	},
+		//	args: args{
+		//		variables: map[octosql.VariableName]octosql.Value{
+		//			"const_0": octosql.MakeString("key0"),
+		//		},
+		//	},
+		//	want: []*execution.Record{},
+		//	wantErr: false,
+		//},
 		{
 			name: "bigger test - no filter",
 			fields: fields{

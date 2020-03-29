@@ -229,8 +229,8 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 
 	if rs.isDone {
 		err := outputQueue.Push(ctx, &QueueElement{
-			Type: &QueueElement_Error{
-				Error: execution.ErrEndOfStream.Error(),
+			Type: &QueueElement_EndOfStream{
+				EndOfStream: true,
 			},
 		})
 		if err != nil {
@@ -270,7 +270,7 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 
 		// We skip this record
 		if len(recordValues) == 0 {
-			return ErrNotFound
+			return errors.New("redis key not found")
 		}
 
 		keyVariableName := octosql.NewVariableName(fmt.Sprintf("%s.%s", rs.alias, rs.keyName))
@@ -313,12 +313,14 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 		log.Println("redis worker: record pushed: ", batch[i])
 	}
 
-	if err := rs.saveOffset(tx, len(batch)); err != nil {
+	rs.offset = rs.offset + len(batch)
+	if err := rs.saveOffset(tx); err != nil {
 		return errors.Wrap(err, "couldn't save redis offset")
 	}
 
 	if rs.isEntireDatabaseStream {
-		if err := rs.saveCursor(tx, newCursor); err != nil {
+		rs.cursor = newCursor
+		if err := rs.saveCursor(tx); err != nil {
 			return errors.Wrap(err, "couldn't save redis cursor")
 		}
 
@@ -354,10 +356,8 @@ func (rs *RecordStream) loadOffset(tx storage.StateTransaction) error {
 	return nil
 }
 
-func (rs *RecordStream) saveOffset(tx storage.StateTransaction, curBatchSize int) error {
+func (rs *RecordStream) saveOffset(tx storage.StateTransaction) error {
 	offsetState := storage.NewValueState(tx.WithPrefix(offsetPrefix))
-
-	rs.offset = rs.offset + curBatchSize
 
 	offset := octosql.MakeInt(rs.offset)
 	err := offsetState.Set(&offset)
@@ -386,12 +386,10 @@ func (rs *RecordStream) loadCursor(tx storage.StateTransaction) error {
 	return nil
 }
 
-func (rs *RecordStream) saveCursor(tx storage.StateTransaction, cursor uint64) error {
+func (rs *RecordStream) saveCursor(tx storage.StateTransaction) error {
 	cursorState := storage.NewValueState(tx.WithPrefix(cursorPrefix))
 
-	rs.cursor = cursor
-
-	cursorValue := octosql.MakeInt(int(cursor))
+	cursorValue := octosql.MakeInt(int(rs.cursor))
 	err := cursorState.Set(&cursorValue)
 	if err != nil {
 		return errors.Wrap(err, "couldn't save redis cursor to state storage")
@@ -413,58 +411,11 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 	switch queueElement := queueElement.Type.(type) {
 	case *QueueElement_Record:
 		return queueElement.Record, nil
+	case *QueueElement_EndOfStream:
+		return nil, execution.ErrEndOfStream
 	case *QueueElement_Error:
-		if queueElement.Error == execution.ErrEndOfStream.Error() {
-			return nil, execution.ErrEndOfStream
-		}
-
 		return nil, errors.New(queueElement.Error)
 	default:
 		panic("invalid queue element type")
 	}
 }
-
-//func (rs *EntireDatabaseStream) Next(ctx context.Context) (*execution.Record, error) {
-//	for {
-//		if rs.isDone {
-//			return nil, execution.ErrEndOfStream
-//		}
-//
-//		if !rs.dbIterator.Next() {
-//			if rs.dbIterator.Err() != nil {
-//				return nil, rs.dbIterator.Err()
-//			}
-//			rs.isDone = true
-//			return nil, execution.ErrEndOfStream
-//		}
-//		key := rs.dbIterator.Val()
-//
-//		record, err := getNewRecord(rs.client, rs.keyName, key, rs.alias)
-//		if err != nil {
-//			if err == ErrNotFound { // key was not in redis database so we skip it
-//				continue
-//			}
-//			return nil, err
-//		}
-//
-//		return record, nil
-//	}
-//}
-
-//func (rs *KeySpecificStream) Next(ctx context.Context) (*execution.Record, error) {
-//	if rs.isDone {
-//		return nil, execution.ErrEndOfStream
-//	}
-//
-//	if rs.counter == len(rs.keys) {
-//		rs.isDone = true
-//		return nil, execution.ErrEndOfStream
-//	}
-//
-//	key := rs.keys[rs.counter]
-//	rs.counter++
-//
-//	return getNewRecord(rs.client, rs.keyName, key, rs.alias)
-//}
-
-var ErrNotFound = errors.New("redis key not found")

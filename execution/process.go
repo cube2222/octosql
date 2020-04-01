@@ -205,7 +205,14 @@ func (p *ProcessByKey) MarkEndOfStream(ctx context.Context, tx storage.StateTran
 
 func (p *ProcessByKey) MarkError(ctx context.Context, tx storage.StateTransaction, err error) error {
 	outputQueue := NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
-	err = outputQueue.Push(ctx, &QueueElement{Type: &QueueElement_Error{Error: err.Error()}})
+	err = outputQueue.Push(
+		ctx,
+		&QueueElement{
+			Type: &QueueElement_Error{
+				Error: err.Error(),
+			},
+		},
+	)
 	if err != nil {
 		return errors.Wrap(err, "couldn't push error to output queue")
 	}

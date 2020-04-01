@@ -90,6 +90,10 @@ func TestWatermarkGenerator_Get(t *testing.T) {
 			}
 
 			stateStorage := execution.GetTestStorage(t)
+			defer func() {
+				go stateStorage.Close()
+			}()
+
 			tx := stateStorage.BeginTransaction()
 			ctx := storage.InjectStateTransaction(ctx, tx)
 
@@ -103,12 +107,10 @@ func TestWatermarkGenerator_Get(t *testing.T) {
 				t.Errorf("WatermarkGenerator.Get() error = %v", err)
 				return
 			}
-			eq, err := execution.AreStreamsEqual(ctx, got, want)
+
+			err = execution.AreStreamsEqual(ctx, got, want)
 			if err != nil {
 				t.Errorf("WatermarkGenerator.Get() AreStreamsEqual error = %v", err)
-			}
-			if !eq {
-				t.Errorf("WatermarkGenerator.Get() streams not equal")
 			}
 
 			if err := tx.Commit(); err != nil {
@@ -154,6 +156,10 @@ func TestWatermarkGeneratorStream_GetWatermark(t *testing.T) {
 	}
 
 	stateStorage := execution.GetTestStorage(t)
+	defer func() {
+		go stateStorage.Close()
+	}()
+
 	tx := stateStorage.BeginTransaction()
 	ctx = storage.InjectStateTransaction(ctx, tx)
 

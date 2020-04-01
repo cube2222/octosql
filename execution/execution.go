@@ -73,8 +73,8 @@ func (se *StarExpression) ExpressionValue(ctx context.Context, variables octosql
 
 	for i := range fields {
 		value, err := variables.Get(fields[i])
-		if err != nil { // this shouldn't happen, but we might as well check
-			return octosql.MakeNull(), errors.Wrap(err, "couldn't get value from variables")
+		if err != nil {
+			panic("failed to read star expression")
 		}
 		values[i] = value
 	}

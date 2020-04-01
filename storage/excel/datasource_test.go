@@ -1,6 +1,18 @@
 package excel
 
-/*func Test_getCellRowCol(t *testing.T) {
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/config"
+	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/physical"
+	"github.com/cube2222/octosql/streaming/storage"
+)
+
+func Test_getCellRowCol(t *testing.T) {
 	type args struct {
 		cell string
 	}
@@ -128,252 +140,270 @@ func Test_getRowColCoords(t *testing.T) {
 }
 
 func TestDataSource_Get(t *testing.T) {
-	stateStorage := execution.GetTestStorage(t)
-	defer func() {
-		go stateStorage.Close()
-	}()
-	tx := stateStorage.BeginTransaction()
-	defer tx.Abort()
-	ctx := storage.InjectStateTransaction(context.Background(), tx)
+	ctx := context.Background()
+	streamId := execution.GetRawStreamID()
 
 	type fields struct {
-		path             string
-		alias            string
-		hasHeaderRow     bool
-		sheet            string
-		horizontalOffset int
-		verticalOffset   int
-		rootColumnString string
-		timeColumns      []string
+		path         string
+		alias        string
+		hasHeaderRow bool
+		sheet        string
+		rootCell     string
+		timeColumns  []interface{}
 	}
 	type args struct {
 		variables octosql.Variables
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    execution.RecordStream
-		wantErr bool
+		name   string
+		fields fields
+		args   args
+		want   []*execution.Record
 	}{
 		{
 			name: "simple default config test",
 			fields: fields{
-				path:             "fixtures/test.xlsx",
-				alias:            "t",
-				hasHeaderRow:     true,
-				sheet:            "Sheet1",
-				horizontalOffset: 0,
-				verticalOffset:   0,
-				rootColumnString: "A",
+				path:         "fixtures/test.xlsx",
+				alias:        "t",
+				hasHeaderRow: true,
+				sheet:        "Sheet1",
+				rootCell:     "A1",
+				timeColumns:  []interface{}{},
 			},
 			args: args{
 				variables: octosql.NoVariables(),
 			},
-			want: execution.NewInMemoryStream(ctx, []*execution.Record{
+			want: []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.name", "t.surname", "t.age"},
 					[]interface{}{"Jan", "Chomiak", 20},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.name", "t.surname", "t.age"},
 					[]interface{}{"Kuba", "Martin", 21},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.name", "t.surname", "t.age"},
 					[]interface{}{"Wojtek", "Kuźmiński", 21},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
-			}),
-			wantErr: false,
+			},
 		},
 
 		{
 			name: "simple modified config test",
 			fields: fields{
-				path:             "fixtures/test.xlsx",
-				alias:            "t",
-				hasHeaderRow:     false,
-				sheet:            "CustomSheet",
-				horizontalOffset: 1,
-				verticalOffset:   2,
-				rootColumnString: "B",
+				path:         "fixtures/test.xlsx",
+				alias:        "t",
+				hasHeaderRow: false,
+				sheet:        "CustomSheet",
+				rootCell:     "B3",
+				timeColumns:  []interface{}{},
 			},
 			args: args{
 				variables: octosql.NoVariables(),
 			},
-			want: execution.NewInMemoryStream(ctx, []*execution.Record{
+			want: []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.col1", "t.col2"},
 					[]interface{}{"Warsaw", 1700000},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.col1", "t.col2"},
 					[]interface{}{"Atlanta", 2000},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.col1", "t.col2"},
 					[]interface{}{"New York", 2},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.col1", "t.col2"},
 					[]interface{}{"Miami", -5},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 3)),
 				),
-			}),
-			wantErr: false,
+			},
 		},
 
 		{
 			name: "table with preceeding data",
 			fields: fields{
-				path:             "fixtures/test.xlsx",
-				alias:            "t",
-				hasHeaderRow:     true,
-				sheet:            "CustomSheet",
-				horizontalOffset: 4,
-				verticalOffset:   1,
-				rootColumnString: "E",
+				path:         "fixtures/test.xlsx",
+				alias:        "t",
+				hasHeaderRow: true,
+				sheet:        "CustomSheet",
+				rootCell:     "E2",
+				timeColumns:  []interface{}{},
 			},
 			args: args{
 				variables: octosql.NoVariables(),
 			},
-			want: execution.NewInMemoryStream(ctx, []*execution.Record{
+			want: []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.id", "t.points"},
 					[]interface{}{1, 10},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.id", "t.points"},
 					[]interface{}{2, 4},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.id", "t.points"},
 					[]interface{}{3, 19},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
-			}),
-			wantErr: false,
+			},
 		},
 
 		{
 			name: "table with nil inside",
 			fields: fields{
-				path:             "fixtures/test.xlsx",
-				alias:            "t",
-				hasHeaderRow:     true,
-				sheet:            "CustomSheet",
-				horizontalOffset: 0,
-				verticalOffset:   8,
-				rootColumnString: "A",
+				path:         "fixtures/test.xlsx",
+				alias:        "t",
+				hasHeaderRow: true,
+				sheet:        "CustomSheet",
+				rootCell:     "A9",
+				timeColumns:  []interface{}{},
 			},
 			args: args{
 				variables: octosql.NoVariables(),
 			},
-			want: execution.NewInMemoryStream(ctx, []*execution.Record{
+			want: []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.name", "t.age", "t.id"},
 					[]interface{}{"Bob", 13, 1},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.name", "t.age", "t.id"},
 					[]interface{}{"Ally", nil, 2},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.name", "t.age", "t.id"},
 					[]interface{}{nil, 7, nil},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
-			}),
-			wantErr: false,
+			},
 		},
 
 		{
 			name: "dates with no header row",
 			fields: fields{
-				path:             "fixtures/test.xlsx",
-				alias:            "t",
-				hasHeaderRow:     false,
-				sheet:            "DateSheet",
-				horizontalOffset: 0,
-				verticalOffset:   1,
-				rootColumnString: "A",
-				timeColumns:      []string{"col1"},
+				path:         "fixtures/test.xlsx",
+				alias:        "t",
+				hasHeaderRow: false,
+				sheet:        "DateSheet",
+				rootCell:     "A2",
+				timeColumns:  []interface{}{"col1"},
 			},
 			args: args{
 				variables: octosql.NoVariables(),
 			},
-			want: execution.NewInMemoryStream(ctx, []*execution.Record{
+			want: []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.col1", "t.col2"},
 					[]interface{}{time.Date(2017, 3, 14, 13, 0, 0, 0, time.UTC), 1},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.col1", "t.col2"},
 					[]interface{}{time.Date(2017, 3, 15, 13, 0, 0, 0, time.UTC), 2},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.col1", "t.col2"},
 					[]interface{}{time.Date(2019, 5, 19, 14, 0, 0, 0, time.UTC), 3},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
-			}),
-			wantErr: false,
+			},
 		},
 
 		{
 			name: "dates with header row",
 			fields: fields{
-				path:             "fixtures/test.xlsx",
-				alias:            "t",
-				hasHeaderRow:     true,
-				sheet:            "DateSheet",
-				horizontalOffset: 3,
-				verticalOffset:   2,
-				rootColumnString: "D",
-				timeColumns:      []string{"date"},
+				path:         "fixtures/test.xlsx",
+				alias:        "t",
+				hasHeaderRow: true,
+				sheet:        "DateSheet",
+				rootCell:     "D3",
+				timeColumns:  []interface{}{"date"},
 			},
 			args: args{
 				variables: octosql.NoVariables(),
 			},
-			want: execution.NewInMemoryStream(ctx, []*execution.Record{
+			want: []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.date", "t.points"},
 					[]interface{}{time.Date(2017, 3, 14, 13, 0, 0, 0, time.UTC), 101},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.date", "t.points"},
 					[]interface{}{time.Date(2017, 3, 15, 13, 0, 0, 0, time.UTC), 102},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1)),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"t.date", "t.points"},
 					[]interface{}{time.Date(2019, 5, 19, 14, 0, 0, 0, time.UTC), 103},
+					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2)),
 				),
-			}),
-			wantErr: false,
+			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ds := &DataSource{
-				path:             tt.fields.path,
-				alias:            tt.fields.alias,
-				hasHeaderRow:     tt.fields.hasHeaderRow,
-				sheet:            tt.fields.sheet,
-				horizontalOffset: tt.fields.horizontalOffset,
-				verticalOffset:   tt.fields.verticalOffset,
-				timeColumns:      tt.fields.timeColumns,
-			}
-			got, _, err := ds.Get(ctx, tt.args.variables, execution.GetRawStreamID())
-			if (err != nil) != tt.wantErr {
-				t.Errorf("DataSource.Get() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			stateStorage := execution.GetTestStorage(t)
+			defer func() {
+				go stateStorage.Close()
+			}()
 
-			areEqual, err := execution.AreStreamsEqual(ctx, got, tt.want)
+			ds, err := NewDataSourceBuilderFactory()("test", tt.fields.alias)[0].Materialize(context.Background(), &physical.MaterializationContext{
+				Config: &config.Config{
+					DataSources: []config.DataSourceConfig{
+						{
+							Name: "test",
+							Config: map[string]interface{}{
+								"path":        tt.fields.path,
+								"headerRow":   tt.fields.hasHeaderRow,
+								"sheet":       tt.fields.sheet,
+								"rootCell":    tt.fields.rootCell,
+								"timeColumns": tt.fields.timeColumns,
+								"batchSize":   2,
+							},
+						},
+					},
+				},
+				Storage: stateStorage,
+			})
 			if err != nil {
-				t.Errorf("Error in areStreamsEqual %v", err)
+				t.Errorf("Error creating data source: %v", err)
+			}
+
+			tx := stateStorage.BeginTransaction()
+			defer tx.Abort()
+
+			got, _, err := ds.Get(storage.InjectStateTransaction(ctx, tx), octosql.NoVariables(), streamId)
+			if err != nil {
+				t.Errorf("DataSource.Get() error: %v", err)
 				return
 			}
 
-			if !areEqual {
-				t.Errorf("DataSource.Get() = %v, want %v", got, tt.want)
+			want, _, err := execution.NewDummyNode(tt.want).Get(storage.InjectStateTransaction(ctx, tx), octosql.NoVariables(), streamId)
+			if err := tx.Commit(); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := execution.AreStreamsEqualNoOrdering(storage.InjectStateTransaction(ctx, tx), stateStorage, want, got); err != nil {
+				t.Errorf("Streams aren't equal: %v", err)
+				return
 			}
 		})
 	}
-}*/
+}

@@ -127,13 +127,10 @@ func TestAreStreamsEqual(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := AreStreamsEqual(ctx, tt.args.first, tt.args.second)
+			err := AreStreamsEqual(ctx, tt.args.first, tt.args.second)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("AreStreamsEqual() error = %v, wantErr %v", err, tt.wantErr)
 				return
-			}
-			if got != tt.want {
-				t.Errorf("AreStreamsEqual() = %v, want %v", got, tt.want)
 			}
 		})
 	}

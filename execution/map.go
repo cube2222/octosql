@@ -81,7 +81,10 @@ func (stream *MappedStream) Next(ctx context.Context) (*Record, error) {
 			fieldNames = append(fieldNames, expressionName...)
 
 			for _, name := range expressionName {
-				value, _ := variables.Get(name) //TODO: err is always nil, handle it anyways?
+				value, err := variables.Get(name)
+				if err != nil {
+					panic(err)
+				}
 
 				outValues[name] = value
 			}

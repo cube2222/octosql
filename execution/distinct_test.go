@@ -603,6 +603,10 @@ func TestDistinct_Get(t *testing.T) {
 			stateStorage := GetTestStorage(t)
 			ctx := context.Background()
 
+			defer func() {
+				go stateStorage.Close()
+			}()
+
 			distinct := NewDistinct(stateStorage, tt.args.source, "")
 
 			tx := stateStorage.BeginTransaction()

@@ -103,10 +103,12 @@ func TestWatermarkGenerator_Get(t *testing.T) {
 				t.Errorf("WatermarkGenerator.Get() error = %v", err)
 				return
 			}
-
-			err = execution.AreStreamsEqual(ctx, got, want)
+			eq, err := execution.AreStreamsEqual(ctx, got, want)
 			if err != nil {
 				t.Errorf("WatermarkGenerator.Get() AreStreamsEqual error = %v", err)
+			}
+			if !eq {
+				t.Errorf("WatermarkGenerator.Get() streams not equal")
 			}
 
 			if err := tx.Commit(); err != nil {

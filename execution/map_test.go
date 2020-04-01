@@ -227,10 +227,13 @@ func TestMappedStream_Next(t *testing.T) {
 				source:      tt.fields.source,
 				keep:        tt.fields.keep,
 			}
-			err := AreStreamsEqual(ctx, stream, tt.want)
+			equal, err := AreStreamsEqual(ctx, stream, tt.want)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("MappedStream.Next() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			if err == nil && !equal {
+				t.Errorf("MappedStream.Next() streams not equal")
 			}
 		})
 	}

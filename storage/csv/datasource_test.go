@@ -1,17 +1,6 @@
 package csv
 
-import (
-	"context"
-	"testing"
-
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/config"
-	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/physical"
-	"github.com/cube2222/octosql/streaming/storage"
-)
-
-type csvDsc struct {
+/*type csvDsc struct {
 	alias string
 	path  string
 }
@@ -68,32 +57,26 @@ func TestCSVDataSource_Get(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			stateStorage := execution.GetTestStorage(t)
-			ds, err := NewDataSourceBuilderFactory()("test", csvDbs[tt.csvName].alias)[0].Materialize(context.Background(), &physical.MaterializationContext{
-				Config: &config.Config{
-					DataSources: []config.DataSourceConfig{
-						{
-							Name: "test",
-							Config: map[string]interface{}{
-								"path":      csvDbs[tt.csvName].path,
-								"headerRow": true,
-								"separator": ",",
-								"batchSize": 2,
-							},
+		ds, err := NewDataSourceBuilderFactory()("test", csvDbs[tt.csvName].alias)[0].Materialize(context.Background(), &physical.MaterializationContext{
+			Config: &config.Config{
+				DataSources: []config.DataSourceConfig{
+					{
+						Name: "test",
+						Config: map[string]interface{}{
+							"path":      csvDbs[tt.csvName].path,
+							"headerRow": true,
+							"separator": ",",
 						},
 					},
 				},
-				Storage: stateStorage,
-			})
-			if err != nil {
-				t.Errorf("Error creating data source: %v", err)
-			}
+			},
+		})
+		if err != nil {
+			t.Errorf("Error creating data source: %v", err)
+		}
 
-			tx := stateStorage.BeginTransaction()
-			defer tx.Abort()
-
-			_, _, err = ds.Get(storage.InjectStateTransaction(ctx, tx), octosql.NoVariables(), execution.GetRawStreamID())
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, err := ds.Get(ctx, octosql.NoVariables(), execution.GetRawStreamID())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataSource.Get() error is %v, want %v", err, tt.wantErr)
 			}
@@ -103,7 +86,10 @@ func TestCSVDataSource_Get(t *testing.T) {
 
 func TestCSVRecordStream_Next(t *testing.T) {
 	ctx := context.Background()
-	streamId := execution.GetRawStreamID()
+	type wanted struct {
+		record *execution.Record
+		error  bool
+	}
 
 	tests := []struct {
 		name            string
@@ -111,7 +97,7 @@ func TestCSVRecordStream_Next(t *testing.T) {
 		hasColumnHeader bool
 		separator       string
 		fields          []string
-		want            []*execution.Record
+		want            []wanted
 	}{
 		{
 			name:            "reading people.csv - happy path",
@@ -119,78 +105,151 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			hasColumnHeader: true,
 			separator:       ",",
 			fields:          []string{"name", "surname", "age", "city"},
-			want: []*execution.Record{
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.name", "p.surname", "p.age", "p.city"},
-					[]interface{}{"jan", "chomiak", 3, "warsaw"},
-					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0))),
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.name", "p.surname", "p.age", "p.city"},
-					[]interface{}{"wojtek", "kuzminski", 4, "warsaw"},
-					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1))),
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.name", "p.surname", "p.age", "p.city"},
-					[]interface{}{"adam", "cz", 5, "ciechanowo"},
-					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2))),
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.name", "p.surname", "p.age", "p.city"},
-					[]interface{}{"kuba", "m", 2, "warsaw"},
-					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 3))),
+			want: []wanted{
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"jan", "chomiak", 3, "warsaw"}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"wojtek", "kuzminski", 4, "warsaw"}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"adam", "cz", 5, "ciechanowo"}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"kuba", "m", 2, "warsaw"}),
+					error: false,
+				},
+				{
+					record: nil,
+					error:  true,
+				},
+				{
+					record: nil,
+					error:  true,
+				},
 			},
 		},
-		//{ Infinite loop, because error in reading line occurs
-		//	name:            "wrong numbers of columns in a row",
-		//	csvName:         "wrongCount",
-		//	hasColumnHeader: true,
-		//	separator:       ",",
-		//	fields:          []string{"name", "surname"},
-		//	want:            []*execution.Record{},
-		//},
-		//{ Infinite loop, because error in reading line occurs
-		//	name:            "not unique columns",
-		//	csvName:         "notUnique",
-		//	hasColumnHeader: true,
-		//	separator:       ",",
-		//	fields:          []string{"jan", "kazimierz"},
-		//	want: []*execution.Record{
-		//		execution.NewRecordFromSliceWithNormalize(
-		//			[]octosql.VariableName{"nu.jan", "nu.kazimierz"},
-		//			[]interface{}{"stanislaw", "august"},
-		//			execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0))),
-		//	},
-		//},
+		{
+			name:            "wrong numbers of columns in a row",
+			csvName:         "wrongCount",
+			hasColumnHeader: true,
+			separator:       ",",
+			fields:          []string{"name", "surname"},
+			want: []wanted{
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"wc.name",
+							"wc.surname",
+						},
+						[]interface{}{"test", "test"}),
+					error: false,
+				},
+				{
+					record: nil,
+					error:  true,
+				},
+			},
+		},
+
+		{
+			name:            "not unique columns",
+			csvName:         "notUnique",
+			hasColumnHeader: true,
+			separator:       ",",
+			fields:          []string{"name", "name"},
+			want: []wanted{
+				{
+					record: nil,
+					error:  true,
+				},
+			},
+		},
+
 		{
 			name:            "file with header row",
 			csvName:         "hasHeaders",
 			hasColumnHeader: true,
 			separator:       ",",
 			fields:          []string{"dog", "age"},
-			want: []*execution.Record{
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"hh.dog", "hh.age"},
-					[]interface{}{"Barry", 3},
-					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0))),
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"hh.dog", "hh.age"},
-					[]interface{}{"Flower", 14},
-					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1))),
+			want: []wanted{
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"hh.dog",
+							"hh.age",
+						},
+						[]interface{}{"Barry", 3}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"hh.dog",
+							"hh.age",
+						},
+						[]interface{}{"Flower", 14}),
+					error: false,
+				},
 			},
 		},
+
 		{
 			name:            "file without header row",
 			csvName:         "noHeaders",
 			hasColumnHeader: false,
 			separator:       ",",
 			fields:          []string{"col1", "col2"},
-			want: []*execution.Record{
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"nh.col1", "nh.col2"},
-					[]interface{}{"Barry", 3},
-					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0))),
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"nh.col1", "nh.col2"},
-					[]interface{}{"Flower", 14},
-					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1))),
+			want: []wanted{
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"nh.col1",
+							"nh.col2",
+						},
+						[]interface{}{"Barry", 3}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"nh.col1",
+							"nh.col2",
+						},
+						[]interface{}{"Flower", 14}),
+					error: false,
+				},
 			},
 		},
 		{
@@ -199,23 +258,59 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			hasColumnHeader: true,
 			separator:       ".",
 			fields:          []string{"name", "surname", "age", "city"},
-			want: []*execution.Record{
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.name", "p.surname", "p.age", "p.city"},
-					[]interface{}{"jan", "chomiak", 3, "warsaw"},
-					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0))),
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.name", "p.surname", "p.age", "p.city"},
-					[]interface{}{"wojtek", "kuzminski", 4, "warsaw"},
-					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1))),
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.name", "p.surname", "p.age", "p.city"},
-					[]interface{}{"adam", "cz", 5, "ciechanowo"},
-					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2))),
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.name", "p.surname", "p.age", "p.city"},
-					[]interface{}{"kuba", "m", 2, "warsaw"},
-					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 3))),
+			want: []wanted{
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"jan", "chomiak", 3, "warsaw"}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"wojtek", "kuzminski", 4, "warsaw"}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"adam", "cz", 5, "ciechanowo"}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"kuba", "m", 2, "warsaw"}),
+					error: false,
+				},
+				{
+					record: nil,
+					error:  true,
+				},
+				{
+					record: nil,
+					error:  true,
+				},
 			},
 		},
 		{
@@ -224,23 +319,59 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			hasColumnHeader: true,
 			separator:       ";",
 			fields:          []string{"name", "surname", "age", "city"},
-			want: []*execution.Record{
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.name", "p.surname", "p.age", "p.city"},
-					[]interface{}{"jan", "chomiak", 3, "warsaw"},
-					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0))),
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.name", "p.surname", "p.age", "p.city"},
-					[]interface{}{"wojtek", "kuzminski", 4, "warsaw"},
-					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1))),
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.name", "p.surname", "p.age", "p.city"},
-					[]interface{}{"adam", "cz", 5, "ciechanowo"},
-					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2))),
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.name", "p.surname", "p.age", "p.city"},
-					[]interface{}{"kuba", "m", 2, "warsaw"},
-					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 3))),
+			want: []wanted{
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"jan", "chomiak", 3, "warsaw"}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"wojtek", "kuzminski", 4, "warsaw"}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"adam", "cz", 5, "ciechanowo"}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name",
+							"p.surname",
+							"p.age",
+							"p.city",
+						},
+						[]interface{}{"kuba", "m", 2, "warsaw"}),
+					error: false,
+				},
+				{
+					record: nil,
+					error:  true,
+				},
+				{
+					record: nil,
+					error:  true,
+				},
 			},
 		},
 		{
@@ -249,30 +380,53 @@ func TestCSVRecordStream_Next(t *testing.T) {
 			hasColumnHeader: true,
 			separator:       ";",
 			fields:          []string{"name, surname, age, city"},
-			want: []*execution.Record{
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.name, surname, age, city"},
-					[]interface{}{"jan, chomiak, 3, warsaw"},
-					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0))),
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.name, surname, age, city"},
-					[]interface{}{"wojtek, kuzminski, 4, warsaw"},
-					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1))),
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.name, surname, age, city"},
-					[]interface{}{"adam, cz, 5, ciechanowo"},
-					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2))),
-				execution.NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{"p.name, surname, age, city"},
-					[]interface{}{"kuba, m, 2, warsaw"},
-					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 3))),
+			want: []wanted{
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name, surname, age, city",
+						},
+						[]interface{}{"jan, chomiak, 3, warsaw"}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name, surname, age, city",
+						},
+						[]interface{}{"wojtek, kuzminski, 4, warsaw"}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name, surname, age, city",
+						},
+						[]interface{}{"adam, cz, 5, ciechanowo"}),
+					error: false,
+				},
+				{
+					record: execution.NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{
+							"p.name, surname, age, city",
+						},
+						[]interface{}{"kuba, m, 2, warsaw"}),
+					error: false,
+				},
+				{
+					record: nil,
+					error:  true,
+				},
+				{
+					record: nil,
+					error:  true,
+				},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stateStorage := execution.GetTestStorage(t)
 			ds, err := NewDataSourceBuilderFactory()("test", csvDbs[tt.csvName].alias)[0].Materialize(context.Background(), &physical.MaterializationContext{
 				Config: &config.Config{
 					DataSources: []config.DataSourceConfig{
@@ -282,35 +436,34 @@ func TestCSVRecordStream_Next(t *testing.T) {
 								"path":      csvDbs[tt.csvName].path,
 								"headerRow": tt.hasColumnHeader,
 								"separator": tt.separator,
-								"batchSize": 2,
 							},
 						},
 					},
 				},
-				Storage: stateStorage,
 			})
 			if err != nil {
 				t.Errorf("Error creating data source: %v", err)
 			}
-
-			tx := stateStorage.BeginTransaction()
-			defer tx.Abort()
-
-			got, _, err := ds.Get(storage.InjectStateTransaction(ctx, tx), octosql.NoVariables(), streamId)
+			rs, _, err := ds.Get(ctx, octosql.NoVariables(), execution.GetRawStreamID())
 			if err != nil {
 				t.Errorf("DataSource.Get() error: %v", err)
 				return
 			}
 
-			want, _, err := execution.NewDummyNode(tt.want).Get(storage.InjectStateTransaction(ctx, tx), octosql.NoVariables(), streamId)
-			if err := tx.Commit(); err != nil {
-				t.Fatal(err)
-			}
+			for _, expected := range tt.want {
+				got, err := rs.Next(ctx)
 
-			if err := execution.AreStreamsEqualNoOrdering(storage.InjectStateTransaction(ctx, tx), stateStorage, want, got); err != nil {
-				t.Errorf("Streams aren't equal: %v", err)
-				return
+				if err != nil || (err != nil) != expected.error {
+					if (err != nil) != expected.error {
+						t.Errorf("DataSource.Next() error is %v, want %v", err, expected.error)
+					}
+					continue
+				}
+
+				if !reflect.DeepEqual(expected.record, got) {
+					t.Errorf("DataSource.Next() is %v, want %v", expected.record, got)
+				}
 			}
 		})
 	}
-}
+}*/

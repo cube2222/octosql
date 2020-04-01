@@ -173,10 +173,13 @@ func TestFilteredStream_Next(t *testing.T) {
 				variables: tt.fields.variables,
 				source:    tt.fields.source,
 			}
-			err := AreStreamsEqual(ctx, stream, tt.want)
+			equal, err := AreStreamsEqual(ctx, stream, tt.want)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("FilteredStream.Next() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			if err == nil && !equal {
+				t.Errorf("FilteredStream.Next() streams not equal")
 			}
 		})
 	}

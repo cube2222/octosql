@@ -150,10 +150,6 @@ func (r *Record) ShowFields() []Field {
 		})
 	}
 
-	fields = append(fields, Field{
-		Name: octosql.NewVariableName("sys.id"),
-	})
-
 	return fields
 }
 

@@ -164,10 +164,12 @@ func TestTumble_Get(t *testing.T) {
 				t.Errorf("Range.Get() error = %v", err)
 				return
 			}
-
-			err = execution.AreStreamsEqual(ctx, got, want)
+			eq, err := execution.AreStreamsEqual(ctx, got, want)
 			if err != nil {
 				t.Errorf("Tumble.Get() AreStreamsEqual error = %v", err)
+			}
+			if !eq {
+				t.Errorf("Tumble.Get() streams not equal")
 			}
 
 			if err := tx.Commit(); err != nil {

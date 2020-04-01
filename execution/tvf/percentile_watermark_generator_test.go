@@ -252,12 +252,10 @@ func TestPercentileWatermarkGenerator_Stream(t *testing.T) {
 				t.Errorf("PercentileWatermarkGenerator.Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			eq, err := execution.AreStreamsEqual(ctx, got, wanted)
+
+			err = execution.AreStreamsEqual(ctx, got, wanted)
 			if err != nil {
 				t.Errorf("PercentileWatermarkGenerator.Get() AreStreamsEqual error = %v", err)
-			}
-			if !eq {
-				t.Errorf("PercentileWatermarkGenerator.Get() streams not equal")
 			}
 
 			if err := tx.Commit(); err != nil {

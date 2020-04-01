@@ -44,6 +44,7 @@ func (printer *StdOutPrinter) Run(ctx context.Context) error {
 		if err != nil {
 			return errors.Wrap(err, "couldn't list records")
 		}
+
 		if len(records) > 0 && !records[0].EventTimeField().Empty() {
 			sort.SliceStable(records, func(i, j int) bool {
 				return records[i].EventTime().AsTime().Before(records[j].EventTime().AsTime())

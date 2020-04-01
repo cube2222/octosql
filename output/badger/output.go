@@ -191,11 +191,11 @@ func (o *Output) ListRecords(ctx context.Context, tx storage.StateTransaction) (
 			)
 		}
 	}
-	if err := iter.Close(); err != nil {
-		return nil, errors.Wrap(err, "couldn't close iterator")
-	}
 	if err != storage.ErrEndOfIterator {
 		return nil, errors.Wrap(err, "couldn't iterate over records")
+	}
+	if err := iter.Close(); err != nil {
+		return nil, errors.Wrap(err, "couldn't close iterator")
 	}
 
 	return outRecords, nil

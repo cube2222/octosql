@@ -194,7 +194,7 @@ func (ds *DistinctStream) Trigger(ctx context.Context, tx storage.StateTransacti
 			return nil, errors.Wrap(err, "couldn't mark record as retracted")
 		}
 
-		return []*Record{NewRecordFromRecord(&record, WithNoUndo(), WithID(NewID(recordID.AsString())))}, nil
+		return []*Record{NewRecordFromRecord(&record, WithNoUndo(), WithID(NewRecordID(recordID.AsString())))}, nil
 	} else if wasRecordTriggered && !isRecordPresent {
 		// The record was triggered, but it isn't present
 
@@ -216,7 +216,7 @@ func (ds *DistinctStream) Trigger(ctx context.Context, tx storage.StateTransacti
 		}
 
 		// Send the retraction
-		return []*Record{NewRecordFromRecord(&record, WithUndo(), WithID(NewID(recordID.AsString())))}, nil
+		return []*Record{NewRecordFromRecord(&record, WithUndo(), WithID(NewRecordID(recordID.AsString())))}, nil
 
 	}
 

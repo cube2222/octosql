@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"sort"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/metadata"
+	"github.com/cube2222/octosql/streaming/storage"
 )
 
 var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
@@ -23,9 +25,11 @@ var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 }
 
 type DataSource struct {
-	path        string
-	alias       string
-	arrayFormat bool
+	path         string
+	alias        string
+	arrayFormat  bool
+	batchSize    int
+	stateStorage storage.Storage
 }
 
 func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
@@ -39,11 +43,17 @@ func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't get if json in array form")
 			}
+			batchSize, err := config.GetInt(dbConfig, "batchSize", config.WithDefault(1000))
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't get batch size")
+			}
 
 			return &DataSource{
-				path:        path,
-				arrayFormat: arrayFormat,
-				alias:       alias,
+				path:         path,
+				arrayFormat:  arrayFormat,
+				alias:        alias,
+				batchSize:    batchSize,
+				stateStorage: matCtx.Storage,
 			}, nil
 		},
 		nil,
@@ -59,31 +69,38 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 }
 
 func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
-	file, err := os.Open(ds.path)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't open file")
-	}
-
-	return &RecordStream{
+	rs := &RecordStream{
+		stateStorage:                  ds.stateStorage,
 		streamID:                      streamID,
 		arrayFormat:                   ds.arrayFormat,
 		arrayFormatOpeningBracketRead: false,
-		file:                          file,
-		decoder:                       json.NewDecoder(file),
+		filePath:                      ds.path,
 		isDone:                        false,
 		alias:                         ds.alias,
-	}, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), nil
+		batchSize:                     ds.batchSize,
+	}
+
+	go func() {
+		log.Println("worker start")
+		rs.RunWorker(ctx)
+		log.Println("worker done")
+	}()
+
+	return rs, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), nil
 }
 
 type RecordStream struct {
+	stateStorage                  storage.Storage
 	streamID                      *execution.StreamID
 	arrayFormat                   bool
 	arrayFormatOpeningBracketRead bool
+	filePath                      string
 	file                          *os.File
 	decoder                       *json.Decoder
 	isDone                        bool
 	alias                         string
 	offset                        int
+	batchSize                     int
 }
 
 func (rs *RecordStream) Close() error {
@@ -95,11 +112,151 @@ func (rs *RecordStream) Close() error {
 	return nil
 }
 
-func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
+func (rs *RecordStream) RunWorker(ctx context.Context) {
+	for { // outer for is loading offset value and moving file iterator
+		tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
+
+		if err := rs.loadOffset(tx); err != nil {
+			log.Fatalf("json worker: couldn't reinitialize offset for json read batch worker: %s", err)
+			return
+		}
+
+		tx.Abort() // We only read data above, no need to risk failing now.
+
+		// Load/Reload file
+		file, err := os.Open(rs.filePath)
+		if err != nil {
+			log.Fatalf("json worker: couldn't open file: %s", err)
+			return
+		}
+
+		rs.file = file
+		rs.decoder = json.NewDecoder(file)
+
+		// Moving file iterator by `rs.offset`
+		for i := 0; i < rs.offset; i++ {
+			_, err := rs.readRecordFromFile()
+			if err == execution.ErrEndOfStream {
+				return
+			} else if err != nil {
+				log.Fatalf("json worker: couldn't move json file iterator by %d offset: %s", rs.offset, err)
+				return
+			}
+		}
+
+		for { // inner for is calling RunWorkerInternal
+			tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
+
+			err := rs.RunWorkerInternal(ctx, tx)
+			if errors.Cause(err) == execution.ErrNewTransactionRequired {
+				tx.Abort()
+				continue
+			} else if waitableError := execution.GetErrWaitForChanges(err); waitableError != nil {
+				tx.Abort()
+				err = waitableError.ListenForChanges(ctx)
+				if err != nil {
+					log.Println("json worker: couldn't listen for changes: ", err)
+				}
+				err = waitableError.Close()
+				if err != nil {
+					log.Println("json worker: couldn't close storage changes subscription: ", err)
+				}
+				continue
+			} else if err == execution.ErrEndOfStream {
+				err = tx.Commit()
+				if err != nil {
+					log.Println("json worker: couldn't commit transaction: ", err)
+					continue
+				}
+				return
+			} else if err != nil {
+				tx.Abort()
+				log.Printf("json worker: error running json read batch worker: %s, reinitializing from storage", err)
+				break
+			}
+
+			err = tx.Commit()
+			if err != nil {
+				log.Println("json worker: couldn't commit transaction: ", err)
+				continue
+			}
+		}
+	}
+}
+
+var outputQueuePrefix = []byte("$output_queue$")
+
+func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateTransaction) error {
+	outputQueue := execution.NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
+
 	if rs.isDone {
-		return nil, execution.ErrEndOfStream
+		err := outputQueue.Push(ctx, &QueueElement{
+			Type: &QueueElement_EndOfStream{
+				EndOfStream: true,
+			},
+		})
+		if err != nil {
+			return errors.Wrapf(err, "couldn't push json EndOfStream to output record queue")
+		}
+
+		return execution.ErrEndOfStream
 	}
 
+	batch := make([]*execution.Record, 0)
+	for i := 0; i < rs.batchSize; i++ {
+		record, err := rs.readRecordFromFile()
+		if err == execution.ErrEndOfStream {
+			break
+		} else if err != nil {
+			return errors.Wrap(err, "couldn't read record from json file")
+		}
+
+		aliasedRecord := make(map[octosql.VariableName]octosql.Value)
+		for k, v := range record {
+			if str, ok := v.(string); ok {
+				parsed, err := time.Parse(time.RFC3339, str)
+				if err == nil {
+					v = parsed
+				}
+			}
+			aliasedRecord[octosql.NewVariableName(fmt.Sprintf("%s.%s", rs.alias, k))] = octosql.NormalizeType(v)
+		}
+
+		fields := make([]octosql.VariableName, 0)
+		for k := range aliasedRecord {
+			fields = append(fields, k)
+		}
+
+		sort.Slice(fields, func(i, j int) bool {
+			return fields[i] < fields[j]
+		})
+
+		batch = append(batch, execution.NewRecord(
+			fields,
+			aliasedRecord,
+			execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(rs.streamID, rs.offset+i))))
+	}
+
+	for i := range batch {
+		err := outputQueue.Push(ctx, &QueueElement{
+			Type: &QueueElement_Record{
+				Record: batch[i],
+			},
+		})
+		if err != nil {
+			return errors.Wrapf(err, "couldn't push json record with index %d in batch to output record queue", i)
+		}
+	}
+
+	rs.offset = rs.offset + len(batch)
+	if err := rs.saveOffset(tx); err != nil {
+		return errors.Wrap(err, "couldn't save json offset")
+	}
+
+	return nil
+}
+
+func (rs *RecordStream) readRecordFromFile() (map[octosql.VariableName]interface{}, error) {
 	if rs.arrayFormat && !rs.arrayFormatOpeningBracketRead {
 		tok, err := rs.decoder.Token() // Read opening [
 		if tok != json.Delim('[') {
@@ -123,31 +280,57 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 		return nil, errors.Wrap(err, "couldn't decode json record")
 	}
 
-	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
-	for k, v := range record {
-		if str, ok := v.(string); ok {
-			parsed, err := time.Parse(time.RFC3339, str)
-			if err == nil {
-				v = parsed
-			}
-		}
-		aliasedRecord[octosql.NewVariableName(fmt.Sprintf("%s.%s", rs.alias, k))] = octosql.NormalizeType(v)
+	return record, nil
+}
+
+var offsetPrefix = []byte("json_offset")
+
+func (rs *RecordStream) loadOffset(tx storage.StateTransaction) error {
+	offsetState := storage.NewValueState(tx.WithPrefix(offsetPrefix))
+
+	var offset octosql.Value
+	err := offsetState.Get(&offset)
+	if err == storage.ErrNotFound {
+		offset = octosql.MakeInt(0)
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't load json offset from state storage")
 	}
 
-	fields := make([]octosql.VariableName, 0)
-	for k := range aliasedRecord {
-		fields = append(fields, k)
+	rs.offset = offset.AsInt()
+
+	return nil
+}
+
+func (rs *RecordStream) saveOffset(tx storage.StateTransaction) error {
+	offsetState := storage.NewValueState(tx.WithPrefix(offsetPrefix))
+
+	offset := octosql.MakeInt(rs.offset)
+	err := offsetState.Set(&offset)
+	if err != nil {
+		return errors.Wrap(err, "couldn't save json offset to state storage")
 	}
 
-	sort.Slice(fields, func(i, j int) bool {
-		return fields[i] < fields[j]
-	})
+	return nil
+}
 
-	curOffset := rs.offset
-	rs.offset++
-	return execution.NewRecord(
-		fields,
-		aliasedRecord,
-		execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(rs.streamID, curOffset)),
-	), nil
+func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
+	tx := storage.GetStateTransactionFromContext(ctx).WithPrefix(rs.streamID.AsPrefix())
+	outputQueue := execution.NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
+
+	var queueElement QueueElement
+	err := outputQueue.Pop(ctx, &queueElement)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't pop queue element")
+	}
+
+	switch queueElement := queueElement.Type.(type) {
+	case *QueueElement_Record:
+		return queueElement.Record, nil
+	case *QueueElement_EndOfStream:
+		return nil, execution.ErrEndOfStream
+	case *QueueElement_Error:
+		return nil, errors.New(queueElement.Error)
+	default:
+		panic("invalid queue element type")
+	}
 }

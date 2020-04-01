@@ -135,10 +135,6 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		batchSize:    ds.batchSize,
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-	rs.workerCtxCancel = cancel
-	rs.workerCloseErrChan = make(chan error)
-
 	go func() {
 		log.Println("worker start")
 		rs.RunWorker(ctx)
@@ -161,9 +157,6 @@ type RecordStream struct {
 	placeholders []execution.Expression
 	offset       int
 	batchSize    int
-
-	workerCtxCancel    func()
-	workerCloseErrChan chan error
 }
 
 func (rs *RecordStream) Close() error {
@@ -229,12 +222,6 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 		rs.columns = columns
 
 		for { // inner for is calling RunWorkerInternal
-			select {
-			case <-ctx.Done():
-				rs.workerCloseErrChan <- ctx.Err()
-			default:
-			}
-
 			tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
 
 			err := rs.RunWorkerInternal(ctx, tx)
@@ -281,8 +268,8 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 
 	if rs.isDone {
 		err := outputQueue.Push(ctx, &QueueElement{
-			Type: &QueueElement_Error{
-				Error: execution.ErrEndOfStream.Error(),
+			Type: &QueueElement_EndOfStream{
+				EndOfStream: true,
 			},
 		})
 		if err != nil {
@@ -392,11 +379,9 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 	switch queueElement := queueElement.Type.(type) {
 	case *QueueElement_Record:
 		return queueElement.Record, nil
+	case *QueueElement_EndOfStream:
+		return nil, execution.ErrEndOfStream
 	case *QueueElement_Error:
-		if queueElement.Error == execution.ErrEndOfStream.Error() {
-			return nil, execution.ErrEndOfStream
-		}
-
 		return nil, errors.New(queueElement.Error)
 	default:
 		panic("invalid queue element type")

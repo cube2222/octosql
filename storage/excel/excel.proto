@@ -1,6 +1,6 @@
 syntax = "proto3";
-package sql;
-option go_package = "github.com/cube2222/octosql/storage/sql";
+package excel;
+option go_package = "github.com/cube2222/octosql/storage/excel";
 import "execution/record.proto";
 
 message QueueElement {

@@ -107,7 +107,7 @@ func Normalize(rec *Record) *Record {
 	return NewRecordFromSliceWithNormalize(sortedFieldNames, values)
 }
 
-func AreStreamsEqual(ctx context.Context, first, second RecordStream) (bool, error) {
+func AreStreamsEqual(ctx context.Context, first, second RecordStream) error {
 	for {
 		firstRec, firstErr := first.Next(ctx)
 		secondRec, secondErr := second.Next(ctx)
@@ -115,21 +115,21 @@ func AreStreamsEqual(ctx context.Context, first, second RecordStream) (bool, err
 		if firstErr == secondErr && firstErr == ErrEndOfStream {
 			break
 		} else if firstErr == ErrEndOfStream && secondErr == nil {
-			return false, fmt.Errorf("no record in first stream, %s in second", secondRec.String())
+			return fmt.Errorf("no record in first stream, %s in second", secondRec.String())
 		} else if firstErr == nil && secondErr == ErrEndOfStream {
-			return false, fmt.Errorf("no record in second stream, %s in first", firstRec.String())
+			return fmt.Errorf("no record in second stream, %s in first", firstRec.String())
 		} else if firstErr != nil {
-			return false, errors.Wrap(firstErr, "error in Next for first stream")
+			return errors.Wrap(firstErr, "error in Next for first stream")
 		} else if secondErr != nil {
-			return false, errors.Wrap(secondErr, "error in Next for second stream")
+			return errors.Wrap(secondErr, "error in Next for second stream")
 		}
 
 		if !firstRec.Equal(secondRec) {
-			return false, fmt.Errorf("records not equal: %s and %s", firstRec.String(), secondRec.String())
+			return fmt.Errorf("records not equal: %s and %s", firstRec.String(), secondRec.String())
 		}
 	}
 
-	return true, nil
+	return nil
 }
 
 func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage, first, second RecordStream) error {

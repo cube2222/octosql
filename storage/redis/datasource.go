@@ -115,11 +115,10 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 	if len(keysWanted.keys) == 0 { // EntireDatabaseStream
 		rs.isEntireDatabaseStream = true
 	} else { // KeySpecificStream
-		sliceKeys := make([]string, 0)
+		rs.keys = make([]string, 0)
 		for k := range keysWanted.keys {
-			sliceKeys = append(sliceKeys, k)
+			rs.keys = append(rs.keys, k)
 		}
-		rs.keys = sliceKeys
 	}
 
 	go func() {
@@ -237,7 +236,6 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 			return errors.Wrapf(err, "couldn't push csv EndOfStream to output record queue")
 		}
 
-		log.Println("csv worker: ErrEndOfStream pushed")
 		return execution.ErrEndOfStream
 	}
 
@@ -309,8 +307,6 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 		if err != nil {
 			return errors.Wrapf(err, "couldn't push redis record with index %d in batch to output record queue", i)
 		}
-
-		log.Println("redis worker: record pushed: ", batch[i])
 	}
 
 	rs.offset = rs.offset + len(batch)

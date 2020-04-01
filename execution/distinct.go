@@ -228,13 +228,17 @@ type RecordExpression struct{}
 
 func (re *RecordExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
 	fields := variables.DeterministicOrder()
-	fieldValues := make([]octosql.Value, len(fields))
-	values := make([]octosql.Value, len(fields))
+	fieldValues := make([]octosql.Value, 0)
+	values := make([]octosql.Value, 0)
 
-	for i, f := range fields {
+	for _, f := range fields {
+		if f.Source() == "sys" { // TODO: some better way to do this?
+			continue
+		}
+
 		v, _ := variables.Get(f)
-		values[i] = v
-		fieldValues[i] = octosql.MakeString(f.String())
+		values = append(values, v)
+		fieldValues = append(fieldValues, octosql.MakeString(f.String()))
 	}
 
 	fieldTuple := octosql.MakeTuple(fieldValues)

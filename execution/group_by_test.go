@@ -1,8 +1,10 @@
 package execution_test
 
+/*
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/cube2222/octosql"
 	. "github.com/cube2222/octosql/execution"
@@ -288,7 +290,7 @@ func TestGroupBy_newRecordsNoChanges(t *testing.T) {
 	}
 }
 
-/*func TestGroupBy_EventTimes(t *testing.T) {
+func TestGroupBy_EventTimes(t *testing.T) {
 	stateStorage := GetTestStorage(t)
 	defer func() {
 		go stateStorage.Close()

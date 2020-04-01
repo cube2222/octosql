@@ -218,7 +218,6 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 			return errors.Wrapf(err, "couldn't push csv EndOfStream to output record queue")
 		}
 
-		log.Println("csv worker: ErrEndOfStream pushed")
 		return execution.ErrEndOfStream
 	}
 
@@ -246,8 +245,6 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 		if err != nil {
 			return errors.Wrapf(err, "couldn't push csv record with index %d in batch to output record queue", i)
 		}
-
-		log.Println("csv worker: record pushed: ", batch[i])
 	}
 
 	rs.offset = rs.offset + len(batch)

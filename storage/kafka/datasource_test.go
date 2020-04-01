@@ -110,6 +110,10 @@ func TestRecordStream_Next(t *testing.T) {
 		t.Run("kafka test", func(t *testing.T) {
 			ctx := context.Background()
 			stateStorage := execution.GetTestStorage(t)
+			defer func() {
+				go stateStorage.Close()
+			}()
+
 			brokers := []string{"localhost:9092"}
 
 			kafkaMessages := make([]kafka.Message, len(tt.messages))

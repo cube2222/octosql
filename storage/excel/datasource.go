@@ -242,7 +242,6 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 			return errors.Wrapf(err, "couldn't push excel EndOfStream to output record queue")
 		}
 
-		log.Println("excel worker: ErrEndOfStream pushed")
 		return execution.ErrEndOfStream
 	}
 
@@ -270,8 +269,6 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 		if err != nil {
 			return errors.Wrapf(err, "couldn't push excel record with index %d in batch to output record queue", i)
 		}
-
-		log.Println("excel worker: record pushed: ", batch[i])
 	}
 
 	rs.offset = rs.offset + len(batch)

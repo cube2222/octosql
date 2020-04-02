@@ -27,7 +27,7 @@ func (o *Output) ReadyForMore(ctx context.Context, tx storage.StateTransaction) 
 
 func (o *Output) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *execution.Record) error {
 	if inputIndex != 0 {
-		return errors.Errorf("input with index other than 0 not allowed in output, got %d", inputIndex)
+		return errors.Errorf("only one input stream allowed for output, got input index %d", inputIndex)
 	}
 	records := storage.NewMap(tx.WithPrefix(recordsPrefix))
 
@@ -38,31 +38,29 @@ func (o *Output) AddRecord(ctx context.Context, tx storage.StateTransaction, inp
 
 	key := octosql.MakeObject(recordKV)
 
-	var octoIDs octosql.Value
-	err := records.Get(&key, &octoIDs)
+	var recordData RecordData
+	err := records.Get(&key, &recordData)
 	if err == storage.ErrNotFound {
-		octoIDs = octosql.MakeTuple(nil)
 	} else if err != nil {
 		return errors.Wrap(err, "couldn't get current IDs for record value")
 	}
-	IDs := octoIDs.AsSlice()
 
-	if !record.IsUndo() {
-		newIDs := octosql.MakeTuple(append(IDs, octosql.MakeString(record.ID().Show())))
-		if err := records.Set(&key, &newIDs); err != nil {
-			return errors.Wrap(err, "couldn't add record ID to output records")
+	if len(recordData.Ids) == 0 {
+		recordData.Ids = append(recordData.Ids, record.ID())
+		recordData.IsUndo = record.IsUndo()
+	} else if recordData.IsUndo != record.IsUndo() {
+		recordData.Ids = recordData.Ids[:len(recordData.Ids)-1]
+	} else {
+		recordData.Ids = append(recordData.Ids, record.ID())
+	}
+
+	if len(recordData.Ids) == 0 {
+		if err := records.Delete(&key); err != nil {
+			return errors.Wrap(err, "couldn't delete record from output records")
 		}
 	} else {
-		IDs = IDs[:len(IDs)-1]
-		if len(IDs) == 0 {
-			if err := records.Delete(&key); err != nil {
-				return errors.Wrap(err, "couldn't delete record from output records")
-			}
-		} else {
-			newIDs := octosql.MakeTuple(IDs)
-			if err := records.Set(&key, &newIDs); err != nil {
-				return errors.Wrap(err, "couldn't remove single record ID from output records")
-			}
+		if err := records.Set(&key, &recordData); err != nil {
+			return errors.Wrap(err, "couldn't remove single record ID from output records")
 		}
 	}
 
@@ -160,8 +158,8 @@ func (o *Output) ListRecords(ctx context.Context, tx storage.StateTransaction) (
 	var outRecords []*execution.Record
 	var err error
 	var octoKey octosql.Value
-	var octoIDs octosql.Value
-	for err = iter.Next(&octoKey, &octoIDs); err == nil; err = iter.Next(&octoKey, &octoIDs) {
+	var recordData RecordData
+	for err = iter.Next(&octoKey, &recordData); err == nil; err = iter.Next(&octoKey, &recordData) {
 		object := octoKey.AsMap()
 		var fields []string
 		for k := range object {
@@ -179,14 +177,21 @@ func (o *Output) ListRecords(ctx context.Context, tx storage.StateTransaction) (
 			variableNames[i] = octosql.NewVariableName(fields[i])
 		}
 
-		for _, id := range octoIDs.AsSlice() {
+		for _, id := range recordData.Ids {
+			opts := []execution.RecordOption{
+				execution.WithID(id),
+				execution.WithEventTimeField(o.EventTimeField),
+			}
+			if recordData.IsUndo {
+				opts = append(opts, execution.WithUndo())
+			}
+
 			outRecords = append(
 				outRecords,
 				execution.NewRecordFromSlice(
 					variableNames,
 					data,
-					execution.WithID(execution.NewRecordID(id.AsString())),
-					execution.WithEventTimeField(o.EventTimeField),
+					opts...,
 				),
 			)
 		}

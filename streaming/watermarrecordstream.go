@@ -37,7 +37,7 @@ func (w *WatermarkRecordStream) Next(ctx context.Context) (*execution.Record, er
 	}
 }
 
-func (w *WatermarkRecordStream) Close() error {
+func (w *WatermarkRecordStream) Close(ctx context.Context) error {
 	return nil
 }
 

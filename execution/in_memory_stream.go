@@ -30,7 +30,7 @@ func NewInMemoryStream(ctx context.Context, data []*Record) *InMemoryStream {
 	}
 }
 
-func (ims *InMemoryStream) Close() error {
+func (ims *InMemoryStream) Close(ctx context.Context) error {
 	return nil
 }
 

@@ -73,10 +73,9 @@ func (node *UnifiedStream) GetWatermark(ctx context.Context, tx storage.StateTra
 	return earliestWatermark, nil
 }
 
-func (node *UnifiedStream) Close() error {
+func (node *UnifiedStream) Close(ctx context.Context) error {
 	for i := range node.sources {
-		err := node.sources[i].Close()
-		if err != nil {
+		if err := node.sources[i].Close(ctx); err != nil {
 			return errors.Wrapf(err, "couldn't close source stream with index %d", i)
 		}
 	}

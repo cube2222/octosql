@@ -90,6 +90,6 @@ func (s *RangeStream) Next(ctx context.Context) (*execution.Record, error) {
 }
 
 // TODO: Cleanup
-func (s *RangeStream) Close() error {
+func (s *RangeStream) Close(ctx context.Context) error {
 	return nil
 }

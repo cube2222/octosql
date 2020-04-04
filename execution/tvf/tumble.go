@@ -115,6 +115,6 @@ func (s *TumbleStream) Next(ctx context.Context) (*execution.Record, error) {
 	return newRecord, nil
 }
 
-func (s *TumbleStream) Close() error {
-	return s.source.Close()
+func (s *TumbleStream) Close(ctx context.Context) error {
+	return s.source.Close(ctx)
 }

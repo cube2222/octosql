@@ -159,7 +159,7 @@ type RecordStream struct {
 	batchSize    int
 }
 
-func (rs *RecordStream) Close() error {
+func (rs *RecordStream) Close(ctx context.Context) error {
 	if err := rs.rows.Close(); err != nil {
 		return errors.Wrap(err, "couldn't close underlying SQL rows")
 	}

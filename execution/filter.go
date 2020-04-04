@@ -43,10 +43,9 @@ type FilteredStream struct {
 	source    RecordStream
 }
 
-func (stream *FilteredStream) Close() error {
-	err := stream.source.Close()
-	if err != nil {
-		return errors.Wrap(err, "Couldn't close underlying stream")
+func (stream *FilteredStream) Close(ctx context.Context) error {
+	if err := stream.source.Close(ctx); err != nil {
+		return errors.Wrap(err, "couldn't close underlying stream")
 	}
 
 	return nil

@@ -3,7 +3,6 @@ package execution
 import (
 	"context"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/golang/protobuf/proto"
@@ -262,7 +261,7 @@ func (id *RecordID) MonotonicUnmarshal(data []byte) error {
 
 type RecordStream interface {
 	Next(ctx context.Context) (*Record, error)
-	io.Closer
+	Close(ctx context.Context) error
 }
 
 var ErrEndOfStream = errors.New("end of stream")

@@ -210,14 +210,12 @@ func (engine *PullEngine) GetWatermark(ctx context.Context, tx storage.StateTran
 	return engine.irs.GetWatermark(ctx, prefixedTx)
 }
 
-func (engine *PullEngine) Close() error {
-	err := engine.source.Close()
-	if err != nil {
+func (engine *PullEngine) Close(ctx context.Context) error {
+	if err := engine.source.Close(ctx); err != nil {
 		return errors.Wrap(err, "couldn't close source stream")
 	}
 
-	err = engine.irs.Close()
-	if err != nil {
+	if err := engine.irs.Close(); err != nil {
 		return errors.Wrap(err, "couldn't close intermediate record store")
 	}
 

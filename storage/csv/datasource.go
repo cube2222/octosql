@@ -119,9 +119,8 @@ type RecordStream struct {
 	batchSize       int
 }
 
-func (rs *RecordStream) Close() error {
-	err := rs.file.Close()
-	if err != nil {
+func (rs *RecordStream) Close(ctx context.Context) error {
+	if err := rs.file.Close(); err != nil {
 		return errors.Wrap(err, "couldn't close underlying file")
 	}
 

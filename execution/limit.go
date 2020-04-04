@@ -61,9 +61,8 @@ type LimitedStream struct {
 	streamID *StreamID
 }
 
-func (node *LimitedStream) Close() error {
-	err := node.rs.Close()
-	if err != nil {
+func (node *LimitedStream) Close(ctx context.Context) error {
+	if err := node.rs.Close(ctx); err != nil {
 		return errors.Wrap(err, "couldn't close underlying stream")
 	}
 

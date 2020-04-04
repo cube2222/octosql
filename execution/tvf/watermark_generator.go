@@ -118,6 +118,6 @@ func (s *WatermarkGeneratorStream) Next(ctx context.Context) (*execution.Record,
 	return srcRecord, nil
 }
 
-func (s *WatermarkGeneratorStream) Close() error {
-	return s.source.Close()
+func (s *WatermarkGeneratorStream) Close(ctx context.Context) error {
+	return s.source.Close(ctx)
 }

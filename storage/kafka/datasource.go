@@ -374,7 +374,7 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 	}
 }
 
-func (rs *RecordStream) Close() error {
+func (rs *RecordStream) Close(ctx context.Context) error {
 	rs.workerCtxCancel()
 	err := <-rs.workerCloseErrChan
 	if err == context.Canceled {

@@ -295,6 +295,6 @@ func removeOldestEvent(tx storage.StateTransaction) error {
 	return nil
 }
 
-func (s *PercentileWatermarkGeneratorStream) Close() error {
-	return s.source.Close()
+func (s *PercentileWatermarkGeneratorStream) Close(ctx context.Context) error {
+	return s.source.Close(ctx)
 }

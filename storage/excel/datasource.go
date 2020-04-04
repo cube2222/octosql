@@ -139,7 +139,7 @@ type RecordStream struct {
 	batchSize   int
 }
 
-func (rs *RecordStream) Close() error {
+func (rs *RecordStream) Close(ctx context.Context) error {
 	return nil
 }
 

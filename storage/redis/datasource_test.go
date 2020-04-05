@@ -44,7 +44,7 @@ func TestDataSource_Get(t *testing.T) {
 		want    []*execution.Record
 		wantErr bool
 	}{
-		//{ // Infinite loop, because error in getting key occurs (key not found)
+		// { // Infinite loop, because error in getting key occurs (key not found)
 		//	name: "test - record not in base",
 		//	fields: fields{
 		//		hostname: hostname,
@@ -66,7 +66,7 @@ func TestDataSource_Get(t *testing.T) {
 		//	},
 		//	want: []*execution.Record{},
 		//	wantErr: false,
-		//},
+		// },
 		{
 			name: "bigger test - no filter",
 			fields: fields{
@@ -858,7 +858,16 @@ func TestDataSource_Get(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if err := execution.AreStreamsEqualNoOrdering(storage.InjectStateTransaction(ctx, tx), stateStorage, want, got); err != nil {
+			if err := execution.AreStreamsEqualNoOrdering(
+				storage.InjectStateTransaction(ctx, tx),
+				stateStorage,
+				want,
+				got,
+				execution.WithEqualityBasedOn(
+					execution.EqualityOfFieldsAndValues,
+					execution.EqualityOfUndo,
+				),
+			); err != nil {
 				t.Errorf("Streams aren't equal: %v", err)
 				return
 			}

@@ -562,7 +562,7 @@ func TestDataSource_Get(t *testing.T) {
 			want: []*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"r.key", "r.age", "r.city", "r.name", "r.surname"},
-					[]interface{}{"key1", "4", "zacisze", "janek", "ch"},
+					[]interface{}{"key1", "4", "zaciszee", "janek", "ch"},
 					execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0))),
 			},
 			wantErr: false,

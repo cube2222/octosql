@@ -52,6 +52,7 @@ func (w *WatermarkGenerator) Get(ctx context.Context, variables octosql.Variable
 	}
 
 	ws := &WatermarkGeneratorStream{
+		streamID:  streamID,
 		source:    source,
 		timeField: w.timeField,
 		offset:    offset.AsDuration(),
@@ -61,6 +62,7 @@ func (w *WatermarkGenerator) Get(ctx context.Context, variables octosql.Variable
 }
 
 type WatermarkGeneratorStream struct {
+	streamID  *execution.StreamID
 	source    execution.RecordStream
 	timeField octosql.VariableName
 	offset    time.Duration
@@ -69,7 +71,7 @@ type WatermarkGeneratorStream struct {
 var watermarkPrefix = []byte("$watermark$")
 
 func (s *WatermarkGeneratorStream) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
-	watermarkStorage := storage.NewValueState(tx.WithPrefix(watermarkPrefix))
+	watermarkStorage := storage.NewValueState(tx.WithPrefix(s.streamID.AsPrefix()).WithPrefix(watermarkPrefix))
 
 	var currentWatermark octosql.Value
 	err := watermarkStorage.Get(&currentWatermark)
@@ -106,7 +108,7 @@ func (s *WatermarkGeneratorStream) Next(ctx context.Context) (*execution.Record,
 	}
 
 	if timeValueWithOffset.After(currentWatermark) { // time in current record is bigger than current watermark - update it
-		watermarkStorage := storage.NewValueState(tx.WithPrefix(watermarkPrefix))
+		watermarkStorage := storage.NewValueState(tx.WithPrefix(s.streamID.AsPrefix()).WithPrefix(watermarkPrefix))
 
 		newWatermark := octosql.MakeTime(timeValueWithOffset)
 		err := watermarkStorage.Set(&newWatermark)
@@ -119,5 +121,14 @@ func (s *WatermarkGeneratorStream) Next(ctx context.Context) (*execution.Record,
 }
 
 func (s *WatermarkGeneratorStream) Close(ctx context.Context) error {
-	return s.source.Close(ctx)
+	if err := s.source.Close(ctx); err != nil {
+		return errors.Wrap(err, "couldn't close underlying stream")
+	}
+
+	storage := storage.GetStateTransactionFromContext(ctx).GetUnderlyingStorage()
+	if err := storage.DropAll(s.streamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
+	}
+
+	return nil
 }

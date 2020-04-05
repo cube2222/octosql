@@ -66,6 +66,11 @@ func (node *LimitedStream) Close(ctx context.Context) error {
 		return errors.Wrap(err, "couldn't close underlying stream")
 	}
 
+	storage := storage.GetStateTransactionFromContext(ctx).GetUnderlyingStorage()
+	if err := storage.DropAll(node.streamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
+	}
+
 	return nil
 }
 

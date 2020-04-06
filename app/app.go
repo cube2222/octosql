@@ -131,6 +131,11 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		}
 	}
 
+	err = stream.Close(storage.InjectStateTransaction(ctx, tx))
+	if err != nil {
+		return errors.Wrap(err, "couldn't close record stream from execution plan")
+	}
+
 	err = app.out.Close()
 	if err != nil {
 		return errors.Wrap(err, "couldn't close output writer")

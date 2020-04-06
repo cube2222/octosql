@@ -164,6 +164,15 @@ func (rs *RecordStream) Close(ctx context.Context) error {
 		return errors.Wrap(err, "couldn't close underlying SQL rows")
 	}
 
+	if err := rs.stmt.Close(); err != nil {
+		return errors.Wrap(err, "couldn't close underlying SQL stmt")
+	}
+
+	storage := storage.GetStateTransactionFromContext(ctx).GetUnderlyingStorage()
+	if err := storage.DropAll(rs.streamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
+	}
+
 	return nil
 }
 
@@ -329,7 +338,8 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 		log.Println("sql worker: record pushed: ", batch[i])
 	}
 
-	if err := rs.saveOffset(tx, len(batch)); err != nil {
+	rs.offset = rs.offset + len(batch)
+	if err := rs.saveOffset(tx); err != nil {
 		return errors.Wrap(err, "couldn't save sql offset")
 	}
 
@@ -352,10 +362,8 @@ func (rs *RecordStream) loadOffset(tx storage.StateTransaction) error {
 	return nil
 }
 
-func (rs *RecordStream) saveOffset(tx storage.StateTransaction, curBatchSize int) error {
+func (rs *RecordStream) saveOffset(tx storage.StateTransaction) error {
 	offsetState := storage.NewValueState(tx.WithPrefix(offsetPrefix))
-
-	rs.offset = rs.offset + curBatchSize
 
 	offset := octosql.MakeInt(rs.offset)
 	err := offsetState.Set(&offset)

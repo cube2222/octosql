@@ -140,6 +140,11 @@ type RecordStream struct {
 }
 
 func (rs *RecordStream) Close(ctx context.Context) error {
+	storage := storage.GetStateTransactionFromContext(ctx).GetUnderlyingStorage()
+	if err := storage.DropAll(rs.streamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
+	}
+
 	return nil
 }
 

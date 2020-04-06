@@ -651,8 +651,17 @@ func (rs *LookupJoinStream) MarkError(ctx context.Context, tx storage.StateTrans
 	return nil
 }
 
-func (rs *LookupJoinStream) Close() error {
-	return nil // TODO: Close this, remove state
+func (rs *LookupJoinStream) Close(ctx context.Context) error {
+	storage := storage.GetStateTransactionFromContext(ctx).GetUnderlyingStorage()
+	if err := storage.DropAll(rs.streamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
+	}
+
+	if err := storage.DropAll(outputWatermarkPrefix); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with output watermark prefix")
+	}
+
+	return nil
 }
 
 type JobOutputQueueIntermediateRecordStore struct {
@@ -723,6 +732,6 @@ func (j *JobOutputQueueIntermediateRecordStore) ReadyForMore(ctx context.Context
 	return nil
 }
 
-func (j *JobOutputQueueIntermediateRecordStore) Close() error {
-	return nil
+func (j *JobOutputQueueIntermediateRecordStore) Close(ctx context.Context) error {
+	return nil // All storages this RecordStore uses are prefixed by pull engine's streamID and therefore will be closed by him
 }

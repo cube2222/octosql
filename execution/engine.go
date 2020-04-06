@@ -53,7 +53,7 @@ type IntermediateRecordStore interface {
 	GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error)
 	MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error
 	MarkError(ctx context.Context, tx storage.StateTransaction, err error) error
-	Close() error
+	Close(ctx context.Context) error
 }
 
 type PullEngine struct {
@@ -215,8 +215,14 @@ func (engine *PullEngine) Close(ctx context.Context) error {
 		return errors.Wrap(err, "couldn't close source stream")
 	}
 
-	if err := engine.irs.Close(); err != nil {
+	if err := engine.irs.Close(ctx); err != nil {
 		return errors.Wrap(err, "couldn't close intermediate record store")
+	}
+
+	// No badger writes are made by pull engine but they are by irs
+	storage := storage.GetStateTransactionFromContext(ctx).GetUnderlyingStorage()
+	if err := storage.DropAll(engine.streamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
 	}
 
 	return nil

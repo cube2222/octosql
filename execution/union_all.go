@@ -80,6 +80,11 @@ func (node *UnifiedStream) Close(ctx context.Context) error {
 		}
 	}
 
+	storage := storage.GetStateTransactionFromContext(ctx).GetUnderlyingStorage()
+	if err := storage.DropAll(node.streamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
+	}
+
 	return nil
 }
 
@@ -87,7 +92,7 @@ var endsOfStreamsPrefix = []byte("$end_of_streams$")
 
 func (node *UnifiedStream) Next(ctx context.Context) (*Record, error) {
 	tx := storage.GetStateTransactionFromContext(ctx).WithPrefix(node.streamID.AsPrefix())
-	endOfStreamsMap := storage.NewMap(tx.WithPrefix(endsOfStreamsPrefix))
+	endOfStreamsMap := storage.NewMap(tx.WithPrefix(node.streamID.AsPrefix()).WithPrefix(endsOfStreamsPrefix))
 
 	// We want to randomize the order so we don't always read from the first input if records are available.
 	sourceOrder := rand.Perm(len(node.sources))

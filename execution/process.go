@@ -223,6 +223,11 @@ func (p *ProcessByKey) ReadyForMore(ctx context.Context, tx storage.StateTransac
 	return nil
 }
 
-func (p *ProcessByKey) Close() error {
-	return nil // TODO: Close this, remove state
+func (p *ProcessByKey) Close(ctx context.Context) error {
+	storage := storage.GetStateTransactionFromContext(ctx).GetUnderlyingStorage()
+	if err := storage.DropAll(outputWatermarkPrefix); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with output watermark prefix")
+	}
+
+	return nil
 }

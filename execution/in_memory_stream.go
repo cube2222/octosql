@@ -31,6 +31,11 @@ func NewInMemoryStream(ctx context.Context, data []*Record) *InMemoryStream {
 }
 
 func (ims *InMemoryStream) Close(ctx context.Context) error {
+	storage := storage.GetStateTransactionFromContext(ctx).GetUnderlyingStorage()
+	if err := storage.DropAll(ims.streamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
+	}
+
 	return nil
 }
 

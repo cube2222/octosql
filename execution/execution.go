@@ -14,6 +14,13 @@ import (
 // This struct represents additional metadata to be returned with Get() and used recursively (like WatermarkSource)
 type ExecutionOutput struct {
 	WatermarkSource WatermarkSource
+	NextShuffles    map[string]ShuffleData
+}
+
+type ShuffleData struct {
+	ShuffleID *ShuffleID
+	Shuffle   *Shuffle
+	Variables octosql.Variables
 }
 
 func NewExecutionOutput(ws WatermarkSource) *ExecutionOutput {

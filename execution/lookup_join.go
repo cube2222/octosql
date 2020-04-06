@@ -733,5 +733,5 @@ func (j *JobOutputQueueIntermediateRecordStore) ReadyForMore(ctx context.Context
 }
 
 func (j *JobOutputQueueIntermediateRecordStore) Close(ctx context.Context) error {
-	return nil // All storages this RecordStore uses are prefixed by pull engine's streamID and therefore will be closed by him
+	return nil // All storages used by this irs are prefixed by pull engine's streamID and therefore will be closed by him
 }

@@ -18,12 +18,15 @@ import (
 )
 
 type recordMultiSet struct {
-	set   []*Record
-	count []int
+	set          []*Record
+	count        []int
+	equalityFunc RecordEqualityFunc
 }
 
-func newMultiSet() *recordMultiSet {
-	return &recordMultiSet{}
+func newMultiSet(equalityFunc RecordEqualityFunc) *recordMultiSet {
+	return &recordMultiSet{
+		equalityFunc: equalityFunc,
+	}
 }
 
 func (rms *recordMultiSet) Insert(rec *Record) {
@@ -40,7 +43,7 @@ func (rms *recordMultiSet) Insert(rec *Record) {
 
 func (rms *recordMultiSet) GetCount(rec *Record) int {
 	for i := range rms.set {
-		if rms.set[i].Equal(rec) {
+		if rms.equalityFunc(rms.set[i], rec) == nil {
 			return rms.count[i]
 		}
 	}
@@ -132,9 +135,81 @@ func AreStreamsEqual(ctx context.Context, first, second RecordStream) error {
 	return nil
 }
 
-func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage, first, second RecordStream) error {
-	firstMultiSet := newMultiSet()
-	secondMultiSet := newMultiSet()
+type AreEqualConfig struct {
+	Equality RecordEqualityFunc
+}
+
+type RecordEqualityFunc func(record1 *Record, record2 *Record) error
+
+type AreEqualOpt func(*AreEqualConfig)
+
+func WithEqualityBasedOn(fs ...RecordEqualityFunc) AreEqualOpt {
+	return func(config *AreEqualConfig) {
+		config.Equality = EqualityOfAll(fs...)
+	}
+}
+
+func EqualityOfAll(fs ...RecordEqualityFunc) func(record1 *Record, record2 *Record) error {
+	return func(record1 *Record, record2 *Record) error {
+		for _, f := range fs {
+			if err := f(record1, record2); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
+func EqualityOfID(record1 *Record, record2 *Record) error {
+	if record1.ID() != record2.ID() {
+		return errors.Errorf("ID's not equal: %s and %s", record1.ID().Show(), record2.ID().Show())
+	}
+	return nil
+}
+
+func EqualityOfUndo(record1 *Record, record2 *Record) error {
+	if record1.IsUndo() != record2.IsUndo() {
+		return errors.Errorf("undo's not equal: %t and %t", record1.IsUndo(), record2.IsUndo())
+	}
+	return nil
+}
+
+func EqualityOfFieldsAndValues(record1 *Record, record2 *Record) error {
+	if len(record1.Fields()) != len(record2.Fields()) {
+		return errors.Errorf("field counts not equal: %d and %d", len(record1.Fields()), len(record2.Fields()))
+	}
+	fields1 := record1.Fields()
+	fields2 := record2.Fields()
+	for i := range fields1 {
+		if !fields1[i].Name.Equal(fields2[i].Name) {
+			return errors.Errorf("field at index %d not equal: %s and %s", i, fields1[i].Name.String(), fields2[i].Name.String())
+		}
+	}
+	for i := range fields1 {
+		if !octosql.AreEqual(record1.Value(fields1[i].Name), record2.Value(fields1[i].Name)) {
+			return errors.Errorf("value with field name %s: %s and %s", fields1[i].Name.String(), record1.Value(fields1[i].Name).Show(), record2.Value(fields1[i].Name).Show())
+		}
+	}
+	return nil
+}
+
+func DefaultEquality(record1 *Record, record2 *Record) error {
+	if !record1.Equal(record2) {
+		return errors.Errorf("records not equal in terms of default equality")
+	}
+	return nil
+}
+
+func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage, first, second RecordStream, opts ...AreEqualOpt) error {
+	config := &AreEqualConfig{
+		Equality: DefaultEquality,
+	}
+	for _, opt := range opts {
+		opt(config)
+	}
+
+	firstMultiSet := newMultiSet(config.Equality)
+	secondMultiSet := newMultiSet(config.Equality)
 
 	log.Println("first stream")
 	firstRecords, err := ReadAll(ctx, stateStorage, first)
@@ -166,8 +241,8 @@ func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage
 }
 
 func AreStreamsEqualNoOrderingWithCount(ctx context.Context, stateStorage storage.Storage, first, second RecordStream, count int) error {
-	firstMultiSet := newMultiSet()
-	secondMultiSet := newMultiSet()
+	firstMultiSet := newMultiSet(DefaultEquality)
+	secondMultiSet := newMultiSet(DefaultEquality)
 
 	firstRecords, err := ReadAllWithCount(ctx, stateStorage, first, count)
 	if err != nil {

@@ -181,8 +181,9 @@ func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlan
 	if err != nil {
 		log.Fatal(err) // TODO: Changeme
 	}
+	log.Printf("group by partition count: %d", groupByPartitionCount)
 
-	outNodes := physical.NewShuffle(int(groupByPartitionCount), sourceNodes)
+	outNodes := physical.NewShuffle(int(groupByPartitionCount), key, sourceNodes)
 	for i := range outNodes {
 		outNodes[i] = physical.NewGroupBy(outNodes[i], key, node.fields, aggregates, node.as, triggers)
 	}

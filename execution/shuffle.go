@@ -23,7 +23,8 @@ type nodeToGet struct {
 }
 
 func GetAndStartAllShuffles(ctx context.Context, stateStorage storage.Storage, tx storage.StateTransaction, nodes []Node, variables octosql.Variables) ([]RecordStream, []*ExecutionOutput, error) {
-	nextShuffleIDRaw, err := GetSourceStreamID(tx.WithPrefix([]byte("$root")), octosql.MakeString("next_shuffle_id"))
+	ctx = storage.InjectStateTransaction(ctx, tx)
+	nextShuffleIDRaw, err := GetSourceStreamID(tx.WithPrefix([]byte("$root$")), octosql.MakeString("next_shuffle_id"))
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get next shuffle id")
 	}
@@ -98,14 +99,14 @@ func (id *ShuffleID) MapKey() string {
 
 type Shuffle struct {
 	outputPartitionCount int
-	strategy             ShuffleStrategy
+	key                  []Expression
 	sources              []Node
 }
 
-func NewShuffle(outputPartitionCount int, strategy ShuffleStrategy, sources []Node) *Shuffle {
+func NewShuffle(outputPartitionCount int, key []Expression, sources []Node) *Shuffle {
 	return &Shuffle{
 		outputPartitionCount: outputPartitionCount,
-		strategy:             strategy,
+		key:                  key,
 		sources:              sources,
 	}
 }
@@ -114,14 +115,13 @@ func (s *Shuffle) Get(ctx context.Context, variables octosql.Variables, streamID
 	pipelineMetadata := ctx.Value(pipelineMetadataContextKey{}).(PipelineMetadata)
 
 	receiver := NewShuffleReceiver(streamID, pipelineMetadata.NextShuffleID, len(s.sources), pipelineMetadata.Partition)
-	execOutput := NewExecutionOutput(receiver)
-	execOutput.NextShuffles = map[string]ShuffleData{
+	execOutput := NewExecutionOutput(receiver, map[string]ShuffleData{
 		pipelineMetadata.NextShuffleID.MapKey(): {
 			Shuffle:   s,
 			Variables: variables,
 			ShuffleID: pipelineMetadata.NextShuffleID,
 		},
-	}
+	})
 
 	return receiver, execOutput, nil
 }
@@ -160,12 +160,11 @@ func (s *Shuffle) StartSources(ctx context.Context, stateStorage storage.Storage
 			return nil, errors.Wrapf(err, "couldn't get new source stream ID for shuffle with ID %s", nextShuffleID.Id)
 		}
 
-		// TODO: Empty streamID in pull engine will still result in $$ as a prefix. We have to get rid of that.
-		sender := NewShuffleSender(senderStreamID, shuffleID, s.strategy, s.outputPartitionCount, partition)
+		sender := NewShuffleSender(senderStreamID, shuffleID, NewKeyHashingStrategy(variables, s.key), s.outputPartitionCount, partition)
 
 		// panic("fix stream ID in pull engine")
 		log.Printf("starting sender for partitiion %d", partition)
-		engine := NewPullEngine(sender, stateStorage, rs, nil, execOutput.WatermarkSource, false) // TODO: Fix streamID
+		engine := NewPullEngine(sender, stateStorage, rs, nil, execOutput.WatermarkSource, false)
 
 		go engine.Run(ctx)
 	}
@@ -362,8 +361,6 @@ func (node *ShuffleSender) AddRecord(ctx context.Context, tx storage.StateTransa
 	if err != nil {
 		return errors.Wrap(err, "couldn't calculate output partition to send record to")
 	}
-
-	log.Printf("sending record %s from %d to %d", record.Show(), node.partition, outputPartition)
 
 	outputPartitionOutputQueue := NewOutputQueue(
 		tx.WithPrefix(node.shuffleID.AsPrefix()).WithPrefix(getQueuePrefix(node.partition, outputPartition)),

@@ -12,13 +12,19 @@ import (
 )
 
 type Shuffle struct {
-	Sources []Node
+	OutputPartitionCount int
+	Key                  []Expression
+	Sources              []Node
 }
 
-func NewShuffle(outputPartitionCount int, sourceNodes []Node) []Node {
-	shuffle := &Shuffle{Sources: sourceNodes}
+func NewShuffle(outputPartitionCount int, key []Expression, sourceNodes []Node) []Node {
+	shuffle := &Shuffle{
+		OutputPartitionCount: outputPartitionCount,
+		Key:                  key,
+		Sources:              sourceNodes,
+	}
 
-	shuffleOutputs := make([]Node, len(sourceNodes))
+	shuffleOutputs := make([]Node, outputPartitionCount)
 	for i := 0; i < outputPartitionCount; i++ {
 		shuffleOutputs[i] = shuffle
 	}
@@ -31,8 +37,14 @@ func (s *Shuffle) Transform(ctx context.Context, transformers *Transformers) Nod
 	for i := range s.Sources {
 		transformedSources[i] = s.Sources[i].Transform(ctx, transformers)
 	}
+	transformedKey := make([]Expression, len(s.Key))
+	for i := range s.Key {
+		transformedKey[i] = s.Key[i].Transform(ctx, transformers)
+	}
 	var transformed Node = &Shuffle{
-		Sources: transformedSources,
+		OutputPartitionCount: s.OutputPartitionCount,
+		Key:                  transformedKey,
+		Sources:              transformedSources,
 	}
 	if transformers.NodeT != nil {
 		transformed = transformers.NodeT(transformed)
@@ -50,7 +62,16 @@ func (s *Shuffle) Materialize(ctx context.Context, matCtx *MaterializationContex
 		sourceNodes[i] = matSource
 	}
 
-	return execution.NewUnionAll(sourceNodes...), nil
+	key := make([]execution.Expression, len(s.Key))
+	for i := range s.Key {
+		matKey, err := s.Key[i].Materialize(ctx, matCtx)
+		if err != nil {
+			return nil, errors.Wrapf(err, "couldn't materialize key part with index %d", i)
+		}
+		key[i] = matKey
+	}
+
+	return execution.NewShuffle(s.OutputPartitionCount, key, sourceNodes), nil
 }
 
 func (s *Shuffle) Metadata() *metadata.NodeMetadata {

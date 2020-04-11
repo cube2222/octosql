@@ -5,7 +5,6 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/physical"
-	"github.com/pkg/errors"
 )
 
 type Distinct struct {
@@ -17,7 +16,8 @@ func NewDistinct(child Node) *Distinct {
 }
 
 func (node *Distinct) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
-	sourceNodes, variables, err := node.child.Physical(ctx, physicalCreator)
+	panic("does not work")
+	/*sourceNodes, variables, err := node.child.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get source nodes physical plan in distinct")
 	}
@@ -27,5 +27,5 @@ func (node *Distinct) Physical(ctx context.Context, physicalCreator *PhysicalPla
 		outNodes[i] = physical.NewDistinct(outNodes[i])
 	}
 
-	return outNodes, variables, nil
+	return outNodes, variables, nil*/
 }

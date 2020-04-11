@@ -45,7 +45,8 @@ func (node *UnionAll) Get(ctx context.Context, variables octosql.Variables, stre
 		streamID:         streamID,
 	}
 
-	return us, NewExecutionOutput(us), nil
+	panic("fixme") // TODO: Fixme combine execution outputs
+	return us, NewExecutionOutput(us, nil), nil
 }
 
 type UnifiedStream struct {

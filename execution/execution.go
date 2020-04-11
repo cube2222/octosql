@@ -23,9 +23,10 @@ type ShuffleData struct {
 	Variables octosql.Variables
 }
 
-func NewExecutionOutput(ws WatermarkSource) *ExecutionOutput {
+func NewExecutionOutput(ws WatermarkSource, nextShuffles map[string]ShuffleData) *ExecutionOutput {
 	return &ExecutionOutput{
 		WatermarkSource: ws,
+		NextShuffles:    nextShuffles,
 	}
 }
 

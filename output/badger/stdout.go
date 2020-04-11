@@ -35,7 +35,7 @@ func NewStdOutPrinter(stateStorage storage.Storage, recordsLister RecordsLister)
 }
 
 func (printer *StdOutPrinter) Run(ctx context.Context) error {
-	for range time.Tick(time.Second / 10) {
+	for range time.Tick(time.Second / 4) {
 		tx := printer.stateStorage.BeginTransaction()
 
 		var buf bytes.Buffer

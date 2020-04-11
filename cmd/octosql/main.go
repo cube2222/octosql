@@ -150,7 +150,7 @@ func main() {
 	go func() {
 		r := chi.NewRouter()
 		r.Mount("/debug", middleware.Profiler())
-		log.Fatal(http.ListenAndServe(":3000", r))
+		log.Fatal(http.ListenAndServe(":3001", r))
 	}()
 
 	if err := rootCmd.Execute(); err != nil {

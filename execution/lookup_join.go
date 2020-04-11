@@ -117,7 +117,7 @@ func (node *LookupJoin) Get(ctx context.Context, variables octosql.Variables, st
 	engine := NewPullEngine(rs, node.stateStorage, sourceStream, streamID, execOutput.WatermarkSource, true)
 	go engine.Run(ctx)
 
-	return engine, NewExecutionOutput(engine), nil
+	return engine, NewExecutionOutput(engine, execOutput.NextShuffles), nil
 }
 
 type LookupJoinStream struct {

@@ -186,7 +186,7 @@ func (ne *NodeExpression) Physical(ctx context.Context, physicalCreator *Physica
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for node expression")
 	}
 
-	outNodes := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
+	outNodes := physical.NewShuffle(1, nil, sourceNodes)
 
 	return physical.NewNodeExpression(outNodes[0]), variables, nil
 }

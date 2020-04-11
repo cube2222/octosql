@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
@@ -41,7 +40,7 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 	}
 
 	// We only want one partition at the end, to print the output easily.
-	shuffled := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
+	shuffled := physical.NewShuffle(1, nil, sourceNodes)
 
 	// Only the first partition is there.
 	var phys physical.Node = shuffled[0]
@@ -58,10 +57,8 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		return errors.Wrap(err, "couldn't materialize the physical plan into an execution plan")
 	}
 
-	programID := &execution.StreamID{Id: "root"}
-
 	tx := stateStorage.BeginTransaction()
-	stream, execOutput, err := exec.Get(storage.InjectStateTransaction(ctx, tx), variables, programID)
+	stream, execOutput, err := execution.GetAndStartAllShuffles(ctx, stateStorage, tx, []execution.Node{exec}, variables)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get record stream from execution plan")
 	}
@@ -75,14 +72,16 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 
 	outStreamID := &execution.StreamID{Id: "output"}
 
-	pullEngine := execution.NewPullEngine(out, stateStorage, stream, outStreamID, execOutput.WatermarkSource)
+	pullEngine := execution.NewPullEngine(out, stateStorage, stream[0], outStreamID, execOutput[0].WatermarkSource, true)
 
 	go func() {
 		pullEngine.Run(ctx)
 	}()
 
 	printer := badger.NewStdOutPrinter(stateStorage.WithPrefix(outStreamID.AsPrefix()), out)
-	log.Fatal(printer.Run(ctx))
+	if err := printer.Run(ctx); err != nil {
+		return errors.Wrap(err, "couldn't run stdout printer")
+	}
 
 	return nil
 }

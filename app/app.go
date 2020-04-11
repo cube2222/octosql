@@ -40,7 +40,7 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 	}
 
 	// We only want one partition at the end, to print the output easily.
-	shuffled := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
+	shuffled := physical.NewShuffle(1, sourceNodes)
 
 	// Only the first partition is there.
 	var phys physical.Node = shuffled[0]
@@ -57,10 +57,8 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		return errors.Wrap(err, "couldn't materialize the physical plan into an execution plan")
 	}
 
-	programID := &execution.StreamID{Id: "root"}
-
 	tx := stateStorage.BeginTransaction()
-	stream, _, err := exec.Get(storage.InjectStateTransaction(ctx, tx), variables, programID)
+	stream, _, err := execution.GetAndStartAllShuffles(ctx, stateStorage, tx, []execution.Node{exec}, variables)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get record stream from execution plan")
 	}
@@ -79,7 +77,7 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		}*/
 		// fmt.Println("current output watermark:", watermark)
 
-		rec, err = stream.Next(ctx)
+		rec, err = stream[0].Next(ctx)
 		if err == execution.ErrEndOfStream {
 			err := tx.Commit()
 			if err != nil {

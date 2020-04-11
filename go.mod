@@ -22,6 +22,7 @@ require (
 	github.com/segmentio/kafka-go v0.3.5
 	github.com/spf13/cobra v0.0.5
 	github.com/stretchr/testify v1.4.0
+	github.com/twmb/murmur3 v1.1.3
 	golang.org/x/net v0.0.0-20190620200207-3b0461eec859
 	google.golang.org/appengine v1.5.0 // indirect
 	gopkg.in/yaml.v2 v2.2.2

@@ -3,12 +3,14 @@ package execution
 import (
 	"context"
 	"fmt"
+	"log"
 	"math/rand"
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/pkg/errors"
+	"github.com/twmb/murmur3"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
@@ -95,13 +97,23 @@ func (id *ShuffleID) MapKey() string {
 }
 
 type Shuffle struct {
-	shuffleSources []Node
+	outputPartitionCount int
+	strategy             ShuffleStrategy
+	sources              []Node
+}
+
+func NewShuffle(outputPartitionCount int, strategy ShuffleStrategy, sources []Node) *Shuffle {
+	return &Shuffle{
+		outputPartitionCount: outputPartitionCount,
+		strategy:             strategy,
+		sources:              sources,
+	}
 }
 
 func (s *Shuffle) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
-	pipelineMetadata := ctx.Value(pipelineMetadataContextKey{}).(*PipelineMetadata)
+	pipelineMetadata := ctx.Value(pipelineMetadataContextKey{}).(PipelineMetadata)
 
-	receiver := NewShuffleReceiver(streamID, pipelineMetadata.NextShuffleID, pipelineMetadata.Partition, len(s.shuffleSources))
+	receiver := NewShuffleReceiver(streamID, pipelineMetadata.NextShuffleID, len(s.sources), pipelineMetadata.Partition)
 	execOutput := NewExecutionOutput(receiver)
 	execOutput.NextShuffles = map[string]ShuffleData{
 		pipelineMetadata.NextShuffleID.MapKey(): {
@@ -112,40 +124,6 @@ func (s *Shuffle) Get(ctx context.Context, variables octosql.Variables, streamID
 	}
 
 	return receiver, execOutput, nil
-
-	/*phantom := octosql.MakePhantom()
-	if err := inputsAlreadyStartedState.Get(&phantom); err == storage.ErrNotFound {
-		if err := inputsAlreadyStartedState.Set(&phantom); err != nil {
-			return nil, nil, errors.Wrap(err, "couldn't save that inputs have already been started")
-		}
-
-		nextShuffleIDRaw, err := GetSourceStreamID(shuffleScopedTx, octosql.MakeString("next_shuffle"))
-		if err != nil {
-			return nil, nil, errors.Wrap(err, "couldn't get next shuffle id")
-		}
-		nextShuffleID := (*ShuffleID)(nextShuffleIDRaw)
-
-		for partition := 0; partition < len(s.shuffleSources); partition++ {
-			sourceStreamID, err := GetSourceStreamID(shuffleScopedTx, octosql.MakeString(fmt.Sprintf("shuffle_input_%d", partition)))
-			if err != nil {
-				return nil, nil, errors.Wrapf(err, "couldn't get new source stream ID for stream with ID %s", streamID.String())
-			}
-
-			newPipelineMetadata := PipelineMetadata{
-				NextShuffleID: nextShuffleID,
-				Partition:     partition,
-			}
-
-			rs, execOutput, err := s.shuffleSources[partition].Get(context.WithValue(ctx, pipelineMetadataContextKey{}, newPipelineMetadata), variables, sourceStreamID)
-			if err != nil {
-				return nil, nil, errors.Wrapf(err, "couldn't get new source stream for stream with ID %s", streamID.String())
-			}
-
-			execOutput.Pipelines
-		}
-	} else {
-		return nil, nil, errors.Wrap(err, "couldn't get if inputs have already been started")
-	}*/
 }
 
 func (s *Shuffle) StartSources(ctx context.Context, stateStorage storage.Storage, tx storage.StateTransaction, shuffleID *ShuffleID, variables octosql.Variables) (map[string]ShuffleData, error) {
@@ -157,7 +135,7 @@ func (s *Shuffle) StartSources(ctx context.Context, stateStorage storage.Storage
 
 	nextShuffles := make(map[string]ShuffleData)
 
-	for partition, node := range s.shuffleSources {
+	for partition, node := range s.sources {
 		sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(shuffleID.AsPrefix()), octosql.MakeString(fmt.Sprintf("shuffle_input_%d", partition)))
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't get new source stream ID for shuffle with ID %s", nextShuffleID.Id)
@@ -183,10 +161,11 @@ func (s *Shuffle) StartSources(ctx context.Context, stateStorage storage.Storage
 		}
 
 		// TODO: Empty streamID in pull engine will still result in $$ as a prefix. We have to get rid of that.
-		sender := NewShuffleSender(senderStreamID, shuffleID, partition)
+		sender := NewShuffleSender(senderStreamID, shuffleID, s.strategy, s.outputPartitionCount, partition)
 
-		panic("fix stream ID in pull engine")
-		engine := NewPullEngine(sender, stateStorage, rs, nil, execOutput.WatermarkSource) // TODO: Fix streamID
+		// panic("fix stream ID in pull engine")
+		log.Printf("starting sender for partitiion %d", partition)
+		engine := NewPullEngine(sender, stateStorage, rs, nil, execOutput.WatermarkSource, false) // TODO: Fix streamID
 
 		go engine.Run(ctx)
 	}
@@ -197,31 +176,35 @@ func (s *Shuffle) StartSources(ctx context.Context, stateStorage storage.Storage
 type ShuffleReceiver struct {
 	streamID             *StreamID
 	shuffleID            *ShuffleID
-	partition            int
 	sourcePartitionCount int
+	partition            int
 }
 
-func NewShuffleReceiver(streamID *StreamID, shuffleID *ShuffleID, partition int, sourcePartitionCount int) *ShuffleReceiver {
+func NewShuffleReceiver(streamID *StreamID, shuffleID *ShuffleID, sourcePartitionCount int, partition int) *ShuffleReceiver {
 	return &ShuffleReceiver{
 		streamID:             streamID,
 		shuffleID:            shuffleID,
-		partition:            partition,
 		sourcePartitionCount: sourcePartitionCount,
+		partition:            partition,
 	}
 }
 
 var watermarksPrefix = []byte("$watermarks$")
 
-func (node *ShuffleReceiver) Next(ctx context.Context) (*Record, error) {
+func getQueuePrefix(from, to int) []byte {
+	return []byte(fmt.Sprintf("$to_%d$from_%d$", to, from))
+}
+
+func (rs *ShuffleReceiver) Next(ctx context.Context) (*Record, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
-	streamPrefixedTx := tx.WithPrefix(node.streamID.AsPrefix())
+	streamPrefixedTx := tx.WithPrefix(rs.streamID.AsPrefix())
 	endOfStreamsMap := storage.NewMap(streamPrefixedTx.WithPrefix(endsOfStreamsPrefix))
 	watermarksMap := storage.NewMap(streamPrefixedTx.WithPrefix(watermarksPrefix))
 
 	// We want to randomize the order so we don't always read from the first input if records are available.
-	sourceOrder := rand.Perm(node.sourcePartitionCount)
+	sourceOrder := rand.Perm(rs.sourcePartitionCount)
 
-	changeSubscriptions := make([]*storage.Subscription, node.sourcePartitionCount)
+	changeSubscriptions := make([]*storage.Subscription, rs.sourcePartitionCount)
 
 sourcePartitionsLoop:
 	for orderIndex, sourcePartition := range sourceOrder {
@@ -239,10 +222,8 @@ sourcePartitionsLoop:
 			continue
 		}
 
-		var sourcePartitionOutputQueue = NewOutputQueue(
-			tx.
-				WithPrefix([]byte(fmt.Sprintf("$%d$", node.partition))).
-				WithPrefix([]byte(fmt.Sprintf("$%d$", sourcePartition))),
+		sourcePartitionOutputQueue := NewOutputQueue(
+			tx.WithPrefix(rs.shuffleID.AsPrefix()).WithPrefix(getQueuePrefix(sourcePartition, rs.partition)),
 		)
 
 	queuePoppingLoop:
@@ -312,13 +293,13 @@ sourcePartitionsLoop:
 	return nil, NewErrWaitForChanges(storage.ConcatSubscriptions(ctx, changeSubscriptionsNonNil...))
 }
 
-func (node *ShuffleReceiver) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
-	streamPrefixedTx := tx.WithPrefix(node.streamID.AsPrefix())
+func (rs *ShuffleReceiver) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
+	streamPrefixedTx := tx.WithPrefix(rs.streamID.AsPrefix())
 	watermarksMap := storage.NewMap(streamPrefixedTx.WithPrefix(watermarksPrefix))
 
 	var earliestWatermark time.Time
 
-	for sourcePartition := 0; sourcePartition < node.sourcePartitionCount; sourcePartition++ {
+	for sourcePartition := 0; sourcePartition < rs.sourcePartitionCount; sourcePartition++ {
 		sourcePartitionValue := octosql.MakeInt(sourcePartition)
 
 		var protoTimestamp timestamp.Timestamp
@@ -344,53 +325,163 @@ func (node *ShuffleReceiver) GetWatermark(ctx context.Context, tx storage.StateT
 	return earliestWatermark, nil
 }
 
-func (node *ShuffleReceiver) Close() error {
+func (rs *ShuffleReceiver) Close() error {
 	// TODO: Cleanup
 	return nil
 }
 
-type ShuffleSender struct {
-	streamID  *StreamID
-	shuffleID *ShuffleID
-	partition int
+type ShuffleStrategy interface {
+	// Return output partition index based on the record and output partition count.
+	CalculatePartition(ctx context.Context, record *Record, outputs int) (int, error)
 }
 
-func NewShuffleSender(streamID *StreamID, shuffleID *ShuffleID, partition int) *ShuffleSender {
+type ShuffleSender struct {
+	streamID             *StreamID
+	shuffleID            *ShuffleID
+	shuffleStrategy      ShuffleStrategy
+	outputPartitionCount int
+	partition            int
+}
+
+func NewShuffleSender(streamID *StreamID, shuffleID *ShuffleID, shuffleStrategy ShuffleStrategy, outputPartitionCount int, partition int) *ShuffleSender {
 	return &ShuffleSender{
-		streamID:  streamID,
-		shuffleID: shuffleID,
-		partition: partition,
+		streamID:             streamID,
+		shuffleID:            shuffleID,
+		shuffleStrategy:      shuffleStrategy,
+		outputPartitionCount: outputPartitionCount,
+		partition:            partition,
 	}
 }
 
-func (s *ShuffleSender) ReadyForMore(ctx context.Context, tx storage.StateTransaction) error {
-	panic("implement me")
+func (node *ShuffleSender) ReadyForMore(ctx context.Context, tx storage.StateTransaction) error {
+	return nil
 }
 
-func (s *ShuffleSender) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *Record) error {
-	panic("implement me")
+func (node *ShuffleSender) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *Record) error {
+	outputPartition, err := node.shuffleStrategy.CalculatePartition(ctx, record, node.outputPartitionCount)
+	if err != nil {
+		return errors.Wrap(err, "couldn't calculate output partition to send record to")
+	}
+
+	log.Printf("sending record %s from %d to %d", record.Show(), node.partition, outputPartition)
+
+	outputPartitionOutputQueue := NewOutputQueue(
+		tx.WithPrefix(node.shuffleID.AsPrefix()).WithPrefix(getQueuePrefix(node.partition, outputPartition)),
+	)
+
+	if err := outputPartitionOutputQueue.Push(ctx, &QueueElement{
+		Type: &QueueElement_Record{
+			Record: record,
+		},
+	}); err != nil {
+		return errors.Wrapf(err, "couldn't send record to output queue for input partition %d, output partition %d", node.partition, outputPartition)
+	}
+
+	return nil
 }
 
-func (s *ShuffleSender) Next(ctx context.Context, tx storage.StateTransaction) (*Record, error) {
-	panic("implement me")
+func (node *ShuffleSender) sendToAllOutputPartitions(ctx context.Context, tx storage.StateTransaction, element *QueueElement) error {
+	for outputPartition := 0; outputPartition < node.outputPartitionCount; outputPartition++ {
+		outputPartitionOutputQueue := NewOutputQueue(
+			tx.WithPrefix(node.shuffleID.AsPrefix()).WithPrefix(getQueuePrefix(node.partition, outputPartition)),
+		)
+
+		if err := outputPartitionOutputQueue.Push(ctx, element); err != nil {
+			return errors.Wrapf(err, "couldn't send to output queue for input partition %d, output partition %d", node.partition, outputPartition)
+		}
+	}
+
+	return nil
 }
 
-func (s *ShuffleSender) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
-	panic("implement me")
+func (node *ShuffleSender) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
+	watermarkTimestamp, err := ptypes.TimestampProto(watermark)
+	if err != nil {
+		return errors.Wrap(err, "couldn't convert watermark to proto timestamp")
+	}
+
+	if err := node.sendToAllOutputPartitions(ctx, tx, &QueueElement{
+		Type: &QueueElement_Watermark{
+			Watermark: watermarkTimestamp,
+		},
+	}); err != nil {
+		return errors.Wrap(err, "couldn't send watermark")
+	}
+
+	return nil
 }
 
-func (s *ShuffleSender) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
-	panic("implement me")
+func (node *ShuffleSender) MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error {
+	if err := node.sendToAllOutputPartitions(ctx, tx, &QueueElement{
+		Type: &QueueElement_EndOfStream{
+			EndOfStream: true,
+		},
+	}); err != nil {
+		return errors.Wrap(err, "couldn't send end of stream")
+	}
+
+	return nil
 }
 
-func (s *ShuffleSender) MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error {
-	panic("implement me")
+func (node *ShuffleSender) MarkError(ctx context.Context, tx storage.StateTransaction, err error) error {
+	if err := node.sendToAllOutputPartitions(ctx, tx, &QueueElement{
+		Type: &QueueElement_Error{
+			Error: err.Error(),
+		},
+	}); err != nil {
+		return errors.Wrap(err, "couldn't send error")
+	}
+
+	return nil
 }
 
-func (s *ShuffleSender) MarkError(ctx context.Context, tx storage.StateTransaction, err error) error {
-	panic("implement me")
+func (node *ShuffleSender) Close() error {
+	// TODO: cleanup
+	return nil
 }
 
-func (s *ShuffleSender) Close() error {
-	panic("implement me")
+func (node *ShuffleSender) Next(ctx context.Context, tx storage.StateTransaction) (*Record, error) {
+	panic("can't get next record from shuffle sender")
+}
+
+func (node *ShuffleSender) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
+	panic("can't get watermark from shuffle sender")
+}
+
+type KeyHashingStrategy struct {
+	variables     octosql.Variables
+	keyExpression []Expression
+}
+
+func NewKeyHashingStrategy(variables octosql.Variables, keyExpression []Expression) ShuffleStrategy {
+	return &KeyHashingStrategy{
+		variables:     variables,
+		keyExpression: keyExpression,
+	}
+}
+
+// TODO: The key should really be calculated by the preceding map. Like all group by values.
+func (s *KeyHashingStrategy) CalculatePartition(ctx context.Context, record *Record, outputs int) (int, error) {
+	variables, err := s.variables.MergeWith(record.AsVariables())
+	if err != nil {
+		return -1, errors.Wrap(err, "couldn't merge stream variables with record")
+	}
+
+	key := make([]octosql.Value, len(s.keyExpression))
+	for i := range s.keyExpression {
+		key[i], err = s.keyExpression[i].ExpressionValue(ctx, variables)
+		if err != nil {
+			return -1, errors.Wrapf(err, "couldn't evaluate process key expression with index %v", i)
+		}
+	}
+
+	hash := murmur3.New32()
+
+	keyTuple := octosql.MakeTuple(key)
+	_, err = hash.Write(keyTuple.MonotonicMarshal())
+	if err != nil {
+		return -1, errors.Wrap(err, "couldn't write to hash")
+	}
+
+	return int(hash.Sum32() % uint32(outputs)), nil
 }

@@ -2,6 +2,9 @@ package logical
 
 import (
 	"context"
+	"log"
+	"os"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -173,7 +176,13 @@ func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlan
 		triggers[i] = out
 	}
 
-	outNodes := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
+	groupByPartitionCountStr := os.Getenv("OCTOSQL_GROUP_BY_PARTITIONS")
+	groupByPartitionCount, err := strconv.ParseInt(groupByPartitionCountStr, 10, 64)
+	if err != nil {
+		log.Fatal(err) // TODO: Changeme
+	}
+
+	outNodes := physical.NewShuffle(int(groupByPartitionCount), sourceNodes)
 	for i := range outNodes {
 		outNodes[i] = physical.NewGroupBy(outNodes[i], key, node.fields, aggregates, node.as, triggers)
 	}

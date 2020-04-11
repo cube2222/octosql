@@ -10,6 +10,7 @@ import (
 	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/output"
+	"github.com/cube2222/octosql/output/badger"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/optimizer"
 	"github.com/cube2222/octosql/streaming/storage"
@@ -40,7 +41,7 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 	}
 
 	// We only want one partition at the end, to print the output easily.
-	shuffled := physical.NewShuffle(1, sourceNodes)
+	shuffled := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
 
 	// Only the first partition is there.
 	var phys physical.Node = shuffled[0]
@@ -57,8 +58,10 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		return errors.Wrap(err, "couldn't materialize the physical plan into an execution plan")
 	}
 
+	programID := &execution.StreamID{Id: "root"}
+
 	tx := stateStorage.BeginTransaction()
-	stream, _, err := execution.GetAndStartAllShuffles(ctx, stateStorage, tx, []execution.Node{exec}, variables)
+	stream, execOutput, err := exec.Get(storage.InjectStateTransaction(ctx, tx), variables, programID)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get record stream from execution plan")
 	}
@@ -66,73 +69,20 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		return errors.Wrap(err, "couldn't commit transaction to get record stream from execution plan")
 	}
 
-	var rec *execution.Record
-	for {
-		tx := stateStorage.BeginTransaction()
-		ctx := storage.InjectStateTransaction(ctx, tx)
-
-		/*watermark, err := execOutput.WatermarkSource.GetWatermark(ctx, tx)
-		if err != nil {
-			log.Fatal(err)
-		}*/
-		// fmt.Println("current output watermark:", watermark)
-
-		rec, err = stream[0].Next(ctx)
-		if err == execution.ErrEndOfStream {
-			err := tx.Commit()
-			if err != nil {
-				log.Printf("couldn't commit transaction: %s", err)
-				continue
-			}
-			break
-		} else if errors.Cause(err) == execution.ErrNewTransactionRequired {
-			log.Println("main new transaction required: ", err)
-			err := tx.Commit()
-			if err != nil {
-				log.Println("main couldn't commit: ", err)
-				continue
-			}
-			continue
-		} else if waitableError := execution.GetErrWaitForChanges(err); waitableError != nil {
-			err := tx.Commit()
-			if err != nil {
-				log.Println("main couldn't commit: ", err)
-				err = waitableError.Close()
-				if err != nil {
-					log.Println("couldn't close subscription: ", err)
-				}
-				continue
-			}
-			err = waitableError.ListenForChanges(ctx)
-			if err != nil {
-				log.Println("couldn't listen for changes: ", err)
-			}
-			err = waitableError.Close()
-			if err != nil {
-				log.Println("couldn't close subscription: ", err)
-			}
-			continue
-		} else if err != nil {
-			tx.Abort()
-			return errors.Wrap(err, "couldn't get next record")
-		}
-
-		err = tx.Commit()
-		if err != nil {
-			log.Printf("couldn't commit transaction: %s", err)
-			continue
-		}
-
-		err = app.out.WriteRecord(rec)
-		if err != nil {
-			return errors.Wrap(err, "couldn't write record")
-		}
+	out := &badger.Output{
+		EventTimeField: phys.Metadata().EventTimeField(),
 	}
 
-	err = app.out.Close()
-	if err != nil {
-		return errors.Wrap(err, "couldn't close output writer")
-	}
+	outStreamID := &execution.StreamID{Id: "output"}
+
+	pullEngine := execution.NewPullEngine(out, stateStorage, stream, outStreamID, execOutput.WatermarkSource)
+
+	go func() {
+		pullEngine.Run(ctx)
+	}()
+
+	printer := badger.NewStdOutPrinter(stateStorage.WithPrefix(outStreamID.AsPrefix()), out)
+	log.Fatal(printer.Run(ctx))
 
 	return nil
 }

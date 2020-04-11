@@ -74,7 +74,7 @@ func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, source 
 		source:               source,
 		streamID:             streamID,
 		watermarkSource:      watermarkSource,
-		batchSizeManager:     NewBatchSizeManager(time.Second),
+		batchSizeManager:     NewBatchSizeManager(time.Second / 4),
 		shouldPrefixStreamID: shouldPrefixStreamID,
 	}
 }

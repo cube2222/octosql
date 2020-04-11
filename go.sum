@@ -16,6 +16,8 @@ github.com/bradleyjkemp/memmap v0.2.2 h1:K1MRR3CePpyv5fCF92VVRQa0YTCF1lBeHYUe1YQ
 github.com/bradleyjkemp/memmap v0.2.2/go.mod h1:hk93kmTK3wk+ezO+gS/h/W7ZXi5CRoB3sXCajzC2PMU=
 github.com/bradleyjkemp/memviz v0.2.2 h1:4401FLjMkfcpjrCJNSorhiPSkjiq8QBS++fsppQSk1s=
 github.com/bradleyjkemp/memviz v0.2.2/go.mod h1:O8KbRC1I+XiOeTs6+KcaCuME1yAAEc54zsQrlv6nkKg=
+github.com/buger/goterm v0.0.0-20200322175922-2f3e71b85129 h1:gfAMKE626QEuKG3si0pdTRcr/YEbBoxY+3GOH3gWvl4=
+github.com/buger/goterm v0.0.0-20200322175922-2f3e71b85129/go.mod h1:u9UyCz2eTrSGy6fbupqJ54eY5c4IC8gREQ1053dK12U=
 github.com/cespare/xxhash v1.1.0 h1:a6HrQnmkObjyL+Gs60czilIUGqrzKutQD6XZog3p+ko=
 github.com/cespare/xxhash v1.1.0/go.mod h1:XrSqR1VqqWfGrhpAt58auRo0WTKS1nRRg3ghfAqPWnc=
 github.com/coreos/etcd v3.3.10+incompatible/go.mod h1:uF7uidLiAD3TWHmW31ZFd/JWoc32PjwdhPthX9715RE=

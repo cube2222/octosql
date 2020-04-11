@@ -629,3 +629,46 @@ func TestDistinct_Get(t *testing.T) {
 		})
 	}
 }
+
+func TestDistinct_Retractions(t *testing.T) {
+	stateStorage := GetTestStorage(t)
+	defer func() {
+		go stateStorage.Close()
+	}()
+
+	ctx := context.Background()
+	fields := []octosql.VariableName{"string", "number"}
+	inputRecords := []*Record{
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"a", 2}, WithID(NewRecordID("id1"))),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"a", 2}, WithID(NewRecordID("id2"))),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"a", 2}, WithID(NewRecordID("id3")), WithUndo()),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"a", 2}, WithID(NewRecordID("id4")), WithUndo()),
+	}
+
+	expectedOutput := []*Record{
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"a", 2}, WithID(NewRecordID("id1"))),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"a", 2}, WithID(NewRecordID("id4")), WithUndo()),
+	}
+
+	source := NewDummyNode(inputRecords)
+
+	distinct := NewDistinct(stateStorage, source, "")
+
+	tx := stateStorage.BeginTransaction()
+
+	stream, _, err := distinct.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wantStream := NewInMemoryStream(storage.InjectStateTransaction(context.Background(), tx), expectedOutput)
+
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	err = AreStreamsEqualNoOrdering(ctx, stateStorage, stream, wantStream)
+	if err != nil {
+		t.Fatal(err)
+	}
+}

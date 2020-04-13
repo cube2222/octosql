@@ -201,11 +201,6 @@ func getQueuePrefix(from, to int) []byte {
 }
 
 func (rs *ShuffleReceiver) Next(ctx context.Context) (*Record, error) {
-	rs.received++
-	if rs.received%1000 == 0 {
-		log.Printf("shuffle %s partition %d received %d records", rs.shuffleID.Id, rs.partition, rs.received)
-	}
-
 	tx := storage.GetStateTransactionFromContext(ctx)
 	streamPrefixedTx := tx.WithPrefix(rs.streamID.AsPrefix())
 	endOfStreamsMap := storage.NewMap(streamPrefixedTx.WithPrefix(endsOfStreamsPrefix))
@@ -365,11 +360,6 @@ func (node *ShuffleSender) ReadyForMore(ctx context.Context, tx storage.StateTra
 }
 
 func (node *ShuffleSender) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *Record) error {
-	node.sent++
-	if node.sent%1000 == 0 {
-		log.Printf("shuffle %s partition %d sent %d records", node.shuffleID.Id, node.partition, node.sent)
-	}
-
 	outputPartition, err := node.shuffleStrategy.CalculatePartition(ctx, record, node.outputPartitionCount)
 	if err != nil {
 		return errors.Wrap(err, "couldn't calculate output partition to send record to")

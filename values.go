@@ -113,6 +113,7 @@ func MakeObject(v map[string]Value) Value {
 
 	return Value{Value: &Value_Object{Object: object}}
 }
+
 func ZeroObject() Value {
 	return Value{Value: &Value_Object{Object: &Object{
 		Fields: nil,

@@ -15,12 +15,6 @@ import (
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
-type nodeToGet struct {
-	shuffleID *ShuffleID
-	node      Node
-	variables octosql.Variables
-}
-
 func GetAndStartAllShuffles(ctx context.Context, stateStorage storage.Storage, tx storage.StateTransaction, nodes []Node, variables octosql.Variables) ([]RecordStream, []*ExecutionOutput, error) {
 	ctx = storage.InjectStateTransaction(ctx, tx)
 	nextShuffleIDRaw, err := GetSourceStreamID(tx.WithPrefix([]byte("$root$")), octosql.MakeString("next_shuffle_id"))
@@ -31,6 +25,7 @@ func GetAndStartAllShuffles(ctx context.Context, stateStorage storage.Storage, t
 
 	nextShuffles := make(map[string]ShuffleData)
 
+	// We start the head node to possibly get the first shuffle
 	outRecordStreams := make([]RecordStream, len(nodes))
 	outExecOutputs := make([]*ExecutionOutput, len(nodes))
 	for partition, node := range nodes {
@@ -57,6 +52,7 @@ func GetAndStartAllShuffles(ctx context.Context, stateStorage storage.Storage, t
 		outExecOutputs[partition] = execOutput
 	}
 
+	// Now iteratively start all shuffles.
 	for len(nextShuffles) > 0 {
 		newNextShuffles := make(map[string]ShuffleData)
 
@@ -66,6 +62,7 @@ func GetAndStartAllShuffles(ctx context.Context, stateStorage storage.Storage, t
 				return nil, nil, errors.Wrapf(err, "couldn't start sources for shuffle with id %v", err)
 			}
 
+			// Deduplicate shuffles by their ID's
 			for id, data := range tmpNextShuffles {
 				newNextShuffles[id] = data
 			}
@@ -77,13 +74,14 @@ func GetAndStartAllShuffles(ctx context.Context, stateStorage storage.Storage, t
 	return outRecordStreams, outExecOutputs, nil
 }
 
-// TODO: The main queue namespaced by shuffle ID, not streamID.
-
 type pipelineMetadataContextKey struct{}
 
 type PipelineMetadata struct {
+	// The ID for the next shuffle.
 	NextShuffleID *ShuffleID
-	Partition     int
+
+	// The partition of the current stream.
+	Partition int
 }
 
 type ShuffleID StreamID
@@ -126,6 +124,7 @@ func (s *Shuffle) Get(ctx context.Context, variables octosql.Variables, streamID
 }
 
 func (s *Shuffle) StartSources(ctx context.Context, stateStorage storage.Storage, tx storage.StateTransaction, shuffleID *ShuffleID, variables octosql.Variables) (map[string]ShuffleData, error) {
+	// Create an ID for the possible _even next_ shuffle.
 	nextShuffleIDRaw, err := GetSourceStreamID(tx.WithPrefix(shuffleID.AsPrefix()), octosql.MakeString("next_shuffle_id"))
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get next shuffle id")
@@ -199,6 +198,8 @@ var watermarksPrefix = []byte("$watermarks$")
 func getQueuePrefix(from, to int) []byte {
 	return []byte(fmt.Sprintf("$to_%d$from_%d$", to, from))
 }
+
+var endsOfStreamsPrefix = []byte("$ends_of_streams$")
 
 func (rs *ShuffleReceiver) Next(ctx context.Context) (*Record, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)

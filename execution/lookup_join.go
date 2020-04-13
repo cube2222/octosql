@@ -114,7 +114,7 @@ func (node *LookupJoin) Get(ctx context.Context, variables octosql.Variables, st
 	go rs.RunScheduler(ctx)
 
 	// Run the pull engine which supplies this lookup join with records which are in need of joining.
-	engine := NewPullEngine(rs, node.stateStorage, sourceStream, streamID, execOutput.WatermarkSource)
+	engine := NewPullEngine(rs, node.stateStorage, []RecordStream{sourceStream}, streamID, execOutput.WatermarkSource)
 	go engine.Run(ctx)
 
 	return engine, NewExecutionOutput(engine), nil
@@ -262,7 +262,7 @@ func (rs *LookupJoinStream) RunWorker(ctx context.Context, id *RecordID) error {
 	engine := NewPullEngine(
 		&JobOutputQueueIntermediateRecordStore{recordID: id},
 		rs.stateStorage,
-		joinedStream,
+		[]RecordStream{joinedStream},
 		rs.streamID,
 		&ZeroWatermarkGenerator{},
 	)

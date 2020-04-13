@@ -75,7 +75,7 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 
 	outStreamID := &execution.StreamID{Id: "output"}
 
-	pullEngine := execution.NewPullEngine(out, stateStorage, stream, outStreamID, execOutput.WatermarkSource)
+	pullEngine := execution.NewPullEngine(out, stateStorage, []execution.RecordStream{stream}, outStreamID, execOutput.WatermarkSource)
 
 	go func() {
 		pullEngine.Run(ctx)

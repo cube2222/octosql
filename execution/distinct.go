@@ -53,7 +53,7 @@ func (node *Distinct) Get(ctx context.Context, variables octosql.Variables, stre
 		variables:       variables,
 	}
 
-	distinctPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, execOutput.WatermarkSource)
+	distinctPullEngine := NewPullEngine(processFunc, node.storage, []RecordStream{source}, streamID, execOutput.WatermarkSource)
 	go distinctPullEngine.Run(ctx) // TODO: .Close() should kill this context and the goroutine.
 
 	return distinctPullEngine, NewExecutionOutput(distinctPullEngine), nil

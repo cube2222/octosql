@@ -3,7 +3,6 @@ package execution
 import (
 	"context"
 	"fmt"
-	"log"
 	"math/rand"
 	"time"
 
@@ -144,11 +143,13 @@ func (s *Shuffle) StartSources(ctx context.Context, stateStorage storage.Storage
 			Partition:     partition,
 		}
 
+		// Get the shuffle source stream.
 		rs, execOutput, err := node.Get(context.WithValue(ctx, pipelineMetadataContextKey{}, newPipelineMetadata), variables, sourceStreamID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't get new source stream for shuffle with ID %s", nextShuffleID.Id)
 		}
 
+		// Add deduplicated next shuffle information.
 		for id, data := range execOutput.NextShuffles {
 			nextShuffles[id] = data
 		}
@@ -163,10 +164,9 @@ func (s *Shuffle) StartSources(ctx context.Context, stateStorage storage.Storage
 			return nil, errors.Wrapf(err, "couldn't get strategy for shuffle with ID %s", nextShuffleID.Id)
 		}
 
+		// Start the shuffle sender.
 		sender := NewShuffleSender(senderStreamID, shuffleID, strategy, s.outputPartitionCount, partition)
 
-		// panic("fix stream ID in pull engine")
-		log.Printf("starting sender for partitiion %d", partition)
 		engine := NewPullEngine(sender, stateStorage, rs, nil, execOutput.WatermarkSource, false)
 
 		go engine.Run(ctx)

@@ -95,11 +95,12 @@ func (engine *PullEngine) Run(ctx context.Context) {
 			err := tx.Commit()
 			if err != nil {
 				log.Println("engine: couldn't commit: ", err)
+				tx = engine.storage.BeginTransaction()
+				continue
 			}
 			log.Println("engine: end of stream, stopping loop")
 			return
 		} else if errors.Cause(err) == ErrNewTransactionRequired {
-			log.Println("engine: new transaction required")
 			err := tx.Commit()
 			if err != nil {
 				log.Println("engine: couldn't commit: ", err)
@@ -107,7 +108,6 @@ func (engine *PullEngine) Run(ctx context.Context) {
 			engine.batchSizeManager.CommitSuccessful()
 			tx = engine.storage.BeginTransaction()
 		} else if waitableError := GetErrWaitForChanges(err); waitableError != nil {
-			log.Println("engine: listening for changes")
 			err := tx.Commit()
 			if err != nil {
 				log.Println("engine: couldn't commit: ", err)
@@ -117,7 +117,6 @@ func (engine *PullEngine) Run(ctx context.Context) {
 			if err != nil {
 				log.Println("engine: couldn't listen for changes: ", err)
 			}
-			log.Println("engine: received change")
 			err = waitableError.Close()
 			if err != nil {
 				log.Println("engine: couldn't close listening for changes: ", err)

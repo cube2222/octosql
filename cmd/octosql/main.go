@@ -153,7 +153,7 @@ func main() {
 	go func() {
 		r := chi.NewRouter()
 		r.Mount("/debug", middleware.Profiler())
-		log.Fatal(http.ListenAndServe(":3001", r))
+		log.Fatal(http.ListenAndServe("127.0.0.1:3001", r))
 	}()
 
 	if err := rootCmd.Execute(); err != nil {

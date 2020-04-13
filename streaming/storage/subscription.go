@@ -49,6 +49,9 @@ func (sub *Subscription) ListenForChanges(ctx context.Context) error {
 	case <-sub.changes:
 		return nil
 	case err := <-sub.errors:
+		if err == ErrChangeSent {
+			return nil
+		}
 		return err
 	case <-ctx.Done():
 		return ctx.Err()

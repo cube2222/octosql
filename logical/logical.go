@@ -13,9 +13,10 @@ import (
 type PhysicalPlanCreator struct {
 	variableCounter int
 	dataSourceRepo  *physical.DataSourceRepository
+	physicalConfig  map[string]interface{}
 }
 
-func NewPhysicalPlanCreator(repo *physical.DataSourceRepository) *PhysicalPlanCreator {
+func NewPhysicalPlanCreator(repo *physical.DataSourceRepository, physicalConfig map[string]interface{}) *PhysicalPlanCreator {
 	return &PhysicalPlanCreator{
 		variableCounter: 0,
 		dataSourceRepo:  repo,

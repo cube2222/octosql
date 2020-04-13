@@ -34,7 +34,7 @@ func NewApp(cfg *config.Config, dataSourceRepository *physical.DataSourceReposit
 }
 
 func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan logical.Node) error {
-	sourceNodes, variables, err := plan.Physical(ctx, logical.NewPhysicalPlanCreator(app.dataSourceRepository))
+	sourceNodes, variables, err := plan.Physical(ctx, logical.NewPhysicalPlanCreator(app.dataSourceRepository, app.cfg.Physical))
 	if err != nil {
 		return errors.Wrap(err, "couldn't create physical plan")
 	}

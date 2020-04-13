@@ -2,14 +2,13 @@ package logical
 
 import (
 	"context"
-	"log"
-	"os"
-	"strconv"
+	"runtime"
 	"strings"
 
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/physical"
 )
 
@@ -176,14 +175,16 @@ func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlan
 		triggers[i] = out
 	}
 
-	groupByPartitionCountStr := os.Getenv("OCTOSQL_GROUP_BY_PARTITIONS")
-	groupByPartitionCount, err := strconv.ParseInt(groupByPartitionCountStr, 10, 64)
+	groupByParallelism, err := config.GetInt(
+		physicalCreator.physicalConfig,
+		"groupByParallelism",
+		config.WithDefault(runtime.GOMAXPROCS(0)),
+	)
 	if err != nil {
-		log.Fatal(err) // TODO: Change me
+		return nil, nil, errors.Wrap(err, "couldn't get groupByParallelism configuration")
 	}
-	log.Printf("group by partition count: %d", groupByPartitionCount)
 
-	outNodes := physical.NewShuffle(int(groupByPartitionCount), physical.NewKeyHashingStrategy(key), sourceNodes)
+	outNodes := physical.NewShuffle(groupByParallelism, physical.NewKeyHashingStrategy(key), sourceNodes)
 	for i := range outNodes {
 		outNodes[i] = physical.NewGroupBy(outNodes[i], key, node.fields, aggregates, node.as, triggers)
 	}

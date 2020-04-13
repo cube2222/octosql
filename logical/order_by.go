@@ -57,7 +57,7 @@ func (node *OrderBy) Physical(ctx context.Context, physicalCreator *PhysicalPlan
 	}
 
 	// OrderBy operates on a single, joined stream.
-	outNodes := physical.NewShuffle(1, nil, sourceNodes)
+	outNodes := physical.NewShuffle(1, physical.NewConstantStrategy(0), sourceNodes)
 
 	return []physical.Node{physical.NewOrderBy(expressions, directions, outNodes[0])}, variables, nil
 }

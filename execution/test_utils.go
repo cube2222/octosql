@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math/rand"
-	"os"
 	"sort"
 	"strings"
 	"testing"
@@ -411,13 +409,10 @@ func ReadAllWithCount(ctx context.Context, stateStorage storage.Storage, stream 
 }
 
 func GetTestStorage(t *testing.T) storage.Storage {
-	dirname := fmt.Sprintf("testdb/%d", rand.Int())
-	err := os.MkdirAll(dirname, os.ModePerm)
-	if err != nil {
-		t.Fatal("couldn't create temporary directory: ", err)
-	}
-
-	opts := badger.DefaultOptions(dirname)
+	opts := badger.DefaultOptions("")
+	opts.InMemory = true
+	opts.Dir = ""
+	opts.ValueDir = ""
 	opts.CompactL0OnClose = false
 	db, err := badger.Open(opts)
 	if err != nil {

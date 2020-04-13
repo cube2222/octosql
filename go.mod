@@ -7,7 +7,7 @@ require (
 	github.com/bradleyjkemp/memmap v0.2.2 // indirect
 	github.com/bradleyjkemp/memviz v0.2.2
 	github.com/buger/goterm v0.0.0-20200322175922-2f3e71b85129
-	github.com/dgraph-io/badger/v2 v2.0.2
+	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/go-chi/chi v4.0.3+incompatible
 	github.com/go-redis/redis v6.15.2+incompatible
 	github.com/go-sql-driver/mysql v1.4.1

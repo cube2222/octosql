@@ -13,14 +13,14 @@ import (
 
 type Shuffle struct {
 	OutputPartitionCount int
-	Key                  []Expression
+	Strategy             ShuffleStrategy
 	Sources              []Node
 }
 
-func NewShuffle(outputPartitionCount int, key []Expression, sourceNodes []Node) []Node {
+func NewShuffle(outputPartitionCount int, strategy ShuffleStrategy, sourceNodes []Node) []Node {
 	shuffle := &Shuffle{
 		OutputPartitionCount: outputPartitionCount,
-		Key:                  key,
+		Strategy:             strategy,
 		Sources:              sourceNodes,
 	}
 
@@ -37,13 +37,10 @@ func (s *Shuffle) Transform(ctx context.Context, transformers *Transformers) Nod
 	for i := range s.Sources {
 		transformedSources[i] = s.Sources[i].Transform(ctx, transformers)
 	}
-	transformedKey := make([]Expression, len(s.Key))
-	for i := range s.Key {
-		transformedKey[i] = s.Key[i].Transform(ctx, transformers)
-	}
+	transformedStrategy := s.Strategy.Transform(ctx, transformers)
 	var transformed Node = &Shuffle{
 		OutputPartitionCount: s.OutputPartitionCount,
-		Key:                  transformedKey,
+		Strategy:             transformedStrategy,
 		Sources:              transformedSources,
 	}
 	if transformers.NodeT != nil {
@@ -62,16 +59,12 @@ func (s *Shuffle) Materialize(ctx context.Context, matCtx *MaterializationContex
 		sourceNodes[i] = matSource
 	}
 
-	key := make([]execution.Expression, len(s.Key))
-	for i := range s.Key {
-		matKey, err := s.Key[i].Materialize(ctx, matCtx)
-		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't materialize key part with index %d", i)
-		}
-		key[i] = matKey
+	strategyPrototype, err := s.Strategy.Materialize(ctx, matCtx)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't materialize shuffle strategy")
 	}
 
-	return execution.NewShuffle(s.OutputPartitionCount, key, sourceNodes), nil
+	return execution.NewShuffle(s.OutputPartitionCount, strategyPrototype, sourceNodes), nil
 }
 
 func (s *Shuffle) Metadata() *metadata.NodeMetadata {
@@ -84,5 +77,8 @@ func (s *Shuffle) Visualize() *graph.Node {
 	for i, input := range s.Sources {
 		n.AddChild(fmt.Sprintf("input_%d", i), input.Visualize())
 	}
+
+	n.AddChild("strategy", s.Strategy.Visualize())
+
 	return n
 }

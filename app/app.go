@@ -40,7 +40,7 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 	}
 
 	// We only want one partition at the end, to print the output easily.
-	shuffled := physical.NewShuffle(1, nil, sourceNodes)
+	shuffled := physical.NewShuffle(1, physical.NewConstantStrategy(0), sourceNodes)
 
 	// Only the first partition is there.
 	var phys physical.Node = shuffled[0]

@@ -10,7 +10,6 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/pkg/errors"
-	"github.com/twmb/murmur3"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
@@ -99,14 +98,14 @@ func (id *ShuffleID) MapKey() string {
 
 type Shuffle struct {
 	outputPartitionCount int
-	key                  []Expression
+	strategyPrototype    ShuffleStrategyPrototype
 	sources              []Node
 }
 
-func NewShuffle(outputPartitionCount int, key []Expression, sources []Node) *Shuffle {
+func NewShuffle(outputPartitionCount int, strategyPrototype ShuffleStrategyPrototype, sources []Node) *Shuffle {
 	return &Shuffle{
 		outputPartitionCount: outputPartitionCount,
-		key:                  key,
+		strategyPrototype:    strategyPrototype,
 		sources:              sources,
 	}
 }
@@ -160,7 +159,12 @@ func (s *Shuffle) StartSources(ctx context.Context, stateStorage storage.Storage
 			return nil, errors.Wrapf(err, "couldn't get new source stream ID for shuffle with ID %s", nextShuffleID.Id)
 		}
 
-		sender := NewShuffleSender(senderStreamID, shuffleID, NewKeyHashingStrategy(variables, s.key), s.outputPartitionCount, partition)
+		strategy, err := s.strategyPrototype.Get(ctx, variables)
+		if err != nil {
+			return nil, errors.Wrapf(err, "couldn't get strategy for shuffle with ID %s", nextShuffleID.Id)
+		}
+
+		sender := NewShuffleSender(senderStreamID, shuffleID, strategy, s.outputPartitionCount, partition)
 
 		// panic("fix stream ID in pull engine")
 		log.Printf("starting sender for partitiion %d", partition)
@@ -177,6 +181,8 @@ type ShuffleReceiver struct {
 	shuffleID            *ShuffleID
 	sourcePartitionCount int
 	partition            int
+
+	received int
 }
 
 func NewShuffleReceiver(streamID *StreamID, shuffleID *ShuffleID, sourcePartitionCount int, partition int) *ShuffleReceiver {
@@ -195,6 +201,11 @@ func getQueuePrefix(from, to int) []byte {
 }
 
 func (rs *ShuffleReceiver) Next(ctx context.Context) (*Record, error) {
+	rs.received++
+	if rs.received%1000 == 0 {
+		log.Printf("shuffle %s partition %d received %d records", rs.shuffleID.Id, rs.partition, rs.received)
+	}
+
 	tx := storage.GetStateTransactionFromContext(ctx)
 	streamPrefixedTx := tx.WithPrefix(rs.streamID.AsPrefix())
 	endOfStreamsMap := storage.NewMap(streamPrefixedTx.WithPrefix(endsOfStreamsPrefix))
@@ -329,17 +340,14 @@ func (rs *ShuffleReceiver) Close() error {
 	return nil
 }
 
-type ShuffleStrategy interface {
-	// Return output partition index based on the record and output partition count.
-	CalculatePartition(ctx context.Context, record *Record, outputs int) (int, error)
-}
-
 type ShuffleSender struct {
 	streamID             *StreamID
 	shuffleID            *ShuffleID
 	shuffleStrategy      ShuffleStrategy
 	outputPartitionCount int
 	partition            int
+
+	sent int
 }
 
 func NewShuffleSender(streamID *StreamID, shuffleID *ShuffleID, shuffleStrategy ShuffleStrategy, outputPartitionCount int, partition int) *ShuffleSender {
@@ -357,6 +365,11 @@ func (node *ShuffleSender) ReadyForMore(ctx context.Context, tx storage.StateTra
 }
 
 func (node *ShuffleSender) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *Record) error {
+	node.sent++
+	if node.sent%1000 == 0 {
+		log.Printf("shuffle %s partition %d sent %d records", node.shuffleID.Id, node.partition, node.sent)
+	}
+
 	outputPartition, err := node.shuffleStrategy.CalculatePartition(ctx, record, node.outputPartitionCount)
 	if err != nil {
 		return errors.Wrap(err, "couldn't calculate output partition to send record to")
@@ -443,42 +456,4 @@ func (node *ShuffleSender) Next(ctx context.Context, tx storage.StateTransaction
 
 func (node *ShuffleSender) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
 	panic("can't get watermark from shuffle sender")
-}
-
-type KeyHashingStrategy struct {
-	variables     octosql.Variables
-	keyExpression []Expression
-}
-
-func NewKeyHashingStrategy(variables octosql.Variables, keyExpression []Expression) ShuffleStrategy {
-	return &KeyHashingStrategy{
-		variables:     variables,
-		keyExpression: keyExpression,
-	}
-}
-
-// TODO: The key should really be calculated by the preceding map. Like all group by values.
-func (s *KeyHashingStrategy) CalculatePartition(ctx context.Context, record *Record, outputs int) (int, error) {
-	variables, err := s.variables.MergeWith(record.AsVariables())
-	if err != nil {
-		return -1, errors.Wrap(err, "couldn't merge stream variables with record")
-	}
-
-	key := make([]octosql.Value, len(s.keyExpression))
-	for i := range s.keyExpression {
-		key[i], err = s.keyExpression[i].ExpressionValue(ctx, variables)
-		if err != nil {
-			return -1, errors.Wrapf(err, "couldn't evaluate process key expression with index %v", i)
-		}
-	}
-
-	hash := murmur3.New32()
-
-	keyTuple := octosql.MakeTuple(key)
-	_, err = hash.Write(keyTuple.MonotonicMarshal())
-	if err != nil {
-		return -1, errors.Wrap(err, "couldn't write to hash")
-	}
-
-	return int(hash.Sum32() % uint32(outputs)), nil
 }

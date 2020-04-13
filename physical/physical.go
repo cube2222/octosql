@@ -22,6 +22,7 @@ type Transformers struct {
 	FormulaT                          func(Formula) Formula
 	TableValuedFunctionArgumentValueT func(TableValuedFunctionArgumentValue) TableValuedFunctionArgumentValue
 	TriggerT                          func(Trigger) Trigger
+	ShuffleStrategyT                  func(ShuffleStrategy) ShuffleStrategy
 }
 
 // MaterializationContext is a structure containing the configuration for the materialization.

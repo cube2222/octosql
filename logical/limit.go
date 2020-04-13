@@ -32,7 +32,7 @@ func (node *Limit) Physical(ctx context.Context, physicalCreator *PhysicalPlanCr
 	}
 
 	// Limit operates on a single, joined stream.
-	outNodes := physical.NewShuffle(1, nil, sourceNodes)
+	outNodes := physical.NewShuffle(1, physical.NewConstantStrategy(0), sourceNodes)
 
 	return []physical.Node{physical.NewLimit(outNodes[0], limitExpr)}, variables, nil
 }

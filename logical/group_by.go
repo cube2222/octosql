@@ -179,11 +179,11 @@ func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlan
 	groupByPartitionCountStr := os.Getenv("OCTOSQL_GROUP_BY_PARTITIONS")
 	groupByPartitionCount, err := strconv.ParseInt(groupByPartitionCountStr, 10, 64)
 	if err != nil {
-		log.Fatal(err) // TODO: Changeme
+		log.Fatal(err) // TODO: Change me
 	}
 	log.Printf("group by partition count: %d", groupByPartitionCount)
 
-	outNodes := physical.NewShuffle(int(groupByPartitionCount), key, sourceNodes)
+	outNodes := physical.NewShuffle(int(groupByPartitionCount), physical.NewKeyHashingStrategy(key), sourceNodes)
 	for i := range outNodes {
 		outNodes[i] = physical.NewGroupBy(outNodes[i], key, node.fields, aggregates, node.as, triggers)
 	}

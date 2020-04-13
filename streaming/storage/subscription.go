@@ -14,7 +14,7 @@ type Subscription struct {
 	cancel  context.CancelFunc
 	wg      sync.WaitGroup
 	changes <-chan struct{}
-	errors  chan error
+	errors  <-chan error
 	closed  bool
 	err     error
 }

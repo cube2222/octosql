@@ -1,15 +1,6 @@
 package execution
 
-import (
-	"context"
-	"log"
-	"testing"
-
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
-)
-
-func TestName(t *testing.T) {
+/*func TestName(t *testing.T) {
 	ctx := context.Background()
 	db := GetTestStorage(t)
 
@@ -129,4 +120,4 @@ func TestName(t *testing.T) {
 	log.Printf("%+v", records1)
 
 	t.Fatal("ok")
-}
+}*/

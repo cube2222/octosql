@@ -16,6 +16,7 @@ type Subscription struct {
 	changes <-chan struct{}
 	errors  chan error
 	closed  bool
+	err     error
 }
 
 type ChangesNotifierFunc func(ctx context.Context, changes chan<- struct{}) error
@@ -49,7 +50,8 @@ func (sub *Subscription) ListenForChanges(ctx context.Context) error {
 	case <-sub.changes:
 		return nil
 	case err := <-sub.errors:
-		sub.errors <- err
+		sub.closed = true
+		sub.err = err
 		if err == ErrChangeSent {
 			return nil
 		}
@@ -63,12 +65,15 @@ var ErrChangeSent = errors.New("change sent")
 
 func (sub *Subscription) Close() error {
 	if sub.closed {
-		return errors.New("subscription already closed")
+		return sub.err
 	}
-	sub.closed = true
 	sub.cancel()
 	sub.wg.Wait()
 	err := <-sub.errors
+
+	sub.closed = true
+	sub.err = err
+
 	if err == context.Canceled {
 		return nil
 	} else if err == ErrChangeSent {

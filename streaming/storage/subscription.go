@@ -14,7 +14,7 @@ type Subscription struct {
 	cancel  context.CancelFunc
 	wg      sync.WaitGroup
 	changes <-chan struct{}
-	errors  <-chan error
+	errors  chan error
 	closed  bool
 }
 
@@ -49,6 +49,7 @@ func (sub *Subscription) ListenForChanges(ctx context.Context) error {
 	case <-sub.changes:
 		return nil
 	case err := <-sub.errors:
+		sub.errors <- err
 		if err == ErrChangeSent {
 			return nil
 		}

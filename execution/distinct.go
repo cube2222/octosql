@@ -41,9 +41,7 @@ func (node *Distinct) Get(ctx context.Context, variables octosql.Variables, stre
 		return nil, nil, errors.Wrap(err, "couldn't create trigger for distinct")
 	}
 
-	distinct := &DistinctStream{
-		variables: variables,
-	}
+	distinct := &DistinctStream{}
 
 	processFunc := &ProcessByKey{
 		eventTimeField:  node.eventTimeField,
@@ -59,9 +57,7 @@ func (node *Distinct) Get(ctx context.Context, variables octosql.Variables, stre
 	return distinctPullEngine, NewExecutionOutput(distinctPullEngine), nil
 }
 
-type DistinctStream struct {
-	variables octosql.Variables
-}
+type DistinctStream struct{}
 
 var idStoragePrefix = []byte("$id_value_state$")
 var recordStoragePrefix = []byte("$record_value_state$")

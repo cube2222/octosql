@@ -75,8 +75,7 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 	return streamJoinPullEngine, NewExecutionOutput(streamJoinPullEngine), nil
 }
 
-type JoinedStream struct {
-}
+type JoinedStream struct{}
 
 func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, key octosql.Value, record *Record) error {
 	return nil

@@ -5,7 +5,6 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
-
 	"github.com/pkg/errors"
 )
 
@@ -66,6 +65,7 @@ type DistinctStream struct {
 
 var idStoragePrefix = []byte("$id_value_state$")
 var recordStoragePrefix = []byte("$record_value_state$")
+var distinctRecordCountPrefix = []byte("$record_count$")
 
 func (ds *DistinctStream) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, key octosql.Value, record *Record) error {
 	if inputIndex > 0 {
@@ -80,8 +80,9 @@ func (ds *DistinctStream) AddRecord(ctx context.Context, tx storage.StateTransac
 	txByKey := tx.WithPrefix(keyPrefix)
 
 	// Keep track of record vs retraction count
-	recordCountState := storage.NewValueState(txByKey.WithPrefix(recordCountPrefix))
+	recordCountState := storage.NewValueState(txByKey.WithPrefix(distinctRecordCountPrefix))
 	var recordCount octosql.Value
+
 	err := recordCountState.Get(&recordCount)
 	if err == storage.ErrNotFound {
 		recordCount = octosql.MakeInt(0)
@@ -90,13 +91,15 @@ func (ds *DistinctStream) AddRecord(ctx context.Context, tx storage.StateTransac
 	}
 
 	var newRecordCount int
+	wasRetracted := false
+
 	if !record.IsUndo() {
 		newRecordCount = recordCount.AsInt() + 1
 	} else {
 		newRecordCount = recordCount.AsInt() - 1
+		wasRetracted = true
 	}
 
-	recordID := octosql.MakeString(record.ID().ID)
 	keyIDState := storage.NewValueState(txByKey.WithPrefix(idStoragePrefix))
 	keyRecordState := storage.NewValueState(txByKey.WithPrefix(recordStoragePrefix))
 
@@ -122,11 +125,18 @@ func (ds *DistinctStream) AddRecord(ctx context.Context, tx storage.StateTransac
 
 	}
 
-	// Now if the count is zero it means we just got a retraction that dropped us to zero, so
-	// we store this ID as the one who will retract the whole key later in Trigger(). If it's
-	// one, then we just got our first record with this specific key, so its ID will be used to
-	// send the record through in Trigger()
-	if newRecordCount == 0 || newRecordCount == 1 {
+	// Now we have two possible scenarios:
+	// 1) There were no records for that specific key and now the first one arrived (the first case of the if)
+	// That means we have to set the ID, because it will be used to trigger this key in Trigger().
+	// 2) There was exactly one record for that specific key and now we retracted it, so we have to
+	// retract it in Trigger(). We store the ID, since this ID will be used to retract in Trigger().
+	// Notice that the two missing cases: (wasRetracted && newRecordCount == 1) and (!wasRetracted && newRecourdCount == 0)
+	// mean respectively that we had two records, and we retracted one (so nothing happens) or
+	// we had an early retraction and now we added a record, so nothing happens as well.
+
+	recordID := octosql.MakeString(record.ID().ID)
+
+	if (!wasRetracted && newRecordCount == 1) || (wasRetracted && newRecordCount == 0) {
 		err := keyIDState.Set(&recordID)
 		if err != nil {
 			return errors.Wrap(err, "couldn't save records ID")
@@ -136,15 +146,17 @@ func (ds *DistinctStream) AddRecord(ctx context.Context, tx storage.StateTransac
 	return nil
 }
 
+var distinctPreviouslyTriggeredPrefix = []byte("$previously_triggered_value$")
+
 func (ds *DistinctStream) Trigger(ctx context.Context, tx storage.StateTransaction, key octosql.Value) ([]*Record, error) {
 	keyPrefix := append(append([]byte("$"), key.MonotonicMarshal()...), '$')
 	txByKey := tx.WithPrefix(keyPrefix)
 
-	phantom := octosql.MakePhantom()
-
 	// Check whether record was triggered
-	recordTriggerState := storage.NewValueState(txByKey.WithPrefix(previouslyTriggeredValuePrefix))
+	recordTriggerState := storage.NewValueState(txByKey.WithPrefix(distinctPreviouslyTriggeredPrefix))
 	var wasRecordTriggered bool
+
+	phantom := octosql.MakePhantom()
 
 	err := recordTriggerState.Get(&phantom)
 	if err == nil {
@@ -156,12 +168,13 @@ func (ds *DistinctStream) Trigger(ctx context.Context, tx storage.StateTransacti
 	}
 
 	// Check whether record is present
-	recordCountState := storage.NewValueState(txByKey.WithPrefix(recordCountPrefix))
+	recordCountState := storage.NewValueState(txByKey.WithPrefix(distinctRecordCountPrefix))
 	var isRecordPresent bool
+	var recordCount octosql.Value
 
-	err = recordCountState.Get(&phantom)
+	err = recordCountState.Get(&recordCount)
 	if err == nil {
-		isRecordPresent = true
+		isRecordPresent = recordCount.AsInt() > 0
 	} else if err == storage.ErrNotFound {
 		isRecordPresent = false
 	} else {
@@ -191,12 +204,13 @@ func (ds *DistinctStream) Trigger(ctx context.Context, tx storage.StateTransacti
 		// Save that the record was triggered
 		err = recordTriggerState.Set(&phantom)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't mark record as retracted")
+			return nil, errors.Wrap(err, "couldn't mark record as triggered")
 		}
 
 		return []*Record{NewRecordFromRecord(&record, WithNoUndo(), WithID(NewRecordID(recordID.AsString())))}, nil
 	} else if wasRecordTriggered && !isRecordPresent {
-		// The record was triggered, but it isn't present
+		// The record was triggered, but it isn't present, so we retract it
+		// note that even if the recordCount is negative, it still means it should be retracted.
 
 		// Reset the triggering of the record
 		err = recordTriggerState.Clear()

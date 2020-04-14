@@ -1,6 +1,5 @@
 package execution
 
-/*
 import (
 	"context"
 	"testing"
@@ -622,11 +621,67 @@ func TestDistinct_Get(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = AreStreamsEqualNoOrdering(ctx, stateStorage, stream, wantStream)
-			if err != nil {
+			if err := AreStreamsEqualNoOrdering(ctx, stateStorage, stream, wantStream); err != nil {
 				t.Fatal(err)
-			}
 
+			}
 		})
 	}
-}*/
+}
+
+func TestDistinct_Retractions(t *testing.T) {
+	stateStorage := GetTestStorage(t)
+	defer func() {
+		go stateStorage.Close()
+	}()
+
+	ctx := context.Background()
+	fields := []octosql.VariableName{"string", "number"}
+	inputRecords := []*Record{
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"a", 1}, WithID(NewRecordID("id1"))),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"a", 2}, WithID(NewRecordID("id2"))),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"b", 1}, WithID(NewRecordID("id3"))),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"a", 1}, WithID(NewRecordID("id4")), WithUndo()), // retraction of a record that appears once
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"a", 2}, WithID(NewRecordID("id5"))),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"a", 2}, WithID(NewRecordID("id6")), WithUndo()),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"a", 2}, WithID(NewRecordID("id7")), WithUndo()), // retraction of a record that appears twice
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"b", 2}, WithID(NewRecordID("id8"))),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"b", 2}, WithID(NewRecordID("id9")), WithUndo()),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"b", 2}, WithID(NewRecordID("id10"))), // a record appears again after being retracted
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"c", 1}, WithID(NewRecordID("id11")), WithUndo()),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"c", 1}, WithID(NewRecordID("id12"))), // we don't want to send the (c,1) record at all
+	}
+
+	expectedOutput := []*Record{
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"a", 1}, WithID(NewRecordID("id1"))),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"a", 2}, WithID(NewRecordID("id2"))),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"b", 1}, WithID(NewRecordID("id3"))),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"a", 1}, WithID(NewRecordID("id4")), WithUndo()),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"a", 2}, WithID(NewRecordID("id7")), WithUndo()),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"b", 2}, WithID(NewRecordID("id8"))),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"b", 2}, WithID(NewRecordID("id9")), WithUndo()),
+		NewRecordFromSliceWithNormalize(fields, []interface{}{"b", 2}, WithID(NewRecordID("id10"))),
+	}
+
+	source := NewDummyNode(inputRecords)
+
+	distinct := NewDistinct(stateStorage, source, "")
+
+	tx := stateStorage.BeginTransaction()
+
+	stream, _, err := distinct.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wantStream := NewInMemoryStream(storage.InjectStateTransaction(context.Background(), tx), expectedOutput)
+
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	err = AreStreamsEqualNoOrdering(ctx, stateStorage, stream, wantStream)
+	if err != nil {
+		t.Fatal(err)
+	}
+}

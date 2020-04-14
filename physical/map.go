@@ -86,6 +86,12 @@ func (node *Map) Metadata() *metadata.NodeMetadata {
 	eventTimeField := node.Source.Metadata().EventTimeField()
 	var newEventTimeField octosql.VariableName
 	for _, expr := range node.Expressions {
+		if expr, ok := expr.(*StarExpression); ok {
+			if expr.Qualifier == "" || expr.Qualifier == eventTimeField.Source() {
+				newEventTimeField = eventTimeField
+				break
+			}
+		}
 		if isVariableNameRecursive(expr, eventTimeField) {
 			newEventTimeField = getOuterName(expr)
 			break

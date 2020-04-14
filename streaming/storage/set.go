@@ -144,6 +144,24 @@ func (set *Set) clearUsingHash(hashFunction func(octosql.Value) ([]byte, error))
 	return nil
 }
 
+func (set *Set) ReadAll() ([]octosql.Value, error) {
+	it := set.GetIterator()
+
+	values := make([]octosql.Value, 0)
+	var value octosql.Value
+
+	for {
+		err := it.Next(&value)
+		if err == ErrEndOfIterator {
+			return values, nil
+		} else if err != nil {
+			return nil, errors.Wrap(err, "couldn't read next value from set")
+		}
+
+		values = append(values, value)
+	}
+}
+
 func (set *Set) GetIterator() *SetIterator {
 	it := set.tx.Iterator(WithDefault())
 	return NewSetIterator(it)

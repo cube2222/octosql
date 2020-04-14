@@ -69,7 +69,7 @@ func (ds *DistinctStream) AddRecord(ctx context.Context, tx storage.StateTransac
 	}
 
 	if record.Metadata.Id == nil {
-		panic("no id for record in distinct")
+		panic("no ID for record in distinct")
 	}
 
 	keyPrefix := append(append([]byte("$"), key.MonotonicMarshal()...), '$')

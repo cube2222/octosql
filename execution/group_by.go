@@ -90,7 +90,7 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 	processFunc := &ProcessByKey{
 		eventTimeField:  node.eventTimeField,
 		trigger:         trigger,
-		keyExpression:   node.key,
+		keyExpressions:  [][]Expression{node.key},
 		processFunction: groupBy,
 		variables:       variables,
 	}

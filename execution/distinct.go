@@ -48,7 +48,7 @@ func (node *Distinct) Get(ctx context.Context, variables octosql.Variables, stre
 	processFunc := &ProcessByKey{
 		eventTimeField:  node.eventTimeField,
 		trigger:         trigger,
-		keyExpression:   []Expression{&RecordExpression{}},
+		keyExpressions:  [][]Expression{{&RecordExpression{}}},
 		processFunction: distinct,
 		variables:       variables,
 	}

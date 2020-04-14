@@ -27,7 +27,7 @@ type Trigger interface {
 type ProcessByKey struct {
 	trigger         Trigger
 	eventTimeField  octosql.VariableName // Empty if not grouping by event time.
-	keyExpression   []Expression
+	keyExpressions  [][]Expression
 	processFunction ProcessFunction
 	variables       octosql.Variables
 }
@@ -39,12 +39,14 @@ func (p *ProcessByKey) AddRecord(ctx context.Context, tx storage.StateTransactio
 		return errors.Wrap(err, "couldn't merge stream variables with record")
 	}
 
-	key := make([]octosql.Value, len(p.keyExpression))
-	for i := range p.keyExpression {
-		if _, ok := p.keyExpression[i].(*RecordExpression); ok {
-			key[i], err = p.keyExpression[i].ExpressionValue(ctx, recordVariables)
+	keyExpressions := p.keyExpressions[inputIndex]
+
+	key := make([]octosql.Value, len(keyExpressions))
+	for i := range keyExpressions {
+		if _, ok := keyExpressions[i].(*RecordExpression); ok {
+			key[i], err = keyExpressions[i].ExpressionValue(ctx, recordVariables)
 		} else {
-			key[i], err = p.keyExpression[i].ExpressionValue(ctx, variables)
+			key[i], err = keyExpressions[i].ExpressionValue(ctx, variables)
 		}
 		if err != nil {
 			return errors.Wrapf(err, "couldn't evaluate process key expression with index %v", i)

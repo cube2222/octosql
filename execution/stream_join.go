@@ -38,17 +38,22 @@ func NewStreamJoin(leftKey, rightKey []Expression, leftSource, rightSource Node,
 
 func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
-	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
+	leftSourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakeString("left"))
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get source stream ID")
+		return nil, nil, errors.Wrap(err, "couldn't get left source stream ID")
 	}
 
-	leftStream, leftExec, err := node.leftSource.Get(ctx, variables, streamID)
+	rightSourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakeString("right"))
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't get right source stream ID")
+	}
+
+	leftStream, leftExec, err := node.leftSource.Get(ctx, variables, leftSourceStreamID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get left source stream in stream join")
 	}
 
-	rightStream, rightExec, err := node.rightSource.Get(ctx, variables, streamID)
+	rightStream, rightExec, err := node.rightSource.Get(ctx, variables, rightSourceStreamID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get right source stream in stream join")
 	}
@@ -56,7 +61,7 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 	execOutput := &UnifiedStream{
 		sources:          []RecordStream{leftStream, rightStream},
 		watermarkSources: []WatermarkSource{leftExec.WatermarkSource, rightExec.WatermarkSource},
-		streamID:         sourceStreamID, // TODO: is this right?
+		streamID:         GetRawStreamID(), // TODO: is this right?
 	}
 
 	trigger, err := node.trigger.Get(ctx, variables)
@@ -65,7 +70,7 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 	}
 
 	stream := &JoinedStream{
-		streamID:       sourceStreamID,
+		streamID:       streamID,
 		eventTimeField: node.eventTimeField,
 	}
 

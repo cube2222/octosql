@@ -32,26 +32,25 @@ func TestJoinedStream_Simple(t *testing.T) {
 		NewRecordFromSliceWithNormalize(rightFields, []interface{}{"b", 12}, WithID(NewRecordID("id6"))),
 	})
 
+	streamID := GetRawStreamID()
+	outFields := []octosql.VariableName{"left.a", "left.b", "right.a", "right.b"}
+	expectedOutput := []*Record{
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{"a", 0, "a", 10}, WithID(NewRecordID(fmt.Sprintf("%s.0", streamID.Id)))),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{"a", 0, "a", 11}, WithID(NewRecordID(fmt.Sprintf("%s.1", streamID.Id)))),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{"a", 1, "a", 10}, WithID(NewRecordID(fmt.Sprintf("%s.2", streamID.Id)))),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{"a", 1, "a", 11}, WithID(NewRecordID(fmt.Sprintf("%s.3", streamID.Id)))),
+		NewRecordFromSliceWithNormalize(outFields, []interface{}{"b", 2, "b", 12}, WithID(NewRecordID(fmt.Sprintf("%s.4", streamID.Id)))),
+	}
+
 	leftKey := []Expression{NewVariable("left.a")}
 	rightKey := []Expression{NewVariable("right.a")}
 
 	sj := NewStreamJoin(leftKey, rightKey, leftSource, rightSource, stateStorage, "", NewCountingTrigger(NewDummyValue(octosql.MakeInt(1))))
 
 	tx := stateStorage.BeginTransaction()
-	stream, _, err := sj.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
+	stream, _, err := sj.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), streamID)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	streamID := stream.(*PullEngine).irs.(*ProcessByKey).processFunction.(*JoinedStream).streamID
-
-	outFields := []octosql.VariableName{"left.a", "left.b", "right.a", "right.b"}
-	expectedOutput := []*Record{
-		NewRecordFromSliceWithNormalize(outFields, []interface{}{"a", 0, "a", 10}, WithID(NewRecordID(fmt.Sprintf("%s.0", streamID)))),
-		NewRecordFromSliceWithNormalize(outFields, []interface{}{"a", 0, "a", 11}, WithID(NewRecordID(fmt.Sprintf("%s.1", streamID)))),
-		NewRecordFromSliceWithNormalize(outFields, []interface{}{"a", 1, "a", 10}, WithID(NewRecordID(fmt.Sprintf("%s.2", streamID)))),
-		NewRecordFromSliceWithNormalize(outFields, []interface{}{"a", 1, "a", 11}, WithID(NewRecordID(fmt.Sprintf("%s.3", streamID)))),
-		NewRecordFromSliceWithNormalize(outFields, []interface{}{"b", 2, "b", 12}, WithID(NewRecordID(fmt.Sprintf("%s.4", streamID)))),
 	}
 
 	want := NewInMemoryStream(storage.InjectStateTransaction(context.Background(), tx), expectedOutput)

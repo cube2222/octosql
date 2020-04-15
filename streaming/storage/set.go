@@ -153,6 +153,11 @@ func (set *Set) ReadAll() ([]octosql.Value, error) {
 	for {
 		err := it.Next(&value)
 		if err == ErrEndOfIterator {
+			err := it.Close()
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't close iterator")
+			}
+
 			return values, nil
 		} else if err != nil {
 			return nil, errors.Wrap(err, "couldn't read next value from set")

@@ -5,6 +5,7 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 )
 
@@ -59,7 +60,9 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 		return nil, nil, errors.Wrap(err, "couldn't create trigger for stream join")
 	}
 
-	stream := &JoinedStream{}
+	stream := &JoinedStream{
+		streamID: sourceStreamID,
+	}
 
 	processFunc := &ProcessByKey{
 		eventTimeField:  node.eventTimeField,
@@ -75,11 +78,13 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 	return streamJoinPullEngine, NewExecutionOutput(streamJoinPullEngine), nil
 }
 
-type JoinedStream struct{}
+type JoinedStream struct {
+	streamID *StreamID
+}
 
 var leftStreamRecordsPrefix = []byte("$left_stream_records$")
 var rightStreamRecordsPrefix = []byte("$right_stream_records$")
-var totalRecordCountPrefix = []byte("$total_record_count$")
+var toTriggerPrefix = []byte("$values_to_trigger$")
 
 func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, key octosql.Value, record *Record) error {
 	if inputIndex < 0 || inputIndex > 1 {
@@ -90,72 +95,198 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 		panic("no ID for record in stream join")
 	}
 
-	isLeft := inputIndex == 0 // from which input source the record was received
-
 	keyPrefix := append(append([]byte("$"), key.MonotonicMarshal()...), '$')
 	txByKey := tx.WithPrefix(keyPrefix)
 
-	if !record.IsUndo() { // we add the record
-		var myRecordSet, otherRecordSet *storage.Set
+	isLeft := inputIndex == LEFT    // from which input source the record was received
+	isRetraction := record.IsUndo() // is the incoming record a retraction
 
+	// We get the key of the new incoming record
+	newRecordValue := recordToValue(record)
+	newRecordKey, err := proto.Marshal(&newRecordValue)
+	if err != nil {
+		return errors.Wrap(err, "couldn't marshall new record")
+	}
+
+	var myRecordSet, otherRecordSet *storage.Set
+
+	// Important note:
+	// 1) If we are adding the record it's natural that we want to match it with every record from the other stream
+	// 2) If we are retracting, we want to also retract every matching between the new record and records from the other stream.
+	// 	  This is because if records arrive in order R1, L1, L2, R2, R3 and then we retract L1, it has matched
+	//	  with R1 (when L1 was added) and with R2 and R3 (when they were added)
+	if isLeft {
+		myRecordSet = storage.NewSet(txByKey.WithPrefix(leftStreamRecordsPrefix))
+		otherRecordSet = storage.NewSet(txByKey.WithPrefix(rightStreamRecordsPrefix))
+	} else {
+		myRecordSet = storage.NewSet(txByKey.WithPrefix(rightStreamRecordsPrefix))
+		otherRecordSet = storage.NewSet(txByKey.WithPrefix(leftStreamRecordsPrefix))
+	}
+
+	// Keep track of the count
+	newCount, err := keepTrackOfCount(txByKey.WithPrefix(newRecordKey), isRetraction)
+	if err != nil {
+		return err
+	}
+
+	// If we got an early retraction, or a record arrived after its retraction then we do nothing
+	if newCount < 0 || (newCount == 0 && !isRetraction) {
+		return nil
+	}
+
+	// We add/remove the record to/from the appropriate set of records
+	if !isRetraction {
+		_, err = myRecordSet.Insert(newRecordValue)
+		if err != nil {
+			return errors.Wrap(err, "couldn't store record in its set")
+		}
+	} else {
+		_, err = myRecordSet.Erase(newRecordValue)
+		if err != nil {
+			return errors.Wrap(err, "couldn't remove record from its set")
+		}
+	}
+
+	// We read all the records from the other stream
+	otherRecordValues, err := otherRecordSet.ReadAll()
+	if err != nil {
+		return errors.Wrap(err, "couldn't read records from the other stream")
+	}
+
+	toTriggerSet := storage.NewSet(txByKey.WithPrefix(toTriggerPrefix))
+
+	for _, otherRecordValue := range otherRecordValues {
+		// We will be creating matches between records. A match is a pair of records and information whether it's a retraction
+		// or not. To make sure we never mix the order the record from the left stream always goes first
+		var leftRecord, rightRecord octosql.Value
 		if isLeft {
-			myRecordSet = storage.NewSet(txByKey.WithPrefix(leftStreamRecordsPrefix))
-			otherRecordSet = storage.NewSet(txByKey.WithPrefix(rightStreamRecordsPrefix))
+			leftRecord = newRecordValue
+			rightRecord = otherRecordValue
 		} else {
-			myRecordSet = storage.NewSet(txByKey.WithPrefix(rightStreamRecordsPrefix))
-			otherRecordSet = storage.NewSet(txByKey.WithPrefix(leftStreamRecordsPrefix))
+			leftRecord = otherRecordValue
+			rightRecord = newRecordValue
 		}
 
-		// We save the record in the appropriate record set
-		// Note that if two exact same records come in (with same columns and data) they will be separate
-		// since we also include the metadata, and hence the ID
-		_, err := myRecordSet.Insert(recordToValue(record))
-		if err != nil {
-			return errors.Wrap(err, "couldn't store record")
+		match := createMatch(leftRecord, rightRecord, false)
+
+		if !isRetraction { // adding the record
+			_, err = toTriggerSet.Insert(match)
+			if err != nil {
+				return errors.Wrap(err, "couldn't store a match of records")
+			}
+		} else { // retracting a record
+			// Now there are two possibilities:
+			// 1) The matching is present in the toTrigger set -> we just remove it
+			// 2) The matching isn't present (so it's already been triggered) -> we send a retraction for it
+
+			isPresent, err := toTriggerSet.Contains(match)
+			if err != nil {
+				return errors.Wrap(err, "couldn't check whether a match of records is present in the toTrigger set")
+			}
+
+			if isPresent {
+				_, err = toTriggerSet.Erase(match)
+				if err != nil {
+					return errors.Wrap(err, "couldn't remove a match of records from the toTrigger set")
+				}
+			} else {
+				_, err = toTriggerSet.Insert(createMatch(leftRecord, rightRecord, true)) // the retraction
+				if err != nil {
+					return errors.Wrap(err, "couldn't store the retraction of a match ")
+				}
+			}
 		}
-
-		// Now get all records from the other stream
-		otherRecordValues, err := otherRecordSet.ReadAll()
-		if err != nil {
-			return errors.Wrap(err, "couldn't read records from the other stream")
-		}
-
-		otherRecords := make([]*Record, len(otherRecordValues))
-		for i, recordValue := range otherRecordValues {
-			otherRecords[i] = valueToRecord(recordValue)
-		}
-
-		// Now we have the record that just arrived, and all the records that it matches with, so we merge them
-
-		// First we check how many records we sent already through the stream join and we update this value
-		sentRecordsCountState := storage.NewValueState(tx.WithPrefix(totalRecordCountPrefix))
-		var sentRecordsCount octosql.Value
-
-		err = sentRecordsCountState.Get(&sentRecordsCount)
-		if err == storage.ErrNotFound {
-			sentRecordsCount = octosql.MakeInt(0)
-		} else if err != nil {
-			return errors.Wrap(err, "couldn't check the number of records previously sent")
-		}
-
-		// Now we have the number of records we already sent, so we increase it by the new records and store it
-		recordsSentBefore := sentRecordsCount.AsInt()
-		recordsSentUpdated := octosql.MakeInt(recordsSentBefore + len(otherRecords))
-
-		err = sentRecordsCountState.Set(&recordsSentUpdated)
-		if err != nil {
-			return errors.Wrap(err, "couldn't save the new number of records sent through")
-		}
-
-	} else { // we retract the record
-
 	}
 
 	return nil
 }
 
+var triggeredCountPrefix = []byte("$count_of_triggered_records$")
+
 func (js *JoinedStream) Trigger(ctx context.Context, tx storage.StateTransaction, key octosql.Value) ([]*Record, error) {
-	return nil, nil
+	keyPrefix := append(append([]byte("$"), key.MonotonicMarshal()...), '$')
+	txByKey := tx.WithPrefix(keyPrefix)
+
+	triggeredCountState := storage.NewValueState(tx.WithPrefix(triggeredCountPrefix))
+	var triggeredCount octosql.Value
+
+	err := triggeredCountState.Get(&triggeredCount)
+	if err == storage.ErrNotFound {
+		triggeredCount = octosql.MakeInt(0)
+	} else if err != nil {
+		return nil, errors.Wrap(err, "couldn't read count of already triggered records")
+	}
+
+	triggeredCountValue := triggeredCount.AsInt()
+
+	// Read all the pairs to merge and send
+	toTriggerSet := storage.NewSet(txByKey.WithPrefix(toTriggerPrefix))
+	matches, err := toTriggerSet.ReadAll()
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't read record matches to trigger")
+	}
+
+	// Update the value of number of triggered records
+	newTriggeredCount := octosql.MakeInt(triggeredCountValue + len(matches))
+
+	err = triggeredCountState.Set(&newTriggeredCount)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't update count of triggered records")
+	}
+
+	records := make([]*Record, 0)
+	// Retrieve record pairs from the set and merge them
+	for i, match := range matches {
+		idForMatch := NewRecordIDFromStreamIDWithOffset(js.streamID, triggeredCountValue+i)
+		leftRecordValue, rightRecordValue, isUndo := unwrapMatch(match)
+
+		leftRecord := valueToRecord(leftRecordValue)
+		rightRecord := valueToRecord(rightRecordValue)
+
+		mergedRecord := mergeRecords(leftRecord, rightRecord, idForMatch, isUndo)
+		records = append(records, mergedRecord)
+	}
+
+	err = toTriggerSet.Clear()
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't clear the toTrigger set")
+	}
+
+	return records, nil
+}
+
+func keepTrackOfCount(tx storage.StateTransaction, isRetraction bool) (int, error) {
+	var recordCount octosql.Value
+	recordCountState := storage.NewValueState(tx)
+
+	err := recordCountState.Get(&recordCount)
+	if err == storage.ErrNotFound {
+		recordCount = octosql.MakeInt(0)
+	} else if err != nil {
+		return 0, errors.Wrap(err, "couldn't check the count of record")
+	}
+
+	var updatedRecordCount octosql.Value
+	if isRetraction {
+		updatedRecordCount = octosql.MakeInt(recordCount.AsInt() - 1)
+	} else {
+		updatedRecordCount = octosql.MakeInt(recordCount.AsInt() + 1)
+	}
+
+	// Store the new count
+	if updatedRecordCount.AsInt() == 0 {
+		err = recordCountState.Clear()
+		if err != nil {
+			return 0, errors.Wrap(err, "couldn't clear count state of record")
+		}
+	} else {
+		err = recordCountState.Set(&updatedRecordCount)
+		if err != nil {
+			return 0, errors.Wrap(err, "couldn't update the count of record")
+		}
+	}
+
+	return updatedRecordCount.AsInt(), nil
 }
 
 func recordToValue(rec *Record) octosql.Value {
@@ -206,4 +337,51 @@ func valueToRecord(val octosql.Value) *Record {
 	}
 
 	return record
+}
+
+// We create a octosql.Value from two records (as values), a flag whether the match is a retraction,
+// and an int indicating which of the records came later
+func createMatch(first, second octosql.Value, isUndo bool) octosql.Value {
+	return octosql.MakeTuple([]octosql.Value{first, second, octosql.MakeBool(isUndo)})
+}
+
+func unwrapMatch(match octosql.Value) (octosql.Value, octosql.Value, bool) {
+	asSlice := match.AsSlice()
+	return asSlice[0], asSlice[1], asSlice[2].AsBool()
+}
+
+func mergeRecords(left, right *Record, ID *RecordID, isUndo bool) *Record {
+	mergedFieldNames := octosql.StringsToVariableNames(append(left.FieldNames, right.FieldNames...))
+	mergedDataPointers := append(left.Data, right.Data...)
+
+	mergedData := make([]octosql.Value, len(mergedDataPointers))
+
+	for i := range mergedDataPointers {
+		mergedData[i] = *mergedDataPointers[i]
+	}
+
+	var eventTimeField octosql.VariableName
+	leftEventTimeField := left.EventTimeField()
+	rightEventTimeField := right.EventTimeField()
+
+	if leftEventTimeField != "" && rightEventTimeField != "" {
+		leftTime := left.EventTime().AsTime()
+		rightTime := right.EventTime().AsTime()
+
+		if leftTime.After(rightTime) {
+			eventTimeField = leftEventTimeField
+		} else {
+			eventTimeField = rightEventTimeField
+		}
+	} else if leftEventTimeField == "" {
+		eventTimeField = rightEventTimeField
+	} else {
+		eventTimeField = leftEventTimeField
+	}
+
+	if isUndo {
+		return NewRecordFromSlice(mergedFieldNames, mergedData, WithID(ID), WithUndo(), WithEventTimeField(eventTimeField))
+	} else {
+		return NewRecordFromSlice(mergedFieldNames, mergedData, WithID(ID), WithNoUndo(), WithEventTimeField(eventTimeField))
+	}
 }

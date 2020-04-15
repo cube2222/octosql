@@ -15,17 +15,21 @@ const (
 )
 
 type StreamJoin struct {
-	keys           [][]Expression // keys[0] are the expressions for the left source, keys[1] for the right source
-	sources        []Node         // sources[0] = left source, sources[1] = right source
+	leftKey        []Expression
+	rightKey       []Expression
+	leftSource     Node
+	rightSource    Node
 	storage        storage.Storage
 	eventTimeField octosql.VariableName
 	trigger        TriggerPrototype
 }
 
-func NewStreamJoin(leftKey, rightKey []Expression, sources []Node, storage storage.Storage, eventTimeField octosql.VariableName, trigger TriggerPrototype) *StreamJoin {
+func NewStreamJoin(leftKey, rightKey []Expression, leftSource, rightSource Node, storage storage.Storage, eventTimeField octosql.VariableName, trigger TriggerPrototype) *StreamJoin {
 	return &StreamJoin{
-		keys:           [][]Expression{leftKey, rightKey},
-		sources:        sources,
+		leftKey:        leftKey,
+		rightKey:       rightKey,
+		leftSource:     leftSource,
+		rightSource:    rightSource,
 		storage:        storage,
 		eventTimeField: eventTimeField,
 		trigger:        trigger,
@@ -39,12 +43,12 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 		return nil, nil, errors.Wrap(err, "couldn't get source stream ID")
 	}
 
-	leftStream, leftExec, err := node.sources[LEFT].Get(ctx, variables, streamID)
+	leftStream, leftExec, err := node.leftSource.Get(ctx, variables, streamID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get left source stream in stream join")
 	}
 
-	rightStream, rightExec, err := node.sources[RIGHT].Get(ctx, variables, streamID)
+	rightStream, rightExec, err := node.rightSource.Get(ctx, variables, streamID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get right source stream in stream join")
 	}
@@ -61,13 +65,14 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 	}
 
 	stream := &JoinedStream{
-		streamID: sourceStreamID,
+		streamID:       sourceStreamID,
+		eventTimeField: node.eventTimeField,
 	}
 
 	processFunc := &ProcessByKey{
 		eventTimeField:  node.eventTimeField,
 		trigger:         trigger,
-		keyExpressions:  node.keys,
+		keyExpressions:  [][]Expression{node.leftKey, node.rightKey},
 		processFunction: stream,
 		variables:       variables,
 	}
@@ -79,7 +84,8 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 }
 
 type JoinedStream struct {
-	streamID *StreamID
+	streamID       *StreamID
+	eventTimeField octosql.VariableName
 }
 
 var leftStreamRecordsPrefix = []byte("$left_stream_records$")
@@ -243,7 +249,7 @@ func (js *JoinedStream) Trigger(ctx context.Context, tx storage.StateTransaction
 		leftRecord := valueToRecord(leftRecordValue)
 		rightRecord := valueToRecord(rightRecordValue)
 
-		mergedRecord := mergeRecords(leftRecord, rightRecord, idForMatch, isUndo)
+		mergedRecord := mergeRecords(leftRecord, rightRecord, idForMatch, isUndo, js.eventTimeField)
 		records = append(records, mergedRecord)
 	}
 
@@ -350,7 +356,7 @@ func unwrapMatch(match octosql.Value) (octosql.Value, octosql.Value, bool) {
 	return asSlice[0], asSlice[1], asSlice[2].AsBool()
 }
 
-func mergeRecords(left, right *Record, ID *RecordID, isUndo bool) *Record {
+func mergeRecords(left, right *Record, ID *RecordID, isUndo bool, eventTimeField octosql.VariableName) *Record {
 	mergedFieldNames := octosql.StringsToVariableNames(append(left.FieldNames, right.FieldNames...))
 	mergedDataPointers := append(left.Data, right.Data...)
 
@@ -360,23 +366,11 @@ func mergeRecords(left, right *Record, ID *RecordID, isUndo bool) *Record {
 		mergedData[i] = *mergedDataPointers[i]
 	}
 
-	var eventTimeField octosql.VariableName
-	leftEventTimeField := left.EventTimeField()
-	rightEventTimeField := right.EventTimeField()
-
-	if leftEventTimeField != "" && rightEventTimeField != "" {
-		leftTime := left.EventTime().AsTime()
-		rightTime := right.EventTime().AsTime()
-
-		if leftTime.After(rightTime) {
-			eventTimeField = leftEventTimeField
-		} else {
-			eventTimeField = rightEventTimeField
-		}
-	} else if leftEventTimeField == "" {
-		eventTimeField = rightEventTimeField
-	} else {
-		eventTimeField = leftEventTimeField
+	// If eventTimeField is not empty, then we are joining by event_time and thus both records have the same value
+	if eventTimeField != "" {
+		eventTime := left.EventTime()
+		mergedFieldNames = append(mergedFieldNames, eventTimeField)
+		mergedData = append(mergedData, eventTime)
 	}
 
 	if isUndo {

@@ -234,7 +234,7 @@ func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage
 	firstContained := firstMultiSet.isContainedIn(secondMultiSet)
 	secondContained := secondMultiSet.isContainedIn(firstMultiSet)
 	if !(firstContained && secondContained) {
-		return errors.Errorf("different sets: %s and %s", firstMultiSet.Show(), secondMultiSet.Show())
+		return errors.Errorf("different sets: \n %s \n and \n %s", firstMultiSet.Show(), secondMultiSet.Show())
 	}
 
 	return nil

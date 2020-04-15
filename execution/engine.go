@@ -175,7 +175,7 @@ func (engine *PullEngine) loop(ctx context.Context, tx storage.StateTransaction)
 	sourceOrder := rand.Perm(len(engine.sources))
 
 	var record *Record
-
+	var inputIndex int
 	areAllEndOfStream := true
 
 	for _, sourceIndex := range sourceOrder {
@@ -189,6 +189,8 @@ func (engine *PullEngine) loop(ctx context.Context, tx storage.StateTransaction)
 		}
 
 		areAllEndOfStream = false
+		inputIndex = sourceIndex
+		break
 	}
 
 	if areAllEndOfStream {
@@ -204,7 +206,7 @@ func (engine *PullEngine) loop(ctx context.Context, tx storage.StateTransaction)
 		return ErrEndOfStream
 	}
 
-	err = engine.irs.AddRecord(ctx, prefixedTx, 0, record)
+	err = engine.irs.AddRecord(ctx, prefixedTx, inputIndex, record)
 	if err != nil {
 		return errors.Wrap(err, "couldn't add record to intermediate record store")
 	}

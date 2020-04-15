@@ -174,6 +174,13 @@ func EqualityOfUndo(record1 *Record, record2 *Record) error {
 	return nil
 }
 
+func EqualityOfEventTimeField(record1 *Record, record2 *Record) error {
+	if record1.EventTimeField() != record2.EventTimeField() {
+		return errors.Errorf("event time fields not equal: %s and %s", record1.EventTimeField(), record2.EventTimeField())
+	}
+	return nil
+}
+
 func EqualityOfFieldsAndValues(record1 *Record, record2 *Record) error {
 	if len(record1.Fields()) != len(record2.Fields()) {
 		return errors.Errorf("field counts not equal: %d and %d", len(record1.Fields()), len(record2.Fields()))

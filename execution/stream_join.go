@@ -21,10 +21,13 @@ type StreamJoin struct {
 	rightSource    Node
 	storage        storage.Storage
 	eventTimeField octosql.VariableName
+	isLeftJoin     bool
 	trigger        TriggerPrototype
 }
 
-func NewStreamJoin(leftKey, rightKey []Expression, leftSource, rightSource Node, storage storage.Storage, eventTimeField octosql.VariableName, trigger TriggerPrototype) *StreamJoin {
+// As with distinct, triggering a stream join is heavily dependant on triggering its sources
+// so sticking with a counting trigger 1 is the easiest approach
+func NewStreamJoin(leftSource, rightSource Node, leftKey, rightKey []Expression, storage storage.Storage, eventTimeField octosql.VariableName, isLeftJoin bool) *StreamJoin {
 	return &StreamJoin{
 		leftKey:        leftKey,
 		rightKey:       rightKey,
@@ -32,7 +35,8 @@ func NewStreamJoin(leftKey, rightKey []Expression, leftSource, rightSource Node,
 		rightSource:    rightSource,
 		storage:        storage,
 		eventTimeField: eventTimeField,
-		trigger:        trigger,
+		isLeftJoin:     isLeftJoin,
+		trigger:        NewCountingTrigger(NewDummyValue(octosql.MakeInt(1))),
 	}
 }
 
@@ -72,6 +76,7 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 	stream := &JoinedStream{
 		streamID:       streamID,
 		eventTimeField: node.eventTimeField,
+		isLeftJoin:     node.isLeftJoin,
 	}
 
 	processFunc := &ProcessByKey{
@@ -91,6 +96,7 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 type JoinedStream struct {
 	streamID       *StreamID
 	eventTimeField octosql.VariableName
+	isLeftJoin     bool
 }
 
 var leftStreamRecordsPrefix = []byte("$left_stream_records$")

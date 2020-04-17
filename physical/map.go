@@ -80,7 +80,7 @@ func getOuterName(expr Expression) octosql.VariableName {
 
 func (node *Map) Metadata() *metadata.NodeMetadata {
 	if node.Keep {
-		return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality(), node.Source.Metadata().EventTimeField())
+		return metadata.NewNodeMetadataFromMetadata(node.Source.Metadata())
 	}
 
 	eventTimeField := node.Source.Metadata().EventTimeField()
@@ -97,7 +97,22 @@ func (node *Map) Metadata() *metadata.NodeMetadata {
 			break
 		}
 	}
-	return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality(), newEventTimeField)
+
+	namespace := metadata.EmptyNamespace()
+
+	for _, expr := range node.Expressions {
+		if expr, ok := expr.(*StarExpression); ok {
+			if expr.Qualifier == "" {
+				namespace.MergeWith(node.Source.Metadata().Namespace())
+			} else {
+				namespace.AddPrefix(expr.Qualifier)
+			}
+		} else {
+			namespace.AddName(expr.name())
+		}
+	}
+
+	return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality(), newEventTimeField, namespace)
 }
 
 func (node *Map) Visualize() *graph.Node {

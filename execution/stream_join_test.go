@@ -24,6 +24,7 @@ func TestJoinedStream_NoRetractions_NoEventTime(t *testing.T) {
 		NewRecordFromSliceWithNormalize(leftFields, []interface{}{"a", 0}, WithID(NewRecordID("id1"))),
 		NewRecordFromSliceWithNormalize(leftFields, []interface{}{"a", 1}, WithID(NewRecordID("id2"))),
 		NewRecordFromSliceWithNormalize(leftFields, []interface{}{"b", 2}, WithID(NewRecordID("id3"))),
+		NewRecordFromSliceWithNormalize(leftFields, []interface{}{"e", 2}, WithID(NewRecordID("id7"))),
 	})
 
 	rightFields := []octosql.VariableName{"right.a", "right.b"}
@@ -31,6 +32,7 @@ func TestJoinedStream_NoRetractions_NoEventTime(t *testing.T) {
 		NewRecordFromSliceWithNormalize(rightFields, []interface{}{"a", 10}, WithID(NewRecordID("id4"))),
 		NewRecordFromSliceWithNormalize(rightFields, []interface{}{"a", 11}, WithID(NewRecordID("id5"))),
 		NewRecordFromSliceWithNormalize(rightFields, []interface{}{"b", 12}, WithID(NewRecordID("id6"))),
+		NewRecordFromSliceWithNormalize(rightFields, []interface{}{"f", 12}, WithID(NewRecordID("id8"))),
 	})
 
 	streamID := GetRawStreamID()
@@ -81,6 +83,7 @@ func TestJoinedStream_NoRetractions_WithEventTime(t *testing.T) {
 		NewRecordFromSliceWithNormalize(leftFields, []interface{}{0, baseTime}, WithID(NewRecordID("id1")), WithEventTimeField("left.time")),
 		NewRecordFromSliceWithNormalize(leftFields, []interface{}{1, baseTime}, WithID(NewRecordID("id2")), WithEventTimeField("left.time")),
 		NewRecordFromSliceWithNormalize(leftFields, []interface{}{2, baseTime.Add(10)}, WithID(NewRecordID("id3")), WithEventTimeField("left.time")),
+		NewRecordFromSliceWithNormalize(leftFields, []interface{}{3, baseTime.Add(20)}, WithID(NewRecordID("id7")), WithEventTimeField("left.time")),
 	})
 
 	rightFields := []octosql.VariableName{"right.a", "right.time"}
@@ -88,6 +91,7 @@ func TestJoinedStream_NoRetractions_WithEventTime(t *testing.T) {
 		NewRecordFromSliceWithNormalize(rightFields, []interface{}{"a", baseTime}, WithID(NewRecordID("id4")), WithEventTimeField("right.time")),
 		NewRecordFromSliceWithNormalize(rightFields, []interface{}{"a", baseTime}, WithID(NewRecordID("id5")), WithEventTimeField("right.time")),
 		NewRecordFromSliceWithNormalize(rightFields, []interface{}{"b", baseTime.Add(10)}, WithID(NewRecordID("id6")), WithEventTimeField("right.time")),
+		NewRecordFromSliceWithNormalize(rightFields, []interface{}{"b", baseTime.Add(30)}, WithID(NewRecordID("id8")), WithEventTimeField("right.time")),
 	})
 
 	streamID := GetRawStreamID()

@@ -51,6 +51,7 @@ type Expression interface {
 	// Transform returns a new Expression after recursively calling Transform
 	Transform(ctx context.Context, transformers *Transformers) Expression
 	Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Expression, error)
+	DoesMatchNamespace(namespace *metadata.Namespace) bool
 	graph.Visualizer
 }
 
@@ -92,6 +93,10 @@ func (se *StarExpression) TransformNamed(ctx context.Context, transformers *Tran
 
 func (se *StarExpression) MaterializeNamed(ctx context.Context, matCtx *MaterializationContext) (execution.NamedExpression, error) {
 	return execution.NewStarExpression(se.Qualifier), nil
+}
+
+func (se *StarExpression) DoesMatchNamespace(namespace *metadata.Namespace) bool {
+	return true // doesn't really matter since a star expression won't appear in a Predicate
 }
 
 func (se *StarExpression) Visualize() *graph.Node {
@@ -139,6 +144,10 @@ func (v *Variable) MaterializeNamed(ctx context.Context, matCtx *Materialization
 	return execution.NewVariable(v.Name), nil
 }
 
+func (v *Variable) DoesMatchNamespace(namespace *metadata.Namespace) bool {
+	return namespace.DoesContainName(v.Name)
+}
+
 func (v *Variable) Visualize() *graph.Node {
 	n := graph.NewNode("Variable")
 	n.AddField("name", v.Name.String())
@@ -181,6 +190,15 @@ func (tup *Tuple) Materialize(ctx context.Context, matCtx *MaterializationContex
 	return execution.NewTuple(matExprs), nil
 }
 
+func (tup *Tuple) DoesMatchNamespace(namespace *metadata.Namespace) bool {
+	for _, expr := range tup.Expressions {
+		if !expr.DoesMatchNamespace(namespace) {
+			return false
+		}
+	}
+	return true
+}
+
 func (tup *Tuple) Visualize() *graph.Node {
 	n := graph.NewNode("Tuple")
 	for i := range tup.Expressions {
@@ -216,6 +234,10 @@ func (ne *NodeExpression) Materialize(ctx context.Context, matCtx *Materializati
 	return execution.NewNodeExpression(materialized, matCtx.Storage), nil
 }
 
+func (ne *NodeExpression) DoesMatchNamespace(namespace *metadata.Namespace) bool {
+	return namespace.Contains(ne.Node.Metadata().Namespace())
+}
+
 func (ne *NodeExpression) Visualize() *graph.Node {
 	n := graph.NewNode("Node Expression")
 	n.AddChild("source", ne.Node.Visualize())
@@ -247,6 +269,10 @@ func (le *LogicExpression) Materialize(ctx context.Context, matCtx *Materializat
 		return nil, errors.Wrap(err, "couldn't materialize formula")
 	}
 	return execution.NewLogicExpression(materialized), nil
+}
+
+func (le *LogicExpression) DoesMatchNamespace(namespace *metadata.Namespace) bool {
+	return le.Formula.DoesMatchNamespace(namespace)
 }
 
 func (le *LogicExpression) Visualize() *graph.Node {
@@ -290,6 +316,10 @@ func (alExpr *AliasedExpression) MaterializeNamed(ctx context.Context, matCtx *M
 		return nil, errors.Wrap(err, "couldn't materialize node")
 	}
 	return execution.NewAliasedExpression(alExpr.Name, materialized), nil
+}
+
+func (alExpr *AliasedExpression) DoesMatchNamespace(namespace *metadata.Namespace) bool {
+	return namespace.DoesContainName(alExpr.Name)
 }
 
 func (alExpr *AliasedExpression) Visualize() *graph.Node {

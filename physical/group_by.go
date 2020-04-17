@@ -254,7 +254,19 @@ func (node *GroupBy) Metadata() *metadata.NodeMetadata {
 		}
 	}
 
-	return metadata.NewNodeMetadata(cardinality, outEventTimeField)
+	names := make([]string, len(node.Fields))
+
+	for i := range node.Fields {
+		if node.As[i] != "" {
+			names[i] = node.As[i].String()
+		} else {
+			names[i] = fmt.Sprintf("%s_%s", node.Fields[i].String(), node.Aggregates[i])
+		}
+	}
+
+	namespace := metadata.NewNamespace([]string{}, names)
+
+	return metadata.NewNodeMetadata(cardinality, outEventTimeField, namespace)
 }
 
 func (node *GroupBy) Visualize() *graph.Node {

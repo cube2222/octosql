@@ -44,7 +44,7 @@ func (node *Limit) Materialize(ctx context.Context, matCtx *MaterializationConte
 }
 
 func (node *Limit) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMetadata(metadata.BoundedFitsInLocalStorage, node.Source.Metadata().EventTimeField())
+	return metadata.NewNodeMetadata(metadata.BoundedFitsInLocalStorage, node.Source.Metadata().EventTimeField(), node.Source.Metadata().Namespace())
 }
 
 func (node *Limit) Visualize() *graph.Node {

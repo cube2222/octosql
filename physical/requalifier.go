@@ -43,7 +43,10 @@ func (node *Requalifier) Metadata() *metadata.NodeMetadata {
 	eventTimeField := node.Source.Metadata().EventTimeField()
 	eventTimeField = octosql.NewVariableName(fmt.Sprintf("%s.%s", node.Qualifier, eventTimeField.Name()))
 
-	return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality(), eventTimeField)
+	namespace := metadata.EmptyNamespace()
+	namespace.AddPrefix(node.Qualifier)
+
+	return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality(), eventTimeField, namespace)
 }
 
 func (node *Requalifier) Visualize() *graph.Node {

@@ -136,7 +136,14 @@ func (node *Join) Physical(ctx context.Context, physicalCreator *PhysicalPlanCre
 			}
 		}
 
-		return
+		sourceShuffled := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
+		joinedShuffled := physical.NewShuffle(1, joinedNodes, physical.DefaultShuffleStrategy)
+		outNodes := make([]physical.Node, len(sourceShuffled))
+		for i := range outNodes {
+			outNodes[i] = physical.NewStreamJoin(sourceShuffled[i], joinedShuffled[i], sourceKey, joinedKey, eventTimeField, node.isLeftJoin)
+		}
+
+		return outNodes, variables, nil
 	} else { // lookup join
 
 	}

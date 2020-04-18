@@ -48,7 +48,7 @@ func TestJoinedStream_NoRetractions_NoEventTime(t *testing.T) {
 	leftKey := []Expression{NewVariable("left.a")}
 	rightKey := []Expression{NewVariable("right.a")}
 
-	sj := NewStreamJoin(leftKey, rightKey, leftSource, rightSource, stateStorage, "", NewCountingTrigger(NewDummyValue(octosql.MakeInt(1))))
+	sj := NewStreamJoin(leftSource, rightSource, leftKey, rightKey, stateStorage, "", true)
 
 	tx := stateStorage.BeginTransaction()
 	stream, _, err := sj.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), streamID)
@@ -107,7 +107,7 @@ func TestJoinedStream_NoRetractions_WithEventTime(t *testing.T) {
 	leftKey := []Expression{NewVariable("left.time")}
 	rightKey := []Expression{NewVariable("right.time")}
 
-	sj := NewStreamJoin(leftKey, rightKey, leftSource, rightSource, stateStorage, outputEventTimeField, NewCountingTrigger(NewDummyValue(octosql.MakeInt(1))))
+	sj := NewStreamJoin(leftSource, rightSource, leftKey, rightKey, stateStorage, outputEventTimeField, true)
 
 	tx := stateStorage.BeginTransaction()
 	stream, _, err := sj.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), streamID)

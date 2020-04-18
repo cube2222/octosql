@@ -51,7 +51,7 @@ func (node *InnerJoin) Materialize(ctx context.Context, matCtx *MaterializationC
 }
 
 func (node *InnerJoin) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMetadata(metadata.CombineCardinalities(node.Source.Metadata().Cardinality(), node.Joined.Metadata().Cardinality()), node.Source.Metadata().EventTimeField())
+	return metadata.NewNodeMetadata(metadata.CombineCardinalities(node.Source.Metadata().Cardinality(), node.Joined.Metadata().Cardinality()), node.Source.Metadata().EventTimeField(), metadata.EmptyNamespace())
 }
 
 func (node *InnerJoin) Visualize() *graph.Node {

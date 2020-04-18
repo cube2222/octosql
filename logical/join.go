@@ -114,7 +114,8 @@ func isConjunctionOfEqualities(f physical.Formula) bool {
 }
 
 func getKeysAndEventTimeFromFormula(formula physical.Formula, sourceNamespace, joinedNamespace *metadata.Namespace, sourceEventTimeField, joinedEventTimeField octosql.VariableName) ([]physical.Expression, []physical.Expression, octosql.VariableName, error) {
-	var sourceKey, joinedKey []physical.Expression
+	sourceKey := make([]physical.Expression, 0)
+	joinedKey := make([]physical.Expression, 0)
 	eventTimeField := octosql.NewVariableName("") // will stay empty if we don't join by event time
 
 	for _, element := range formula.SplitByAnd() {

@@ -39,6 +39,10 @@ func (node *Join) Physical(ctx context.Context, physicalCreator *PhysicalPlanCre
 		return nil, nil, errors.Wrap(err, "couldn't merge variables for source and joined nodes")
 	}
 
+	sourceShuffled := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
+	joinedShuffled := physical.NewShuffle(1, joinedNodes, physical.DefaultShuffleStrategy)
+	outNodes := make([]physical.Node, len(sourceShuffled))
+
 	// Based on the cardinality of sources we decide whether we will create a stream_join or a lookup_join
 	// Stream joins support only equity conjunctions (i.e a.x = b.y AND a.v + 17 = b.something * 2)
 	sourceCardinality := sourceNodes[0].Metadata().Cardinality()
@@ -136,19 +140,16 @@ func (node *Join) Physical(ctx context.Context, physicalCreator *PhysicalPlanCre
 			}
 		}
 
-		sourceShuffled := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
-		joinedShuffled := physical.NewShuffle(1, joinedNodes, physical.DefaultShuffleStrategy)
-		outNodes := make([]physical.Node, len(sourceShuffled))
 		for i := range outNodes {
 			outNodes[i] = physical.NewStreamJoin(sourceShuffled[i], joinedShuffled[i], sourceKey, joinedKey, eventTimeField, node.isLeftJoin)
 		}
-
-		return outNodes, variables, nil
 	} else { // lookup join
-
+		for i := range outNodes {
+			outNodes[i] = physical.NewLookupJoin(sourceShuffled[i], joinedShuffled[i], node.isLeftJoin)
+		}
 	}
 
-	return nil, variables, nil
+	return outNodes, variables, nil
 }
 
 func isConjunctionOfEqualities(f physical.Formula) bool {

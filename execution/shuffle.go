@@ -83,13 +83,11 @@ type PipelineMetadata struct {
 	Partition int
 }
 
-type ShuffleID StreamID
-
 func (id *ShuffleID) AsPrefix() []byte {
-	return (*StreamID)(id).AsPrefix()
+	return []byte("$" + id.Id + "$")
 }
 
-func (id *ShuffleID) MapKey() string {
+func (id *ShuffleID) AsMapKey() string {
 	return id.Id
 }
 
@@ -112,7 +110,7 @@ func (s *Shuffle) Get(ctx context.Context, variables octosql.Variables, streamID
 
 	receiver := NewShuffleReceiver(streamID, pipelineMetadata.NextShuffleID, len(s.sources), pipelineMetadata.Partition)
 	execOutput := NewExecutionOutput(receiver, map[string]ShuffleData{
-		pipelineMetadata.NextShuffleID.MapKey(): {
+		pipelineMetadata.NextShuffleID.AsMapKey(): {
 			Shuffle:   s,
 			Variables: variables,
 			ShuffleID: pipelineMetadata.NextShuffleID,

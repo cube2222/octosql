@@ -95,6 +95,12 @@ func (nm *Namespace) MergeWith(other *Namespace) {
 	}
 }
 
+func (nm *Namespace) MergeWithVariables(variables octosql.Variables) {
+	for name := range variables {
+		nm.AddName(name.String())
+	}
+}
+
 func (nm *Namespace) DoesContainPrefix(prefix string) bool {
 	return belongs(nm.prefixes, prefix)
 }

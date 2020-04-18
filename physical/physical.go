@@ -59,7 +59,7 @@ type Expression interface {
 type NamedExpression interface {
 	Expression
 	// TransformNamed returns a new NamedExpression after recursively calling Transform
-	Name() octosql.VariableName
+	ExpressionName() octosql.VariableName
 	TransformNamed(ctx context.Context, transformers *Transformers) NamedExpression
 	MaterializeNamed(ctx context.Context, matCtx *MaterializationContext) (execution.NamedExpression, error)
 }
@@ -76,7 +76,7 @@ func (se *StarExpression) Transform(ctx context.Context, transformers *Transform
 	return se.TransformNamed(ctx, transformers)
 }
 
-func (se *StarExpression) Name() octosql.VariableName {
+func (se *StarExpression) ExpressionName() octosql.VariableName {
 	if se.Qualifier == "" {
 		return octosql.StarExpressionName
 	}
@@ -123,19 +123,19 @@ func (se *StarExpression) name() string {
 
 // Variables describes a variable name.
 type Variable struct {
-	VariableName octosql.VariableName
+	Name octosql.VariableName
 }
 
 func NewVariable(name octosql.VariableName) *Variable {
-	return &Variable{VariableName: name}
+	return &Variable{Name: name}
 }
 
 func (v *Variable) Transform(ctx context.Context, transformers *Transformers) Expression {
 	return v.TransformNamed(ctx, transformers)
 }
 
-func (v *Variable) Name() octosql.VariableName {
-	return v.VariableName
+func (v *Variable) ExpressionName() octosql.VariableName {
+	return v.Name
 }
 
 func (v *Variable) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Expression, error) {
@@ -144,7 +144,7 @@ func (v *Variable) Materialize(ctx context.Context, matCtx *MaterializationConte
 
 func (v *Variable) TransformNamed(ctx context.Context, transformers *Transformers) NamedExpression {
 	var expr NamedExpression = &Variable{
-		VariableName: v.VariableName,
+		Name: v.Name,
 	}
 	if transformers.NamedExprT != nil {
 		expr = transformers.NamedExprT(expr)
@@ -153,16 +153,16 @@ func (v *Variable) TransformNamed(ctx context.Context, transformers *Transformer
 }
 
 func (v *Variable) MaterializeNamed(ctx context.Context, matCtx *MaterializationContext) (execution.NamedExpression, error) {
-	return execution.NewVariable(v.VariableName), nil
+	return execution.NewVariable(v.ExpressionName()), nil
 }
 
 func (v *Variable) DoesMatchNamespace(namespace *metadata.Namespace) bool {
-	return namespace.DoesContainName(v.VariableName)
+	return namespace.DoesContainName(v.ExpressionName())
 }
 
 func (v *Variable) Visualize() *graph.Node {
 	n := graph.NewNode("Variable")
-	n.AddField("name", v.VariableName.String())
+	n.AddField("name", v.ExpressionName().String())
 	return n
 }
 
@@ -295,20 +295,20 @@ func (le *LogicExpression) Visualize() *graph.Node {
 
 // AliasedExpression describes an expression which is explicitly named.
 type AliasedExpression struct {
-	ExpressionName octosql.VariableName
-	Expr           Expression
+	ExpressionAlias octosql.VariableName
+	Expr            Expression
 }
 
 func NewAliasedExpression(name octosql.VariableName, expr Expression) *AliasedExpression {
-	return &AliasedExpression{ExpressionName: name, Expr: expr}
+	return &AliasedExpression{ExpressionAlias: name, Expr: expr}
 }
 
 func (alExpr *AliasedExpression) Transform(ctx context.Context, transformers *Transformers) Expression {
 	return alExpr.TransformNamed(ctx, transformers)
 }
 
-func (alExpr *AliasedExpression) Name() octosql.VariableName {
-	return alExpr.ExpressionName
+func (alExpr *AliasedExpression) ExpressionName() octosql.VariableName {
+	return alExpr.ExpressionAlias
 }
 
 func (alExpr *AliasedExpression) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Expression, error) {
@@ -317,8 +317,8 @@ func (alExpr *AliasedExpression) Materialize(ctx context.Context, matCtx *Materi
 
 func (alExpr *AliasedExpression) TransformNamed(ctx context.Context, transformers *Transformers) NamedExpression {
 	var expr NamedExpression = &AliasedExpression{
-		ExpressionName: alExpr.ExpressionName,
-		Expr:           alExpr.Expr.Transform(ctx, transformers),
+		ExpressionAlias: alExpr.ExpressionName(),
+		Expr:            alExpr.Expr.Transform(ctx, transformers),
 	}
 	if transformers.NamedExprT != nil {
 		expr = transformers.NamedExprT(expr)
@@ -331,16 +331,16 @@ func (alExpr *AliasedExpression) MaterializeNamed(ctx context.Context, matCtx *M
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize node")
 	}
-	return execution.NewAliasedExpression(alExpr.ExpressionName, materialized), nil
+	return execution.NewAliasedExpression(alExpr.ExpressionName(), materialized), nil
 }
 
 func (alExpr *AliasedExpression) DoesMatchNamespace(namespace *metadata.Namespace) bool {
-	return namespace.DoesContainName(alExpr.ExpressionName)
+	return namespace.DoesContainName(alExpr.ExpressionName())
 }
 
 func (alExpr *AliasedExpression) Visualize() *graph.Node {
 	n := graph.NewNode("Aliased Expression")
-	n.AddField("alias", alExpr.ExpressionName.String())
+	n.AddField("alias", alExpr.ExpressionName().String())
 	n.AddChild("expr", alExpr.Expr.Visualize())
 	return n
 }

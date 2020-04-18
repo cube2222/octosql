@@ -226,7 +226,7 @@ func (node *GroupBy) groupingByEventTime(sourceMetadata *metadata.NodeMetadata) 
 	if !sourceMetadata.EventTimeField().Empty() {
 		for i := range node.Key {
 			if variable, ok := node.Key[i].(*Variable); ok {
-				if variable.Name() == sourceMetadata.EventTimeField() {
+				if variable.ExpressionName() == sourceMetadata.EventTimeField() {
 					groupingByEventTime = true
 				}
 			}

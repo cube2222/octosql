@@ -58,7 +58,7 @@ func (node *Map) Materialize(ctx context.Context, matCtx *MaterializationContext
 func isVariableNameRecursive(expr Expression, name octosql.VariableName) bool {
 	switch expr := expr.(type) {
 	case *Variable:
-		return expr.Name().Equal(name)
+		return expr.Name.Equal(name)
 	case *AliasedExpression:
 		return isVariableNameRecursive(expr.Expr, name)
 	default:
@@ -70,9 +70,9 @@ func isVariableNameRecursive(expr Expression, name octosql.VariableName) bool {
 func getOuterName(expr Expression) octosql.VariableName {
 	switch expr := expr.(type) {
 	case *Variable:
-		return expr.Name()
+		return expr.Name
 	case *AliasedExpression:
-		return expr.ExpressionName
+		return expr.ExpressionAlias
 	default:
 		return octosql.NewVariableName("")
 	}
@@ -98,7 +98,7 @@ func (node *Map) Metadata() *metadata.NodeMetadata {
 				namespace.AddPrefix(starExpr.Qualifier)
 			}
 		} else {
-			namespace.AddName(expr.Name())
+			namespace.AddName(expr.ExpressionName())
 		}
 	}
 

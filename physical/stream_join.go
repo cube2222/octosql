@@ -85,7 +85,7 @@ func (node *StreamJoin) Metadata() *metadata.NodeMetadata {
 }
 
 func (node *StreamJoin) Visualize() *graph.Node {
-	n := graph.NewNode("Left Join")
+	n := graph.NewNode("Stream Join")
 	n.AddChild("source", node.source.Visualize())
 	n.AddChild("joined", node.joined.Visualize())
 	return n

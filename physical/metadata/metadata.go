@@ -63,10 +63,10 @@ func NewNodeMetadataFromMetadata(meta *NodeMetadata) *NodeMetadata {
 
 type Namespace struct {
 	prefixes []string
-	names    []string
+	names    []octosql.VariableName
 }
 
-func NewNamespace(prefixes, names []string) *Namespace {
+func NewNamespace(prefixes []string, names []octosql.VariableName) *Namespace {
 	return &Namespace{
 		prefixes: prefixes,
 		names:    names,
@@ -74,15 +74,7 @@ func NewNamespace(prefixes, names []string) *Namespace {
 }
 
 func EmptyNamespace() *Namespace {
-	return NewNamespace(make([]string, 0), make([]string, 0))
-}
-
-func (nm *Namespace) AddPrefix(prefix string) {
-	nm.prefixes = append(nm.prefixes, prefix)
-}
-
-func (nm *Namespace) AddName(name string) {
-	nm.names = append(nm.names, name)
+	return NewNamespace(nil, nil)
 }
 
 func (nm *Namespace) MergeWith(other *Namespace) {
@@ -97,12 +89,40 @@ func (nm *Namespace) MergeWith(other *Namespace) {
 
 func (nm *Namespace) MergeWithVariables(variables octosql.Variables) {
 	for name := range variables {
-		nm.AddName(name.String())
+		nm.AddName(name)
 	}
 }
 
-func (nm *Namespace) DoesContainPrefix(prefix string) bool {
-	return belongs(nm.prefixes, prefix)
+func (nm *Namespace) AddPrefix(prefix string) {
+	if !nm.DoesContainPrefix(prefix) {
+		nm.prefixes = append(nm.prefixes, prefix)
+	}
+}
+
+func (nm *Namespace) AddName(name octosql.VariableName) {
+	if !nm.DoesContainName(name) {
+		nm.names = append(nm.names, name)
+	}
+}
+
+func (nm *Namespace) Equal(other *Namespace) bool {
+	return nm.Contains(other) && other.Contains(nm)
+}
+
+func (nm *Namespace) Contains(other *Namespace) bool {
+	for _, otherPrefix := range other.prefixes {
+		if !nm.DoesContainPrefix(otherPrefix) {
+			return false
+		}
+	}
+
+	for _, otherName := range other.names {
+		if !nm.DoesContainName(otherName) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (nm *Namespace) DoesContainName(name octosql.VariableName) bool {
@@ -110,26 +130,14 @@ func (nm *Namespace) DoesContainName(name octosql.VariableName) bool {
 		return true
 	}
 
-	if belongs(nm.names, name.String()) {
+	if belongsV(nm.names, name) {
 		return true
 	}
 	return false
 }
 
-func (nm *Namespace) Contains(other *Namespace) bool {
-	for _, otherPrefix := range other.prefixes {
-		if !belongs(nm.prefixes, otherPrefix) {
-			return false
-		}
-	}
-
-	for _, otherName := range other.names {
-		if !nm.DoesContainName(octosql.NewVariableName(otherName)) {
-			return false
-		}
-	}
-
-	return true
+func (nm *Namespace) DoesContainPrefix(prefix string) bool {
+	return belongs(nm.prefixes, prefix)
 }
 
 func belongs(strings []string, element string) bool {
@@ -138,5 +146,15 @@ func belongs(strings []string, element string) bool {
 			return true
 		}
 	}
+	return false
+}
+
+func belongsV(vNames []octosql.VariableName, element octosql.VariableName) bool {
+	for _, vName := range vNames {
+		if vName == element {
+			return true
+		}
+	}
+
 	return false
 }

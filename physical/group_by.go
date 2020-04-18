@@ -226,7 +226,7 @@ func (node *GroupBy) groupingByEventTime(sourceMetadata *metadata.NodeMetadata) 
 	if !sourceMetadata.EventTimeField().Empty() {
 		for i := range node.Key {
 			if variable, ok := node.Key[i].(*Variable); ok {
-				if variable.Name == sourceMetadata.EventTimeField() {
+				if variable.Name() == sourceMetadata.EventTimeField() {
 					groupingByEventTime = true
 				}
 			}
@@ -254,17 +254,17 @@ func (node *GroupBy) Metadata() *metadata.NodeMetadata {
 		}
 	}
 
-	names := make([]string, len(node.Fields))
+	names := make([]octosql.VariableName, len(node.Fields))
 
 	for i := range node.Fields {
 		if node.As[i] != "" {
-			names[i] = node.As[i].String()
+			names[i] = node.As[i]
 		} else {
-			names[i] = fmt.Sprintf("%s_%s", node.Fields[i].String(), node.Aggregates[i])
+			names[i] = octosql.NewVariableName(fmt.Sprintf("%s_%s", node.Fields[i].String(), node.Aggregates[i]))
 		}
 	}
 
-	namespace := metadata.NewNamespace([]string{}, names)
+	namespace := metadata.NewNamespace(nil, names)
 
 	return metadata.NewNodeMetadata(cardinality, outEventTimeField, namespace)
 }

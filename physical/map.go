@@ -58,7 +58,7 @@ func (node *Map) Materialize(ctx context.Context, matCtx *MaterializationContext
 func isVariableNameRecursive(expr Expression, name octosql.VariableName) bool {
 	switch expr := expr.(type) {
 	case *Variable:
-		return expr.Name.Equal(name)
+		return expr.Name().Equal(name)
 	case *AliasedExpression:
 		return isVariableNameRecursive(expr.Expr, name)
 	default:
@@ -70,20 +70,43 @@ func isVariableNameRecursive(expr Expression, name octosql.VariableName) bool {
 func getOuterName(expr Expression) octosql.VariableName {
 	switch expr := expr.(type) {
 	case *Variable:
-		return expr.Name
+		return expr.Name()
 	case *AliasedExpression:
-		return expr.Name
+		return expr.ExpressionName
 	default:
 		return octosql.NewVariableName("")
 	}
 }
 
 func (node *Map) Metadata() *metadata.NodeMetadata {
+	sourceMetadata := node.Source.Metadata()
+	cardinality := sourceMetadata.Cardinality()
+	namespace := metadata.EmptyNamespace()
+
+	wasMergedWithSource := false
 	if node.Keep {
-		return metadata.NewNodeMetadataFromMetadata(node.Source.Metadata())
+		namespace.MergeWith(sourceMetadata.Namespace())
+		wasMergedWithSource = true
 	}
 
-	eventTimeField := node.Source.Metadata().EventTimeField()
+	for _, expr := range node.Expressions {
+		if starExpr, ok := expr.(*StarExpression); ok {
+			if starExpr.Qualifier == "" && !wasMergedWithSource {
+				namespace.MergeWith(sourceMetadata.Namespace())
+				wasMergedWithSource = true
+			} else {
+				namespace.AddPrefix(starExpr.Qualifier)
+			}
+		} else {
+			namespace.AddName(expr.Name())
+		}
+	}
+
+	if node.Keep {
+		return metadata.NewNodeMetadata(cardinality, sourceMetadata.EventTimeField(), namespace)
+	}
+
+	eventTimeField := sourceMetadata.EventTimeField()
 	var newEventTimeField octosql.VariableName
 	for _, expr := range node.Expressions {
 		if expr, ok := expr.(*StarExpression); ok {
@@ -97,22 +120,7 @@ func (node *Map) Metadata() *metadata.NodeMetadata {
 			break
 		}
 	}
-
-	namespace := metadata.EmptyNamespace()
-
-	for _, expr := range node.Expressions {
-		if expr, ok := expr.(*StarExpression); ok {
-			if expr.Qualifier == "" {
-				namespace.MergeWith(node.Source.Metadata().Namespace())
-			} else {
-				namespace.AddPrefix(expr.Qualifier)
-			}
-		} else {
-			namespace.AddName(expr.name())
-		}
-	}
-
-	return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality(), newEventTimeField, namespace)
+	return metadata.NewNodeMetadata(cardinality, newEventTimeField, namespace)
 }
 
 func (node *Map) Visualize() *graph.Node {

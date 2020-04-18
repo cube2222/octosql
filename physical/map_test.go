@@ -3,7 +3,6 @@ package physical
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/cube2222/octosql"
@@ -49,6 +48,7 @@ func TestMap_Metadata(t *testing.T) {
 				metadata: metadata.NewNodeMetadata(
 					metadata.Unbounded,
 					octosql.NewVariableName(""),
+					metadata.EmptyNamespace(),
 				),
 			},
 			Keep: false,
@@ -56,6 +56,7 @@ func TestMap_Metadata(t *testing.T) {
 			want: metadata.NewNodeMetadata(
 				metadata.Unbounded,
 				octosql.NewVariableName(""),
+				metadata.NewNamespace(nil, []octosql.VariableName{"test", "test2"}),
 			),
 		},
 		{
@@ -67,6 +68,7 @@ func TestMap_Metadata(t *testing.T) {
 				metadata: metadata.NewNodeMetadata(
 					metadata.Unbounded,
 					octosql.NewVariableName("my_time_field"),
+					metadata.EmptyNamespace(),
 				),
 			},
 			Keep: false,
@@ -74,6 +76,7 @@ func TestMap_Metadata(t *testing.T) {
 			want: metadata.NewNodeMetadata(
 				metadata.Unbounded,
 				octosql.NewVariableName(""),
+				metadata.NewNamespace(nil, []octosql.VariableName{"test", "test2"}),
 			),
 		},
 		{
@@ -85,6 +88,7 @@ func TestMap_Metadata(t *testing.T) {
 				metadata: metadata.NewNodeMetadata(
 					metadata.Unbounded,
 					octosql.NewVariableName("my_time_field"),
+					metadata.NewNamespace(nil, []octosql.VariableName{"my_time_field"}),
 				),
 			},
 			Keep: true,
@@ -92,6 +96,7 @@ func TestMap_Metadata(t *testing.T) {
 			want: metadata.NewNodeMetadata(
 				metadata.Unbounded,
 				octosql.NewVariableName("my_time_field"),
+				metadata.NewNamespace(nil, []octosql.VariableName{"my_time_field", "test", "test2"}),
 			),
 		},
 		{
@@ -105,6 +110,7 @@ func TestMap_Metadata(t *testing.T) {
 				metadata: metadata.NewNodeMetadata(
 					metadata.Unbounded,
 					octosql.NewVariableName("my_time_field"),
+					metadata.NewNamespace(nil, []octosql.VariableName{"my_time_field"}),
 				),
 			},
 			Keep: false,
@@ -112,6 +118,7 @@ func TestMap_Metadata(t *testing.T) {
 			want: metadata.NewNodeMetadata(
 				metadata.Unbounded,
 				octosql.NewVariableName("my_time_field"),
+				metadata.NewNamespace(nil, []octosql.VariableName{"test", "test2", "my_time_field", "test3"}),
 			),
 		},
 		{
@@ -128,6 +135,7 @@ func TestMap_Metadata(t *testing.T) {
 				metadata: metadata.NewNodeMetadata(
 					metadata.Unbounded,
 					octosql.NewVariableName("my_time_field"),
+					metadata.NewNamespace(nil, []octosql.VariableName{"my_time_field"}),
 				),
 			},
 			Keep: false,
@@ -135,6 +143,7 @@ func TestMap_Metadata(t *testing.T) {
 			want: metadata.NewNodeMetadata(
 				metadata.Unbounded,
 				octosql.NewVariableName("my_time_field_1"),
+				metadata.NewNamespace(nil, []octosql.VariableName{"test", "test2", "my_time_field_1", "test3"}),
 			),
 		},
 		{
@@ -160,6 +169,7 @@ func TestMap_Metadata(t *testing.T) {
 				metadata: metadata.NewNodeMetadata(
 					metadata.Unbounded,
 					octosql.NewVariableName("my_time_field"),
+					metadata.NewNamespace(nil, []octosql.VariableName{"my_time_field"}),
 				),
 			},
 			Keep: false,
@@ -167,6 +177,7 @@ func TestMap_Metadata(t *testing.T) {
 			want: metadata.NewNodeMetadata(
 				metadata.Unbounded,
 				octosql.NewVariableName("my_time_field_4"),
+				metadata.NewNamespace(nil, []octosql.VariableName{"test", "test2", "my_time_field_4", "test3"}),
 			),
 		},
 		{
@@ -192,6 +203,7 @@ func TestMap_Metadata(t *testing.T) {
 				metadata: metadata.NewNodeMetadata(
 					metadata.Unbounded,
 					octosql.NewVariableName("my_time_field"),
+					metadata.NewNamespace(nil, []octosql.VariableName{"my_time_field"}),
 				),
 			},
 			Keep: true,
@@ -199,6 +211,7 @@ func TestMap_Metadata(t *testing.T) {
 			want: metadata.NewNodeMetadata(
 				metadata.Unbounded,
 				octosql.NewVariableName("my_time_field"),
+				metadata.NewNamespace(nil, []octosql.VariableName{"test", "test2", "my_time_field_4", "my_time_field", "test3"}),
 			),
 		},
 	}
@@ -209,7 +222,12 @@ func TestMap_Metadata(t *testing.T) {
 				Source:      tt.Source,
 				Keep:        tt.Keep,
 			}
-			if got := node.Metadata(); !reflect.DeepEqual(got, tt.want) {
+
+			got := node.Metadata()
+
+			areNamespacesEqual := got.Namespace().Equal(tt.want.Namespace())
+
+			if got.EventTimeField() != tt.want.EventTimeField() || got.Cardinality() != tt.want.Cardinality() || !areNamespacesEqual {
 				t.Errorf("Metadata() = %v, want %v", got, tt.want)
 			}
 		})

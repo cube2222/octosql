@@ -30,11 +30,6 @@ func (s *VariableBasedStrategy) CalculatePartition(ctx context.Context, record *
 }
 
 func TestShuffle(t *testing.T) {
-	stateStorage := GetTestStorage(t)
-	defer func() {
-		go stateStorage.Close()
-	}()
-
 	fieldNames := []octosql.VariableName{
 		octosql.NewVariableName("age"),
 		octosql.NewVariableName("something"),
@@ -300,6 +295,249 @@ func TestShuffle(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestShuffleMultiStage(t *testing.T) {
+	fieldNames := []octosql.VariableName{
+		octosql.NewVariableName("age"),
+		octosql.NewVariableName("something"),
+	}
+
+	output := NewShuffle(
+		5,
+		NewKeyHashingStrategyPrototype([]Expression{NewVariable(octosql.NewVariableName("something"))}),
+		[]Node{
+			NewDummyNode(
+				[]*Record{
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{4, "test2"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{3, "test3"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{5, "test"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{3, "test33"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{2, "test2"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{4, "test2"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{3, "test3"},
+					),
+				},
+			),
+			NewDummyNode(
+				[]*Record{
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{5, "test"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{3, "test33"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{2, "test2"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{4, "test2"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{3, "test3"},
+					),
+				},
+			),
+			NewDummyNode(
+				[]*Record{
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{5, "test"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{4, "test2"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{3, "test3"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{5, "test"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{3, "test33"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{2, "test2"},
+					),
+				},
+			),
+		},
+	)
+	output = NewShuffle(4,
+		NewKeyHashingStrategyPrototype([]Expression{NewVariable(octosql.NewVariableName("something"))}),
+		[]Node{
+			output,
+			output,
+			output,
+			output,
+			output,
+		},
+	)
+	output = NewShuffle(1,
+		NewKeyHashingStrategyPrototype([]Expression{NewVariable(octosql.NewVariableName("something"))}),
+		[]Node{
+			output,
+			output,
+			output,
+			output,
+		},
+	)
+	output = NewShuffle(3,
+		NewKeyHashingStrategyPrototype([]Expression{NewVariable(octosql.NewVariableName("something"))}),
+		[]Node{
+			output,
+		},
+	)
+	output = NewShuffle(4,
+		NewKeyHashingStrategyPrototype([]Expression{NewVariable(octosql.NewVariableName("something"))}),
+		[]Node{
+			output,
+			output,
+			output,
+		},
+	)
+	output = NewShuffle(1,
+		NewKeyHashingStrategyPrototype([]Expression{NewVariable(octosql.NewVariableName("something"))}),
+		[]Node{
+			output,
+			output,
+			output,
+			output,
+		},
+	)
+	want := NewDummyNode(
+		[]*Record{
+			NewRecordFromSliceWithNormalize(
+				fieldNames,
+				[]interface{}{4, "test2"},
+			),
+			NewRecordFromSliceWithNormalize(
+				fieldNames,
+				[]interface{}{3, "test3"},
+			),
+			NewRecordFromSliceWithNormalize(
+				fieldNames,
+				[]interface{}{5, "test"},
+			),
+			NewRecordFromSliceWithNormalize(
+				fieldNames,
+				[]interface{}{3, "test33"},
+			),
+			NewRecordFromSliceWithNormalize(
+				fieldNames,
+				[]interface{}{2, "test2"},
+			),
+			NewRecordFromSliceWithNormalize(
+				fieldNames,
+				[]interface{}{4, "test2"},
+			),
+			NewRecordFromSliceWithNormalize(
+				fieldNames,
+				[]interface{}{3, "test3"},
+			),
+			NewRecordFromSliceWithNormalize(
+				fieldNames,
+				[]interface{}{5, "test"},
+			),
+			NewRecordFromSliceWithNormalize(
+				fieldNames,
+				[]interface{}{3, "test33"},
+			),
+			NewRecordFromSliceWithNormalize(
+				fieldNames,
+				[]interface{}{2, "test2"},
+			),
+			NewRecordFromSliceWithNormalize(
+				fieldNames,
+				[]interface{}{4, "test2"},
+			),
+			NewRecordFromSliceWithNormalize(
+				fieldNames,
+				[]interface{}{3, "test3"},
+			),
+			NewRecordFromSliceWithNormalize(
+				fieldNames,
+				[]interface{}{5, "test"},
+			),
+			NewRecordFromSliceWithNormalize(
+				fieldNames,
+				[]interface{}{4, "test2"},
+			),
+			NewRecordFromSliceWithNormalize(
+				fieldNames,
+				[]interface{}{3, "test3"},
+			),
+			NewRecordFromSliceWithNormalize(
+				fieldNames,
+				[]interface{}{5, "test"},
+			),
+			NewRecordFromSliceWithNormalize(
+				fieldNames,
+				[]interface{}{3, "test33"},
+			),
+			NewRecordFromSliceWithNormalize(
+				fieldNames,
+				[]interface{}{2, "test2"},
+			),
+		},
+	)
+
+	stateStorage := GetTestStorage(t)
+	defer func() {
+		go stateStorage.Close()
+	}()
+	tx := stateStorage.BeginTransaction()
+	ctx := storage.InjectStateTransaction(context.Background(), tx)
+
+	outputStream, _, err := GetAndStartAllShuffles(ctx, stateStorage, tx, []Node{output}, octosql.NoVariables())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wantStream, _, err := want.Get(ctx, octosql.NoVariables(), GetRawStreamID())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	err = AreStreamsEqualNoOrdering(context.Background(), stateStorage, outputStream[0], wantStream)
+	if err != nil {
+		t.Errorf("Shuffle.Next() error = %v", err)
+		return
 	}
 }
 

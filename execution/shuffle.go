@@ -16,7 +16,8 @@ import (
 
 func GetAndStartAllShuffles(ctx context.Context, stateStorage storage.Storage, tx storage.StateTransaction, nodes []Node, variables octosql.Variables) ([]RecordStream, []*ExecutionOutput, error) {
 	ctx = storage.InjectStateTransaction(ctx, tx)
-	nextShuffleIDRaw, err := GetSourceStreamID(tx.WithPrefix([]byte("$root$")), octosql.MakeString("next_shuffle_id"))
+	rootShuffleID := &ShuffleID{Id: "root_shuffle_id"}
+	nextShuffleIDRaw, err := GetSourceStreamID(tx.WithPrefix(rootShuffleID.AsPrefix()), octosql.MakeString("next_shuffle_id"))
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get next shuffle id")
 	}
@@ -28,9 +29,9 @@ func GetAndStartAllShuffles(ctx context.Context, stateStorage storage.Storage, t
 	outRecordStreams := make([]RecordStream, len(nodes))
 	outExecOutputs := make([]*ExecutionOutput, len(nodes))
 	for partition, node := range nodes {
-		sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(nextShuffleID.AsPrefix()), octosql.MakeString(fmt.Sprintf("shuffle_input_%d", partition)))
+		sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(rootShuffleID.AsPrefix()), octosql.MakeString(fmt.Sprintf("shuffle_input_%d", partition)))
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "couldn't get new source stream ID for shuffle with ID %s", nextShuffleID.Id)
+			return nil, nil, errors.Wrapf(err, "couldn't get new source stream ID for shuffle with ID %s", rootShuffleID.Id)
 		}
 
 		newPipelineMetadata := PipelineMetadata{
@@ -40,7 +41,7 @@ func GetAndStartAllShuffles(ctx context.Context, stateStorage storage.Storage, t
 
 		rs, execOutput, err := node.Get(context.WithValue(ctx, pipelineMetadataContextKey{}, newPipelineMetadata), variables, sourceStreamID)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "couldn't get new source stream for shuffle with ID %s", nextShuffleID.Id)
+			return nil, nil, errors.Wrapf(err, "couldn't get new source stream for shuffle with ID %s", rootShuffleID.Id)
 		}
 
 		for id, data := range execOutput.NextShuffles {
@@ -133,7 +134,7 @@ func (s *Shuffle) StartSources(ctx context.Context, stateStorage storage.Storage
 	for partition, node := range s.sources {
 		sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(shuffleID.AsPrefix()), octosql.MakeString(fmt.Sprintf("shuffle_input_%d", partition)))
 		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't get new source stream ID for shuffle with ID %s", nextShuffleID.Id)
+			return nil, errors.Wrapf(err, "couldn't get new source stream ID for shuffle with ID %s", shuffleID.Id)
 		}
 
 		newPipelineMetadata := PipelineMetadata{
@@ -144,7 +145,7 @@ func (s *Shuffle) StartSources(ctx context.Context, stateStorage storage.Storage
 		// Get the shuffle source stream.
 		rs, execOutput, err := node.Get(context.WithValue(ctx, pipelineMetadataContextKey{}, newPipelineMetadata), variables, sourceStreamID)
 		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't get new source stream for shuffle with ID %s", nextShuffleID.Id)
+			return nil, errors.Wrapf(err, "couldn't get new source stream for shuffle with ID %s", shuffleID.Id)
 		}
 
 		// Add deduplicated next shuffle information.
@@ -152,14 +153,14 @@ func (s *Shuffle) StartSources(ctx context.Context, stateStorage storage.Storage
 			nextShuffles[id] = data
 		}
 
-		senderStreamID, err := GetSourceStreamID(tx.WithPrefix(nextShuffleID.AsPrefix()), octosql.MakeString(fmt.Sprintf("shuffle_sender_%d", partition)))
+		senderStreamID, err := GetSourceStreamID(tx.WithPrefix(shuffleID.AsPrefix()), octosql.MakeString(fmt.Sprintf("shuffle_sender_%d", partition)))
 		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't get new source stream ID for shuffle with ID %s", nextShuffleID.Id)
+			return nil, errors.Wrapf(err, "couldn't get new source stream ID for shuffle with ID %s", shuffleID.Id)
 		}
 
 		strategy, err := s.strategyPrototype.Get(ctx, variables)
 		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't get strategy for shuffle with ID %s", nextShuffleID.Id)
+			return nil, errors.Wrapf(err, "couldn't get strategy for shuffle with ID %s", shuffleID.Id)
 		}
 
 		// Start the shuffle sender.

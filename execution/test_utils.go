@@ -322,12 +322,10 @@ func ReadAll(ctx context.Context, stateStorage storage.Storage, stream RecordStr
 			log.Println("no record: ", err)
 		}
 		if err == ErrEndOfStream {
-			log.Println("breaking")
 			err := tx.Commit()
 			if err != nil {
-				return nil, errors.Wrap(err, "couldn't commit transaction")
+				continue
 			}
-			log.Println("committed")
 			break
 		} else if errors.Cause(err) == ErrNewTransactionRequired {
 			err := tx.Commit()
@@ -355,7 +353,7 @@ func ReadAll(ctx context.Context, stateStorage storage.Storage, stream RecordStr
 
 		err = tx.Commit()
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't commit transaction")
+			continue
 		}
 
 		records = append(records, rec)

@@ -1,218 +1,263 @@
 package execution
 
-/*func TestName(t *testing.T) {
-	ctx := context.Background()
-	db := GetTestStorage(t)
+import (
+	"context"
+	"testing"
+	"time"
 
-	inPart0 := NewDummyNode([]*Record{
-		NewRecordFromSlice(
-			[]octosql.VariableName{octosql.NewVariableName("color"), octosql.NewVariableName("age")},
-			[]octosql.Value{
-				octosql.MakeString("red"),
-				octosql.MakeInt(5),
-			},
-			WithID(NewRecordID("0.0")),
-		),
-		NewRecordFromSlice(
-			[]octosql.VariableName{octosql.NewVariableName("color"), octosql.NewVariableName("age")},
-			[]octosql.Value{
-				octosql.MakeString("blue"),
-				octosql.MakeInt(3),
-			},
-			WithID(NewRecordID("0.1")),
-		),
-		NewRecordFromSlice(
-			[]octosql.VariableName{octosql.NewVariableName("color"), octosql.NewVariableName("age")},
-			[]octosql.Value{
-				octosql.MakeString("red"),
-				octosql.MakeInt(5),
-			},
-			WithID(NewRecordID("0.2")),
-		),
-	})
-	inPart1 := NewDummyNode([]*Record{
-		NewRecordFromSlice(
-			[]octosql.VariableName{octosql.NewVariableName("color"), octosql.NewVariableName("age")},
-			[]octosql.Value{
-				octosql.MakeString("green"),
-				octosql.MakeInt(4),
-			},
-			WithID(NewRecordID("1.0")),
-		),
-		NewRecordFromSlice(
-			[]octosql.VariableName{octosql.NewVariableName("color"), octosql.NewVariableName("age")},
-			[]octosql.Value{
-				octosql.MakeString("blue"),
-				octosql.MakeInt(3),
-			},
-			WithID(NewRecordID("1.1")),
-		),
-		NewRecordFromSlice(
-			[]octosql.VariableName{octosql.NewVariableName("color"), octosql.NewVariableName("age")},
-			[]octosql.Value{
-				octosql.MakeString("green"),
-				octosql.MakeInt(5),
-			},
-			WithID(NewRecordID("1.2")),
-		),
-	})
-	inPart2 := NewDummyNode([]*Record{
-		NewRecordFromSlice(
-			[]octosql.VariableName{octosql.NewVariableName("color"), octosql.NewVariableName("age")},
-			[]octosql.Value{
-				octosql.MakeString("green"),
-				octosql.MakeInt(5),
-			},
-			WithID(NewRecordID("2.0")),
-		),
-		NewRecordFromSlice(
-			[]octosql.VariableName{octosql.NewVariableName("color"), octosql.NewVariableName("age")},
-			[]octosql.Value{
-				octosql.MakeString("blue"),
-				octosql.MakeInt(3),
-			},
-			WithID(NewRecordID("2.1")),
-		),
-		NewRecordFromSlice(
-			[]octosql.VariableName{octosql.NewVariableName("color"), octosql.NewVariableName("age")},
-			[]octosql.Value{
-				octosql.MakeString("red"),
-				octosql.MakeInt(5),
-			},
-			WithID(NewRecordID("2.2")),
-		),
-	})
+	"github.com/stretchr/testify/assert"
 
-	shuffle := NewShuffle(
-		2,
-		NewKeyHashingStrategy(octosql.NoVariables(), []Expression{NewVariable(octosql.NewVariableName("color"))}),
-		[]Node{inPart0, inPart1, inPart2},
-	)
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/streaming/storage"
+)
 
-	tx := db.BeginTransaction()
-	ctxWithTx := storage.InjectStateTransaction(ctx, tx)
+type VariableBasedStrategyPrototype struct {
+	name octosql.VariableName
+}
 
-	streams, execOutputs, err := GetAndStartAllShuffles(ctxWithTx, db, tx, []Node{shuffle, shuffle}, octosql.NoVariables())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatal(err)
-	}
+func (s *VariableBasedStrategyPrototype) Get(ctx context.Context, variables octosql.Variables) (ShuffleStrategy, error) {
+	return &VariableBasedStrategy{
+		name: s.name,
+	}, nil
+}
 
-	streams = streams
-	execOutputs = execOutputs
+type VariableBasedStrategy struct {
+	name octosql.VariableName
+}
 
-	records0, err := ReadAll(ctx, db, streams[0])
-	if err != nil {
-		t.Fatal(err)
-	}
-	records0 = records0
+func (s *VariableBasedStrategy) CalculatePartition(ctx context.Context, record *Record, outputs int) (int, error) {
+	return record.Value(s.name).AsInt(), nil
+}
 
-	log.Printf("%+v", records0)
-
-	records1, err := ReadAll(ctx, db, streams[1])
-	if err != nil {
-		t.Fatal(err)
-	}
-	records1 = records1
-
-	log.Printf("%+v", records1)
-
-	t.Fatal("ok")
-}*/
-
-/*func TestUnionAll(t *testing.T) {
+func TestShuffle(t *testing.T) {
 	stateStorage := GetTestStorage(t)
 	defer func() {
 		go stateStorage.Close()
 	}()
-	tx := stateStorage.BeginTransaction()
-	defer tx.Abort()
-	ctx := storage.InjectStateTransaction(context.Background(), tx)
 
 	fieldNames := []octosql.VariableName{
 		octosql.NewVariableName("age"),
 		octosql.NewVariableName("something"),
 	}
 
-	type fields struct {
-		sources []Node
-	}
 	tests := []struct {
-		name    string
-		fields  fields
-		want    RecordStream
+		name             string
+		outputPartitions int
+		output           Node
+
+		want    []Node
 		wantErr bool
 	}{
 		{
-			name: "simple union all",
-			fields: fields{
-				sources: []Node{
-					NewDummyNode(
-						[]*Record{
-							NewRecordFromSliceWithNormalize(
-								fieldNames,
-								[]interface{}{4, "test2"},
-							),
-							NewRecordFromSliceWithNormalize(
-								fieldNames,
-								[]interface{}{3, "test3"},
-							),
-						},
-					),
-					NewDummyNode(
-						[]*Record{
-							NewRecordFromSliceWithNormalize(
-								fieldNames,
-								[]interface{}{5, "test"},
-							),
-							NewRecordFromSliceWithNormalize(
-								fieldNames,
-								[]interface{}{3, "test33"},
-							),
-							NewRecordFromSliceWithNormalize(
-								fieldNames,
-								[]interface{}{2, "test2"},
-							),
-						},
-					),
-					NewDummyNode(
-						[]*Record{
-							NewRecordFromSliceWithNormalize(
-								fieldNames,
-								[]interface{}{5, "test"},
-							),
-						},
-					),
-				},
+			name:             "one output multiple source",
+			outputPartitions: 1,
+			output: NewShuffle(1, NewConstantStrategyPrototype(0), []Node{
+				NewDummyNode(
+					[]*Record{
+						NewRecordFromSliceWithNormalize(
+							fieldNames,
+							[]interface{}{4, "test2"},
+						),
+						NewRecordFromSliceWithNormalize(
+							fieldNames,
+							[]interface{}{3, "test3"},
+						),
+					},
+				),
+				NewDummyNode(
+					[]*Record{
+						NewRecordFromSliceWithNormalize(
+							fieldNames,
+							[]interface{}{5, "test"},
+						),
+						NewRecordFromSliceWithNormalize(
+							fieldNames,
+							[]interface{}{3, "test33"},
+						),
+						NewRecordFromSliceWithNormalize(
+							fieldNames,
+							[]interface{}{2, "test2"},
+						),
+					},
+				),
+				NewDummyNode(
+					[]*Record{
+						NewRecordFromSliceWithNormalize(
+							fieldNames,
+							[]interface{}{5, "test"},
+						),
+					},
+				),
 			},
-			want: NewInMemoryStream(ctx, []*Record{
-				NewRecordFromSliceWithNormalize(
-					fieldNames,
-					[]interface{}{4, "test2"},
+			),
+			want: []Node{
+				NewDummyNode([]*Record{
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{4, "test2"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{3, "test3"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{5, "test"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{3, "test33"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{2, "test2"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{5, "test"},
+					),
+				}),
+			},
+			wantErr: false,
+		},
+		{
+			name:             "multiple output one source",
+			outputPartitions: 3,
+			output: NewShuffle(3, &VariableBasedStrategyPrototype{name: octosql.NewVariableName("something")}, []Node{
+				NewDummyNode(
+					[]*Record{
+						NewRecordFromSliceWithNormalize(
+							fieldNames,
+							[]interface{}{4, 0},
+						),
+						NewRecordFromSliceWithNormalize(
+							fieldNames,
+							[]interface{}{3, 1},
+						),
+						NewRecordFromSliceWithNormalize(
+							fieldNames,
+							[]interface{}{5, 0},
+						),
+						NewRecordFromSliceWithNormalize(
+							fieldNames,
+							[]interface{}{3, 2},
+						),
+						NewRecordFromSliceWithNormalize(
+							fieldNames,
+							[]interface{}{2, 1},
+						),
+						NewRecordFromSliceWithNormalize(
+							fieldNames,
+							[]interface{}{5, 0},
+						),
+					},
 				),
-				NewRecordFromSliceWithNormalize(
-					fieldNames,
-					[]interface{}{3, "test3"},
+			},
+			),
+			want: []Node{
+				NewDummyNode([]*Record{
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{4, 0},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{5, 0},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{5, 0},
+					),
+				}),
+				NewDummyNode([]*Record{
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{3, 1},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{2, 1},
+					),
+				}),
+				NewDummyNode([]*Record{
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{3, 2},
+					),
+				}),
+			},
+			wantErr: false,
+		},
+		{
+			name:             "multiple output multiple source",
+			outputPartitions: 3,
+			output: NewShuffle(3, &VariableBasedStrategyPrototype{name: octosql.NewVariableName("something")}, []Node{
+				NewDummyNode(
+					[]*Record{
+						NewRecordFromSliceWithNormalize(
+							fieldNames,
+							[]interface{}{4, 0},
+						),
+						NewRecordFromSliceWithNormalize(
+							fieldNames,
+							[]interface{}{3, 1},
+						),
+					},
 				),
-				NewRecordFromSliceWithNormalize(
-					fieldNames,
-					[]interface{}{5, "test"},
+				NewDummyNode(
+					[]*Record{
+						NewRecordFromSliceWithNormalize(
+							fieldNames,
+							[]interface{}{5, 0},
+						),
+						NewRecordFromSliceWithNormalize(
+							fieldNames,
+							[]interface{}{3, 2},
+						),
+						NewRecordFromSliceWithNormalize(
+							fieldNames,
+							[]interface{}{2, 1},
+						),
+						NewRecordFromSliceWithNormalize(
+							fieldNames,
+							[]interface{}{5, 0},
+						),
+					},
 				),
-				NewRecordFromSliceWithNormalize(
-					fieldNames,
-					[]interface{}{3, "test33"},
-				),
-				NewRecordFromSliceWithNormalize(
-					fieldNames,
-					[]interface{}{2, "test2"},
-				),
-				NewRecordFromSliceWithNormalize(
-					fieldNames,
-					[]interface{}{5, "test"},
-				),
-			}),
+			},
+			),
+			want: []Node{
+				NewDummyNode([]*Record{
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{4, 0},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{5, 0},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{5, 0},
+					),
+				}),
+				NewDummyNode([]*Record{
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{3, 1},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{2, 1},
+					),
+				}),
+				NewDummyNode([]*Record{
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{3, 2},
+					),
+				}),
+			},
 			wantErr: false,
 		},
 	}
@@ -225,19 +270,171 @@ package execution
 			tx := stateStorage.BeginTransaction()
 			ctx := storage.InjectStateTransaction(context.Background(), tx)
 
-			node := &UnionAll{
-				sources: tt.fields.sources,
+			outputs := make([]Node, tt.outputPartitions)
+			for i := 0; i < tt.outputPartitions; i++ {
+				outputs[i] = tt.output
 			}
-			stream, _, err := node.Get(ctx, octosql.NoVariables(), GetRawStreamID())
+			outputStreams, _, err := GetAndStartAllShuffles(ctx, stateStorage, tx, outputs, octosql.NoVariables())
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			err = AreStreamsEqualNoOrdering(context.Background(), stateStorage, stream, tt.want)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("UnionAll.Next() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			wantOutputStreams := make([]RecordStream, tt.outputPartitions)
+			for i := 0; i < tt.outputPartitions; i++ {
+				stream, _, err := tt.want[i].Get(ctx, octosql.NoVariables(), GetRawStreamID())
+				if err != nil {
+					t.Fatal(err)
+				}
+				wantOutputStreams[i] = stream
+			}
+
+			if err := tx.Commit(); err != nil {
+				t.Fatal(err)
+			}
+
+			for i := 0; i < tt.outputPartitions; i++ {
+				err := AreStreamsEqualNoOrdering(context.Background(), stateStorage, outputStreams[i], wantOutputStreams[i])
+				if (err != nil) != tt.wantErr {
+					t.Errorf("Shuffle.Next() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
 			}
 		})
 	}
-}*/
+}
+
+func TestShuffleWatermarks(t *testing.T) {
+	stateStorage := GetTestStorage(t)
+	defer func() {
+		go stateStorage.Close()
+	}()
+	tx := stateStorage.BeginTransaction()
+	ctx := context.Background()
+	ctx = storage.InjectStateTransaction(ctx, tx)
+
+	shuffleID := &ShuffleID{
+		Id: "test",
+	}
+
+	sender0 := NewShuffleSender(
+		GetRawStreamID(),
+		shuffleID,
+		&VariableBasedStrategy{
+			name: octosql.NewVariableName("partition"),
+		},
+		2,
+		0,
+	)
+	sender1 := NewShuffleSender(
+		GetRawStreamID(),
+		shuffleID,
+		&VariableBasedStrategy{
+			name: octosql.NewVariableName("partition"),
+		},
+		2,
+		1,
+	)
+	receiver0 := NewShuffleReceiver(
+		GetRawStreamID(),
+		shuffleID,
+		2,
+		0,
+	)
+	receiver1 := NewShuffleReceiver(
+		GetRawStreamID(),
+		shuffleID,
+		2,
+		1,
+	)
+	sender0 = sender0
+	sender1 = sender1
+
+	ExpectWatermarkValue(t, ctx, time.Time{}, receiver0)
+	ExpectWatermarkValue(t, ctx, time.Time{}, receiver1)
+
+	PropagateWatermarks(t, ctx, []IntermediateRecordStore{sender0, sender1}, []RecordStream{receiver0, receiver1})
+
+	ExpectWatermarkValue(t, ctx, time.Time{}, receiver0)
+	ExpectWatermarkValue(t, ctx, time.Time{}, receiver1)
+
+	now := time.Now().UTC()
+	UpdateWatermark(t, ctx, now, sender0)
+	now = now.Add(time.Second)
+	UpdateWatermark(t, ctx, now, sender1)
+
+	PropagateWatermarks(t, ctx, []IntermediateRecordStore{sender0, sender1}, []RecordStream{receiver0, receiver1})
+
+	ExpectWatermarkValue(t, ctx, now.Add(-time.Second), receiver0)
+	ExpectWatermarkValue(t, ctx, now.Add(-time.Second), receiver1)
+
+	UpdateWatermark(t, ctx, now, sender0)
+
+	PropagateWatermarks(t, ctx, []IntermediateRecordStore{sender0, sender1}, []RecordStream{receiver0, receiver1})
+
+	ExpectWatermarkValue(t, ctx, now, receiver0)
+	ExpectWatermarkValue(t, ctx, now, receiver1)
+
+	PropagateWatermarks(t, ctx, []IntermediateRecordStore{sender0, sender1}, []RecordStream{receiver0, receiver1})
+
+	ExpectWatermarkValue(t, ctx, now, receiver0)
+	ExpectWatermarkValue(t, ctx, now, receiver1)
+
+	now = now.Add(time.Second)
+	UpdateWatermark(t, ctx, now, sender0)
+	UpdateWatermark(t, ctx, now, sender1)
+
+	PropagateWatermarks(t, ctx, []IntermediateRecordStore{sender0, sender1}, []RecordStream{receiver0, receiver1})
+
+	ExpectWatermarkValue(t, ctx, now, receiver0)
+	ExpectWatermarkValue(t, ctx, now, receiver1)
+}
+
+func PropagateWatermarks(t *testing.T, ctx context.Context, senders []IntermediateRecordStore, receivers []RecordStream) {
+	for i := range senders {
+		for partition := range receivers {
+			SendRecordToPartition(t, ctx, partition, senders[i])
+		}
+	}
+
+	for i := range receivers {
+		for range senders {
+			NextRecord(t, ctx, receivers[i])
+		}
+		NoRecord(t, ctx, receivers[i])
+	}
+}
+
+func ExpectWatermarkValue(t *testing.T, ctx context.Context, expected time.Time, ws WatermarkSource) {
+	val, err := ws.GetWatermark(ctx, storage.GetStateTransactionFromContext(ctx))
+	assert.Equal(t, expected, val)
+	assert.Nil(t, err)
+}
+
+func NextRecord(t *testing.T, ctx context.Context, rs RecordStream) {
+	_, err := rs.Next(ctx)
+	assert.Nil(t, err)
+}
+
+func NoRecord(t *testing.T, ctx context.Context, rs RecordStream) {
+	_, err := rs.Next(ctx)
+	if err := GetErrWaitForChanges(err); err != nil {
+		if err := err.Close(); err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		t.Fatalf("expected err wait for changes, got %v", err)
+	}
+}
+
+func SendRecordToPartition(t *testing.T, ctx context.Context, partition int, irs IntermediateRecordStore) {
+	err := irs.AddRecord(ctx, storage.GetStateTransactionFromContext(ctx), 0, NewRecordFromSlice(
+		[]octosql.VariableName{octosql.NewVariableName("partition")},
+		[]octosql.Value{octosql.MakeInt(partition)},
+	))
+	assert.Nil(t, err)
+}
+
+func UpdateWatermark(t *testing.T, ctx context.Context, watermark time.Time, irs IntermediateRecordStore) {
+	err := irs.UpdateWatermark(ctx, storage.GetStateTransactionFromContext(ctx), watermark)
+	assert.Nil(t, err)
+}

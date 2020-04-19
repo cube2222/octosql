@@ -124,14 +124,19 @@ func EqualNodes(node1, node2 Node) error {
 			return nil
 		}
 
-	case *LeftJoin:
-		if node2, ok := node2.(*LeftJoin); ok {
+	case *Join:
+		if node2, ok := node2.(*Join); ok {
 			if err := EqualNodes(node1.source, node2.source); err != nil {
 				return errors.Wrap(err, "source nodes underneath not equal")
 			}
 			if err := EqualNodes(node1.joined, node2.joined); err != nil {
 				return errors.Wrap(err, "joined nodes underneath not equal")
 			}
+
+			if node1.isLeftJoin != node2.isLeftJoin {
+				return errors.New("joins differ on isLeftJoin")
+			}
+
 			return nil
 		}
 

@@ -38,7 +38,7 @@ func (w *WatermarkGenerator) Get(ctx context.Context, variables octosql.Variable
 		return nil, nil, errors.Wrap(err, "couldn't get source stream ID")
 	}
 
-	source, execOutput, err := w.source.Get(ctx, variables, sourceStreamID) // we don't need execOutput here since we become the new watermark source
+	source, execOutput, err := w.source.Get(ctx, variables, sourceStreamID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get source")
 	}

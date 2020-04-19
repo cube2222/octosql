@@ -262,20 +262,23 @@ func TestShuffle(t *testing.T) {
 			defer func() {
 				go stateStorage.Close()
 			}()
-			tx := stateStorage.BeginTransaction()
-			ctx := storage.InjectStateTransaction(context.Background(), tx)
+			ctx := context.Background()
 
 			outputs := make([]Node, tt.outputPartitions)
 			for i := 0; i < tt.outputPartitions; i++ {
 				outputs[i] = tt.output
 			}
-			outputStreams, _, err := GetAndStartAllShuffles(ctx, stateStorage, tx, outputs, octosql.NoVariables())
+			outputStreams, _, err := GetAndStartAllShuffles(ctx, stateStorage, outputs, octosql.NoVariables())
 			if err != nil {
 				t.Fatal(err)
 			}
 
+			tx := stateStorage.BeginTransaction()
+			ctx = storage.InjectStateTransaction(ctx, tx)
+
 			wantOutputStreams := make([]RecordStream, tt.outputPartitions)
 			for i := 0; i < tt.outputPartitions; i++ {
+
 				stream, _, err := tt.want[i].Get(ctx, octosql.NoVariables(), GetRawStreamID())
 				if err != nil {
 					t.Fatal(err)
@@ -520,7 +523,7 @@ func TestShuffleMultiStage(t *testing.T) {
 	tx := stateStorage.BeginTransaction()
 	ctx := storage.InjectStateTransaction(context.Background(), tx)
 
-	outputStream, _, err := GetAndStartAllShuffles(ctx, stateStorage, tx, []Node{output}, octosql.NoVariables())
+	outputStream, _, err := GetAndStartAllShuffles(ctx, stateStorage, []Node{output}, octosql.NoVariables())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -584,8 +587,6 @@ func TestShuffleWatermarks(t *testing.T) {
 		2,
 		1,
 	)
-	sender0 = sender0
-	sender1 = sender1
 
 	ExpectWatermarkValue(t, ctx, time.Time{}, receiver0)
 	ExpectWatermarkValue(t, ctx, time.Time{}, receiver1)

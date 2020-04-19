@@ -14,17 +14,17 @@ type ShuffleStrategyPrototype interface {
 }
 
 type KeyHashingStrategyPrototype struct {
-	keyExpression []Expression
+	key []Expression
 }
 
-func NewKeyHashingStrategyPrototype(keyExpression []Expression) ShuffleStrategyPrototype {
+func NewKeyHashingStrategyPrototype(key []Expression) ShuffleStrategyPrototype {
 	return &KeyHashingStrategyPrototype{
-		keyExpression: keyExpression,
+		key: key,
 	}
 }
 
 func (s *KeyHashingStrategyPrototype) Get(ctx context.Context, variables octosql.Variables) (ShuffleStrategy, error) {
-	return NewKeyHashingStrategy(variables, s.keyExpression), nil
+	return NewKeyHashingStrategy(variables, s.key), nil
 }
 
 type ConstantStrategyPrototype struct {
@@ -47,14 +47,14 @@ type ShuffleStrategy interface {
 }
 
 type KeyHashingStrategy struct {
-	variables     octosql.Variables
-	keyExpression []Expression
+	variables octosql.Variables
+	key       []Expression
 }
 
-func NewKeyHashingStrategy(variables octosql.Variables, keyExpression []Expression) ShuffleStrategy {
+func NewKeyHashingStrategy(variables octosql.Variables, key []Expression) ShuffleStrategy {
 	return &KeyHashingStrategy{
-		variables:     variables,
-		keyExpression: keyExpression,
+		variables: variables,
+		key:       key,
 	}
 }
 
@@ -65,15 +65,15 @@ func (s *KeyHashingStrategy) CalculatePartition(ctx context.Context, record *Rec
 		return -1, errors.Wrap(err, "couldn't merge stream variables with record")
 	}
 
-	key := make([]octosql.Value, len(s.keyExpression))
-	for i := range s.keyExpression {
-		if _, ok := s.keyExpression[i].(*RecordExpression); ok {
-			key[i], err = s.keyExpression[i].ExpressionValue(ctx, record.AsVariables())
+	key := make([]octosql.Value, len(s.key))
+	for i := range s.key {
+		if _, ok := s.key[i].(*RecordExpression); ok {
+			key[i], err = s.key[i].ExpressionValue(ctx, record.AsVariables())
 		} else {
-			key[i], err = s.keyExpression[i].ExpressionValue(ctx, variables)
+			key[i], err = s.key[i].ExpressionValue(ctx, variables)
 		}
 		if err != nil {
-			return -1, errors.Wrapf(err, "couldn't evaluate process key expression with index %v", i)
+			return -1, errors.Wrapf(err, "couldn't evaluate key expression with index %v", i)
 		}
 	}
 

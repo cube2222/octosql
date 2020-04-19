@@ -14,14 +14,17 @@ import (
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
-func GetAndStartAllShuffles(ctx context.Context, stateStorage storage.Storage, tx storage.StateTransaction, nodes []Node, variables octosql.Variables) ([]RecordStream, []*ExecutionOutput, error) {
+// This is used to start the whole plan. It starts each phase (separated by shuffles) one by one
+// and takes care to properly pass shuffle ID's to shuffle receivers and senders.
+func GetAndStartAllShuffles(ctx context.Context, stateStorage storage.Storage, nodes []Node, variables octosql.Variables) ([]RecordStream, []*ExecutionOutput, error) {
+	tx := stateStorage.BeginTransaction()
+
 	ctx = storage.InjectStateTransaction(ctx, tx)
 	rootShuffleID := &ShuffleID{Id: "root_shuffle_id"}
-	nextShuffleIDRaw, err := GetSourceStreamID(tx.WithPrefix(rootShuffleID.AsPrefix()), octosql.MakeString("next_shuffle_id"))
+	nextShuffleID, err := GetSourceShuffleID(tx.WithPrefix(rootShuffleID.AsPrefix()), octosql.MakeString("next_shuffle_id"))
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get next shuffle id")
 	}
-	nextShuffleID := (*ShuffleID)(nextShuffleIDRaw)
 
 	nextShuffles := make(map[string]ShuffleData)
 
@@ -34,6 +37,7 @@ func GetAndStartAllShuffles(ctx context.Context, stateStorage storage.Storage, t
 			return nil, nil, errors.Wrapf(err, "couldn't get new source stream ID for shuffle with ID %s", rootShuffleID.Id)
 		}
 
+		// These are parameters for the _next_ shuffle.
 		newPipelineMetadata := PipelineMetadata{
 			NextShuffleID: nextShuffleID,
 			Partition:     partition,
@@ -52,14 +56,18 @@ func GetAndStartAllShuffles(ctx context.Context, stateStorage storage.Storage, t
 		outExecOutputs[partition] = execOutput
 	}
 
+	if err := tx.Commit(); err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't commit transaction to get first shuffle outputs")
+	}
+
 	// Now iteratively start all shuffles.
 	for len(nextShuffles) > 0 {
 		newNextShuffles := make(map[string]ShuffleData)
 
 		for _, shuffle := range nextShuffles {
-			tmpNextShuffles, err := shuffle.Shuffle.StartSources(ctx, stateStorage, tx, shuffle.ShuffleID, shuffle.Variables)
+			tmpNextShuffles, err := shuffle.Shuffle.StartSources(ctx, stateStorage, shuffle.ShuffleID, shuffle.Variables)
 			if err != nil {
-				return nil, nil, errors.Wrapf(err, "couldn't start sources for shuffle with id %v", err)
+				return nil, nil, errors.Wrapf(err, "couldn't start sources for shuffle with id %v", shuffle.ShuffleID.Id)
 			}
 
 			// Deduplicate shuffles by their ID's
@@ -82,6 +90,12 @@ type PipelineMetadata struct {
 
 	// The partition of the current stream.
 	Partition int
+}
+
+func NewShuffleID(id string) *ShuffleID {
+	return &ShuffleID{
+		Id: id,
+	}
 }
 
 func (id *ShuffleID) AsPrefix() []byte {
@@ -121,17 +135,25 @@ func (s *Shuffle) Get(ctx context.Context, variables octosql.Variables, streamID
 	return receiver, execOutput, nil
 }
 
-func (s *Shuffle) StartSources(ctx context.Context, stateStorage storage.Storage, tx storage.StateTransaction, shuffleID *ShuffleID, variables octosql.Variables) (map[string]ShuffleData, error) {
+func (s *Shuffle) StartSources(ctx context.Context, stateStorage storage.Storage, shuffleID *ShuffleID, variables octosql.Variables) (map[string]ShuffleData, error) {
+	tx := stateStorage.BeginTransaction()
+
 	// Create an ID for the possible _even next_ shuffle.
-	nextShuffleIDRaw, err := GetSourceStreamID(tx.WithPrefix(shuffleID.AsPrefix()), octosql.MakeString("next_shuffle_id"))
+	nextShuffleID, err := GetSourceShuffleID(tx.WithPrefix(shuffleID.AsPrefix()), octosql.MakeString("next_shuffle_id"))
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get next shuffle id")
 	}
-	nextShuffleID := (*ShuffleID)(nextShuffleIDRaw)
+
+	if err := tx.Commit(); err != nil {
+		return nil, errors.Wrap(err, "couldn't commit transaction to save next shuffle ID")
+	}
 
 	nextShuffles := make(map[string]ShuffleData)
 
 	for partition, node := range s.sources {
+		tx := stateStorage.BeginTransaction()
+		ctx := storage.InjectStateTransaction(ctx, tx)
+
 		sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(shuffleID.AsPrefix()), octosql.MakeString(fmt.Sprintf("shuffle_input_%d", partition)))
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't get new source stream ID for shuffle with ID %s", shuffleID.Id)
@@ -163,6 +185,10 @@ func (s *Shuffle) StartSources(ctx context.Context, stateStorage storage.Storage
 			return nil, errors.Wrapf(err, "couldn't get strategy for shuffle with ID %s", shuffleID.Id)
 		}
 
+		if err := tx.Commit(); err != nil {
+			return nil, errors.Wrapf(err, "couldn't commit transaction to run shuffle sender from partition %d", partition)
+		}
+
 		// Start the shuffle sender.
 		sender := NewShuffleSender(senderStreamID, shuffleID, strategy, s.outputPartitionCount, partition)
 
@@ -174,6 +200,7 @@ func (s *Shuffle) StartSources(ctx context.Context, stateStorage storage.Storage
 	return nextShuffles, nil
 }
 
+// ShuffleReceiver is a RecordStream abstraction on a shuffle and receives records from it for a partition.
 type ShuffleReceiver struct {
 	streamID             *StreamID
 	shuffleID            *ShuffleID
@@ -335,6 +362,7 @@ func (rs *ShuffleReceiver) Close() error {
 	return nil
 }
 
+// ShuffleSender is used to send data to a shuffle from a given partition.
 type ShuffleSender struct {
 	streamID             *StreamID
 	shuffleID            *ShuffleID

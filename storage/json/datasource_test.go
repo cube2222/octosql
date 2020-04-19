@@ -93,9 +93,6 @@ func TestJSONRecordStream_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stateStorage := execution.GetTestStorage(t)
-			defer func() {
-				go stateStorage.Close()
-			}()
 
 			ds, err := NewDataSourceBuilderFactory()("test", tt.alias)[0].Materialize(context.Background(), &physical.MaterializationContext{
 				Config: &config.Config{

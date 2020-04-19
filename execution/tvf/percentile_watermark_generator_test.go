@@ -137,9 +137,6 @@ func TestPercentileWatermarkGenerator_Get(t *testing.T) {
 			}
 
 			stateStorage := execution.GetTestStorage(t)
-			defer func() {
-				go stateStorage.Close()
-			}()
 
 			tx := stateStorage.BeginTransaction()
 			ctx := storage.InjectStateTransaction(ctx, tx)
@@ -243,9 +240,6 @@ func TestPercentileWatermarkGenerator_Stream(t *testing.T) {
 			}
 
 			stateStorage := execution.GetTestStorage(t)
-			defer func() {
-				go stateStorage.Close()
-			}()
 
 			tx := stateStorage.BeginTransaction()
 			ctx := storage.InjectStateTransaction(ctx, tx)

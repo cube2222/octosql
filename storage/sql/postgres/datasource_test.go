@@ -293,9 +293,6 @@ func TestDataSource_Get(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			args := tt.args
 			stateStorage := execution.GetTestStorage(t)
-			defer func() {
-				go stateStorage.Close()
-			}()
 
 			err := createTable(db, args.tableDescription)
 			if err != nil {

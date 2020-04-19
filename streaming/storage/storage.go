@@ -57,6 +57,5 @@ func (bs *BadgerStorage) Subscribe(ctx context.Context) *Subscription {
 }
 
 func (bs *BadgerStorage) Close() error {
-	return nil
 	return bs.db.Close()
 }

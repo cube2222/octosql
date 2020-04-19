@@ -777,9 +777,6 @@ func TestDataSource_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stateStorage := execution.GetTestStorage(t)
-			defer func() {
-				go stateStorage.Close()
-			}()
 
 			client := redis.NewClient(
 				&redis.Options{

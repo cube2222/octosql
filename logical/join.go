@@ -174,7 +174,7 @@ func getKeysAndEventTimeFromFormula(formula physical.Formula, sourceNamespace, j
 				if sourceVariable.Name == sourceEventTimeField &&
 					joinedVariable.Name == joinedEventTimeField {
 					// We are joining by event time field
-					eventTimeField = octosql.NewVariableName("join_event_time") // TODO: what about this?
+					eventTimeField = sourceVariable.Name
 				}
 			}
 		}

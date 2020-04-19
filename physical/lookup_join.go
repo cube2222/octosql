@@ -55,7 +55,14 @@ func (node *LookupJoin) Materialize(ctx context.Context, matCtx *Materialization
 }
 
 func (node *LookupJoin) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMetadata(metadata.CombineCardinalities(node.source.Metadata().Cardinality(), node.joined.Metadata().Cardinality()), node.source.Metadata().EventTimeField(), metadata.EmptyNamespace())
+	sourceMetadata := node.source.Metadata()
+	joinedMetadata := node.joined.Metadata()
+	cardinality := metadata.CombineCardinalities(sourceMetadata.Cardinality(), joinedMetadata.Cardinality())
+
+	sourceNamespace := sourceMetadata.Namespace()
+	sourceNamespace.MergeWith(joinedMetadata.Namespace())
+
+	return metadata.NewNodeMetadata(cardinality, sourceMetadata.EventTimeField(), sourceNamespace)
 }
 
 func (node *LookupJoin) Visualize() *graph.Node {

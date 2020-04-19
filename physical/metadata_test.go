@@ -232,11 +232,11 @@ func TestNamespace(t *testing.T) {
 						),
 					),
 				},
-				eventTimeField: "join_event_time_field",
+				eventTimeField: "source_event_time",
 			},
 			want: metadata.NewNodeMetadata(
 				metadata.BoundedDoesntFitInLocalStorage,
-				octosql.NewVariableName("join_event_time_field"),
+				octosql.NewVariableName("source_event_time"),
 				metadata.NewNamespace(
 					[]string{"a", "b", "c", "d", "e"},
 					[]octosql.VariableName{"source.x", "joined.y", "id"},

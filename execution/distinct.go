@@ -3,9 +3,10 @@ package execution
 import (
 	"context"
 
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
-	"github.com/pkg/errors"
 )
 
 type Distinct struct {
@@ -54,9 +55,14 @@ func (node *Distinct) Get(ctx context.Context, variables octosql.Variables, stre
 	}
 
 	distinctPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, execOutput.WatermarkSource, true)
-	go distinctPullEngine.Run(ctx) // TODO: .Close() should kill this context and the goroutine.
 
-	return distinctPullEngine, NewExecutionOutput(distinctPullEngine, execOutput.NextShuffles), nil
+	return distinctPullEngine,
+		NewExecutionOutput(
+			distinctPullEngine,
+			execOutput.NextShuffles,
+			append(execOutput.PullEnginesToStart, distinctPullEngine),
+		),
+		nil
 }
 
 type DistinctStream struct {

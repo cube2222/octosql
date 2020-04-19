@@ -150,7 +150,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		log.Println("worker done")
 	}()
 
-	return rs, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator(), map[string]execution.ShuffleData{}), nil
+	return rs, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator(), map[string]execution.ShuffleData{}, nil), nil
 }
 
 type RecordStream struct {

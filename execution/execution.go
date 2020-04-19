@@ -13,8 +13,9 @@ import (
 
 // This struct represents additional metadata to be returned with Get() and used recursively (like WatermarkSource)
 type ExecutionOutput struct {
-	WatermarkSource WatermarkSource
-	NextShuffles    map[string]ShuffleData
+	WatermarkSource    WatermarkSource
+	NextShuffles       map[string]ShuffleData
+	PullEnginesToStart []*PullEngine
 }
 
 type ShuffleData struct {
@@ -23,10 +24,11 @@ type ShuffleData struct {
 	Variables octosql.Variables
 }
 
-func NewExecutionOutput(ws WatermarkSource, nextShuffles map[string]ShuffleData) *ExecutionOutput {
+func NewExecutionOutput(ws WatermarkSource, nextShuffles map[string]ShuffleData, pullEnginesToStart []*PullEngine) *ExecutionOutput {
 	return &ExecutionOutput{
-		WatermarkSource: ws,
-		NextShuffles:    nextShuffles,
+		WatermarkSource:    ws,
+		NextShuffles:       nextShuffles,
+		PullEnginesToStart: pullEnginesToStart,
 	}
 }
 

@@ -623,7 +623,6 @@ func TestDistinct_Get(t *testing.T) {
 
 			if err := AreStreamsEqualNoOrdering(ctx, stateStorage, stream, wantStream); err != nil {
 				t.Fatal(err)
-
 			}
 		})
 	}

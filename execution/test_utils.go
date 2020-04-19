@@ -2,15 +2,19 @@ package execution
 
 import (
 	"context"
+	cryptorand "crypto/rand"
 	"fmt"
 	"log"
 	"math/rand"
 	"os"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/oklog/ulid"
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
@@ -289,10 +293,10 @@ type DummyNode struct {
 
 func (dn *DummyNode) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
 	if dn.data == nil {
-		return NewInMemoryStream(ctx, []*Record{}), NewExecutionOutput(NewZeroWatermarkGenerator(), map[string]ShuffleData{}), nil
+		return NewInMemoryStream(ctx, []*Record{}), NewExecutionOutput(NewZeroWatermarkGenerator(), map[string]ShuffleData{}, nil), nil
 	}
 
-	return NewInMemoryStream(ctx, dn.data), NewExecutionOutput(NewZeroWatermarkGenerator(), map[string]ShuffleData{}), nil
+	return NewInMemoryStream(ctx, dn.data), NewExecutionOutput(NewZeroWatermarkGenerator(), map[string]ShuffleData{}, nil), nil
 }
 
 func NewDummyValue(value octosql.Value) *DummyValue {
@@ -408,17 +412,25 @@ func ReadAllWithCount(ctx context.Context, stateStorage storage.Storage, stream 
 	return records, nil
 }
 
-func GetTestStorage(t *testing.T) storage.Storage {
-	dirname := fmt.Sprintf("testdb/%d", rand.Int())
-	err := os.MkdirAll(dirname, os.ModePerm)
-	if err != nil {
-		t.Fatal("couldn't create temporary directory: ", err)
-	}
+var globalTestStorage *badger.DB
+var globalTestStorageInitializer = sync.Once{}
 
-	opts := badger.DefaultOptions(dirname)
-	db, err := badger.Open(opts)
-	if err != nil {
-		t.Fatal("couldn't open in-memory badger database: ", err)
-	}
-	return storage.NewBadgerStorage(db)
+func GetTestStorage(t *testing.T) storage.Storage {
+	globalTestStorageInitializer.Do(func() {
+		dirname := fmt.Sprintf("testdb/%d", rand.Int())
+		err := os.MkdirAll(dirname, os.ModePerm)
+		if err != nil {
+			t.Fatal("couldn't create temporary directory: ", err)
+		}
+
+		opts := badger.DefaultOptions(dirname)
+		db, err := badger.Open(opts)
+		if err != nil {
+			t.Fatal("couldn't open in-memory badger database: ", err)
+		}
+		globalTestStorage = db
+	})
+	prefix := ulid.MustNew(ulid.Timestamp(time.Now()), cryptorand.Reader).String()
+
+	return storage.NewBadgerStorage(globalTestStorage).WithPrefix([]byte(prefix + "$"))
 }

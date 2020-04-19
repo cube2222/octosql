@@ -32,14 +32,19 @@ type ProcessByKey struct {
 }
 
 func (p *ProcessByKey) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *Record) error {
-	variables, err := p.variables.MergeWith(record.AsVariables())
+	recordVariables := record.AsVariables()
+	variables, err := p.variables.MergeWith(recordVariables)
 	if err != nil {
 		return errors.Wrap(err, "couldn't merge stream variables with record")
 	}
 
 	key := make([]octosql.Value, len(p.keyExpression))
 	for i := range p.keyExpression {
-		key[i], err = p.keyExpression[i].ExpressionValue(ctx, variables)
+		if _, ok := p.keyExpression[i].(*RecordExpression); ok {
+			key[i], err = p.keyExpression[i].ExpressionValue(ctx, recordVariables)
+		} else {
+			key[i], err = p.keyExpression[i].ExpressionValue(ctx, variables)
+		}
 		if err != nil {
 			return errors.Wrapf(err, "couldn't evaluate process key expression with index %v", i)
 		}

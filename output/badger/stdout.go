@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"sort"
 	"time"
 
@@ -97,7 +98,8 @@ func (printer *StdOutPrinter) Run(ctx context.Context) error {
 		if len(errorMessage) > 0 {
 			return errors.New(errorMessage)
 		} else if endOfStream {
-			return nil
+			_, err := buf.WriteTo(os.Stdout)
+			return err
 		}
 	}
 	panic("unreachable")

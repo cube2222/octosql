@@ -399,9 +399,9 @@ func ParseJoinTableExpression(expr *sqlparser.JoinTableExpr) (logical.Node, erro
 
 	switch expr.Join {
 	case sqlparser.LeftJoinStr, sqlparser.RightJoinStr:
-		return logical.NewLeftJoin(source, joined), nil
+		return logical.NewJoin(source, joined, true), nil
 	case sqlparser.JoinStr:
-		return logical.NewInnerJoin(source, joined), nil
+		return logical.NewJoin(source, joined, false), nil
 	default:
 		return nil, errors.Errorf("invalid join expression: %v", expr.Join)
 	}

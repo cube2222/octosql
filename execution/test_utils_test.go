@@ -10,9 +10,7 @@ import (
 
 func TestAreStreamsEqual(t *testing.T) {
 	stateStorage := GetTestStorage(t)
-	defer func() {
-		go stateStorage.Close()
-	}()
+
 	tx := stateStorage.BeginTransaction()
 	defer tx.Abort()
 	ctx := storage.InjectStateTransaction(context.Background(), tx)

@@ -622,9 +622,6 @@ func TestDistinct_Get(t *testing.T) {
 
 func TestDistinct_Retractions(t *testing.T) {
 	stateStorage := GetTestStorage(t)
-	defer func() {
-		go stateStorage.Close()
-	}()
 
 	ctx := context.Background()
 	fields := []octosql.VariableName{"string", "number"}

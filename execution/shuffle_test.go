@@ -515,9 +515,7 @@ func TestShuffleMultiStage(t *testing.T) {
 	)
 
 	stateStorage := GetTestStorage(t)
-	defer func() {
-		go stateStorage.Close()
-	}()
+
 	tx := stateStorage.BeginTransaction()
 	ctx := storage.InjectStateTransaction(context.Background(), tx)
 
@@ -544,9 +542,7 @@ func TestShuffleMultiStage(t *testing.T) {
 
 func TestShuffleWatermarks(t *testing.T) {
 	stateStorage := GetTestStorage(t)
-	defer func() {
-		go stateStorage.Close()
-	}()
+
 	tx := stateStorage.BeginTransaction()
 	ctx := context.Background()
 	ctx = storage.InjectStateTransaction(ctx, tx)

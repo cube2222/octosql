@@ -13,9 +13,6 @@ import (
 
 func TestGroupBy_SimpleBatch(t *testing.T) {
 	stateStorage := GetTestStorage(t)
-	defer func() {
-		go stateStorage.Close()
-	}()
 
 	ctx := context.Background()
 	fields := []octosql.VariableName{"cat", "livesleft", "ownerid"}
@@ -74,9 +71,6 @@ func TestGroupBy_SimpleBatch(t *testing.T) {
 
 func TestGroupBy_BatchWithUndos(t *testing.T) {
 	stateStorage := GetTestStorage(t)
-	defer func() {
-		go stateStorage.Close()
-	}()
 
 	ctx := context.Background()
 	fields := []octosql.VariableName{"cat", "livesleft", "ownerid"}
@@ -142,9 +136,6 @@ func TestGroupBy_BatchWithUndos(t *testing.T) {
 
 func TestGroupBy_WithOutputUndos(t *testing.T) {
 	stateStorage := GetTestStorage(t)
-	defer func() {
-		go stateStorage.Close()
-	}()
 
 	ctx := context.Background()
 	fields := []octosql.VariableName{"cat", "livesleft", "ownerid"}
@@ -226,9 +217,6 @@ func TestGroupBy_WithOutputUndos(t *testing.T) {
 
 func TestGroupBy_newRecordsNoChanges(t *testing.T) {
 	stateStorage := GetTestStorage(t)
-	defer func() {
-		go stateStorage.Close()
-	}()
 
 	ctx := context.Background()
 	fields := []octosql.VariableName{"cat", "livesleft", "ownerid"}
@@ -283,9 +271,6 @@ func TestGroupBy_newRecordsNoChanges(t *testing.T) {
 
 func TestGroupBy_EventTimes(t *testing.T) {
 	stateStorage := GetTestStorage(t)
-	defer func() {
-		go stateStorage.Close()
-	}()
 
 	start := time.Date(2020, 7, 2, 14, 0, 0, 0, time.UTC)
 	firstWindow := start

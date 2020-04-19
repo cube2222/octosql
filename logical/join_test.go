@@ -107,35 +107,29 @@ func Test_isConjunctionOfEqualities(t *testing.T) {
 	}
 }
 
-func Test_getKeysAndEventTimeFromFormula(t *testing.T) {
+func Test_getKeysFromFormula(t *testing.T) {
 	type args struct {
-		formula              physical.Formula
-		sourceNamespace      *metadata.Namespace
-		joinedNamespace      *metadata.Namespace
-		sourceEventTimeField octosql.VariableName
-		joinedEventTimeField octosql.VariableName
+		formula         physical.Formula
+		sourceNamespace *metadata.Namespace
+		joinedNamespace *metadata.Namespace
 	}
 	tests := []struct {
-		name               string
-		args               args
-		wantSourceKey      []physical.Expression
-		wantJoinedKey      []physical.Expression
-		wantEventTimeField octosql.VariableName
-		wantErr            bool
+		name          string
+		args          args
+		wantSourceKey []physical.Expression
+		wantJoinedKey []physical.Expression
+		wantErr       bool
 	}{
 		{
 			name: "empty formula",
 			args: args{
-				formula:              physical.NewConstant(true),
-				sourceNamespace:      metadata.NewNamespace(nil, nil),
-				joinedNamespace:      metadata.NewNamespace(nil, nil),
-				sourceEventTimeField: "",
-				joinedEventTimeField: "",
+				formula:         physical.NewConstant(true),
+				sourceNamespace: metadata.NewNamespace(nil, nil),
+				joinedNamespace: metadata.NewNamespace(nil, nil),
 			},
-			wantSourceKey:      []physical.Expression{},
-			wantJoinedKey:      []physical.Expression{},
-			wantEventTimeField: "",
-			wantErr:            false,
+			wantSourceKey: []physical.Expression{},
+			wantJoinedKey: []physical.Expression{},
+			wantErr:       false,
 		},
 
 		{
@@ -146,23 +140,20 @@ func Test_getKeysAndEventTimeFromFormula(t *testing.T) {
 					physical.Equal,
 					physical.NewVariable("joined"),
 				),
-				sourceNamespace:      metadata.NewNamespace(nil, []octosql.VariableName{"source"}),
-				joinedNamespace:      metadata.NewNamespace(nil, []octosql.VariableName{"joined"}),
-				sourceEventTimeField: "",
-				joinedEventTimeField: "",
+				sourceNamespace: metadata.NewNamespace(nil, []octosql.VariableName{"source"}),
+				joinedNamespace: metadata.NewNamespace(nil, []octosql.VariableName{"joined"}),
 			},
-			wantSourceKey:      []physical.Expression{physical.NewVariable("source")},
-			wantJoinedKey:      []physical.Expression{physical.NewVariable("joined")},
-			wantEventTimeField: "",
-			wantErr:            false,
+			wantSourceKey: []physical.Expression{physical.NewVariable("source")},
+			wantJoinedKey: []physical.Expression{physical.NewVariable("joined")},
+			wantErr:       false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sourceKey, joinedKey, eventTimeField, err := getKeysAndEventTimeFromFormula(tt.args.formula, tt.args.sourceNamespace, tt.args.joinedNamespace, tt.args.sourceEventTimeField, tt.args.joinedEventTimeField)
+			sourceKey, joinedKey, err := getKeysFromFormula(tt.args.formula, tt.args.sourceNamespace, tt.args.joinedNamespace)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("getKeysAndEventTimeFromFormula() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("getKeysFromFormula() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
@@ -172,10 +163,6 @@ func Test_getKeysAndEventTimeFromFormula(t *testing.T) {
 
 			if !reflect.DeepEqual(joinedKey, tt.wantJoinedKey) {
 				t.Errorf("getKeysAndEventTimeFromFormula() joinedKey = %v, want %v", joinedKey, tt.wantJoinedKey)
-			}
-
-			if eventTimeField != tt.wantEventTimeField {
-				t.Errorf("getKeysAndEventTimeFromFormula() eventTimeField = %v, want %v", eventTimeField, tt.wantEventTimeField)
 			}
 		})
 	}

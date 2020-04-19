@@ -20,6 +20,7 @@ func NewPhysicalPlanCreator(repo *physical.DataSourceRepository, physicalConfig 
 	return &PhysicalPlanCreator{
 		variableCounter: 0,
 		dataSourceRepo:  repo,
+		physicalConfig:  physicalConfig,
 	}
 }
 

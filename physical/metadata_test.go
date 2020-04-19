@@ -243,6 +243,39 @@ func TestNamespace(t *testing.T) {
 				),
 			),
 		},
+		{
+			name: "lookup join",
+			node: &LookupJoin{
+				source: &StubNode{
+					metadata: metadata.NewNodeMetadata(
+						metadata.BoundedDoesntFitInLocalStorage,
+						octosql.NewVariableName("source_event_time"),
+						metadata.NewNamespace(
+							[]string{"a", "b", "c"},
+							[]octosql.VariableName{"source.x", "id"},
+						),
+					),
+				},
+				joined: &StubNode{
+					metadata: metadata.NewNodeMetadata(
+						metadata.BoundedFitsInLocalStorage,
+						octosql.NewVariableName("joined_event_time"),
+						metadata.NewNamespace(
+							[]string{"c", "d", "e"},
+							[]octosql.VariableName{"joined.y", "id"},
+						),
+					),
+				},
+			},
+			want: metadata.NewNodeMetadata(
+				metadata.BoundedDoesntFitInLocalStorage,
+				octosql.NewVariableName("source_event_time"),
+				metadata.NewNamespace(
+					[]string{"a", "b", "c", "d", "e"},
+					[]octosql.VariableName{"source.x", "joined.y", "id"},
+				),
+			),
+		},
 	}
 	for i, tt := range tests {
 		t.Run(fmt.Sprint(i), func(t *testing.T) {

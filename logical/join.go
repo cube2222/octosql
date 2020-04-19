@@ -78,12 +78,11 @@ func (node *Join) Physical(ctx context.Context, physicalCreator *PhysicalPlanCre
 		joinedNamespace := joinedNodes[0].Metadata().Namespace()
 		joinedNamespace.MergeWithVariables(joinedVariables)
 
-		sourceEventTimeField := sourceNodes[0].Metadata().EventTimeField()
-		joinedEventTimeField := joinedNodes[0].Metadata().EventTimeField()
+		eventTimeField := sourceNodes[0].Metadata().EventTimeField()
 
 		// Create the appropriate keys from the formula. Basically how it works is it goes through predicates i.e a.x = b.y
 		// and then decides whether a.x forms part of source or joined and then adds it to the appropriate key.
-		sourceKey, joinedKey, eventTimeField, err := getKeysAndEventTimeFromFormula(formula, sourceNamespace, joinedNamespace, sourceEventTimeField, joinedEventTimeField)
+		sourceKey, joinedKey, err := getKeysFromFormula(formula, sourceNamespace, joinedNamespace)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "couldn't create keys from join formula")
 		}
@@ -113,10 +112,9 @@ func isConjunctionOfEqualities(f physical.Formula) bool {
 	}
 }
 
-func getKeysAndEventTimeFromFormula(formula physical.Formula, sourceNamespace, joinedNamespace *metadata.Namespace, sourceEventTimeField, joinedEventTimeField octosql.VariableName) ([]physical.Expression, []physical.Expression, octosql.VariableName, error) {
+func getKeysFromFormula(formula physical.Formula, sourceNamespace, joinedNamespace *metadata.Namespace) ([]physical.Expression, []physical.Expression, error) {
 	sourceKey := make([]physical.Expression, 0)
 	joinedKey := make([]physical.Expression, 0)
-	eventTimeField := octosql.NewVariableName("") // will stay empty if we don't join by event time
 
 	for _, element := range formula.SplitByAnd() {
 		if _, ok := element.(*physical.Constant); ok {
@@ -135,13 +133,13 @@ func getKeysAndEventTimeFromFormula(formula physical.Formula, sourceNamespace, j
 
 		// We check for errors. For example a predicate a.x - b.y = 0 won't have any match on the left formula
 		if !doesLeftMatchSource && !doesLeftMatchJoined {
-			return nil, nil, "", errors.New("Left expression of predicate doesn't match either sources namespace")
+			return nil, nil, errors.New("Left expression of predicate doesn't match either sources namespace")
 		} else if !doesRightMatchSource && !doesRightMatchJoined {
-			return nil, nil, "", errors.New("Right expression of predicate doesn't match either sources namespace")
+			return nil, nil, errors.New("Right expression of predicate doesn't match either sources namespace")
 		} else if !doesLeftMatchSource && !doesRightMatchSource {
-			return nil, nil, "", errors.New("Neither side of predicate matches sources namespace")
+			return nil, nil, errors.New("Neither side of predicate matches sources namespace")
 		} else if !doesLeftMatchJoined && !doesRightMatchJoined {
-			return nil, nil, "", errors.New("Neither side of predicate matches joined sources namespace")
+			return nil, nil, errors.New("Neither side of predicate matches joined sources namespace")
 		}
 
 		// Now we want to decide which part of the predicate belong to which key
@@ -162,23 +160,7 @@ func getKeysAndEventTimeFromFormula(formula physical.Formula, sourceNamespace, j
 			sourceKey = append(sourceKey, rightExpression)
 			joinedKey = append(joinedKey, leftExpression)
 		}
-
-		// Now we have added a new expression to the appropriate keys
-		// we want to check whether we are joining by event time
-
-		lastSourceExpression := sourceKey[len(sourceKey)-1] // slice won't be empty, since we just appended to it
-		lastJoinedExpression := joinedKey[len(joinedKey)-1]
-
-		if sourceVariable, ok := lastSourceExpression.(*physical.Variable); ok {
-			if joinedVariable, ok := lastJoinedExpression.(*physical.Variable); ok {
-				if sourceVariable.Name == sourceEventTimeField &&
-					joinedVariable.Name == joinedEventTimeField {
-					// We are joining by event time field
-					eventTimeField = sourceVariable.Name
-				}
-			}
-		}
 	}
 
-	return sourceKey, joinedKey, eventTimeField, nil
+	return sourceKey, joinedKey, nil
 }

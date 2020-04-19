@@ -67,7 +67,11 @@ func (s *KeyHashingStrategy) CalculatePartition(ctx context.Context, record *Rec
 
 	key := make([]octosql.Value, len(s.keyExpression))
 	for i := range s.keyExpression {
-		key[i], err = s.keyExpression[i].ExpressionValue(ctx, variables)
+		if _, ok := s.keyExpression[i].(*RecordExpression); ok {
+			key[i], err = s.keyExpression[i].ExpressionValue(ctx, record.AsVariables())
+		} else {
+			key[i], err = s.keyExpression[i].ExpressionValue(ctx, variables)
+		}
 		if err != nil {
 			return -1, errors.Wrapf(err, "couldn't evaluate process key expression with index %v", i)
 		}

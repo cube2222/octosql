@@ -2,8 +2,12 @@ package logical
 
 import (
 	"context"
+	"runtime"
+
+	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/physical"
 )
 
@@ -16,16 +20,28 @@ func NewDistinct(child Node) *Distinct {
 }
 
 func (node *Distinct) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
-	panic("does not work")
-	/*sourceNodes, variables, err := node.child.Physical(ctx, physicalCreator)
+	groupByParallelism, err := config.GetInt(
+		physicalCreator.physicalConfig,
+		"groupByParallelism",
+		config.WithDefault(runtime.GOMAXPROCS(0)),
+	)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't get groupByParallelism configuration")
+	}
+
+	sourceNodes, variables, err := node.child.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get source nodes physical plan in distinct")
 	}
 
-	outNodes := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
+	outNodes := physical.NewShuffle(
+		groupByParallelism,
+		physical.NewKeyHashingStrategy([]physical.Expression{physical.NewRecordExpression()}),
+		sourceNodes,
+	)
 	for i := range outNodes {
 		outNodes[i] = physical.NewDistinct(outNodes[i])
 	}
 
-	return outNodes, variables, nil*/
+	return outNodes, variables, nil
 }

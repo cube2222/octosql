@@ -58,8 +58,8 @@ func GetAndStartAllShuffles(ctx context.Context, stateStorage storage.Storage, n
 			return nil, nil, errors.Wrapf(err, "couldn't commit transaction to get first shuffle output with partition %d", partition)
 		}
 
-		for _, engine := range execOutput.PullEnginesToStart {
-			go engine.Run(ctx)
+		for _, task := range execOutput.TasksToRun {
+			go task() // TODO: Error handling, or maybe gather in main?
 		}
 
 		for id, data := range execOutput.NextShuffles {
@@ -199,8 +199,8 @@ func (s *Shuffle) StartSources(ctx context.Context, stateStorage storage.Storage
 			return nil, errors.Wrapf(err, "couldn't commit transaction to run shuffle sender from partition %d", partition)
 		}
 
-		for _, engine := range execOutput.PullEnginesToStart {
-			go engine.Run(ctx)
+		for _, task := range execOutput.TasksToRun {
+			go task() // TODO: Error handling, or maybe gather in main?
 		}
 
 		// Start the shuffle sender.

@@ -116,15 +116,9 @@ func TestJSONRecordStream_Get(t *testing.T) {
 				t.Errorf("Error creating data source: %v", err)
 			}
 
+			got := execution.GetTestStream(t, stateStorage, octosql.NoVariables(), ds, execution.GetTestStreamWithStreamID(streamId))
+
 			tx := stateStorage.BeginTransaction()
-			defer tx.Abort()
-
-			got, _, err := ds.Get(storage.InjectStateTransaction(ctx, tx), octosql.NoVariables(), streamId)
-			if err != nil {
-				t.Errorf("DataSource.Get() error: %v", err)
-				return
-			}
-
 			want, _, err := execution.NewDummyNode(tt.want).Get(storage.InjectStateTransaction(ctx, tx), octosql.NoVariables(), streamId)
 			if err := tx.Commit(); err != nil {
 				t.Fatal(err)

@@ -57,7 +57,7 @@ func (w *WatermarkGenerator) Get(ctx context.Context, variables octosql.Variable
 		offset:    offset.AsDuration(),
 	}
 
-	return ws, execution.NewExecutionOutput(ws, execOutput.NextShuffles, execOutput.PullEnginesToStart), nil // watermark generator stream now indicates new watermark source
+	return ws, execution.NewExecutionOutput(ws, execOutput.NextShuffles, execOutput.TasksToRun), nil // watermark generator stream now indicates new watermark source
 }
 
 type WatermarkGeneratorStream struct {

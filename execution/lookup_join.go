@@ -120,7 +120,7 @@ func (node *LookupJoin) Get(ctx context.Context, variables octosql.Variables, st
 		NewExecutionOutput(
 			engine,
 			execOutput.NextShuffles,
-			append(execOutput.PullEnginesToStart, engine),
+			append(execOutput.TasksToRun, func() error { engine.Run(ctx); return nil }),
 		),
 		nil
 }

@@ -434,3 +434,31 @@ func GetTestStorage(t *testing.T) storage.Storage {
 
 	return storage.NewBadgerStorage(globalTestStorage).WithPrefix([]byte(prefix + "$"))
 }
+
+type GetTestStreamOption func(*StreamID)
+
+func GetTestStreamWithStreamID(id *StreamID) GetTestStreamOption {
+	return func(old *StreamID) {
+		*old = *id
+	}
+}
+
+func GetTestStream(t *testing.T, stateStorage storage.Storage, variables octosql.Variables, node Node, opts ...GetTestStreamOption) RecordStream {
+	streamID := GetRawStreamID()
+	for _, opt := range opts {
+		opt(streamID)
+	}
+
+	tx := stateStorage.BeginTransaction()
+	stream, execOutput, err := node.Get(storage.InjectStateTransaction(context.Background(), tx), variables, streamID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, task := range execOutput.TasksToRun {
+		go task()
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	return stream
+}

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
 )
 
 func TestLookupJoin(t *testing.T) {
@@ -308,26 +307,13 @@ func TestLookupJoin(t *testing.T) {
 			defer func() {
 				go stateStorage.Close()
 			}()
-			tx := stateStorage.BeginTransaction()
-			ctx := storage.InjectStateTransaction(context.Background(), tx)
 
-			stream := NewLookupJoin(tt.fields.maxJobCount, stateStorage, tt.fields.source, tt.fields.joined, tt.fields.isLeftJoin)
+			lookupJoin := NewLookupJoin(tt.fields.maxJobCount, stateStorage, tt.fields.source, tt.fields.joined, tt.fields.isLeftJoin)
+			stream := GetTestStream(t, stateStorage, tt.fields.variables, lookupJoin)
 
-			rs, _, err := stream.Get(ctx, tt.fields.variables, GetRawStreamID())
-			if err != nil {
-				t.Fatal("couldn't get actual record stream: ", err)
-			}
+			want := GetTestStream(t, stateStorage, octosql.NoVariables(), tt.want)
 
-			want, _, err := tt.want.Get(ctx, tt.fields.variables, GetRawStreamID())
-			if err != nil {
-				t.Fatal("couldn't get wanted record stream: ", err)
-			}
-
-			if err := tx.Commit(); err != nil {
-				t.Fatal(err)
-			}
-
-			err = AreStreamsEqualNoOrdering(ctx, stateStorage, rs, want)
+			err := AreStreamsEqualNoOrdering(context.Background(), stateStorage, stream, want)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LookupJoin error = %v, wantErr %v", err, tt.wantErr)
 				return

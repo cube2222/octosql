@@ -609,14 +609,10 @@ func TestDistinct_Get(t *testing.T) {
 
 			distinct := NewDistinct(stateStorage, tt.args.source, "")
 
+			stream := GetTestStream(t, stateStorage, octosql.NoVariables(), distinct)
+
 			tx := stateStorage.BeginTransaction()
-			stream, _, err := distinct.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
-			if err != nil {
-				t.Fatal(err)
-			}
-
 			wantStream := NewInMemoryStream(storage.InjectStateTransaction(context.Background(), tx), tt.want)
-
 			if err := tx.Commit(); err != nil {
 				t.Fatal(err)
 			}
@@ -666,20 +662,15 @@ func TestDistinct_Retractions(t *testing.T) {
 
 	distinct := NewDistinct(stateStorage, source, "")
 
+	stream := GetTestStream(t, stateStorage, octosql.NoVariables(), distinct)
+
 	tx := stateStorage.BeginTransaction()
-
-	stream, _, err := distinct.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	wantStream := NewInMemoryStream(storage.InjectStateTransaction(context.Background(), tx), expectedOutput)
-
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}
 
-	err = AreStreamsEqualNoOrdering(ctx, stateStorage, stream, wantStream)
+	err := AreStreamsEqualNoOrdering(ctx, stateStorage, stream, wantStream)
 	if err != nil {
 		t.Fatal(err)
 	}

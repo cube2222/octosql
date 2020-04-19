@@ -338,13 +338,9 @@ func TestDataSource_Get(t *testing.T) {
 				return
 			}
 
-			tx := stateStorage.BeginTransaction()
-			stream, _, err := execNode.Get(storage.InjectStateTransaction(ctx, tx), args.variables, streamId)
-			if err != nil {
-				t.Errorf("Couldn't get stream: %v", err)
-				return
-			}
+			stream := execution.GetTestStream(t, stateStorage, args.variables, execNode, execution.GetTestStreamWithStreamID(streamId))
 
+			tx := stateStorage.BeginTransaction()
 			want, _, err := execution.NewDummyNode(tt.want).Get(storage.InjectStateTransaction(ctx, tx), args.variables, streamId)
 			if err := tx.Commit(); err != nil {
 				t.Fatal(err)

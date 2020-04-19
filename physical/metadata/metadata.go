@@ -73,6 +73,10 @@ func NewNamespace(prefixes []string, names []octosql.VariableName) *Namespace {
 	}
 }
 
+func (nm *Namespace) Names() []octosql.VariableName {
+	return nm.names
+}
+
 func EmptyNamespace() *Namespace {
 	return NewNamespace(nil, nil)
 }

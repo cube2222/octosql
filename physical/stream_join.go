@@ -81,7 +81,12 @@ func (node *StreamJoin) Materialize(ctx context.Context, matCtx *Materialization
 
 func (node *StreamJoin) Metadata() *metadata.NodeMetadata {
 	cardinality := metadata.CombineCardinalities(node.source.Metadata().Cardinality(), node.joined.Metadata().Cardinality())
-	return metadata.NewNodeMetadata(cardinality, node.eventTimeField, metadata.EmptyNamespace()) // TODO: think about the namespace
+
+	sourceNamespace := node.source.Metadata().Namespace()
+	joinedNamespace := node.joined.Metadata().Namespace()
+	sourceNamespace.MergeWith(joinedNamespace)
+
+	return metadata.NewNodeMetadata(cardinality, node.eventTimeField, sourceNamespace)
 }
 
 func (node *StreamJoin) Visualize() *graph.Node {

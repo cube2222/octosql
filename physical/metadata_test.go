@@ -139,6 +139,110 @@ func TestNamespace(t *testing.T) {
 				),
 			),
 		},
+		{
+			name: "limit",
+			node: &Limit{
+				Source: &StubNode{
+					metadata: metadata.NewNodeMetadata(
+						metadata.Unbounded,
+						octosql.NewVariableName("event_time_field"),
+						metadata.NewNamespace(
+							[]string{"a", "b"},
+							[]octosql.VariableName{"x.field1", "x.field2"},
+						),
+					),
+				},
+			},
+			want: metadata.NewNodeMetadata(
+				metadata.BoundedFitsInLocalStorage,
+				octosql.NewVariableName("event_time_field"),
+				metadata.NewNamespace(
+					[]string{"a", "b"},
+					[]octosql.VariableName{"x.field1", "x.field2"},
+				),
+			),
+		},
+		{
+			name: "offset",
+			node: &Offset{
+				Source: &StubNode{
+					metadata: metadata.NewNodeMetadata(
+						metadata.BoundedDoesntFitInLocalStorage,
+						octosql.NewVariableName("event_time_field"),
+						metadata.NewNamespace(
+							[]string{"a", "b"},
+							[]octosql.VariableName{"x.field1", "x.field2"},
+						),
+					),
+				},
+			},
+			want: metadata.NewNodeMetadata(
+				metadata.BoundedDoesntFitInLocalStorage,
+				octosql.NewVariableName("event_time_field"),
+				metadata.NewNamespace(
+					[]string{"a", "b"},
+					[]octosql.VariableName{"x.field1", "x.field2"},
+				),
+			),
+		},
+		{
+			name: "requalifier",
+			node: &Requalifier{
+				Source: &StubNode{
+					metadata: metadata.NewNodeMetadata(
+						metadata.Unbounded,
+						octosql.NewVariableName("event_field"),
+						metadata.NewNamespace(
+							[]string{"a", "b", "c"},
+							[]octosql.VariableName{"a.field1", "b.field2", "c.field3", "field4"},
+						),
+					),
+				},
+				Qualifier: "q",
+			},
+			want: metadata.NewNodeMetadata(
+				metadata.Unbounded,
+				octosql.NewVariableName("q.event_field"),
+				metadata.NewNamespace(
+					[]string{"q"},
+					[]octosql.VariableName{"q.field1", "q.field2", "q.field3", "q.field4"},
+				),
+			),
+		},
+		{
+			name: "stream join",
+			node: &StreamJoin{
+				source: &StubNode{
+					metadata: metadata.NewNodeMetadata(
+						metadata.BoundedDoesntFitInLocalStorage,
+						octosql.NewVariableName("source_event_time"),
+						metadata.NewNamespace(
+							[]string{"a", "b", "c"},
+							[]octosql.VariableName{"source.x", "id"},
+						),
+					),
+				},
+				joined: &StubNode{
+					metadata: metadata.NewNodeMetadata(
+						metadata.BoundedFitsInLocalStorage,
+						octosql.NewVariableName("joined_event_time"),
+						metadata.NewNamespace(
+							[]string{"c", "d", "e"},
+							[]octosql.VariableName{"joined.y", "id"},
+						),
+					),
+				},
+				eventTimeField: "join_event_time_field",
+			},
+			want: metadata.NewNodeMetadata(
+				metadata.BoundedDoesntFitInLocalStorage,
+				octosql.NewVariableName("join_event_time_field"),
+				metadata.NewNamespace(
+					[]string{"a", "b", "c", "d", "e"},
+					[]octosql.VariableName{"source.x", "joined.y", "id"},
+				),
+			),
+		},
 	}
 	for i, tt := range tests {
 		t.Run(fmt.Sprint(i), func(t *testing.T) {

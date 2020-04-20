@@ -13,15 +13,9 @@ import (
 
 func TestBadgerStorage_Subscribe(t *testing.T) {
 	ctx := context.Background()
-	prefix := []byte{'a'}
 
-	// This key should be printed, since it matches the prefix.
 	aKey := []byte("a-key")
 	aValue := []byte("a-value")
-
-	// This key should not be printed.
-	bKey := []byte("b-key")
-	bValue := []byte("b-value")
 
 	dirname := fmt.Sprintf("testdb/%d", rand.Int())
 	err := os.MkdirAll(dirname, os.ModePerm)
@@ -36,7 +30,7 @@ func TestBadgerStorage_Subscribe(t *testing.T) {
 	}
 	defer db.Close()
 
-	storage := NewBadgerStorage(db).WithPrefix(prefix)
+	storage := NewBadgerStorage(db)
 	subscription := storage.Subscribe(ctx)
 
 	ctx, cancel := context.WithTimeout(ctx, time.Millisecond*100)
@@ -46,12 +40,7 @@ func TestBadgerStorage_Subscribe(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Write both keys, but only one should be printed in the Output.
 	err = db.Update(func(txn *badger.Txn) error { return txn.Set(aKey, aValue) })
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = db.Update(func(txn *badger.Txn) error { return txn.Set(bKey, bValue) })
 	if err != nil {
 		t.Fatal(err)
 	}

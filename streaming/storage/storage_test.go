@@ -39,6 +39,13 @@ func TestBadgerStorage_Subscribe(t *testing.T) {
 	storage := NewBadgerStorage(db).WithPrefix(prefix)
 	subscription := storage.Subscribe(ctx)
 
+	ctx, cancel := context.WithTimeout(ctx, time.Millisecond*100)
+	defer cancel()
+	err = subscription.ListenForChanges(ctx)
+	if err != context.DeadlineExceeded {
+		t.Fatal(err)
+	}
+
 	// Write both keys, but only one should be printed in the Output.
 	err = db.Update(func(txn *badger.Txn) error { return txn.Set(aKey, aValue) })
 	if err != nil {
@@ -49,17 +56,10 @@ func TestBadgerStorage_Subscribe(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Millisecond*100)
-	defer cancel()
-	err = subscription.ListenForChanges(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	ctx, cancel = context.WithTimeout(ctx, time.Millisecond*100)
 	defer cancel()
 	err = subscription.ListenForChanges(ctx)
-	if err != context.DeadlineExceeded {
+	if err != nil {
 		t.Fatal(err)
 	}
 

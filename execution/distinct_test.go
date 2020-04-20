@@ -600,7 +600,7 @@ func TestDistinct_Get(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stateStorage := GetTestStorage(t)
+			stateStorage := storage.GetTestStorage(t)
 			ctx := context.Background()
 
 			distinct := NewDistinct(stateStorage, tt.args.source, "")
@@ -621,7 +621,7 @@ func TestDistinct_Get(t *testing.T) {
 }
 
 func TestDistinct_Retractions(t *testing.T) {
-	stateStorage := GetTestStorage(t)
+	stateStorage := storage.GetTestStorage(t)
 
 	ctx := context.Background()
 	fields := []octosql.VariableName{"string", "number"}

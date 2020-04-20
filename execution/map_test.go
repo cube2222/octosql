@@ -9,7 +9,7 @@ import (
 )
 
 func TestMappedStream_Next(t *testing.T) {
-	stateStorage := GetTestStorage(t)
+	stateStorage := storage.GetTestStorage(t)
 
 	tx := stateStorage.BeginTransaction()
 	defer tx.Abort()

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/streaming/storage"
 )
 
 func TestLookupJoin(t *testing.T) {
@@ -303,7 +304,7 @@ func TestLookupJoin(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stateStorage := GetTestStorage(t)
+			stateStorage := storage.GetTestStorage(t)
 
 			lookupJoin := NewLookupJoin(tt.fields.maxJobCount, stateStorage, tt.fields.source, tt.fields.joined, tt.fields.isLeftJoin)
 			stream := GetTestStream(t, stateStorage, tt.fields.variables, lookupJoin)

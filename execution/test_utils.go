@@ -2,19 +2,12 @@ package execution
 
 import (
 	"context"
-	cryptorand "crypto/rand"
 	"fmt"
 	"log"
-	"math/rand"
-	"os"
 	"sort"
 	"strings"
-	"sync"
 	"testing"
-	"time"
 
-	"github.com/dgraph-io/badger/v2"
-	"github.com/oklog/ulid"
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
@@ -410,29 +403,6 @@ func ReadAllWithCount(ctx context.Context, stateStorage storage.Storage, stream 
 	}
 
 	return records, nil
-}
-
-var globalTestStorage *badger.DB
-var globalTestStorageInitializer = sync.Once{}
-
-func GetTestStorage(t *testing.T) storage.Storage {
-	globalTestStorageInitializer.Do(func() {
-		dirname := fmt.Sprintf("testdb/%d", rand.Int())
-		err := os.MkdirAll(dirname, os.ModePerm)
-		if err != nil {
-			t.Fatal("couldn't create temporary directory: ", err)
-		}
-
-		opts := badger.DefaultOptions(dirname)
-		db, err := badger.Open(opts)
-		if err != nil {
-			t.Fatal("couldn't open in-memory badger database: ", err)
-		}
-		globalTestStorage = db
-	})
-	prefix := ulid.MustNew(ulid.Timestamp(time.Now()), cryptorand.Reader).String()
-
-	return storage.NewBadgerStorage(globalTestStorage).WithPrefix([]byte(prefix + "$"))
 }
 
 type GetTestStreamOption func(*StreamID)

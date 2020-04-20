@@ -2,11 +2,9 @@ package aggregate
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/cube2222/octosql"
@@ -15,19 +13,11 @@ import (
 
 func TestDistinctSum(t *testing.T) {
 	ctx := context.Background()
-	db, err := badger.Open(badger.DefaultOptions("test"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		db.Close()
-		os.RemoveAll("test")
-	}()
 
 	prefix := []byte("distinct")
 
-	badgerStorage := storage.NewBadgerStorage(db)
-	tx := badgerStorage.BeginTransaction().WithPrefix(prefix)
+	stateStorage := storage.GetTestStorage(t)
+	tx := stateStorage.BeginTransaction().WithPrefix(prefix)
 
 	aggr := NewDistinctAggregate(NewSumAggregate())
 
@@ -152,19 +142,11 @@ func TestDistinctSum(t *testing.T) {
 
 func TestDistinctCount(t *testing.T) {
 	ctx := context.Background()
-	db, err := badger.Open(badger.DefaultOptions("test"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		db.Close()
-		os.RemoveAll("test")
-	}()
 
 	prefix := []byte("distinct")
 
-	badgerStorage := storage.NewBadgerStorage(db)
-	tx := badgerStorage.BeginTransaction().WithPrefix(prefix)
+	stateStorage := storage.GetTestStorage(t)
+	tx := stateStorage.BeginTransaction().WithPrefix(prefix)
 
 	aggr := NewDistinctAggregate(NewCountAggregate())
 
@@ -282,19 +264,11 @@ func TestDistinctCount(t *testing.T) {
 
 func TestDistinctAvg(t *testing.T) {
 	ctx := context.Background()
-	db, err := badger.Open(badger.DefaultOptions("test"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		db.Close()
-		os.RemoveAll("test")
-	}()
 
 	prefix := []byte("distinct")
 
-	badgerStorage := storage.NewBadgerStorage(db)
-	tx := badgerStorage.BeginTransaction().WithPrefix(prefix)
+	stateStorage := storage.GetTestStorage(t)
+	tx := stateStorage.BeginTransaction().WithPrefix(prefix)
 
 	aggr := NewDistinctAggregate(NewAverageAggregate())
 

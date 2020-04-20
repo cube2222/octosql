@@ -2,30 +2,17 @@ package storage
 
 import (
 	"log"
-	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
 )
 
 func TestMap(t *testing.T) {
-	path := "test_map"
-	db, err := badger.Open(badger.DefaultOptions(path))
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	prefix := []byte("map_prefix_")
 
-	defer func() {
-		_ = db.Close()
-		_ = os.RemoveAll(path)
-	}()
-
-	store := NewBadgerStorage(db)
+	store := GetTestStorage(t)
 	txn := store.BeginTransaction().WithPrefix(prefix)
 
 	badgerMap := NewMap(txn)

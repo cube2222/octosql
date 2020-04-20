@@ -1,7 +1,19 @@
 package storage
 
 import (
+	cryptorand "crypto/rand"
+	"fmt"
+	"math/rand"
+	"os"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/oklog/ulid"
+
 	"github.com/cube2222/octosql"
+
+	"github.com/dgraph-io/badger/v2"
 	"github.com/pkg/errors"
 )
 
@@ -54,7 +66,7 @@ func TestMapIteratorCorrectness(iter *MapIterator, expectedKeys, expectedValues 
 	return true, nil
 }
 
-//The iterator of a set has no determined order
+// The iterator of a set has no determined order
 func TestSetIteratorCorrectness(iter *SetIterator, expectedValues []octosql.Value) (bool, error) {
 	var value octosql.Value
 
@@ -94,4 +106,27 @@ func reverseValues(values []octosql.Value) []octosql.Value {
 	}
 
 	return result
+}
+
+var globalTestStorage *badger.DB
+var globalTestStorageInitializer = sync.Once{}
+
+func GetTestStorage(t *testing.T) Storage {
+	globalTestStorageInitializer.Do(func() {
+		dirname := fmt.Sprintf("testdb/%d", rand.Int())
+		err := os.MkdirAll(dirname, os.ModePerm)
+		if err != nil {
+			t.Fatal("couldn't create temporary directory: ", err)
+		}
+
+		opts := badger.DefaultOptions(dirname)
+		db, err := badger.Open(opts)
+		if err != nil {
+			t.Fatal("couldn't open in-memory badger database: ", err)
+		}
+		globalTestStorage = db
+	})
+	prefix := ulid.MustNew(ulid.Timestamp(time.Now()), cryptorand.Reader).String()
+
+	return NewBadgerStorage(globalTestStorage).WithPrefix([]byte(prefix + "$"))
 }

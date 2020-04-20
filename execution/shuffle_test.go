@@ -258,7 +258,7 @@ func TestShuffle(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stateStorage := GetTestStorage(t)
+			stateStorage := storage.GetTestStorage(t)
 
 			ctx := context.Background()
 
@@ -514,7 +514,7 @@ func TestShuffleMultiStage(t *testing.T) {
 		},
 	)
 
-	stateStorage := GetTestStorage(t)
+	stateStorage := storage.GetTestStorage(t)
 
 	tx := stateStorage.BeginTransaction()
 	ctx := storage.InjectStateTransaction(context.Background(), tx)
@@ -541,7 +541,7 @@ func TestShuffleMultiStage(t *testing.T) {
 }
 
 func TestShuffleWatermarks(t *testing.T) {
-	stateStorage := GetTestStorage(t)
+	stateStorage := storage.GetTestStorage(t)
 
 	tx := stateStorage.BeginTransaction()
 	ctx := context.Background()

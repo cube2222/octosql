@@ -64,15 +64,17 @@ func (sub *Subscription) ListenForChanges(ctx context.Context) error {
 var ErrChangeSent = errors.New("change sent")
 
 func (sub *Subscription) Close() error {
+	var err error
 	if sub.closed {
-		return sub.err
-	}
-	sub.cancel()
-	sub.wg.Wait()
-	err := <-sub.errors
+		err = sub.err
+	} else {
+		sub.cancel()
+		sub.wg.Wait()
+		err = <-sub.errors
 
-	sub.closed = true
-	sub.err = err
+		sub.closed = true
+		sub.err = err
+	}
 
 	if err == context.Canceled {
 		return nil

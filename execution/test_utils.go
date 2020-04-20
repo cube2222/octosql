@@ -424,11 +424,11 @@ func GetTestStream(t *testing.T, stateStorage storage.Storage, variables octosql
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, task := range execOutput.TasksToRun {
-		go task()
-	}
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
+	}
+	for _, task := range execOutput.TasksToRun {
+		go task()
 	}
 	return stream
 }

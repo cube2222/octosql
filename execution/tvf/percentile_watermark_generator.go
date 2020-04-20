@@ -74,7 +74,7 @@ func (w *PercentileWatermarkGenerator) Get(ctx context.Context, variables octosq
 		frequency:  frequency.AsInt(),
 	}
 
-	return ws, execution.NewExecutionOutput(ws, execOutput.NextShuffles), nil // watermark generator stream now indicates new watermark source
+	return ws, execution.NewExecutionOutput(ws, execOutput.NextShuffles, execOutput.TasksToRun), nil // watermark generator stream now indicates new watermark source
 }
 
 // The way this watermark generator is working is following:

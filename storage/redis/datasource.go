@@ -121,13 +121,13 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		}
 	}
 
-	go func() {
-		log.Println("worker start")
-		rs.RunWorker(ctx)
-		log.Println("worker done")
-	}()
-
-	return rs, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator(), map[string]execution.ShuffleData{}), nil
+	return rs,
+		execution.NewExecutionOutput(
+			execution.NewZeroWatermarkGenerator(),
+			map[string]execution.ShuffleData{},
+			[]execution.Task{func() error { rs.RunWorker(ctx); return nil }},
+		),
+		nil
 }
 
 type RecordStream struct {

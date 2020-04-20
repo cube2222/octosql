@@ -115,9 +115,14 @@ func (node *LookupJoin) Get(ctx context.Context, variables octosql.Variables, st
 
 	// Run the pull engine which supplies this lookup join with records which are in need of joining.
 	engine := NewPullEngine(rs, node.stateStorage, sourceStream, streamID, execOutput.WatermarkSource, true)
-	go engine.Run(ctx)
 
-	return engine, NewExecutionOutput(engine, execOutput.NextShuffles), nil
+	return engine,
+		NewExecutionOutput(
+			engine,
+			execOutput.NextShuffles,
+			append(execOutput.TasksToRun, func() error { engine.Run(ctx); return nil }),
+		),
+		nil
 }
 
 type LookupJoinStream struct {

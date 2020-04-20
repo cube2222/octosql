@@ -4,13 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math/rand"
-	"os"
 	"sort"
 	"strings"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
@@ -289,10 +286,10 @@ type DummyNode struct {
 
 func (dn *DummyNode) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
 	if dn.data == nil {
-		return NewInMemoryStream(ctx, []*Record{}), NewExecutionOutput(NewZeroWatermarkGenerator(), map[string]ShuffleData{}), nil
+		return NewInMemoryStream(ctx, []*Record{}), NewExecutionOutput(NewZeroWatermarkGenerator(), map[string]ShuffleData{}, nil), nil
 	}
 
-	return NewInMemoryStream(ctx, dn.data), NewExecutionOutput(NewZeroWatermarkGenerator(), map[string]ShuffleData{}), nil
+	return NewInMemoryStream(ctx, dn.data), NewExecutionOutput(NewZeroWatermarkGenerator(), map[string]ShuffleData{}, nil), nil
 }
 
 func NewDummyValue(value octosql.Value) *DummyValue {
@@ -408,17 +405,31 @@ func ReadAllWithCount(ctx context.Context, stateStorage storage.Storage, stream 
 	return records, nil
 }
 
-func GetTestStorage(t *testing.T) storage.Storage {
-	dirname := fmt.Sprintf("testdb/%d", rand.Int())
-	err := os.MkdirAll(dirname, os.ModePerm)
-	if err != nil {
-		t.Fatal("couldn't create temporary directory: ", err)
+type GetTestStreamOption func(*StreamID)
+
+func GetTestStreamWithStreamID(id *StreamID) GetTestStreamOption {
+	return func(old *StreamID) {
+		*old = *id
+	}
+}
+
+func GetTestStream(t *testing.T, stateStorage storage.Storage, variables octosql.Variables, node Node, opts ...GetTestStreamOption) RecordStream {
+	streamID := GetRawStreamID()
+	for _, opt := range opts {
+		opt(streamID)
 	}
 
-	opts := badger.DefaultOptions(dirname)
-	db, err := badger.Open(opts)
+	tx := stateStorage.BeginTransaction()
+	stream, execOutput, err := node.Get(storage.InjectStateTransaction(context.Background(), tx), variables, streamID)
 	if err != nil {
-		t.Fatal("couldn't open in-memory badger database: ", err)
+		t.Fatal(err)
 	}
-	return storage.NewBadgerStorage(db)
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, task := range execOutput.TasksToRun {
+		go task()
+	}
+	return stream
 }

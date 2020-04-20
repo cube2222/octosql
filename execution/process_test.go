@@ -2,10 +2,9 @@ package execution
 
 import (
 	"context"
-	"log"
 	"testing"
+	"time"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/stretchr/testify/assert"
@@ -41,15 +40,7 @@ func GetElementAssertNoError(t *testing.T, ctx context.Context, queue *OutputQue
 }
 
 func TestOutputQueue_Ok(t *testing.T) {
-	opts := badger.DefaultOptions("test")
-	opts.InMemory = true
-	opts.Dir = ""
-	opts.ValueDir = ""
-	db, err := badger.Open(opts)
-	if err != nil {
-		log.Fatal(err)
-	}
-	stateStorage := storage.NewBadgerStorage(db)
+	stateStorage := storage.GetTestStorage(t)
 	ctx := context.Background()
 
 	{
@@ -81,15 +72,7 @@ func TestOutputQueue_Ok(t *testing.T) {
 }
 
 func TestOutputQueue_AbortTransaction(t *testing.T) {
-	opts := badger.DefaultOptions("test")
-	opts.InMemory = true
-	opts.Dir = ""
-	opts.ValueDir = ""
-	db, err := badger.Open(opts)
-	if err != nil {
-		log.Fatal(err)
-	}
-	stateStorage := storage.NewBadgerStorage(db)
+	stateStorage := storage.GetTestStorage(t)
 	ctx := context.Background()
 
 	{
@@ -132,15 +115,7 @@ func TestOutputQueue_AbortTransaction(t *testing.T) {
 }
 
 func TestOutputQueue_NewTransactionRequired(t *testing.T) {
-	opts := badger.DefaultOptions("test")
-	opts.InMemory = true
-	opts.Dir = ""
-	opts.ValueDir = ""
-	db, err := badger.Open(opts)
-	if err != nil {
-		log.Fatal(err)
-	}
-	stateStorage := storage.NewBadgerStorage(db)
+	stateStorage := storage.GetTestStorage(t)
 	ctx := context.Background()
 
 	{
@@ -167,22 +142,15 @@ func TestOutputQueue_NewTransactionRequired(t *testing.T) {
 	}
 }
 
-/*func TestOutputQueue_WaitForChanges(t *testing.T) {
-	opts := badger.DefaultOptions("test")
-	opts.InMemory = true
-	opts.Dir = ""
-	opts.ValueDir = ""
-	db, err := badger.Open(opts)
-	if err != nil {
-		log.Fatal(err)
-	}
-	stateStorage := storage.NewBadgerStorage(db)
+func TestOutputQueue_WaitForChanges(t *testing.T) {
+	stateStorage := storage.GetTestStorage(t)
 	ctx := context.Background()
 
 	{
 		readTx := stateStorage.BeginTransaction()
 		readQueue := NewOutputQueue(readTx)
-		_, err := readQueue.Pop(ctx)
+		var phantom octosql.Value
+		err := readQueue.Pop(ctx, &phantom)
 		assert.IsType(t, err, &ErrWaitForChanges{})
 		readTx.Abort()
 
@@ -217,4 +185,4 @@ func TestOutputQueue_NewTransactionRequired(t *testing.T) {
 			assert.Nil(t, err)
 		}
 	}
-}*/
+}

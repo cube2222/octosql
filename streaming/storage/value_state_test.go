@@ -2,29 +2,17 @@ package storage
 
 import (
 	"log"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/cube2222/octosql"
-	"github.com/dgraph-io/badger/v2"
 )
 
 func TestValueState(t *testing.T) {
 	prefix := []byte("test_value_store")
-	path := "test_value_store"
-	db, err := badger.Open(badger.DefaultOptions(path))
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	defer func() {
-		_ = db.Close()
-		_ = os.RemoveAll(path)
-	}()
-
-	store := NewBadgerStorage(db)
-	txn := store.BeginTransaction().WithPrefix([]byte(prefix))
+	store := GetTestStorage(t)
+	txn := store.BeginTransaction().WithPrefix(prefix)
 
 	vs := NewValueState(txn)
 
@@ -49,7 +37,7 @@ func TestValueState(t *testing.T) {
 	var targetValue octosql.Value
 
 	for _, value := range values {
-		err = vs.Set(&value)
+		err := vs.Set(&value)
 		if err != nil {
 			log.Fatal(err)
 		}

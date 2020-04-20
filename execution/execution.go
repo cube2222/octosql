@@ -11,10 +11,21 @@ import (
 	"github.com/pkg/errors"
 )
 
+type Task func() error
+
 // This struct represents additional metadata to be returned with Get() and used recursively (like WatermarkSource)
 type ExecutionOutput struct {
+	// Watermark source is the highest (in the execution tree)
+	// watermark source available, which the record consumer should consume.
 	WatermarkSource WatermarkSource
-	NextShuffles    map[string]ShuffleData
+
+	// Next shuffles contains information about the next shuffles down the execution plan
+	// which need to be started.
+	NextShuffles map[string]ShuffleData
+
+	// Tasks to run are functions which need to be run asynchronously,
+	// after the storage initialization has been committed (and will thus be available for reading).
+	TasksToRun []Task
 }
 
 type ShuffleData struct {
@@ -23,10 +34,11 @@ type ShuffleData struct {
 	Variables octosql.Variables
 }
 
-func NewExecutionOutput(ws WatermarkSource, nextShuffles map[string]ShuffleData) *ExecutionOutput {
+func NewExecutionOutput(ws WatermarkSource, nextShuffles map[string]ShuffleData, tasksToRun []Task) *ExecutionOutput {
 	return &ExecutionOutput{
 		WatermarkSource: ws,
 		NextShuffles:    nextShuffles,
+		TasksToRun:      tasksToRun,
 	}
 }
 

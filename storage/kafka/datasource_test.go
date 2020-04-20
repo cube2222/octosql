@@ -109,10 +109,7 @@ func TestRecordStream_Next(t *testing.T) {
 	for _, tt := range tests {
 		t.Run("kafka test", func(t *testing.T) {
 			ctx := context.Background()
-			stateStorage := execution.GetTestStorage(t)
-			defer func() {
-				go stateStorage.Close()
-			}()
+			stateStorage := storage.GetTestStorage(t)
 
 			brokers := []string{"localhost:9092"}
 
@@ -159,11 +156,9 @@ func TestRecordStream_Next(t *testing.T) {
 				stateStorage: stateStorage,
 			}
 
+			rs := execution.GetTestStream(t, stateStorage, octosql.NoVariables(), node, execution.GetTestStreamWithStreamID(streamID))
+
 			tx := stateStorage.BeginTransaction()
-			rs, _, err := node.Get(storage.InjectStateTransaction(ctx, tx), octosql.NoVariables(), streamID)
-			if err != nil {
-				t.Fatal(err)
-			}
 			want, _, err := execution.NewDummyNode(tt.want).Get(storage.InjectStateTransaction(ctx, tx), octosql.NoVariables(), execution.GetRawStreamID())
 			if err := tx.Commit(); err != nil {
 				t.Fatal(err)

@@ -2,6 +2,9 @@ package storage
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
+	"os"
 	"testing"
 	"time"
 
@@ -25,10 +28,13 @@ func TestConcatSubscriptions(t *testing.T) {
 	cKey := []byte("c-key")
 	cValue := []byte("c-value")
 
-	opts := badger.DefaultOptions("")
-	opts.Dir = ""
-	opts.ValueDir = ""
-	opts.InMemory = true
+	dirname := fmt.Sprintf("testdb/%d", rand.Int())
+	err := os.MkdirAll(dirname, os.ModePerm)
+	if err != nil {
+		t.Fatal("couldn't create temporary directory: ", err)
+	}
+
+	opts := badger.DefaultOptions(dirname)
 	db, err := badger.Open(opts)
 	if err != nil {
 		t.Fatal(err)

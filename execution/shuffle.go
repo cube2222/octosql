@@ -26,12 +26,18 @@ func GetAndStartAllShuffles(ctx context.Context, stateStorage storage.Storage, n
 		return nil, nil, errors.Wrap(err, "couldn't get next shuffle id")
 	}
 
+	if err := tx.Commit(); err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't commit transaction to get initial next shuffle id")
+	}
+
 	nextShuffles := make(map[string]ShuffleData)
 
 	// We start the head node to possibly get the first shuffle
 	outRecordStreams := make([]RecordStream, len(nodes))
 	outExecOutputs := make([]*ExecutionOutput, len(nodes))
 	for partition, node := range nodes {
+		tx := stateStorage.BeginTransaction()
+
 		sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(rootShuffleID.AsPrefix()), octosql.MakeString(fmt.Sprintf("shuffle_input_%d", partition)))
 		if err != nil {
 			return nil, nil, errors.Wrapf(err, "couldn't get new source stream ID for shuffle with ID %s", rootShuffleID.Id)
@@ -48,16 +54,20 @@ func GetAndStartAllShuffles(ctx context.Context, stateStorage storage.Storage, n
 			return nil, nil, errors.Wrapf(err, "couldn't get new source stream for shuffle with ID %s", rootShuffleID.Id)
 		}
 
+		if err := tx.Commit(); err != nil {
+			return nil, nil, errors.Wrapf(err, "couldn't commit transaction to get first shuffle output with partition %d", partition)
+		}
+
+		for _, task := range execOutput.TasksToRun {
+			go task() // TODO: Error handling, or maybe gather in main?
+		}
+
 		for id, data := range execOutput.NextShuffles {
 			nextShuffles[id] = data
 		}
 
 		outRecordStreams[partition] = rs
 		outExecOutputs[partition] = execOutput
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't commit transaction to get first shuffle outputs")
 	}
 
 	// Now iteratively start all shuffles.
@@ -130,7 +140,7 @@ func (s *Shuffle) Get(ctx context.Context, variables octosql.Variables, streamID
 			Variables: variables,
 			ShuffleID: pipelineMetadata.NextShuffleID,
 		},
-	})
+	}, nil)
 
 	return receiver, execOutput, nil
 }
@@ -187,6 +197,10 @@ func (s *Shuffle) StartSources(ctx context.Context, stateStorage storage.Storage
 
 		if err := tx.Commit(); err != nil {
 			return nil, errors.Wrapf(err, "couldn't commit transaction to run shuffle sender from partition %d", partition)
+		}
+
+		for _, task := range execOutput.TasksToRun {
+			go task() // TODO: Error handling, or maybe gather in main?
 		}
 
 		// Start the shuffle sender.

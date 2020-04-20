@@ -17,6 +17,7 @@ type DataSourceConfig struct {
 type Config struct {
 	DataSources []DataSourceConfig     `yaml:"dataSources"`
 	Execution   map[string]interface{} `yaml:"execution"`
+	Physical    map[string]interface{} `yaml:"physical"`
 }
 
 func (config *Config) GetDataSourceConfig(name string) (map[string]interface{}, error) {

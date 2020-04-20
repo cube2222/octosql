@@ -33,8 +33,8 @@ func (node *InnerJoin) Physical(ctx context.Context, physicalCreator *PhysicalPl
 		return nil, nil, errors.Wrap(err, "couldn't merge variables for source and joined nodes")
 	}
 
-	sourceShuffled := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
-	joinedShuffled := physical.NewShuffle(1, joinedNodes, physical.DefaultShuffleStrategy)
+	sourceShuffled := physical.NewShuffle(1, physical.NewConstantStrategy(0), sourceNodes)
+	joinedShuffled := physical.NewShuffle(1, physical.NewConstantStrategy(0), joinedNodes)
 	outNodes := make([]physical.Node, len(sourceShuffled))
 	for i := range sourceShuffled {
 		outNodes[i] = physical.NewInnerJoin(sourceShuffled[i], joinedShuffled[i])

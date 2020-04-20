@@ -47,6 +47,7 @@ func (bs *BadgerStorage) Subscribe(ctx context.Context) *Subscription {
 		return bs.db.Subscribe(ctx, func(kv *badger.KVList) error {
 			select {
 			case changes <- struct{}{}:
+				return ErrChangeSent
 			case <-ctx.Done():
 				return ctx.Err()
 			}

@@ -20,10 +20,13 @@ func (id *StreamID) AsPrefix() []byte {
 
 var inputStreamIDPrefix = []byte("$input$")
 
+func GetRawStringID() string {
+	return ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader).String()
+}
+
 // GetRawStreamID can be used to get a new random StreamID without saving it.
 func GetRawStreamID() *StreamID {
-	id := ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader)
-	return NewStreamID(id.String())
+	return NewStreamID(GetRawStringID())
 }
 
 // NewStreamID can be used to create a StreamID without saving it.
@@ -35,21 +38,37 @@ func NewStreamID(str string) *StreamID {
 
 // GetSourceStreamID loads the StreamID of the given input stream in case it exists (from a previous run maybe?)
 // Otherwise it allocates a new StreamID and saves it.
-func GetSourceStreamID(tx storage.StateTransaction, inputName octosql.Value) (*StreamID, error) {
+func GetSourceStringID(tx storage.StateTransaction, inputName octosql.Value) (string, error) {
 	sourceStreamMap := storage.NewMap(tx.WithPrefix(inputStreamIDPrefix))
 
-	var streamID StreamID
-	err := sourceStreamMap.Get(&inputName, &streamID)
+	var id octosql.Value
+	err := sourceStreamMap.Get(&inputName, &id)
 	if err == storage.ErrNotFound {
-		streamID = *GetRawStreamID()
+		id = octosql.MakeString(GetRawStringID())
 
-		err := sourceStreamMap.Set(&inputName, &streamID)
+		err := sourceStreamMap.Set(&inputName, &id)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't set new stream id")
+			return "", errors.Wrap(err, "couldn't set new id")
 		}
 	} else if err != nil {
-		return nil, errors.Wrap(err, "couldn't get current value for stream id")
+		return "", errors.Wrap(err, "couldn't get current value for id")
 	}
 
-	return &streamID, nil
+	return id.AsString(), nil
+}
+
+func GetSourceStreamID(tx storage.StateTransaction, inputName octosql.Value) (*StreamID, error) {
+	id, err := GetSourceStringID(tx, inputName)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get stream id")
+	}
+	return NewStreamID(id), nil
+}
+
+func GetSourceShuffleID(tx storage.StateTransaction, inputName octosql.Value) (*ShuffleID, error) {
+	id, err := GetSourceStringID(tx, inputName)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get stream id")
+	}
+	return NewShuffleID(id), nil
 }

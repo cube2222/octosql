@@ -32,7 +32,7 @@ func (node *Offset) Physical(ctx context.Context, physicalCreator *PhysicalPlanC
 	}
 
 	// Offset operates on a single, joined stream.
-	outNodes := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
+	outNodes := physical.NewShuffle(1, physical.NewConstantStrategy(0), sourceNodes)
 
 	return []physical.Node{physical.NewOffset(outNodes[0], offsetExpr)}, variables, nil
 }

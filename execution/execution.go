@@ -14,11 +14,19 @@ import (
 // This struct represents additional metadata to be returned with Get() and used recursively (like WatermarkSource)
 type ExecutionOutput struct {
 	WatermarkSource WatermarkSource
+	NextShuffles    map[string]ShuffleData
 }
 
-func NewExecutionOutput(ws WatermarkSource) *ExecutionOutput {
+type ShuffleData struct {
+	ShuffleID *ShuffleID
+	Shuffle   *Shuffle
+	Variables octosql.Variables
+}
+
+func NewExecutionOutput(ws WatermarkSource, nextShuffles map[string]ShuffleData) *ExecutionOutput {
 	return &ExecutionOutput{
 		WatermarkSource: ws,
+		NextShuffles:    nextShuffles,
 	}
 }
 
@@ -218,4 +226,31 @@ func (alExpr *AliasedExpression) ExpressionValue(ctx context.Context, variables 
 
 func (alExpr *AliasedExpression) Name() octosql.VariableName {
 	return alExpr.name
+}
+
+type RecordExpression struct{}
+
+func NewRecordExpression() Expression {
+	return &RecordExpression{}
+}
+
+func (re *RecordExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
+	fields := variables.DeterministicOrder()
+	fieldValues := make([]octosql.Value, 0)
+	values := make([]octosql.Value, 0)
+
+	for _, f := range fields {
+		if f.Source() == "sys" { // TODO: some better way to do this?
+			continue
+		}
+
+		v, _ := variables.Get(f)
+		values = append(values, v)
+		fieldValues = append(fieldValues, octosql.MakeString(f.String()))
+	}
+
+	fieldTuple := octosql.MakeTuple(fieldValues)
+	valueTuple := octosql.MakeTuple(values)
+
+	return octosql.MakeTuple([]octosql.Value{fieldTuple, valueTuple}), nil
 }

@@ -58,7 +58,7 @@ func (ob *OrderBy) Get(ctx context.Context, variables octosql.Variables, streamI
 		return nil, nil, errors.Wrap(err, "couldn't get source stream ID")
 	}
 
-	sourceStream, _, err := ob.source.Get(ctx, variables, sourceStreamID)
+	sourceStream, execOutput, err := ob.source.Get(ctx, variables, sourceStreamID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get underlying stream in order by")
 	}
@@ -68,7 +68,7 @@ func (ob *OrderBy) Get(ctx context.Context, variables octosql.Variables, streamI
 		return nil, nil, errors.Wrap(err, "couldn't create ordered stream from source stream")
 	}
 
-	return orderedStream, NewExecutionOutput(NewZeroWatermarkGenerator()), nil
+	return orderedStream, NewExecutionOutput(NewZeroWatermarkGenerator(), execOutput.NextShuffles), nil
 }
 
 func createOrderedStream(ctx context.Context, expressions []Expression, directions []OrderDirection, variables octosql.Variables, sourceStream RecordStream) (stream RecordStream, outErr error) {

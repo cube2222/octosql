@@ -289,10 +289,10 @@ type DummyNode struct {
 
 func (dn *DummyNode) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
 	if dn.data == nil {
-		return NewInMemoryStream(ctx, []*Record{}), NewExecutionOutput(NewZeroWatermarkGenerator()), nil
+		return NewInMemoryStream(ctx, []*Record{}), NewExecutionOutput(NewZeroWatermarkGenerator(), map[string]ShuffleData{}), nil
 	}
 
-	return NewInMemoryStream(ctx, dn.data), NewExecutionOutput(NewZeroWatermarkGenerator()), nil
+	return NewInMemoryStream(ctx, dn.data), NewExecutionOutput(NewZeroWatermarkGenerator(), map[string]ShuffleData{}), nil
 }
 
 func NewDummyValue(value octosql.Value) *DummyValue {
@@ -322,12 +322,10 @@ func ReadAll(ctx context.Context, stateStorage storage.Storage, stream RecordStr
 			log.Println("no record: ", err)
 		}
 		if err == ErrEndOfStream {
-			log.Println("breaking")
 			err := tx.Commit()
 			if err != nil {
-				return nil, errors.Wrap(err, "couldn't commit transaction")
+				continue
 			}
-			log.Println("committed")
 			break
 		} else if errors.Cause(err) == ErrNewTransactionRequired {
 			err := tx.Commit()
@@ -355,7 +353,7 @@ func ReadAll(ctx context.Context, stateStorage storage.Storage, stream RecordStr
 
 		err = tx.Commit()
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't commit transaction")
+			continue
 		}
 
 		records = append(records, rec)
@@ -418,7 +416,6 @@ func GetTestStorage(t *testing.T) storage.Storage {
 	}
 
 	opts := badger.DefaultOptions(dirname)
-	opts.CompactL0OnClose = false
 	db, err := badger.Open(opts)
 	if err != nil {
 		t.Fatal("couldn't open in-memory badger database: ", err)

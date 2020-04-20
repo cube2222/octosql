@@ -136,7 +136,7 @@ func TestPercentileWatermarkGenerator_Get(t *testing.T) {
 				frequency:  tt.fields.frequency,
 			}
 
-			stateStorage := execution.GetTestStorage(t)
+			stateStorage := storage.GetTestStorage(t)
 
 			tx := stateStorage.BeginTransaction()
 			ctx := storage.InjectStateTransaction(ctx, tx)
@@ -239,7 +239,7 @@ func TestPercentileWatermarkGenerator_Stream(t *testing.T) {
 				frequency:  tt.fields.frequency,
 			}
 
-			stateStorage := execution.GetTestStorage(t)
+			stateStorage := storage.GetTestStorage(t)
 
 			tx := stateStorage.BeginTransaction()
 			ctx := storage.InjectStateTransaction(ctx, tx)
@@ -353,7 +353,7 @@ func TestPercentileWatermarkGeneratorStream_GetWatermark(t *testing.T) {
 		frequency:  frequency,
 	}
 
-	stateStorage := execution.GetTestStorage(t)
+	stateStorage := storage.GetTestStorage(t)
 
 	tx := stateStorage.BeginTransaction()
 	ctx = storage.InjectStateTransaction(ctx, tx)

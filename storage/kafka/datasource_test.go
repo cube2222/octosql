@@ -109,7 +109,7 @@ func TestRecordStream_Next(t *testing.T) {
 	for _, tt := range tests {
 		t.Run("kafka test", func(t *testing.T) {
 			ctx := context.Background()
-			stateStorage := execution.GetTestStorage(t)
+			stateStorage := storage.GetTestStorage(t)
 
 			brokers := []string{"localhost:9092"}
 

@@ -89,7 +89,7 @@ func TestWatermarkGenerator_Get(t *testing.T) {
 				offset:    tt.fields.offset,
 			}
 
-			stateStorage := execution.GetTestStorage(t)
+			stateStorage := storage.GetTestStorage(t)
 
 			tx := stateStorage.BeginTransaction()
 			ctx := storage.InjectStateTransaction(ctx, tx)
@@ -152,7 +152,7 @@ func TestWatermarkGeneratorStream_GetWatermark(t *testing.T) {
 		offset:    offset,
 	}
 
-	stateStorage := execution.GetTestStorage(t)
+	stateStorage := storage.GetTestStorage(t)
 
 	tx := stateStorage.BeginTransaction()
 	ctx = storage.InjectStateTransaction(ctx, tx)

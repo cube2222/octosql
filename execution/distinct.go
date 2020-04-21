@@ -3,9 +3,10 @@ package execution
 import (
 	"context"
 
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
-	"github.com/pkg/errors"
 )
 
 type Distinct struct {
@@ -53,10 +54,15 @@ func (node *Distinct) Get(ctx context.Context, variables octosql.Variables, stre
 		variables:       variables,
 	}
 
-	distinctPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, execOutput.WatermarkSource)
-	go distinctPullEngine.Run(ctx) // TODO: .Close() should kill this context and the goroutine.
+	distinctPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, execOutput.WatermarkSource, true)
 
-	return distinctPullEngine, NewExecutionOutput(distinctPullEngine), nil
+	return distinctPullEngine,
+		NewExecutionOutput(
+			distinctPullEngine,
+			execOutput.NextShuffles,
+			append(execOutput.TasksToRun, func() error { distinctPullEngine.Run(ctx); return nil }),
+		),
+		nil
 }
 
 type DistinctStream struct {
@@ -236,27 +242,4 @@ func (ds *DistinctStream) Trigger(ctx context.Context, tx storage.StateTransacti
 
 	// Otherwise we the record was triggered and it's still present, so we don't do anything
 	return nil, nil
-}
-
-type RecordExpression struct{}
-
-func (re *RecordExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
-	fields := variables.DeterministicOrder()
-	fieldValues := make([]octosql.Value, 0)
-	values := make([]octosql.Value, 0)
-
-	for _, f := range fields {
-		if f.Source() == "sys" { // TODO: some better way to do this?
-			continue
-		}
-
-		v, _ := variables.Get(f)
-		values = append(values, v)
-		fieldValues = append(fieldValues, octosql.MakeString(f.String()))
-	}
-
-	fieldTuple := octosql.MakeTuple(fieldValues)
-	valueTuple := octosql.MakeTuple(values)
-
-	return octosql.MakeTuple([]octosql.Value{fieldTuple, valueTuple}), nil
 }

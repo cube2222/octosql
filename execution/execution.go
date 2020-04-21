@@ -11,14 +11,34 @@ import (
 	"github.com/pkg/errors"
 )
 
+type Task func() error
+
 // This struct represents additional metadata to be returned with Get() and used recursively (like WatermarkSource)
 type ExecutionOutput struct {
+	// Watermark source is the highest (in the execution tree)
+	// watermark source available, which the record consumer should consume.
 	WatermarkSource WatermarkSource
+
+	// Next shuffles contains information about the next shuffles down the execution plan
+	// which need to be started.
+	NextShuffles map[string]ShuffleData
+
+	// Tasks to run are functions which need to be run asynchronously,
+	// after the storage initialization has been committed (and will thus be available for reading).
+	TasksToRun []Task
 }
 
-func NewExecutionOutput(ws WatermarkSource) *ExecutionOutput {
+type ShuffleData struct {
+	ShuffleID *ShuffleID
+	Shuffle   *Shuffle
+	Variables octosql.Variables
+}
+
+func NewExecutionOutput(ws WatermarkSource, nextShuffles map[string]ShuffleData, tasksToRun []Task) *ExecutionOutput {
 	return &ExecutionOutput{
 		WatermarkSource: ws,
+		NextShuffles:    nextShuffles,
+		TasksToRun:      tasksToRun,
 	}
 }
 
@@ -218,4 +238,31 @@ func (alExpr *AliasedExpression) ExpressionValue(ctx context.Context, variables 
 
 func (alExpr *AliasedExpression) Name() octosql.VariableName {
 	return alExpr.name
+}
+
+type RecordExpression struct{}
+
+func NewRecordExpression() Expression {
+	return &RecordExpression{}
+}
+
+func (re *RecordExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
+	fields := variables.DeterministicOrder()
+	fieldValues := make([]octosql.Value, 0)
+	values := make([]octosql.Value, 0)
+
+	for _, f := range fields {
+		if f.Source() == "sys" { // TODO: some better way to do this?
+			continue
+		}
+
+		v, _ := variables.Get(f)
+		values = append(values, v)
+		fieldValues = append(fieldValues, octosql.MakeString(f.String()))
+	}
+
+	fieldTuple := octosql.MakeTuple(fieldValues)
+	valueTuple := octosql.MakeTuple(values)
+
+	return octosql.MakeTuple([]octosql.Value{fieldTuple, valueTuple}), nil
 }

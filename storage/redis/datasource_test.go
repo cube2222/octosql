@@ -635,7 +635,7 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			wantErr: false,
 		},
-		{
+		/*{
 			name: "wrong - no variables",
 			fields: fields{
 				hostname: hostname,
@@ -662,7 +662,7 @@ func TestDataSource_Get(t *testing.T) {
 			},
 			want:    nil,
 			wantErr: true,
-		},
+		},*/
 		/*{
 			name: "wrong password",
 			fields: fields{
@@ -776,10 +776,7 @@ func TestDataSource_Get(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stateStorage := execution.GetTestStorage(t)
-			defer func() {
-				go stateStorage.Close()
-			}()
+			stateStorage := storage.GetTestStorage(t)
 
 			client := redis.NewClient(
 				&redis.Options{
@@ -842,17 +839,9 @@ func TestDataSource_Get(t *testing.T) {
 				return
 			}
 
+			got := execution.GetTestStream(t, stateStorage, tt.args.variables, ds)
+
 			tx := stateStorage.BeginTransaction()
-			defer tx.Abort()
-
-			got, _, err := ds.Get(storage.InjectStateTransaction(ctx, tx), tt.args.variables, streamId)
-			if err != nil && !tt.wantErr {
-				t.Errorf("DataSource.Get() error: %v", err)
-				return
-			} else if err != nil {
-				return
-			}
-
 			want, _, err := execution.NewDummyNode(tt.want).Get(storage.InjectStateTransaction(ctx, tx), octosql.NoVariables(), streamId)
 			if err := tx.Commit(); err != nil {
 				t.Fatal(err)

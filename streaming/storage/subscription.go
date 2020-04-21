@@ -16,14 +16,15 @@ type Subscription struct {
 	changes <-chan struct{}
 	errors  <-chan error
 	closed  bool
+	err     error
 }
 
 type ChangesNotifierFunc func(ctx context.Context, changes chan<- struct{}) error
 
 func NewSubscription(ctx context.Context, subscriptionFunc ChangesNotifierFunc) *Subscription {
 	ctx, cancel := context.WithCancel(ctx)
-	changes := make(chan struct{})
-	errs := make(chan error, 1) // Buffered so there won't be a goroutine leak if nobody reads the error.
+	changes := make(chan struct{}, 1) // TODO: Buffered to fix stalling issue
+	errs := make(chan error, 1)       // Buffered so there won't be a goroutine leak if nobody reads the error.
 	sub := &Subscription{
 		cancel:  cancel,
 		changes: changes,
@@ -49,21 +50,35 @@ func (sub *Subscription) ListenForChanges(ctx context.Context) error {
 	case <-sub.changes:
 		return nil
 	case err := <-sub.errors:
+		sub.closed = true
+		sub.err = err
+		if err == ErrChangeSent {
+			return nil
+		}
 		return err
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 }
 
+var ErrChangeSent = errors.New("change sent")
+
 func (sub *Subscription) Close() error {
+	var err error
 	if sub.closed {
-		return errors.New("subscription already closed")
+		err = sub.err
+	} else {
+		sub.cancel()
+		sub.wg.Wait()
+		err = <-sub.errors
+
+		sub.closed = true
+		sub.err = err
 	}
-	sub.closed = true
-	sub.cancel()
-	sub.wg.Wait()
-	err := <-sub.errors
+
 	if err == context.Canceled {
+		return nil
+	} else if err == ErrChangeSent {
 		return nil
 	} else {
 		return err

@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
@@ -35,13 +34,13 @@ func NewApp(cfg *config.Config, dataSourceRepository *physical.DataSourceReposit
 }
 
 func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan logical.Node) error {
-	sourceNodes, variables, err := plan.Physical(ctx, logical.NewPhysicalPlanCreator(app.dataSourceRepository))
+	sourceNodes, variables, err := plan.Physical(ctx, logical.NewPhysicalPlanCreator(app.dataSourceRepository, app.cfg.Physical))
 	if err != nil {
 		return errors.Wrap(err, "couldn't create physical plan")
 	}
 
 	// We only want one partition at the end, to print the output easily.
-	shuffled := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
+	shuffled := physical.NewShuffle(1, physical.NewConstantStrategy(0), sourceNodes)
 
 	// Only the first partition is there.
 	var phys physical.Node = shuffled[0]
@@ -58,15 +57,9 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		return errors.Wrap(err, "couldn't materialize the physical plan into an execution plan")
 	}
 
-	programID := &execution.StreamID{Id: "root"}
-
-	tx := stateStorage.BeginTransaction()
-	stream, execOutput, err := exec.Get(storage.InjectStateTransaction(ctx, tx), variables, programID)
+	stream, execOutput, err := execution.GetAndStartAllShuffles(ctx, stateStorage, []execution.Node{exec}, variables)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get record stream from execution plan")
-	}
-	if err := tx.Commit(); err != nil {
-		return errors.Wrap(err, "couldn't commit transaction to get record stream from execution plan")
 	}
 
 	out := &badger.Output{
@@ -75,14 +68,16 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 
 	outStreamID := &execution.StreamID{Id: "output"}
 
-	pullEngine := execution.NewPullEngine(out, stateStorage, stream, outStreamID, execOutput.WatermarkSource)
+	pullEngine := execution.NewPullEngine(out, stateStorage, stream[0], outStreamID, execOutput[0].WatermarkSource, true)
 
 	go func() {
 		pullEngine.Run(ctx)
 	}()
 
 	printer := badger.NewStdOutPrinter(stateStorage.WithPrefix(outStreamID.AsPrefix()), out)
-	log.Fatal(printer.Run(ctx))
+	if err := printer.Run(ctx); err != nil {
+		return errors.Wrap(err, "couldn't run stdout printer")
+	}
 
 	return nil
 }

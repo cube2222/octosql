@@ -359,10 +359,7 @@ func TestDataSource_Get(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stateStorage := execution.GetTestStorage(t)
-			defer func() {
-				go stateStorage.Close()
-			}()
+			stateStorage := storage.GetTestStorage(t)
 
 			ds, err := NewDataSourceBuilderFactory()("test", tt.fields.alias)[0].Materialize(context.Background(), &physical.MaterializationContext{
 				Config: &config.Config{
@@ -386,15 +383,9 @@ func TestDataSource_Get(t *testing.T) {
 				t.Errorf("Error creating data source: %v", err)
 			}
 
+			got := execution.GetTestStream(t, stateStorage, octosql.NoVariables(), ds, execution.GetTestStreamWithStreamID(streamId))
+
 			tx := stateStorage.BeginTransaction()
-			defer tx.Abort()
-
-			got, _, err := ds.Get(storage.InjectStateTransaction(ctx, tx), octosql.NoVariables(), streamId)
-			if err != nil {
-				t.Errorf("DataSource.Get() error: %v", err)
-				return
-			}
-
 			want, _, err := execution.NewDummyNode(tt.want).Get(storage.InjectStateTransaction(ctx, tx), octosql.NoVariables(), streamId)
 			if err := tx.Commit(); err != nil {
 				t.Fatal(err)

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"sort"
 	"time"
 
@@ -35,7 +36,7 @@ func NewStdOutPrinter(stateStorage storage.Storage, recordsLister RecordsLister)
 }
 
 func (printer *StdOutPrinter) Run(ctx context.Context) error {
-	for range time.Tick(time.Second / 10) {
+	for range time.Tick(time.Second / 4) {
 		tx := printer.stateStorage.BeginTransaction()
 
 		var buf bytes.Buffer
@@ -97,7 +98,8 @@ func (printer *StdOutPrinter) Run(ctx context.Context) error {
 		if len(errorMessage) > 0 {
 			return errors.New(errorMessage)
 		} else if endOfStream {
-			return nil
+			_, err := buf.WriteTo(os.Stdout)
+			return err
 		}
 	}
 	panic("unreachable")

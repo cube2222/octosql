@@ -2,11 +2,8 @@ package aggregate
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
-
-	"github.com/dgraph-io/badger/v2"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
@@ -14,19 +11,11 @@ import (
 
 func TestSumInt(t *testing.T) {
 	ctx := context.Background()
-	db, err := badger.Open(badger.DefaultOptions("test"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		db.Close()
-		os.RemoveAll("test")
-	}()
 
 	prefix := []byte("sum")
 
-	badgerStorage := storage.NewBadgerStorage(db)
-	tx := badgerStorage.BeginTransaction().WithPrefix(prefix)
+	stateStorage := storage.GetTestStorage(t)
+	tx := stateStorage.BeginTransaction().WithPrefix(prefix)
 
 	aggr := NewSumAggregate()
 
@@ -90,19 +79,11 @@ func TestSumInt(t *testing.T) {
 
 func TestSumFloat(t *testing.T) {
 	ctx := context.Background()
-	db, err := badger.Open(badger.DefaultOptions("test"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		db.Close()
-		os.RemoveAll("test")
-	}()
 
 	prefix := []byte("sum")
 
-	badgerStorage := storage.NewBadgerStorage(db)
-	tx := badgerStorage.BeginTransaction().WithPrefix(prefix)
+	stateStorage := storage.GetTestStorage(t)
+	tx := stateStorage.BeginTransaction().WithPrefix(prefix)
 
 	aggr := NewSumAggregate()
 
@@ -153,19 +134,11 @@ func TestSumFloat(t *testing.T) {
 
 func TestSumDuration(t *testing.T) {
 	ctx := context.Background()
-	db, err := badger.Open(badger.DefaultOptions("test"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		db.Close()
-		os.RemoveAll("test")
-	}()
 
 	prefix := []byte("sum")
 
-	badgerStorage := storage.NewBadgerStorage(db)
-	tx := badgerStorage.BeginTransaction().WithPrefix(prefix)
+	stateStorage := storage.GetTestStorage(t)
+	tx := stateStorage.BeginTransaction().WithPrefix(prefix)
 
 	aggr := NewSumAggregate()
 
@@ -216,19 +189,11 @@ func TestSumDuration(t *testing.T) {
 
 func TestSumNasty(t *testing.T) {
 	ctx := context.Background()
-	db, err := badger.Open(badger.DefaultOptions("test"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		db.Close()
-		os.RemoveAll("test")
-	}()
 
 	prefix := []byte("sum")
 
-	badgerStorage := storage.NewBadgerStorage(db)
-	tx := badgerStorage.BeginTransaction().WithPrefix(prefix)
+	stateStorage := storage.GetTestStorage(t)
+	tx := stateStorage.BeginTransaction().WithPrefix(prefix)
 
 	aggr := NewSumAggregate()
 

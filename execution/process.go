@@ -2,7 +2,6 @@ package execution
 
 import (
 	"context"
-	"log"
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
@@ -90,7 +89,6 @@ func (p *ProcessByKey) triggerKeys(ctx context.Context, tx storage.StateTransact
 		}
 
 		for i := range records {
-			log.Printf("triggerKeys: record: %s", records[i].Show())
 			err := outputQueue.Push(ctx, &QueueElement{
 				Type: &QueueElement_Record{
 					Record: records[i],
@@ -168,7 +166,6 @@ func (p *ProcessByKey) UpdateWatermark(ctx context.Context, tx storage.StateTran
 		return errors.Wrap(err, "couldn't trigger keys")
 	}
 
-	log.Printf("triggerKeys: watermark: %v", watermark)
 	timestamp, err := ptypes.TimestampProto(watermark)
 	if err != nil {
 		return errors.Wrap(err, "couldn't convert time to proto timestamp")

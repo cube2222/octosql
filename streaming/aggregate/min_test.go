@@ -2,10 +2,7 @@ package aggregate
 
 import (
 	"context"
-	"os"
 	"testing"
-
-	"github.com/dgraph-io/badger/v2"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
@@ -13,19 +10,11 @@ import (
 
 func TestMinInt(t *testing.T) {
 	ctx := context.Background()
-	db, err := badger.Open(badger.DefaultOptions("test"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		db.Close()
-		os.RemoveAll("test")
-	}()
 
 	prefix := []byte("min")
 
-	badgerStorage := storage.NewBadgerStorage(db)
-	tx := badgerStorage.BeginTransaction().WithPrefix(prefix)
+	stateStorage := storage.GetTestStorage(t)
+	tx := stateStorage.BeginTransaction().WithPrefix(prefix)
 
 	aggr := NewMinAggregate()
 
@@ -133,19 +122,11 @@ func TestMinInt(t *testing.T) {
 
 func TestMinString(t *testing.T) {
 	ctx := context.Background()
-	db, err := badger.Open(badger.DefaultOptions("test"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		db.Close()
-		os.RemoveAll("test")
-	}()
 
 	prefix := []byte("min")
 
-	badgerStorage := storage.NewBadgerStorage(db)
-	tx := badgerStorage.BeginTransaction().WithPrefix(prefix)
+	stateStorage := storage.GetTestStorage(t)
+	tx := stateStorage.BeginTransaction().WithPrefix(prefix)
 
 	aggr := NewMinAggregate()
 
@@ -220,19 +201,11 @@ func TestMinString(t *testing.T) {
 
 func TestMinBool(t *testing.T) {
 	ctx := context.Background()
-	db, err := badger.Open(badger.DefaultOptions("test"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		db.Close()
-		os.RemoveAll("test")
-	}()
 
 	prefix := []byte("min")
 
-	badgerStorage := storage.NewBadgerStorage(db)
-	tx := badgerStorage.BeginTransaction().WithPrefix(prefix)
+	stateStorage := storage.GetTestStorage(t)
+	tx := stateStorage.BeginTransaction().WithPrefix(prefix)
 
 	aggr := NewMinAggregate()
 

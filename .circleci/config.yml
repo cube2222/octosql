@@ -21,7 +21,7 @@ version: 2
 jobs:
   lint:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.14
 
     working_directory: /go/src/github.com/cube2222/octosql
     steps:
@@ -32,7 +32,7 @@ jobs:
 
   test:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.14
     environment:
       GO111MODULE: "on"
 
@@ -50,10 +50,11 @@ jobs:
       - run: go test -v ./storage/json/...
       - run: go test -v ./storage/csv/...
       - run: go test -v ./storage/excel/...
+      - run: go test -v ./streaming/...
 
   test-mysql:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.14
         environment:
           GO111MODULE: "on"
       - image: circleci/mysql:latest
@@ -70,7 +71,7 @@ jobs:
 
   test-postgres:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.14
         environment:
           GO111MODULE: "on"
       - image: circleci/postgres:latest
@@ -87,7 +88,7 @@ jobs:
 
   test-redis:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.14
         environment:
           GO111MODULE: "on"
       - image: circleci/redis:latest
@@ -100,7 +101,7 @@ jobs:
 
   test-kafka:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.14
         environment:
           GO111MODULE: "on"
       - image: spotify/kafka:latest
@@ -113,7 +114,7 @@ jobs:
 
   release:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.14
     environment:
       GO111MODULE: "on"
 

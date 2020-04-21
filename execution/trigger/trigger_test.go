@@ -11,8 +11,8 @@ import (
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
-func RecordReceived(t *testing.T, ctx context.Context, trigger Trigger, badgerStorage *storage.BadgerStorage, key octosql.Value, eventTime time.Time) {
-	tx := badgerStorage.BeginTransaction()
+func RecordReceived(t *testing.T, ctx context.Context, trigger Trigger, stateStorage storage.Storage, key octosql.Value, eventTime time.Time) {
+	tx := stateStorage.BeginTransaction()
 	keys, err := trigger.PollKeysToFire(ctx, tx)
 	assert.Nil(t, keys)
 	assert.Nil(t, err)
@@ -21,31 +21,31 @@ func RecordReceived(t *testing.T, ctx context.Context, trigger Trigger, badgerSt
 	assert.Nil(t, tx.Commit())
 }
 
-func ExpectFire(t *testing.T, ctx context.Context, trigger Trigger, badgerStorage *storage.BadgerStorage, keys ...octosql.Value) {
-	tx := badgerStorage.BeginTransaction()
+func ExpectFire(t *testing.T, ctx context.Context, trigger Trigger, stateStorage storage.Storage, keys ...octosql.Value) {
+	tx := stateStorage.BeginTransaction()
 	k, err := trigger.PollKeysToFire(ctx, tx)
 	assert.Equal(t, keys, k)
 	assert.Nil(t, err)
 	assert.Nil(t, tx.Commit())
 }
 
-func ExpectNoFire(t *testing.T, ctx context.Context, trigger Trigger, badgerStorage *storage.BadgerStorage) {
-	tx := badgerStorage.BeginTransaction()
+func ExpectNoFire(t *testing.T, ctx context.Context, trigger Trigger, stateStorage storage.Storage) {
+	tx := stateStorage.BeginTransaction()
 	keys, err := trigger.PollKeysToFire(ctx, tx)
 	assert.Nil(t, keys)
 	assert.Nil(t, err)
 	assert.Nil(t, tx.Commit())
 }
 
-func UpdateWatermark(t *testing.T, ctx context.Context, trigger Trigger, badgerStorage *storage.BadgerStorage, watermark time.Time) {
-	tx := badgerStorage.BeginTransaction()
+func UpdateWatermark(t *testing.T, ctx context.Context, trigger Trigger, stateStorage storage.Storage, watermark time.Time) {
+	tx := stateStorage.BeginTransaction()
 	err := trigger.UpdateWatermark(ctx, tx, watermark)
 	assert.Nil(t, err)
 	assert.Nil(t, tx.Commit())
 }
 
-func KeyFired(t *testing.T, ctx context.Context, trigger Trigger, badgerStorage *storage.BadgerStorage, keys ...octosql.Value) {
-	tx := badgerStorage.BeginTransaction()
+func KeyFired(t *testing.T, ctx context.Context, trigger Trigger, stateStorage storage.Storage, keys ...octosql.Value) {
+	tx := stateStorage.BeginTransaction()
 	err := trigger.KeysFired(ctx, tx, keys)
 	assert.Nil(t, err)
 	assert.Nil(t, tx.Commit())

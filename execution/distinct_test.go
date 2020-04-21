@@ -600,40 +600,28 @@ func TestDistinct_Get(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stateStorage := GetTestStorage(t)
+			stateStorage := storage.GetTestStorage(t)
 			ctx := context.Background()
-
-			defer func() {
-				go stateStorage.Close()
-			}()
 
 			distinct := NewDistinct(stateStorage, tt.args.source, "")
 
+			stream := GetTestStream(t, stateStorage, octosql.NoVariables(), distinct)
+
 			tx := stateStorage.BeginTransaction()
-			stream, _, err := distinct.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
-			if err != nil {
-				t.Fatal(err)
-			}
-
 			wantStream := NewInMemoryStream(storage.InjectStateTransaction(context.Background(), tx), tt.want)
-
 			if err := tx.Commit(); err != nil {
 				t.Fatal(err)
 			}
 
 			if err := AreStreamsEqualNoOrdering(ctx, stateStorage, stream, wantStream); err != nil {
 				t.Fatal(err)
-
 			}
 		})
 	}
 }
 
 func TestDistinct_Retractions(t *testing.T) {
-	stateStorage := GetTestStorage(t)
-	defer func() {
-		go stateStorage.Close()
-	}()
+	stateStorage := storage.GetTestStorage(t)
 
 	ctx := context.Background()
 	fields := []octosql.VariableName{"string", "number"}
@@ -667,20 +655,15 @@ func TestDistinct_Retractions(t *testing.T) {
 
 	distinct := NewDistinct(stateStorage, source, "")
 
+	stream := GetTestStream(t, stateStorage, octosql.NoVariables(), distinct)
+
 	tx := stateStorage.BeginTransaction()
-
-	stream, _, err := distinct.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), GetRawStreamID())
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	wantStream := NewInMemoryStream(storage.InjectStateTransaction(context.Background(), tx), expectedOutput)
-
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}
 
-	err = AreStreamsEqualNoOrdering(ctx, stateStorage, stream, wantStream)
+	err := AreStreamsEqualNoOrdering(ctx, stateStorage, stream, wantStream)
 	if err != nil {
 		t.Fatal(err)
 	}

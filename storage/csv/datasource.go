@@ -94,6 +94,10 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		batchSize:       ds.batchSize,
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
+	rs.workerCtxCancel = cancel
+	rs.workerCloseErrChan = make(chan error)
+
 	return rs,
 		execution.NewExecutionOutput(
 			execution.NewZeroWatermarkGenerator(),
@@ -117,9 +121,19 @@ type RecordStream struct {
 	hasColumnHeader bool
 	offset          int
 	batchSize       int
+
+	workerCtxCancel    func()
+	workerCloseErrChan chan error
 }
 
 func (rs *RecordStream) Close(ctx context.Context, storage storage.Storage) error {
+	rs.workerCtxCancel()
+	err := <-rs.workerCloseErrChan
+	if err == context.Canceled {
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't stop csv worker")
+	}
+
 	if err := rs.file.Close(); err != nil {
 		return errors.Wrap(err, "couldn't close underlying file")
 	}
@@ -133,6 +147,13 @@ func (rs *RecordStream) Close(ctx context.Context, storage storage.Storage) erro
 
 func (rs *RecordStream) RunWorker(ctx context.Context) {
 	for { // outer for is loading offset value and moving file iterator
+		select {
+		case <-ctx.Done():
+			rs.workerCloseErrChan <- ctx.Err()
+			return
+		default:
+		}
+
 		tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
 
 		if err := rs.loadOffset(tx); err != nil {

@@ -146,9 +146,7 @@ func (o *Output) GetErrorMessage(ctx context.Context, tx storage.StateTransactio
 	return octoError.AsString(), nil
 }
 
-func (o *Output) Close(ctx context.Context) error {
-	storage := storage.GetStateTransactionFromContext(ctx).GetUnderlyingStorage()
-
+func (o *Output) Close(ctx context.Context, storage storage.Storage) error {
 	if err := storage.DropAll(recordsPrefix); err != nil {
 		return errors.Wrap(err, "couldn't clear storage with records prefix")
 	}

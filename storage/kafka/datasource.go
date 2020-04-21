@@ -174,6 +174,7 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			rs.workerCloseErrChan <- ctx.Err()
+			return
 		default:
 		}
 
@@ -380,7 +381,7 @@ func (rs *RecordStream) Close(ctx context.Context, storage storage.Storage) erro
 	err := <-rs.workerCloseErrChan
 	if err == context.Canceled {
 	} else if err != nil {
-		return errors.Wrap(err, "couldn't stop worker")
+		return errors.Wrap(err, "couldn't stop kafka worker")
 	}
 
 	// TODO - is this needed?

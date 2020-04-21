@@ -46,8 +46,8 @@ type MappedStream struct {
 	keep        bool
 }
 
-func (stream *MappedStream) Close(ctx context.Context) error {
-	if err := stream.source.Close(ctx); err != nil {
+func (stream *MappedStream) Close(ctx context.Context, storage storage.Storage) error {
+	if err := stream.source.Close(ctx, storage); err != nil {
 		return errors.Wrap(err, "couldn't close underlying stream")
 	}
 

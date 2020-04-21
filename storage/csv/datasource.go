@@ -119,12 +119,11 @@ type RecordStream struct {
 	batchSize       int
 }
 
-func (rs *RecordStream) Close(ctx context.Context) error {
+func (rs *RecordStream) Close(ctx context.Context, storage storage.Storage) error {
 	if err := rs.file.Close(); err != nil {
 		return errors.Wrap(err, "couldn't close underlying file")
 	}
 
-	storage := storage.GetStateTransactionFromContext(ctx).GetUnderlyingStorage()
 	if err := storage.DropAll(rs.streamID.AsPrefix()); err != nil {
 		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
 	}

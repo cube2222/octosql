@@ -371,8 +371,11 @@ func (rs *ShuffleReceiver) GetWatermark(ctx context.Context, tx storage.StateTra
 	return earliestWatermark, nil
 }
 
-func (rs *ShuffleReceiver) Close() error {
-	// TODO: Cleanup
+func (rs *ShuffleReceiver) Close(ctx context.Context, storage storage.Storage) error {
+	if err := storage.DropAll(rs.streamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
+	}
+
 	return nil
 }
 
@@ -477,8 +480,11 @@ func (node *ShuffleSender) MarkError(ctx context.Context, tx storage.StateTransa
 	return nil
 }
 
-func (node *ShuffleSender) Close() error {
-	// TODO: cleanup
+func (node *ShuffleSender) Close(ctx context.Context, storage storage.Storage) error {
+	if err := storage.DropAll(node.streamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
+	}
+
 	return nil
 }
 

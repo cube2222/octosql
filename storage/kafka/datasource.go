@@ -375,7 +375,7 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 	}
 }
 
-func (rs *RecordStream) Close(ctx context.Context) error {
+func (rs *RecordStream) Close(ctx context.Context, storage storage.Storage) error {
 	rs.workerCtxCancel()
 	err := <-rs.workerCloseErrChan
 	if err == context.Canceled {
@@ -388,7 +388,6 @@ func (rs *RecordStream) Close(ctx context.Context) error {
 		return errors.Wrap(err, "couldn't close underlying kafka reader")
 	}
 
-	storage := storage.GetStateTransactionFromContext(ctx).GetUnderlyingStorage()
 	if err := storage.DropAll(rs.streamID.AsPrefix()); err != nil {
 		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
 	}

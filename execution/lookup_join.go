@@ -657,8 +657,7 @@ func (rs *LookupJoinStream) MarkError(ctx context.Context, tx storage.StateTrans
 	return nil
 }
 
-func (rs *LookupJoinStream) Close(ctx context.Context) error {
-	storage := storage.GetStateTransactionFromContext(ctx).GetUnderlyingStorage()
+func (rs *LookupJoinStream) Close(ctx context.Context, storage storage.Storage) error {
 	if err := storage.DropAll(rs.streamID.AsPrefix()); err != nil {
 		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
 	}
@@ -738,6 +737,6 @@ func (j *JobOutputQueueIntermediateRecordStore) ReadyForMore(ctx context.Context
 	return nil
 }
 
-func (j *JobOutputQueueIntermediateRecordStore) Close(ctx context.Context) error {
+func (j *JobOutputQueueIntermediateRecordStore) Close(ctx context.Context, storage storage.Storage) error {
 	return nil // All storages used by this irs are prefixed by pull engine's streamID and therefore will be closed by him
 }

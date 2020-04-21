@@ -354,11 +354,12 @@ func TestPercentileWatermarkGeneratorStream_GetWatermark(t *testing.T) {
 	}
 
 	stateStorage := storage.GetTestStorage(t)
+	streamID := execution.GetRawStreamID()
 
 	tx := stateStorage.BeginTransaction()
 	ctx = storage.InjectStateTransaction(ctx, tx)
 
-	src, execOutput, err := wg.Get(ctx, variables, execution.GetRawStreamID())
+	src, execOutput, err := wg.Get(ctx, variables, streamID)
 	if err != nil {
 		t.Errorf("PercentileWatermarkGenerator.Get() error = %v", err)
 		return
@@ -367,6 +368,7 @@ func TestPercentileWatermarkGeneratorStream_GetWatermark(t *testing.T) {
 	assert.Equal(t, src, execOutput.WatermarkSource)
 
 	ws := execOutput.WatermarkSource
+	tx = tx.WithPrefix(streamID.AsPrefix())
 
 	// event times seen : 1, 0, 5, 3, 2, 2, 4, 1, 6, 8, 7, 9, 7, 8, 42
 

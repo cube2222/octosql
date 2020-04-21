@@ -49,8 +49,8 @@ type RequalifiedStream struct {
 // TODO: Do table name validation on logical -> physical plan transformation
 var simpleQualifierMatcher = regexp.MustCompile("[a-zA-Z0-9-_]+")
 
-func (stream *RequalifiedStream) Close(ctx context.Context) error {
-	if err := stream.source.Close(ctx); err != nil {
+func (stream *RequalifiedStream) Close(ctx context.Context, storage storage.Storage) error {
+	if err := stream.source.Close(ctx, storage); err != nil {
 		return errors.Wrap(err, "couldn't close underlying stream")
 	}
 

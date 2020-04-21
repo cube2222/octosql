@@ -104,7 +104,7 @@ var (
 )
 
 func (s *PercentileWatermarkGeneratorStream) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
-	watermarkStorage := storage.NewValueState(tx.WithPrefix(s.streamID.AsPrefix()).WithPrefix(percentileWatermarkPrefix))
+	watermarkStorage := storage.NewValueState(tx.WithPrefix(percentileWatermarkPrefix))
 
 	var currentWatermark octosql.Value
 	err := watermarkStorage.Get(&currentWatermark)
@@ -131,11 +131,12 @@ func (s *PercentileWatermarkGeneratorStream) Next(ctx context.Context) (*executi
 		return nil, fmt.Errorf("couldn't get time field '%v' as time, got: %v", s.timeField.String(), srcRecord.Value(s.timeField))
 	}
 
-	tx := storage.GetStateTransactionFromContext(ctx)
-	watermarkStorage := storage.NewValueState(tx.WithPrefix(s.streamID.AsPrefix()).WithPrefix(percentileWatermarkPrefix))
-	eventsStorage := storage.NewDeque(tx.WithPrefix(s.streamID.AsPrefix()).WithPrefix(percentileWatermarkEventsPrefix))
-	eventsCountStorage := storage.NewMap(tx.WithPrefix(s.streamID.AsPrefix()).WithPrefix(percentileWatermarkEventsCountPrefix))
-	eventsSeenStorage := storage.NewValueState(tx.WithPrefix(s.streamID.AsPrefix()).WithPrefix(percentileWatermarkEventsSeenPrefix))
+	tx := storage.GetStateTransactionFromContext(ctx).WithPrefix(s.streamID.AsPrefix())
+
+	watermarkStorage := storage.NewValueState(tx.WithPrefix(percentileWatermarkPrefix))
+	eventsStorage := storage.NewDeque(tx.WithPrefix(percentileWatermarkEventsPrefix))
+	eventsCountStorage := storage.NewMap(tx.WithPrefix(percentileWatermarkEventsCountPrefix))
+	eventsSeenStorage := storage.NewValueState(tx.WithPrefix(percentileWatermarkEventsSeenPrefix))
 
 	// Extracting eventsSeen value (remember: this equals to number of events seen before watermark update)
 	var eventsSeen octosql.Value
@@ -227,8 +228,8 @@ func (s *PercentileWatermarkGeneratorStream) Next(ctx context.Context) (*executi
 }
 
 func (s *PercentileWatermarkGeneratorStream) addNewestEvent(eventTimeValue octosql.Value, tx storage.StateTransaction) error {
-	eventsStorage := storage.NewDeque(tx.WithPrefix(s.streamID.AsPrefix()).WithPrefix(percentileWatermarkEventsPrefix))
-	eventsCountStorage := storage.NewMap(tx.WithPrefix(s.streamID.AsPrefix()).WithPrefix(percentileWatermarkEventsCountPrefix))
+	eventsStorage := storage.NewDeque(tx.WithPrefix(percentileWatermarkEventsPrefix))
+	eventsCountStorage := storage.NewMap(tx.WithPrefix(percentileWatermarkEventsCountPrefix))
 
 	// Adding to events deque
 	err := eventsStorage.PushBack(&eventTimeValue)
@@ -260,8 +261,8 @@ func (s *PercentileWatermarkGeneratorStream) addNewestEvent(eventTimeValue octos
 }
 
 func (s *PercentileWatermarkGeneratorStream) removeOldestEvent(tx storage.StateTransaction) error {
-	eventsStorage := storage.NewDeque(tx.WithPrefix(s.streamID.AsPrefix()).WithPrefix(percentileWatermarkEventsPrefix))
-	eventsCountStorage := storage.NewMap(tx.WithPrefix(s.streamID.AsPrefix()).WithPrefix(percentileWatermarkEventsCountPrefix))
+	eventsStorage := storage.NewDeque(tx.WithPrefix(percentileWatermarkEventsPrefix))
+	eventsCountStorage := storage.NewMap(tx.WithPrefix(percentileWatermarkEventsCountPrefix))
 
 	var oldestEventTimeValue octosql.Value
 
@@ -295,12 +296,11 @@ func (s *PercentileWatermarkGeneratorStream) removeOldestEvent(tx storage.StateT
 	return nil
 }
 
-func (s *PercentileWatermarkGeneratorStream) Close(ctx context.Context) error {
-	if err := s.source.Close(ctx); err != nil {
+func (s *PercentileWatermarkGeneratorStream) Close(ctx context.Context, storage storage.Storage) error {
+	if err := s.source.Close(ctx, storage); err != nil {
 		return errors.Wrap(err, "couldn't close underlying stream")
 	}
 
-	storage := storage.GetStateTransactionFromContext(ctx).GetUnderlyingStorage()
 	if err := storage.DropAll(s.streamID.AsPrefix()); err != nil {
 		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
 	}

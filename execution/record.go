@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/streaming/storage"
 )
 
 type Field struct {
@@ -261,7 +262,7 @@ func (id *RecordID) MonotonicUnmarshal(data []byte) error {
 
 type RecordStream interface {
 	Next(ctx context.Context) (*Record, error)
-	Close(ctx context.Context) error
+	Close(ctx context.Context, storage storage.Storage) error
 }
 
 var ErrEndOfStream = errors.New("end of stream")

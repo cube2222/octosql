@@ -149,12 +149,11 @@ type RecordStream struct {
 	keys []string
 }
 
-func (rs *RecordStream) Close(ctx context.Context) error {
+func (rs *RecordStream) Close(ctx context.Context, storage storage.Storage) error {
 	if err := rs.client.Close(); err != nil {
 		return errors.Wrap(err, "couldn't close underlying redis client")
 	}
 
-	storage := storage.GetStateTransactionFromContext(ctx).GetUnderlyingStorage()
 	if err := storage.DropAll(rs.streamID.AsPrefix()); err != nil {
 		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
 	}

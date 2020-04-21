@@ -61,12 +61,11 @@ type LimitedStream struct {
 	streamID *StreamID
 }
 
-func (node *LimitedStream) Close(ctx context.Context) error {
-	if err := node.rs.Close(ctx); err != nil {
+func (node *LimitedStream) Close(ctx context.Context, storage storage.Storage) error {
+	if err := node.rs.Close(ctx, storage); err != nil {
 		return errors.Wrap(err, "couldn't close underlying stream")
 	}
 
-	storage := storage.GetStateTransactionFromContext(ctx).GetUnderlyingStorage()
 	if err := storage.DropAll(node.streamID.AsPrefix()); err != nil {
 		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
 	}

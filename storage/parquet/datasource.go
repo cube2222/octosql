@@ -29,8 +29,8 @@ type DataSource struct {
 }
 
 type ColStrIter struct {
-	f   *parquet.File
-	col parquet.Column
+	file *parquet.File
+	col  parquet.Column
 
 	bools      []bool
 	int32s     []int32
@@ -45,18 +45,18 @@ type ColStrIter struct {
 	dLevels []uint16 // definition levels
 	rLevels []uint16 // repetition levels
 
-	cr                  *parquet.ColumnChunkReader
-	rg                  int // row groups
-	n                   int // number of loaded elements
-	descriptionIterator int
-	dataIterator        int
+	columnChunkReader      *parquet.ColumnChunkReader
+	rowGroups              int
+	numberOfLoadedElements int
+	descriptionIterator    int
+	dataIterator           int
 }
 
 func NewColStrIter(f *parquet.File, col parquet.Column) *ColStrIter {
 	const batchSize = 1024
 
 	it := ColStrIter{
-		f:       f,
+		file:    f,
 		col:     col,
 		dLevels: make([]uint16, batchSize),
 		rLevels: make([]uint16, batchSize),
@@ -90,31 +90,30 @@ func NewColStrIter(f *parquet.File, col parquet.Column) *ColStrIter {
 	return &it
 }
 
-
 func (it *ColStrIter) Next() (interface{}, error) {
 	var err error
 	var s interface{}
 	s = nil
 	elements := make([]interface{}, 0)
 	for {
-		if it.cr == nil {
-			if it.rg == len(it.f.MetaData.RowGroups) {
+		if it.columnChunkReader == nil {
+			if it.rowGroups == len(it.file.MetaData.RowGroups) {
 				if len(elements) > 0 {
 					return elements, nil
 				}
 				return nil, io.EOF
 			}
-			it.cr, err = it.f.NewReader(it.col, it.rg)
+			it.columnChunkReader, err = it.file.NewReader(it.col, it.rowGroups)
 			if err != nil {
 				return nil, err
 			}
-			it.rg++
+			it.rowGroups++
 		}
 
-		if it.descriptionIterator >= it.n {
-			it.n, err = it.cr.Read(it.values, it.dLevels, it.rLevels)
+		if it.descriptionIterator >= it.numberOfLoadedElements {
+			it.numberOfLoadedElements, err = it.columnChunkReader.Read(it.values, it.dLevels, it.rLevels)
 			if err == parquet.EndOfChunk {
-				it.cr = nil
+				it.columnChunkReader = nil
 				return it.Next()
 			}
 			if err != nil {
@@ -173,7 +172,6 @@ func (it *ColStrIter) Next() (interface{}, error) {
 		} else {
 			elements = append(elements, nil)
 		}
-
 
 		it.descriptionIterator++
 

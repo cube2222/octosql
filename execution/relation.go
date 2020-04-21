@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"regexp"
+	"strings"
 
 	"github.com/pkg/errors"
 
@@ -148,6 +149,10 @@ func NewLike() Relation {
 	return &Like{}
 }
 
+const likeEscape = '\\'
+const likeAny = '_'
+const likeAll = '%'
+
 func (rel *Like) Apply(ctx context.Context, variables octosql.Variables, left, right Expression) (bool, error) {
 	leftValue, err := left.ExpressionValue(ctx, variables)
 	if err != nil {
@@ -168,11 +173,76 @@ func (rel *Like) Apply(ctx context.Context, variables octosql.Variables, left, r
 			leftValue.Show(), rightValue.Show(), leftValue.GetType(), rightValue.GetType())
 	}
 
-	match, err := regexp.MatchString(rightValue.AsString(), leftValue.AsString())
+	patternString, err := likePatternToRegexp(rightValue.AsString())
+	if err != nil {
+		return false, errors.Wrapf(err, "couldn't transform LIKE pattern %v to regexp", patternString)
+	}
+
+	match, err := regexp.MatchString(patternString, leftValue.AsString())
 	if err != nil {
 		return false, errors.Wrapf(err, "couldn't match string in like relation with pattern %v", rightValue)
 	}
 	return match, nil
+}
+
+//we assume that the escape character is '\'
+func likePatternToRegexp(pattern string) (string, error) {
+	var sb strings.Builder
+	sb.WriteRune('^') // match start
+
+	escaping := false // was the character previously seen an escaping \
+
+	for _, r := range pattern {
+		if escaping { // escaping \, _ and % is legal (we just write . or .*), otherwise an error occurs
+			if r != likeAny && r != likeAll && r != likeEscape {
+				return "", errors.Errorf("escaping invalid character in LIKE pattern: %v", r)
+			}
+
+			escaping = false
+			sb.WriteRune(r)
+
+			if r == likeEscape {
+				// since _ and % don't need to be escaped in regexp we just replace \_ with _
+				// but \ needs to be replaced in both, so we need to write an additional \
+				sb.WriteRune(likeEscape)
+			}
+		} else {
+			if r == likeEscape { // if we find an escape sequence we just handle it in the next step
+				escaping = true
+			} else if r == likeAny { // _ transforms to . (any character)
+				sb.WriteRune('.')
+			} else if r == likeAll { // % transforms to .* (any string)
+				sb.WriteString(".*")
+			} else if needsEscaping(r) { // escape characters that might break the regexp
+				sb.WriteRune('\\')
+				sb.WriteRune(r)
+			} else { // just write everything else
+				sb.WriteRune(r)
+			}
+		}
+	}
+
+	sb.WriteRune('$') // match end
+
+	if escaping {
+		return "", errors.New("pattern ends with an escape character that doesn't escape anything")
+	}
+
+	return sb.String(), nil
+}
+
+func needsEscaping(r rune) bool {
+	return r == '+' ||
+		r == '?' ||
+		r == '(' ||
+		r == ')' ||
+		r == '{' ||
+		r == '}' ||
+		r == '[' ||
+		r == ']' ||
+		r == '^' ||
+		r == '$' ||
+		r == '.'
 }
 
 type In struct {
@@ -220,4 +290,38 @@ func (rel *NotIn) Apply(ctx context.Context, variables octosql.Variables, left, 
 		return false, errors.Wrap(err, "couldn't check containment")
 	}
 	return !in, nil
+}
+
+type Regexp struct {
+}
+
+func NewRegexp() Relation {
+	return &Regexp{}
+}
+
+func (rel *Regexp) Apply(ctx context.Context, variables octosql.Variables, left, right Expression) (bool, error) {
+	leftValue, err := left.ExpressionValue(ctx, variables)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't get value of left operator in REGEXP")
+	}
+	rightValue, err := right.ExpressionValue(ctx, variables)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't get value of right operator in REGEXP")
+	}
+	if leftValue.GetType() != octosql.TypeString {
+		return false, errors.Errorf(
+			"invalid operands to regexp %v and %v with types %v and %v, only string allowed",
+			leftValue.Show(), rightValue.Show(), leftValue.GetType(), rightValue.GetType())
+	}
+	if rightValue.GetType() != octosql.TypeString {
+		return false, errors.Errorf(
+			"invalid operands to regexp %v and %v with types %v and %v, only string allowed",
+			leftValue.Show(), rightValue.Show(), leftValue.GetType(), rightValue.GetType())
+	}
+
+	match, err := regexp.MatchString(rightValue.AsString(), leftValue.AsString())
+	if err != nil {
+		return false, errors.Wrapf(err, "couldn't match string in regexp relation with pattern %v", rightValue)
+	}
+	return match, nil
 }

@@ -24,11 +24,11 @@ func TestDataSource_Get(t *testing.T) {
 	password := "toor"
 	dbname := "mydb"
 
-	mysqlInfo := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true", user, password, host, port, dbname)
+	mysqlInfo, driver := template.GetDSNAndDriverName(user, password, host, dbname, port)
 
-	db, err := sql.Open("mysql", mysqlInfo)
+	db, err := sql.Open(driver, mysqlInfo)
 	if err != nil {
-		panic("Couldn't connect to a database")
+		panic("Couldn't connect to the database")
 	}
 
 	type args struct {
@@ -281,7 +281,7 @@ func TestDataSource_Get(t *testing.T) {
 				return
 			}
 
-			defer dropTable(db, args.tablename) //unhandled error
+			defer dropTable(db, args.tablename)
 
 			err = insertValues(db, args.tablename, args.rows)
 			if err != nil {
@@ -339,7 +339,7 @@ func TestDataSource_Get(t *testing.T) {
 func createTable(db *sql.DB, tableDescription string) error {
 	_, err := db.Exec(tableDescription)
 	if err != nil {
-		return errors.Wrap(err, "Couldn't create table")
+		return errors.Wrap(err, "couldn't create table")
 	}
 	return nil
 }

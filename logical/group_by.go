@@ -2,9 +2,12 @@ package logical
 
 import (
 	"context"
+	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
 )
@@ -45,6 +48,26 @@ type GroupBy struct {
 	aggregates []Aggregate
 
 	as []octosql.VariableName
+}
+
+func (groupBy *GroupBy) Visualize() *graph.Node {
+	n := graph.NewNode("Group By")
+	if groupBy.source != nil {
+		n.AddChild("source", groupBy.source.Visualize())
+	}
+
+	for idx := range groupBy.key {
+		n.AddChild("key_"+strconv.Itoa(idx), groupBy.key[idx].Visualize())
+	}
+
+	for i := range groupBy.fields {
+		value := fmt.Sprintf("%s(%s)", groupBy.aggregates[i], groupBy.fields[i])
+		if i < len(groupBy.as) && !groupBy.as[i].Empty() {
+			value += fmt.Sprintf(" as %s", groupBy.as[i])
+		}
+		n.AddField(fmt.Sprintf("field_%d", i), value)
+	}
+	return n
 }
 
 func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, aggregates []Aggregate, as []octosql.VariableName) *GroupBy {

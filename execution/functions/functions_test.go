@@ -222,54 +222,54 @@ func Test_stringFunctions(t *testing.T) {
 
 		/* regexp matching tests */
 		{
-			name: "simple match - 1",
+			name: "simple find - 1",
 			args: args{
-				fun:  FuncMatchRegexp,
+				fun:  FuncRegexpFind,
 				args: []Value{MakeString("t[a+b]e"), MakeString("tcetdetaetbe")},
 			},
 			want:    MakeString("tae"),
 			wantErr: false,
 		},
 		{
-			name: "simple match - 2",
+			name: "simple find - 2",
 			args: args{
-				fun:  FuncMatchRegexp,
+				fun:  FuncRegexpFind,
 				args: []Value{MakeString("a..d"), MakeString("axdaxxdaxdxa")},
 			},
 			want:    MakeString("axxd"),
 			wantErr: false,
 		},
 		{
-			name: "simple match - 3",
+			name: "simple find - 3",
 			args: args{
-				fun:  FuncMatchRegexp,
+				fun:  FuncRegexpFind,
 				args: []Value{MakeString(".[0-9]."), MakeString("this is a bit longer but 4 the matcher it's no problem")},
 			},
 			want:    MakeString(" 4 "), /* matches the spaces with . */
 			wantErr: false,
 		},
 		{
-			name: "simple match - 4",
+			name: "simple find - 4",
 			args: args{
-				fun:  FuncMatchRegexp,
+				fun:  FuncRegexpFind,
 				args: []Value{MakeString("[1-9][0-9]{3}"), MakeString("The year was 2312 and the aliens began their invasion")},
 			},
 			want:    MakeString("2312"),
 			wantErr: false,
 		},
 		{
-			name: "star regexp match - 1",
+			name: "star regexp find - 1",
 			args: args{
-				fun:  FuncMatchRegexp,
+				fun:  FuncRegexpFind,
 				args: []Value{MakeString("AB*A"), MakeString("My favourite band is not ABA, it's ABBA.")},
 			},
 			want:    MakeString("ABA"),
 			wantErr: false,
 		},
 		{
-			name: "star regexp match - 2",
+			name: "star regexp find - 2",
 			args: args{
-				fun:  FuncMatchRegexp,
+				fun:  FuncRegexpFind,
 				args: []Value{MakeString("a*ba*"), MakeString("What is a bbba?")},
 			},
 			want:    MakeString("b"), /* matches the shortest */
@@ -278,10 +278,46 @@ func Test_stringFunctions(t *testing.T) {
 		{
 			name: "complex regexp",
 			args: args{
-				fun:  FuncMatchRegexp,
+				fun:  FuncRegexpFind,
 				args: []Value{MakeString(`[a + b]{2}c*d{3}`), MakeString("abcddaaacdddbacccdddabcda")},
 			},
 			want:    MakeString("aacddd"),
+			wantErr: false,
+		},
+		{
+			name: "regexp match true",
+			args: args{
+				fun:  FuncRegexpMatches,
+				args: []Value{MakeString(`[a + b]{2}c*d{3}`), MakeString("abcddaaacdddbacccdddabcda")},
+			},
+			want:    MakeBool(true),
+			wantErr: false,
+		},
+		{
+			name: "regexp match false",
+			args: args{
+				fun:  FuncRegexpMatches,
+				args: []Value{MakeString(`[a + b]{2}zc*d{3}`), MakeString("abcddaaacdddbacccdddabcda")},
+			},
+			want:    MakeBool(false),
+			wantErr: false,
+		},
+		{
+			name: "regexp match whole true",
+			args: args{
+				fun:  FuncRegexpMatches,
+				args: []Value{MakeString(`^abcd$`), MakeString("abcd")},
+			},
+			want:    MakeBool(true),
+			wantErr: false,
+		},
+		{
+			name: "regexp match whole false",
+			args: args{
+				fun:  FuncRegexpMatches,
+				args: []Value{MakeString(`^abcd$`), MakeString("abcde")},
+			},
+			want:    MakeBool(false),
 			wantErr: false,
 		},
 	}
@@ -513,7 +549,7 @@ func Test_various(t *testing.T) {
 					MakeString("[l]*o"),
 					MakeString("hello hello"),
 				},
-				fun: FuncMatchRegexp,
+				fun: FuncRegexpFind,
 			},
 			want:    MakeString("llo"),
 			wantErr: false,
@@ -1013,6 +1049,42 @@ func Test_various(t *testing.T) {
 			want:    MakeNull(),
 			wantErr: false,
 		},
+		{
+			name: "parse_time('2006-01-02', '2019-06-13')",
+			args: args{
+				args: []Value{
+					MakeString("2006-01-02"),
+					MakeString("2019-06-13"),
+				},
+				fun: FuncParseTime,
+			},
+			want:    MakeTime(time.Date(2019, 06, 13, 0, 0, 0, 0, time.UTC)),
+			wantErr: false,
+		},
+		{
+			name: "parse_time('2006-01-02', '2019-06-13')",
+			args: args{
+				args: []Value{
+					MakeString("2006-01-02 15:04"),
+					MakeString("2019-06-13 17:21"),
+				},
+				fun: FuncParseTime,
+			},
+			want:    MakeTime(time.Date(2019, 06, 13, 17, 21, 0, 0, time.UTC)),
+			wantErr: false,
+		},
+		{
+			name: "parse_time('2006-01-02', '2019-06-13')",
+			args: args{
+				args: []Value{
+					MakeString("2006-01-02 15:04"),
+					MakeString("2019-13-06 17:21"),
+				},
+				fun: FuncParseTime,
+			},
+			want:    ZeroValue(),
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1022,7 +1094,7 @@ func Test_various(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Func = %v, want %v", got, tt.want)
+				t.Errorf("Func = %v, want %v", got.Show(), tt.want.Show())
 			}
 		})
 	}

@@ -1,7 +1,10 @@
 package logical
 
 import (
+	"strconv"
+
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 
 	"context"
@@ -12,6 +15,14 @@ import (
 type FunctionExpression struct {
 	name      string
 	arguments []Expression
+}
+
+func (functionExpression *FunctionExpression) Visualize() *graph.Node {
+	n := graph.NewNode("Function(" + functionExpression.name + ")")
+	for idx, arg := range functionExpression.arguments {
+		n.AddChild("arg_"+strconv.Itoa(idx), arg.Visualize())
+	}
+	return n
 }
 
 func NewFunctionExpression(name string, args []Expression) *FunctionExpression {

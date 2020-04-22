@@ -68,6 +68,9 @@ func (node *Join) Physical(ctx context.Context, physicalCreator *PhysicalPlanCre
 		var formula physical.Formula
 		if filter, ok := joinedNodes[0].(*physical.Filter); ok {
 			formula = filter.Formula
+			for i := range joinedNodes {
+				joinedNodes[i] = joinedNodes[i].(*physical.Filter).Source
+			}
 		} else {
 			formula = physical.NewConstant(true)
 		}

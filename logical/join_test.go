@@ -11,6 +11,22 @@ import (
 	"github.com/cube2222/octosql/physical/metadata"
 )
 
+type StubNode struct {
+	metadata  *metadata.NodeMetadata
+	variables octosql.Variables
+}
+
+func NewStubNode(metadata *metadata.NodeMetadata, variables octosql.Variables) *StubNode {
+	return &StubNode{
+		metadata:  metadata,
+		variables: variables,
+	}
+}
+
+func (sb *StubNode) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
+	return []physical.Node{physical.NewStubNode(sb.metadata)}, sb.variables, nil
+}
+
 func TestJoin_Physical(t *testing.T) {
 	type fields struct {
 		source   Node
@@ -22,15 +38,71 @@ func TestJoin_Physical(t *testing.T) {
 		physicalCreator *PhysicalPlanCreator
 	}
 	tests := []struct {
-		name          string
-		fields        fields
-		args          args
-		wantNode      physical.Node
-		wantVariables octosql.Variables
-		wantErr       bool
+		name     string
+		fields   fields
+		args     args
+		wantNode physical.Node
+		wantErr  bool
 	}{
-		// TODO: Add test cases.
+		{
+			name: "two unbounded streams - stream join",
+			fields: fields{
+				source: &StubNode{
+					metadata: metadata.NewNodeMetadata(
+						metadata.Unbounded,
+						"",
+						metadata.NewNamespace(
+							[]string{""},
+							[]octosql.VariableName{"a.field1", "a.field2"},
+						),
+					),
+					variables: octosql.NoVariables(),
+				},
+
+				joined: &Filter{
+					formula: &InfixOperator{
+						Left: &Predicate{
+							Left:     &Variable{"a.field1"},
+							Relation: Equal,
+							Right:    &Variable{"b.field2"},
+						},
+						Operator: "and",
+						Right: &Predicate{
+							Left:     &Variable{"b.field1"},
+							Relation: Equal,
+							Right:    &Variable{"a.field2"},
+						},
+					},
+					source: &StubNode{
+						metadata: metadata.NewNodeMetadata(
+							metadata.Unbounded,
+							"",
+							metadata.NewNamespace(
+								[]string{""},
+								[]octosql.VariableName{"b.field1", "b.field2"},
+							),
+						),
+					},
+				},
+
+				joinType: execution.LEFT_JOIN,
+			},
+
+			args: args{
+				ctx:             context.Background(),
+				physicalCreator: nil,
+			},
+
+			wantNode: &physical.StreamJoin{
+				SourceKey:      []physical.Expression{physical.NewVariable("a.field1"), physical.NewVariable("a.field2")},
+				JoinedKey:      []physical.Expression{physical.NewVariable("b.field2"), physical.NewVariable("b.field1")},
+				EventTimeField: "",
+			},
+
+			wantErr: false,
+		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			node := &Join{
@@ -38,17 +110,49 @@ func TestJoin_Physical(t *testing.T) {
 				joined:   tt.fields.joined,
 				joinType: tt.fields.joinType,
 			}
-			gotNodes, gotVariables, err := node.Physical(tt.args.ctx, tt.args.physicalCreator)
+
+			gotNodes, _, err := node.Physical(tt.args.ctx, tt.args.physicalCreator)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Physical() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(gotNodes[0], tt.wantNode) {
-				t.Errorf("Physical() got = %v, want %v", gotNodes[0], tt.wantNode)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("wantErr incorrect")
 			}
-			if !reflect.DeepEqual(gotVariables, tt.wantVariables) {
-				t.Errorf("Physical() got1 = %v, want %v", gotVariables, tt.wantVariables)
+
+			switch gotNode := gotNodes[0].(type) {
+			case *physical.StreamJoin:
+				wantNode, ok := tt.wantNode.(*physical.StreamJoin)
+
+				if !ok {
+					t.Errorf("Expected a lookup join else, got stream join")
+				}
+
+				if gotNode.EventTimeField != wantNode.EventTimeField {
+					t.Errorf("Different event time fields: %v, %v", gotNode.EventTimeField, wantNode.EventTimeField)
+				}
+
+				if !reflect.DeepEqual(gotNode.SourceKey, wantNode.SourceKey) {
+					t.Errorf("Different source key")
+				}
+
+				if !reflect.DeepEqual(gotNode.JoinedKey, wantNode.JoinedKey) {
+					t.Errorf("Different joined key")
+				}
+
+				if gotNode.JoinType != tt.fields.joinType {
+					t.Errorf("Invalid join type")
+				}
+
+			case *physical.LookupJoin:
+				if _, ok := tt.wantNode.(*physical.LookupJoin); !ok {
+					t.Errorf("Expected a stream join, got a lookup join")
+				}
+			default:
+				panic("invalid type after join.Physical()")
 			}
+
 		})
 	}
 }

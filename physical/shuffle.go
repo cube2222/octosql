@@ -3,7 +3,6 @@ package physical
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/pkg/errors"
 
@@ -12,41 +11,37 @@ import (
 	"github.com/cube2222/octosql/physical/metadata"
 )
 
-type ShuffleInput struct {
-	Source Node
+type Shuffle struct {
+	OutputPartitionCount int
+	Strategy             ShuffleStrategy
+	Sources              []Node
 }
 
-type node struct {
-	ShuffleInputs []*ShuffleInput
-}
-
-type ShuffleStrategy interface {
-	// Return output partition index based on the record and output partition count.
-	CalculatePartition(record *execution.Record, outputs int) int
-}
-
-var DefaultShuffleStrategy ShuffleStrategy = nil
-
-func NewShuffle(outputPartitionCount int, sourceNodes []Node, strategy ShuffleStrategy) []Node {
-	if outputPartitionCount != 1 {
-		log.Fatal("Shuffle: output partition count other than 1 is not implemented yet")
+func NewShuffle(outputPartitionCount int, strategy ShuffleStrategy, sourceNodes []Node) []Node {
+	shuffle := &Shuffle{
+		OutputPartitionCount: outputPartitionCount,
+		Strategy:             strategy,
+		Sources:              sourceNodes,
 	}
 
-	shuffleInputs := make([]*ShuffleInput, len(sourceNodes))
-	for i := range sourceNodes {
-		shuffleInputs[i] = &ShuffleInput{Source: sourceNodes[i]}
+	shuffleOutputs := make([]Node, outputPartitionCount)
+	for i := 0; i < outputPartitionCount; i++ {
+		shuffleOutputs[i] = shuffle
 	}
 
-	return []Node{&node{ShuffleInputs: shuffleInputs}}
+	return shuffleOutputs
 }
 
-func (s *node) Transform(ctx context.Context, transformers *Transformers) Node {
-	transformedSources := make([]*ShuffleInput, len(s.ShuffleInputs))
-	for i := range s.ShuffleInputs {
-		transformedSources[i] = &ShuffleInput{Source: s.ShuffleInputs[i].Source.Transform(ctx, transformers)}
+func (s *Shuffle) Transform(ctx context.Context, transformers *Transformers) Node {
+	transformedSources := make([]Node, len(s.Sources))
+	for i := range s.Sources {
+		transformedSources[i] = s.Sources[i].Transform(ctx, transformers)
 	}
-	var transformed Node = &node{
-		ShuffleInputs: transformedSources,
+	transformedStrategy := s.Strategy.Transform(ctx, transformers)
+	var transformed Node = &Shuffle{
+		OutputPartitionCount: s.OutputPartitionCount,
+		Strategy:             transformedStrategy,
+		Sources:              transformedSources,
 	}
 	if transformers.NodeT != nil {
 		transformed = transformers.NodeT(transformed)
@@ -54,28 +49,36 @@ func (s *node) Transform(ctx context.Context, transformers *Transformers) Node {
 	return transformed
 }
 
-func (s *node) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
-	sourceNodes := make([]execution.Node, len(s.ShuffleInputs))
-	for i := range s.ShuffleInputs {
-		matSource, err := s.ShuffleInputs[i].Source.Materialize(ctx, matCtx)
+func (s *Shuffle) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
+	sourceNodes := make([]execution.Node, len(s.Sources))
+	for i := range s.Sources {
+		matSource, err := s.Sources[i].Materialize(ctx, matCtx)
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't materialize shuffle input with index %d", i)
 		}
 		sourceNodes[i] = matSource
 	}
 
-	return execution.NewUnionAll(sourceNodes...), nil
+	strategyPrototype, err := s.Strategy.Materialize(ctx, matCtx)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't materialize shuffle strategy")
+	}
+
+	return execution.NewShuffle(s.OutputPartitionCount, strategyPrototype, sourceNodes), nil
 }
 
-func (s *node) Metadata() *metadata.NodeMetadata {
-	return s.ShuffleInputs[0].Source.Metadata()
+func (s *Shuffle) Metadata() *metadata.NodeMetadata {
+	return s.Sources[0].Metadata()
 }
 
-func (s *node) Visualize() *graph.Node {
+func (s *Shuffle) Visualize() *graph.Node {
 	n := graph.NewNode("Shuffle")
 
-	for i, input := range s.ShuffleInputs {
-		n.AddChild(fmt.Sprintf("input_%d", i), input.Source.Visualize())
+	for i, input := range s.Sources {
+		n.AddChild(fmt.Sprintf("input_%d", i), input.Visualize())
 	}
+
+	n.AddChild("strategy", s.Strategy.Visualize())
+
 	return n
 }

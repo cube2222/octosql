@@ -151,10 +151,7 @@ func TestRange_Get(t *testing.T) {
 				end:   tt.fields.end,
 			}
 
-			stateStorage := execution.GetTestStorage(t)
-			defer func() {
-				go stateStorage.Close()
-			}()
+			stateStorage := storage.GetTestStorage(t)
 
 			tx := stateStorage.BeginTransaction()
 			ctx := storage.InjectStateTransaction(ctx, tx)

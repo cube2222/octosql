@@ -13,12 +13,14 @@ import (
 type PhysicalPlanCreator struct {
 	variableCounter int
 	dataSourceRepo  *physical.DataSourceRepository
+	physicalConfig  map[string]interface{}
 }
 
-func NewPhysicalPlanCreator(repo *physical.DataSourceRepository) *PhysicalPlanCreator {
+func NewPhysicalPlanCreator(repo *physical.DataSourceRepository, physicalConfig map[string]interface{}) *PhysicalPlanCreator {
 	return &PhysicalPlanCreator{
 		variableCounter: 0,
 		dataSourceRepo:  repo,
+		physicalConfig:  physicalConfig,
 	}
 }
 
@@ -186,7 +188,7 @@ func (ne *NodeExpression) Physical(ctx context.Context, physicalCreator *Physica
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for node expression")
 	}
 
-	outNodes := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
+	outNodes := physical.NewShuffle(1, physical.NewConstantStrategy(0), sourceNodes)
 
 	return physical.NewNodeExpression(outNodes[0]), variables, nil
 }

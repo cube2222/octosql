@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math/rand"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -59,23 +58,32 @@ type IntermediateRecordStore interface {
 
 type PullEngine struct {
 	irs                    IntermediateRecordStore
-	sources                []RecordStream
+	source                 RecordStream
 	lastCommittedWatermark time.Time
 	watermarkSource        WatermarkSource
 	storage                storage.Storage
 	streamID               *StreamID
 	batchSizeManager       *BatchSizeManager
+	shouldPrefixStreamID   bool
 }
 
-func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, sources []RecordStream, streamID *StreamID, watermarkSource WatermarkSource) *PullEngine {
+func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, source RecordStream, streamID *StreamID, watermarkSource WatermarkSource, shouldPrefixStreamID bool) *PullEngine {
 	return &PullEngine{
-		irs:              irs,
-		storage:          storage,
-		sources:          sources,
-		streamID:         streamID,
-		watermarkSource:  watermarkSource,
-		batchSizeManager: NewBatchSizeManager(time.Second / 4),
+		irs:                  irs,
+		storage:              storage,
+		source:               source,
+		streamID:             streamID,
+		watermarkSource:      watermarkSource,
+		batchSizeManager:     NewBatchSizeManager(time.Second / 4),
+		shouldPrefixStreamID: shouldPrefixStreamID,
 	}
+}
+
+func (engine *PullEngine) getPrefixedTx(tx storage.StateTransaction) storage.StateTransaction {
+	if engine.shouldPrefixStreamID {
+		return tx.WithPrefix(engine.streamID.AsPrefix())
+	}
+	return tx
 }
 
 func (engine *PullEngine) Run(ctx context.Context) {
@@ -87,11 +95,12 @@ func (engine *PullEngine) Run(ctx context.Context) {
 			err := tx.Commit()
 			if err != nil {
 				log.Println("engine: couldn't commit: ", err)
+				tx = engine.storage.BeginTransaction()
+				continue
 			}
 			log.Println("engine: end of stream, stopping loop")
 			return
 		} else if errors.Cause(err) == ErrNewTransactionRequired {
-			log.Println("engine: new transaction required")
 			err := tx.Commit()
 			if err != nil {
 				log.Println("engine: couldn't commit: ", err)
@@ -99,7 +108,6 @@ func (engine *PullEngine) Run(ctx context.Context) {
 			engine.batchSizeManager.CommitSuccessful()
 			tx = engine.storage.BeginTransaction()
 		} else if waitableError := GetErrWaitForChanges(err); waitableError != nil {
-			log.Println("engine: listening for changes")
 			err := tx.Commit()
 			if err != nil {
 				log.Println("engine: couldn't commit: ", err)
@@ -109,7 +117,6 @@ func (engine *PullEngine) Run(ctx context.Context) {
 			if err != nil {
 				log.Println("engine: couldn't listen for changes: ", err)
 			}
-			log.Println("engine: received change")
 			err = waitableError.Close()
 			if err != nil {
 				log.Println("engine: couldn't close listening for changes: ", err)
@@ -120,7 +127,7 @@ func (engine *PullEngine) Run(ctx context.Context) {
 			tx.Abort()
 			log.Println("engine: ", err)
 			tx = engine.storage.BeginTransaction()
-			err := engine.irs.MarkError(ctx, tx.WithPrefix(engine.streamID.AsPrefix()), err)
+			err := engine.irs.MarkError(ctx, engine.getPrefixedTx(tx), err)
 			if err != nil {
 				log.Fatalf("couldn't mark error on intermediate record store: %s", err)
 			}
@@ -145,14 +152,11 @@ func (engine *PullEngine) Run(ctx context.Context) {
 	}
 }
 
-var endOfStreamSourcesPrefix = []byte("$end_of_stream_sources$")
-var endOfStreamCountPrefix = []byte("$end_of_stream_count$")
-
 func (engine *PullEngine) loop(ctx context.Context, tx storage.StateTransaction) error {
 	// This is a transaction prefixed with the current node StreamID,
 	// which should be used for all storage operations of this node.
 	// Source streams will get the raw, non-prefixed, transaction.
-	prefixedTx := tx.WithPrefix(engine.streamID.AsPrefix())
+	prefixedTx := engine.getPrefixedTx(tx)
 
 	watermark, err := engine.watermarkSource.GetWatermark(ctx, tx)
 	if err != nil {
@@ -171,42 +175,22 @@ func (engine *PullEngine) loop(ctx context.Context, tx storage.StateTransaction)
 		return errors.Wrap(err, "couldn't check if intermediate record store can take more records")
 	}
 
-	// We want to read from sources in some random order, so that we don't always read from the first one
-	sourceOrder := rand.Perm(len(engine.sources))
-
-	var record *Record
-	var inputIndex int
-	areAllEndOfStream := true
-
-	for _, sourceIndex := range sourceOrder {
-		record, err = engine.sources[sourceIndex].Next(storage.InjectStateTransaction(ctx, tx))
-		if err != nil {
-			if err == ErrEndOfStream {
-				continue
+	record, err := engine.source.Next(storage.InjectStateTransaction(ctx, tx))
+	if err != nil {
+		if err == ErrEndOfStream {
+			err := engine.irs.UpdateWatermark(ctx, prefixedTx, maxWatermark)
+			if err != nil {
+				return errors.Wrap(err, "couldn't mark end of stream max watermark in intermediate record store")
 			}
-
-			return errors.Wrap(err, "couldn't get next record")
+			err = engine.irs.MarkEndOfStream(ctx, prefixedTx)
+			if err != nil {
+				return errors.Wrap(err, "couldn't mark end of stream in intermediate record store")
+			}
+			return ErrEndOfStream
 		}
-
-		areAllEndOfStream = false
-		inputIndex = sourceIndex
-		break
+		return errors.Wrap(err, "couldn't get next record")
 	}
-
-	if areAllEndOfStream {
-		err := engine.irs.UpdateWatermark(ctx, prefixedTx, maxWatermark)
-		if err != nil {
-			return errors.Wrap(err, "couldn't mark end of stream max watermark in intermediate record store")
-		}
-
-		err = engine.irs.MarkEndOfStream(ctx, prefixedTx)
-		if err != nil {
-			return errors.Wrap(err, "couldn't mark end of stream in intermediate record store")
-		}
-		return ErrEndOfStream
-	}
-
-	err = engine.irs.AddRecord(ctx, prefixedTx, inputIndex, record)
+	err = engine.irs.AddRecord(ctx, prefixedTx, 0, record)
 	if err != nil {
 		return errors.Wrap(err, "couldn't add record to intermediate record store")
 	}
@@ -216,7 +200,7 @@ func (engine *PullEngine) loop(ctx context.Context, tx storage.StateTransaction)
 
 func (engine *PullEngine) Next(ctx context.Context) (*Record, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
-	prefixedTx := tx.WithPrefix(engine.streamID.AsPrefix())
+	prefixedTx := engine.getPrefixedTx(tx)
 
 	rec, err := engine.irs.Next(ctx, prefixedTx)
 	if err != nil {
@@ -229,20 +213,18 @@ func (engine *PullEngine) Next(ctx context.Context) (*Record, error) {
 }
 
 func (engine *PullEngine) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
-	prefixedTx := tx.WithPrefix(engine.streamID.AsPrefix())
+	prefixedTx := engine.getPrefixedTx(tx)
 
 	return engine.irs.GetWatermark(ctx, prefixedTx)
 }
 
 func (engine *PullEngine) Close() error {
-	for i := range engine.sources {
-		if err := engine.sources[i].Close(); err != nil {
-			return errors.Wrapf(err, "couldn't close source stream with index %v", i)
-
-		}
+	err := engine.source.Close()
+	if err != nil {
+		return errors.Wrap(err, "couldn't close source stream")
 	}
 
-	err := engine.irs.Close()
+	err = engine.irs.Close()
 	if err != nil {
 		return errors.Wrap(err, "couldn't close intermediate record store")
 	}

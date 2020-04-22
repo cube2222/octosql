@@ -59,7 +59,7 @@ func (r *Range) Get(ctx context.Context, variables octosql.Variables, streamID *
 	return &RangeStream{
 		streamID:     streamID,
 		endExclusive: end.AsInt(),
-	}, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator()), nil
+	}, execution.NewExecutionOutput(execution.NewZeroWatermarkGenerator(), map[string]execution.ShuffleData{}, nil), nil
 }
 
 type RangeStream struct {

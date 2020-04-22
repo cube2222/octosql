@@ -95,10 +95,15 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 		variables:       variables,
 	}
 
-	groupByPullEngine := NewPullEngine(processFunc, node.storage, []RecordStream{source}, streamID, execOutput.WatermarkSource)
-	go groupByPullEngine.Run(ctx) // TODO: .Close() should kill this context and the goroutine.
+	groupByPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, execOutput.WatermarkSource, true)
 
-	return groupByPullEngine, NewExecutionOutput(groupByPullEngine), nil // groupByPullEngine now indicates new watermark source
+	return groupByPullEngine, // groupByPullEngine now indicates new watermark source
+		NewExecutionOutput(
+			groupByPullEngine,
+			execOutput.NextShuffles,
+			append(execOutput.TasksToRun, func() error { groupByPullEngine.Run(ctx); return nil }),
+		),
+		nil
 }
 
 type GroupByStream struct {

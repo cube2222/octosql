@@ -11,11 +11,7 @@ import (
 )
 
 func TestJoinedStream_NoRetractions_NoEventTime(t *testing.T) {
-	stateStorage := GetTestStorage(t)
-
-	defer func() {
-		go stateStorage.Close()
-	}()
+	stateStorage := storage.GetTestStorage(t)
 
 	ctx := context.Background()
 
@@ -48,7 +44,7 @@ func TestJoinedStream_NoRetractions_NoEventTime(t *testing.T) {
 	leftKey := []Expression{NewVariable("left.a")}
 	rightKey := []Expression{NewVariable("right.a")}
 
-	sj := NewStreamJoin(leftSource, rightSource, leftKey, rightKey, stateStorage, "", true)
+	sj := NewStreamJoin(leftSource, rightSource, leftKey, rightKey, stateStorage, "", LEFT_JOIN)
 
 	tx := stateStorage.BeginTransaction()
 	stream, _, err := sj.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), streamID)
@@ -68,13 +64,9 @@ func TestJoinedStream_NoRetractions_NoEventTime(t *testing.T) {
 }
 
 func TestJoinedStream_NoRetractions_WithEventTime(t *testing.T) {
-	stateStorage := GetTestStorage(t)
+	stateStorage := storage.GetTestStorage(t)
 	baseTime := time.Unix(1000000000, 0)
 	outputEventTimeField := octosql.NewVariableName("output.time")
-
-	defer func() {
-		go stateStorage.Close()
-	}()
 
 	ctx := context.Background()
 
@@ -107,7 +99,7 @@ func TestJoinedStream_NoRetractions_WithEventTime(t *testing.T) {
 	leftKey := []Expression{NewVariable("left.time")}
 	rightKey := []Expression{NewVariable("right.time")}
 
-	sj := NewStreamJoin(leftSource, rightSource, leftKey, rightKey, stateStorage, outputEventTimeField, true)
+	sj := NewStreamJoin(leftSource, rightSource, leftKey, rightKey, stateStorage, outputEventTimeField, LEFT_JOIN)
 
 	tx := stateStorage.BeginTransaction()
 	stream, _, err := sj.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), streamID)

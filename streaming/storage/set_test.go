@@ -2,29 +2,16 @@ package storage
 
 import (
 	"log"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/cube2222/octosql"
-	"github.com/dgraph-io/badger/v2"
 )
 
 func TestSet(t *testing.T) {
-	path := "test_set"
-	db, err := badger.Open(badger.DefaultOptions(path))
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	prefix := []byte("set_prefix_")
 
-	defer func() {
-		_ = db.Close()
-		_ = os.RemoveAll(path)
-	}()
-
-	store := NewBadgerStorage(db)
+	store := GetTestStorage(t)
 	txn := store.BeginTransaction().WithPrefix(prefix)
 
 	set := NewSet(txn)
@@ -129,20 +116,9 @@ func TestSet(t *testing.T) {
 }
 
 func TestSetWithCollisions(t *testing.T) {
-	path := "test_set_collision"
-	db, err := badger.Open(badger.DefaultOptions(path))
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	prefix := []byte("set_prefix_")
 
-	defer func() {
-		_ = db.Close()
-		_ = os.RemoveAll(path)
-	}()
-
-	store := NewBadgerStorage(db)
+	store := GetTestStorage(t)
 	txn := store.BeginTransaction().WithPrefix(prefix)
 
 	set := NewSet(txn)

@@ -22,6 +22,7 @@ type Transformers struct {
 	FormulaT                          func(Formula) Formula
 	TableValuedFunctionArgumentValueT func(TableValuedFunctionArgumentValue) TableValuedFunctionArgumentValue
 	TriggerT                          func(Trigger) Trigger
+	ShuffleStrategyT                  func(ShuffleStrategy) ShuffleStrategy
 }
 
 // MaterializationContext is a structure containing the configuration for the materialization.
@@ -342,5 +343,33 @@ func (alExpr *AliasedExpression) Visualize() *graph.Node {
 	n := graph.NewNode("Aliased Expression")
 	n.AddField("alias", alExpr.ExpressionName().String())
 	n.AddChild("expr", alExpr.Expr.Visualize())
+	return n
+}
+
+type RecordExpression struct {
+}
+
+func NewRecordExpression() Expression {
+	return &RecordExpression{}
+}
+
+func (r *RecordExpression) Transform(ctx context.Context, transformers *Transformers) Expression {
+	var expr Expression = &RecordExpression{}
+	if transformers.ExprT != nil {
+		expr = transformers.ExprT(expr)
+	}
+	return expr
+}
+
+func (r *RecordExpression) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Expression, error) {
+	return execution.NewRecordExpression(), nil
+}
+
+func (r *RecordExpression) DoesMatchNamespace(namespace *metadata.Namespace) bool {
+	return false
+}
+
+func (r *RecordExpression) Visualize() *graph.Node {
+	n := graph.NewNode("Record Expression")
 	return n
 }

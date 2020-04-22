@@ -2,11 +2,8 @@ package trigger
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
-
-	"github.com/dgraph-io/badger/v2"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
@@ -14,16 +11,7 @@ import (
 
 func TestMultiTrigger(t *testing.T) {
 	ctx := context.Background()
-	db, err := badger.Open(badger.DefaultOptions("test"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		db.Close()
-		os.RemoveAll("test")
-	}()
-
-	badgerStorage := storage.NewBadgerStorage(db)
+	stateStorage := storage.GetTestStorage(t)
 	ct := NewCountingTrigger(2)
 	clock := &StaticClock{}
 	clock.SetTime(time.Now())
@@ -31,42 +19,42 @@ func TestMultiTrigger(t *testing.T) {
 	mt := NewMultiTrigger(ct, dt)
 
 	/*
-		RecordReceived(t, ctx, mt, badgerStorage, octosql.MakeInt(2), time.Time{})
+		RecordReceived(t, ctx, mt, stateStorage, octosql.MakeInt(2), time.Time{})
 
-		ExpectNoFire(t, ctx, mt, badgerStorage)
+		ExpectNoFire(t, ctx, mt, stateStorage)
 
-		KeysFired(t, ctx, mt, badgerStorage, octosql.MakeInt(2))
+		KeysFired(t, ctx, mt, stateStorage, octosql.MakeInt(2))
 
-		ExpectFire(t, ctx, mt, badgerStorage, octosql.MakeInt(3))
+		ExpectFire(t, ctx, mt, stateStorage, octosql.MakeInt(3))
 	*/
 
-	ExpectNoFire(t, ctx, mt, badgerStorage)
+	ExpectNoFire(t, ctx, mt, stateStorage)
 
-	RecordReceived(t, ctx, mt, badgerStorage, octosql.MakeInt(2), clock.Now())
+	RecordReceived(t, ctx, mt, stateStorage, octosql.MakeInt(2), clock.Now())
 
-	ExpectNoFire(t, ctx, mt, badgerStorage)
+	ExpectNoFire(t, ctx, mt, stateStorage)
 
-	RecordReceived(t, ctx, mt, badgerStorage, octosql.MakeInt(2), clock.Now())
+	RecordReceived(t, ctx, mt, stateStorage, octosql.MakeInt(2), clock.Now())
 
-	ExpectFire(t, ctx, mt, badgerStorage, octosql.MakeInt(2))
+	ExpectFire(t, ctx, mt, stateStorage, octosql.MakeInt(2))
 
-	ExpectNoFire(t, ctx, mt, badgerStorage)
-
-	clock.Advance(time.Minute * 2)
-
-	ExpectNoFire(t, ctx, mt, badgerStorage)
-
-	RecordReceived(t, ctx, mt, badgerStorage, octosql.MakeInt(2), clock.Now())
-
-	ExpectNoFire(t, ctx, mt, badgerStorage)
+	ExpectNoFire(t, ctx, mt, stateStorage)
 
 	clock.Advance(time.Minute * 2)
 
-	ExpectFire(t, ctx, mt, badgerStorage, octosql.MakeInt(2))
+	ExpectNoFire(t, ctx, mt, stateStorage)
 
-	ExpectNoFire(t, ctx, mt, badgerStorage)
+	RecordReceived(t, ctx, mt, stateStorage, octosql.MakeInt(2), clock.Now())
 
-	RecordReceived(t, ctx, mt, badgerStorage, octosql.MakeInt(2), clock.Now())
+	ExpectNoFire(t, ctx, mt, stateStorage)
 
-	ExpectNoFire(t, ctx, mt, badgerStorage)
+	clock.Advance(time.Minute * 2)
+
+	ExpectFire(t, ctx, mt, stateStorage, octosql.MakeInt(2))
+
+	ExpectNoFire(t, ctx, mt, stateStorage)
+
+	RecordReceived(t, ctx, mt, stateStorage, octosql.MakeInt(2), clock.Now())
+
+	ExpectNoFire(t, ctx, mt, stateStorage)
 }

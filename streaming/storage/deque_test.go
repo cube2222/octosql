@@ -2,10 +2,8 @@ package storage
 
 import (
 	"log"
-	"os"
 	"testing"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -15,19 +13,8 @@ import (
 
 func TestDeque(t *testing.T) {
 	prefix := "test_deque"
-	path := "test"
 
-	db, err := badger.Open(badger.DefaultOptions(path))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	defer func() {
-		_ = db.Close()
-		_ = os.RemoveAll(path)
-	}()
-
-	store := NewBadgerStorage(db)
+	store := GetTestStorage(t)
 	txn := store.BeginTransaction().WithPrefix([]byte(prefix))
 
 	queue := NewDeque(txn)

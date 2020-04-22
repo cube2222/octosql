@@ -95,7 +95,8 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 		variables:       variables,
 	}
 
-	groupByPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, execOutput.WatermarkSource, true)
+	ctx, cancel := context.WithCancel(ctx)
+	groupByPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, execOutput.WatermarkSource, true, cancel)
 
 	return groupByPullEngine, // groupByPullEngine now indicates new watermark source
 		NewExecutionOutput(

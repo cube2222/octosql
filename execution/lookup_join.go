@@ -114,7 +114,8 @@ func (node *LookupJoin) Get(ctx context.Context, variables octosql.Variables, st
 	go rs.RunScheduler(ctx)
 
 	// Run the pull engine which supplies this lookup join with records which are in need of joining.
-	engine := NewPullEngine(rs, node.stateStorage, sourceStream, streamID, execOutput.WatermarkSource, true)
+	ctx, cancel := context.WithCancel(ctx)
+	engine := NewPullEngine(rs, node.stateStorage, sourceStream, streamID, execOutput.WatermarkSource, true, cancel)
 
 	return engine,
 		NewExecutionOutput(
@@ -264,6 +265,7 @@ func (rs *LookupJoinStream) RunWorker(ctx context.Context, id *RecordID) error {
 		return errors.Wrapf(err, "couldn't commit transaction setting up the job")
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
 	engine := NewPullEngine(
 		&JobOutputQueueIntermediateRecordStore{recordID: id},
 		rs.stateStorage,
@@ -271,6 +273,7 @@ func (rs *LookupJoinStream) RunWorker(ctx context.Context, id *RecordID) error {
 		rs.streamID,
 		&ZeroWatermarkGenerator{},
 		true,
+		cancel,
 	)
 
 	engine.Run(ctx)

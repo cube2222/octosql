@@ -68,11 +68,10 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 
 	outStreamID := &execution.StreamID{Id: "output"}
 
-	pullEngine := execution.NewPullEngine(out, stateStorage, stream[0], outStreamID, execOutput[0].WatermarkSource, true)
+	ctx, cancel := context.WithCancel(ctx)
+	pullEngine := execution.NewPullEngine(out, stateStorage, stream[0], outStreamID, execOutput[0].WatermarkSource, true, cancel)
 
-	go func() {
-		pullEngine.Run(ctx)
-	}()
+	go pullEngine.Run(ctx)
 
 	printer := badger.NewStdOutPrinter(stateStorage.WithPrefix(outStreamID.AsPrefix()), out)
 	if err := printer.Run(ctx); err != nil {

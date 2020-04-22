@@ -65,9 +65,12 @@ type PullEngine struct {
 	streamID               *StreamID
 	batchSizeManager       *BatchSizeManager
 	shouldPrefixStreamID   bool
+
+	ctxCancel    func()
+	closeErrChan chan error
 }
 
-func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, source RecordStream, streamID *StreamID, watermarkSource WatermarkSource, shouldPrefixStreamID bool) *PullEngine {
+func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, source RecordStream, streamID *StreamID, watermarkSource WatermarkSource, shouldPrefixStreamID bool, cancel func()) *PullEngine {
 	return &PullEngine{
 		irs:                  irs,
 		storage:              storage,
@@ -76,6 +79,8 @@ func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, source 
 		watermarkSource:      watermarkSource,
 		batchSizeManager:     NewBatchSizeManager(time.Second / 4),
 		shouldPrefixStreamID: shouldPrefixStreamID,
+		ctxCancel:            cancel,
+		closeErrChan:         make(chan error),
 	}
 }
 
@@ -90,6 +95,13 @@ func (engine *PullEngine) Run(ctx context.Context) {
 	tx := engine.storage.BeginTransaction()
 
 	for {
+		select {
+		case <-ctx.Done():
+			engine.closeErrChan <- ctx.Err()
+			return
+		default:
+		}
+
 		err := engine.loop(ctx, tx)
 		if err == ErrEndOfStream {
 			err := tx.Commit()
@@ -219,6 +231,13 @@ func (engine *PullEngine) GetWatermark(ctx context.Context, tx storage.StateTran
 }
 
 func (engine *PullEngine) Close(ctx context.Context, storage storage.Storage) error {
+	engine.ctxCancel()
+	err := <-engine.closeErrChan
+	if err == context.Canceled {
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't stop pull engine")
+	}
+
 	if err := engine.source.Close(ctx, storage); err != nil {
 		return errors.Wrap(err, "couldn't close source stream")
 	}

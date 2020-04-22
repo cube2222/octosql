@@ -31,7 +31,6 @@ func TestJoinedStream_NoRetractions_NoEventTime(t *testing.T) {
 		NewRecordFromSliceWithNormalize(rightFields, []interface{}{"f", 12}, WithID(NewRecordID("id8"))),
 	})
 
-	streamID := GetRawStreamID()
 	outFields := []octosql.VariableName{"left.a", "left.b", "right.a", "right.b"}
 	expectedOutput := []*Record{
 		NewRecordFromSliceWithNormalize(outFields, []interface{}{"a", 0, "a", 10}),
@@ -47,17 +46,14 @@ func TestJoinedStream_NoRetractions_NoEventTime(t *testing.T) {
 	sj := NewStreamJoin(leftSource, rightSource, leftKey, rightKey, stateStorage, "", LEFT_JOIN)
 
 	tx := stateStorage.BeginTransaction()
-	stream, _, err := sj.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), streamID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	stream := GetTestStream(t, stateStorage, octosql.NoVariables(), sj)
 
 	want := NewInMemoryStream(storage.InjectStateTransaction(context.Background(), tx), expectedOutput)
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}
 
-	err = AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream, WithEqualityBasedOn(EqualityOfFieldsAndValues))
+	err := AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream, WithEqualityBasedOn(EqualityOfFieldsAndValues))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,17 +98,14 @@ func TestJoinedStream_NoRetractions_WithEventTime(t *testing.T) {
 	sj := NewStreamJoin(leftSource, rightSource, leftKey, rightKey, stateStorage, outputEventTimeField, LEFT_JOIN)
 
 	tx := stateStorage.BeginTransaction()
-	stream, _, err := sj.Get(storage.InjectStateTransaction(context.Background(), tx), octosql.NoVariables(), streamID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	stream := GetTestStream(t, stateStorage, octosql.NoVariables(), sj)
 
 	want := NewInMemoryStream(storage.InjectStateTransaction(context.Background(), tx), expectedOutput)
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}
 
-	err = AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream, WithEqualityBasedOn(EqualityOfFieldsAndValues, EqualityOfEventTimeField))
+	err := AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream, WithEqualityBasedOn(EqualityOfFieldsAndValues, EqualityOfEventTimeField))
 	if err != nil {
 		t.Fatal(err)
 	}

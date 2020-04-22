@@ -92,13 +92,12 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 	}
 
 	streamJoinPullEngine := NewPullEngine(processFunc, node.storage, []RecordStream{leftStream, rightStream}, streamID, watermarkSource, true)
-	go streamJoinPullEngine.Run(ctx)
 
 	return streamJoinPullEngine,
 		NewExecutionOutput(
 			streamJoinPullEngine,
 			nil,
-			append(leftExec.TasksToRun, rightExec.TasksToRun...),
+			append(leftExec.TasksToRun, append(rightExec.TasksToRun, func() error { streamJoinPullEngine.Run(ctx); return nil })...),
 		), nil
 }
 

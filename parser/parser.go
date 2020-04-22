@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
@@ -374,16 +375,12 @@ func ParseJoinTableExpression(expr *sqlparser.JoinTableExpr) (logical.Node, erro
 
 	var source, joined logical.Node
 	switch expr.Join {
-	case sqlparser.LeftJoinStr:
+	case sqlparser.LeftJoinStr, sqlparser.JoinStr:
 		source = leftTable
 		joined = rightTable
 	case sqlparser.RightJoinStr:
 		source = rightTable
 		joined = leftTable
-	case sqlparser.JoinStr:
-		// TODO: Add cardinality based heuristics
-		source = leftTable
-		joined = rightTable
 	default:
 		return nil, errors.Errorf("invalid join expression: %v", expr.Join)
 	}
@@ -399,9 +396,9 @@ func ParseJoinTableExpression(expr *sqlparser.JoinTableExpr) (logical.Node, erro
 
 	switch expr.Join {
 	case sqlparser.LeftJoinStr, sqlparser.RightJoinStr:
-		return logical.NewJoin(source, joined, true), nil
+		return logical.NewJoin(source, joined, execution.LEFT_JOIN), nil
 	case sqlparser.JoinStr:
-		return logical.NewJoin(source, joined, false), nil
+		return logical.NewJoin(source, joined, execution.INNER_JOIN), nil
 	default:
 		return nil, errors.Errorf("invalid join expression: %v", expr.Join)
 	}

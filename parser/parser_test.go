@@ -7,6 +7,7 @@ import (
 	"time"
 
 	memmap "github.com/bradleyjkemp/memviz"
+	"github.com/cube2222/octosql/execution"
 
 	"github.com/cube2222/octosql"
 
@@ -673,7 +674,7 @@ SELECT p.name FROM people p LEFT JOIN cities c ON p.city = c.name AND p.favorite
 							),
 							logical.NewDataSource("cities", "c"),
 						),
-						true,
+						execution.LEFT_JOIN,
 					),
 					true,
 				),
@@ -713,7 +714,7 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 							),
 							logical.NewDataSource("cities", "c"),
 						),
-						true,
+						execution.LEFT_JOIN,
 					),
 					true,
 				),

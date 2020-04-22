@@ -133,7 +133,7 @@ func EqualNodes(node1, node2 Node) error {
 				return errors.Wrap(err, "joined nodes underneath not equal")
 			}
 
-			if node1.isLeftJoin != node2.isLeftJoin {
+			if node1.joinType != node2.joinType {
 				return errors.New("joins differ on isLeftJoin")
 			}
 

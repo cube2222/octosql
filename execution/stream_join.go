@@ -60,20 +60,19 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 		return nil, nil, errors.Wrap(err, "couldn't get right source stream ID")
 	}
 
-	leftStream, leftExec, err := node.leftSource.Get(ctx, variables, leftSourceStreamID)
+	leftStream, _, err := node.leftSource.Get(ctx, variables, leftSourceStreamID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get left source stream in stream join")
 	}
 
-	rightStream, rightExec, err := node.rightSource.Get(ctx, variables, rightSourceStreamID)
+	rightStream, _, err := node.rightSource.Get(ctx, variables, rightSourceStreamID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get right source stream in stream join")
 	}
 
-	execOutput := &UnifiedStream{
-		sources:          []RecordStream{leftStream, rightStream},
-		watermarkSources: []WatermarkSource{leftExec.WatermarkSource, rightExec.WatermarkSource},
-		streamID:         GetRawStreamID(), // TODO: is this right?
+	_, execOutput, err := NewShuffle(1, NewConstantStrategyPrototype(0), []Node{node.leftSource, node.rightSource}).Get(ctx, variables, GetRawStreamID()) // TODO: what about the stream ID?
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't create execution output for stream join")
 	}
 
 	trigger, err := node.trigger.Get(ctx, variables)
@@ -95,10 +94,15 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 		variables:       variables,
 	}
 
-	streamJoinPullEngine := NewPullEngine(processFunc, node.storage, []RecordStream{leftStream, rightStream}, streamID, execOutput)
+	streamJoinPullEngine := NewPullEngine(processFunc, node.storage, []RecordStream{leftStream, rightStream}, streamID, execOutput.WatermarkSource, true)
 	go streamJoinPullEngine.Run(ctx)
 
-	return streamJoinPullEngine, NewExecutionOutput(streamJoinPullEngine), nil
+	return streamJoinPullEngine,
+		NewExecutionOutput(
+			streamJoinPullEngine,
+			execOutput.NextShuffles,
+			execOutput.TasksToRun,
+		), nil
 }
 
 type JoinedStream struct {

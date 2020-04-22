@@ -2,8 +2,10 @@ package logical
 
 import (
 	"context"
+	"runtime"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/metadata"
@@ -25,6 +27,8 @@ func NewJoin(source, joined Node, joinType execution.JoinType) *Join {
 }
 
 func (node *Join) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
+	var outNodes []physical.Node
+
 	sourceNodes, sourceVariables, err := node.source.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for join source nodes")
@@ -39,10 +43,6 @@ func (node *Join) Physical(ctx context.Context, physicalCreator *PhysicalPlanCre
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't merge variables for source and joined nodes")
 	}
-
-	sourceShuffled := physical.NewShuffle(1, sourceNodes, physical.DefaultShuffleStrategy)
-	joinedShuffled := physical.NewShuffle(1, joinedNodes, physical.DefaultShuffleStrategy)
-	outNodes := make([]physical.Node, len(sourceShuffled))
 
 	// Based on the cardinality of sources we decide whether we will create a stream_join or a lookup_join
 	// Stream joins support only equity conjunctions (i.e a.x = b.y AND a.v + 17 = b.something * 2)
@@ -96,11 +96,31 @@ func (node *Join) Physical(ctx context.Context, physicalCreator *PhysicalPlanCre
 			return nil, nil, errors.Wrap(err, "couldn't create keys from join formula")
 		}
 
+		// Get the number of partitions into which the stream join will be split
+		streamJoinParallelism, err := config.GetInt(
+			physicalCreator.physicalConfig,
+			"streamJoinParallelism",
+			config.WithDefault(runtime.GOMAXPROCS(0)),
+		)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "couldn't get streamJoinParallelism configuration")
+
+		}
+
+		sourceShuffled := physical.NewShuffle(streamJoinParallelism, physical.NewKeyHashingStrategy(sourceKey), sourceNodes)
+		joinedShuffled := physical.NewShuffle(streamJoinParallelism, physical.NewKeyHashingStrategy(joinedKey), joinedNodes)
+		outNodes = make([]physical.Node, len(sourceShuffled))
+
 		for i := range outNodes {
 			outNodes[i] = physical.NewStreamJoin(sourceShuffled[i], joinedShuffled[i], sourceKey, joinedKey, eventTimeField, node.joinType)
 		}
 	} else { // if the conditions for a stream join aren't met we create a lookup join
 		isLeftJoin := node.joinType == execution.LEFT_JOIN
+
+		sourceShuffled := physical.NewShuffle(1, physical.NewConstantStrategy(0), sourceNodes)
+		joinedShuffled := physical.NewShuffle(1, physical.NewConstantStrategy(0), joinedNodes)
+		outNodes = make([]physical.Node, len(sourceShuffled))
+
 		for i := range outNodes {
 			outNodes[i] = physical.NewLookupJoin(sourceShuffled[i], joinedShuffled[i], isLeftJoin)
 		}

@@ -53,6 +53,33 @@ func NewZeroWatermarkGenerator() *ZeroWatermarkGenerator {
 	return &ZeroWatermarkGenerator{}
 }
 
+type UnionWatermarkGenerator struct {
+	sources []WatermarkSource
+}
+
+func NewUnionWatermarkGenerator(sources []WatermarkSource) *UnionWatermarkGenerator {
+	return &UnionWatermarkGenerator{
+		sources: sources,
+	}
+}
+
+func (uwg *UnionWatermarkGenerator) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
+	minimalTime := maxWatermark
+
+	for i := range uwg.sources {
+		sourceTime, err := uwg.sources[i].GetWatermark(ctx, tx)
+		if err != nil {
+			return minimalTime, errors.Wrapf(err, "couldn't get watermark for source with id %v", i)
+		}
+
+		if minimalTime.After(sourceTime) {
+			minimalTime = sourceTime
+		}
+	}
+
+	return minimalTime, nil
+}
+
 type Node interface {
 	Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error)
 }

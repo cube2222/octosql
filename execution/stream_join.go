@@ -60,20 +60,17 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 		return nil, nil, errors.Wrap(err, "couldn't get right source stream ID")
 	}
 
-	leftStream, _, err := node.leftSource.Get(ctx, variables, leftSourceStreamID)
+	leftStream, leftExec, err := node.leftSource.Get(ctx, variables, leftSourceStreamID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get left source stream in stream join")
 	}
 
-	rightStream, _, err := node.rightSource.Get(ctx, variables, rightSourceStreamID)
+	rightStream, rightExec, err := node.rightSource.Get(ctx, variables, rightSourceStreamID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get right source stream in stream join")
 	}
 
-	_, execOutput, err := NewShuffle(1, NewConstantStrategyPrototype(0), []Node{node.leftSource, node.rightSource}).Get(ctx, variables, GetRawStreamID()) // TODO: what about the stream ID?
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't create execution output for stream join")
-	}
+	watermarkSource := NewUnionWatermarkGenerator([]WatermarkSource{leftExec.WatermarkSource, rightExec.WatermarkSource})
 
 	trigger, err := node.trigger.Get(ctx, variables)
 	if err != nil {
@@ -94,14 +91,14 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 		variables:       variables,
 	}
 
-	streamJoinPullEngine := NewPullEngine(processFunc, node.storage, []RecordStream{leftStream, rightStream}, streamID, execOutput.WatermarkSource, true)
+	streamJoinPullEngine := NewPullEngine(processFunc, node.storage, []RecordStream{leftStream, rightStream}, streamID, watermarkSource, true)
 	go streamJoinPullEngine.Run(ctx)
 
 	return streamJoinPullEngine,
 		NewExecutionOutput(
 			streamJoinPullEngine,
-			execOutput.NextShuffles,
-			execOutput.TasksToRun,
+			nil,
+			append(leftExec.TasksToRun, rightExec.TasksToRun...),
 		), nil
 }
 

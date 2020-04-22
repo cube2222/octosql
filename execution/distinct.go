@@ -54,14 +54,13 @@ func (node *Distinct) Get(ctx context.Context, variables octosql.Variables, stre
 		variables:       variables,
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-	distinctPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, execOutput.WatermarkSource, true, cancel)
+	distinctPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, execOutput.WatermarkSource, true, ctx)
 
 	return distinctPullEngine,
 		NewExecutionOutput(
 			distinctPullEngine,
 			execOutput.NextShuffles,
-			append(execOutput.TasksToRun, func() error { distinctPullEngine.Run(ctx); return nil }),
+			append(execOutput.TasksToRun, func() error { distinctPullEngine.Run(); return nil }),
 		),
 		nil
 }

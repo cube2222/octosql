@@ -206,10 +206,9 @@ func (s *Shuffle) StartSources(ctx context.Context, stateStorage storage.Storage
 		// Start the shuffle sender.
 		sender := NewShuffleSender(senderStreamID, shuffleID, strategy, s.outputPartitionCount, partition)
 
-		ctx, cancel := context.WithCancel(ctx)
-		engine := NewPullEngine(sender, stateStorage, rs, nil, execOutput.WatermarkSource, false, cancel)
+		engine := NewPullEngine(sender, stateStorage, rs, nil, execOutput.WatermarkSource, false, ctx)
 
-		go engine.Run(ctx)
+		go engine.Run()
 	}
 
 	return nextShuffles, nil

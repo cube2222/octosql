@@ -66,11 +66,14 @@ type PullEngine struct {
 	batchSizeManager       *BatchSizeManager
 	shouldPrefixStreamID   bool
 
+	ctx          context.Context
 	ctxCancel    func()
 	closeErrChan chan error
 }
 
-func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, source RecordStream, streamID *StreamID, watermarkSource WatermarkSource, shouldPrefixStreamID bool, cancel func()) *PullEngine {
+func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, source RecordStream, streamID *StreamID, watermarkSource WatermarkSource, shouldPrefixStreamID bool, ctx context.Context) *PullEngine {
+	ctx, cancel := context.WithCancel(ctx)
+
 	return &PullEngine{
 		irs:                  irs,
 		storage:              storage,
@@ -79,6 +82,7 @@ func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, source 
 		watermarkSource:      watermarkSource,
 		batchSizeManager:     NewBatchSizeManager(time.Second / 4),
 		shouldPrefixStreamID: shouldPrefixStreamID,
+		ctx:                  ctx,
 		ctxCancel:            cancel,
 		closeErrChan:         make(chan error),
 	}
@@ -91,18 +95,18 @@ func (engine *PullEngine) getPrefixedTx(tx storage.StateTransaction) storage.Sta
 	return tx
 }
 
-func (engine *PullEngine) Run(ctx context.Context) {
+func (engine *PullEngine) Run() {
 	tx := engine.storage.BeginTransaction()
 
 	for {
 		select {
-		case <-ctx.Done():
-			engine.closeErrChan <- ctx.Err()
+		case <-engine.ctx.Done():
+			engine.closeErrChan <- engine.ctx.Err()
 			return
 		default:
 		}
 
-		err := engine.loop(ctx, tx)
+		err := engine.loop(engine.ctx, tx)
 		if err == ErrEndOfStream {
 			err := tx.Commit()
 			if err != nil {
@@ -125,7 +129,7 @@ func (engine *PullEngine) Run(ctx context.Context) {
 				log.Println("engine: couldn't commit: ", err)
 			}
 			engine.batchSizeManager.CommitSuccessful()
-			err = waitableError.ListenForChanges(ctx)
+			err = waitableError.ListenForChanges(engine.ctx)
 			if err != nil {
 				log.Println("engine: couldn't listen for changes: ", err)
 			}
@@ -139,7 +143,7 @@ func (engine *PullEngine) Run(ctx context.Context) {
 			tx.Abort()
 			log.Println("engine: ", err)
 			tx = engine.storage.BeginTransaction()
-			err := engine.irs.MarkError(ctx, engine.getPrefixedTx(tx), err)
+			err := engine.irs.MarkError(engine.ctx, engine.getPrefixedTx(tx), err)
 			if err != nil {
 				log.Fatalf("couldn't mark error on intermediate record store: %s", err)
 			}

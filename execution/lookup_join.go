@@ -114,14 +114,13 @@ func (node *LookupJoin) Get(ctx context.Context, variables octosql.Variables, st
 	go rs.RunScheduler(ctx)
 
 	// Run the pull engine which supplies this lookup join with records which are in need of joining.
-	ctx, cancel := context.WithCancel(ctx)
-	engine := NewPullEngine(rs, node.stateStorage, sourceStream, streamID, execOutput.WatermarkSource, true, cancel)
+	engine := NewPullEngine(rs, node.stateStorage, sourceStream, streamID, execOutput.WatermarkSource, true, ctx)
 
 	return engine,
 		NewExecutionOutput(
 			engine,
 			execOutput.NextShuffles,
-			append(execOutput.TasksToRun, func() error { engine.Run(ctx); return nil }),
+			append(execOutput.TasksToRun, func() error { engine.Run(); return nil }),
 		),
 		nil
 }
@@ -265,7 +264,6 @@ func (rs *LookupJoinStream) RunWorker(ctx context.Context, id *RecordID) error {
 		return errors.Wrapf(err, "couldn't commit transaction setting up the job")
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
 	engine := NewPullEngine(
 		&JobOutputQueueIntermediateRecordStore{recordID: id},
 		rs.stateStorage,
@@ -273,10 +271,10 @@ func (rs *LookupJoinStream) RunWorker(ctx context.Context, id *RecordID) error {
 		rs.streamID,
 		&ZeroWatermarkGenerator{},
 		true,
-		cancel,
+		ctx,
 	)
 
-	engine.Run(ctx)
+	engine.Run()
 
 	// We're done, the receiver of all those records will clean up everything when he's done reading.
 

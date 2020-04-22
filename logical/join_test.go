@@ -60,7 +60,7 @@ func TestJoin_Physical(t *testing.T) {
 				},
 
 				joined: &Filter{
-					formula: &InfixOperator{
+					formula: &InfixOperator{ // ON a.field1 = b.field2 AND b.field1 = a.field2
 						Left: &Predicate{
 							Left:     &Variable{"a.field1"},
 							Relation: Equal,
@@ -96,6 +96,151 @@ func TestJoin_Physical(t *testing.T) {
 			wantNode: &physical.StreamJoin{
 				SourceKey:      []physical.Expression{physical.NewVariable("a.field1"), physical.NewVariable("a.field2")},
 				JoinedKey:      []physical.Expression{physical.NewVariable("b.field2"), physical.NewVariable("b.field1")},
+				EventTimeField: "",
+			},
+
+			wantErr: false,
+		},
+
+		{
+			name: "outer join - stream join",
+			fields: fields{
+				source: &StubNode{
+					metadata: metadata.NewNodeMetadata(
+						metadata.Unbounded,
+						"",
+						metadata.NewNamespace(
+							[]string{""},
+							[]octosql.VariableName{"a.field1"},
+						),
+					),
+					variables: octosql.NoVariables(),
+				},
+
+				joined: &Filter{
+					formula: &Predicate{ // ON a.field1 = b.field1
+						Left:     &Variable{"a.field1"},
+						Relation: Equal,
+						Right:    &Variable{"b.field1"},
+					},
+
+					source: &StubNode{
+						metadata: metadata.NewNodeMetadata(
+							metadata.Unbounded,
+							"",
+							metadata.NewNamespace(
+								[]string{""},
+								[]octosql.VariableName{"b.field1"},
+							),
+						),
+					},
+				},
+
+				joinType: execution.OUTER_JOIN,
+			},
+
+			args: args{
+				ctx:             context.Background(),
+				physicalCreator: nil,
+			},
+
+			wantNode: &physical.StreamJoin{
+				SourceKey:      []physical.Expression{physical.NewVariable("a.field1")},
+				JoinedKey:      []physical.Expression{physical.NewVariable("b.field1")},
+				EventTimeField: "",
+			},
+
+			wantErr: false,
+		},
+
+		{
+			name: "unbounded and fits in local storage - stream join + eventTimeField",
+			fields: fields{
+				source: &StubNode{
+					metadata: metadata.NewNodeMetadata(
+						metadata.Unbounded,
+						"a.field1",
+						metadata.NewNamespace(
+							[]string{""},
+							[]octosql.VariableName{"a.field1"},
+						),
+					),
+					variables: octosql.NoVariables(),
+				},
+
+				joined: &Filter{
+					formula: &Predicate{ // ON a.field1 = b.field1
+						Left:     &Variable{"a.field1"},
+						Relation: Equal,
+						Right:    &Variable{"b.field1"},
+					},
+
+					source: &StubNode{
+						metadata: metadata.NewNodeMetadata(
+							metadata.BoundedFitsInLocalStorage,
+							"b.field1",
+							metadata.NewNamespace(
+								[]string{""},
+								[]octosql.VariableName{"b.field1"},
+							),
+						),
+					},
+				},
+
+				joinType: execution.INNER_JOIN,
+			},
+
+			args: args{
+				ctx:             context.Background(),
+				physicalCreator: nil,
+			},
+
+			wantNode: &physical.StreamJoin{
+				SourceKey:      []physical.Expression{physical.NewVariable("a.field1")},
+				JoinedKey:      []physical.Expression{physical.NewVariable("b.field1")},
+				EventTimeField: "a.field1",
+			},
+
+			wantErr: false,
+		},
+
+		{
+			name: "two bounded streams, no predicate - stream join",
+			fields: fields{
+				source: &StubNode{
+					metadata: metadata.NewNodeMetadata(
+						metadata.Unbounded,
+						"",
+						metadata.NewNamespace(
+							[]string{""},
+							[]octosql.VariableName{"a.field1"},
+						),
+					),
+					variables: octosql.NoVariables(),
+				},
+
+				joined: &StubNode{
+					metadata: metadata.NewNodeMetadata(
+						metadata.BoundedFitsInLocalStorage,
+						"",
+						metadata.NewNamespace(
+							[]string{""},
+							[]octosql.VariableName{"b.field1"},
+						),
+					),
+				},
+
+				joinType: execution.INNER_JOIN,
+			},
+
+			args: args{
+				ctx:             context.Background(),
+				physicalCreator: nil,
+			},
+
+			wantNode: &physical.StreamJoin{
+				SourceKey:      []physical.Expression{},
+				JoinedKey:      []physical.Expression{},
 				EventTimeField: "",
 			},
 
@@ -146,7 +291,8 @@ func TestJoin_Physical(t *testing.T) {
 				}
 
 			case *physical.LookupJoin:
-				if _, ok := tt.wantNode.(*physical.LookupJoin); !ok {
+				_, ok := tt.wantNode.(*physical.LookupJoin)
+				if !ok {
 					t.Errorf("Expected a stream join, got a lookup join")
 				}
 			default:

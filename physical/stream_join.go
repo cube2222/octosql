@@ -16,17 +16,17 @@ type StreamJoin struct {
 	sourceKey      []Expression
 	joinedKey      []Expression
 	eventTimeField octosql.VariableName
-	isLeftJoin     bool
+	joinType       execution.JoinType
 }
 
-func NewStreamJoin(source, joined Node, sourceKey, joinedKey []Expression, eventTimeField octosql.VariableName, isLeftJoin bool) *StreamJoin {
+func NewStreamJoin(source, joined Node, sourceKey, joinedKey []Expression, eventTimeField octosql.VariableName, joinType execution.JoinType) *StreamJoin {
 	return &StreamJoin{
 		source:         source,
 		joined:         joined,
 		sourceKey:      sourceKey,
 		joinedKey:      joinedKey,
 		eventTimeField: eventTimeField,
-		isLeftJoin:     isLeftJoin,
+		joinType:       joinType,
 	}
 }
 
@@ -37,7 +37,7 @@ func (node *StreamJoin) Transform(ctx context.Context, transformers *Transformer
 		sourceKey:      node.sourceKey,
 		joinedKey:      node.joinedKey,
 		eventTimeField: node.eventTimeField,
-		isLeftJoin:     node.isLeftJoin,
+		joinType:       node.joinType,
 	}
 
 	if transformers.NodeT != nil {
@@ -76,7 +76,7 @@ func (node *StreamJoin) Materialize(ctx context.Context, matCtx *Materialization
 		materializedJoinedKey[i] = materializedJoined
 	}
 
-	return execution.NewStreamJoin(materializedSource, materializedJoined, materializedSourceKey, materializedJoinedKey, matCtx.Storage, node.eventTimeField, node.isLeftJoin), nil
+	return execution.NewStreamJoin(materializedSource, materializedJoined, materializedSourceKey, materializedJoinedKey, matCtx.Storage, node.eventTimeField, node.joinType), nil
 }
 
 func (node *StreamJoin) Metadata() *metadata.NodeMetadata {

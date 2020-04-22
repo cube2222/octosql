@@ -1,13 +1,57 @@
 package logical
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/metadata"
 )
+
+func TestJoin_Physical(t *testing.T) {
+	type fields struct {
+		source   Node
+		joined   Node
+		joinType execution.JoinType
+	}
+	type args struct {
+		ctx             context.Context
+		physicalCreator *PhysicalPlanCreator
+	}
+	tests := []struct {
+		name          string
+		fields        fields
+		args          args
+		wantNode      physical.Node
+		wantVariables octosql.Variables
+		wantErr       bool
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			node := &Join{
+				source:   tt.fields.source,
+				joined:   tt.fields.joined,
+				joinType: tt.fields.joinType,
+			}
+			gotNodes, gotVariables, err := node.Physical(tt.args.ctx, tt.args.physicalCreator)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Physical() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(gotNodes[0], tt.wantNode) {
+				t.Errorf("Physical() got = %v, want %v", gotNodes[0], tt.wantNode)
+			}
+			if !reflect.DeepEqual(gotVariables, tt.wantVariables) {
+				t.Errorf("Physical() got1 = %v, want %v", gotVariables, tt.wantVariables)
+			}
+		})
+	}
+}
 
 func Test_isConjunctionOfEqualities(t *testing.T) {
 	type args struct {

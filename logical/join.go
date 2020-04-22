@@ -4,22 +4,23 @@ import (
 	"context"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/pkg/errors"
 )
 
 type Join struct {
-	source     Node
-	joined     Node
-	isLeftJoin bool
+	source   Node
+	joined   Node
+	joinType execution.JoinType // TODO: define this on every level, or import execution?
 }
 
-func NewJoin(source, joined Node, isLeftJoin bool) *Join {
+func NewJoin(source, joined Node, joinType execution.JoinType) *Join {
 	return &Join{
-		source:     source,
-		joined:     joined,
-		isLeftJoin: isLeftJoin,
+		source:   source,
+		joined:   joined,
+		joinType: joinType,
 	}
 }
 
@@ -58,6 +59,11 @@ func (node *Join) Physical(ctx context.Context, physicalCreator *PhysicalPlanCre
 		isStreamJoin = true
 	}
 
+	// Lookup join doesn't support outer join, so it must be a stream join
+	if node.joinType == execution.OUTER_JOIN {
+		isStreamJoin = true
+	}
+
 	if isStreamJoin {
 		var formula physical.Formula
 		if filter, ok := joinedNodes[0].(*physical.Filter); ok {
@@ -88,11 +94,12 @@ func (node *Join) Physical(ctx context.Context, physicalCreator *PhysicalPlanCre
 		}
 
 		for i := range outNodes {
-			outNodes[i] = physical.NewStreamJoin(sourceShuffled[i], joinedShuffled[i], sourceKey, joinedKey, eventTimeField, node.isLeftJoin)
+			outNodes[i] = physical.NewStreamJoin(sourceShuffled[i], joinedShuffled[i], sourceKey, joinedKey, eventTimeField, node.joinType)
 		}
 	} else { // if the conditions for a stream join aren't met we create a lookup join
+		isLeftJoin := node.joinType == execution.LEFT_JOIN
 		for i := range outNodes {
-			outNodes[i] = physical.NewLookupJoin(sourceShuffled[i], joinedShuffled[i], node.isLeftJoin)
+			outNodes[i] = physical.NewLookupJoin(sourceShuffled[i], joinedShuffled[i], isLeftJoin)
 		}
 	}
 

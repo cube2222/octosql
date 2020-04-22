@@ -37,7 +37,7 @@ func TestSet(t *testing.T) {
 	}
 
 	for _, value := range values {
-		inserted, err := set.Insert(value)
+		inserted, err := set.InsertWithConfirmation(value)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -70,7 +70,7 @@ func TestSet(t *testing.T) {
 	_ = iter.Close()
 
 	/* test erase */
-	wasErased, err := set.Erase(values[0])
+	wasErased, err := set.EraseWithConfirmation(values[0])
 
 	if !wasErased {
 		log.Fatal("the value should've been erased, but it wasn't")
@@ -89,7 +89,7 @@ func TestSet(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	wasErased, err = set.Erase(values[0])
+	wasErased, err = set.EraseWithConfirmation(values[0])
 
 	if wasErased {
 		log.Fatal("the value should not have been erased, but it was")

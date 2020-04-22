@@ -26,7 +26,12 @@ func NewSet(tx StateTransaction) *Set {
 	}
 }
 
-func (set *Set) Insert(value octosql.Value) (bool, error) {
+func (set *Set) Insert(value octosql.Value) error {
+	_, err := set.insertUsingHash(value, hashValue)
+	return err
+}
+
+func (set *Set) InsertWithConfirmation(value octosql.Value) (bool, error) {
 	return set.insertUsingHash(value, hashValue)
 }
 
@@ -65,7 +70,12 @@ func (set *Set) containsUsingHash(value octosql.Value, hashFunction func(octosql
 	return getPositionInTuple(values, value) != -1, nil
 }
 
-func (set *Set) Erase(value octosql.Value) (bool, error) {
+func (set *Set) Erase(value octosql.Value) error {
+	_, err := set.eraseUsingHash(value, hashValue)
+	return err
+}
+
+func (set *Set) EraseWithConfirmation(value octosql.Value) (bool, error) {
 	return set.eraseUsingHash(value, hashValue)
 }
 

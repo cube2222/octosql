@@ -41,7 +41,7 @@ func TestJoinedStream_NoRetractions_NoEventTime(t *testing.T) {
 	leftKey := []Expression{NewVariable("left.a")}
 	rightKey := []Expression{NewVariable("right.a")}
 
-	sj := NewStreamJoin(leftSource, rightSource, leftKey, rightKey, stateStorage, "", LEFT_JOIN)
+	sj := NewStreamJoin(leftSource, rightSource, leftKey, rightKey, stateStorage, "", INNER_JOIN)
 
 	stream, _, err := GetAndStartAllShuffles(context.Background(), stateStorage, GetRawStreamID(), []Node{sj}, octosql.NoVariables())
 	if err != nil {

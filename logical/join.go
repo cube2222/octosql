@@ -109,6 +109,15 @@ func (node *Join) Physical(ctx context.Context, physicalCreator *PhysicalPlanCre
 
 		sourceShuffled := physical.NewShuffle(streamJoinParallelism, physical.NewKeyHashingStrategy(sourceKey), sourceNodes)
 		joinedShuffled := physical.NewShuffle(streamJoinParallelism, physical.NewKeyHashingStrategy(joinedKey), joinedNodes)
+
+		for i := range sourceShuffled {
+			sourceShuffled[i] = physical.NewNextShuffleMetadataChange("_left", i, sourceShuffled[i])
+		}
+
+		for i := range joinedShuffled {
+			joinedShuffled[i] = physical.NewNextShuffleMetadataChange("_right", i, sourceShuffled[i])
+		}
+
 		outNodes = make([]physical.Node, len(sourceShuffled))
 
 		for i := range outNodes {

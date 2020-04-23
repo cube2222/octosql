@@ -2,7 +2,6 @@ package execution
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
@@ -58,24 +57,12 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 		return nil, nil, errors.Wrap(err, "couldn't get right source stream ID")
 	}
 
-	// Get our current pipeline metadata, modify it for both streams and get the underlying streams
-	pipelineMetadata := ctx.Value(pipelineMetadataContextKey{}).(PipelineMetadata)
-	leftPipelineMetadata := PipelineMetadata{
-		NextShuffleID: NewShuffleID(fmt.Sprintf("%s_%s", pipelineMetadata.NextShuffleID.Id, "left")),
-		Partition:     pipelineMetadata.Partition,
-	}
-
-	leftStream, leftExec, err := node.leftSource.Get(context.WithValue(ctx, pipelineMetadataContextKey{}, leftPipelineMetadata), variables, leftSourceStreamID)
+	leftStream, leftExec, err := node.leftSource.Get(ctx, variables, leftSourceStreamID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get left source stream in stream join")
 	}
 
-	rightPipelineMetadata := PipelineMetadata{
-		NextShuffleID: NewShuffleID(fmt.Sprintf("%s_%s", pipelineMetadata.NextShuffleID.Id, "right")),
-		Partition:     pipelineMetadata.Partition,
-	}
-
-	rightStream, rightExec, err := node.rightSource.Get(context.WithValue(ctx, pipelineMetadataContextKey{}, rightPipelineMetadata), variables, rightSourceStreamID)
+	rightStream, rightExec, err := node.rightSource.Get(ctx, variables, rightSourceStreamID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get right source stream in stream join")
 	}
@@ -126,7 +113,8 @@ type JoinedStream struct {
 
 var leftStreamRecordsPrefix = []byte("$left_stream_records$")
 var rightStreamRecordsPrefix = []byte("$right_stream_records$")
-var toTriggerPrefix = []byte("$values_to_trigger$")
+var matchesToTriggerPrefix = []byte("$matches_to_trigger$")
+var recordsToTriggerPrefix = []byte("$records_to_trigger$")
 
 func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, key octosql.Value, record *Record) error {
 	if inputIndex < 0 || inputIndex > 1 {
@@ -193,7 +181,7 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 		return errors.Wrap(err, "couldn't read records from the other stream")
 	}
 
-	toTriggerSet := storage.NewSet(txByKey.WithPrefix(toTriggerPrefix))
+	matchesToTriggerSet := storage.NewSet(txByKey.WithPrefix(matchesToTriggerPrefix))
 
 	// Add matched records
 	for _, otherRecordValue := range otherRecordValues {
@@ -211,7 +199,7 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 		match := createMatch(leftRecord, rightRecord, false)
 
 		if !isRetraction { // adding the record
-			if err := toTriggerSet.Insert(match); err != nil {
+			if err := matchesToTriggerSet.Insert(match); err != nil {
 				return errors.Wrap(err, "couldn't store a match of records")
 			}
 		} else { // retracting a record
@@ -219,17 +207,17 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 			// 1) The matching is present in the toTrigger set -> we just remove it
 			// 2) The matching isn't present (so it's already been triggered) -> we send a retraction for it
 
-			isPresent, err := toTriggerSet.Contains(match)
+			isPresent, err := matchesToTriggerSet.Contains(match)
 			if err != nil {
-				return errors.Wrap(err, "couldn't check whether a match of records is present in the toTrigger set")
+				return errors.Wrap(err, "couldn't check whether a match of records is present in the set")
 			}
 
 			if isPresent {
-				if err := toTriggerSet.Erase(match); err != nil {
-					return errors.Wrap(err, "couldn't remove a match of records from the toTrigger set")
+				if err := matchesToTriggerSet.Erase(match); err != nil {
+					return errors.Wrap(err, "couldn't remove a match of records from the set")
 				}
 			} else {
-				if err := toTriggerSet.Insert(createMatch(leftRecord, rightRecord, true)); err != nil {
+				if err := matchesToTriggerSet.Insert(createMatch(leftRecord, rightRecord, true)); err != nil {
 					return errors.Wrap(err, "couldn't store the retraction of a match ")
 				}
 			}
@@ -238,32 +226,34 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 
 	// Now additionally we might need to add the record itself if we are dealing with a specific join type
 
+	recordsToTriggerSet := storage.NewSet(txByKey.WithPrefix(recordsToTriggerPrefix))
+
 	// If we are performing an outer join or a left join and the record comes from the left
 	if js.joinType == OUTER_JOIN || (js.joinType == LEFT_JOIN && isLeft) {
 		if !isRetraction {
-			if err := toTriggerSet.Insert(newRecordValue); err != nil {
-				return errors.Wrap(err, "couldn't insert record into the toTrigger set")
+			if err := recordsToTriggerSet.Insert(newRecordValue); err != nil {
+				return errors.Wrap(err, "couldn't insert record into the set")
 			}
 		} else {
 			// If it's a retraction we do the same as before: check if it's present in the set, if yes
 			// remove it, otherwise send a retraction.
-			contains, err := toTriggerSet.Contains(newRecordValue)
+			contains, err := recordsToTriggerSet.Contains(newRecordValue)
 			if err != nil {
 				return errors.Wrap(err, "couldn't check whether the toTrigger set contains the record")
 			}
 
 			if contains {
 				// Remove the record from the set
-				if err := toTriggerSet.Erase(newRecordValue); err != nil {
-					return errors.Wrap(err, "couldn't remove record from the toTrigger set")
+				if err := recordsToTriggerSet.Erase(newRecordValue); err != nil {
+					return errors.Wrap(err, "couldn't remove record from the set")
 				}
 			} else {
 				// Send a retraction
-				retractionRecord := NewRecordFromRecord(record, WithUndo())
+				retractionRecord := NewRecordFromRecord(record, WithMetadataFrom(record), WithUndo())
 				retractionRecordValue := recordToValue(retractionRecord)
 
-				if err := toTriggerSet.Insert(retractionRecordValue); err != nil {
-					return errors.Wrap(err, "couldn't insert a retraction for the record into the toTrigger set")
+				if err := recordsToTriggerSet.Insert(retractionRecordValue); err != nil {
+					return errors.Wrap(err, "couldn't insert a retraction for the record into the set")
 				}
 			}
 		}
@@ -291,8 +281,8 @@ func (js *JoinedStream) Trigger(ctx context.Context, tx storage.StateTransaction
 	triggeredCountValue := triggeredCount.AsInt()
 
 	// Read all the pairs to merge and send
-	toTriggerSet := storage.NewSet(txByKey.WithPrefix(toTriggerPrefix))
-	matches, err := toTriggerSet.ReadAll()
+	matchesToTriggerSet := storage.NewSet(txByKey.WithPrefix(matchesToTriggerPrefix))
+	matches, err := matchesToTriggerSet.ReadAll()
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't read record matches to trigger")
 	}
@@ -305,7 +295,7 @@ func (js *JoinedStream) Trigger(ctx context.Context, tx storage.StateTransaction
 		return nil, errors.Wrap(err, "couldn't update count of triggered records")
 	}
 
-	records := make([]*Record, 0)
+	records := make([]*Record, len(matches))
 	// Retrieve record pairs from the set and merge them
 	for i, match := range matches {
 		idForMatch := NewRecordIDFromStreamIDWithOffset(js.streamID, triggeredCountValue+i)
@@ -315,12 +305,26 @@ func (js *JoinedStream) Trigger(ctx context.Context, tx storage.StateTransaction
 		rightRecord := valueToRecord(rightRecordValue)
 
 		mergedRecord := mergeRecords(leftRecord, rightRecord, idForMatch, isUndo, js.eventTimeField)
-		records = append(records, mergedRecord)
+		records[i] = mergedRecord
 	}
 
-	err = toTriggerSet.Clear()
+	err = matchesToTriggerSet.Clear()
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't clear the toTrigger set")
+		return nil, errors.Wrap(err, "couldn't clear the set of matches")
+	}
+
+	// If it's not an inner join we might need to send not matched records
+	if js.joinType != INNER_JOIN {
+		recordsToTriggerSet := storage.NewSet(txByKey.WithPrefix(recordsToTriggerPrefix))
+
+		singleRecords, err := recordsToTriggerSet.ReadAll()
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't read single records from record set")
+		}
+
+		for i := range singleRecords {
+			records = append(records, valueToRecord(singleRecords[i]))
+		}
 	}
 
 	return records, nil

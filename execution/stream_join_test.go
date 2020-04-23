@@ -43,14 +43,13 @@ func TestJoinedStream_NoRetractions_NoEventTime(t *testing.T) {
 
 	sj := NewStreamJoin(leftSource, rightSource, leftKey, rightKey, stateStorage, "", LEFT_JOIN)
 
-	tx := stateStorage.BeginTransaction()
-	ctx := storage.InjectStateTransaction(context.Background(), tx)
-
-	stream, _, err := GetAndStartAllShuffles(ctx, stateStorage, []Node{sj}, octosql.NoVariables())
+	stream, _, err := GetAndStartAllShuffles(context.Background(), stateStorage, GetRawStreamID(), []Node{sj}, octosql.NoVariables())
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	tx := stateStorage.BeginTransaction()
+	ctx := storage.InjectStateTransaction(context.Background(), tx)
 	want := NewInMemoryStream(storage.InjectStateTransaction(context.Background(), tx), expectedOutput)
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)

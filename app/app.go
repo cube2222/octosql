@@ -57,7 +57,7 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		return errors.Wrap(err, "couldn't materialize the physical plan into an execution plan")
 	}
 
-	stream, execOutput, err := execution.GetAndStartAllShuffles(ctx, stateStorage, []execution.Node{exec}, variables)
+	stream, execOutput, err := execution.GetAndStartAllShuffles(ctx, stateStorage, execution.NewStreamID("root"), []execution.Node{exec}, variables)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get record stream from execution plan")
 	}

@@ -266,7 +266,7 @@ func TestShuffle(t *testing.T) {
 			for i := 0; i < tt.outputPartitions; i++ {
 				outputs[i] = tt.output
 			}
-			outputStreams, _, err := GetAndStartAllShuffles(ctx, stateStorage, outputs, octosql.NoVariables())
+			outputStreams, _, err := GetAndStartAllShuffles(ctx, stateStorage, NewStreamID("root"), outputs, octosql.NoVariables())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -519,7 +519,7 @@ func TestShuffleMultiStage(t *testing.T) {
 	tx := stateStorage.BeginTransaction()
 	ctx := storage.InjectStateTransaction(context.Background(), tx)
 
-	outputStream, _, err := GetAndStartAllShuffles(ctx, stateStorage, []Node{output}, octosql.NoVariables())
+	outputStream, _, err := GetAndStartAllShuffles(ctx, stateStorage, NewStreamID("root"), []Node{output}, octosql.NoVariables())
 	if err != nil {
 		t.Fatal(err)
 	}

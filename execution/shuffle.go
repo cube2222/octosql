@@ -36,6 +36,7 @@ func GetAndStartAllShuffles(ctx context.Context, stateStorage storage.Storage, r
 	outExecOutputs := make([]*ExecutionOutput, len(nodes))
 	for partition, node := range nodes {
 		tx := stateStorage.BeginTransaction()
+		ctx := storage.InjectStateTransaction(ctx, tx)
 
 		sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(rootStreamID.AsPrefix()), octosql.MakeString(fmt.Sprintf("shuffle_input_%d", partition)))
 		if err != nil {

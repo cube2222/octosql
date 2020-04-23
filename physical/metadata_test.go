@@ -9,7 +9,7 @@ import (
 )
 
 // This file has to be here and not in the metadata package,
-// because it uses both metadada and physical, and physical already
+// because it uses both metadata and physical, and physical already
 // imports metadata, so we don't want to create a cycle.
 
 func TestNamespace(t *testing.T) {
@@ -39,7 +39,7 @@ func TestNamespace(t *testing.T) {
 			name: "distinct",
 			node: &Distinct{
 				Source: &StubNode{
-					metadata: metadata.NewNodeMetadata(
+					NodeMetadata: metadata.NewNodeMetadata(
 						metadata.Unbounded,
 						"a.event_time",
 						metadata.NewNamespace(
@@ -63,7 +63,7 @@ func TestNamespace(t *testing.T) {
 			name: "filter",
 			node: &Filter{
 				Source: &StubNode{
-					metadata: metadata.NewNodeMetadata(
+					NodeMetadata: metadata.NewNodeMetadata(
 						metadata.BoundedDoesntFitInLocalStorage,
 						"event_time",
 						metadata.NewNamespace(
@@ -87,7 +87,7 @@ func TestNamespace(t *testing.T) {
 			name: "groupby - unbounded with event time",
 			node: &GroupBy{
 				Source: &StubNode{
-					metadata: metadata.NewNodeMetadata(
+					NodeMetadata: metadata.NewNodeMetadata(
 						metadata.Unbounded,
 						"a.event_time",
 						metadata.NewNamespace(
@@ -115,7 +115,7 @@ func TestNamespace(t *testing.T) {
 			name: "groupby - bounded doesnt fit, no event time",
 			node: &GroupBy{
 				Source: &StubNode{
-					metadata: metadata.NewNodeMetadata(
+					NodeMetadata: metadata.NewNodeMetadata(
 						metadata.BoundedDoesntFitInLocalStorage,
 						"a.event_time",
 						metadata.NewNamespace(
@@ -143,7 +143,7 @@ func TestNamespace(t *testing.T) {
 			name: "limit",
 			node: &Limit{
 				Source: &StubNode{
-					metadata: metadata.NewNodeMetadata(
+					NodeMetadata: metadata.NewNodeMetadata(
 						metadata.Unbounded,
 						octosql.NewVariableName("event_time_field"),
 						metadata.NewNamespace(
@@ -166,7 +166,7 @@ func TestNamespace(t *testing.T) {
 			name: "offset",
 			node: &Offset{
 				Source: &StubNode{
-					metadata: metadata.NewNodeMetadata(
+					NodeMetadata: metadata.NewNodeMetadata(
 						metadata.BoundedDoesntFitInLocalStorage,
 						octosql.NewVariableName("event_time_field"),
 						metadata.NewNamespace(
@@ -189,7 +189,7 @@ func TestNamespace(t *testing.T) {
 			name: "requalifier",
 			node: &Requalifier{
 				Source: &StubNode{
-					metadata: metadata.NewNodeMetadata(
+					NodeMetadata: metadata.NewNodeMetadata(
 						metadata.Unbounded,
 						octosql.NewVariableName("event_field"),
 						metadata.NewNamespace(
@@ -212,8 +212,8 @@ func TestNamespace(t *testing.T) {
 		{
 			name: "stream join",
 			node: &StreamJoin{
-				source: &StubNode{
-					metadata: metadata.NewNodeMetadata(
+				Source: &StubNode{
+					NodeMetadata: metadata.NewNodeMetadata(
 						metadata.BoundedDoesntFitInLocalStorage,
 						octosql.NewVariableName("source_event_time"),
 						metadata.NewNamespace(
@@ -222,8 +222,8 @@ func TestNamespace(t *testing.T) {
 						),
 					),
 				},
-				joined: &StubNode{
-					metadata: metadata.NewNodeMetadata(
+				Joined: &StubNode{
+					NodeMetadata: metadata.NewNodeMetadata(
 						metadata.BoundedFitsInLocalStorage,
 						octosql.NewVariableName("joined_event_time"),
 						metadata.NewNamespace(
@@ -232,7 +232,7 @@ func TestNamespace(t *testing.T) {
 						),
 					),
 				},
-				eventTimeField: "source_event_time",
+				EventTimeField: "source_event_time",
 			},
 			want: metadata.NewNodeMetadata(
 				metadata.BoundedDoesntFitInLocalStorage,
@@ -247,7 +247,7 @@ func TestNamespace(t *testing.T) {
 			name: "lookup join",
 			node: &LookupJoin{
 				source: &StubNode{
-					metadata: metadata.NewNodeMetadata(
+					NodeMetadata: metadata.NewNodeMetadata(
 						metadata.BoundedDoesntFitInLocalStorage,
 						octosql.NewVariableName("source_event_time"),
 						metadata.NewNamespace(
@@ -257,7 +257,7 @@ func TestNamespace(t *testing.T) {
 					),
 				},
 				joined: &StubNode{
-					metadata: metadata.NewNodeMetadata(
+					NodeMetadata: metadata.NewNodeMetadata(
 						metadata.BoundedFitsInLocalStorage,
 						octosql.NewVariableName("joined_event_time"),
 						metadata.NewNamespace(

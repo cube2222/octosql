@@ -18,18 +18,14 @@ const (
 )
 
 type StreamJoin struct {
-	leftKey        []Expression
-	rightKey       []Expression
-	leftSource     Node
-	rightSource    Node
-	storage        storage.Storage
-	eventTimeField octosql.VariableName
-	joinType       JoinType
-	trigger        TriggerPrototype
+	leftSource, rightSource Node
+	leftKey, rightKey       []Expression
+	storage                 storage.Storage
+	eventTimeField          octosql.VariableName
+	joinType                JoinType
+	trigger                 TriggerPrototype
 }
 
-// As with distinct, triggering a stream join is heavily dependant on triggering its sources
-// so sticking with a counting trigger 1 is the easiest approach
 func NewStreamJoin(leftSource, rightSource Node, leftKey, rightKey []Expression, storage storage.Storage, eventTimeField octosql.VariableName, joinType JoinType) *StreamJoin {
 	return &StreamJoin{
 		leftKey:        leftKey,
@@ -209,16 +205,16 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 
 			isPresent, err := matchesToTriggerSet.Contains(match)
 			if err != nil {
-				return errors.Wrap(err, "couldn't check whether a match of records is present in the set")
+				return errors.Wrap(err, "couldn't check whether a match of records is present in the matched records set")
 			}
 
 			if isPresent {
 				if err := matchesToTriggerSet.Erase(match); err != nil {
-					return errors.Wrap(err, "couldn't remove a match of records from the set")
+					return errors.Wrap(err, "couldn't remove a match of records from the matched records set")
 				}
 			} else {
 				if err := matchesToTriggerSet.Insert(createMatch(leftRecord, rightRecord, true)); err != nil {
-					return errors.Wrap(err, "couldn't store the retraction of a match ")
+					return errors.Wrap(err, "couldn't store the retraction of a match in the matched records set")
 				}
 			}
 		}
@@ -232,20 +228,20 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 	if js.joinType == OUTER_JOIN || (js.joinType == LEFT_JOIN && isLeft) {
 		if !isRetraction {
 			if err := recordsToTriggerSet.Insert(newRecordValue); err != nil {
-				return errors.Wrap(err, "couldn't insert record into the set")
+				return errors.Wrap(err, "couldn't insert record into the single records set")
 			}
 		} else {
 			// If it's a retraction we do the same as before: check if it's present in the set, if yes
 			// remove it, otherwise send a retraction.
 			contains, err := recordsToTriggerSet.Contains(newRecordValue)
 			if err != nil {
-				return errors.Wrap(err, "couldn't check whether the toTrigger set contains the record")
+				return errors.Wrap(err, "couldn't check whether the single records set contains the record")
 			}
 
 			if contains {
 				// Remove the record from the set
 				if err := recordsToTriggerSet.Erase(newRecordValue); err != nil {
-					return errors.Wrap(err, "couldn't remove record from the set")
+					return errors.Wrap(err, "couldn't remove record from the single records set")
 				}
 			} else {
 				// Send a retraction
@@ -253,7 +249,7 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 				retractionRecordValue := recordToValue(retractionRecord)
 
 				if err := recordsToTriggerSet.Insert(retractionRecordValue); err != nil {
-					return errors.Wrap(err, "couldn't insert a retraction for the record into the set")
+					return errors.Wrap(err, "couldn't insert a retraction for the record into the single records set")
 				}
 			}
 		}
@@ -324,6 +320,11 @@ func (js *JoinedStream) Trigger(ctx context.Context, tx storage.StateTransaction
 
 		for i := range singleRecords {
 			records = append(records, valueToRecord(singleRecords[i]))
+		}
+
+		err = recordsToTriggerSet.Clear()
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't clear the set of single records")
 		}
 	}
 

@@ -2,113 +2,80 @@ package execution
 
 import (
 	"context"
-	"fmt"
 	"testing"
-	"time"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
-func TestJoinedStream_NoRetractions_NoEventTime(t *testing.T) {
-	stateStorage := storage.GetTestStorage(t)
+func TestStreamJoin(t *testing.T) {
+	leftFieldNames1 := []octosql.VariableName{"left.a", "left.b"}
+	rightFieldNames1 := []octosql.VariableName{"right.a", "right.b"}
+	concatFieldNames1 := append(leftFieldNames1, rightFieldNames1...)
 
-	leftFields := []octosql.VariableName{"left.a", "left.b"}
-	leftSource := NewDummyNode([]*Record{
-		NewRecordFromSliceWithNormalize(leftFields, []interface{}{"a", 0}, WithID(NewRecordID("id1"))),
-		NewRecordFromSliceWithNormalize(leftFields, []interface{}{"a", 1}, WithID(NewRecordID("id2"))),
-		NewRecordFromSliceWithNormalize(leftFields, []interface{}{"b", 2}, WithID(NewRecordID("id3"))),
-		NewRecordFromSliceWithNormalize(leftFields, []interface{}{"e", 2}, WithID(NewRecordID("id7"))),
-	})
-
-	rightFields := []octosql.VariableName{"right.a", "right.b"}
-	rightSource := NewDummyNode([]*Record{
-		NewRecordFromSliceWithNormalize(rightFields, []interface{}{"a", 10}, WithID(NewRecordID("id4"))),
-		NewRecordFromSliceWithNormalize(rightFields, []interface{}{"a", 11}, WithID(NewRecordID("id5"))),
-		NewRecordFromSliceWithNormalize(rightFields, []interface{}{"b", 12}, WithID(NewRecordID("id6"))),
-		NewRecordFromSliceWithNormalize(rightFields, []interface{}{"f", 12}, WithID(NewRecordID("id8"))),
-	})
-
-	outFields := []octosql.VariableName{"left.a", "left.b", "right.a", "right.b"}
-	expectedOutput := []*Record{
-		NewRecordFromSliceWithNormalize(outFields, []interface{}{"a", 0, "a", 10}),
-		NewRecordFromSliceWithNormalize(outFields, []interface{}{"a", 0, "a", 11}),
-		NewRecordFromSliceWithNormalize(outFields, []interface{}{"a", 1, "a", 10}),
-		NewRecordFromSliceWithNormalize(outFields, []interface{}{"a", 1, "a", 11}),
-		NewRecordFromSliceWithNormalize(outFields, []interface{}{"b", 2, "b", 12}),
+	type fields struct {
+		leftSource, rightSource Node
+		leftKey, rightKey       []Expression
+		joinType                JoinType
+		eventTimeField          octosql.VariableName
+		trigger                 TriggerPrototype
 	}
 
-	leftKey := []Expression{NewVariable("left.a")}
-	rightKey := []Expression{NewVariable("right.a")}
+	tests := []struct {
+		name   string
+		fields fields
+		want   Node
+	}{
+		{
+			name: "Simple inner join 1 - no event time field",
+			fields: fields{
+				leftSource: NewDummyNode([]*Record{
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"a", 0}, WithID(NewRecordID("id1"))),
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"a", 1}, WithID(NewRecordID("id2"))),
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"b", 2}, WithID(NewRecordID("id3"))),
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"e", 2}, WithID(NewRecordID("id7"))),
+				}),
+				leftKey: []Expression{NewVariable("left.a")},
 
-	sj := NewStreamJoin(leftSource, rightSource, leftKey, rightKey, stateStorage, "", INNER_JOIN)
+				rightSource: NewDummyNode([]*Record{
+					NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"a", 10}, WithID(NewRecordID("id4"))),
+					NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"a", 11}, WithID(NewRecordID("id5"))),
+					NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"b", 12}, WithID(NewRecordID("id6"))),
+					NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"f", 12}, WithID(NewRecordID("id8"))),
+				}),
+				rightKey: []Expression{NewVariable("right.a")},
 
-	stream, _, err := GetAndStartAllShuffles(context.Background(), stateStorage, GetRawStreamID(), []Node{sj}, octosql.NoVariables())
-	if err != nil {
-		t.Fatal(err)
+				joinType:       INNER_JOIN,
+				eventTimeField: "",
+			},
+
+			want: NewDummyNode([]*Record{
+				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"a", 0, "a", 10}),
+				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"a", 0, "a", 11}),
+				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"a", 1, "a", 10}),
+				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"a", 1, "a", 11}),
+				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"b", 2, "b", 12}),
+			}),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stateStorage := storage.GetTestStorage(t)
+			streamJoin := NewStreamJoin(tt.fields.leftSource, tt.fields.rightSource, tt.fields.leftKey, tt.fields.rightKey, stateStorage, tt.fields.eventTimeField, tt.fields.joinType)
+
+			stream, _, err := GetAndStartAllShuffles(context.Background(), stateStorage, GetRawStreamID(), []Node{streamJoin}, octosql.NoVariables())
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			want := GetTestStream(t, stateStorage, octosql.NoVariables(), tt.want)
+
+			err = AreStreamsEqualNoOrdering(context.Background(), stateStorage, stream[0], want, WithEqualityBasedOn(EqualityOfFieldsAndValues))
+			if err != nil {
+				t.Errorf("Streams aren't equal")
+				return
+			}
+		})
 	}
 
-	tx := stateStorage.BeginTransaction()
-	ctx := storage.InjectStateTransaction(context.Background(), tx)
-	want := NewInMemoryStream(storage.InjectStateTransaction(context.Background(), tx), expectedOutput)
-	if err := tx.Commit(); err != nil {
-		t.Fatal(err)
-	}
-
-	err = AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream[0], WithEqualityBasedOn(EqualityOfFieldsAndValues))
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestJoinedStream_NoRetractions_WithEventTime(t *testing.T) {
-	stateStorage := storage.GetTestStorage(t)
-	baseTime := time.Unix(1000000000, 0)
-	outputEventTimeField := octosql.NewVariableName("output.time")
-
-	ctx := context.Background()
-
-	leftFields := []octosql.VariableName{"left.a", "left.time"}
-	leftSource := NewDummyNode([]*Record{
-		NewRecordFromSliceWithNormalize(leftFields, []interface{}{0, baseTime}, WithID(NewRecordID("id1")), WithEventTimeField("left.time")),
-		NewRecordFromSliceWithNormalize(leftFields, []interface{}{1, baseTime}, WithID(NewRecordID("id2")), WithEventTimeField("left.time")),
-		NewRecordFromSliceWithNormalize(leftFields, []interface{}{2, baseTime.Add(10)}, WithID(NewRecordID("id3")), WithEventTimeField("left.time")),
-		NewRecordFromSliceWithNormalize(leftFields, []interface{}{3, baseTime.Add(20)}, WithID(NewRecordID("id7")), WithEventTimeField("left.time")),
-	})
-
-	rightFields := []octosql.VariableName{"right.a", "right.time"}
-	rightSource := NewDummyNode([]*Record{
-		NewRecordFromSliceWithNormalize(rightFields, []interface{}{"a", baseTime}, WithID(NewRecordID("id4")), WithEventTimeField("right.time")),
-		NewRecordFromSliceWithNormalize(rightFields, []interface{}{"a", baseTime}, WithID(NewRecordID("id5")), WithEventTimeField("right.time")),
-		NewRecordFromSliceWithNormalize(rightFields, []interface{}{"b", baseTime.Add(10)}, WithID(NewRecordID("id6")), WithEventTimeField("right.time")),
-		NewRecordFromSliceWithNormalize(rightFields, []interface{}{"b", baseTime.Add(30)}, WithID(NewRecordID("id8")), WithEventTimeField("right.time")),
-	})
-
-	streamID := GetRawStreamID()
-	outFields := []octosql.VariableName{"left.a", "left.time", "right.a", "right.time", "output.time"}
-	expectedOutput := []*Record{
-		NewRecordFromSliceWithNormalize(outFields, []interface{}{0, baseTime, "a", baseTime, baseTime}, WithID(NewRecordID(fmt.Sprintf("%s.0", streamID.Id))), WithEventTimeField(outputEventTimeField)),
-		NewRecordFromSliceWithNormalize(outFields, []interface{}{0, baseTime, "a", baseTime, baseTime}, WithID(NewRecordID(fmt.Sprintf("%s.1", streamID.Id))), WithEventTimeField(outputEventTimeField)),
-		NewRecordFromSliceWithNormalize(outFields, []interface{}{1, baseTime, "a", baseTime, baseTime}, WithID(NewRecordID(fmt.Sprintf("%s.2", streamID.Id))), WithEventTimeField(outputEventTimeField)),
-		NewRecordFromSliceWithNormalize(outFields, []interface{}{1, baseTime, "a", baseTime, baseTime}, WithID(NewRecordID(fmt.Sprintf("%s.3", streamID.Id))), WithEventTimeField(outputEventTimeField)),
-		NewRecordFromSliceWithNormalize(outFields, []interface{}{2, baseTime.Add(10), "b", baseTime.Add(10), baseTime.Add(10)}, WithID(NewRecordID(fmt.Sprintf("%s.4", streamID.Id))), WithEventTimeField(outputEventTimeField)),
-	}
-
-	leftKey := []Expression{NewVariable("left.time")}
-	rightKey := []Expression{NewVariable("right.time")}
-
-	sj := NewStreamJoin(leftSource, rightSource, leftKey, rightKey, stateStorage, outputEventTimeField, LEFT_JOIN)
-
-	tx := stateStorage.BeginTransaction()
-	stream := GetTestStream(t, stateStorage, octosql.NoVariables(), sj)
-
-	want := NewInMemoryStream(storage.InjectStateTransaction(context.Background(), tx), expectedOutput)
-	if err := tx.Commit(); err != nil {
-		t.Fatal(err)
-	}
-
-	err := AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream, WithEqualityBasedOn(EqualityOfFieldsAndValues, EqualityOfEventTimeField))
-	if err != nil {
-		t.Fatal(err)
-	}
 }

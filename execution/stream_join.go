@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
@@ -15,11 +16,6 @@ const (
 	INNER_JOIN JoinType = 0
 	LEFT_JOIN  JoinType = 1
 	OUTER_JOIN JoinType = 2
-)
-
-const (
-	LEFT  = 0
-	RIGHT = 1
 )
 
 type StreamJoin struct {
@@ -50,6 +46,8 @@ func NewStreamJoin(leftSource, rightSource Node, leftKey, rightKey []Expression,
 
 func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
+
+	// Get IDs of streams
 	leftSourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakeString("left"))
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get left source stream ID")
@@ -60,21 +58,40 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 		return nil, nil, errors.Wrap(err, "couldn't get right source stream ID")
 	}
 
-	leftStream, leftExec, err := node.leftSource.Get(ctx, variables, leftSourceStreamID)
+	// Get our current pipeline metadata, modify it for both streams and get the underlying streams
+	pipelineMetadata := ctx.Value(pipelineMetadataContextKey{}).(PipelineMetadata)
+	leftPipelineMetadata := PipelineMetadata{
+		NextShuffleID: NewShuffleID(fmt.Sprintf("%s_%s", pipelineMetadata.NextShuffleID.Id, "left")),
+		Partition:     pipelineMetadata.Partition,
+	}
+
+	leftStream, leftExec, err := node.leftSource.Get(context.WithValue(ctx, pipelineMetadataContextKey{}, leftPipelineMetadata), variables, leftSourceStreamID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get left source stream in stream join")
 	}
 
-	rightStream, rightExec, err := node.rightSource.Get(ctx, variables, rightSourceStreamID)
+	rightPipelineMetadata := PipelineMetadata{
+		NextShuffleID: NewShuffleID(fmt.Sprintf("%s_%s", pipelineMetadata.NextShuffleID.Id, "right")),
+		Partition:     pipelineMetadata.Partition,
+	}
+
+	rightStream, rightExec, err := node.rightSource.Get(context.WithValue(ctx, pipelineMetadataContextKey{}, rightPipelineMetadata), variables, rightSourceStreamID)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get right source stream in stream join")
 	}
 
+	// The source of watermarks for a stream join is the minimum of watermarks from its sources
 	watermarkSource := NewUnionWatermarkGenerator([]WatermarkSource{leftExec.WatermarkSource, rightExec.WatermarkSource})
 
 	trigger, err := node.trigger.Get(ctx, variables)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't create trigger for stream join")
+	}
+
+	// Create the shuffles
+	mergedNextShuffles, err := mergeNextShuffles(leftExec.NextShuffles, rightExec.NextShuffles)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't merge next shuffles of sources")
 	}
 
 	stream := &JoinedStream{
@@ -96,7 +113,7 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 	return streamJoinPullEngine,
 		NewExecutionOutput(
 			streamJoinPullEngine,
-			nil,
+			mergedNextShuffles,
 			append(leftExec.TasksToRun, append(rightExec.TasksToRun, func() error { streamJoinPullEngine.Run(ctx); return nil })...),
 		), nil
 }
@@ -123,7 +140,7 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 	keyPrefix := append(append([]byte("$"), key.MonotonicMarshal()...), '$')
 	txByKey := tx.WithPrefix(keyPrefix)
 
-	isLeft := inputIndex == LEFT    // from which input source the record was received
+	isLeft := inputIndex == 0       // from which input source the record was received
 	isRetraction := record.IsUndo() // is the incoming record a retraction
 
 	// We get the key of the new incoming record

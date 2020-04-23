@@ -267,7 +267,7 @@ func (rs *LookupJoinStream) RunWorker(ctx context.Context, id *RecordID) error {
 	engine := NewPullEngine(
 		&JobOutputQueueIntermediateRecordStore{recordID: id},
 		rs.stateStorage,
-		joinedStream[0],
+		joinedStream[0], // We put one stream in, so only one stream will come out.
 		rs.streamID,
 		&ZeroWatermarkGenerator{},
 		true,

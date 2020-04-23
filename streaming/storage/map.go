@@ -54,7 +54,7 @@ func (hm *Map) Get(key MonotonicallySerializable, value proto.Message) error {
 	if err == ErrNotFound {
 		return ErrNotFound
 	} else if err != nil {
-		return errors.Wrap(err, "something went wrong during the key look-up")
+		return errors.Wrap(err, "couldn't get key from underlying store in Map.Get")
 	}
 
 	err = proto.Unmarshal(data, value)

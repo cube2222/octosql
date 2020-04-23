@@ -57,6 +57,80 @@ func TestStreamJoin(t *testing.T) {
 				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"b", 2, "b", 12}),
 			}),
 		},
+		{
+			name: "Simple left join 1 - no event time field",
+			fields: fields{
+				leftSource: NewDummyNode([]*Record{
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"a", 0}, WithID(NewRecordID("id1"))),
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"a", 1}, WithID(NewRecordID("id2"))),
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"b", 2}, WithID(NewRecordID("id3"))),
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"e", 2}, WithID(NewRecordID("id7"))),
+				}),
+				leftKey: []Expression{NewVariable("left.a")},
+
+				rightSource: NewDummyNode([]*Record{
+					NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"a", 10}, WithID(NewRecordID("id4"))),
+					NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"a", 11}, WithID(NewRecordID("id5"))),
+					NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"b", 12}, WithID(NewRecordID("id6"))),
+					NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"f", 12}, WithID(NewRecordID("id8"))),
+				}),
+				rightKey: []Expression{NewVariable("right.a")},
+
+				joinType:       LEFT_JOIN,
+				eventTimeField: "",
+			},
+
+			want: NewDummyNode([]*Record{
+				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"a", 0, "a", 10}),
+				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"a", 0, "a", 11}),
+				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"a", 1, "a", 10}),
+				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"a", 1, "a", 11}),
+				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"b", 2, "b", 12}),
+				NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"a", 0}),
+				NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"a", 1}),
+				NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"b", 2}),
+				NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"e", 2}),
+			}),
+		},
+		{
+			name: "Simple outer join 1 - no event time field",
+			fields: fields{
+				leftSource: NewDummyNode([]*Record{
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"a", 0}, WithID(NewRecordID("id1"))),
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"a", 1}, WithID(NewRecordID("id2"))),
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"b", 2}, WithID(NewRecordID("id3"))),
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"e", 2}, WithID(NewRecordID("id7"))),
+				}),
+				leftKey: []Expression{NewVariable("left.a")},
+
+				rightSource: NewDummyNode([]*Record{
+					NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"a", 10}, WithID(NewRecordID("id4"))),
+					NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"a", 11}, WithID(NewRecordID("id5"))),
+					NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"b", 12}, WithID(NewRecordID("id6"))),
+					NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"f", 12}, WithID(NewRecordID("id8"))),
+				}),
+				rightKey: []Expression{NewVariable("right.a")},
+
+				joinType:       OUTER_JOIN,
+				eventTimeField: "",
+			},
+
+			want: NewDummyNode([]*Record{
+				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"a", 0, "a", 10}),
+				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"a", 0, "a", 11}),
+				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"a", 1, "a", 10}),
+				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"a", 1, "a", 11}),
+				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"b", 2, "b", 12}),
+				NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"a", 0}),
+				NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"a", 1}),
+				NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"b", 2}),
+				NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"e", 2}),
+				NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"a", 10}),
+				NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"a", 11}),
+				NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"b", 12}),
+				NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"f", 12}),
+			}),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

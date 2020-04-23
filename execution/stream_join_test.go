@@ -13,8 +13,6 @@ import (
 func TestJoinedStream_NoRetractions_NoEventTime(t *testing.T) {
 	stateStorage := storage.GetTestStorage(t)
 
-	ctx := context.Background()
-
 	leftFields := []octosql.VariableName{"left.a", "left.b"}
 	leftSource := NewDummyNode([]*Record{
 		NewRecordFromSliceWithNormalize(leftFields, []interface{}{"a", 0}, WithID(NewRecordID("id1"))),
@@ -46,14 +44,19 @@ func TestJoinedStream_NoRetractions_NoEventTime(t *testing.T) {
 	sj := NewStreamJoin(leftSource, rightSource, leftKey, rightKey, stateStorage, "", LEFT_JOIN)
 
 	tx := stateStorage.BeginTransaction()
-	stream := GetTestStream(t, stateStorage, octosql.NoVariables(), sj)
+	ctx := storage.InjectStateTransaction(context.Background(), tx)
+
+	stream, _, err := GetAndStartAllShuffles(ctx, stateStorage, []Node{sj}, octosql.NoVariables())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	want := NewInMemoryStream(storage.InjectStateTransaction(context.Background(), tx), expectedOutput)
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}
 
-	err := AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream, WithEqualityBasedOn(EqualityOfFieldsAndValues))
+	err = AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream[0], WithEqualityBasedOn(EqualityOfFieldsAndValues))
 	if err != nil {
 		t.Fatal(err)
 	}

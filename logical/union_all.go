@@ -36,5 +36,12 @@ func (node *UnionAll) Physical(ctx context.Context, physicalCreator *PhysicalPla
 		return nil, nil, errors.Wrap(err, "couldn't get second node variables")
 	}
 
+	for partition := range leftNodes {
+		leftNodes[partition] = physical.NewNextShuffleMetadataChange("_union_left", partition, leftNodes[partition])
+	}
+	for partition := range rightNodes {
+		rightNodes[partition] = physical.NewNextShuffleMetadataChange("_union_right", partition, rightNodes[partition])
+	}
+
 	return append(leftNodes, rightNodes...), variables, nil
 }

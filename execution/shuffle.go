@@ -16,12 +16,11 @@ import (
 
 // This is used to start the whole plan. It starts each phase (separated by shuffles) one by one
 // and takes care to properly pass shuffle ID's to shuffle receivers and senders.
-func GetAndStartAllShuffles(ctx context.Context, stateStorage storage.Storage, nodes []Node, variables octosql.Variables) ([]RecordStream, []*ExecutionOutput, error) {
+func GetAndStartAllShuffles(ctx context.Context, stateStorage storage.Storage, rootStreamID *StreamID, nodes []Node, variables octosql.Variables) ([]RecordStream, []*ExecutionOutput, error) {
 	tx := stateStorage.BeginTransaction()
 
 	ctx = storage.InjectStateTransaction(ctx, tx)
-	rootShuffleID := &ShuffleID{Id: "root_shuffle_id"}
-	nextShuffleID, err := GetSourceShuffleID(tx.WithPrefix(rootShuffleID.AsPrefix()), octosql.MakeString("next_shuffle_id"))
+	nextShuffleID, err := GetSourceShuffleID(tx.WithPrefix(rootStreamID.AsPrefix()), octosql.MakeString("next_shuffle_id"))
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get next shuffle id")
 	}
@@ -37,10 +36,11 @@ func GetAndStartAllShuffles(ctx context.Context, stateStorage storage.Storage, n
 	outExecOutputs := make([]*ExecutionOutput, len(nodes))
 	for partition, node := range nodes {
 		tx := stateStorage.BeginTransaction()
+		ctx := storage.InjectStateTransaction(ctx, tx)
 
-		sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(rootShuffleID.AsPrefix()), octosql.MakeString(fmt.Sprintf("shuffle_input_%d", partition)))
+		sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(rootStreamID.AsPrefix()), octosql.MakeString(fmt.Sprintf("shuffle_input_%d", partition)))
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "couldn't get new source stream ID for shuffle with ID %s", rootShuffleID.Id)
+			return nil, nil, errors.Wrapf(err, "couldn't get new source stream ID for root stream ID %s", rootStreamID.Id)
 		}
 
 		// These are parameters for the _next_ shuffle.
@@ -51,7 +51,7 @@ func GetAndStartAllShuffles(ctx context.Context, stateStorage storage.Storage, n
 
 		rs, execOutput, err := node.Get(context.WithValue(ctx, pipelineMetadataContextKey{}, newPipelineMetadata), variables, sourceStreamID)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "couldn't get new source stream for shuffle with ID %s", rootShuffleID.Id)
+			return nil, nil, errors.Wrapf(err, "couldn't get new source stream for root stream with ID %s", rootStreamID.Id)
 		}
 
 		if err := tx.Commit(); err != nil {
@@ -488,4 +488,30 @@ func (node *ShuffleSender) Next(ctx context.Context, tx storage.StateTransaction
 
 func (node *ShuffleSender) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
 	panic("can't get watermark from shuffle sender")
+}
+
+type NextShuffleMetadataChange struct {
+	ShuffleIDAddSuffix string
+	Partition          int
+	Source             Node
+}
+
+func NewNextShuffleMetadataChange(shuffleIDAddSuffix string, partition int, source Node) *NextShuffleMetadataChange {
+	return &NextShuffleMetadataChange{
+		ShuffleIDAddSuffix: shuffleIDAddSuffix,
+		Partition:          partition,
+		Source:             source,
+	}
+}
+
+func (n *NextShuffleMetadataChange) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
+	pipelineMetadata := ctx.Value(pipelineMetadataContextKey{}).(PipelineMetadata)
+	newPipelineMetadata := PipelineMetadata{
+		NextShuffleID: NewShuffleID(pipelineMetadata.NextShuffleID.Id + n.ShuffleIDAddSuffix),
+		Partition:     n.Partition,
+	}
+
+	newCtx := context.WithValue(ctx, pipelineMetadataContextKey{}, newPipelineMetadata)
+
+	return n.Source.Get(newCtx, variables, streamID)
 }

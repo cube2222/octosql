@@ -81,12 +81,8 @@ func (node *Join) Physical(ctx context.Context, physicalCreator *PhysicalPlanCre
 		}
 
 		// Create necessary namespaces of source and joined
-		sourceNamespace := sourceNodes[0].Metadata().Namespace()
-		sourceNamespace.MergeWithVariables(sourceVariables)
-
+		sourceNamespace := sourceNodes[0].Metadata().Namespace() // TODO: should these be merged with variables
 		joinedNamespace := joinedNodes[0].Metadata().Namespace()
-		joinedNamespace.MergeWithVariables(joinedVariables)
-
 		eventTimeField := sourceNodes[0].Metadata().EventTimeField()
 
 		// Create the appropriate keys from the formula. Basically how it works is it goes through predicates i.e a.x = b.y

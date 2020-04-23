@@ -33,14 +33,9 @@ func TestJoin_Physical(t *testing.T) {
 		joined   Node
 		joinType execution.JoinType
 	}
-	type args struct {
-		ctx             context.Context
-		physicalCreator *PhysicalPlanCreator
-	}
 	tests := []struct {
 		name     string
 		fields   fields
-		args     args
 		wantNode physical.Node
 		wantErr  bool
 	}{
@@ -86,11 +81,6 @@ func TestJoin_Physical(t *testing.T) {
 				},
 
 				joinType: execution.LEFT_JOIN,
-			},
-
-			args: args{
-				ctx:             context.Background(),
-				physicalCreator: nil,
 			},
 
 			wantNode: &physical.StreamJoin{
@@ -139,11 +129,6 @@ func TestJoin_Physical(t *testing.T) {
 				joinType: execution.OUTER_JOIN,
 			},
 
-			args: args{
-				ctx:             context.Background(),
-				physicalCreator: nil,
-			},
-
 			wantNode: &physical.StreamJoin{
 				SourceKey:      []physical.Expression{physical.NewVariable("a.field1")},
 				JoinedKey:      []physical.Expression{physical.NewVariable("b.field1")},
@@ -190,11 +175,6 @@ func TestJoin_Physical(t *testing.T) {
 				joinType: execution.INNER_JOIN,
 			},
 
-			args: args{
-				ctx:             context.Background(),
-				physicalCreator: nil,
-			},
-
 			wantNode: &physical.StreamJoin{
 				SourceKey:      []physical.Expression{physical.NewVariable("a.field1")},
 				JoinedKey:      []physical.Expression{physical.NewVariable("b.field1")},
@@ -233,11 +213,6 @@ func TestJoin_Physical(t *testing.T) {
 				joinType: execution.INNER_JOIN,
 			},
 
-			args: args{
-				ctx:             context.Background(),
-				physicalCreator: nil,
-			},
-
 			wantNode: &physical.StreamJoin{
 				SourceKey:      []physical.Expression{},
 				JoinedKey:      []physical.Expression{},
@@ -256,7 +231,7 @@ func TestJoin_Physical(t *testing.T) {
 				joinType: tt.fields.joinType,
 			}
 
-			gotNodes, _, err := node.Physical(tt.args.ctx, tt.args.physicalCreator)
+			gotNodes, _, err := node.Physical(context.Background(), NewPhysicalPlanCreator(nil, nil))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Physical() error = %v, wantErr %v", err, tt.wantErr)
 				return

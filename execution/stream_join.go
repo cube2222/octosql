@@ -2,7 +2,6 @@ package execution
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
@@ -113,28 +112,10 @@ var rightStreamRecordsPrefix = []byte("$right_stream_records$")
 var matchesToTriggerPrefix = []byte("$matches_to_trigger$")
 var recordsToTriggerPrefix = []byte("$records_to_trigger$")
 
-func showRecord(rec *Record) string {
-	str := ""
-	for i := range rec.Data {
-		if (*rec.Data[i]).AsString() != "" {
-			str += (*rec.Data[i]).AsString()
-		} else {
-			str += fmt.Sprintf("%d", (*rec.Data[i]).AsInt())
-		}
-		str += "|"
-	}
-
-	str += fmt.Sprint(rec.IsUndo())
-
-	return str
-}
-
 func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, key octosql.Value, record *Record) error {
 	if inputIndex < 0 || inputIndex > 1 {
 		panic("invalid inputIndex for stream join")
 	}
-
-	println("Got AddRecord with index: ", inputIndex)
 
 	keyPrefix := append(append([]byte("$"), key.MonotonicMarshal()...), '$')
 	txByKey := tx.WithPrefix(keyPrefix)
@@ -143,7 +124,6 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 	isRetraction := record.IsUndo() // is the incoming record a retraction
 
 	// We get the key of the new incoming record
-	WithID(NewRecordID(""))(record) // reset the ID, we don't care about it
 	newRecordValue := recordToValue(record)
 	newRecordKey, err := proto.Marshal(&newRecordValue)
 	if err != nil {
@@ -170,8 +150,6 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 	if err != nil {
 		return err
 	}
-
-	fmt.Printf("New count (%s) = %d\n", showRecord(record), newCount)
 
 	// If we got an early retraction, or a record bumped up the count to 0, but it was previously retracted we do nothing
 	if newCount < 0 || (newCount == 0 && !isRetraction) {
@@ -386,9 +364,6 @@ func keepTrackOfCount(tx storage.StateTransaction, isRetraction bool) (int, erro
 func recordToValue(rec *Record) octosql.Value {
 	fields := make([]octosql.Value, len(rec.FieldNames))
 	data := make([]octosql.Value, len(rec.Data))
-
-	IDValue := octosql.MakeString(rec.ID().ID)
-	undoValue := octosql.MakeBool(rec.IsUndo())
 	eventTimeField := octosql.MakeString(rec.EventTimeField().String())
 
 	for i := range rec.FieldNames {
@@ -396,29 +371,11 @@ func recordToValue(rec *Record) octosql.Value {
 		data[i] = *rec.Data[i]
 	}
 
-	valuesTogether := make([]octosql.Value, 5)
+	valuesTogether := make([]octosql.Value, 3)
 
 	valuesTogether[0] = octosql.MakeTuple(fields)
 	valuesTogether[1] = octosql.MakeTuple(data)
-	valuesTogether[2] = IDValue
-	valuesTogether[3] = undoValue
-	valuesTogether[4] = eventTimeField
-
-	return octosql.MakeTuple(valuesTogether)
-}
-
-func recordDataToValue(rec *Record) octosql.Value {
-	fields := make([]octosql.Value, len(rec.FieldNames))
-	data := make([]octosql.Value, len(rec.Data))
-
-	for i := range rec.FieldNames {
-		fields[i] = octosql.MakeString(rec.FieldNames[i])
-		data[i] = *rec.Data[i]
-	}
-
-	valuesTogether := make([]octosql.Value, 2)
-	valuesTogether[0] = octosql.MakeTuple(fields)
-	valuesTogether[1] = octosql.MakeTuple(data)
+	valuesTogether[2] = eventTimeField
 
 	return octosql.MakeTuple(valuesTogether)
 }
@@ -428,9 +385,7 @@ func valueToRecord(val octosql.Value) *Record {
 
 	fieldNameValues := slice[0].AsSlice()
 	values := slice[1].AsSlice()
-	ID := slice[2].AsString()
-	undo := slice[3].AsBool()
-	eventTimeField := octosql.NewVariableName(slice[4].AsString())
+	eventTimeField := octosql.NewVariableName(slice[2].AsString())
 
 	fieldNames := make([]octosql.VariableName, len(fieldNameValues))
 
@@ -438,15 +393,7 @@ func valueToRecord(val octosql.Value) *Record {
 		fieldNames[i] = octosql.NewVariableName(fieldName.AsString())
 	}
 
-	var record *Record
-
-	if undo {
-		record = NewRecordFromSlice(fieldNames, values, WithID(NewRecordID(ID)), WithEventTimeField(eventTimeField), WithUndo())
-	} else {
-		record = NewRecordFromSlice(fieldNames, values, WithID(NewRecordID(ID)), WithEventTimeField(eventTimeField), WithNoUndo())
-	}
-
-	return record
+	return NewRecordFromSlice(fieldNames, values, WithEventTimeField(eventTimeField))
 }
 
 // We create a octosql.Value from two records (as values), a flag whether the match is a retraction,

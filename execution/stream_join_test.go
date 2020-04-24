@@ -58,7 +58,7 @@ func TestStreamJoin(t *testing.T) {
 				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"b", 2, "b", 12}),
 			}),
 
-			executionCount: 1, // this test is pretty much deterministic since there are no retractions
+			executionCount: 4, // the only non-determinism is the order
 		},
 		{
 			name: "left join 1 - no event time field, no retractions",
@@ -95,7 +95,7 @@ func TestStreamJoin(t *testing.T) {
 				NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"e", 2}),
 			}),
 
-			executionCount: 1, // no retractions
+			executionCount: 4, // as above
 		},
 		{
 			name: "outer join 1 - no event time field, no retractions",
@@ -136,7 +136,7 @@ func TestStreamJoin(t *testing.T) {
 				NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"f", 12}),
 			}),
 
-			executionCount: 1, // no retractions
+			executionCount: 4, // as above
 		},
 		{
 			name: "inner join 2 - no event time field, retractions",

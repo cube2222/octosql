@@ -177,6 +177,59 @@ func TestStreamJoin(t *testing.T) {
 			executionCount: 16, // there are basically two possibilities: either retraction for id1 comes before all records from the right
 			// or not, 16 seems like a fair number of go throughs to make sure both scenarios occur
 		},
+		{
+			name: "outer join 2 - multiple retractions + early retractions",
+			fields: fields{
+				leftSource: NewDummyNode([]*Record{
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"a", 0}, WithID(NewRecordID("L1_ret1")), WithUndo()), // early retraction for (a,0)
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"a", 0}, WithID(NewRecordID("L1_ret2")), WithUndo()), // count for (a,0) is -2
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"a", 0}, WithID(NewRecordID("L1_1"))),                // count for (a,0) is now -1
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"a", 1}, WithID(NewRecordID("L2_1"))),                // introduce new record with same key: (a,1) x1
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"b", 0}, WithID(NewRecordID("L3_1"))),                // other key (b,0) x1
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"b", 0}, WithID(NewRecordID("L3_2"))),                // double it (b,0) x2
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"b", 0}, WithID(NewRecordID("L3_ret1")), WithUndo()), // retraction, so now (b,0) x1
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"b", 0}, WithID(NewRecordID("L3_3"))),                // add again, so in the end (b,0) x2
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"a", 0}, WithID(NewRecordID("L1_2"))),                // count for (a,0) is now 0
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"a", 0}, WithID(NewRecordID("L1_3"))),                // count for (a,0) is now 1
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"c", 0}, WithID(NewRecordID("L4_1"))),                // no match from the left: (c,0)
+					NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"c", 0}, WithID(NewRecordID("L4_2"))),                // no match from the left: (c,0) x2
+				}), // in the end we have (a,0) x1; (a,1) x1; (b,0) x2; (c,0) x2
+				leftKey: []Expression{NewVariable("left.a")},
+
+				rightSource: NewDummyNode([]*Record{
+					NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"a", 10}, WithID(NewRecordID("R1_1"))),                // (a,10) x1
+					NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"a", 10}, WithID(NewRecordID("R1_ret1")), WithUndo()), // retraction: (a,10) x0
+					NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"b", 10}, WithID(NewRecordID("R2"))),                  // introduce new key: (b,10) x1
+					NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"a", 10}, WithID(NewRecordID("R1_ret2")), WithUndo()), // retract again: (a,10) x(-1)
+					NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"a", 10}, WithID(NewRecordID("R1_2"))),                // (a,10) x0
+					NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"a", 10}, WithID(NewRecordID("R1_3"))),                // (a,10) x1
+					NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"d", 10}, WithID(NewRecordID("R3"))),                  // no match from the right: (d,10) x1
+				}), // in the end we have (a,10) x1; (b,10) x1; (d,10) x1
+				rightKey: []Expression{NewVariable("right.a")},
+
+				joinType:       OUTER_JOIN,
+				eventTimeField: "",
+				trigger:        NewMultiTrigger(NewWatermarkTrigger(), NewCountingTrigger(NewDummyExpression(octosql.MakeInt(2)))), // TODO: maybe change triggers every few tests
+			},
+
+			want: NewDummyNode([]*Record{
+				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"a", 0, "a", 10}),
+				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"a", 1, "a", 10}),
+				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"b", 0, "b", 10}),
+				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"b", 0, "b", 10}),
+				NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"a", 0}),
+				NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"a", 1}),
+				NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"b", 0}),
+				NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"b", 0}),
+				NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"c", 0}),
+				NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"c", 0}),
+				NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"a", 10}),
+				NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"b", 10}),
+				NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"d", 10}),
+			}),
+
+			executionCount: 64, // there is a TON of possibilities, didn't even bother counting
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

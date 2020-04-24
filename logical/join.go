@@ -54,9 +54,9 @@ func (node *Join) Physical(ctx context.Context, physicalCreator *PhysicalPlanCre
 
 	if sourceCardinality == metadata.Unbounded && joinedCardinality == metadata.Unbounded {
 		isStreamJoin = true
-	} else if sourceCardinality == metadata.Unbounded && joinedCardinality == metadata.BoundedFitsInLocalStorage {
+	} else if joinedCardinality == metadata.BoundedFitsInLocalStorage {
 		isStreamJoin = true
-	} else if sourceCardinality == metadata.BoundedFitsInLocalStorage && joinedCardinality == metadata.Unbounded {
+	} else if sourceCardinality == metadata.BoundedFitsInLocalStorage {
 		isStreamJoin = true
 	}
 

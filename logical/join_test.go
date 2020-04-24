@@ -183,7 +183,6 @@ func TestJoin_Physical(t *testing.T) {
 
 			wantErr: false,
 		},
-
 		{
 			name: "two bounded streams, no predicate - stream join",
 			fields: fields{
@@ -221,6 +220,146 @@ func TestJoin_Physical(t *testing.T) {
 
 			wantErr: false,
 		},
+		{
+			name: "unbounded + bounded doesn't fit left join - lookup join",
+			fields: fields{
+				source: &StubNode{
+					metadata: metadata.NewNodeMetadata(
+						metadata.Unbounded,
+						"",
+						metadata.NewNamespace(
+							[]string{""},
+							[]octosql.VariableName{"a.field1"},
+						),
+					),
+					variables: octosql.NoVariables(),
+				},
+
+				joined: &StubNode{
+					metadata: metadata.NewNodeMetadata(
+						metadata.BoundedDoesntFitInLocalStorage,
+						"",
+						metadata.NewNamespace(
+							[]string{""},
+							[]octosql.VariableName{"b.field1"},
+						),
+					),
+				},
+
+				joinType: execution.LEFT_JOIN,
+			},
+
+			wantNode: physical.NewLookupJoin(nil, nil, true),
+
+			wantErr: false,
+		},
+		{
+			name: "two unbounded streams - stream join, bigger filter",
+			fields: fields{
+				source: &StubNode{
+					metadata: metadata.NewNodeMetadata(
+						metadata.Unbounded,
+						"a.field1",
+						metadata.NewNamespace(
+							[]string{"x", "y"},
+							[]octosql.VariableName{"a.field1", "a.field2"},
+						),
+					),
+					variables: octosql.NoVariables(),
+				},
+
+				joined: &Filter{
+					formula: &InfixOperator{ // ON a.field1 = b.field2 AND x.something1 = p.something2 AND b.field1 = a.field2 AND p.something1 = x.something2
+						Left: &InfixOperator{
+							Left: &Predicate{
+								Left:     &Variable{"a.field1"},
+								Relation: Equal,
+								Right:    &Variable{"b.field2"},
+							},
+							Operator: "and",
+							Right: &Predicate{
+								Left:     &Variable{"x.something1"},
+								Relation: Equal,
+								Right:    &Variable{"p.something2"},
+							},
+						},
+						Operator: "and",
+						Right: &InfixOperator{
+							Left: &Predicate{
+								Left:     &Variable{"b.field1"},
+								Relation: Equal,
+								Right:    &Variable{"a.field2"},
+							},
+							Operator: "and",
+							Right: &Predicate{
+								Left:     &Variable{"p.something1"},
+								Relation: Equal,
+								Right:    &Variable{"x.something2"},
+							},
+						},
+					},
+					source: &StubNode{
+						metadata: metadata.NewNodeMetadata(
+							metadata.Unbounded,
+							"b.field2",
+							metadata.NewNamespace(
+								[]string{"p", "q"},
+								[]octosql.VariableName{"b.field1", "b.field2"},
+							),
+						),
+					},
+				},
+
+				joinType: execution.LEFT_JOIN,
+			},
+
+			wantNode: &physical.StreamJoin{
+				SourceKey:      []physical.Expression{physical.NewVariable("a.field1"), physical.NewVariable("x.something1"), physical.NewVariable("a.field2"), physical.NewVariable("x.something2")},
+				JoinedKey:      []physical.Expression{physical.NewVariable("b.field2"), physical.NewVariable("p.something2"), physical.NewVariable("b.field1"), physical.NewVariable("p.something1")},
+				EventTimeField: "a.field1",
+			},
+
+			wantErr: false,
+		},
+		{
+			name: "invalid predicate 1 - both sides of predicate match the same namespace",
+			fields: fields{
+				source: &StubNode{
+					metadata: metadata.NewNodeMetadata(
+						metadata.Unbounded,
+						"a.field1",
+						metadata.NewNamespace(
+							[]string{},
+							[]octosql.VariableName{"a.field1", "a.field2"},
+						),
+					),
+					variables: octosql.NoVariables(),
+				},
+
+				joined: &Filter{ // a.field1
+					formula: &Predicate{
+						Left:     &Variable{"a.field1"},
+						Relation: Equal,
+						Right:    &Variable{"a.field2"},
+					},
+					source: &StubNode{
+						metadata: metadata.NewNodeMetadata(
+							metadata.Unbounded,
+							"b.field2",
+							metadata.NewNamespace(
+								[]string{},
+								[]octosql.VariableName{"b.field1", "b.field2"},
+							),
+						),
+					},
+				},
+
+				joinType: execution.LEFT_JOIN,
+			},
+
+			wantNode: nil,
+			wantErr:  true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -235,10 +374,8 @@ func TestJoin_Physical(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Physical() error = %v, wantErr %v", err, tt.wantErr)
 				return
-			}
-
-			if (err != nil) != tt.wantErr {
-				t.Errorf("wantErr incorrect")
+			} else if err != nil {
+				return
 			}
 
 			switch gotNode := gotNodes[0].(type) {

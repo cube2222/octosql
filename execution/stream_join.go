@@ -282,8 +282,7 @@ func (js *JoinedStream) Trigger(ctx context.Context, tx storage.StateTransaction
 	// Update the value of number of triggered records
 	newTriggeredCount := octosql.MakeInt(triggeredCountValue + len(matches))
 
-	err = triggeredCountState.Set(&newTriggeredCount)
-	if err != nil {
+	if err := triggeredCountState.Set(&newTriggeredCount); err != nil {
 		return nil, errors.Wrap(err, "couldn't update count of triggered records")
 	}
 
@@ -300,13 +299,14 @@ func (js *JoinedStream) Trigger(ctx context.Context, tx storage.StateTransaction
 		records[i] = mergedRecord
 	}
 
-	err = matchesToTriggerSet.Clear()
-	if err != nil {
+	if err := matchesToTriggerSet.Clear(); err != nil {
 		return nil, errors.Wrap(err, "couldn't clear the set of matches")
 	}
 
-	// If it's not an inner join we might need to send not matched records
+	// If it's not an inner join we might need to send single, not matched records
 	if js.joinType != INNER_JOIN {
+		triggeredCountValue += len(matches)
+
 		recordsToTriggerSet := storage.NewMultiSet(txByKey.WithPrefix(recordsToTriggerPrefix))
 
 		singleRecords, err := recordsToTriggerSet.ReadAll()
@@ -315,12 +315,21 @@ func (js *JoinedStream) Trigger(ctx context.Context, tx storage.StateTransaction
 		}
 
 		for i := range singleRecords {
-			records = append(records, valueToRecord(singleRecords[i]))
+			singleRecord := valueToRecord(singleRecords[i])
+			idForRecord := NewRecordIDFromStreamIDWithOffset(js.streamID, triggeredCountValue+i)
+			WithID(idForRecord)(singleRecord)
+
+			records = append(records, singleRecord)
 		}
 
-		err = recordsToTriggerSet.Clear()
-		if err != nil {
+		if err := recordsToTriggerSet.Clear(); err != nil {
 			return nil, errors.Wrap(err, "couldn't clear the set of single records")
+		}
+
+		newTriggeredCount = octosql.MakeInt(triggeredCountValue + len(singleRecords))
+
+		if err := triggeredCountState.Set(&newTriggeredCount); err != nil {
+			return nil, errors.Wrap(err, "couldn't update count of triggered records after triggering single records")
 		}
 	}
 

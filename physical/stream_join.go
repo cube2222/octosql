@@ -17,9 +17,10 @@ type StreamJoin struct {
 	JoinedKey      []Expression
 	EventTimeField octosql.VariableName
 	JoinType       execution.JoinType
+	Triggers       []Trigger
 }
 
-func NewStreamJoin(source, joined Node, sourceKey, joinedKey []Expression, eventTimeField octosql.VariableName, joinType execution.JoinType) *StreamJoin {
+func NewStreamJoin(source, joined Node, sourceKey, joinedKey []Expression, eventTimeField octosql.VariableName, joinType execution.JoinType, triggers []Trigger) *StreamJoin {
 	return &StreamJoin{
 		Source:         source,
 		Joined:         joined,
@@ -27,6 +28,7 @@ func NewStreamJoin(source, joined Node, sourceKey, joinedKey []Expression, event
 		JoinedKey:      joinedKey,
 		EventTimeField: eventTimeField,
 		JoinType:       joinType,
+		Triggers:       triggers,
 	}
 }
 
@@ -38,6 +40,7 @@ func (node *StreamJoin) Transform(ctx context.Context, transformers *Transformer
 		JoinedKey:      node.JoinedKey,
 		EventTimeField: node.EventTimeField,
 		JoinType:       node.JoinType,
+		Triggers:       node.Triggers,
 	}
 
 	if transformers.NodeT != nil {
@@ -65,18 +68,31 @@ func (node *StreamJoin) Materialize(ctx context.Context, matCtx *Materialization
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't materialize source key expression with index %v", i)
 		}
-
 		materializedSourceKey[i] = materializedSource
 
 		materializedJoined, err := node.JoinedKey[i].Materialize(ctx, matCtx)
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't materialize joined key expression with index %v", i)
 		}
-
 		materializedJoinedKey[i] = materializedJoined
 	}
 
-	return execution.NewStreamJoin(materializedSource, materializedJoined, materializedSourceKey, materializedJoinedKey, matCtx.Storage, node.EventTimeField, node.JoinType), nil
+	triggerPrototypes := make([]execution.TriggerPrototype, len(node.Triggers))
+	for i := range node.Triggers {
+		triggerPrototypes[i], err = node.Triggers[i].Materialize(ctx, matCtx)
+		if err != nil {
+			return nil, errors.Wrapf(err, "couldn't materialize trigger with index %v", i)
+		}
+	}
+
+	var triggerPrototype execution.TriggerPrototype
+	if len(triggerPrototypes) == 0 {
+		triggerPrototype = execution.NewWatermarkTrigger()
+	} else {
+		triggerPrototype = execution.NewMultiTrigger(triggerPrototypes...)
+	}
+
+	return execution.NewStreamJoin(materializedSource, materializedJoined, materializedSourceKey, materializedJoinedKey, matCtx.Storage, node.EventTimeField, node.JoinType, triggerPrototype), nil
 }
 
 func (node *StreamJoin) Metadata() *metadata.NodeMetadata {

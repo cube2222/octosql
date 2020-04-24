@@ -16,6 +16,7 @@ type Join struct {
 	source   Node
 	joined   Node
 	joinType execution.JoinType // TODO: define this on every level, or import execution?
+	triggers []Trigger
 }
 
 func NewJoin(source, joined Node, joinType execution.JoinType) *Join {
@@ -103,6 +104,21 @@ func (node *Join) Physical(ctx context.Context, physicalCreator *PhysicalPlanCre
 
 		}
 
+		// Create physical.Triggers from logical.Triggers
+		triggers := make([]physical.Trigger, len(node.triggers))
+		for i := range node.triggers {
+			out, triggerVariables, err := node.triggers[i].Physical(ctx, physicalCreator)
+			if err != nil {
+				return nil, nil, errors.Wrapf(err, "couldn't get physical plan for trigger with index %d", i)
+			}
+			variables, err = variables.MergeWith(triggerVariables)
+			if err != nil {
+				return nil, nil, errors.Wrapf(err, "couldn't merge variables with those of trigger with index %d", i)
+			}
+
+			triggers[i] = out
+		}
+
 		sourceShuffled := physical.NewShuffle(streamJoinParallelism, physical.NewKeyHashingStrategy(sourceKey), sourceNodes)
 		joinedShuffled := physical.NewShuffle(streamJoinParallelism, physical.NewKeyHashingStrategy(joinedKey), joinedNodes)
 
@@ -117,7 +133,7 @@ func (node *Join) Physical(ctx context.Context, physicalCreator *PhysicalPlanCre
 		outNodes = make([]physical.Node, len(sourceShuffled))
 
 		for i := range outNodes {
-			outNodes[i] = physical.NewStreamJoin(sourceShuffled[i], joinedShuffled[i], sourceKey, joinedKey, eventTimeField, node.joinType)
+			outNodes[i] = physical.NewStreamJoin(sourceShuffled[i], joinedShuffled[i], sourceKey, joinedKey, eventTimeField, node.joinType, triggers)
 		}
 	} else { // if the conditions for a stream join aren't met we create a lookup join
 		isLeftJoin := node.joinType == execution.LEFT_JOIN
@@ -198,4 +214,13 @@ func getKeysFromFormula(formula physical.Formula, sourceNamespace, joinedNamespa
 	}
 
 	return sourceKey, joinedKey, nil
+}
+
+func (node *Join) WithTriggers(triggers []Trigger) *Join {
+	return &Join{
+		source:   node.source,
+		joined:   node.joined,
+		joinType: node.joinType,
+		triggers: triggers,
+	}
 }

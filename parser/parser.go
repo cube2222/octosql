@@ -72,6 +72,18 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		return nil, errors.Wrap(err, "couldn't parse from expression")
 	}
 
+	if root, ok := root.(*logical.Join); ok { // TODO: this is not very elegant, but maybe changing 3 functions to achieve the same thing isn't either
+		triggers := make([]logical.Trigger, len(statement.Trigger))
+		for i := range statement.Trigger {
+			triggers[i], err = ParseTrigger(statement.Trigger[i])
+			if err != nil {
+				return nil, errors.Wrapf(err, "couldn't parse trigger with index %d", i)
+			}
+		}
+
+		root = root.WithTriggers(triggers)
+	}
+
 	// Separate star expressions so we can put them at last positions
 	nonStarExpressions := make([]sqlparser.SelectExpr, 0)
 	starExpressions := make([]sqlparser.SelectExpr, 0)

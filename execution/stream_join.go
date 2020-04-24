@@ -23,19 +23,19 @@ type StreamJoin struct {
 	storage                 storage.Storage
 	eventTimeField          octosql.VariableName
 	joinType                JoinType
-	trigger                 TriggerPrototype
+	triggerPrototype        TriggerPrototype
 }
 
-func NewStreamJoin(leftSource, rightSource Node, leftKey, rightKey []Expression, storage storage.Storage, eventTimeField octosql.VariableName, joinType JoinType) *StreamJoin {
+func NewStreamJoin(leftSource, rightSource Node, leftKey, rightKey []Expression, storage storage.Storage, eventTimeField octosql.VariableName, joinType JoinType, triggerPrototype TriggerPrototype) *StreamJoin {
 	return &StreamJoin{
-		leftKey:        leftKey,
-		rightKey:       rightKey,
-		leftSource:     leftSource,
-		rightSource:    rightSource,
-		storage:        storage,
-		eventTimeField: eventTimeField,
-		joinType:       joinType,
-		trigger:        NewCountingTrigger(NewDummyValue(octosql.MakeInt(1))),
+		leftKey:          leftKey,
+		rightKey:         rightKey,
+		leftSource:       leftSource,
+		rightSource:      rightSource,
+		storage:          storage,
+		eventTimeField:   eventTimeField,
+		joinType:         joinType,
+		triggerPrototype: triggerPrototype,
 	}
 }
 
@@ -66,9 +66,9 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 	// The source of watermarks for a stream join is the minimum of watermarks from its sources
 	watermarkSource := NewUnionWatermarkGenerator([]WatermarkSource{leftExec.WatermarkSource, rightExec.WatermarkSource})
 
-	trigger, err := node.trigger.Get(ctx, variables)
+	trigger, err := node.triggerPrototype.Get(ctx, variables)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't create trigger for stream join")
+		return nil, nil, errors.Wrap(err, "couldn't get trigger from trigger prototype")
 	}
 
 	// Create the shuffles

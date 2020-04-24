@@ -216,7 +216,7 @@ func DefaultEquality(record1 *Record, record2 *Record) error {
 	return nil
 }
 
-func AreStreamsEqualNoOrderingWithRetractionReduction(ctx context.Context, stateStorage storage.Storage, first, second RecordStream, opts ...AreEqualOpt) ([]*Record, []*Record, error) {
+func AreStreamsEqualNoOrderingWithRetractionReduction(ctx context.Context, stateStorage storage.Storage, first, second RecordStream, opts ...AreEqualOpt) error {
 	config := &AreEqualConfig{
 		Equality: DefaultEquality,
 	}
@@ -231,7 +231,7 @@ func AreStreamsEqualNoOrderingWithRetractionReduction(ctx context.Context, state
 	log.Println("first stream")
 	firstRecords, err := ReadAll(ctx, stateStorage, first)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't read first streams records")
+		return errors.Wrap(err, "couldn't read first streams records")
 	}
 
 	for _, rec := range firstRecords {
@@ -247,7 +247,7 @@ func AreStreamsEqualNoOrderingWithRetractionReduction(ctx context.Context, state
 	log.Println("second stream")
 	secondRecords, err := ReadAll(ctx, stateStorage, second)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't read second streams records")
+		return errors.Wrap(err, "couldn't read second streams records")
 	}
 
 	for _, rec := range secondRecords {
@@ -263,10 +263,10 @@ func AreStreamsEqualNoOrderingWithRetractionReduction(ctx context.Context, state
 	firstContained := firstMultiSet.isContainedIn(secondMultiSet)
 	secondContained := secondMultiSet.isContainedIn(firstMultiSet)
 	if !(firstContained && secondContained) {
-		return firstRecords, secondRecords, errors.Errorf("different sets: \n %s \n and \n %s", firstMultiSet.Show(), secondMultiSet.Show())
+		return errors.Errorf("different sets: \n %s \n and \n %s", firstMultiSet.Show(), secondMultiSet.Show())
 	}
 
-	return firstRecords, secondRecords, nil
+	return nil
 }
 
 func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage, first, second RecordStream, opts ...AreEqualOpt) error {

@@ -110,6 +110,20 @@ type NamedExpression interface {
 	Name() octosql.VariableName
 }
 
+type DummyExpression struct {
+	value octosql.Value
+}
+
+func NewDummyExpression(value octosql.Value) *DummyExpression {
+	return &DummyExpression{
+		value: value,
+	}
+}
+
+func (de *DummyExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
+	return de.value, nil
+}
+
 type StarExpression struct {
 	qualifier string
 }
@@ -296,7 +310,7 @@ func (re *RecordExpression) ExpressionValue(ctx context.Context, variables octos
 	values := make([]octosql.Value, 0)
 
 	for _, f := range fields {
-		if f.Source() == "sys" { // TODO: some better way to do this?
+		if f.Source() == SystemSource { // TODO: some better way to do this?
 			continue
 		}
 

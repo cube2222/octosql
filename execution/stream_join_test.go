@@ -48,6 +48,7 @@ func TestStreamJoin(t *testing.T) {
 
 				joinType:       INNER_JOIN,
 				eventTimeField: "",
+				trigger:        NewCountingTrigger(NewDummyValue(octosql.MakeInt(1))),
 			},
 
 			want: NewDummyNode([]*Record{
@@ -59,6 +60,7 @@ func TestStreamJoin(t *testing.T) {
 			}),
 
 			executionCount: 4, // the only non-determinism is the order
+
 		},
 		{
 			name: "left join 1 - no event time field, no retractions",
@@ -81,6 +83,7 @@ func TestStreamJoin(t *testing.T) {
 
 				joinType:       LEFT_JOIN,
 				eventTimeField: "",
+				trigger:        NewMultiTrigger(NewWatermarkTrigger(), NewCountingTrigger(NewDummyExpression(octosql.MakeInt(2)))), // check other values
 			},
 
 			want: NewDummyNode([]*Record{
@@ -118,6 +121,7 @@ func TestStreamJoin(t *testing.T) {
 
 				joinType:       OUTER_JOIN,
 				eventTimeField: "",
+				trigger:        NewMultiTrigger(NewWatermarkTrigger(), NewCountingTrigger(NewDummyExpression(octosql.MakeInt(3)))), // check other values
 			},
 
 			want: NewDummyNode([]*Record{
@@ -160,6 +164,7 @@ func TestStreamJoin(t *testing.T) {
 
 				joinType:       INNER_JOIN,
 				eventTimeField: "",
+				trigger:        NewCountingTrigger(NewDummyValue(octosql.MakeInt(1))),
 			},
 
 			want: NewDummyNode([]*Record{
@@ -176,7 +181,7 @@ func TestStreamJoin(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stateStorage := storage.GetTestStorage(t)
-			streamJoin := NewStreamJoin(tt.fields.leftSource, tt.fields.rightSource, tt.fields.leftKey, tt.fields.rightKey, stateStorage, tt.fields.eventTimeField, tt.fields.joinType)
+			streamJoin := NewStreamJoin(tt.fields.leftSource, tt.fields.rightSource, tt.fields.leftKey, tt.fields.rightKey, stateStorage, tt.fields.eventTimeField, tt.fields.joinType, tt.fields.trigger)
 
 			for i := 0; i < tt.executionCount; i++ {
 				stream, _, err := GetAndStartAllShuffles(context.Background(), stateStorage, GetRawStreamID(), []Node{streamJoin}, octosql.NoVariables())
@@ -186,18 +191,11 @@ func TestStreamJoin(t *testing.T) {
 
 				want := GetTestStream(t, stateStorage, octosql.NoVariables(), tt.want)
 
-				firstRecords, secondRecords, err := AreStreamsEqualNoOrderingWithRetractionReduction(context.Background(), stateStorage, stream[0], want, WithEqualityBasedOn(EqualityOfFieldsAndValues))
+				err = AreStreamsEqualNoOrderingWithRetractionReduction(context.Background(), stateStorage, stream[0], want, WithEqualityBasedOn(EqualityOfFieldsAndValues))
 				if err != nil {
 					t.Errorf("Streams aren't equal")
-
-					if len(firstRecords) == 0 && len(secondRecords) == 0 {
-						println("a")
-					}
-
 					return
 				}
-
-				println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 			}
 		})
 	}

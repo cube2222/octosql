@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
@@ -112,14 +113,28 @@ var rightStreamRecordsPrefix = []byte("$right_stream_records$")
 var matchesToTriggerPrefix = []byte("$matches_to_trigger$")
 var recordsToTriggerPrefix = []byte("$records_to_trigger$")
 
+func showRecord(rec *Record) string {
+	str := ""
+	for i := range rec.Data {
+		if (*rec.Data[i]).AsString() != "" {
+			str += (*rec.Data[i]).AsString()
+		} else {
+			str += fmt.Sprintf("%d", (*rec.Data[i]).AsInt())
+		}
+		str += "|"
+	}
+
+	str += fmt.Sprint(rec.IsUndo())
+
+	return str
+}
+
 func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, key octosql.Value, record *Record) error {
 	if inputIndex < 0 || inputIndex > 1 {
 		panic("invalid inputIndex for stream join")
 	}
 
-	if record.Metadata.Id == nil {
-		panic("no ID for record in stream join")
-	}
+	println("Got AddRecord with index: ", inputIndex)
 
 	keyPrefix := append(append([]byte("$"), key.MonotonicMarshal()...), '$')
 	txByKey := tx.WithPrefix(keyPrefix)
@@ -128,13 +143,14 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 	isRetraction := record.IsUndo() // is the incoming record a retraction
 
 	// We get the key of the new incoming record
+	WithID(NewRecordID(""))(record) // reset the ID, we don't care about it
 	newRecordValue := recordToValue(record)
 	newRecordKey, err := proto.Marshal(&newRecordValue)
 	if err != nil {
 		return errors.Wrap(err, "couldn't marshall new record")
 	}
 
-	var myRecordSet, otherRecordSet *storage.Set
+	var myRecordSet, otherRecordSet *storage.MultiSet
 
 	// Important note:
 	// 1) If we are adding the record it's natural that we want to match it with every record from the other stream
@@ -142,20 +158,22 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 	// 	  This is because if records arrive in order R1, L1, L2, R2, R3 and then we retract L1, it has matched
 	//	  with R1 (when L1 was added) and with R2 and R3 (when they were added)
 	if isLeft {
-		myRecordSet = storage.NewSet(txByKey.WithPrefix(leftStreamRecordsPrefix))
-		otherRecordSet = storage.NewSet(txByKey.WithPrefix(rightStreamRecordsPrefix))
+		myRecordSet = storage.NewMultiSet(txByKey.WithPrefix(leftStreamRecordsPrefix))
+		otherRecordSet = storage.NewMultiSet(txByKey.WithPrefix(rightStreamRecordsPrefix))
 	} else {
-		myRecordSet = storage.NewSet(txByKey.WithPrefix(rightStreamRecordsPrefix))
-		otherRecordSet = storage.NewSet(txByKey.WithPrefix(leftStreamRecordsPrefix))
+		myRecordSet = storage.NewMultiSet(txByKey.WithPrefix(rightStreamRecordsPrefix))
+		otherRecordSet = storage.NewMultiSet(txByKey.WithPrefix(leftStreamRecordsPrefix))
 	}
 
-	// Keep track of the count. Since recordKey contains ID this will basically be either -1, 0 or 1
+	// Keep track of the count of the record (fields + data no metadata)
 	newCount, err := keepTrackOfCount(txByKey.WithPrefix(newRecordKey), isRetraction)
 	if err != nil {
 		return err
 	}
 
-	// If we got an early retraction, or a record arrived after its retraction then we do nothing
+	fmt.Printf("New count (%s) = %d\n", showRecord(record), newCount)
+
+	// If we got an early retraction, or a record bumped up the count to 0, but it was previously retracted we do nothing
 	if newCount < 0 || (newCount == 0 && !isRetraction) {
 		return nil
 	}
@@ -177,7 +195,7 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 		return errors.Wrap(err, "couldn't read records from the other stream")
 	}
 
-	matchesToTriggerSet := storage.NewSet(txByKey.WithPrefix(matchesToTriggerPrefix))
+	matchesToTriggerSet := storage.NewMultiSet(txByKey.WithPrefix(matchesToTriggerPrefix))
 
 	// Add matched records
 	for _, otherRecordValue := range otherRecordValues {
@@ -222,7 +240,7 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 
 	// Now additionally we might need to add the record itself if we are dealing with a specific join type
 
-	recordsToTriggerSet := storage.NewSet(txByKey.WithPrefix(recordsToTriggerPrefix))
+	recordsToTriggerSet := storage.NewMultiSet(txByKey.WithPrefix(recordsToTriggerPrefix))
 
 	// If we are performing an outer join or a left join and the record comes from the left
 	if js.joinType == OUTER_JOIN || (js.joinType == LEFT_JOIN && isLeft) {
@@ -277,7 +295,7 @@ func (js *JoinedStream) Trigger(ctx context.Context, tx storage.StateTransaction
 	triggeredCountValue := triggeredCount.AsInt()
 
 	// Read all the pairs to merge and send
-	matchesToTriggerSet := storage.NewSet(txByKey.WithPrefix(matchesToTriggerPrefix))
+	matchesToTriggerSet := storage.NewMultiSet(txByKey.WithPrefix(matchesToTriggerPrefix))
 	matches, err := matchesToTriggerSet.ReadAll()
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't read record matches to trigger")
@@ -311,7 +329,7 @@ func (js *JoinedStream) Trigger(ctx context.Context, tx storage.StateTransaction
 
 	// If it's not an inner join we might need to send not matched records
 	if js.joinType != INNER_JOIN {
-		recordsToTriggerSet := storage.NewSet(txByKey.WithPrefix(recordsToTriggerPrefix))
+		recordsToTriggerSet := storage.NewMultiSet(txByKey.WithPrefix(recordsToTriggerPrefix))
 
 		singleRecords, err := recordsToTriggerSet.ReadAll()
 		if err != nil {
@@ -385,6 +403,22 @@ func recordToValue(rec *Record) octosql.Value {
 	valuesTogether[2] = IDValue
 	valuesTogether[3] = undoValue
 	valuesTogether[4] = eventTimeField
+
+	return octosql.MakeTuple(valuesTogether)
+}
+
+func recordDataToValue(rec *Record) octosql.Value {
+	fields := make([]octosql.Value, len(rec.FieldNames))
+	data := make([]octosql.Value, len(rec.Data))
+
+	for i := range rec.FieldNames {
+		fields[i] = octosql.MakeString(rec.FieldNames[i])
+		data[i] = *rec.Data[i]
+	}
+
+	valuesTogether := make([]octosql.Value, 2)
+	valuesTogether[0] = octosql.MakeTuple(fields)
+	valuesTogether[1] = octosql.MakeTuple(data)
 
 	return octosql.MakeTuple(valuesTogether)
 }

@@ -14,7 +14,7 @@ func TestSet(t *testing.T) {
 	store := GetTestStorage(t)
 	txn := store.BeginTransaction().WithPrefix(prefix)
 
-	set := NewSet(txn)
+	set := NewMultiSet(txn)
 
 	values := []octosql.Value{
 		octosql.MakeInt(17),
@@ -24,13 +24,8 @@ func TestSet(t *testing.T) {
 	}
 
 	for _, value := range values {
-		inserted, err := set.InsertWithConfirmation(value)
-		if err != nil {
+		if err := set.Insert(value); err != nil {
 			log.Fatal(err)
-		}
-
-		if !inserted {
-			log.Fatal("the value wasn't inserted, although it should've been")
 		}
 
 		contains, err := set.Contains(value)
@@ -45,25 +40,14 @@ func TestSet(t *testing.T) {
 
 	/* test iterator correctness */
 	iter := set.GetIterator()
-	isCorrect, err := TestSetIteratorCorrectness(iter, values)
 
-	if !isCorrect {
-		log.Fatal("The set iterator doesn't contain all the values")
-	}
-
-	if err != nil {
+	if err := TestSetIteratorCorrectness(iter, values, []int{1, 1, 1, 1}); err != nil {
 		log.Fatal(err)
 	}
 	_ = iter.Close()
 
 	/* test erase */
-	wasErased, err := set.EraseWithConfirmation(values[0])
-
-	if !wasErased {
-		log.Fatal("the value should've been erased, but it wasn't")
-	}
-
-	if err != nil {
+	if err := set.Erase(values[0]); err != nil {
 		log.Fatal(err)
 	}
 
@@ -76,25 +60,13 @@ func TestSet(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	wasErased, err = set.EraseWithConfirmation(values[0])
-
-	if wasErased {
-		log.Fatal("the value should not have been erased, but it was")
-	}
-
-	if err != nil {
+	if err := set.Erase(values[0]); err != nil {
 		log.Fatal(err)
 	}
 	/* test iterator again after removal*/
 	iter = set.GetIterator()
 
-	isCorrect, err = TestSetIteratorCorrectness(iter, values[1:])
-
-	if !isCorrect {
-		log.Fatal("The set iterator doesn't contain all the values")
-	}
-
-	if err != nil {
+	if err := TestSetIteratorCorrectness(iter, values[1:], []int{1, 1, 1}); err != nil {
 		log.Fatal(err)
 	}
 	_ = iter.Close()
@@ -113,6 +85,53 @@ func TestSet(t *testing.T) {
 	if err != ErrEndOfIterator {
 		log.Fatal("expected end of iterator")
 	}
+
+	_ = iter2.Close()
+
+	for i := 0; i < 4; i++ {
+		for j := 0; j < 2; j++ {
+			if err := set.Insert(values[i]); err != nil {
+				log.Fatal(err)
+			}
+		}
+	}
+
+	iter = set.GetIterator()
+
+	if err := TestSetIteratorCorrectness(iter, values, []int{2, 2, 2, 2}); err != nil {
+		log.Fatal(err)
+	}
+
+	_ = iter.Close()
+
+	if err := set.Erase(values[0]); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := set.Erase(values[0]); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := set.Erase(values[1]); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := set.Erase(values[2]); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := set.Erase(values[3]); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := set.Erase(values[3]); err != nil {
+		log.Fatal(err)
+	}
+
+	iter = set.GetIterator()
+	if err := TestSetIteratorCorrectness(iter, values[1:3], []int{1, 1}); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func TestSetWithCollisions(t *testing.T) {
@@ -121,7 +140,7 @@ func TestSetWithCollisions(t *testing.T) {
 	store := GetTestStorage(t)
 	txn := store.BeginTransaction().WithPrefix(prefix)
 
-	set := NewSet(txn)
+	set := NewMultiSet(txn)
 
 	values := []octosql.Value{
 		octosql.MakeInt(17),
@@ -131,13 +150,8 @@ func TestSetWithCollisions(t *testing.T) {
 	}
 
 	for _, value := range values {
-		inserted, err := set.collisionInsert(value)
-		if err != nil {
+		if err := set.collisionInsert(value); err != nil {
 			log.Fatal(err)
-		}
-
-		if !inserted {
-			log.Fatal("the value wasn't inserted, although it should've been")
 		}
 
 		contains, err := set.collisionContains(value)
@@ -153,25 +167,13 @@ func TestSetWithCollisions(t *testing.T) {
 	/* test iterator */
 	iter := set.GetIterator()
 
-	isCorrect, err := TestSetIteratorCorrectness(iter, values)
-
-	if !isCorrect {
-		log.Fatal("The set iterator doesn't contain all the values")
-	}
-
-	if err != nil {
+	if err := TestSetIteratorCorrectness(iter, values, []int{1, 1, 1, 1}); err != nil {
 		log.Fatal(err)
 	}
 	_ = iter.Close()
 
 	/* test erase */
-	wasErased, err := set.collisionErase(values[0])
-
-	if !wasErased {
-		log.Fatal("the value should've been erased, but it wasn't")
-	}
-
-	if err != nil {
+	if err := set.collisionErase(values[0]); err != nil {
 		log.Fatal(err)
 	}
 
@@ -184,24 +186,12 @@ func TestSetWithCollisions(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	wasErased, err = set.collisionErase(values[0])
-
-	if wasErased {
-		log.Fatal("the value should not have been erased, but it was")
-	}
-
-	if err != nil {
+	if err := set.collisionErase(values[0]); err != nil {
 		log.Fatal(err)
 	}
 	/* test iterator after erasing*/
 	iter = set.GetIterator()
-	isCorrect, err = TestSetIteratorCorrectness(iter, values[1:])
-
-	if !isCorrect {
-		log.Fatal("The set iterator doesn't contain all the values")
-	}
-
-	if err != nil {
+	if err := TestSetIteratorCorrectness(iter, values[1:], []int{1, 1, 1}); err != nil {
 		log.Fatal(err)
 	}
 
@@ -227,55 +217,77 @@ func TestSetWithCollisions(t *testing.T) {
 
 	/* basic testing with two hashes */
 	for i := 0; i < 2; i++ {
-		inserted, err := set.collisionInsert(values[i])
-		if !inserted {
-			log.Fatal("the value should've been inserted, but it wasn't")
-		}
-
-		if err != nil {
-			log.Fatal(err)
+		for j := 0; j < 10; j++ {
+			if err := set.collisionInsert(values[i]); err != nil {
+				log.Fatal(err)
+			}
 		}
 	}
 
-	for j := 2; j < 4; j++ {
-		inserted, err := set.collisionInsert2(values[j])
-		if !inserted {
-			log.Fatal("the value should've been inserted, but it wasn't")
-		}
-
-		if err != nil {
-			log.Fatal(err)
+	for i := 2; i < 4; i++ {
+		for j := 0; j < 10; j++ {
+			if err := set.collisionInsert2(values[i]); err != nil {
+				log.Fatal(err)
+			}
 		}
 	}
 
-	/* test if iterator works */
+	/* test if iterator works with collisions */
 	iter = set.GetIterator()
-	isCorrect, err = TestSetIteratorCorrectness(iter, values)
-
-	if !isCorrect {
-		log.Fatal("The set iterator doesn't contain all the values")
+	if err := TestSetIteratorCorrectness(iter, values, []int{10, 10, 10, 10}); err != nil {
+		log.Fatal(err)
 	}
 
-	if err != nil {
+	_ = iter.Close()
+
+	for i := 0; i < 10; i++ {
+		if err := set.collisionErase(values[0]); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	if err := set.collisionErase(values[1]); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := set.collisionErase2(values[2]); err != nil {
+		log.Fatal(err)
+	}
+
+	iter = set.GetIterator()
+	if err := TestSetIteratorCorrectness(iter, values[1:], []int{9, 9, 10}); err != nil {
+		log.Fatal(err)
+	}
+
+	_ = iter.Close()
+
+	for i := 0; i < 9; i++ {
+		if err := set.collisionErase(values[1]); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	iter = set.GetIterator()
+	if err := TestSetIteratorCorrectness(iter, values[2:], []int{9, 10}); err != nil {
 		log.Fatal(err)
 	}
 
 	_ = iter.Close()
 }
 
-func (set *Set) collisionInsert(value octosql.Value) (bool, error) {
-	return set.insertUsingHash(value, collisionHash)
+func (set *MultiSet) collisionInsert(value octosql.Value) error {
+	return set.insertWithFunction(value, collisionHash)
 }
 
-func (set *Set) collisionErase(value octosql.Value) (bool, error) {
-	return set.eraseUsingHash(value, collisionHash)
+func (set *MultiSet) collisionErase(value octosql.Value) error {
+	return set.eraseWithFunction(value, collisionHash, false)
 }
 
-func (set *Set) collisionContains(value octosql.Value) (bool, error) {
-	return set.containsUsingHash(value, collisionHash)
+func (set *MultiSet) collisionContains(value octosql.Value) (bool, error) {
+	return set.containsWithFunction(value, collisionHash)
 }
 
-func (set *Set) collisionClear() error {
+func (set *MultiSet) collisionClear() error {
 	return set.clearUsingHash(collisionHash)
 }
 
@@ -285,19 +297,19 @@ func collisionHash(value octosql.Value) ([]byte, error) {
 
 //There are two different mock hash functions, to simulate if our set
 //works correctly with multiple collisions
-func (set *Set) collisionInsert2(value octosql.Value) (bool, error) {
-	return set.insertUsingHash(value, collisionHash2)
+func (set *MultiSet) collisionInsert2(value octosql.Value) error {
+	return set.insertWithFunction(value, collisionHash2)
 }
 
-func (set *Set) collisionErase2(value octosql.Value) (bool, error) {
-	return set.eraseUsingHash(value, collisionHash2)
+func (set *MultiSet) collisionErase2(value octosql.Value) error {
+	return set.eraseWithFunction(value, collisionHash2, false)
 }
 
-func (set *Set) collisionContains2(value octosql.Value) (bool, error) {
-	return set.containsUsingHash(value, collisionHash2)
+func (set *MultiSet) collisionContains2(value octosql.Value) (bool, error) {
+	return set.containsWithFunction(value, collisionHash2)
 }
 
-func (set *Set) collisionClear2() error {
+func (set *MultiSet) collisionClear2() error {
 	return set.clearUsingHash(collisionHash2)
 }
 

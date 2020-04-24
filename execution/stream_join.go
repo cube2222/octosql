@@ -124,7 +124,7 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 	isRetraction := record.IsUndo() // is the incoming record a retraction
 
 	// We get the key of the new incoming record
-	WithNoUndo()(record) // reset the potential retraction information
+	WithNoUndo()(record) // reset the potential retraction information, since we want a record and its retraction "to find each other"
 	newRecordValue := recordToValue(record)
 	newRecordKey, err := proto.Marshal(&newRecordValue)
 	if err != nil {

@@ -264,24 +264,24 @@ func (rs *LookupJoinStream) RunWorker(ctx context.Context, id *RecordID) error {
 		return errors.Wrap(err, "couldn't get source record for job")
 	}
 
+	if err := tx.Commit(); err != nil {
+		return errors.Wrapf(err, "couldn't commit transaction setting up the job")
+	}
+
 	jobVariables, err := sourceRecord.AsVariables().MergeWith(rs.variables)
 	if err != nil {
 		return errors.Wrapf(err, "couldn't merge node variables with current record variables: %v and %s", rs.variables, sourceRecord.Show())
 	}
 
-	joinedStream, _, err := rs.joinedNode.Get(storage.InjectStateTransaction(ctx, tx), jobVariables, sourceStreamID)
+	joinedStream, _, err := GetAndStartAllShuffles(ctx, rs.stateStorage, sourceStreamID, []Node{rs.joinedNode}, jobVariables)
 	if err != nil {
 		return errors.Wrapf(err, "couldn't get record stream from joined node")
-	}
-
-	if err := tx.Commit(); err != nil {
-		return errors.Wrapf(err, "couldn't commit transaction setting up the job")
 	}
 
 	engine := NewPullEngine(
 		&JobOutputQueueIntermediateRecordStore{recordID: id},
 		rs.stateStorage,
-		joinedStream,
+		joinedStream[0], // We put one stream in, so only one stream will come out.
 		rs.streamID,
 		&ZeroWatermarkGenerator{},
 		true,

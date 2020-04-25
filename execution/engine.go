@@ -140,8 +140,8 @@ func (engine *PullEngine) Run() {
 			engine.batchSizeManager.Reset()
 			tx = engine.storage.BeginTransaction()
 		} else if err != nil {
-			tx.Abort()
 			log.Println("engine: ", err)
+			tx.Abort()
 			tx = engine.storage.BeginTransaction()
 			err := engine.irs.MarkError(engine.ctx, engine.getPrefixedTx(tx), err)
 			if err != nil {

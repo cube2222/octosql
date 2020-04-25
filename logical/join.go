@@ -127,7 +127,7 @@ func (node *Join) Physical(ctx context.Context, physicalCreator *PhysicalPlanCre
 		}
 
 		for i := range joinedShuffled {
-			joinedShuffled[i] = physical.NewNextShuffleMetadataChange("_right", i, sourceShuffled[i])
+			joinedShuffled[i] = physical.NewNextShuffleMetadataChange("_right", i, joinedShuffled[i])
 		}
 
 		outNodes = make([]physical.Node, len(sourceShuffled))

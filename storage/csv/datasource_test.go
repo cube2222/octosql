@@ -307,6 +307,11 @@ func TestCSVRecordStream_Next(t *testing.T) {
 				t.Errorf("Streams aren't equal: %v", err)
 				return
 			}
+
+			if err := got.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close csv stream: %v", err)
+				return
+			}
 		})
 	}
 }

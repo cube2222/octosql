@@ -188,6 +188,13 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 		}
 
 		for { // inner for is calling RunWorkerInternal
+			select {
+			case <-ctx.Done():
+				rs.workerCloseErrChan <- ctx.Err()
+				return
+			default:
+			}
+
 			tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
 
 			err := rs.RunWorkerInternal(ctx, tx)
@@ -209,9 +216,8 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 				err = tx.Commit()
 				if err != nil {
 					log.Println("csv worker: couldn't commit transaction: ", err)
-					continue
 				}
-				return
+				continue
 			} else if err != nil {
 				tx.Abort()
 				log.Printf("csv worker: error running csv read batch worker: %s, reinitializing from storage", err)
@@ -305,7 +311,6 @@ func (rs *RecordStream) readRecordFromFileWithInitialize() (map[octosql.Variable
 	line, err := rs.r.Read()
 	if err == io.EOF {
 		rs.isDone = true
-		rs.file.Close()
 		return nil, execution.ErrEndOfStream
 	} else if err != nil {
 		return nil, errors.Wrap(err, "couldn't read record")

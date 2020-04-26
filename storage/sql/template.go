@@ -143,7 +143,16 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		execution.NewExecutionOutput(
 			execution.NewZeroWatermarkGenerator(),
 			map[string]execution.ShuffleData{},
-			[]execution.Task{func() error { rs.RunWorker(ctx); return nil }},
+			[]execution.Task{func() error {
+				if err := rs.RunWorker(ctx); err != nil {
+					err1 := errors.Wrap(err, "sql worker error")
+					rs.workerCloseErrChan <- err1
+					return err1
+				}
+
+				rs.workerCloseErrChan <- ctx.Err()
+				return nil
+			}},
 		),
 		nil
 }
@@ -189,12 +198,11 @@ func (rs *RecordStream) Close(ctx context.Context, storage storage.Storage) erro
 	return nil
 }
 
-func (rs *RecordStream) RunWorker(ctx context.Context) {
+func (rs *RecordStream) RunWorker(ctx context.Context) error {
 	for { // outer for is loading offset value and creating rows
 		select {
 		case <-ctx.Done():
-			rs.workerCloseErrChan <- ctx.Err()
-			return
+			return nil
 		default:
 		}
 
@@ -202,8 +210,7 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 
 		err := rs.loadOffset(tx)
 		if err != nil {
-			log.Fatalf("sql worker: couldn't reinitialize offset for sql read batch worker: %s", err)
-			return
+			return errors.Wrap(err, "couldn't reinitialize offset for sql read batch worker")
 		}
 
 		tx.Abort() // We only read data above, no need to risk failing now.
@@ -216,8 +223,7 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 			offsetVariable := octosql.NewVariables(map[octosql.VariableName]octosql.Value{offsetPlaceholderName: newOffsetValue})
 			rs.variables, err = rs.variables.MergeWith(offsetVariable)
 			if err != nil {
-				log.Fatalf("sql worker: couldn't merge variables with offset variable: %s", err)
-				return
+				return errors.Wrap(err, "couldn't merge variables with offset variable")
 			}
 		} else { // just update value in variables // TODO - maybe think about some Set() method on variables? MergeWith returns error when exists
 			rs.variables[offsetPlaceholderName] = newOffsetValue
@@ -229,8 +235,7 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 			// Since we have an execution expression, then we can evaluate it given the variables
 			value, err := expression.ExpressionValue(ctx, rs.variables)
 			if err != nil {
-				log.Fatalf("sql worker: couldn't get actual value from variables: %s", err)
-				return
+				return errors.Wrap(err, "couldn't get actual value from variables")
 			}
 
 			values = append(values, value.ToRawValue())
@@ -238,23 +243,20 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 
 		rows, err := rs.stmt.QueryContext(ctx, values...)
 		if err != nil {
-			log.Fatalf("sql worker: couldn't query statement: %s", err)
-			return
+			return errors.Wrap(err, "couldn't query statement")
 		}
 		rs.rows = rows
 
 		columns, err := rows.Columns()
 		if err != nil {
-			log.Fatalf("sql worker: couldn't get columns from rows: %s", err)
-			return
+			return errors.Wrap(err, "couldn't get columns from rows")
 		}
 		rs.columns = columns
 
 		for { // inner for is calling RunWorkerInternal
 			select {
 			case <-ctx.Done():
-				rs.workerCloseErrChan <- ctx.Err()
-				return
+				return nil
 			default:
 			}
 
@@ -279,8 +281,9 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 				err = tx.Commit()
 				if err != nil {
 					log.Println("sql worker: couldn't commit transaction: ", err)
+					continue
 				}
-				continue
+				return nil
 			} else if err != nil {
 				tx.Abort()
 				log.Printf("sql worker: error running sql read batch worker: %s, reinitializing from storage", err)

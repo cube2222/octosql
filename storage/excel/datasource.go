@@ -118,7 +118,16 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		execution.NewExecutionOutput(
 			execution.NewZeroWatermarkGenerator(),
 			map[string]execution.ShuffleData{},
-			[]execution.Task{func() error { rs.RunWorker(ctx); return nil }},
+			[]execution.Task{func() error {
+				if err := rs.RunWorker(ctx); err != nil {
+					err1 := errors.Wrap(err, "excel worker error")
+					rs.workerCloseErrChan <- err1
+					return err1
+				}
+
+				rs.workerCloseErrChan <- ctx.Err()
+				return nil
+			}},
 		),
 		nil
 }
@@ -161,20 +170,18 @@ func (rs *RecordStream) Close(ctx context.Context, storage storage.Storage) erro
 	return nil
 }
 
-func (rs *RecordStream) RunWorker(ctx context.Context) {
+func (rs *RecordStream) RunWorker(ctx context.Context) error {
 	for { // outer for is loading offset value and moving file iterator
 		select {
 		case <-ctx.Done():
-			rs.workerCloseErrChan <- ctx.Err()
-			return
+			return nil
 		default:
 		}
 
 		tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
 
 		if err := rs.loadOffset(tx); err != nil {
-			log.Fatalf("excel worker: couldn't reinitialize offset for excel read batch worker: %s", err)
-			return
+			return errors.Wrap(err, "couldn't reinitialize offset for excel read batch worker")
 		}
 
 		tx.Abort() // We only read data above, no need to risk failing now.
@@ -182,20 +189,17 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 		// Load/Reload file
 		file, err := excelize.OpenFile(rs.filePath)
 		if err != nil {
-			log.Fatalf("excel worker: couldn't open file: %s", err)
-			return
+			return errors.Wrap(err, "couldn't open file")
 		}
 
 		rows, err := file.Rows(rs.sheet)
 		if err != nil {
-			log.Fatalf("excel worker: couldn't get sheet's rows: %s", err)
-			return
+			return errors.Wrap(err, "couldn't get sheet's rows")
 		}
 
 		for i := 0; i <= rs.verticalOffset; i++ {
 			if !rows.Next() {
-				log.Fatalf("excel worker: root cell is lower than row count: %s", err)
-				return
+				return errors.Wrap(err, "root cell is lower than row count")
 			}
 		}
 
@@ -205,18 +209,16 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 		for i := 0; i < rs.offset; i++ {
 			_, err := rs.readRecordFromFileWithInitialize()
 			if err == execution.ErrEndOfStream {
-				return
+				return nil
 			} else if err != nil {
-				log.Fatalf("excel worker: couldn't move excel file iterator by %d offset: %s", rs.offset, err)
-				return
+				return errors.Wrapf(err, "couldn't move excel file iterator by %d offset", rs.offset)
 			}
 		}
 
 		for { // inner for is calling RunWorkerInternal
 			select {
 			case <-ctx.Done():
-				rs.workerCloseErrChan <- ctx.Err()
-				return
+				return nil
 			default:
 			}
 
@@ -241,8 +243,9 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 				err = tx.Commit()
 				if err != nil {
 					log.Println("excel worker: couldn't commit transaction: ", err)
+					continue
 				}
-				continue
+				return nil
 			} else if err != nil {
 				tx.Abort()
 				log.Printf("excel worker: error running excel read batch worker: %s, reinitializing from storage", err)

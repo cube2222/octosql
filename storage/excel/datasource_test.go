@@ -400,6 +400,10 @@ func TestDataSource_Get(t *testing.T) {
 				t.Errorf("Couldn't close excel stream: %v", err)
 				return
 			}
+			if err := want.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+				return
+			}
 		})
 	}
 }

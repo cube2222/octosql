@@ -149,7 +149,16 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		execution.NewExecutionOutput(
 			execution.NewZeroWatermarkGenerator(),
 			map[string]execution.ShuffleData{},
-			[]execution.Task{func() error { rs.RunWorker(ctx); return nil }},
+			[]execution.Task{func() error {
+				if err := rs.RunWorker(ctx); err != nil {
+					err1 := errors.Wrap(err, "kafka worker error")
+					rs.workerCloseErrChan <- err1
+					return err1
+				}
+
+				rs.workerCloseErrChan <- ctx.Err()
+				return nil
+			}},
 		),
 		nil
 }
@@ -169,12 +178,11 @@ type RecordStream struct {
 
 var outputQueuePrefix = []byte("$output_queue$")
 
-func (rs *RecordStream) RunWorker(ctx context.Context) {
+func (rs *RecordStream) RunWorker(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			rs.workerCloseErrChan <- ctx.Err()
-			return
+			return nil
 		default:
 		}
 
@@ -200,8 +208,7 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 			log.Printf("kafka worker: error running kafka read messages worker: %s, reinitializing from storage", err)
 			tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
 			if err := rs.loadOffset(tx); err != nil {
-				log.Fatalf("kafka worker: couldn't reinitialize offset for kafka read messages worker: %s", err)
-				return
+				return errors.Wrap(err, "couldn't reinitialize offset for kafka read messages worker")
 			}
 			tx.Abort() // We only read data above, no need to risk failing now.
 			continue

@@ -88,7 +88,16 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		execution.NewExecutionOutput(
 			execution.NewZeroWatermarkGenerator(),
 			map[string]execution.ShuffleData{},
-			[]execution.Task{func() error { rs.RunWorker(ctx); return nil }},
+			[]execution.Task{func() error {
+				if err := rs.RunWorker(ctx); err != nil {
+					err1 := errors.Wrap(err, "json worker error")
+					rs.workerCloseErrChan <- err1
+					return err1
+				}
+
+				rs.workerCloseErrChan <- ctx.Err()
+				return nil
+			}},
 		),
 		nil
 }
@@ -129,20 +138,18 @@ func (rs *RecordStream) Close(ctx context.Context, storage storage.Storage) erro
 	return nil
 }
 
-func (rs *RecordStream) RunWorker(ctx context.Context) {
+func (rs *RecordStream) RunWorker(ctx context.Context) error {
 	for { // outer for is loading offset value and moving file iterator
 		select {
 		case <-ctx.Done():
-			rs.workerCloseErrChan <- ctx.Err()
-			return
+			return nil
 		default:
 		}
 
 		tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
 
 		if err := rs.loadOffset(tx); err != nil {
-			log.Fatalf("json worker: couldn't reinitialize offset for json read batch worker: %s", err)
-			return
+			return errors.Wrap(err, "couldn't reinitialize offset for json read batch worker")
 		}
 
 		tx.Abort() // We only read data above, no need to risk failing now.
@@ -150,8 +157,7 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 		// Load/Reload file
 		file, err := os.Open(rs.filePath)
 		if err != nil {
-			log.Fatalf("json worker: couldn't open file: %s", err)
-			return
+			return errors.Wrap(err, "couldn't open file")
 		}
 
 		rs.file = file
@@ -161,18 +167,16 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 		for i := 0; i < rs.offset; i++ {
 			_, err := rs.readRecordFromFile()
 			if err == execution.ErrEndOfStream {
-				return
+				return nil
 			} else if err != nil {
-				log.Fatalf("json worker: couldn't move json file iterator by %d offset: %s", rs.offset, err)
-				return
+				return errors.Wrapf(err, "couldn't move json file iterator by %d offset", rs.offset)
 			}
 		}
 
 		for { // inner for is calling RunWorkerInternal
 			select {
 			case <-ctx.Done():
-				rs.workerCloseErrChan <- ctx.Err()
-				return
+				return nil
 			default:
 			}
 
@@ -197,8 +201,9 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 				err = tx.Commit()
 				if err != nil {
 					log.Println("json worker: couldn't commit transaction: ", err)
+					continue
 				}
-				continue
+				return nil
 			} else if err != nil {
 				tx.Abort()
 				log.Printf("json worker: error running json read batch worker: %s, reinitializing from storage", err)

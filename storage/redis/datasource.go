@@ -129,7 +129,16 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		execution.NewExecutionOutput(
 			execution.NewZeroWatermarkGenerator(),
 			map[string]execution.ShuffleData{},
-			[]execution.Task{func() error { rs.RunWorker(ctx); return nil }},
+			[]execution.Task{func() error {
+				if err := rs.RunWorker(ctx); err != nil {
+					err1 := errors.Wrap(err, "redis worker error")
+					rs.workerCloseErrChan <- err1
+					return err1
+				}
+
+				rs.workerCloseErrChan <- ctx.Err()
+				return nil
+			}},
 		),
 		nil
 }
@@ -175,28 +184,25 @@ func (rs *RecordStream) Close(ctx context.Context, storage storage.Storage) erro
 	return nil
 }
 
-func (rs *RecordStream) RunWorker(ctx context.Context) {
+func (rs *RecordStream) RunWorker(ctx context.Context) error {
 	for { // outer for is loading offset value and moving file iterator
 		select {
 		case <-ctx.Done():
-			rs.workerCloseErrChan <- ctx.Err()
-			return
+			return nil
 		default:
 		}
 
 		tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
 
 		if err := rs.loadOffset(tx); err != nil {
-			log.Fatalf("redis worker: couldn't reinitialize offset for redis read batch worker: %s", err)
-			return
+			return errors.Wrap(err, "couldn't reinitialize offset for redis read batch worker")
 		}
 
 		// Moving file iterator by `rs.offset`
 		if rs.isEntireDatabaseStream {
 			// Here we do full database scan so all we need to do is load last returned cursor value
 			if err := rs.loadCursor(tx); err != nil {
-				log.Fatalf("redis worker: couldn't load redis cursor: %s", err)
-				return
+				return errors.Wrap(err, "couldn't load redis cursor")
 			}
 		} else {
 			// Here we just drop first `rs.offset` from keys slice
@@ -208,8 +214,7 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 		for { // inner for is calling RunWorkerInternal
 			select {
 			case <-ctx.Done():
-				rs.workerCloseErrChan <- ctx.Err()
-				return
+				return nil
 			default:
 			}
 
@@ -234,8 +239,9 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 				err = tx.Commit()
 				if err != nil {
 					log.Println("redis worker: couldn't commit transaction: ", err)
+					continue
 				}
-				continue
+				return nil
 			} else if err != nil {
 				tx.Abort()
 				log.Printf("redis worker: error running redis read batch worker: %s, reinitializing from storage", err)

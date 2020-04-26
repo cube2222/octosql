@@ -130,6 +130,15 @@ func TestAreStreamsEqual(t *testing.T) {
 				t.Errorf("AreStreamsEqual() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
+			if err := tt.args.first.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close first in_memory stream: %v", err)
+				return
+			}
+			if err := tt.args.second.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close second in_memory stream: %v", err)
+				return
+			}
 		})
 	}
 }

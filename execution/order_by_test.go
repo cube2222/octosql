@@ -268,6 +268,11 @@ func TestOrderBy_Get(t *testing.T) {
 				t.Errorf("Error in AreStreamsEqual(): %v", err)
 				return
 			}
+
+			if err := ordered.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close order_by stream: %v", err)
+				return
+			}
 		})
 	}
 }

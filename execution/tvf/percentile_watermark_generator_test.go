@@ -264,6 +264,10 @@ func TestPercentileWatermarkGenerator_Stream(t *testing.T) {
 				t.Errorf("Couldn't close percentile watermark generator stream: %v", err)
 				return
 			}
+			if err := wanted.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+				return
+			}
 
 			if err := tx.Commit(); err != nil {
 				t.Fatal(err)

@@ -299,6 +299,10 @@ func TestShuffle(t *testing.T) {
 					t.Errorf("Couldn't close output stream with id %v: %v", i, err)
 					return
 				}
+				if err := wantOutputStreams[i].Close(ctx, stateStorage); err != nil {
+					t.Errorf("Couldn't close wanted in_memory stream with id %v: %v", i, err)
+					return
+				}
 			}
 		})
 	}
@@ -546,6 +550,10 @@ func TestShuffleMultiStage(t *testing.T) {
 
 	if err := outputStream[0].Close(ctx, stateStorage); err != nil {
 		t.Errorf("Couldn't close output stream: %v", err)
+		return
+	}
+	if err := wantStream.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close wanted in_memory stream: %v", err)
 		return
 	}
 }

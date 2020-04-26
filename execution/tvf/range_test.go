@@ -176,6 +176,10 @@ func TestRange_Get(t *testing.T) {
 				t.Errorf("Couldn't close range stream: %v", err)
 				return
 			}
+			if err := want.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+				return
+			}
 
 			if err := tx.Commit(); err != nil {
 				t.Fatal(err)

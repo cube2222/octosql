@@ -172,6 +172,11 @@ func TestRange_Get(t *testing.T) {
 				t.Errorf("Range.Get() AreStreamsEqual error = %v", err)
 			}
 
+			if err := got.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close range stream: %v", err)
+				return
+			}
+
 			if err := tx.Commit(); err != nil {
 				t.Fatal(err)
 			}

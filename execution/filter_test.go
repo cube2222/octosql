@@ -176,6 +176,11 @@ func TestFilteredStream_Next(t *testing.T) {
 				t.Errorf("FilteredStream.Next() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
+			if err := stream.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close filter stream: %v", err)
+				return
+			}
 		})
 	}
 }

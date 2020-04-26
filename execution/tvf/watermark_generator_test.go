@@ -110,6 +110,11 @@ func TestWatermarkGenerator_Get(t *testing.T) {
 				t.Errorf("WatermarkGenerator.Get() AreStreamsEqual error = %v", err)
 			}
 
+			if err := got.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close watermark generator stream: %v", err)
+				return
+			}
+
 			if err := tx.Commit(); err != nil {
 				t.Fatal(err)
 			}
@@ -186,4 +191,9 @@ func TestWatermarkGeneratorStream_GetWatermark(t *testing.T) {
 	NextRecord(t, ctx, src) // curTime = 8, maxTime = 13
 
 	ExpectWatermarkValue(t, ctx, ws, tx, baseTime.Add(time.Second*8)) // maxTime = 13 - 5
+
+	if err := src.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close watermark generator stream: %v", err)
+		return
+	}
 }

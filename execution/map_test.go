@@ -230,6 +230,11 @@ func TestMappedStream_Next(t *testing.T) {
 				t.Errorf("MappedStream.Next() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
+			if err := stream.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close mapped stream: %v", err)
+				return
+			}
 		})
 	}
 }

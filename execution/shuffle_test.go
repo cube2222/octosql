@@ -294,6 +294,11 @@ func TestShuffle(t *testing.T) {
 					t.Errorf("Shuffle.Next() error = %v, wantErr %v", err, tt.wantErr)
 					return
 				}
+
+				if err := outputStreams[i].Close(ctx, stateStorage); err != nil {
+					t.Errorf("Couldn't close output stream with id %v: %v", i, err)
+					return
+				}
 			}
 		})
 	}
@@ -538,6 +543,11 @@ func TestShuffleMultiStage(t *testing.T) {
 		t.Errorf("Shuffle.Next() error = %v", err)
 		return
 	}
+
+	if err := outputStream[0].Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close output stream: %v", err)
+		return
+	}
 }
 
 func TestShuffleWatermarks(t *testing.T) {
@@ -620,6 +630,15 @@ func TestShuffleWatermarks(t *testing.T) {
 
 	ExpectWatermarkValue(t, ctx, now, receiver0)
 	ExpectWatermarkValue(t, ctx, now, receiver1)
+
+	if err := sender0.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close sender0: %v", err)
+		return
+	}
+	if err := sender1.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close sender1: %v", err)
+		return
+	}
 }
 
 func PropagateWatermarks(t *testing.T, ctx context.Context, senders []IntermediateRecordStore, receivers []RecordStream) {

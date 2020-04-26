@@ -171,6 +171,11 @@ func TestTumble_Get(t *testing.T) {
 				t.Errorf("Tumble.Get() AreStreamsEqual error = %v", err)
 			}
 
+			if err := got.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close tumble stream: %v", err)
+				return
+			}
+
 			if err := tx.Commit(); err != nil {
 				t.Fatal(err)
 			}

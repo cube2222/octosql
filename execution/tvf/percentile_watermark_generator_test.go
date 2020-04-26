@@ -260,6 +260,11 @@ func TestPercentileWatermarkGenerator_Stream(t *testing.T) {
 				t.Errorf("PercentileWatermarkGenerator.Get() AreStreamsEqual error = %v", err)
 			}
 
+			if err := got.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close percentile watermark generator stream: %v", err)
+				return
+			}
+
 			if err := tx.Commit(); err != nil {
 				t.Fatal(err)
 			}
@@ -422,4 +427,9 @@ func TestPercentileWatermarkGeneratorStream_GetWatermark(t *testing.T) {
 
 	NextRecord(t, ctx, src)                                           // event: 42 ; deque: 7 9 7 8 42; sorted: 7 7 8 9 42
 	ExpectWatermarkValue(t, ctx, ws, tx, baseTime.Add(time.Second*7)) // update
+
+	if err := src.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close percentile watermark generator stream: %v", err)
+		return
+	}
 }

@@ -77,5 +77,9 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		return errors.Wrap(err, "couldn't run stdout printer")
 	}
 
+	if err := pullEngine.Close(ctx, stateStorage); err != nil {
+		return errors.Wrap(err, "couldn't close output pull engine")
+	}
+
 	return nil
 }

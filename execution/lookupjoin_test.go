@@ -316,6 +316,15 @@ func TestLookupJoin(t *testing.T) {
 				t.Errorf("LookupJoin error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
+			if err := stream.Close(context.Background(), stateStorage); err != nil {
+				t.Errorf("Couldn't close group_by stream: %v", err)
+				return
+			}
+			if err := want.Close(context.Background(), stateStorage); err != nil {
+				t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+				return
+			}
 		})
 	}
 }

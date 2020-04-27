@@ -115,6 +115,8 @@ func (engine *PullEngine) Run() {
 				continue
 			}
 			log.Println("engine: end of stream, stopping loop")
+
+			engine.closeErrChan <- engine.ctx.Err()
 			return
 		} else if errors.Cause(err) == ErrNewTransactionRequired {
 			err := tx.Commit()
@@ -143,13 +145,15 @@ func (engine *PullEngine) Run() {
 			log.Println("engine: ", err)
 			tx.Abort()
 			tx = engine.storage.BeginTransaction()
-			err := engine.irs.MarkError(engine.ctx, engine.getPrefixedTx(tx), err)
-			if err != nil {
-				log.Fatalf("couldn't mark error on intermediate record store: %s", err)
+			err1 := engine.irs.MarkError(engine.ctx, engine.getPrefixedTx(tx), err)
+			if err1 != nil {
+				log.Fatalf("couldn't mark error on intermediate record store: %s", err1)
 			}
-			if err := tx.Commit(); err != nil {
-				log.Fatalf("couldn't commit marking error on intermediate record store: %s", err)
+			if err1 := tx.Commit(); err1 != nil {
+				log.Fatalf("couldn't commit marking error on intermediate record store: %s", err1)
 			}
+
+			engine.closeErrChan <- err
 			return
 		}
 

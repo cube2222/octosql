@@ -90,9 +90,9 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 			map[string]execution.ShuffleData{},
 			[]execution.Task{func() error {
 				if err := rs.RunWorker(ctx); err != nil {
-					err1 := errors.Wrap(err, "json worker error")
-					rs.workerCloseErrChan <- err1
-					return err1
+					err := errors.Wrap(err, "json worker error")
+					rs.workerCloseErrChan <- err
+					return err
 				}
 
 				rs.workerCloseErrChan <- ctx.Err()

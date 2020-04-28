@@ -143,21 +143,22 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 
 	ctx, cancel := context.WithCancel(ctx)
 	rs.workerCtxCancel = cancel
-	rs.workerCloseErrChan = make(chan error)
+	rs.workerCloseErrChan = make(chan error, 1)
 
 	return rs,
 		execution.NewExecutionOutput(
 			execution.NewZeroWatermarkGenerator(),
 			map[string]execution.ShuffleData{},
 			[]execution.Task{func() error {
-				if err := rs.RunWorker(ctx); err != nil {
+				err := rs.RunWorker(ctx)
+				if err == context.Canceled || err == context.DeadlineExceeded {
+					rs.workerCloseErrChan <- err
+					return nil
+				} else {
 					err := errors.Wrap(err, "kafka worker error")
 					rs.workerCloseErrChan <- err
 					return err
 				}
-
-				rs.workerCloseErrChan <- ctx.Err()
-				return nil
 			}},
 		),
 		nil
@@ -182,7 +183,7 @@ func (rs *RecordStream) RunWorker(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return ctx.Err()
 		default:
 		}
 

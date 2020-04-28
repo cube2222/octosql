@@ -123,21 +123,22 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 
 	ctx, cancel := context.WithCancel(ctx)
 	rs.workerCtxCancel = cancel
-	rs.workerCloseErrChan = make(chan error)
+	rs.workerCloseErrChan = make(chan error, 1)
 
 	return rs,
 		execution.NewExecutionOutput(
 			execution.NewZeroWatermarkGenerator(),
 			map[string]execution.ShuffleData{},
 			[]execution.Task{func() error {
-				if err := rs.RunWorker(ctx); err != nil {
+				err := rs.RunWorker(ctx)
+				if err == context.Canceled || err == context.DeadlineExceeded {
+					rs.workerCloseErrChan <- err
+					return nil
+				} else {
 					err := errors.Wrap(err, "redis worker error")
 					rs.workerCloseErrChan <- err
 					return err
 				}
-
-				rs.workerCloseErrChan <- ctx.Err()
-				return nil
 			}},
 		),
 		nil
@@ -188,7 +189,7 @@ func (rs *RecordStream) RunWorker(ctx context.Context) error {
 	for { // outer for is loading offset value and moving file iterator
 		select {
 		case <-ctx.Done():
-			return nil
+			return ctx.Err()
 		default:
 		}
 
@@ -214,7 +215,7 @@ func (rs *RecordStream) RunWorker(ctx context.Context) error {
 		for { // inner for is calling RunWorkerInternal
 			select {
 			case <-ctx.Done():
-				return nil
+				return ctx.Err()
 			default:
 			}
 
@@ -241,7 +242,7 @@ func (rs *RecordStream) RunWorker(ctx context.Context) error {
 					log.Println("redis worker: couldn't commit transaction: ", err)
 					continue
 				}
-				return nil
+				return ctx.Err()
 			} else if err != nil {
 				tx.Abort()
 				log.Printf("redis worker: error running redis read batch worker: %s, reinitializing from storage", err)

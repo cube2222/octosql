@@ -241,7 +241,7 @@ func (engine *PullEngine) GetWatermark(ctx context.Context, tx storage.StateTran
 func (engine *PullEngine) Close(ctx context.Context, storage storage.Storage) error {
 	engine.ctxCancel()
 	err := <-engine.closeErrChan
-	if err == context.Canceled {
+	if err == context.Canceled || err == context.DeadlineExceeded {
 	} else if err != nil {
 		return errors.Wrap(err, "couldn't stop pull engine")
 	}

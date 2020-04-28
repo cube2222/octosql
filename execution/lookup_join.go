@@ -675,7 +675,7 @@ func (rs *LookupJoinStream) MarkError(ctx context.Context, tx storage.StateTrans
 func (rs *LookupJoinStream) Close(ctx context.Context, storage storage.Storage) error {
 	rs.schedulerCtxCancel()
 	err := <-rs.schedulerCloseErrChan
-	if err == context.Canceled {
+	if err == context.Canceled || err == context.DeadlineExceeded {
 	} else if err != nil {
 		return errors.Wrap(err, "couldn't stop lookup join scheduler")
 	}

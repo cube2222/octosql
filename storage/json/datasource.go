@@ -123,7 +123,7 @@ type RecordStream struct {
 func (rs *RecordStream) Close(ctx context.Context, storage storage.Storage) error {
 	rs.workerCtxCancel()
 	err := <-rs.workerCloseErrChan
-	if err == context.Canceled {
+	if err == context.Canceled || err == context.DeadlineExceeded {
 	} else if err != nil {
 		return errors.Wrap(err, "couldn't stop json worker")
 	}

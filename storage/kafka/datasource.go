@@ -387,12 +387,11 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 func (rs *RecordStream) Close(ctx context.Context, storage storage.Storage) error {
 	rs.workerCtxCancel()
 	err := <-rs.workerCloseErrChan
-	if err == context.Canceled {
+	if err == context.Canceled || err == context.DeadlineExceeded {
 	} else if err != nil {
 		return errors.Wrap(err, "couldn't stop kafka worker")
 	}
 
-	// TODO - is this needed?
 	if err := rs.kafkaReader.Close(); err != nil {
 		return errors.Wrap(err, "couldn't close underlying kafka reader")
 	}

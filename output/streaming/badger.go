@@ -1,6 +1,7 @@
-package badger
+package streaming
 
 import (
+	"bytes"
 	"context"
 	"sort"
 	"time"
@@ -9,69 +10,74 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/execution/trigger"
 	"github.com/cube2222/octosql/streaming/storage"
 )
 
-type TableOutput struct {
+type StreamOutput struct {
 	EventTimeField octosql.VariableName
+	Trigger        trigger.WatermarkTrigger
 }
 
 var recordsPrefix = []byte("$records$")
+var retractionsPrefix = []byte("$retractions$")
+var triggerPrefix = []byte("$trigger$")
 var watermarkPrefix = []byte("$watermark$")
 var errorPrefix = []byte("$error$")
 var endOfStreamPrefix = []byte("$end_of_stream$")
 
-func (o *TableOutput) ReadyForMore(ctx context.Context, tx storage.StateTransaction) error {
+func (o *StreamOutput) ReadyForMore(ctx context.Context, tx storage.StateTransaction) error {
 	return nil
 }
 
-func (o *TableOutput) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *execution.Record) error {
+func (o *StreamOutput) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *execution.Record) error {
 	if inputIndex != 0 {
 		return errors.Errorf("only one input stream allowed for output, got input index %d", inputIndex)
 	}
-	records := storage.NewMap(tx.WithPrefix(recordsPrefix))
 
-	recordKV := map[string]octosql.Value{}
-	for _, field := range record.Fields() {
-		recordKV[field.Name.String()] = record.Value(field.Name)
-	}
-
-	key := octosql.MakeObject(recordKV)
-
-	var recordData RecordData
-	err := records.Get(&key, &recordData)
-	if err == storage.ErrNotFound {
-	} else if err != nil {
-		return errors.Wrap(err, "couldn't get current IDs for record value")
-	}
-
-	if len(recordData.Ids) == 0 {
-		recordData.Ids = append(recordData.Ids, record.ID())
-		recordData.IsUndo = record.IsUndo()
-	} else if recordData.IsUndo != record.IsUndo() {
-		recordData.Ids = recordData.Ids[:len(recordData.Ids)-1]
-	} else {
-		recordData.Ids = append(recordData.Ids, record.ID())
-	}
-
-	if len(recordData.Ids) == 0 {
-		if err := records.Delete(&key); err != nil {
-			return errors.Wrap(err, "couldn't delete record from output records")
+	if !o.EventTimeField.Empty() {
+		if err := o.Trigger.RecordReceived(ctx, tx.WithPrefix(triggerPrefix), record.EventTime(), record.EventTime().AsTime()); err != nil {
+			return errors.Wrap(err, "couldn't mark record received in watermark trigger")
 		}
-	} else {
-		if err := records.Set(&key, &recordData); err != nil {
-			return errors.Wrap(err, "couldn't remove single record ID from output records")
+
+		tx := tx.WithPrefix(bytes.Join([][]byte{[]byte("$"), record.EventTime().MonotonicMarshal(), []byte("$")}, nil))
+
+		if !record.IsUndo() {
+			records := storage.NewDeque(tx.WithPrefix(recordsPrefix))
+			if err := records.PushBack(record); err != nil {
+				return errors.Wrap(err, "couldn't add record to records queue")
+			}
+		} else {
+			recordKV := map[string]octosql.Value{}
+			for _, field := range record.Fields() {
+				recordKV[field.Name.String()] = record.Value(field.Name)
+			}
+			key := octosql.MakeObject(recordKV)
+
+			var curCount octosql.Value
+			retractions := storage.NewMap(tx.WithPrefix(retractionsPrefix))
+			err := retractions.Get(&key, &curCount)
+			if err == storage.ErrNotFound {
+				curCount = octosql.MakeInt(0)
+			} else if err != nil {
+				return errors.Wrap(err, "couldn't get current record count from retractions map")
+			}
+
+			curCount = octosql.MakeInt(curCount.AsInt() + 1)
+			if err := retractions.Set(&key, &curCount); err != nil {
+				return errors.Wrap(err, "couldn't add record to retractions map")
+			}
 		}
 	}
 
 	return nil
 }
 
-func (o *TableOutput) Next(ctx context.Context, tx storage.StateTransaction) (*execution.Record, error) {
+func (o *StreamOutput) Next(ctx context.Context, tx storage.StateTransaction) (*execution.Record, error) {
 	panic("no next in output")
 }
 
-func (o *TableOutput) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
+func (o *StreamOutput) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
 	watermarkState := storage.NewValueState(tx.WithPrefix(watermarkPrefix))
 
 	octoWatermark := octosql.MakeTime(watermark)
@@ -82,7 +88,7 @@ func (o *TableOutput) UpdateWatermark(ctx context.Context, tx storage.StateTrans
 	return nil
 }
 
-func (o *TableOutput) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
+func (o *StreamOutput) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
 	watermarkState := storage.NewValueState(tx.WithPrefix(watermarkPrefix))
 
 	var octoWatermark octosql.Value
@@ -96,7 +102,7 @@ func (o *TableOutput) GetWatermark(ctx context.Context, tx storage.StateTransact
 	return octoWatermark.AsTime(), nil
 }
 
-func (o *TableOutput) MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error {
+func (o *StreamOutput) MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error {
 	endOfStreamState := storage.NewValueState(tx.WithPrefix(endOfStreamPrefix))
 
 	phantom := octosql.MakePhantom()
@@ -107,7 +113,7 @@ func (o *TableOutput) MarkEndOfStream(ctx context.Context, tx storage.StateTrans
 	return nil
 }
 
-func (o *TableOutput) GetEndOfStream(ctx context.Context, tx storage.StateTransaction) (bool, error) {
+func (o *StreamOutput) GetEndOfStream(ctx context.Context, tx storage.StateTransaction) (bool, error) {
 	endOfStreamState := storage.NewValueState(tx.WithPrefix(endOfStreamPrefix))
 
 	var octoEndOfStream octosql.Value
@@ -121,7 +127,7 @@ func (o *TableOutput) GetEndOfStream(ctx context.Context, tx storage.StateTransa
 	return true, nil
 }
 
-func (o *TableOutput) MarkError(ctx context.Context, tx storage.StateTransaction, err error) error {
+func (o *StreamOutput) MarkError(ctx context.Context, tx storage.StateTransaction, err error) error {
 	endOfStreamState := storage.NewValueState(tx.WithPrefix(errorPrefix))
 
 	octoError := octosql.MakeString(err.Error())
@@ -132,7 +138,7 @@ func (o *TableOutput) MarkError(ctx context.Context, tx storage.StateTransaction
 	return nil
 }
 
-func (o *TableOutput) GetErrorMessage(ctx context.Context, tx storage.StateTransaction) (string, error) {
+func (o *StreamOutput) GetErrorMessage(ctx context.Context, tx storage.StateTransaction) (string, error) {
 	errorState := storage.NewValueState(tx.WithPrefix(errorPrefix))
 
 	var octoError octosql.Value
@@ -146,11 +152,11 @@ func (o *TableOutput) GetErrorMessage(ctx context.Context, tx storage.StateTrans
 	return octoError.AsString(), nil
 }
 
-func (o *TableOutput) Close() error {
+func (o *StreamOutput) Close() error {
 	return nil // TODO: Cleanup?
 }
 
-func (o *TableOutput) ListRecords(ctx context.Context, tx storage.StateTransaction) ([]*execution.Record, error) {
+func (o *StreamOutput) ListRecords(ctx context.Context, tx storage.StateTransaction) ([]*execution.Record, error) {
 	records := storage.NewMap(tx.WithPrefix(recordsPrefix))
 
 	iter := records.GetIterator()

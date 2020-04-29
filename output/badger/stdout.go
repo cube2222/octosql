@@ -23,19 +23,19 @@ type RecordsLister interface {
 	GetErrorMessage(ctx context.Context, tx storage.StateTransaction) (string, error)
 }
 
-type StdOutPrinter struct {
+type WholeTablePrinter struct {
 	recordsLister RecordsLister
 	stateStorage  storage.Storage
 }
 
-func NewStdOutPrinter(stateStorage storage.Storage, recordsLister RecordsLister) *StdOutPrinter {
-	return &StdOutPrinter{
+func NewStdOutPrinter(stateStorage storage.Storage, recordsLister RecordsLister) *WholeTablePrinter {
+	return &WholeTablePrinter{
 		recordsLister: recordsLister,
 		stateStorage:  stateStorage,
 	}
 }
 
-func (printer *StdOutPrinter) Run(ctx context.Context) error {
+func (printer *WholeTablePrinter) Run(ctx context.Context) error {
 	for range time.Tick(time.Second / 4) {
 		tx := printer.stateStorage.BeginTransaction()
 

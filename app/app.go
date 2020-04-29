@@ -62,7 +62,7 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		return errors.Wrap(err, "couldn't get record stream from execution plan")
 	}
 
-	out := &badger.Output{
+	out := &badger.TableOutput{
 		EventTimeField: phys.Metadata().EventTimeField(),
 	}
 

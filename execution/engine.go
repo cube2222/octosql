@@ -142,18 +142,19 @@ func (engine *PullEngine) Run() {
 			engine.batchSizeManager.Reset()
 			tx = engine.storage.BeginTransaction()
 		} else if err != nil {
-			log.Println("engine: ", err)
+			loopErr := err
+			log.Println("engine: ", loopErr)
 			tx.Abort()
 			tx = engine.storage.BeginTransaction()
-			err1 := engine.irs.MarkError(engine.ctx, engine.getPrefixedTx(tx), err)
-			if err1 != nil {
-				log.Fatalf("couldn't mark error on intermediate record store: %s", err1)
+			err := engine.irs.MarkError(engine.ctx, engine.getPrefixedTx(tx), loopErr)
+			if err != nil {
+				log.Fatalf("couldn't mark error on intermediate record store: %s", err)
 			}
-			if err1 := tx.Commit(); err1 != nil {
-				log.Fatalf("couldn't commit marking error on intermediate record store: %s", err1)
+			if err := tx.Commit(); err != nil {
+				log.Fatalf("couldn't commit marking error on intermediate record store: %s", err)
 			}
 
-			engine.closeErrChan <- err
+			engine.closeErrChan <- loopErr
 			return
 		}
 

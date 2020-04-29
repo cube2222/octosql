@@ -31,7 +31,7 @@ func TestMap_Metadata(t *testing.T) {
 			want: metadata.NewNodeMetadata(
 				metadata.Unbounded,
 				octosql.NewVariableName(""),
-				metadata.NewNamespace(nil, []octosql.VariableName{"test", "test2"}),
+				metadata.EmptyNamespace(),
 			),
 		},
 		{
@@ -49,7 +49,7 @@ func TestMap_Metadata(t *testing.T) {
 			want: metadata.NewNodeMetadata(
 				metadata.Unbounded,
 				octosql.NewVariableName(""),
-				metadata.NewNamespace(nil, []octosql.VariableName{"test", "test2"}),
+				metadata.EmptyNamespace(),
 			),
 		},
 		{
@@ -60,14 +60,14 @@ func TestMap_Metadata(t *testing.T) {
 			Source: NewStubNode(metadata.NewNodeMetadata(
 				metadata.Unbounded,
 				octosql.NewVariableName("my_time_field"),
-				metadata.NewNamespace(nil, []octosql.VariableName{"my_time_field"}))),
+				metadata.EmptyNamespace())),
 
 			Keep: true,
 
 			want: metadata.NewNodeMetadata(
 				metadata.Unbounded,
 				octosql.NewVariableName("my_time_field"),
-				metadata.NewNamespace(nil, []octosql.VariableName{"my_time_field", "test", "test2"}),
+				metadata.EmptyNamespace(),
 			),
 		},
 		{
@@ -80,14 +80,14 @@ func TestMap_Metadata(t *testing.T) {
 			Source: NewStubNode(metadata.NewNodeMetadata(
 				metadata.Unbounded,
 				octosql.NewVariableName("my_time_field"),
-				metadata.NewNamespace(nil, []octosql.VariableName{"my_time_field"}))),
+				metadata.EmptyNamespace())),
 
 			Keep: false,
 
 			want: metadata.NewNodeMetadata(
 				metadata.Unbounded,
 				octosql.NewVariableName("my_time_field"),
-				metadata.NewNamespace(nil, []octosql.VariableName{"test", "test2", "my_time_field", "test3"}),
+				metadata.EmptyNamespace(),
 			),
 		},
 		{
@@ -103,14 +103,14 @@ func TestMap_Metadata(t *testing.T) {
 			Source: NewStubNode(metadata.NewNodeMetadata(
 				metadata.Unbounded,
 				octosql.NewVariableName("my_time_field"),
-				metadata.NewNamespace(nil, []octosql.VariableName{"my_time_field"}))),
+				metadata.EmptyNamespace())),
 
 			Keep: false,
 
 			want: metadata.NewNodeMetadata(
 				metadata.Unbounded,
 				octosql.NewVariableName("my_time_field_1"),
-				metadata.NewNamespace(nil, []octosql.VariableName{"test", "test2", "my_time_field_1", "test3"}),
+				metadata.EmptyNamespace(),
 			),
 		},
 		{
@@ -135,14 +135,14 @@ func TestMap_Metadata(t *testing.T) {
 			Source: NewStubNode(metadata.NewNodeMetadata(
 				metadata.Unbounded,
 				octosql.NewVariableName("my_time_field"),
-				metadata.NewNamespace(nil, []octosql.VariableName{"my_time_field"}))),
+				metadata.EmptyNamespace())),
 
 			Keep: false,
 
 			want: metadata.NewNodeMetadata(
 				metadata.Unbounded,
 				octosql.NewVariableName("my_time_field_4"),
-				metadata.NewNamespace(nil, []octosql.VariableName{"test", "test2", "my_time_field_4", "test3"}),
+				metadata.EmptyNamespace(),
 			),
 		},
 		{
@@ -167,14 +167,14 @@ func TestMap_Metadata(t *testing.T) {
 			Source: NewStubNode(metadata.NewNodeMetadata(
 				metadata.Unbounded,
 				octosql.NewVariableName("my_time_field"),
-				metadata.NewNamespace(nil, []octosql.VariableName{"my_time_field"}))),
+				metadata.EmptyNamespace())),
 
 			Keep: true,
 
 			want: metadata.NewNodeMetadata(
 				metadata.Unbounded,
 				octosql.NewVariableName("my_time_field"),
-				metadata.NewNamespace(nil, []octosql.VariableName{"test", "test2", "my_time_field_4", "my_time_field", "test3"}),
+				metadata.EmptyNamespace(),
 			),
 		},
 	}

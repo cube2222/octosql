@@ -63,49 +63,27 @@ func NewNodeMetadataFromMetadata(meta *NodeMetadata) *NodeMetadata {
 
 type Namespace struct {
 	prefixes []string
-	names    []octosql.VariableName
 }
 
-func NewNamespace(prefixes []string, names []octosql.VariableName) *Namespace {
+func NewNamespace(prefixes []string) *Namespace {
 	return &Namespace{
 		prefixes: prefixes,
-		names:    names,
 	}
 }
 
-func (nm *Namespace) Names() []octosql.VariableName {
-	return nm.names
-}
-
 func EmptyNamespace() *Namespace {
-	return NewNamespace(nil, nil)
+	return NewNamespace(nil)
 }
 
 func (nm *Namespace) MergeWith(other *Namespace) {
 	for _, prefix := range other.prefixes {
 		nm.AddPrefix(prefix)
 	}
-
-	for _, name := range other.names {
-		nm.AddName(name)
-	}
-}
-
-func (nm *Namespace) MergeWithVariables(variables octosql.Variables) {
-	for name := range variables {
-		nm.AddName(name)
-	}
 }
 
 func (nm *Namespace) AddPrefix(prefix string) {
 	if !nm.DoesContainPrefix(prefix) {
 		nm.prefixes = append(nm.prefixes, prefix)
-	}
-}
-
-func (nm *Namespace) AddName(name octosql.VariableName) {
-	if !nm.DoesContainName(name) {
-		nm.names = append(nm.names, name)
 	}
 }
 
@@ -120,24 +98,11 @@ func (nm *Namespace) Contains(other *Namespace) bool {
 		}
 	}
 
-	for _, otherName := range other.names {
-		if !nm.DoesContainName(otherName) {
-			return false
-		}
-	}
-
 	return true
 }
 
 func (nm *Namespace) DoesContainName(name octosql.VariableName) bool {
-	if nm.DoesContainPrefix(name.Source()) {
-		return true
-	}
-
-	if belongsV(nm.names, name) {
-		return true
-	}
-	return false
+	return nm.DoesContainPrefix(name.Source())
 }
 
 func (nm *Namespace) DoesContainPrefix(prefix string) bool {
@@ -147,15 +112,6 @@ func (nm *Namespace) DoesContainPrefix(prefix string) bool {
 func belongs(strings []string, element string) bool {
 	for _, str := range strings {
 		if str == element {
-			return true
-		}
-	}
-	return false
-}
-
-func belongsV(vNames []octosql.VariableName, element octosql.VariableName) bool {
-	for _, vName := range vNames {
-		if vName == element {
 			return true
 		}
 	}

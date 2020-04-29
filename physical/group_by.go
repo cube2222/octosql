@@ -253,19 +253,7 @@ func (node *GroupBy) Metadata() *metadata.NodeMetadata {
 		}
 	}
 
-	names := make([]octosql.VariableName, len(node.Fields))
-
-	for i := range node.Fields {
-		if node.As[i] != "" {
-			names[i] = node.As[i]
-		} else {
-			names[i] = octosql.NewVariableName(fmt.Sprintf("%s_%s", node.Fields[i].String(), node.Aggregates[i]))
-		}
-	}
-
-	namespace := metadata.NewNamespace(nil, names)
-
-	return metadata.NewNodeMetadata(cardinality, outEventTimeField, namespace)
+	return metadata.NewNodeMetadata(cardinality, outEventTimeField, metadata.EmptyNamespace())
 }
 
 func (node *GroupBy) Visualize() *graph.Node {

@@ -72,7 +72,7 @@ func (node *OrderBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 }
 
 func (node *OrderBy) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMetadata(metadata.BoundedFitsInLocalStorage, node.Source.Metadata().EventTimeField(), node.Source.Metadata().Namespace())
+	return metadata.NewNodeMetadataFromMetadata(node.Source.Metadata())
 }
 
 func (node *OrderBy) Visualize() *graph.Node {

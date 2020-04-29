@@ -97,8 +97,6 @@ func (node *Map) Metadata() *metadata.NodeMetadata {
 			} else {
 				namespace.AddPrefix(starExpr.Qualifier)
 			}
-		} else {
-			namespace.AddName(expr.ExpressionName())
 		}
 	}
 

@@ -12,8 +12,6 @@ import (
 // because it uses both metadata and physical, and physical already
 // imports metadata, so we don't want to create a cycle.
 
-// NOTE: Tests for Map metadata are located in the physical/map_test.go file.
-
 func TestNamespace(t *testing.T) {
 	tests := []struct {
 		name string
@@ -33,7 +31,6 @@ func TestNamespace(t *testing.T) {
 				octosql.NewVariableName(""),
 				metadata.NewNamespace(
 					[]string{"x"},
-					nil,
 				),
 			),
 		},
@@ -46,7 +43,6 @@ func TestNamespace(t *testing.T) {
 						"a.event_time",
 						metadata.NewNamespace(
 							[]string{"a"},
-							[]octosql.VariableName{"x.field1", "y.field2"},
 						),
 					),
 				},
@@ -57,7 +53,28 @@ func TestNamespace(t *testing.T) {
 				"a.event_time",
 				metadata.NewNamespace(
 					[]string{"a"},
-					[]octosql.VariableName{"x.field1", "y.field2"},
+				),
+			),
+		},
+		{
+			name: "orderby",
+			node: &OrderBy{
+				Source: &StubNode{
+					NodeMetadata: metadata.NewNodeMetadata(
+						metadata.Unbounded,
+						"a.event_time",
+						metadata.NewNamespace(
+							[]string{"a"},
+						),
+					),
+				},
+			},
+
+			want: metadata.NewNodeMetadata(
+				metadata.Unbounded,
+				"a.event_time",
+				metadata.NewNamespace(
+					[]string{"a"},
 				),
 			),
 		},
@@ -70,7 +87,6 @@ func TestNamespace(t *testing.T) {
 						"event_time",
 						metadata.NewNamespace(
 							nil,
-							[]octosql.VariableName{"x.field1", "y.field2"},
 						),
 					),
 				},
@@ -81,7 +97,6 @@ func TestNamespace(t *testing.T) {
 				"event_time",
 				metadata.NewNamespace(
 					nil,
-					[]octosql.VariableName{"x.field1", "y.field2"},
 				),
 			),
 		},
@@ -94,7 +109,6 @@ func TestNamespace(t *testing.T) {
 						"a.event_time",
 						metadata.NewNamespace(
 							nil,
-							[]octosql.VariableName{"a.event_time", "a.id"},
 						),
 					),
 				},
@@ -109,7 +123,6 @@ func TestNamespace(t *testing.T) {
 				"out_event_time",
 				metadata.NewNamespace(
 					nil,
-					[]octosql.VariableName{"out_event_time", "a.id_key"},
 				),
 			),
 		},
@@ -122,7 +135,6 @@ func TestNamespace(t *testing.T) {
 						"a.event_time",
 						metadata.NewNamespace(
 							nil,
-							[]octosql.VariableName{"a.event_time", "a.age", "b.event_time"},
 						),
 					),
 				},
@@ -137,7 +149,6 @@ func TestNamespace(t *testing.T) {
 				"",
 				metadata.NewNamespace(
 					nil,
-					[]octosql.VariableName{"out_field", "a.age_sum"},
 				),
 			),
 		},
@@ -150,7 +161,6 @@ func TestNamespace(t *testing.T) {
 						octosql.NewVariableName("event_time_field"),
 						metadata.NewNamespace(
 							[]string{"a", "b"},
-							[]octosql.VariableName{"x.field1", "x.field2"},
 						),
 					),
 				},
@@ -160,7 +170,6 @@ func TestNamespace(t *testing.T) {
 				octosql.NewVariableName("event_time_field"),
 				metadata.NewNamespace(
 					[]string{"a", "b"},
-					[]octosql.VariableName{"x.field1", "x.field2"},
 				),
 			),
 		},
@@ -173,7 +182,6 @@ func TestNamespace(t *testing.T) {
 						octosql.NewVariableName("event_time_field"),
 						metadata.NewNamespace(
 							[]string{"a", "b"},
-							[]octosql.VariableName{"x.field1", "x.field2"},
 						),
 					),
 				},
@@ -183,7 +191,6 @@ func TestNamespace(t *testing.T) {
 				octosql.NewVariableName("event_time_field"),
 				metadata.NewNamespace(
 					[]string{"a", "b"},
-					[]octosql.VariableName{"x.field1", "x.field2"},
 				),
 			),
 		},
@@ -196,7 +203,6 @@ func TestNamespace(t *testing.T) {
 						octosql.NewVariableName("event_field"),
 						metadata.NewNamespace(
 							[]string{"a", "b", "c"},
-							[]octosql.VariableName{"a.field1", "b.field2", "c.field3", "field4"},
 						),
 					),
 				},
@@ -207,7 +213,6 @@ func TestNamespace(t *testing.T) {
 				octosql.NewVariableName("q.event_field"),
 				metadata.NewNamespace(
 					[]string{"q"},
-					[]octosql.VariableName{"q.field1", "q.field2", "q.field3", "q.field4"},
 				),
 			),
 		},
@@ -220,7 +225,6 @@ func TestNamespace(t *testing.T) {
 						octosql.NewVariableName("source_event_time"),
 						metadata.NewNamespace(
 							[]string{"a", "b", "c"},
-							[]octosql.VariableName{"source.x", "id"},
 						),
 					),
 				},
@@ -230,7 +234,6 @@ func TestNamespace(t *testing.T) {
 						octosql.NewVariableName("joined_event_time"),
 						metadata.NewNamespace(
 							[]string{"c", "d", "e"},
-							[]octosql.VariableName{"joined.y", "id"},
 						),
 					),
 				},
@@ -241,7 +244,6 @@ func TestNamespace(t *testing.T) {
 				octosql.NewVariableName("source_event_time"),
 				metadata.NewNamespace(
 					[]string{"a", "b", "c", "d", "e"},
-					[]octosql.VariableName{"source.x", "joined.y", "id"},
 				),
 			),
 		},
@@ -254,7 +256,6 @@ func TestNamespace(t *testing.T) {
 						octosql.NewVariableName("source_event_time"),
 						metadata.NewNamespace(
 							[]string{"a", "b", "c"},
-							[]octosql.VariableName{"source.x", "id"},
 						),
 					),
 				},
@@ -264,7 +265,6 @@ func TestNamespace(t *testing.T) {
 						octosql.NewVariableName("joined_event_time"),
 						metadata.NewNamespace(
 							[]string{"c", "d", "e"},
-							[]octosql.VariableName{"joined.y", "id"},
 						),
 					),
 				},
@@ -274,7 +274,52 @@ func TestNamespace(t *testing.T) {
 				octosql.NewVariableName("source_event_time"),
 				metadata.NewNamespace(
 					[]string{"a", "b", "c", "d", "e"},
-					[]octosql.VariableName{"source.x", "joined.y", "id"},
+				),
+			),
+		},
+		{
+			name: "map test 1 - unqualified star",
+			node: &Map{
+				Expressions: []NamedExpression{NewStarExpression("")},
+				Source: &StubNode{
+					NodeMetadata: metadata.NewNodeMetadata(
+						metadata.Unbounded,
+						"",
+						metadata.NewNamespace(
+							[]string{"x", "y", "z"},
+						),
+					),
+				},
+				Keep: false,
+			},
+			want: metadata.NewNodeMetadata(
+				metadata.Unbounded,
+				"",
+				metadata.NewNamespace(
+					[]string{"x", "y", "z"},
+				),
+			),
+		},
+		{
+			name: "map test 2 - keep = true and qualified star",
+			node: &Map{
+				Expressions: []NamedExpression{NewStarExpression("q")},
+				Source: &StubNode{
+					NodeMetadata: metadata.NewNodeMetadata(
+						metadata.Unbounded,
+						"",
+						metadata.NewNamespace(
+							[]string{"x", "y", "z"},
+						),
+					),
+				},
+				Keep: true,
+			},
+			want: metadata.NewNodeMetadata(
+				metadata.Unbounded,
+				"",
+				metadata.NewNamespace(
+					[]string{"q", "x", "y", "z"},
 				),
 			),
 		},

@@ -47,11 +47,6 @@ func (node *Requalifier) Metadata() *metadata.NodeMetadata {
 	namespace := metadata.EmptyNamespace()
 	namespace.AddPrefix(node.Qualifier)
 
-	for _, name := range sourceMetadata.Namespace().Names() {
-		requalifiedName := octosql.NewVariableName(fmt.Sprintf("%s.%s", node.Qualifier, name.Name()))
-		namespace.AddName(requalifiedName)
-	}
-
 	return metadata.NewNodeMetadata(sourceMetadata.Cardinality(), eventTimeField, namespace)
 }
 

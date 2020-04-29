@@ -158,7 +158,10 @@ func (v *Variable) MaterializeNamed(ctx context.Context, matCtx *Materialization
 }
 
 func (v *Variable) DoesMatchNamespace(namespace *metadata.Namespace) bool {
-	return namespace.DoesContainName(v.ExpressionName())
+	if v.Name.Source() != "" {
+		return namespace.DoesContainPrefix(v.Name.Source())
+	}
+	return true
 }
 
 func (v *Variable) Visualize() *graph.Node {

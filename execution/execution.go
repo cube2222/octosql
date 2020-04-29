@@ -3,7 +3,6 @@ package execution
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"time"
 
 	"github.com/cube2222/octosql"
@@ -39,12 +38,6 @@ func mergeNextShuffles(first, second map[string]ShuffleData) (map[string]Shuffle
 	result := first
 
 	for key, value := range second {
-		alreadyValue, ok := first[key]
-
-		if ok && !reflect.DeepEqual(alreadyValue, value) {
-			return nil, errors.Errorf("Conflict in next shuffles at key %v", key)
-		}
-
 		result[key] = value
 	}
 

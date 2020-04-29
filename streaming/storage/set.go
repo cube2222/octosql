@@ -40,8 +40,8 @@ func (set *MultiSet) getCountWithFunction(value octosql.Value, hashFunction hash
 		return 0, errors.Wrap(err, "couldn't hash value")
 	}
 
-	hashedTxn := set.tx.WithPrefix(hash)
-	state := NewValueState(hashedTxn)
+	// Get state of given hash
+	state := NewValueState(set.tx.WithPrefix(hash))
 
 	var tuple octosql.Value
 	err = state.Get(&tuple)
@@ -72,9 +72,8 @@ func (set *MultiSet) insertWithFunction(value octosql.Value, hashFunction hashin
 		return errors.Wrap(err, "couldn't parse given value in insert")
 	}
 
-	// Get transaction with prefix of the hash
-	hashedTxn := set.tx.WithPrefix(hash)
-	state := NewValueState(hashedTxn)
+	// Get state of given hash
+	state := NewValueState(set.tx.WithPrefix(hash))
 
 	// Get elements with that hash
 	var tuple octosql.Value
@@ -106,28 +105,11 @@ func (set *MultiSet) insertWithFunction(value octosql.Value, hashFunction hashin
 	return nil
 }
 
-func (set *MultiSet) Contains(value octosql.Value) (bool, error) {
-	return set.containsWithFunction(value, hashValue)
-}
-
-func (set *MultiSet) containsWithFunction(value octosql.Value, hashFunction func(octosql.Value) ([]byte, error)) (bool, error) {
-	count, err := set.getCountWithFunction(value, hashFunction)
-	if err != nil {
-		return false, errors.Wrap(err, "couldn't get values count")
-	}
-
-	return count > 0, nil
-}
-
-func (set *MultiSet) EraseAll(value octosql.Value) error {
-	return set.eraseWithFunction(value, hashValue, true)
-}
-
 func (set *MultiSet) Erase(value octosql.Value) error {
-	return set.eraseWithFunction(value, hashValue, false)
+	return set.eraseWithFunction(value, hashValue)
 }
 
-func (set *MultiSet) eraseWithFunction(value octosql.Value, hashFunction hashingFunction, erasingAll bool) error {
+func (set *MultiSet) eraseWithFunction(value octosql.Value, hashFunction hashingFunction) error {
 	hash, err := hashFunction(value)
 	if err != nil {
 		return errors.Wrap(err, "couldn't hash value")
@@ -182,6 +164,43 @@ func (set *MultiSet) eraseWithFunction(value octosql.Value, hashFunction hashing
 	}
 
 	return nil
+}
+
+// Returns the position of a value in a tuple if it's a member of the tuple,
+// and -1 if it's not. Each value is in fact a tuple of (value, count)
+func getPositionInTuple(values []octosql.Value, value octosql.Value) int {
+	for i, pair := range values {
+		if octosql.AreEqual(getValueFromPair(pair), value) {
+			return i
+		}
+	}
+
+	return valueNotPresent
+}
+
+// Removes the value at a specified index
+func removeElementFromTuple(index int, values []octosql.Value) octosql.Value {
+	length := len(values)
+	result := values[:index]
+
+	if index != length-1 {
+		result = append(result, values[index+1:]...)
+	}
+
+	return octosql.MakeTuple(result)
+}
+
+func (set *MultiSet) Contains(value octosql.Value) (bool, error) {
+	return set.containsWithFunction(value, hashValue)
+}
+
+func (set *MultiSet) containsWithFunction(value octosql.Value, hashFunction func(octosql.Value) ([]byte, error)) (bool, error) {
+	count, err := set.getCountWithFunction(value, hashFunction)
+	if err != nil {
+		return false, errors.Wrap(err, "couldn't get values count")
+	}
+
+	return count > 0, nil
 }
 
 func (set *MultiSet) Clear() error {
@@ -278,11 +297,27 @@ func (msi *MultiSetIterator) Next(value *octosql.Value) error {
 	return nil
 }
 
+func makePair(value octosql.Value, count int) octosql.Value {
+	pair := make([]octosql.Value, 2)
+	pair[0] = value
+	pair[1] = octosql.MakeInt(count)
+
+	return octosql.MakeTuple(pair)
+}
+
+func getValueFromPair(pair octosql.Value) octosql.Value {
+	return pair.AsSlice()[0]
+}
+
+func getCountFromPair(pair octosql.Value) int {
+	return pair.AsSlice()[1].AsInt()
+}
+
 func (msi *MultiSetIterator) Close() error {
 	return msi.it.Close()
 }
 
-// Auxiliary functions
+// The function used to hash values
 func hashValue(value octosql.Value) ([]byte, error) {
 	valueBytes, err := proto.Marshal(&value)
 	if err != nil {
@@ -298,47 +333,4 @@ func hashValue(value octosql.Value) ([]byte, error) {
 	binary.BigEndian.PutUint64(hashKey, hashValue)
 
 	return hashKey, nil
-}
-
-//Returns the position of a value in a tuple if it's a member of the tuple,
-//and -1 if it's not. Each value is in fact a tuple of (value, count)
-func getPositionInTuple(values []octosql.Value, value octosql.Value) int {
-	for i, pair := range values {
-		if octosql.AreEqual(pair.AsSlice()[0], value) {
-			return i
-		}
-	}
-
-	return valueNotPresent
-}
-
-func removeElementFromTuple(index int, values []octosql.Value) octosql.Value {
-	length := len(values)
-	result := values[:index]
-
-	if index != length-1 {
-		result = append(result, values[index+1:]...)
-	}
-
-	return octosql.MakeTuple(result)
-}
-
-func addValueToTuple(value octosql.Value, tuple []octosql.Value) octosql.Value {
-	return octosql.MakeTuple(append(tuple, value))
-}
-
-func makePair(value octosql.Value, count int) octosql.Value {
-	pair := make([]octosql.Value, 2)
-	pair[0] = value
-	pair[1] = octosql.MakeInt(count)
-
-	return octosql.MakeTuple(pair)
-}
-
-func getValueFromPair(pair octosql.Value) octosql.Value {
-	return pair.AsSlice()[0]
-}
-
-func getCountFromPair(pair octosql.Value) int {
-	return pair.AsSlice()[1].AsInt()
 }

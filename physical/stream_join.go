@@ -64,17 +64,15 @@ func (node *StreamJoin) Materialize(ctx context.Context, matCtx *Materialization
 	materializedJoinedKey := make([]execution.Expression, len(node.JoinedKey))
 
 	for i := range node.SourceKey {
-		materializedSource, err := node.SourceKey[i].Materialize(ctx, matCtx)
+		materializedSourceKey[i], err = node.SourceKey[i].Materialize(ctx, matCtx)
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't materialize source key expression with index %v", i)
 		}
-		materializedSourceKey[i] = materializedSource
 
-		materializedJoined, err := node.JoinedKey[i].Materialize(ctx, matCtx)
+		materializedJoinedKey[i], err = node.JoinedKey[i].Materialize(ctx, matCtx)
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't materialize joined key expression with index %v", i)
 		}
-		materializedJoinedKey[i] = materializedJoined
 	}
 
 	triggerPrototypes := make([]execution.TriggerPrototype, len(node.Triggers))

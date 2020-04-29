@@ -280,7 +280,7 @@ func (set *MultiSet) collisionInsert(value octosql.Value) error {
 }
 
 func (set *MultiSet) collisionErase(value octosql.Value) error {
-	return set.eraseWithFunction(value, collisionHash, false)
+	return set.eraseWithFunction(value, collisionHash)
 }
 
 func (set *MultiSet) collisionContains(value octosql.Value) (bool, error) {
@@ -302,7 +302,7 @@ func (set *MultiSet) collisionInsert2(value octosql.Value) error {
 }
 
 func (set *MultiSet) collisionErase2(value octosql.Value) error {
-	return set.eraseWithFunction(value, collisionHash2, false)
+	return set.eraseWithFunction(value, collisionHash2)
 }
 
 func (set *MultiSet) collisionContains2(value octosql.Value) (bool, error) {

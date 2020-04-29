@@ -110,7 +110,7 @@ type JoinedStream struct {
 var leftStreamRecordsPrefix = []byte("$left_stream_records$")
 var rightStreamRecordsPrefix = []byte("$right_stream_records$")
 var matchesToTriggerPrefix = []byte("$matches_to_trigger$")
-var recordsToTriggerPrefix = []byte("$records_to_trigger$")
+var singleRecordsToTriggerPrefix = []byte("$records_to_trigger$")
 
 func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, key octosql.Value, record *Record) error {
 	if inputIndex < 0 || inputIndex > 1 {
@@ -219,7 +219,7 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 
 	// Now additionally we might need to add the record itself if we are dealing with a specific join type
 
-	recordsToTriggerSet := storage.NewMultiSet(txByKey.WithPrefix(recordsToTriggerPrefix))
+	recordsToTriggerSet := storage.NewMultiSet(txByKey.WithPrefix(singleRecordsToTriggerPrefix))
 
 	// If we are performing an outer join or a left join and the record comes from the left
 	if js.joinType == OUTER_JOIN || (js.joinType == LEFT_JOIN && isLeft) {
@@ -308,7 +308,7 @@ func (js *JoinedStream) Trigger(ctx context.Context, tx storage.StateTransaction
 	if js.joinType != INNER_JOIN {
 		triggeredCountValue += len(matches)
 
-		recordsToTriggerSet := storage.NewMultiSet(txByKey.WithPrefix(recordsToTriggerPrefix))
+		recordsToTriggerSet := storage.NewMultiSet(txByKey.WithPrefix(singleRecordsToTriggerPrefix))
 
 		singleRecords, err := recordsToTriggerSet.ReadAll()
 		if err != nil {
@@ -408,7 +408,6 @@ func valueToRecord(val octosql.Value) *Record {
 	if isUndo {
 		return NewRecordFromSlice(fieldNames, values, WithEventTimeField(eventTimeField), WithUndo())
 	}
-
 	return NewRecordFromSlice(fieldNames, values, WithEventTimeField(eventTimeField), WithNoUndo())
 }
 
@@ -442,7 +441,6 @@ func mergeRecords(left, right *Record, ID *RecordID, isUndo bool, eventTimeField
 
 	if isUndo {
 		return NewRecordFromSlice(mergedFieldNames, mergedData, WithID(ID), WithUndo(), WithEventTimeField(eventTimeField))
-	} else {
-		return NewRecordFromSlice(mergedFieldNames, mergedData, WithID(ID), WithNoUndo(), WithEventTimeField(eventTimeField))
 	}
+	return NewRecordFromSlice(mergedFieldNames, mergedData, WithID(ID), WithNoUndo(), WithEventTimeField(eventTimeField))
 }

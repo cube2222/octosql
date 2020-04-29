@@ -188,7 +188,7 @@ func TestJoin_Physical(t *testing.T) {
 			fields: fields{
 				source: &StubNode{
 					metadata: metadata.NewNodeMetadata(
-						metadata.Unbounded,
+						metadata.BoundedFitsInLocalStorage,
 						"",
 						metadata.NewNamespace(
 							[]string{""},
@@ -248,10 +248,8 @@ func TestJoin_Physical(t *testing.T) {
 
 				joinType: execution.LEFT_JOIN,
 			},
-
 			wantNode: physical.NewLookupJoin(nil, nil, true),
-
-			wantErr: false,
+			wantErr:  false,
 		},
 		{
 			name: "two unbounded streams - stream join, bigger filter",
@@ -312,13 +310,11 @@ func TestJoin_Physical(t *testing.T) {
 
 				joinType: execution.LEFT_JOIN,
 			},
-
 			wantNode: &physical.StreamJoin{
 				SourceKey:      []physical.Expression{physical.NewVariable("a.field1"), physical.NewVariable("x.something1"), physical.NewVariable("a.field2"), physical.NewVariable("x.something2")},
 				JoinedKey:      []physical.Expression{physical.NewVariable("b.field2"), physical.NewVariable("p.something2"), physical.NewVariable("b.field1"), physical.NewVariable("p.something1")},
 				EventTimeField: "a.field1",
 			},
-
 			wantErr: false,
 		},
 		{
@@ -359,6 +355,45 @@ func TestJoin_Physical(t *testing.T) {
 
 			wantNode: nil,
 			wantErr:  true,
+		},
+		{
+			name: "invalid predicate 2 - a formula not supported by stream join, fallback to lookup",
+			fields: fields{
+				source: &StubNode{
+					metadata: metadata.NewNodeMetadata(
+						metadata.BoundedFitsInLocalStorage,
+						"a.field1",
+						metadata.NewNamespace(
+							[]string{},
+							[]octosql.VariableName{"a.field1", "a.field2"},
+						),
+					),
+					variables: octosql.NoVariables(),
+				},
+
+				joined: &Filter{ // a.field1
+					formula: &Predicate{
+						Left:     &Variable{"a.field1"},
+						Relation: GreaterEqual,
+						Right:    &Variable{"b.field2"},
+					},
+					source: &StubNode{
+						metadata: metadata.NewNodeMetadata(
+							metadata.BoundedFitsInLocalStorage,
+							"b.field2",
+							metadata.NewNamespace(
+								[]string{},
+								[]octosql.VariableName{"b.field1", "b.field2"},
+							),
+						),
+					},
+				},
+
+				joinType: execution.LEFT_JOIN,
+			},
+
+			wantNode: physical.NewLookupJoin(nil, nil, true),
+			wantErr:  false,
 		},
 	}
 

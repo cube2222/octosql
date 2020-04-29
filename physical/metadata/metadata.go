@@ -159,6 +159,5 @@ func belongsV(vNames []octosql.VariableName, element octosql.VariableName) bool 
 			return true
 		}
 	}
-
 	return false
 }

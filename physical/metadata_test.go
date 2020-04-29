@@ -12,6 +12,8 @@ import (
 // because it uses both metadata and physical, and physical already
 // imports metadata, so we don't want to create a cycle.
 
+// NOTE: Tests for Map metadata are located in the physical/map_test.go file.
+
 func TestNamespace(t *testing.T) {
 	tests := []struct {
 		name string

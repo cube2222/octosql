@@ -93,10 +93,12 @@ func NewColStrIter(f *parquet.File, col parquet.Column) *ColStrIter {
 func (it *ColStrIter) Next() (interface{}, error) {
 	var err error
 	var s interface{}
-	s = nil
 	elements := make([]interface{}, 0)
+
 	for {
+		//if there is no active row group create one
 		if it.columnChunkReader == nil {
+			//if all row groups have been processed return current value
 			if it.rowGroups == len(it.file.MetaData.RowGroups) {
 				if len(elements) > 0 {
 					return elements, nil
@@ -109,12 +111,12 @@ func (it *ColStrIter) Next() (interface{}, error) {
 			}
 			it.rowGroups++
 		}
-
+		// if all data in chunk has been processed load next chunk
 		if it.descriptionIterator >= it.numberOfLoadedElements {
 			it.numberOfLoadedElements, err = it.columnChunkReader.Read(it.values, it.dLevels, it.rLevels)
 			if err == parquet.EndOfChunk {
 				it.columnChunkReader = nil
-				return it.Next()
+				continue
 			}
 			if err != nil {
 				return nil, err
@@ -123,10 +125,11 @@ func (it *ColStrIter) Next() (interface{}, error) {
 			it.dataIterator = 0
 		}
 
+		//if new record is reached return current value
 		if it.rLevels[it.descriptionIterator] == 0 && len(elements) > 0 {
 			break;
 		}
-
+		//if data is not defined insert nil in it's place
 		if it.dLevels[it.descriptionIterator] == it.col.MaxD() {
 			if it.col.MaxR() == 0 {
 				switch it.col.Type() {
@@ -174,7 +177,7 @@ func (it *ColStrIter) Next() (interface{}, error) {
 		}
 
 		it.descriptionIterator++
-
+		//if data is not repeated stop reading after first element
 		if it.col.MaxR() == 0 {
 			break;
 		}
@@ -256,36 +259,28 @@ func (rs *RecordStream) Close() error {
 
 func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 	if rs.isDone {
-		err := rs.file.Close()
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't close underlying file")
-		}
 		return nil, execution.ErrEndOfStream
 	}
 
 	m := make(map[string]interface{})
 
-	rs.isDone = true
-
+	isDone := true
+	//if at least one row has remaining elements create new record
 	for i, it := range rs.columnIterators {
 		s, err := it.Next()
-		if err != nil {
-			if err == io.EOF {
-				s = nil
-			} else {
-				return nil, errors.Wrap(err, "couldn't decode parquet record")
-			}
+		if err == io.EOF {
+			s = nil
+		} else if err != nil {
+			return nil, errors.Wrap(err, "couldn't decode parquet record")
 		} else {
-			rs.isDone = false
+			isDone = false
 		}
+
 		m[rs.columns[i].String()] = s
 	}
 
-	if rs.isDone == true {
-		err := rs.file.Close()
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't close underlying file")
-		}
+	if isDone == true {
+		rs.isDone = true
 		return nil, execution.ErrEndOfStream
 	}
 

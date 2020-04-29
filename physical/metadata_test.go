@@ -301,7 +301,7 @@ func TestNamespace(t *testing.T) {
 			),
 		},
 		{
-			name: "map test 2 - keep = true and qualified star",
+			name: "map test 2 - keep = true and qualified star no match",
 			node: &Map{
 				Expressions: []NamedExpression{NewStarExpression("q")},
 				Source: &StubNode{
@@ -319,7 +319,30 @@ func TestNamespace(t *testing.T) {
 				metadata.Unbounded,
 				"",
 				metadata.NewNamespace(
-					[]string{"q", "x", "y", "z"},
+					[]string{"x", "y", "z"}, // don't add q because it's not in source metadata
+				),
+			),
+		},
+		{
+			name: "map test 3 - keep = false and qualified star match",
+			node: &Map{
+				Expressions: []NamedExpression{NewStarExpression("x"), NewStarExpression("y")},
+				Source: &StubNode{
+					NodeMetadata: metadata.NewNodeMetadata(
+						metadata.Unbounded,
+						"",
+						metadata.NewNamespace(
+							[]string{"x", "y", "z"},
+						),
+					),
+				},
+				Keep: false,
+			},
+			want: metadata.NewNodeMetadata(
+				metadata.Unbounded,
+				"",
+				metadata.NewNamespace(
+					[]string{"x", "y"},
 				),
 			),
 		},

@@ -80,22 +80,24 @@ func getOuterName(expr Expression) octosql.VariableName {
 
 func (node *Map) Metadata() *metadata.NodeMetadata {
 	sourceMetadata := node.Source.Metadata()
+	sourceNamespace := sourceMetadata.Namespace()
 	cardinality := sourceMetadata.Cardinality()
 	namespace := metadata.EmptyNamespace()
 
 	wasMergedWithSource := false
 	if node.Keep {
-		namespace.MergeWith(sourceMetadata.Namespace())
+		namespace.MergeWith(sourceNamespace)
 		wasMergedWithSource = true
 	}
 
 	for _, expr := range node.Expressions {
 		if starExpr, ok := expr.(*StarExpression); ok {
-			if starExpr.Qualifier == "" && !wasMergedWithSource {
+			qualifier := starExpr.Qualifier
+			if qualifier == "" && !wasMergedWithSource {
 				namespace.MergeWith(sourceMetadata.Namespace())
 				wasMergedWithSource = true
-			} else {
-				namespace.AddPrefix(starExpr.Qualifier)
+			} else if sourceNamespace.DoesContainPrefix(qualifier) {
+				namespace.AddPrefix(qualifier)
 			}
 		}
 	}

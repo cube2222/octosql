@@ -47,8 +47,7 @@ func TestJoin_Physical(t *testing.T) {
 						metadata.Unbounded,
 						"",
 						metadata.NewNamespace(
-							[]string{""},
-							[]octosql.VariableName{"a.field1", "a.field2"},
+							[]string{"a"},
 						),
 					),
 					variables: octosql.NoVariables(),
@@ -73,8 +72,7 @@ func TestJoin_Physical(t *testing.T) {
 							metadata.Unbounded,
 							"",
 							metadata.NewNamespace(
-								[]string{""},
-								[]octosql.VariableName{"b.field1", "b.field2"},
+								[]string{"b"},
 							),
 						),
 					},
@@ -100,8 +98,7 @@ func TestJoin_Physical(t *testing.T) {
 						metadata.Unbounded,
 						"",
 						metadata.NewNamespace(
-							[]string{""},
-							[]octosql.VariableName{"a.field1"},
+							[]string{"a"},
 						),
 					),
 					variables: octosql.NoVariables(),
@@ -119,8 +116,7 @@ func TestJoin_Physical(t *testing.T) {
 							metadata.Unbounded,
 							"",
 							metadata.NewNamespace(
-								[]string{""},
-								[]octosql.VariableName{"b.field1"},
+								[]string{"b"},
 							),
 						),
 					},
@@ -146,8 +142,7 @@ func TestJoin_Physical(t *testing.T) {
 						metadata.Unbounded,
 						"a.field1",
 						metadata.NewNamespace(
-							[]string{""},
-							[]octosql.VariableName{"a.field1"},
+							[]string{"a"},
 						),
 					),
 					variables: octosql.NoVariables(),
@@ -165,8 +160,7 @@ func TestJoin_Physical(t *testing.T) {
 							metadata.BoundedFitsInLocalStorage,
 							"b.field1",
 							metadata.NewNamespace(
-								[]string{""},
-								[]octosql.VariableName{"b.field1"},
+								[]string{"b"},
 							),
 						),
 					},
@@ -191,8 +185,7 @@ func TestJoin_Physical(t *testing.T) {
 						metadata.BoundedFitsInLocalStorage,
 						"",
 						metadata.NewNamespace(
-							[]string{""},
-							[]octosql.VariableName{"a.field1"},
+							[]string{"a"},
 						),
 					),
 					variables: octosql.NoVariables(),
@@ -203,8 +196,7 @@ func TestJoin_Physical(t *testing.T) {
 						metadata.BoundedFitsInLocalStorage,
 						"",
 						metadata.NewNamespace(
-							[]string{""},
-							[]octosql.VariableName{"b.field1"},
+							[]string{"b"},
 						),
 					),
 				},
@@ -228,8 +220,7 @@ func TestJoin_Physical(t *testing.T) {
 						metadata.Unbounded,
 						"",
 						metadata.NewNamespace(
-							[]string{""},
-							[]octosql.VariableName{"a.field1"},
+							[]string{"a"},
 						),
 					),
 					variables: octosql.NoVariables(),
@@ -240,8 +231,7 @@ func TestJoin_Physical(t *testing.T) {
 						metadata.BoundedDoesntFitInLocalStorage,
 						"",
 						metadata.NewNamespace(
-							[]string{""},
-							[]octosql.VariableName{"b.field1"},
+							[]string{"b"},
 						),
 					),
 				},
@@ -259,8 +249,7 @@ func TestJoin_Physical(t *testing.T) {
 						metadata.Unbounded,
 						"a.field1",
 						metadata.NewNamespace(
-							[]string{"x", "y"},
-							[]octosql.VariableName{"a.field1", "a.field2"},
+							[]string{"x", "y", "a"},
 						),
 					),
 					variables: octosql.NoVariables(),
@@ -301,8 +290,7 @@ func TestJoin_Physical(t *testing.T) {
 							metadata.Unbounded,
 							"b.field2",
 							metadata.NewNamespace(
-								[]string{"p", "q"},
-								[]octosql.VariableName{"b.field1", "b.field2"},
+								[]string{"p", "q", "b"},
 							),
 						),
 					},
@@ -325,8 +313,7 @@ func TestJoin_Physical(t *testing.T) {
 						metadata.Unbounded,
 						"a.field1",
 						metadata.NewNamespace(
-							[]string{},
-							[]octosql.VariableName{"a.field1", "a.field2"},
+							[]string{"a"},
 						),
 					),
 					variables: octosql.NoVariables(),
@@ -343,8 +330,7 @@ func TestJoin_Physical(t *testing.T) {
 							metadata.Unbounded,
 							"b.field2",
 							metadata.NewNamespace(
-								[]string{},
-								[]octosql.VariableName{"b.field1", "b.field2"},
+								[]string{"b"},
 							),
 						),
 					},
@@ -364,8 +350,7 @@ func TestJoin_Physical(t *testing.T) {
 						metadata.BoundedFitsInLocalStorage,
 						"a.field1",
 						metadata.NewNamespace(
-							[]string{},
-							[]octosql.VariableName{"a.field1", "a.field2"},
+							[]string{"a"},
 						),
 					),
 					variables: octosql.NoVariables(),
@@ -382,8 +367,7 @@ func TestJoin_Physical(t *testing.T) {
 							metadata.BoundedFitsInLocalStorage,
 							"b.field2",
 							metadata.NewNamespace(
-								[]string{},
-								[]octosql.VariableName{"b.field1", "b.field2"},
+								[]string{"b"},
 							),
 						),
 					},
@@ -565,8 +549,8 @@ func Test_getKeysFromFormula(t *testing.T) {
 			name: "empty formula",
 			args: args{
 				formula:         physical.NewConstant(true),
-				sourceNamespace: metadata.NewNamespace(nil, nil),
-				joinedNamespace: metadata.NewNamespace(nil, nil),
+				sourceNamespace: metadata.NewNamespace(nil),
+				joinedNamespace: metadata.NewNamespace(nil),
 			},
 			wantSourceKey: []physical.Expression{},
 			wantJoinedKey: []physical.Expression{},
@@ -577,15 +561,15 @@ func Test_getKeysFromFormula(t *testing.T) {
 			name: "single correct predicate",
 			args: args{
 				formula: physical.NewPredicate(
-					physical.NewVariable("source"),
+					physical.NewVariable("s.source"),
 					physical.Equal,
-					physical.NewVariable("joined"),
+					physical.NewVariable("j.joined"),
 				),
-				sourceNamespace: metadata.NewNamespace(nil, []octosql.VariableName{"source"}),
-				joinedNamespace: metadata.NewNamespace(nil, []octosql.VariableName{"joined"}),
+				sourceNamespace: metadata.NewNamespace([]string{"s"}),
+				joinedNamespace: metadata.NewNamespace([]string{"j"}),
 			},
-			wantSourceKey: []physical.Expression{physical.NewVariable("source")},
-			wantJoinedKey: []physical.Expression{physical.NewVariable("joined")},
+			wantSourceKey: []physical.Expression{physical.NewVariable("s.source")},
+			wantJoinedKey: []physical.Expression{physical.NewVariable("j.joined")},
 			wantErr:       false,
 		},
 	}

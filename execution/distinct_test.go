@@ -616,6 +616,15 @@ func TestDistinct_Get(t *testing.T) {
 			if err := AreStreamsEqualNoOrdering(ctx, stateStorage, stream, wantStream); err != nil {
 				t.Fatal(err)
 			}
+
+			if err := stream.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close distinct stream: %v", err)
+				return
+			}
+			if err := wantStream.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+				return
+			}
 		})
 	}
 }
@@ -666,5 +675,14 @@ func TestDistinct_Retractions(t *testing.T) {
 	err := AreStreamsEqualNoOrdering(ctx, stateStorage, stream, wantStream)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if err := stream.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close distinct stream: %v", err)
+		return
+	}
+	if err := wantStream.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+		return
 	}
 }

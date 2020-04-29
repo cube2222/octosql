@@ -89,7 +89,10 @@ func (s *RangeStream) Next(ctx context.Context) (*execution.Record, error) {
 	return out, nil
 }
 
-// TODO: Cleanup
-func (s *RangeStream) Close() error {
+func (s *RangeStream) Close(ctx context.Context, storage storage.Storage) error {
+	if err := storage.DropAll(s.streamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
+	}
+
 	return nil
 }

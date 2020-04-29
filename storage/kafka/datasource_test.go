@@ -168,6 +168,11 @@ func TestRecordStream_Next(t *testing.T) {
 				t.Errorf("Streams aren't equal: %v", err)
 				return
 			}
+
+			if err := rs.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close kafka stream: %v", err)
+				return
+			}
 		})
 	}
 }

@@ -143,13 +143,23 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 
 	ctx, cancel := context.WithCancel(ctx)
 	rs.workerCtxCancel = cancel
-	rs.workerCloseErrChan = make(chan error)
+	rs.workerCloseErrChan = make(chan error, 1)
 
 	return rs,
 		execution.NewExecutionOutput(
 			execution.NewZeroWatermarkGenerator(),
 			map[string]execution.ShuffleData{},
-			[]execution.Task{func() error { rs.RunWorker(ctx); return nil }},
+			[]execution.Task{func() error {
+				err := rs.RunWorker(ctx)
+				if err == context.Canceled || err == context.DeadlineExceeded {
+					rs.workerCloseErrChan <- err
+					return nil
+				} else {
+					err := errors.Wrap(err, "kafka worker error")
+					rs.workerCloseErrChan <- err
+					return err
+				}
+			}},
 		),
 		nil
 }
@@ -169,11 +179,11 @@ type RecordStream struct {
 
 var outputQueuePrefix = []byte("$output_queue$")
 
-func (rs *RecordStream) RunWorker(ctx context.Context) {
+func (rs *RecordStream) RunWorker(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			rs.workerCloseErrChan <- ctx.Err()
+			return ctx.Err()
 		default:
 		}
 
@@ -199,8 +209,7 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 			log.Printf("kafka worker: error running kafka read messages worker: %s, reinitializing from storage", err)
 			tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
 			if err := rs.loadOffset(tx); err != nil {
-				log.Fatalf("kafka worker: couldn't reinitialize offset for kafka read messages worker: %s", err)
-				return
+				return errors.Wrap(err, "couldn't reinitialize offset for kafka read messages worker")
 			}
 			tx.Abort() // We only read data above, no need to risk failing now.
 			continue
@@ -375,12 +384,20 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 	}
 }
 
-func (rs *RecordStream) Close() error {
+func (rs *RecordStream) Close(ctx context.Context, storage storage.Storage) error {
 	rs.workerCtxCancel()
 	err := <-rs.workerCloseErrChan
-	if err == context.Canceled {
+	if err == context.Canceled || err == context.DeadlineExceeded {
 	} else if err != nil {
-		return errors.Wrap(err, "couldn't stop worker")
+		return errors.Wrap(err, "couldn't stop kafka worker")
+	}
+
+	if err := rs.kafkaReader.Close(); err != nil {
+		return errors.Wrap(err, "couldn't close underlying kafka reader")
+	}
+
+	if err := storage.DropAll(rs.streamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
 	}
 
 	return nil

@@ -80,11 +80,25 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		batchSize:                     ds.batchSize,
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
+	rs.workerCtxCancel = cancel
+	rs.workerCloseErrChan = make(chan error, 1)
+
 	return rs,
 		execution.NewExecutionOutput(
 			execution.NewZeroWatermarkGenerator(),
 			map[string]execution.ShuffleData{},
-			[]execution.Task{func() error { rs.RunWorker(ctx); return nil }},
+			[]execution.Task{func() error {
+				err := rs.RunWorker(ctx)
+				if err == context.Canceled || err == context.DeadlineExceeded {
+					rs.workerCloseErrChan <- err
+					return nil
+				} else {
+					err := errors.Wrap(err, "json worker error")
+					rs.workerCloseErrChan <- err
+					return err
+				}
+			}},
 		),
 		nil
 }
@@ -101,24 +115,42 @@ type RecordStream struct {
 	alias                         string
 	offset                        int
 	batchSize                     int
+
+	workerCtxCancel    func()
+	workerCloseErrChan chan error
 }
 
-func (rs *RecordStream) Close() error {
-	err := rs.file.Close()
-	if err != nil {
-		return errors.Wrap(err, "Couldn't close underlying file")
+func (rs *RecordStream) Close(ctx context.Context, storage storage.Storage) error {
+	rs.workerCtxCancel()
+	err := <-rs.workerCloseErrChan
+	if err == context.Canceled || err == context.DeadlineExceeded {
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't stop json worker")
+	}
+
+	if err := rs.file.Close(); err != nil {
+		return errors.Wrap(err, "couldn't close underlying file")
+	}
+
+	if err := storage.DropAll(rs.streamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
 	}
 
 	return nil
 }
 
-func (rs *RecordStream) RunWorker(ctx context.Context) {
+func (rs *RecordStream) RunWorker(ctx context.Context) error {
 	for { // outer for is loading offset value and moving file iterator
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
 
 		if err := rs.loadOffset(tx); err != nil {
-			log.Fatalf("json worker: couldn't reinitialize offset for json read batch worker: %s", err)
-			return
+			return errors.Wrap(err, "couldn't reinitialize offset for json read batch worker")
 		}
 
 		tx.Abort() // We only read data above, no need to risk failing now.
@@ -126,8 +158,7 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 		// Load/Reload file
 		file, err := os.Open(rs.filePath)
 		if err != nil {
-			log.Fatalf("json worker: couldn't open file: %s", err)
-			return
+			return errors.Wrap(err, "couldn't open file")
 		}
 
 		rs.file = file
@@ -137,14 +168,19 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 		for i := 0; i < rs.offset; i++ {
 			_, err := rs.readRecordFromFile()
 			if err == execution.ErrEndOfStream {
-				return
+				return ctx.Err()
 			} else if err != nil {
-				log.Fatalf("json worker: couldn't move json file iterator by %d offset: %s", rs.offset, err)
-				return
+				return errors.Wrapf(err, "couldn't move json file iterator by %d offset", rs.offset)
 			}
 		}
 
 		for { // inner for is calling RunWorkerInternal
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
+
 			tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
 
 			err := rs.RunWorkerInternal(ctx, tx)
@@ -168,7 +204,7 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 					log.Println("json worker: couldn't commit transaction: ", err)
 					continue
 				}
-				return
+				return ctx.Err()
 			} else if err != nil {
 				tx.Abort()
 				log.Printf("json worker: error running json read batch worker: %s, reinitializing from storage", err)
@@ -270,7 +306,6 @@ func (rs *RecordStream) readRecordFromFile() (map[octosql.VariableName]interface
 
 	if !rs.decoder.More() {
 		rs.isDone = true
-		rs.file.Close()
 		return nil, execution.ErrEndOfStream
 	}
 

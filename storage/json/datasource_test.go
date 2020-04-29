@@ -125,6 +125,15 @@ func TestJSONRecordStream_Get(t *testing.T) {
 				t.Errorf("Streams aren't equal: %v", err)
 				return
 			}
+
+			if err := got.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close json stream: %v", err)
+				return
+			}
+			if err := want.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+				return
+			}
 		})
 	}
 }

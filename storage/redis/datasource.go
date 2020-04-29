@@ -121,11 +121,25 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 		}
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
+	rs.workerCtxCancel = cancel
+	rs.workerCloseErrChan = make(chan error, 1)
+
 	return rs,
 		execution.NewExecutionOutput(
 			execution.NewZeroWatermarkGenerator(),
 			map[string]execution.ShuffleData{},
-			[]execution.Task{func() error { rs.RunWorker(ctx); return nil }},
+			[]execution.Task{func() error {
+				err := rs.RunWorker(ctx)
+				if err == context.Canceled || err == context.DeadlineExceeded {
+					rs.workerCloseErrChan <- err
+					return nil
+				} else {
+					err := errors.Wrap(err, "redis worker error")
+					rs.workerCloseErrChan <- err
+					return err
+				}
+			}},
 		),
 		nil
 }
@@ -147,32 +161,49 @@ type RecordStream struct {
 
 	// Field used by KeySpecificStream
 	keys []string
+
+	workerCtxCancel    func()
+	workerCloseErrChan chan error
 }
 
-func (rs *RecordStream) Close() error {
-	err := rs.client.Close()
-	if err != nil {
-		return errors.Wrap(err, "Couldn't close underlying client")
+func (rs *RecordStream) Close(ctx context.Context, storage storage.Storage) error {
+	rs.workerCtxCancel()
+	err := <-rs.workerCloseErrChan
+	if err == context.Canceled || err == context.DeadlineExceeded {
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't stop redis worker")
+	}
+
+	if err := rs.client.Close(); err != nil {
+		return errors.Wrap(err, "couldn't close underlying redis client")
+	}
+
+	if err := storage.DropAll(rs.streamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
 	}
 
 	return nil
 }
 
-func (rs *RecordStream) RunWorker(ctx context.Context) {
+func (rs *RecordStream) RunWorker(ctx context.Context) error {
 	for { // outer for is loading offset value and moving file iterator
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
 
 		if err := rs.loadOffset(tx); err != nil {
-			log.Fatalf("redis worker: couldn't reinitialize offset for redis read batch worker: %s", err)
-			return
+			return errors.Wrap(err, "couldn't reinitialize offset for redis read batch worker")
 		}
 
 		// Moving file iterator by `rs.offset`
 		if rs.isEntireDatabaseStream {
 			// Here we do full database scan so all we need to do is load last returned cursor value
 			if err := rs.loadCursor(tx); err != nil {
-				log.Fatalf("redis worker: couldn't load redis cursor: %s", err)
-				return
+				return errors.Wrap(err, "couldn't load redis cursor")
 			}
 		} else {
 			// Here we just drop first `rs.offset` from keys slice
@@ -182,6 +213,12 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 		tx.Abort() // We only read data above, no need to risk failing now.
 
 		for { // inner for is calling RunWorkerInternal
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
+
 			tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
 
 			err := rs.RunWorkerInternal(ctx, tx)
@@ -205,7 +242,7 @@ func (rs *RecordStream) RunWorker(ctx context.Context) {
 					log.Println("redis worker: couldn't commit transaction: ", err)
 					continue
 				}
-				return
+				return ctx.Err()
 			} else if err != nil {
 				tx.Abort()
 				log.Printf("redis worker: error running redis read batch worker: %s, reinitializing from storage", err)

@@ -220,6 +220,6 @@ func (p *ProcessByKey) ReadyForMore(ctx context.Context, tx storage.StateTransac
 	return nil
 }
 
-func (p *ProcessByKey) Close() error {
-	return nil // TODO: Close this, remove state
+func (p *ProcessByKey) Close(ctx context.Context, storage storage.Storage) error {
+	return nil
 }

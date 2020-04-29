@@ -61,6 +61,10 @@ func (node *LookupJoin) Get(ctx context.Context, variables octosql.Variables, st
 		joinedNode: node.joined,
 	}
 
+	schedCtx, cancel := context.WithCancel(ctx)
+	rs.schedulerCtxCancel = cancel
+	rs.schedulerCloseErrChan = make(chan error)
+
 	// We only want to do the initialization routine once, even in case of restarts.
 	isInitialized := storage.NewValueState(tx.WithPrefix(streamID.AsPrefix()).WithPrefix(isInitializedPrefix))
 	var phantom octosql.Value
@@ -95,10 +99,10 @@ func (node *LookupJoin) Get(ctx context.Context, variables octosql.Variables, st
 		var phantom octosql.Value
 		for err = iter.Next(&jobID, &phantom); err == nil; err = iter.Next(&jobID, &phantom) {
 			go func() {
-				err = rs.RunWorker(ctx, &jobID)
+				err = rs.RunWorker(schedCtx, &jobID)
 				for err != nil {
 					log.Printf("couldn't run worker for job ID %s: %s, retrying", jobID.Show(), err.Error())
-					err = rs.RunWorker(ctx, &jobID)
+					err = rs.RunWorker(schedCtx, &jobID)
 				}
 			}()
 		}
@@ -111,16 +115,16 @@ func (node *LookupJoin) Get(ctx context.Context, variables octosql.Variables, st
 	}
 
 	// Run the scheduler which will start workers for new join jobs.
-	go rs.RunScheduler(ctx)
+	go rs.RunScheduler(schedCtx)
 
 	// Run the pull engine which supplies this lookup join with records which are in need of joining.
-	engine := NewPullEngine(rs, node.stateStorage, sourceStream, streamID, execOutput.WatermarkSource, true)
+	engine := NewPullEngine(rs, node.stateStorage, sourceStream, streamID, execOutput.WatermarkSource, true, ctx)
 
 	return engine,
 		NewExecutionOutput(
 			engine,
 			execOutput.NextShuffles,
-			append(execOutput.TasksToRun, func() error { engine.Run(ctx); return nil }),
+			append(execOutput.TasksToRun, func() error { engine.Run(); return nil }),
 		),
 		nil
 }
@@ -134,6 +138,9 @@ type LookupJoinStream struct {
 	isLeftJoin bool
 
 	joinedNode Node
+
+	schedulerCtxCancel    func()
+	schedulerCloseErrChan chan error
 }
 
 // The scheduler takes records from the toBeJoined queue, and starts jobs to do joins.
@@ -141,6 +148,13 @@ type LookupJoinStream struct {
 // where they will be handled by the receiver.
 func (rs *LookupJoinStream) RunScheduler(ctx context.Context) {
 	for {
+		select {
+		case <-ctx.Done():
+			rs.schedulerCloseErrChan <- ctx.Err()
+			return
+		default:
+		}
+
 		err := rs.loopScheduler(ctx)
 		if errors.Cause(err) == ErrNewTransactionRequired {
 			continue
@@ -271,9 +285,10 @@ func (rs *LookupJoinStream) RunWorker(ctx context.Context, id *RecordID) error {
 		rs.streamID,
 		&ZeroWatermarkGenerator{},
 		true,
+		ctx,
 	)
 
-	engine.Run(ctx)
+	engine.Run()
 
 	// We're done, the receiver of all those records will clean up everything when he's done reading.
 
@@ -657,8 +672,23 @@ func (rs *LookupJoinStream) MarkError(ctx context.Context, tx storage.StateTrans
 	return nil
 }
 
-func (rs *LookupJoinStream) Close() error {
-	return nil // TODO: Close this, remove state
+func (rs *LookupJoinStream) Close(ctx context.Context, storage storage.Storage) error {
+	rs.schedulerCtxCancel()
+	err := <-rs.schedulerCloseErrChan
+	if err == context.Canceled || err == context.DeadlineExceeded {
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't stop lookup join scheduler")
+	}
+
+	if err := storage.DropAll(rs.streamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
+	}
+
+	if err := storage.DropAll(outputWatermarkPrefix); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with output watermark prefix")
+	}
+
+	return nil
 }
 
 type JobOutputQueueIntermediateRecordStore struct {
@@ -729,6 +759,6 @@ func (j *JobOutputQueueIntermediateRecordStore) ReadyForMore(ctx context.Context
 	return nil
 }
 
-func (j *JobOutputQueueIntermediateRecordStore) Close() error {
-	return nil
+func (j *JobOutputQueueIntermediateRecordStore) Close(ctx context.Context, storage storage.Storage) error {
+	return nil // All storages used by this irs are prefixed by pull engine's streamID and therefore will be closed by him
 }

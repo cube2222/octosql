@@ -95,13 +95,13 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 		variables:       variables,
 	}
 
-	groupByPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, execOutput.WatermarkSource, true)
+	groupByPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, execOutput.WatermarkSource, true, ctx)
 
 	return groupByPullEngine, // groupByPullEngine now indicates new watermark source
 		NewExecutionOutput(
 			groupByPullEngine,
 			execOutput.NextShuffles,
-			append(execOutput.TasksToRun, func() error { groupByPullEngine.Run(ctx); return nil }),
+			append(execOutput.TasksToRun, func() error { groupByPullEngine.Run(); return nil }),
 		),
 		nil
 }

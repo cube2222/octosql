@@ -146,8 +146,20 @@ func (o *Output) GetErrorMessage(ctx context.Context, tx storage.StateTransactio
 	return octoError.AsString(), nil
 }
 
-func (o *Output) Close() error {
-	return nil // TODO: Cleanup?
+func (o *Output) Close(ctx context.Context, storage storage.Storage) error {
+	if err := storage.DropAll(recordsPrefix); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with records prefix")
+	}
+
+	if err := storage.DropAll(endOfStreamPrefix); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with end of stream prefix")
+	}
+
+	if err := storage.DropAll(errorPrefix); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with error prefix")
+	}
+
+	return nil
 }
 
 func (o *Output) ListRecords(ctx context.Context, tx storage.StateTransaction) ([]*execution.Record, error) {

@@ -67,6 +67,15 @@ func TestGroupBy_SimpleBatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	if err := stream.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close group_by stream: %v", err)
+		return
+	}
+	if err := want.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+		return
+	}
 }
 
 func TestGroupBy_BatchWithUndos(t *testing.T) {
@@ -131,6 +140,15 @@ func TestGroupBy_BatchWithUndos(t *testing.T) {
 	err := AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if err := stream.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close group_by stream: %v", err)
+		return
+	}
+	if err := want.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+		return
 	}
 }
 
@@ -213,6 +231,15 @@ func TestGroupBy_WithOutputUndos(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	if err := stream.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close group_by stream: %v", err)
+		return
+	}
+	if err := want.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+		return
+	}
 }
 
 func TestGroupBy_newRecordsNoChanges(t *testing.T) {
@@ -266,6 +293,15 @@ func TestGroupBy_newRecordsNoChanges(t *testing.T) {
 	err := AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if err := stream.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close group_by stream: %v", err)
+		return
+	}
+	if err := want.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+		return
 	}
 }
 
@@ -345,5 +381,14 @@ func TestGroupBy_EventTimes(t *testing.T) {
 	err := AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if err := stream.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close group_by stream: %v", err)
+		return
+	}
+	if err := want.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+		return
 	}
 }

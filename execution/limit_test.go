@@ -139,6 +139,15 @@ func TestLimit_Get(t *testing.T) {
 			if err != nil {
 				t.Errorf("limitedStream comparison error: %v", err)
 			}
+
+			if err := rs.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close limited stream: %v", err)
+				return
+			}
+			if err := want.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+				return
+			}
 		})
 	}
 }

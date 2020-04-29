@@ -348,6 +348,15 @@ func TestDataSource_Get(t *testing.T) {
 				t.Errorf("Error in AreStreamsEqual(): %v", err)
 				return
 			}
+
+			if err := stream.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close mysql stream: %v", err)
+				return
+			}
+			if err := want.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+				return
+			}
 		})
 	}
 }

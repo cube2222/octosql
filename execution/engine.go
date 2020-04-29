@@ -53,7 +53,7 @@ type IntermediateRecordStore interface {
 	GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error)
 	MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error
 	MarkError(ctx context.Context, tx storage.StateTransaction, err error) error
-	Close() error
+	Close(ctx context.Context, storage storage.Storage) error
 }
 
 type PullEngine struct {
@@ -65,9 +65,15 @@ type PullEngine struct {
 	streamID               *StreamID
 	batchSizeManager       *BatchSizeManager
 	shouldPrefixStreamID   bool
+
+	ctx          context.Context
+	ctxCancel    func()
+	closeErrChan chan error
 }
 
-func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, source RecordStream, streamID *StreamID, watermarkSource WatermarkSource, shouldPrefixStreamID bool) *PullEngine {
+func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, source RecordStream, streamID *StreamID, watermarkSource WatermarkSource, shouldPrefixStreamID bool, ctx context.Context) *PullEngine {
+	ctx, cancel := context.WithCancel(ctx)
+
 	return &PullEngine{
 		irs:                  irs,
 		storage:              storage,
@@ -76,6 +82,9 @@ func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, source 
 		watermarkSource:      watermarkSource,
 		batchSizeManager:     NewBatchSizeManager(time.Second / 4),
 		shouldPrefixStreamID: shouldPrefixStreamID,
+		ctx:                  ctx,
+		ctxCancel:            cancel,
+		closeErrChan:         make(chan error),
 	}
 }
 
@@ -86,11 +95,18 @@ func (engine *PullEngine) getPrefixedTx(tx storage.StateTransaction) storage.Sta
 	return tx
 }
 
-func (engine *PullEngine) Run(ctx context.Context) {
+func (engine *PullEngine) Run() {
 	tx := engine.storage.BeginTransaction()
 
 	for {
-		err := engine.loop(ctx, tx)
+		select {
+		case <-engine.ctx.Done():
+			engine.closeErrChan <- engine.ctx.Err()
+			return
+		default:
+		}
+
+		err := engine.loop(engine.ctx, tx)
 		if err == ErrEndOfStream {
 			err := tx.Commit()
 			if err != nil {
@@ -99,6 +115,8 @@ func (engine *PullEngine) Run(ctx context.Context) {
 				continue
 			}
 			log.Println("engine: end of stream, stopping loop")
+
+			engine.closeErrChan <- engine.ctx.Err()
 			return
 		} else if errors.Cause(err) == ErrNewTransactionRequired {
 			err := tx.Commit()
@@ -113,7 +131,7 @@ func (engine *PullEngine) Run(ctx context.Context) {
 				log.Println("engine: couldn't commit: ", err)
 			}
 			engine.batchSizeManager.CommitSuccessful()
-			err = waitableError.ListenForChanges(ctx)
+			err = waitableError.ListenForChanges(engine.ctx)
 			if err != nil {
 				log.Println("engine: couldn't listen for changes: ", err)
 			}
@@ -124,16 +142,19 @@ func (engine *PullEngine) Run(ctx context.Context) {
 			engine.batchSizeManager.Reset()
 			tx = engine.storage.BeginTransaction()
 		} else if err != nil {
-			log.Println("engine: ", err)
+			loopErr := err
+			log.Println("engine: ", loopErr)
 			tx.Abort()
 			tx = engine.storage.BeginTransaction()
-			err := engine.irs.MarkError(ctx, engine.getPrefixedTx(tx), err)
+			err := engine.irs.MarkError(engine.ctx, engine.getPrefixedTx(tx), loopErr)
 			if err != nil {
 				log.Fatalf("couldn't mark error on intermediate record store: %s", err)
 			}
 			if err := tx.Commit(); err != nil {
 				log.Fatalf("couldn't commit marking error on intermediate record store: %s", err)
 			}
+
+			engine.closeErrChan <- loopErr
 			return
 		}
 
@@ -218,15 +239,24 @@ func (engine *PullEngine) GetWatermark(ctx context.Context, tx storage.StateTran
 	return engine.irs.GetWatermark(ctx, prefixedTx)
 }
 
-func (engine *PullEngine) Close() error {
-	err := engine.source.Close()
-	if err != nil {
+func (engine *PullEngine) Close(ctx context.Context, storage storage.Storage) error {
+	engine.ctxCancel()
+	err := <-engine.closeErrChan
+	if err == context.Canceled || err == context.DeadlineExceeded {
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't stop pull engine")
+	}
+
+	if err := engine.source.Close(ctx, storage); err != nil {
 		return errors.Wrap(err, "couldn't close source stream")
 	}
 
-	err = engine.irs.Close()
-	if err != nil {
+	if err := engine.irs.Close(ctx, storage); err != nil {
 		return errors.Wrap(err, "couldn't close intermediate record store")
+	}
+
+	if err := storage.DropAll(engine.streamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
 	}
 
 	return nil

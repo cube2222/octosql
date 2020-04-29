@@ -115,6 +115,10 @@ func (s *TumbleStream) Next(ctx context.Context) (*execution.Record, error) {
 	return newRecord, nil
 }
 
-func (s *TumbleStream) Close() error {
-	return s.source.Close()
+func (s *TumbleStream) Close(ctx context.Context, storage storage.Storage) error {
+	if err := s.source.Close(ctx, storage); err != nil {
+		return errors.Wrap(err, "couldn't close underlying stream")
+	}
+
+	return nil
 }

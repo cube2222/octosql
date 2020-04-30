@@ -274,7 +274,7 @@ func TestStreamJoin(t *testing.T) {
 
 				want := GetTestStream(t, stateStorage, octosql.NoVariables(), tt.want)
 
-				err = AreStreamsEqualNoOrderingWithRetractionReduction(context.Background(), stateStorage, stream[0], want, WithEqualityBasedOn(EqualityOfFieldsAndValues))
+				err = AreStreamsEqualNoOrderingWithRetractionReductionAndIDChecking(context.Background(), stateStorage, stream[0], want, WithEqualityBasedOn(EqualityOfFieldsAndValues))
 				if err != nil {
 					t.Errorf("Streams aren't equal: %v", err)
 					return

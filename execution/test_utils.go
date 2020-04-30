@@ -217,7 +217,7 @@ func DefaultEquality(record1 *Record, record2 *Record) error {
 	return nil
 }
 
-func AreStreamsEqualNoOrderingWithRetractionReduction(ctx context.Context, stateStorage storage.Storage, got, want RecordStream, opts ...AreEqualOpt) error {
+func AreStreamsEqualNoOrderingWithRetractionReductionAndIDChecking(ctx context.Context, stateStorage storage.Storage, got, want RecordStream, opts ...AreEqualOpt) error {
 	config := &AreEqualConfig{
 		Equality: DefaultEquality,
 	}
@@ -234,8 +234,44 @@ func AreStreamsEqualNoOrderingWithRetractionReduction(ctx context.Context, state
 	if err != nil {
 		return errors.Wrap(err, "couldn't read got streams records")
 	}
+	if len(gotRecords) == 0 {
+		return nil
+	}
 
-	for _, rec := range gotRecords {
+	seenIDs := make(map[int64]struct{})
+	var wantID string
+
+	for i, rec := range gotRecords {
+		// All recordIDs should be of form X.index, where X is the same streamID for every record and indexes are distinct
+		// Store the first streamID prefix from the record
+		if i == 0 {
+			wantID, err = getBaseID(rec.ID())
+			if err != nil {
+				return errors.Wrap(err, "couldn't get base ID from first record")
+			}
+		}
+
+		// The ID should be of form streamID.index, first we want to compare streamIDs and then check if indexes are unique
+		recordIDSplit := strings.Split(rec.ID().ID, ".")
+
+		if len(recordIDSplit) != 2 {
+			return errors.Errorf("got a record ID of invalid format: %v", rec.ID().ID)
+		} else if recordIDSplit[0] != wantID {
+			return errors.Errorf("got non-matching base of record ID %v, wanted %v", recordIDSplit[0], wantID)
+		}
+
+		numberAsInt, err := strconv.ParseInt(recordIDSplit[1], 10, 64)
+		if err != nil {
+			return errors.Wrap(err, "couldn't parse second part of record ID as number")
+		}
+
+		_, ok := seenIDs[numberAsInt]
+		if ok {
+			return errors.Errorf("ids with number %v where repeated", numberAsInt)
+		}
+		seenIDs[numberAsInt] = struct{}{}
+
+		// Store record with respect to whether it's a retraction or not
 		baseRecord := NewRecordFromRecord(rec, WithNoUndo(), WithID(NewRecordID("phantom_id")), WithEventTimeField(""))
 
 		if rec.IsUndo() {
@@ -265,41 +301,6 @@ func AreStreamsEqualNoOrderingWithRetractionReduction(ctx context.Context, state
 	secondContained := secondMultiSet.isContainedIn(firstMultiSet)
 	if !(firstContained && secondContained) {
 		return errors.Errorf("different sets: \n %s \n and \n %s", firstMultiSet.Show(), secondMultiSet.Show())
-	}
-
-	if len(gotRecords) == 0 {
-		return nil
-	}
-
-	wantID, err := getBaseID(gotRecords[0].ID())
-	if err != nil {
-		return errors.Wrap(err, "couldn't get base ID from first record")
-	}
-
-	seenIDs := make(map[int64]struct{})
-
-	// Check if the records in want stream are correct
-	for _, rec := range gotRecords {
-		recordIDSplit := strings.Split(rec.ID().ID, ".")
-
-		if len(recordIDSplit) != 2 {
-			return errors.Errorf("got a record ID of invalid format: %v", rec.ID().ID)
-		} else if recordIDSplit[0] != wantID {
-			return errors.Errorf("got non-matching base of record ID %v, wanted %v", recordIDSplit[0], wantID)
-		}
-
-		numberAsInt, err := strconv.ParseInt(recordIDSplit[1], 10, 64)
-		if err != nil {
-			return errors.Wrap(err, "couldn't parse second part of record ID as number")
-		}
-
-		_, ok := seenIDs[numberAsInt]
-
-		if ok {
-			return errors.Errorf("ids with number %v where repeated", numberAsInt)
-		}
-
-		seenIDs[numberAsInt] = struct{}{}
 	}
 
 	return nil

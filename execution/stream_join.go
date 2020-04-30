@@ -107,10 +107,10 @@ type JoinedStream struct {
 	joinType       JoinType
 }
 
-var leftStreamRecordsPrefix = []byte("$left_stream_records$")
-var rightStreamRecordsPrefix = []byte("$right_stream_records$")
-var matchesToTriggerPrefix = []byte("$matches_to_trigger$")
-var singleRecordsToTriggerPrefix = []byte("$records_to_trigger$")
+var leftStreamOldRecordsPrefix = []byte("$left_stream_old_records$")
+var rightStreamOldRecordsPrefix = []byte("$right_stream_old_records$")
+var leftStreamNewRecordsPrefix = []byte("$left_stream_new_records$")
+var rightStreamNewRecordsPrefix = []byte("$right_stream_new_records$")
 
 func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, key octosql.Value, record *Record) error {
 	if inputIndex < 0 || inputIndex > 1 {
@@ -131,7 +131,7 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 		return errors.Wrap(err, "couldn't marshall new record")
 	}
 
-	var myRecordSet, otherRecordSet *storage.MultiSet
+	var myRecordSet *storage.MultiSet
 
 	// Important note:
 	// 1) If we are adding the record it's natural that we want to match it with every record from the other stream
@@ -139,14 +139,12 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 	// 	  This is because if records arrive in order R1, L1, L2, R2, R3 and then we retract L1, it has matched
 	//	  with R1 (when L1 was added) and with R2 and R3 (when they were added)
 	if isLeft {
-		myRecordSet = storage.NewMultiSet(txByKey.WithPrefix(leftStreamRecordsPrefix))
-		otherRecordSet = storage.NewMultiSet(txByKey.WithPrefix(rightStreamRecordsPrefix))
+		myRecordSet = storage.NewMultiSet(txByKey.WithPrefix(leftStreamNewRecordsPrefix))
 	} else {
-		myRecordSet = storage.NewMultiSet(txByKey.WithPrefix(rightStreamRecordsPrefix))
-		otherRecordSet = storage.NewMultiSet(txByKey.WithPrefix(leftStreamRecordsPrefix))
+		myRecordSet = storage.NewMultiSet(txByKey.WithPrefix(rightStreamNewRecordsPrefix))
 	}
 
-	// Keep track of the count of the record (fields + data no metadata)
+	// Keep track of the count of the record (fields + data, no metadata)
 	newCount, err := keepTrackOfCount(txByKey.WithPrefix(newRecordKey), isRetraction)
 	if err != nil {
 		return err
@@ -157,98 +155,31 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 		return nil
 	}
 
-	// We add/remove the record to/from the appropriate set of records
-	if !isRetraction {
-		if err := myRecordSet.Insert(newRecordValue); err != nil {
-			return errors.Wrap(err, "couldn't store record in its set")
+	// If the record is a retraction there are two options:
+	// 1) It's still present in the set, then we just remove it
+	// 2) It's not present, so it has already been triggered, so we send a retraction for it
+	if isRetraction {
+		present, err := myRecordSet.Contains(newRecordValue)
+		if err != nil {
+			return errors.Wrap(err, "couldn't check if record is present in the appropriate record set")
+		}
+
+		if present {
+			// Present, so remove it
+			if err := myRecordSet.Erase(newRecordValue); err != nil {
+				return errors.Wrap(err, "couldn't erase record from the appropriate record set")
+			}
+		} else {
+			// Otherwise send a retraction
+			retractionRecord := NewRecordFromRecord(record, WithUndo())
+			if err := myRecordSet.Insert(recordToValue(retractionRecord)); err != nil {
+				return errors.Wrap(err, "couldn't insert retraction for record into the appropriate record set")
+			}
 		}
 	} else {
-		if err := myRecordSet.Erase(newRecordValue); err != nil {
-			return errors.Wrap(err, "couldn't remove record from its set")
-		}
-	}
-
-	// We read all the records from the other stream
-	otherRecordValues, err := otherRecordSet.ReadAll()
-	if err != nil {
-		return errors.Wrap(err, "couldn't read records from the other stream")
-	}
-
-	matchesToTriggerSet := storage.NewMultiSet(txByKey.WithPrefix(matchesToTriggerPrefix))
-
-	// Add matched records
-	for _, otherRecordValue := range otherRecordValues {
-		// We will be creating matches between records. A match is a pair of records and information whether it's a retraction
-		// or not. To make sure we never mix the order the record from the left stream always goes first
-		var leftRecord, rightRecord octosql.Value
-		if isLeft {
-			leftRecord = newRecordValue
-			rightRecord = otherRecordValue
-		} else {
-			leftRecord = otherRecordValue
-			rightRecord = newRecordValue
-		}
-
-		match := createMatch(leftRecord, rightRecord, false)
-
-		if !isRetraction { // adding the record
-			if err := matchesToTriggerSet.Insert(match); err != nil {
-				return errors.Wrap(err, "couldn't store a match of records")
-			}
-		} else { // retracting a record
-			// Now there are two possibilities:
-			// 1) The matching is present in the toTrigger set -> we just remove it
-			// 2) The matching isn't present (so it's already been triggered) -> we send a retraction for it
-
-			isPresent, err := matchesToTriggerSet.Contains(match)
-			if err != nil {
-				return errors.Wrap(err, "couldn't check whether a match of records is present in the matched records set")
-			}
-
-			if isPresent {
-				if err := matchesToTriggerSet.Erase(match); err != nil {
-					return errors.Wrap(err, "couldn't remove a match of records from the matched records set")
-				}
-			} else {
-				if err := matchesToTriggerSet.Insert(createMatch(leftRecord, rightRecord, true)); err != nil {
-					return errors.Wrap(err, "couldn't store the retraction of a match in the matched records set")
-				}
-			}
-		}
-	}
-
-	// Now additionally we might need to add the record itself if we are dealing with a specific join type
-
-	recordsToTriggerSet := storage.NewMultiSet(txByKey.WithPrefix(singleRecordsToTriggerPrefix))
-
-	// If we are performing an outer join or a left join and the record comes from the left
-	if js.joinType == OUTER_JOIN || (js.joinType == LEFT_JOIN && isLeft) {
-		if !isRetraction {
-			if err := recordsToTriggerSet.Insert(newRecordValue); err != nil {
-				return errors.Wrap(err, "couldn't insert record into the single records set")
-			}
-		} else {
-			// If it's a retraction we do the same as before: check if it's present in the set, if yes
-			// remove it, otherwise send a retraction.
-			contains, err := recordsToTriggerSet.Contains(newRecordValue)
-			if err != nil {
-				return errors.Wrap(err, "couldn't check whether the single records set contains the record")
-			}
-
-			if contains {
-				// Remove the record from the set
-				if err := recordsToTriggerSet.Erase(newRecordValue); err != nil {
-					return errors.Wrap(err, "couldn't remove record from the single records set")
-				}
-			} else {
-				// Send a retraction
-				retractionRecord := NewRecordFromRecord(record, WithUndo())
-				retractionRecordValue := recordToValue(retractionRecord)
-
-				if err := recordsToTriggerSet.Insert(retractionRecordValue); err != nil {
-					return errors.Wrap(err, "couldn't insert a retraction for the record into the single records set")
-				}
-			}
+		// Just insert it into the set
+		if err := myRecordSet.Insert(newRecordValue); err != nil {
+			return errors.Wrap(err, "couldn't insert new record into the appropriate record set")
 		}
 	}
 
@@ -261,6 +192,10 @@ func (js *JoinedStream) Trigger(ctx context.Context, tx storage.StateTransaction
 	keyPrefix := append(append([]byte("$"), key.MonotonicMarshal()...), '$')
 	txByKey := tx.WithPrefix(keyPrefix)
 
+	addLeftRecords := js.joinType == LEFT_JOIN || js.joinType == OUTER_JOIN
+	addRightRecords := js.joinType == OUTER_JOIN
+
+	// Read the number of records already triggered from this JoinedStream. These will be used in assigning IDs to new records
 	triggeredCountState := storage.NewValueState(tx.WithPrefix(triggeredCountPrefix))
 	var triggeredCount octosql.Value
 
@@ -271,67 +206,170 @@ func (js *JoinedStream) Trigger(ctx context.Context, tx storage.StateTransaction
 		return nil, errors.Wrap(err, "couldn't read count of already triggered records")
 	}
 
-	triggeredCountValue := triggeredCount.AsInt()
+	alreadyTriggeredCount := triggeredCount.AsInt()
 
-	// Read all the pairs to merge and send
-	matchesToTriggerSet := storage.NewMultiSet(txByKey.WithPrefix(matchesToTriggerPrefix))
-	matches, err := matchesToTriggerSet.ReadAll()
+	// Read records from the left stream that were already present after the previous Trigger() call
+	oldLeftRecords, err := readAllAndTransformIntoRecords(txByKey.WithPrefix(leftStreamOldRecordsPrefix))
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't read record matches to trigger")
+		return nil, errors.Wrap(err, "couldn't read old records from the left stream")
+	}
+
+	// Read records from the right stream that were already present after the previous Trigger() call
+	oldRightRecords, err := readAllAndTransformIntoRecords(txByKey.WithPrefix(rightStreamOldRecordsPrefix))
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't read old records from the right stream")
+	}
+
+	// Read records from the left stream that arrived after the previous Trigger() call
+	newLeftRecords, err := readAllAndTransformIntoRecords(txByKey.WithPrefix(leftStreamNewRecordsPrefix))
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't read new records from the left stream")
+	}
+
+	// Read records from the right stream that arrived after the previous Trigger() call
+	newRightRecords, err := readAllAndTransformIntoRecords(txByKey.WithPrefix(rightStreamNewRecordsPrefix))
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't read new records from the right stream")
+	}
+
+	// This offset will be used to assign IDs to records
+	baseOffset := alreadyTriggeredCount
+
+	var allRecordsToTrigger []*Record
+
+	// First we merge new left records with both old and new right records
+	leftMergedWithAllRights := createPairsOfRecords(newLeftRecords, append(oldRightRecords, newRightRecords...), baseOffset, js.streamID, js.eventTimeField)
+	allRecordsToTrigger = append(allRecordsToTrigger, leftMergedWithAllRights...)
+	baseOffset += len(leftMergedWithAllRights)
+
+	// Now we merge new right records with old left records. In this way we now have oldLeft x newRight, newLeft x oldRight and newLeft x newRight, which
+	// is exactly what we want, since we basically want to get (allLeft x allRight) - (oldLeft x oldRight), since these records were already triggered
+	newRightsMergedWithOldLefts := createPairsOfRecords(oldLeftRecords, newRightRecords, baseOffset, js.streamID, js.eventTimeField)
+	allRecordsToTrigger = append(allRecordsToTrigger, newRightsMergedWithOldLefts...)
+	baseOffset += len(newRightsMergedWithOldLefts)
+
+	// If we are adding single left records (LEFT or OUTER join) we add them and update the offset
+	if addLeftRecords {
+		leftRecordsRenamed := renameRecords(newLeftRecords, baseOffset, js.streamID)
+		allRecordsToTrigger = append(allRecordsToTrigger, leftRecordsRenamed...)
+		baseOffset += len(newLeftRecords)
+	}
+
+	// Same goes for right records (in OUTER join)
+	if addRightRecords {
+		rightRecordsRenamed := renameRecords(newRightRecords, baseOffset, js.streamID)
+		allRecordsToTrigger = append(allRecordsToTrigger, rightRecordsRenamed...)
+		baseOffset += len(newRightRecords)
+	}
+
+	// Now we have to handle merging newRecords and oldRecords. Basically we move records from the new set to the old one,
+	// while keeping in mind which new records are retractions, and then we clear the new set. We do this for both left and right streams
+	if err := mergeNewAndOldRecords(txByKey, newLeftRecords, leftStreamNewRecordsPrefix, leftStreamOldRecordsPrefix); err != nil {
+		return nil, errors.Wrap(err, "couldn't move left new records to the old records set")
+	}
+
+	if err := mergeNewAndOldRecords(txByKey, newRightRecords, rightStreamNewRecordsPrefix, rightStreamOldRecordsPrefix); err != nil {
+		return nil, errors.Wrap(err, "couldn't move right new records to the old records set")
 	}
 
 	// Update the value of number of triggered records
-	newTriggeredCount := octosql.MakeInt(triggeredCountValue + len(matches))
-
+	newTriggeredCount := octosql.MakeInt(baseOffset)
 	if err := triggeredCountState.Set(&newTriggeredCount); err != nil {
 		return nil, errors.Wrap(err, "couldn't update count of triggered records")
 	}
 
-	records := make([]*Record, len(matches))
-	// Retrieve record pairs from the set and merge them
-	for i, match := range matches {
-		idForMatch := NewRecordIDFromStreamIDWithOffset(js.streamID, triggeredCountValue+i)
-		leftRecordValue, rightRecordValue, isUndo := unwrapMatch(match)
+	return allRecordsToTrigger, nil
+}
 
-		leftRecord := valueToRecord(leftRecordValue)
-		rightRecord := valueToRecord(rightRecordValue)
+func mergeNewAndOldRecords(tx storage.StateTransaction, newRecords []*Record, newRecordsPrefix, oldRecordsPrefix []byte) error {
+	oldRecordsSet := storage.NewMultiSet(tx.WithPrefix(oldRecordsPrefix))
 
-		mergedRecord := mergeRecords(leftRecord, rightRecord, idForMatch, isUndo, js.eventTimeField)
-		records[i] = mergedRecord
+	for i := range newRecords {
+		record := newRecords[i]
+
+		isRetraction := record.IsUndo()
+		WithNoUndo()(record) // Reset the retraction value
+
+		recordValue := recordToValue(record)
+
+		if !isRetraction {
+			// If the record isn't a retraction we simply store it
+			if err := oldRecordsSet.Insert(recordValue); err != nil {
+				return errors.Wrap(err, "couldn't insert new record into old records set")
+			}
+		} else {
+			// Otherwise we remove one copy of this record (it should be present, since we handled counts in AddRecord)
+			present, err := oldRecordsSet.Contains(recordValue)
+			if err != nil {
+				return errors.Wrap(err, "couldn't check if record is present in the old records set")
+			}
+			if !present { // this should never happen, but if it does, something went wrong
+				panic("A record we are retracting isn't present in a set in JoinedStream.Trigger()")
+			}
+
+			if err := oldRecordsSet.Erase(recordValue); err != nil {
+				return errors.Wrap(err, "couldn't remove record from the old records set")
+			}
+		}
 	}
 
-	if err := matchesToTriggerSet.Clear(); err != nil {
-		return nil, errors.Wrap(err, "couldn't clear the set of matches")
+	newRecordsSet := storage.NewMultiSet(tx.WithPrefix(newRecordsPrefix))
+	if err := newRecordsSet.Clear(); err != nil {
+		return errors.Wrap(err, "couldn't clear new records set")
 	}
 
-	// If it's not an inner join we might need to send single, not matched records
-	if js.joinType != INNER_JOIN {
-		triggeredCountValue += len(matches)
+	return nil
+}
 
-		recordsToTriggerSet := storage.NewMultiSet(txByKey.WithPrefix(singleRecordsToTriggerPrefix))
+func createPairsOfRecords(leftRecords, rightRecords []*Record, baseOffset int, streamID *StreamID, eventTimeField octosql.VariableName) []*Record {
+	records := make([]*Record, len(leftRecords)*len(rightRecords))
+	recordCount := 0
 
-		singleRecords, err := recordsToTriggerSet.ReadAll()
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't read single records from record set")
+	for i := range leftRecords {
+		leftRecord := leftRecords[i]
+
+		for j := range rightRecords {
+			rightRecord := rightRecords[j]
+
+			// Get ID for new match based on the amount of records that were already triggered
+			recordMatchID := NewRecordIDFromStreamIDWithOffset(streamID, baseOffset+recordCount)
+
+			// A match is a retraction if any of the original records are a retraction
+			isMatchUndo := leftRecord.IsUndo() || rightRecord.IsUndo()
+
+			// Create and store match; increase the count of records created
+			recordMatch := mergeRecords(leftRecord, rightRecord, recordMatchID, isMatchUndo, eventTimeField)
+			records[recordCount] = recordMatch
+			recordCount++
 		}
+	}
 
-		for i := range singleRecords {
-			singleRecord := valueToRecord(singleRecords[i])
-			idForRecord := NewRecordIDFromStreamIDWithOffset(js.streamID, triggeredCountValue+i)
-			WithID(idForRecord)(singleRecord)
+	return records
+}
 
-			records = append(records, singleRecord)
-		}
+func renameRecords(records []*Record, baseOffset int, streamID *StreamID) []*Record {
+	newRecords := make([]*Record, len(records))
 
-		if err := recordsToTriggerSet.Clear(); err != nil {
-			return nil, errors.Wrap(err, "couldn't clear the set of single records")
-		}
+	for i := range records {
+		IDForRecord := NewRecordIDFromStreamIDWithOffset(streamID, baseOffset+i)
+		newRecords[i] = NewRecordFromRecord(records[i], WithID(IDForRecord))
+	}
 
-		newTriggeredCount = octosql.MakeInt(triggeredCountValue + len(singleRecords))
+	return newRecords
+}
 
-		if err := triggeredCountState.Set(&newTriggeredCount); err != nil {
-			return nil, errors.Wrap(err, "couldn't update count of triggered records after triggering single records")
-		}
+func readAllAndTransformIntoRecords(tx storage.StateTransaction) ([]*Record, error) {
+	set := storage.NewMultiSet(tx)
+
+	recordValues, err := set.ReadAll()
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't read values from set")
+	}
+
+	records := make([]*Record, len(recordValues))
+
+	for i, recordValue := range recordValues {
+		records[i] = valueToRecord(recordValue)
 	}
 
 	return records, nil
@@ -409,17 +447,6 @@ func valueToRecord(val octosql.Value) *Record {
 		return NewRecordFromSlice(fieldNames, values, WithEventTimeField(eventTimeField), WithUndo())
 	}
 	return NewRecordFromSlice(fieldNames, values, WithEventTimeField(eventTimeField), WithNoUndo())
-}
-
-// We create a octosql.Value from two records (as values), a flag whether the match is a retraction,
-// and an int indicating which of the records came later
-func createMatch(first, second octosql.Value, isUndo bool) octosql.Value {
-	return octosql.MakeTuple([]octosql.Value{first, second, octosql.MakeBool(isUndo)})
-}
-
-func unwrapMatch(match octosql.Value) (octosql.Value, octosql.Value, bool) {
-	asSlice := match.AsSlice()
-	return asSlice[0], asSlice[1], asSlice[2].AsBool()
 }
 
 func mergeRecords(left, right *Record, ID *RecordID, isUndo bool, eventTimeField octosql.VariableName) *Record {

@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-var ErrFallbackToLookupJoin = errors.New("Fallback to lookup join")
+var ErrFallbackToLookupJoin = errors.New("fallback to lookup join")
 
 type Join struct {
 	source   Node

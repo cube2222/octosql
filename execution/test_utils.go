@@ -244,30 +244,22 @@ func AreStreamsEqualNoOrderingWithRetractionReductionAndIDChecking(ctx context.C
 	for i, rec := range gotRecords {
 		// All recordIDs should be of form X.index, where X is the same streamID for every record and indexes are distinct
 		// Store the first streamID prefix from the record
-		if i == 0 {
-			wantID, err = getBaseID(rec.ID())
-			if err != nil {
-				return errors.Wrap(err, "couldn't get base ID from first record")
-			}
-		}
-
-		// The ID should be of form streamID.index, first we want to compare streamIDs and then check if indexes are unique
-		recordIDSplit := strings.Split(rec.ID().ID, ".")
-
-		if len(recordIDSplit) != 2 {
-			return errors.Errorf("got a record ID of invalid format: %v", rec.ID().ID)
-		} else if recordIDSplit[0] != wantID {
-			return errors.Errorf("got non-matching base of record ID %v, wanted %v", recordIDSplit[0], wantID)
-		}
-
-		numberAsInt, err := strconv.ParseInt(recordIDSplit[1], 10, 64)
+		recordIDBase, numberAsInt, err := splitID(rec.ID())
 		if err != nil {
-			return errors.Wrap(err, "couldn't parse second part of record ID as number")
+			return errors.Wrap(err, "couldn't parse record ID")
+		}
+
+		if i == 0 {
+			wantID = recordIDBase
+		} else {
+			if wantID != recordIDBase {
+				return errors.Errorf("got a record with base %v but expected it to be %v", recordIDBase, wantID)
+			}
 		}
 
 		_, ok := seenIDs[numberAsInt]
 		if ok {
-			return errors.Errorf("ids with number %v where repeated", numberAsInt)
+			return errors.Errorf("ids with number %v were repeated", numberAsInt)
 		}
 		seenIDs[numberAsInt] = struct{}{}
 
@@ -306,13 +298,18 @@ func AreStreamsEqualNoOrderingWithRetractionReductionAndIDChecking(ctx context.C
 	return nil
 }
 
-func getBaseID(ID *RecordID) (string, error) {
-	splitID := strings.Split(ID.ID, ".")
-	if len(splitID) != 2 {
-		return "", errors.Errorf("invalid format of record ID: %v", ID.ID)
+func splitID(ID *RecordID) (string, int64, error) {
+	splitByComa := strings.Split(ID.ID, ".")
+	if len(splitByComa) != 2 {
+		return "", 0, errors.Errorf("got a record ID that didn't split into two parts when split by a coma: %v", ID.ID)
 	}
 
-	return splitID[0], nil
+	numberAsInt, err := strconv.ParseInt(splitByComa[1], 10, 64)
+	if err != nil {
+		return "", 0, errors.Wrap(err, "couldn't parse second part of record ID as number")
+	}
+
+	return splitByComa[0], numberAsInt, nil
 }
 
 func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage, first, second RecordStream, opts ...AreEqualOpt) error {

@@ -556,7 +556,6 @@ func Test_getKeysFromFormula(t *testing.T) {
 			wantJoinedKey: []physical.Expression{},
 			wantErr:       false,
 		},
-
 		{
 			name: "single correct predicate",
 			args: args{
@@ -572,6 +571,65 @@ func Test_getKeysFromFormula(t *testing.T) {
 			wantJoinedKey: []physical.Expression{physical.NewVariable("j.joined")},
 			wantErr:       false,
 		},
+		{
+			name: "single correct predicate",
+			args: args{
+				formula: physical.NewPredicate(
+					physical.NewVariable("s.source"),
+					physical.Equal,
+					physical.NewVariable("j.joined"),
+				),
+				sourceNamespace: metadata.NewNamespace([]string{"s"}),
+				joinedNamespace: metadata.NewNamespace([]string{"j"}),
+			},
+			wantSourceKey: []physical.Expression{physical.NewVariable("s.source")},
+			wantJoinedKey: []physical.Expression{physical.NewVariable("j.joined")},
+			wantErr:       false,
+		},
+		{
+			name: "invalid predicate - both sides match only source",
+			args: args{
+				formula: physical.NewPredicate(
+					physical.NewVariable("a.x"),
+					physical.Equal,
+					physical.NewVariable("a.y"),
+				),
+				sourceNamespace: metadata.NewNamespace([]string{"a"}),
+				joinedNamespace: metadata.NewNamespace([]string{"b"}),
+			},
+			wantSourceKey: nil,
+			wantJoinedKey: nil,
+			wantErr:       true,
+		},
+		{
+			name: "correct predicate with AND",
+			args: args{
+				formula: &physical.And{
+					Left: &physical.Predicate{
+						Left:     physical.NewVariable("a.x"),
+						Relation: physical.Equal,
+						Right:    physical.NewVariable("c.x"),
+					},
+					Right: &physical.And{
+						Left: &physical.Predicate{
+							Left:     physical.NewVariable("const_0"),
+							Relation: physical.Equal,
+							Right:    physical.NewVariable("a.y"),
+						},
+						Right: &physical.Predicate{
+							Left:     physical.NewVariable("b.y"),
+							Relation: physical.Equal,
+							Right:    physical.NewVariable("const_1"),
+						},
+					},
+				},
+				sourceNamespace: metadata.NewNamespace([]string{"a"}),
+				joinedNamespace: metadata.NewNamespace([]string{"b", "c"}),
+			},
+			wantSourceKey: []physical.Expression{physical.NewVariable("a.x"), physical.NewVariable("a.y"), physical.NewVariable("const_1")},
+			wantJoinedKey: []physical.Expression{physical.NewVariable("c.x"), physical.NewVariable("const_0"), physical.NewVariable("b.y")},
+			wantErr:       false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -579,6 +637,8 @@ func Test_getKeysFromFormula(t *testing.T) {
 			sourceKey, joinedKey, err := getKeysFromFormula(tt.args.formula, tt.args.sourceNamespace, tt.args.joinedNamespace)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getKeysFromFormula() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			} else if err != nil {
 				return
 			}
 

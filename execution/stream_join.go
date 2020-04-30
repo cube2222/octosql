@@ -186,6 +186,40 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 	return nil
 }
 
+func keepTrackOfCount(tx storage.StateTransaction, isRetraction bool) (int, error) {
+	var recordCount octosql.Value
+	recordCountState := storage.NewValueState(tx)
+
+	err := recordCountState.Get(&recordCount)
+	if err == storage.ErrNotFound {
+		recordCount = octosql.MakeInt(0)
+	} else if err != nil {
+		return 0, errors.Wrap(err, "couldn't check the count of record")
+	}
+
+	var updatedRecordCount octosql.Value
+	if isRetraction {
+		updatedRecordCount = octosql.MakeInt(recordCount.AsInt() - 1)
+	} else {
+		updatedRecordCount = octosql.MakeInt(recordCount.AsInt() + 1)
+	}
+
+	// Store the new count
+	if updatedRecordCount.AsInt() == 0 {
+		err = recordCountState.Clear()
+		if err != nil {
+			return 0, errors.Wrap(err, "couldn't clear count state of record")
+		}
+	} else {
+		err = recordCountState.Set(&updatedRecordCount)
+		if err != nil {
+			return 0, errors.Wrap(err, "couldn't update the count of record")
+		}
+	}
+
+	return updatedRecordCount.AsInt(), nil
+}
+
 var triggeredCountPrefix = []byte("$count_of_triggered_records$")
 
 func (js *JoinedStream) Trigger(ctx context.Context, tx storage.StateTransaction, key octosql.Value) ([]*Record, error) {
@@ -281,6 +315,123 @@ func (js *JoinedStream) Trigger(ctx context.Context, tx storage.StateTransaction
 	return allRecordsToTrigger, nil
 }
 
+func recordToValue(rec *Record) octosql.Value {
+	fields := make([]octosql.Value, len(rec.FieldNames))
+	data := make([]octosql.Value, len(rec.Data))
+	eventTimeField := octosql.MakeString(rec.EventTimeField().String())
+
+	for i := range rec.FieldNames {
+		fields[i] = octosql.MakeString(rec.FieldNames[i])
+		data[i] = *rec.Data[i]
+	}
+
+	valuesTogether := make([]octosql.Value, 4)
+
+	valuesTogether[0] = octosql.MakeTuple(fields)
+	valuesTogether[1] = octosql.MakeTuple(data)
+	valuesTogether[2] = octosql.MakeBool(rec.IsUndo())
+	valuesTogether[3] = eventTimeField
+
+	return octosql.MakeTuple(valuesTogether)
+}
+
+func readAllAndTransformIntoRecords(tx storage.StateTransaction) ([]*Record, error) {
+	set := storage.NewMultiSet(tx)
+
+	recordValues, err := set.ReadAll()
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't read values from set")
+	}
+
+	records := make([]*Record, len(recordValues))
+
+	for i, recordValue := range recordValues {
+		records[i] = valueToRecord(recordValue)
+	}
+
+	return records, nil
+}
+
+func valueToRecord(val octosql.Value) *Record {
+	slice := val.AsSlice()
+
+	fieldNameValues := slice[0].AsSlice()
+	values := slice[1].AsSlice()
+	isUndo := slice[2].AsBool()
+	eventTimeField := octosql.NewVariableName(slice[3].AsString())
+
+	fieldNames := make([]octosql.VariableName, len(fieldNameValues))
+
+	for i, fieldName := range fieldNameValues {
+		fieldNames[i] = octosql.NewVariableName(fieldName.AsString())
+	}
+
+	if isUndo {
+		return NewRecordFromSlice(fieldNames, values, WithEventTimeField(eventTimeField), WithUndo())
+	}
+	return NewRecordFromSlice(fieldNames, values, WithEventTimeField(eventTimeField), WithNoUndo())
+}
+
+func createPairsOfRecords(leftRecords, rightRecords []*Record, baseOffset int, streamID *StreamID, eventTimeField octosql.VariableName) []*Record {
+	records := make([]*Record, len(leftRecords)*len(rightRecords))
+	recordCount := 0
+
+	for i := range leftRecords {
+		leftRecord := leftRecords[i]
+
+		for j := range rightRecords {
+			rightRecord := rightRecords[j]
+
+			// Get ID for new match based on the amount of records that were already triggered
+			recordMatchID := NewRecordIDFromStreamIDWithOffset(streamID, baseOffset+recordCount)
+
+			// A match is a retraction if any of the original records are a retraction
+			isMatchUndo := leftRecord.IsUndo() || rightRecord.IsUndo()
+
+			// Create and store match; increase the count of records created
+			recordMatch := mergeRecords(leftRecord, rightRecord, recordMatchID, isMatchUndo, eventTimeField)
+			records[recordCount] = recordMatch
+			recordCount++
+		}
+	}
+
+	return records
+}
+
+func mergeRecords(left, right *Record, ID *RecordID, isUndo bool, eventTimeField octosql.VariableName) *Record {
+	mergedFieldNames := octosql.StringsToVariableNames(append(left.FieldNames, right.FieldNames...))
+	mergedDataPointers := append(left.Data, right.Data...)
+
+	mergedData := make([]octosql.Value, len(mergedDataPointers))
+
+	for i := range mergedDataPointers {
+		mergedData[i] = *mergedDataPointers[i]
+	}
+
+	// If eventTimeField is not empty, then we are joining by event_time and thus both records have the same value
+	if eventTimeField != "" {
+		eventTime := left.EventTime()
+		mergedFieldNames = append(mergedFieldNames, eventTimeField)
+		mergedData = append(mergedData, eventTime)
+	}
+
+	if isUndo {
+		return NewRecordFromSlice(mergedFieldNames, mergedData, WithID(ID), WithUndo(), WithEventTimeField(eventTimeField))
+	}
+	return NewRecordFromSlice(mergedFieldNames, mergedData, WithID(ID), WithNoUndo(), WithEventTimeField(eventTimeField))
+}
+
+func renameRecords(records []*Record, baseOffset int, streamID *StreamID) []*Record {
+	newRecords := make([]*Record, len(records))
+
+	for i := range records {
+		IDForRecord := NewRecordIDFromStreamIDWithOffset(streamID, baseOffset+i)
+		newRecords[i] = NewRecordFromRecord(records[i], WithID(IDForRecord))
+	}
+
+	return newRecords
+}
+
 func mergeNewAndOldRecords(tx storage.StateTransaction, newRecords []*Record, newRecordsPrefix, oldRecordsPrefix []byte) error {
 	oldRecordsSet := storage.NewMultiSet(tx.WithPrefix(oldRecordsPrefix))
 
@@ -319,155 +470,4 @@ func mergeNewAndOldRecords(tx storage.StateTransaction, newRecords []*Record, ne
 	}
 
 	return nil
-}
-
-func createPairsOfRecords(leftRecords, rightRecords []*Record, baseOffset int, streamID *StreamID, eventTimeField octosql.VariableName) []*Record {
-	records := make([]*Record, len(leftRecords)*len(rightRecords))
-	recordCount := 0
-
-	for i := range leftRecords {
-		leftRecord := leftRecords[i]
-
-		for j := range rightRecords {
-			rightRecord := rightRecords[j]
-
-			// Get ID for new match based on the amount of records that were already triggered
-			recordMatchID := NewRecordIDFromStreamIDWithOffset(streamID, baseOffset+recordCount)
-
-			// A match is a retraction if any of the original records are a retraction
-			isMatchUndo := leftRecord.IsUndo() || rightRecord.IsUndo()
-
-			// Create and store match; increase the count of records created
-			recordMatch := mergeRecords(leftRecord, rightRecord, recordMatchID, isMatchUndo, eventTimeField)
-			records[recordCount] = recordMatch
-			recordCount++
-		}
-	}
-
-	return records
-}
-
-func renameRecords(records []*Record, baseOffset int, streamID *StreamID) []*Record {
-	newRecords := make([]*Record, len(records))
-
-	for i := range records {
-		IDForRecord := NewRecordIDFromStreamIDWithOffset(streamID, baseOffset+i)
-		newRecords[i] = NewRecordFromRecord(records[i], WithID(IDForRecord))
-	}
-
-	return newRecords
-}
-
-func readAllAndTransformIntoRecords(tx storage.StateTransaction) ([]*Record, error) {
-	set := storage.NewMultiSet(tx)
-
-	recordValues, err := set.ReadAll()
-	if err != nil {
-		return nil, errors.Wrap(err, "couldn't read values from set")
-	}
-
-	records := make([]*Record, len(recordValues))
-
-	for i, recordValue := range recordValues {
-		records[i] = valueToRecord(recordValue)
-	}
-
-	return records, nil
-}
-
-func keepTrackOfCount(tx storage.StateTransaction, isRetraction bool) (int, error) {
-	var recordCount octosql.Value
-	recordCountState := storage.NewValueState(tx)
-
-	err := recordCountState.Get(&recordCount)
-	if err == storage.ErrNotFound {
-		recordCount = octosql.MakeInt(0)
-	} else if err != nil {
-		return 0, errors.Wrap(err, "couldn't check the count of record")
-	}
-
-	var updatedRecordCount octosql.Value
-	if isRetraction {
-		updatedRecordCount = octosql.MakeInt(recordCount.AsInt() - 1)
-	} else {
-		updatedRecordCount = octosql.MakeInt(recordCount.AsInt() + 1)
-	}
-
-	// Store the new count
-	if updatedRecordCount.AsInt() == 0 {
-		err = recordCountState.Clear()
-		if err != nil {
-			return 0, errors.Wrap(err, "couldn't clear count state of record")
-		}
-	} else {
-		err = recordCountState.Set(&updatedRecordCount)
-		if err != nil {
-			return 0, errors.Wrap(err, "couldn't update the count of record")
-		}
-	}
-
-	return updatedRecordCount.AsInt(), nil
-}
-
-func recordToValue(rec *Record) octosql.Value {
-	fields := make([]octosql.Value, len(rec.FieldNames))
-	data := make([]octosql.Value, len(rec.Data))
-	eventTimeField := octosql.MakeString(rec.EventTimeField().String())
-
-	for i := range rec.FieldNames {
-		fields[i] = octosql.MakeString(rec.FieldNames[i])
-		data[i] = *rec.Data[i]
-	}
-
-	valuesTogether := make([]octosql.Value, 4)
-
-	valuesTogether[0] = octosql.MakeTuple(fields)
-	valuesTogether[1] = octosql.MakeTuple(data)
-	valuesTogether[2] = octosql.MakeBool(rec.IsUndo())
-	valuesTogether[3] = eventTimeField
-
-	return octosql.MakeTuple(valuesTogether)
-}
-
-func valueToRecord(val octosql.Value) *Record {
-	slice := val.AsSlice()
-
-	fieldNameValues := slice[0].AsSlice()
-	values := slice[1].AsSlice()
-	isUndo := slice[2].AsBool()
-	eventTimeField := octosql.NewVariableName(slice[3].AsString())
-
-	fieldNames := make([]octosql.VariableName, len(fieldNameValues))
-
-	for i, fieldName := range fieldNameValues {
-		fieldNames[i] = octosql.NewVariableName(fieldName.AsString())
-	}
-
-	if isUndo {
-		return NewRecordFromSlice(fieldNames, values, WithEventTimeField(eventTimeField), WithUndo())
-	}
-	return NewRecordFromSlice(fieldNames, values, WithEventTimeField(eventTimeField), WithNoUndo())
-}
-
-func mergeRecords(left, right *Record, ID *RecordID, isUndo bool, eventTimeField octosql.VariableName) *Record {
-	mergedFieldNames := octosql.StringsToVariableNames(append(left.FieldNames, right.FieldNames...))
-	mergedDataPointers := append(left.Data, right.Data...)
-
-	mergedData := make([]octosql.Value, len(mergedDataPointers))
-
-	for i := range mergedDataPointers {
-		mergedData[i] = *mergedDataPointers[i]
-	}
-
-	// If eventTimeField is not empty, then we are joining by event_time and thus both records have the same value
-	if eventTimeField != "" {
-		eventTime := left.EventTime()
-		mergedFieldNames = append(mergedFieldNames, eventTimeField)
-		mergedData = append(mergedData, eventTime)
-	}
-
-	if isUndo {
-		return NewRecordFromSlice(mergedFieldNames, mergedData, WithID(ID), WithUndo(), WithEventTimeField(eventTimeField))
-	}
-	return NewRecordFromSlice(mergedFieldNames, mergedData, WithID(ID), WithNoUndo(), WithEventTimeField(eventTimeField))
 }

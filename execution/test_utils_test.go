@@ -163,7 +163,9 @@ func TestAreStreamsEqualNoOrderingWithRetractionReduction(t *testing.T) {
 					NewRecordFromSliceWithNormalize([]octosql.VariableName{"field1", "field2"}, []interface{}{1, "a"}, WithID(NewRecordID("A.10"))),             // count 1
 					NewRecordFromSliceWithNormalize([]octosql.VariableName{"field1", "field2"}, []interface{}{1, "a"}, WithID(NewRecordID("A.11")), WithUndo()), // count 0
 					NewRecordFromSliceWithNormalize([]octosql.VariableName{"field1", "field2"}, []interface{}{1, "a"}, WithID(NewRecordID("A.12")), WithUndo()), // count -1
-					NewRecordFromSliceWithNormalize([]octosql.VariableName{"field1", "field2"}, []interface{}{2, "b"}, WithID(NewRecordID("A.20"))),
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"field1", "field2"}, []interface{}{2, "b"}, WithID(NewRecordID("A.20")), WithUndo()), // count -1
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"field1", "field2"}, []interface{}{2, "b"}, WithID(NewRecordID("A.21"))),             // count 0
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"field1", "field2"}, []interface{}{2, "b"}, WithID(NewRecordID("A.22"))),             // count 1
 					NewRecordFromSliceWithNormalize([]octosql.VariableName{"field1", "field2"}, []interface{}{3, "c"}, WithID(NewRecordID("A.30"))),
 					NewRecordFromSliceWithNormalize([]octosql.VariableName{"field1", "field2"}, []interface{}{1, "a"}, WithID(NewRecordID("A.13"))), // count 0
 					NewRecordFromSliceWithNormalize([]octosql.VariableName{"field1", "field2"}, []interface{}{3, "c"}, WithID(NewRecordID("A.31"))),

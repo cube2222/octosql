@@ -56,7 +56,7 @@ func (p *ProcessByKey) AddRecord(ctx context.Context, tx storage.StateTransactio
 		return errors.Wrap(err, "couldn't add record to process function")
 	}
 
-	eventTime := maxWatermark
+	eventTime := MaxWatermark
 	if len(p.eventTimeField) > 0 {
 		eventTime = record.EventTime().AsTime()
 	}

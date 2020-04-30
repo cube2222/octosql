@@ -122,10 +122,10 @@ func (o *TableOutput) GetEndOfStream(ctx context.Context, tx storage.StateTransa
 }
 
 func (o *TableOutput) MarkError(ctx context.Context, tx storage.StateTransaction, err error) error {
-	endOfStreamState := storage.NewValueState(tx.WithPrefix(errorPrefix))
+	errorState := storage.NewValueState(tx.WithPrefix(errorPrefix))
 
 	octoError := octosql.MakeString(err.Error())
-	if err := endOfStreamState.Set(&octoError); err != nil {
+	if err := errorState.Set(&octoError); err != nil {
 		return errors.Wrap(err, "couldn't mark error")
 	}
 

@@ -13,6 +13,13 @@ func TestStreamJoin(t *testing.T) {
 	rightFieldNames1 := []octosql.VariableName{"right.a", "right.b"}
 	concatFieldNames1 := append(leftFieldNames1, rightFieldNames1...)
 
+	leftFieldNames2 := []octosql.VariableName{"left.city", "left.age", "left.person_type"}
+	rightFieldNames2 := []octosql.VariableName{"right.city", "right.age", "right.person_type"}
+	concatFieldNames2 := append(leftFieldNames2, rightFieldNames2...)
+
+	catPerson := "cat_person"
+	dogPerson := "dog_person"
+
 	type fields struct {
 		leftSource, rightSource Node
 		leftKey, rightKey       []Expression
@@ -234,23 +241,73 @@ func TestStreamJoin(t *testing.T) {
 			executionCount: 96, // there is a TON of possibilities, didn't even bother counting
 			triggerValues:  []int{1, 2, 3, 4, 8, 16},
 		},
-		{
+		{ // we will be joining people from the same city, left person is a cat person and right person is a dog person
 			name: "left join - the final test",
 			fields: fields{
-				leftSource: NewDummyNode([]*Record{}),
-				leftKey:    []Expression{},
+				leftSource: NewDummyNode([]*Record{ // city, age, type
+					NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Warsaw", 22, catPerson}, WithID(NewRecordID("W_22_C.1")), WithUndo()), // W_22_C count = -1
+					NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Warsaw", 22, dogPerson}, WithID(NewRecordID("W_22_D.1"))),             // W_22_D count = 1
+					NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Warsaw", 22, catPerson}, WithID(NewRecordID("W_22_C.2"))),             // W_22_C count = 0
+					NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Berlin", 19, dogPerson}, WithID(NewRecordID("B_19_D.1"))),             // B_19_D count = 1
+					NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Berlin", 19, dogPerson}, WithID(NewRecordID("B_19_D.2"))),             // B_19_D count = 2
+					NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Berlin", 24, catPerson}, WithID(NewRecordID("B_24_C.1"))),             // B_24_C count = 1
+					NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Warsaw", 22, catPerson}, WithID(NewRecordID("W_22_C.3")), WithUndo()), // W_22_C count = -1
+					NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Warsaw", 22, catPerson}, WithID(NewRecordID("W_22_C.4")), WithUndo()), // W_22_C count = -2
+					NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Berlin", 24, catPerson}, WithID(NewRecordID("B_24_C.2"))),             // B_24_C count = 2
+					NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Berlin", 24, catPerson}, WithID(NewRecordID("B_24_C.3")), WithUndo()), // B_24_C count = 1
+					NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Berlin", 24, catPerson}, WithID(NewRecordID("B_24_C.4"))),             // B_24_C count = 2
+					NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Berlin", 24, catPerson}, WithID(NewRecordID("B_24_C.5"))),             // B_24_C count = 3
+					NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Warsaw", 22, catPerson}, WithID(NewRecordID("W_22_C.4"))),             // W_22_C count = -1
+					NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Warsaw", 22, catPerson}, WithID(NewRecordID("W_22_C.4"))),             // W_22_C count = 0
+					NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Warsaw", 22, catPerson}, WithID(NewRecordID("W_22_C.5"))),             // W_22_C count = 1
+					NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Warsaw", 42, catPerson}, WithID(NewRecordID("W_42_C.1"))),             // W_42_C count = 1
+				}),
+				leftKey: []Expression{NewVariable("left.city"), NewVariable("left.person_type"), NewVariable("dog")},
 
-				rightSource: NewDummyNode([]*Record{}),
-				rightKey:    []Expression{},
+				rightSource: NewDummyNode([]*Record{
+					NewRecordFromSliceWithNormalize(rightFieldNames2, []interface{}{"Berlin", 20, catPerson}, WithID(NewRecordID("B_20_C.1"))),             // B_20_C count = 1
+					NewRecordFromSliceWithNormalize(rightFieldNames2, []interface{}{"Berlin", 20, catPerson}, WithID(NewRecordID("B_20_C.1"))),             // B_20_C count = 2
+					NewRecordFromSliceWithNormalize(rightFieldNames2, []interface{}{"Berlin", 20, catPerson}, WithID(NewRecordID("B_20_C.1")), WithUndo()), // B_20_C count = 1
+					NewRecordFromSliceWithNormalize(rightFieldNames2, []interface{}{"Berlin", 22, catPerson}, WithID(NewRecordID("B_22_C.1")), WithUndo()), // B_22_C count = -1
+					NewRecordFromSliceWithNormalize(rightFieldNames2, []interface{}{"Berlin", 22, catPerson}, WithID(NewRecordID("B_22_C.2")), WithUndo()), // B_22_C count = -2
+					NewRecordFromSliceWithNormalize(rightFieldNames2, []interface{}{"Warsaw", 20, dogPerson}, WithID(NewRecordID("W_20_D.1"))),             // W_20_D count = 1
+					NewRecordFromSliceWithNormalize(rightFieldNames2, []interface{}{"Warsaw", 99, dogPerson}, WithID(NewRecordID("W_99_D.1"))),             // W_99_D count = 1
+					NewRecordFromSliceWithNormalize(rightFieldNames2, []interface{}{"Berlin", 17, dogPerson}, WithID(NewRecordID("B_17_D.1"))),             // B_17_D count = 1
+					NewRecordFromSliceWithNormalize(rightFieldNames2, []interface{}{"Berlin", 22, catPerson}, WithID(NewRecordID("B_22_C.3"))),             // B_22_C count = -1
+					NewRecordFromSliceWithNormalize(rightFieldNames2, []interface{}{"Warsaw", 100, catPerson}, WithID(NewRecordID("W_100_C.1"))),           // W_100_C count = 1
+					NewRecordFromSliceWithNormalize(rightFieldNames2, []interface{}{"Warsaw", 20, dogPerson}, WithID(NewRecordID("W_20_D.2"))),             // W_20_D count = 2
+					NewRecordFromSliceWithNormalize(rightFieldNames2, []interface{}{"Berlin", 17, dogPerson}, WithID(NewRecordID("B_17_D.2")), WithUndo()), // B_17_D count = 0
+				}),
+				rightKey: []Expression{NewVariable("right.city"), NewVariable("cat"), NewVariable("right.person_type")},
 
 				joinType:       LEFT_JOIN,
-				eventTimeField: "", // TODO: add testing for this
+				eventTimeField: "",
 				variables: octosql.NewVariables(map[octosql.VariableName]octosql.Value{
-					"const_0": octosql.MakeInt(0),
+					"cat": octosql.MakeString(catPerson),
+					"dog": octosql.MakeString(dogPerson),
 				}),
 			},
 
-			want: NewDummyNode([]*Record{}),
+			want: NewDummyNode([]*Record{
+				// single records
+				NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Warsaw", 22, dogPerson}),
+				NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Berlin", 19, dogPerson}),
+				NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Berlin", 19, dogPerson}),
+				NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Berlin", 24, catPerson}),
+				NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Berlin", 24, catPerson}),
+				NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Berlin", 24, catPerson}),
+				NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Warsaw", 22, catPerson}),
+				NewRecordFromSliceWithNormalize(leftFieldNames2, []interface{}{"Warsaw", 42, catPerson}),
+				// matches
+				NewRecordFromSliceWithNormalize(concatFieldNames2, []interface{}{"Warsaw", 22, catPerson, "Warsaw", 20, dogPerson}),
+				NewRecordFromSliceWithNormalize(concatFieldNames2, []interface{}{"Warsaw", 22, catPerson, "Warsaw", 20, dogPerson}),
+				NewRecordFromSliceWithNormalize(concatFieldNames2, []interface{}{"Warsaw", 22, catPerson, "Warsaw", 99, dogPerson}),
+				NewRecordFromSliceWithNormalize(concatFieldNames2, []interface{}{"Warsaw", 42, catPerson, "Warsaw", 20, dogPerson}),
+				NewRecordFromSliceWithNormalize(concatFieldNames2, []interface{}{"Warsaw", 42, catPerson, "Warsaw", 20, dogPerson}),
+				NewRecordFromSliceWithNormalize(concatFieldNames2, []interface{}{"Warsaw", 42, catPerson, "Warsaw", 99, dogPerson}),
+			}),
+			executionCount: 200,
+			triggerValues:  []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
 		},
 	}
 	for _, tt := range tests {

@@ -105,10 +105,12 @@ func (it *ColStrIter) Next() (interface{}, error) {
 				}
 				return nil, io.EOF
 			}
+
 			it.columnChunkReader, err = it.file.NewReader(it.col, it.rowGroups)
 			if err != nil {
 				return nil, err
 			}
+
 			it.rowGroups++
 		}
 		// if all data in chunk has been processed load next chunk
@@ -117,10 +119,10 @@ func (it *ColStrIter) Next() (interface{}, error) {
 			if err == parquet.EndOfChunk {
 				it.columnChunkReader = nil
 				continue
-			}
-			if err != nil {
+			} else if err != nil {
 				return nil, err
 			}
+
 			it.descriptionIterator = 0
 			it.dataIterator = 0
 		}
@@ -182,10 +184,11 @@ func (it *ColStrIter) Next() (interface{}, error) {
 			break;
 		}
 	}
-
+	//if column has repeated elements return list instead of single value
 	if it.col.MaxR() > 0 {
 		s = elements
 	}
+
 	return s, nil
 }
 
@@ -218,15 +221,16 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables) (exe
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't open file")
 	}
+
 	columns := file.Schema.Columns()
-	n := len(columns)
+
 	for _, col := range columns {
 		if col.MaxR() > 1 {
-			return nil, fmt.Errorf("column '%s' has nested repeated elements", col)
+			return nil, fmt.Errorf("not supported nested repeated elements in column '%s'", col)
 		}
 	}
 
-	colIters := make([]*ColStrIter, n)
+	colIters := make([]*ColStrIter, len(columns))
 	for i, col := range columns {
 		colIters[i] = NewColStrIter(file, col)
 	}
@@ -249,8 +253,7 @@ type RecordStream struct {
 }
 
 func (rs *RecordStream) Close() error {
-	err := rs.file.Close()
-	if err != nil {
+	if err := rs.file.Close(); err != nil {
 		return errors.Wrap(err, "couldn't close underlying file")
 	}
 
@@ -262,7 +265,7 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 		return nil, execution.ErrEndOfStream
 	}
 
-	m := make(map[string]interface{})
+	recordMap := make(map[string]interface{})
 
 	isDone := true
 	//if at least one row has remaining elements create new record
@@ -276,16 +279,16 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 			isDone = false
 		}
 
-		m[rs.columns[i].String()] = s
+		recordMap[rs.columns[i].String()] = s
 	}
 
-	if isDone == true {
+	if isDone {
 		rs.isDone = true
 		return nil, execution.ErrEndOfStream
 	}
 
 	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
-	for k, v := range m {
+	for k, v := range recordMap {
 		if str, ok := v.(string); ok {
 			parsed, err := time.Parse(time.RFC3339, str)
 			if err == nil {

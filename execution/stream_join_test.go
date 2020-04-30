@@ -18,13 +18,14 @@ func TestStreamJoin(t *testing.T) {
 		leftKey, rightKey       []Expression
 		joinType                JoinType
 		eventTimeField          octosql.VariableName
-		trigger                 TriggerPrototype
+		variables               octosql.Variables
 	}
 
 	tests := []struct {
 		name           string
 		fields         fields
 		executionCount int
+		triggerValues  []int
 		want           Node
 	}{
 		{
@@ -48,7 +49,7 @@ func TestStreamJoin(t *testing.T) {
 
 				joinType:       INNER_JOIN,
 				eventTimeField: "",
-				trigger:        NewCountingTrigger(NewDummyValue(octosql.MakeInt(1))),
+				variables:      octosql.NoVariables(),
 			},
 
 			want: NewDummyNode([]*Record{
@@ -59,8 +60,8 @@ func TestStreamJoin(t *testing.T) {
 				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"b", 2, "b", 12}),
 			}),
 
-			executionCount: 4, // the only non-determinism is the order
-
+			executionCount: 16, // not much determinism, we will check trigger values from 1 to 4
+			triggerValues:  []int{1, 2, 3, 4},
 		},
 		{
 			name: "left join 1 - no event time field, no retractions",
@@ -83,7 +84,7 @@ func TestStreamJoin(t *testing.T) {
 
 				joinType:       LEFT_JOIN,
 				eventTimeField: "",
-				trigger:        NewMultiTrigger(NewWatermarkTrigger(), NewCountingTrigger(NewDummyExpression(octosql.MakeInt(2)))), // check other values
+				variables:      octosql.NoVariables(),
 			},
 
 			want: NewDummyNode([]*Record{
@@ -98,7 +99,8 @@ func TestStreamJoin(t *testing.T) {
 				NewRecordFromSliceWithNormalize(leftFieldNames1, []interface{}{"e", 2}),
 			}),
 
-			executionCount: 4, // as above
+			executionCount: 16, // as above
+			triggerValues:  []int{1, 2, 3, 4},
 		},
 		{
 			name: "outer join 1 - no event time field, no retractions",
@@ -121,7 +123,7 @@ func TestStreamJoin(t *testing.T) {
 
 				joinType:       OUTER_JOIN,
 				eventTimeField: "",
-				trigger:        NewMultiTrigger(NewWatermarkTrigger(), NewCountingTrigger(NewDummyExpression(octosql.MakeInt(3)))), // check other values
+				variables:      octosql.NoVariables(),
 			},
 
 			want: NewDummyNode([]*Record{
@@ -140,7 +142,8 @@ func TestStreamJoin(t *testing.T) {
 				NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"f", 12}),
 			}),
 
-			executionCount: 4, // as above
+			executionCount: 16, // as above
+			triggerValues:  []int{1, 2, 3, 4},
 		},
 		{
 			name: "inner join 2 - no event time field, retractions",
@@ -164,7 +167,7 @@ func TestStreamJoin(t *testing.T) {
 
 				joinType:       INNER_JOIN,
 				eventTimeField: "",
-				trigger:        NewCountingTrigger(NewDummyValue(octosql.MakeInt(1))),
+				variables:      octosql.NoVariables(),
 			},
 
 			want: NewDummyNode([]*Record{
@@ -174,8 +177,8 @@ func TestStreamJoin(t *testing.T) {
 				NewRecordFromSliceWithNormalize(concatFieldNames1, []interface{}{"a", 0, "a", 11}),
 			}),
 
-			executionCount: 16, // there are basically two possibilities: either retraction for id1 comes before all records from the right
-			// or not, 16 seems like a fair number of go throughs to make sure both scenarios occur
+			executionCount: 21, // there are basically two possibilities: either retraction for id1 comes before all records from the right
+			triggerValues:  []int{1, 2, 3},
 		},
 		{
 			name: "outer join 2 - multiple retractions + early retractions",
@@ -209,7 +212,7 @@ func TestStreamJoin(t *testing.T) {
 
 				joinType:       OUTER_JOIN,
 				eventTimeField: "",
-				trigger:        NewMultiTrigger(NewWatermarkTrigger(), NewCountingTrigger(NewDummyExpression(octosql.MakeInt(2)))), // TODO: maybe change triggers every few tests
+				variables:      octosql.NoVariables(),
 			},
 
 			want: NewDummyNode([]*Record{
@@ -228,16 +231,43 @@ func TestStreamJoin(t *testing.T) {
 				NewRecordFromSliceWithNormalize(rightFieldNames1, []interface{}{"d", 10}),
 			}),
 
-			executionCount: 64, // there is a TON of possibilities, didn't even bother counting
+			executionCount: 96, // there is a TON of possibilities, didn't even bother counting
+			triggerValues:  []int{1, 2, 3, 4, 8, 16},
+		},
+		{
+			name: "left join - the final test",
+			fields: fields{
+				leftSource: NewDummyNode([]*Record{}),
+				leftKey:    []Expression{},
+
+				rightSource: NewDummyNode([]*Record{}),
+				rightKey:    []Expression{},
+
+				joinType:       LEFT_JOIN,
+				eventTimeField: "", // TODO: add testing for this
+				variables: octosql.NewVariables(map[octosql.VariableName]octosql.Value{
+					"const_0": octosql.MakeInt(0),
+				}),
+			},
+
+			want: NewDummyNode([]*Record{}),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stateStorage := storage.GetTestStorage(t)
-			streamJoin := NewStreamJoin(tt.fields.leftSource, tt.fields.rightSource, tt.fields.leftKey, tt.fields.rightKey, stateStorage, tt.fields.eventTimeField, tt.fields.joinType, tt.fields.trigger)
+			streamJoin := NewStreamJoin(tt.fields.leftSource, tt.fields.rightSource, tt.fields.leftKey, tt.fields.rightKey, stateStorage, tt.fields.eventTimeField, tt.fields.joinType, nil)
 
 			for i := 0; i < tt.executionCount; i++ {
-				stream, _, err := GetAndStartAllShuffles(context.Background(), stateStorage, GetRawStreamID(), []Node{streamJoin}, octosql.NoVariables())
+				// Test different values of triggers
+				triggerValue := tt.triggerValues[i%(len(tt.triggerValues))]
+				trigger := NewMultiTrigger(NewWatermarkTrigger(), NewCountingTrigger(NewDummyValue(octosql.MakeInt(triggerValue))))
+
+				streamJoin.triggerPrototype = trigger
+
+				streamID := GetRawStreamID()
+
+				stream, _, err := GetAndStartAllShuffles(context.Background(), stateStorage, streamID, []Node{streamJoin}, tt.fields.variables)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -246,7 +276,7 @@ func TestStreamJoin(t *testing.T) {
 
 				err = AreStreamsEqualNoOrderingWithRetractionReduction(context.Background(), stateStorage, stream[0], want, WithEqualityBasedOn(EqualityOfFieldsAndValues))
 				if err != nil {
-					t.Errorf("Streams aren't equal")
+					t.Errorf("Streams aren't equal: %v", err)
 					return
 				}
 			}

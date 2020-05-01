@@ -21,14 +21,14 @@ func TestLimit_Get(t *testing.T) {
 		{
 			name:      "negative limit value",
 			vars:      octosql.NoVariables(),
-			node:      NewLimit(NewDummyNode(nil), NewDummyValue(octosql.MakeInt(-42))),
+			node:      NewLimit(NewDummyNode(nil), NewConstantValue(octosql.MakeInt(-42))),
 			want:      nil,
 			wantError: true,
 		},
 		{
 			name:      "limit value not int",
 			vars:      octosql.NoVariables(),
-			node:      NewLimit(NewDummyNode(nil), NewDummyValue(octosql.MakeFloat(2.0))),
+			node:      NewLimit(NewDummyNode(nil), NewConstantValue(octosql.MakeFloat(2.0))),
 			want:      nil,
 			wantError: true,
 		},
@@ -66,7 +66,7 @@ func TestLimit_Get(t *testing.T) {
 							2.23e7,
 						}),
 				},
-			), NewDummyValue(octosql.MakeInt(3))),
+			), NewConstantValue(octosql.MakeInt(3))),
 			want: NewDummyNode([]*Record{
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{
@@ -105,7 +105,7 @@ func TestLimit_Get(t *testing.T) {
 							1,
 						}),
 				},
-			}, NewDummyValue(octosql.MakeInt(0))),
+			}, NewConstantValue(octosql.MakeInt(0))),
 			want:      NewDummyNode([]*Record{}),
 			wantError: false,
 		},

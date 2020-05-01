@@ -407,17 +407,17 @@ func (dn *DummyNode) Get(ctx context.Context, variables octosql.Variables, strea
 	return NewInMemoryStream(ctx, dn.data), NewExecutionOutput(NewZeroWatermarkGenerator(), map[string]ShuffleData{}, nil), nil
 }
 
-func NewDummyValue(value octosql.Value) *DummyValue {
-	return &DummyValue{
+type ConstantValue struct {
+	value octosql.Value
+}
+
+func NewConstantValue(value octosql.Value) *ConstantValue {
+	return &ConstantValue{
 		value,
 	}
 }
 
-type DummyValue struct {
-	value octosql.Value
-}
-
-func (dv *DummyValue) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
+func (dv *ConstantValue) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
 	return dv.value, nil
 }
 

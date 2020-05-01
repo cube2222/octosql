@@ -318,7 +318,7 @@ func TestStreamJoin(t *testing.T) {
 			for i := 0; i < tt.executionCount; i++ {
 				// Test different values of triggers
 				triggerValue := tt.triggerValues[i%(len(tt.triggerValues))]
-				trigger := NewMultiTrigger(NewWatermarkTrigger(), NewCountingTrigger(NewDummyValue(octosql.MakeInt(triggerValue))))
+				trigger := NewMultiTrigger(NewWatermarkTrigger(), NewCountingTrigger(NewConstantValue(octosql.MakeInt(triggerValue))))
 
 				streamJoin.triggerPrototype = trigger
 

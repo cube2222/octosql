@@ -134,7 +134,9 @@ func (dsb *DataSourceBuilder) Materialize(ctx context.Context, matCtx *Materiali
 }
 
 func (dsb *DataSourceBuilder) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMetadata(dsb.Cardinality, octosql.NewVariableName(""))
+	namespace := metadata.EmptyNamespace()
+	namespace.AddPrefix(dsb.Alias)
+	return metadata.NewNodeMetadata(dsb.Cardinality, octosql.NewVariableName(""), namespace)
 }
 
 func (dsb *DataSourceBuilder) Visualize() *graph.Node {

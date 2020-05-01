@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -46,6 +47,18 @@ func (rms *recordMultiSet) GetCount(rec *Record) int {
 	}
 
 	return 0
+}
+
+func (rms *recordMultiSet) Erase(rec *Record) {
+	for i := range rms.set {
+		if rms.set[i].Equal(rec) {
+			rms.count[i]--
+			return
+		}
+	}
+
+	rms.set = append(rms.set, rec)
+	rms.count = append(rms.count, -1)
 }
 
 func (rms *recordMultiSet) isContainedIn(other *recordMultiSet) bool {
@@ -171,6 +184,13 @@ func EqualityOfUndo(record1 *Record, record2 *Record) error {
 	return nil
 }
 
+func EqualityOfEventTimeField(record1 *Record, record2 *Record) error {
+	if record1.EventTimeField() != record2.EventTimeField() {
+		return errors.Errorf("event time fields not equal: %s and %s", record1.EventTimeField(), record2.EventTimeField())
+	}
+	return nil
+}
+
 func EqualityOfFieldsAndValues(record1 *Record, record2 *Record) error {
 	if len(record1.Fields()) != len(record2.Fields()) {
 		return errors.Errorf("field counts not equal: %d and %d", len(record1.Fields()), len(record2.Fields()))
@@ -197,6 +217,101 @@ func DefaultEquality(record1 *Record, record2 *Record) error {
 	return nil
 }
 
+func AreStreamsEqualNoOrderingWithRetractionReductionAndIDChecking(ctx context.Context, stateStorage storage.Storage, got, want RecordStream, opts ...AreEqualOpt) error {
+	config := &AreEqualConfig{
+		Equality: DefaultEquality,
+	}
+
+	for _, opt := range opts {
+		opt(config)
+	}
+
+	firstMultiSet := newMultiSet(config.Equality)
+	secondMultiSet := newMultiSet(config.Equality)
+
+	log.Println("got stream")
+	gotRecords, err := ReadAll(ctx, stateStorage, got)
+	if err != nil {
+		return errors.Wrap(err, "couldn't read got streams records")
+	}
+	if len(gotRecords) == 0 {
+		return nil
+	}
+
+	seenIDs := make(map[int64]struct{})
+	var wantID string
+
+	for i, rec := range gotRecords {
+		// All recordIDs should be of form X.index, where X is the same streamID for every record and indexes are distinct
+		// Store the first streamID prefix from the record
+		recordIDBase, numberAsInt, err := splitID(rec.ID())
+		if err != nil {
+			return errors.Wrap(err, "couldn't parse record ID")
+		}
+
+		if i == 0 {
+			wantID = recordIDBase
+		} else {
+			if wantID != recordIDBase {
+				return errors.Errorf("got a record with base %v but expected it to be %v", recordIDBase, wantID)
+			}
+		}
+
+		_, ok := seenIDs[numberAsInt]
+		if ok {
+			return errors.Errorf("ids with number %v were repeated", numberAsInt)
+		}
+		seenIDs[numberAsInt] = struct{}{}
+
+		// Store record with respect to whether it's a retraction or not
+		baseRecord := NewRecordFromRecord(rec, WithNoUndo(), WithID(NewRecordID("phantom_id")), WithEventTimeField(""))
+
+		if rec.IsUndo() {
+			firstMultiSet.Erase(baseRecord)
+		} else {
+			firstMultiSet.Insert(baseRecord)
+		}
+	}
+
+	log.Println("want stream")
+	wantRecords, err := ReadAll(ctx, stateStorage, want)
+	if err != nil {
+		return errors.Wrap(err, "couldn't read want streams records")
+	}
+
+	for _, rec := range wantRecords {
+		baseRecord := NewRecordFromRecord(rec, WithNoUndo(), WithID(NewRecordID("phantom_id")), WithEventTimeField(""))
+
+		if rec.IsUndo() {
+			secondMultiSet.Erase(baseRecord)
+		} else {
+			secondMultiSet.Insert(baseRecord)
+		}
+	}
+
+	firstContained := firstMultiSet.isContainedIn(secondMultiSet)
+	secondContained := secondMultiSet.isContainedIn(firstMultiSet)
+	if !(firstContained && secondContained) {
+		return errors.Errorf("different sets: \n %s \n and \n %s", firstMultiSet.Show(), secondMultiSet.Show())
+	}
+
+	return nil
+}
+
+func splitID(ID *RecordID) (string, int64, error) {
+	splitByComa := strings.Split(ID.ID, ".")
+	if len(splitByComa) != 2 {
+		return "", 0, errors.Errorf("got a record ID that didn't split into two parts when split by a coma: %v", ID.ID)
+	}
+
+	numberAsInt, err := strconv.ParseInt(splitByComa[1], 10, 64)
+	if err != nil {
+		return "", 0, errors.Wrap(err, "couldn't parse second part of record ID as number")
+	}
+
+	return splitByComa[0], numberAsInt, nil
+}
+
 func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage, first, second RecordStream, opts ...AreEqualOpt) error {
 	config := &AreEqualConfig{
 		Equality: DefaultEquality,
@@ -211,7 +326,7 @@ func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage
 	log.Println("first stream")
 	firstRecords, err := ReadAll(ctx, stateStorage, first)
 	if err != nil {
-		return errors.Wrap(err, "couldn't read first stream records")
+		return errors.Wrap(err, "couldn't read first streams records")
 	}
 	for _, rec := range firstRecords {
 		firstMultiSet.Insert(rec)
@@ -221,7 +336,7 @@ func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage
 	log.Println("second stream")
 	secondRecords, err := ReadAll(ctx, stateStorage, second)
 	if err != nil {
-		return errors.Wrap(err, "couldn't read second stream records")
+		return errors.Wrap(err, "couldn't read second streams records")
 	}
 	for _, rec := range secondRecords {
 		secondMultiSet.Insert(rec)
@@ -231,7 +346,7 @@ func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage
 	firstContained := firstMultiSet.isContainedIn(secondMultiSet)
 	secondContained := secondMultiSet.isContainedIn(firstMultiSet)
 	if !(firstContained && secondContained) {
-		return errors.Errorf("different sets: %s and %s", firstMultiSet.Show(), secondMultiSet.Show())
+		return errors.Errorf("different sets: \n %s \n and \n %s", firstMultiSet.Show(), secondMultiSet.Show())
 	}
 
 	return nil
@@ -292,17 +407,17 @@ func (dn *DummyNode) Get(ctx context.Context, variables octosql.Variables, strea
 	return NewInMemoryStream(ctx, dn.data), NewExecutionOutput(NewZeroWatermarkGenerator(), map[string]ShuffleData{}, nil), nil
 }
 
-func NewDummyValue(value octosql.Value) *DummyValue {
-	return &DummyValue{
+type ConstantValue struct {
+	value octosql.Value
+}
+
+func NewConstantValue(value octosql.Value) *ConstantValue {
+	return &ConstantValue{
 		value,
 	}
 }
 
-type DummyValue struct {
-	value octosql.Value
-}
-
-func (dv *DummyValue) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
+func (dv *ConstantValue) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
 	return dv.value, nil
 }
 

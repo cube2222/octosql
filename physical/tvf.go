@@ -273,10 +273,12 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 	return nil, errors.Errorf("invalid table valued function: %v", node.Name)
 }
 
+// TODO: fix Namespace here
 func (node *TableValuedFunction) Metadata() *metadata.NodeMetadata {
+	namespace := metadata.EmptyNamespace()
 	switch node.Name {
 	case "range":
-		return metadata.NewNodeMetadata(metadata.BoundedFitsInLocalStorage, octosql.NewVariableName(""))
+		return metadata.NewNodeMetadata(metadata.BoundedFitsInLocalStorage, octosql.NewVariableName(""), namespace)
 	case "tumble":
 		var cardinality metadata.Cardinality
 		source, err := node.getArgumentTable(octosql.NewVariableName("source"))
@@ -285,7 +287,7 @@ func (node *TableValuedFunction) Metadata() *metadata.NodeMetadata {
 		} else {
 			cardinality = metadata.BoundedFitsInLocalStorage
 		}
-		return metadata.NewNodeMetadata(cardinality, octosql.NewVariableName("window_end"))
+		return metadata.NewNodeMetadata(cardinality, octosql.NewVariableName("window_end"), namespace)
 	case "max_diff_watermark":
 		var cardinality metadata.Cardinality
 		var eventTimeField octosql.VariableName
@@ -297,7 +299,7 @@ func (node *TableValuedFunction) Metadata() *metadata.NodeMetadata {
 			cardinality = metadata.BoundedFitsInLocalStorage
 			eventTimeField = octosql.NewVariableName("")
 		}
-		return metadata.NewNodeMetadata(cardinality, eventTimeField)
+		return metadata.NewNodeMetadata(cardinality, eventTimeField, namespace)
 	case "percentile_watermark":
 		var cardinality metadata.Cardinality
 		var eventTimeField octosql.VariableName
@@ -309,9 +311,9 @@ func (node *TableValuedFunction) Metadata() *metadata.NodeMetadata {
 			cardinality = metadata.BoundedFitsInLocalStorage
 			eventTimeField = octosql.NewVariableName("")
 		}
-		return metadata.NewNodeMetadata(cardinality, eventTimeField)
+		return metadata.NewNodeMetadata(cardinality, eventTimeField, namespace)
 	default:
-		return metadata.NewNodeMetadata(metadata.Unbounded, octosql.NewVariableName(""))
+		return metadata.NewNodeMetadata(metadata.Unbounded, octosql.NewVariableName(""), namespace)
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -58,7 +59,7 @@ type IntermediateRecordStore interface {
 
 type PullEngine struct {
 	irs                    IntermediateRecordStore
-	source                 RecordStream
+	sources                []RecordStream
 	lastCommittedWatermark time.Time
 	watermarkSource        WatermarkSource
 	storage                storage.Storage
@@ -71,13 +72,13 @@ type PullEngine struct {
 	closeErrChan chan error
 }
 
-func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, source RecordStream, streamID *StreamID, watermarkSource WatermarkSource, shouldPrefixStreamID bool, ctx context.Context) *PullEngine {
+func NewPullEngine(irs IntermediateRecordStore, storage storage.Storage, sources []RecordStream, streamID *StreamID, watermarkSource WatermarkSource, shouldPrefixStreamID bool, ctx context.Context) *PullEngine {
 	ctx, cancel := context.WithCancel(ctx)
 
 	return &PullEngine{
 		irs:                  irs,
 		storage:              storage,
-		source:               source,
+		sources:              sources,
 		streamID:             streamID,
 		watermarkSource:      watermarkSource,
 		batchSizeManager:     NewBatchSizeManager(time.Second / 4),
@@ -196,22 +197,42 @@ func (engine *PullEngine) loop(ctx context.Context, tx storage.StateTransaction)
 		return errors.Wrap(err, "couldn't check if intermediate record store can take more records")
 	}
 
-	record, err := engine.source.Next(storage.InjectStateTransaction(ctx, tx))
-	if err != nil {
-		if err == ErrEndOfStream {
-			err := engine.irs.UpdateWatermark(ctx, prefixedTx, maxWatermark)
-			if err != nil {
-				return errors.Wrap(err, "couldn't mark end of stream max watermark in intermediate record store")
+	// We want to read from sources in some random order, so that we don't always read from the first one
+	sourceOrder := rand.Perm(len(engine.sources))
+
+	var record *Record
+	var inputIndex int
+	areAllEndOfStream := true
+
+	for _, sourceIndex := range sourceOrder {
+		record, err = engine.sources[sourceIndex].Next(storage.InjectStateTransaction(ctx, tx))
+		if err != nil {
+			if err == ErrEndOfStream {
+				continue
 			}
-			err = engine.irs.MarkEndOfStream(ctx, prefixedTx)
-			if err != nil {
-				return errors.Wrap(err, "couldn't mark end of stream in intermediate record store")
-			}
-			return ErrEndOfStream
+
+			return errors.Wrap(err, "couldn't get next record")
 		}
-		return errors.Wrap(err, "couldn't get next record")
+
+		areAllEndOfStream = false
+		inputIndex = sourceIndex
+		break
 	}
-	err = engine.irs.AddRecord(ctx, prefixedTx, 0, record)
+
+	if areAllEndOfStream {
+		err := engine.irs.UpdateWatermark(ctx, prefixedTx, maxWatermark)
+		if err != nil {
+			return errors.Wrap(err, "couldn't mark end of stream max watermark in intermediate record store")
+		}
+
+		err = engine.irs.MarkEndOfStream(ctx, prefixedTx)
+		if err != nil {
+			return errors.Wrap(err, "couldn't mark end of stream in intermediate record store")
+		}
+		return ErrEndOfStream
+	}
+
+	err = engine.irs.AddRecord(ctx, prefixedTx, inputIndex, record)
 	if err != nil {
 		return errors.Wrap(err, "couldn't add record to intermediate record store")
 	}
@@ -247,8 +268,10 @@ func (engine *PullEngine) Close(ctx context.Context, storage storage.Storage) er
 		return errors.Wrap(err, "couldn't stop pull engine")
 	}
 
-	if err := engine.source.Close(ctx, storage); err != nil {
-		return errors.Wrap(err, "couldn't close source stream")
+	for i := range engine.sources {
+		if err := engine.sources[i].Close(ctx, storage); err != nil {
+			return errors.Wrapf(err, "couldn't close source stream with index %v", i)
+		}
 	}
 
 	if err := engine.irs.Close(ctx, storage); err != nil {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/graph"
+	"github.com/cube2222/octosql/physical/metadata"
 
 	"github.com/pkg/errors"
 )
@@ -17,6 +18,7 @@ type Formula interface {
 	SplitByAnd() []Formula
 	ExtractPredicates() []*Predicate
 	Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Formula, error)
+	DoesMatchNamespace(namespace *metadata.Namespace) bool
 	graph.Visualizer
 }
 
@@ -48,6 +50,10 @@ func (f *Constant) ExtractPredicates() []*Predicate {
 
 func (f *Constant) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Formula, error) {
 	return execution.NewConstant(f.Value), nil
+}
+
+func (f *Constant) DoesMatchNamespace(namespace *metadata.Namespace) bool {
+	return true
 }
 
 func (f *Constant) Visualize() *graph.Node {
@@ -93,6 +99,10 @@ func (f *And) Materialize(ctx context.Context, matCtx *MaterializationContext) (
 		return nil, errors.Wrap(err, "couldn't materialize right operand")
 	}
 	return execution.NewAnd(materializedLeft, materializedRight), nil
+}
+
+func (f *And) DoesMatchNamespace(namespace *metadata.Namespace) bool {
+	return f.Left.DoesMatchNamespace(namespace) && f.Right.DoesMatchNamespace(namespace)
 }
 
 func (f *And) Visualize() *graph.Node {
@@ -141,6 +151,10 @@ func (f *Or) Materialize(ctx context.Context, matCtx *MaterializationContext) (e
 	return execution.NewOr(materializedLeft, materializedRight), nil
 }
 
+func (f *Or) DoesMatchNamespace(namespace *metadata.Namespace) bool {
+	return f.Left.DoesMatchNamespace(namespace) && f.Right.DoesMatchNamespace(namespace)
+}
+
 func (f *Or) Visualize() *graph.Node {
 	n := graph.NewNode("Or")
 	n.AddChild("left", f.Left.Visualize())
@@ -180,6 +194,10 @@ func (f *Not) Materialize(ctx context.Context, matCtx *MaterializationContext) (
 		return nil, errors.Wrap(err, "couldn't materialize operand")
 	}
 	return execution.NewNot(materialized), nil
+}
+
+func (f *Not) DoesMatchNamespace(namespace *metadata.Namespace) bool {
+	return f.Child.DoesMatchNamespace(namespace)
 }
 
 func (f *Not) Visualize() *graph.Node {
@@ -228,6 +246,10 @@ func (f *Predicate) Materialize(ctx context.Context, matCtx *MaterializationCont
 		return nil, errors.Wrap(err, "couldn't materialize right operand")
 	}
 	return execution.NewPredicate(materializedLeft, f.Relation.Materialize(ctx, matCtx), materializedRight), nil
+}
+
+func (f *Predicate) DoesMatchNamespace(namespace *metadata.Namespace) bool {
+	return f.Left.DoesMatchNamespace(namespace) && f.Right.DoesMatchNamespace(namespace)
 }
 
 func (f *Predicate) Visualize() *graph.Node {

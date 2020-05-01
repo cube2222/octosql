@@ -222,18 +222,17 @@ func (node *GroupBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 }
 
 func (node *GroupBy) groupingByEventTime(sourceMetadata *metadata.NodeMetadata) bool {
-	groupingByEventTime := false
 	if !sourceMetadata.EventTimeField().Empty() {
 		for i := range node.Key {
 			if variable, ok := node.Key[i].(*Variable); ok {
-				if variable.Name == sourceMetadata.EventTimeField() {
-					groupingByEventTime = true
+				if variable.ExpressionName() == sourceMetadata.EventTimeField() {
+					return true
 				}
 			}
 		}
 	}
 
-	return groupingByEventTime
+	return false
 }
 
 func (node *GroupBy) Metadata() *metadata.NodeMetadata {
@@ -254,7 +253,7 @@ func (node *GroupBy) Metadata() *metadata.NodeMetadata {
 		}
 	}
 
-	return metadata.NewNodeMetadata(cardinality, outEventTimeField)
+	return metadata.NewNodeMetadata(cardinality, outEventTimeField, metadata.EmptyNamespace())
 }
 
 func (node *GroupBy) Visualize() *graph.Node {

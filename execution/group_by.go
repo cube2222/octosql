@@ -90,12 +90,12 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 	processFunc := &ProcessByKey{
 		eventTimeField:  node.eventTimeField,
 		trigger:         trigger,
-		keyExpression:   node.key,
+		keyExpressions:  [][]Expression{node.key},
 		processFunction: groupBy,
 		variables:       variables,
 	}
 
-	groupByPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, execOutput.WatermarkSource, true, ctx)
+	groupByPullEngine := NewPullEngine(processFunc, node.storage, []RecordStream{source}, streamID, execOutput.WatermarkSource, true, ctx)
 
 	return groupByPullEngine, // groupByPullEngine now indicates new watermark source
 		NewExecutionOutput(

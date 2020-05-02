@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
 )
@@ -11,6 +12,17 @@ import (
 type Filter struct {
 	formula Formula
 	source  Node
+}
+
+func (filter *Filter) Visualize() *graph.Node {
+	n := graph.NewNode("Filter")
+	if filter.formula != nil {
+		n.AddChild("formula", filter.formula.Visualize())
+	}
+	if filter.source != nil {
+		n.AddChild("source", filter.source.Visualize())
+	}
+	return n
 }
 
 func NewFilter(formula Formula, child Node) *Filter {

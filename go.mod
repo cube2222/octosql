@@ -12,7 +12,7 @@ require (
 	github.com/go-redis/redis v6.15.2+incompatible
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/golang/protobuf v1.3.1
-	github.com/kostya-sh/parquet-go v0.0.0-20180827163605-06b7130dc45c // indirect
+	github.com/kostya-sh/parquet-go v0.0.0-20180827163605-06b7130dc45c
 	github.com/lib/pq v1.0.0
 	github.com/mattn/go-runewidth v0.0.4 // indirect
 	github.com/mitchellh/hashstructure v1.0.0

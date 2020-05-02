@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 )
 
@@ -56,4 +57,13 @@ func (node *With) Physical(ctx context.Context, physicalCreator *PhysicalPlanCre
 	}
 
 	return source, variables, nil
+}
+
+func (node *With) Visualize() *graph.Node {
+	n := graph.NewNode("With")
+	for i := range node.cteNodes {
+		n.AddChild(node.cteNames[i], node.cteNodes[i].Visualize())
+	}
+	n.AddChild("Source", node.source.Visualize())
+	return n
 }

@@ -65,13 +65,6 @@ type DataSource struct {
 	alias string
 }
 
-func (dataSource *DataSource) Visualize() *graph.Node {
-	n := graph.NewNode("DataSource")
-	n.AddField("name", dataSource.name)
-	n.AddField("alias", dataSource.alias)
-	return n
-}
-
 func NewDataSource(name string, alias string) *DataSource {
 	return &DataSource{name: name, alias: alias}
 }
@@ -82,6 +75,13 @@ func (ds *DataSource) Physical(ctx context.Context, physicalCreator *PhysicalPla
 		return nil, nil, errors.Wrap(err, "couldn't get data source")
 	}
 	return outDs, octosql.NoVariables(), nil
+}
+
+func (ds *DataSource) Visualize() *graph.Node {
+	n := graph.NewNode("DataSource")
+	n.AddField("name", ds.name)
+	n.AddField("alias", ds.alias)
+	return n
 }
 
 type Expression interface {
@@ -120,14 +120,14 @@ func (se *StarExpression) PhysicalNamed(ctx context.Context, physicalCreator *Ph
 	return physical.NewStarExpression(se.qualifier), octosql.NoVariables(), nil
 }
 
-type Variable struct {
-	name octosql.VariableName
+func (se *StarExpression) Visualize() *graph.Node {
+	n := graph.NewNode("Star Expression")
+	n.AddField("qualifier", se.qualifier)
+	return n
 }
 
-func (variable *Variable) Visualize() *graph.Node {
-	n := graph.NewNode("Variable")
-	n.AddField("name", string(variable.name))
-	return n
+type Variable struct {
+	name octosql.VariableName
 }
 
 func NewVariable(name octosql.VariableName) *Variable {
@@ -146,39 +146,35 @@ func (v *Variable) PhysicalNamed(ctx context.Context, physicalCreator *PhysicalP
 	return physical.NewVariable(v.name), octosql.NoVariables(), nil
 }
 
-type Constant struct {
-	value interface{}
+func (v *Variable) Visualize() *graph.Node {
+	n := graph.NewNode("Variable")
+	n.AddField("name", v.name.String())
+	return n
 }
 
-func (constant *Constant) Visualize() *graph.Node {
-	n := graph.NewNode("Constant")
-	n.AddField("value", fmt.Sprintf("%T %v", constant.value, constant.value))
-	return n
+type Constant struct {
+	value interface{}
 }
 
 func NewConstant(value interface{}) *Constant {
 	return &Constant{value: value}
 }
 
-func (v *Constant) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
+func (c *Constant) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
 	name := physicalCreator.GetVariableName()
 	return physical.NewVariable(name), octosql.NewVariables(map[octosql.VariableName]octosql.Value{
-		name: octosql.NormalizeType(v.value),
+		name: octosql.NormalizeType(c.value),
 	}), nil
+}
+
+func (c *Constant) Visualize() *graph.Node {
+	n := graph.NewNode("Constant")
+	n.AddField("value", fmt.Sprintf("%T %v", c.value, c.value))
+	return n
 }
 
 type Tuple struct {
 	expressions []Expression
-}
-
-func (tuple *Tuple) Visualize() *graph.Node {
-	n := graph.NewNode("Tuple")
-	if len(tuple.expressions) != 0 {
-		for idx, expr := range tuple.expressions {
-			n.AddChild("expr_"+strconv.Itoa(idx), expr.Visualize())
-		}
-	}
-	return n
 }
 
 func NewTuple(expressions []Expression) *Tuple {
@@ -209,16 +205,18 @@ func (tup *Tuple) Physical(ctx context.Context, physicalCreator *PhysicalPlanCre
 	return physical.NewTuple(physicalExprs), variables, nil
 }
 
-type NodeExpression struct {
-	node Node
-}
-
-func (nodeExpression *NodeExpression) Visualize() *graph.Node {
-	n := graph.NewNode("Node Expression")
-	if nodeExpression.node != nil {
-		n.AddChild("source", nodeExpression.node.Visualize())
+func (tup *Tuple) Visualize() *graph.Node {
+	n := graph.NewNode("Tuple")
+	if len(tup.expressions) != 0 {
+		for idx, expr := range tup.expressions {
+			n.AddChild("expr_"+strconv.Itoa(idx), expr.Visualize())
+		}
 	}
 	return n
+}
+
+type NodeExpression struct {
+	node Node
 }
 
 func NewNodeExpression(node Node) *NodeExpression {
@@ -236,16 +234,16 @@ func (ne *NodeExpression) Physical(ctx context.Context, physicalCreator *Physica
 	return physical.NewNodeExpression(outNodes[0]), variables, nil
 }
 
-type LogicExpression struct {
-	formula Formula
-}
-
-func (logicExpression *LogicExpression) Visualize() *graph.Node {
-	n := graph.NewNode("Logic Expression")
-	if logicExpression.formula != nil {
-		n.AddChild("source", logicExpression.formula.Visualize())
+func (ne *NodeExpression) Visualize() *graph.Node {
+	n := graph.NewNode("Node Expression")
+	if ne.node != nil {
+		n.AddChild("source", ne.node.Visualize())
 	}
 	return n
+}
+
+type LogicExpression struct {
+	formula Formula
 }
 
 func NewLogicExpression(formula Formula) *LogicExpression {
@@ -260,18 +258,17 @@ func (le *LogicExpression) Physical(ctx context.Context, physicalCreator *Physic
 	return physical.NewLogicExpression(physicalNode), variables, nil
 }
 
+func (le *LogicExpression) Visualize() *graph.Node {
+	n := graph.NewNode("Logic Expression")
+	if le.formula != nil {
+		n.AddChild("source", le.formula.Visualize())
+	}
+	return n
+}
+
 type AliasedExpression struct {
 	name octosql.VariableName
 	expr Expression
-}
-
-func (aliasedExpression *AliasedExpression) Visualize() *graph.Node {
-	n := graph.NewNode("Aliased Expression")
-	n.AddField("alias", string(aliasedExpression.name))
-	if aliasedExpression.expr != nil {
-		n.AddChild("expr", aliasedExpression.expr.Visualize())
-	}
-	return n
 }
 
 func NewAliasedExpression(name octosql.VariableName, expr Expression) NamedExpression {
@@ -292,4 +289,13 @@ func (alExpr *AliasedExpression) PhysicalNamed(ctx context.Context, physicalCrea
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for aliased expression")
 	}
 	return physical.NewAliasedExpression(alExpr.name, physicalNode), variables, nil
+}
+
+func (alExpr *AliasedExpression) Visualize() *graph.Node {
+	n := graph.NewNode("Aliased Expression")
+	n.AddField("alias", string(alExpr.name))
+	if alExpr.expr != nil {
+		n.AddChild("expr", alExpr.expr.Visualize())
+	}
+	return n
 }

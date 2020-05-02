@@ -14,17 +14,6 @@ type Offset struct {
 	offsetExpr Expression
 }
 
-func (offset *Offset) Visualize() *graph.Node {
-	n := graph.NewNode("Offset")
-	if offset.data != nil {
-		n.AddChild("data", offset.data.Visualize())
-	}
-	if offset.offsetExpr != nil {
-		n.AddChild("offset", offset.offsetExpr.Visualize())
-	}
-	return n
-}
-
 func NewOffset(data Node, expr Expression) Node {
 	return &Offset{data: data, offsetExpr: expr}
 }
@@ -48,4 +37,15 @@ func (node *Offset) Physical(ctx context.Context, physicalCreator *PhysicalPlanC
 	outNodes := physical.NewShuffle(1, physical.NewConstantStrategy(0), sourceNodes)
 
 	return []physical.Node{physical.NewOffset(outNodes[0], offsetExpr)}, variables, nil
+}
+
+func (node *Offset) Visualize() *graph.Node {
+	n := graph.NewNode("Offset")
+	if node.data != nil {
+		n.AddChild("data", node.data.Visualize())
+	}
+	if node.offsetExpr != nil {
+		n.AddChild("offset", node.offsetExpr.Visualize())
+	}
+	return n
 }

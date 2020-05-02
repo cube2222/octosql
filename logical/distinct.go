@@ -7,21 +7,13 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/config"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 )
 
 type Distinct struct {
 	child Node
-}
-
-func (node *Distinct) Visualize() *graph.Node {
-	n := graph.NewNode("Distinct")
-	if node.child != nil {
-		n.AddChild("source", node.child.Visualize())
-	}
-	return n
 }
 
 func NewDistinct(child Node) *Distinct {
@@ -53,4 +45,12 @@ func (node *Distinct) Physical(ctx context.Context, physicalCreator *PhysicalPla
 	}
 
 	return outNodes, variables, nil
+}
+
+func (node *Distinct) Visualize() *graph.Node {
+	n := graph.NewNode("Distinct")
+	if node.child != nil {
+		n.AddChild("source", node.child.Visualize())
+	}
+	return n
 }

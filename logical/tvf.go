@@ -24,14 +24,6 @@ type TableValuedFunctionArgumentValueExpression struct {
 	expression Expression
 }
 
-func (tvfave *TableValuedFunctionArgumentValueExpression) Visualize() *graph.Node {
-	n := graph.NewNode("TableValuedFunctionArgumentValueExpression")
-	if tvfave.expression != nil {
-		n.AddChild("expression", tvfave.expression.Visualize())
-	}
-	return n
-}
-
 func NewTableValuedFunctionArgumentValueExpression(expression Expression) *TableValuedFunctionArgumentValueExpression {
 	return &TableValuedFunctionArgumentValueExpression{expression: expression}
 }
@@ -45,16 +37,16 @@ func (arg *TableValuedFunctionArgumentValueExpression) Physical(ctx context.Cont
 	return []physical.TableValuedFunctionArgumentValue{physical.NewTableValuedFunctionArgumentValueExpression(physExpression)}, variables, nil
 }
 
-type TableValuedFunctionArgumentValueTable struct {
-	source Node
-}
-
-func (tvfavt *TableValuedFunctionArgumentValueTable) Visualize() *graph.Node {
-	n := graph.NewNode("TableValuedFunctionArgumentValueTable")
-	if tvfavt.source != nil {
-		n.AddChild("source", tvfavt.source.Visualize())
+func (arg *TableValuedFunctionArgumentValueExpression) Visualize() *graph.Node {
+	n := graph.NewNode("TableValuedFunctionArgumentValueExpression")
+	if arg.expression != nil {
+		n.AddChild("expression", arg.expression.Visualize())
 	}
 	return n
+}
+
+type TableValuedFunctionArgumentValueTable struct {
+	source Node
 }
 
 func NewTableValuedFunctionArgumentValueTable(source Node) *TableValuedFunctionArgumentValueTable {
@@ -75,14 +67,16 @@ func (arg *TableValuedFunctionArgumentValueTable) Physical(ctx context.Context, 
 	return outputArguments, variables, nil
 }
 
-type TableValuedFunctionArgumentValueDescriptor struct {
-	descriptor octosql.VariableName
+func (arg *TableValuedFunctionArgumentValueTable) Visualize() *graph.Node {
+	n := graph.NewNode("TableValuedFunctionArgumentValueTable")
+	if arg.source != nil {
+		n.AddChild("source", arg.source.Visualize())
+	}
+	return n
 }
 
-func (tvfavd *TableValuedFunctionArgumentValueDescriptor) Visualize() *graph.Node {
-	n := graph.NewNode("TableValuedFunctionArgumentValueDescriptor")
-	n.AddField("descriptor", string(tvfavd.descriptor))
-	return n
+type TableValuedFunctionArgumentValueDescriptor struct {
+	descriptor octosql.VariableName
 }
 
 func NewTableValuedFunctionArgumentValueDescriptor(descriptor octosql.VariableName) *TableValuedFunctionArgumentValueDescriptor {
@@ -93,18 +87,15 @@ func (arg *TableValuedFunctionArgumentValueDescriptor) Physical(ctx context.Cont
 	return []physical.TableValuedFunctionArgumentValue{physical.NewTableValuedFunctionArgumentValueDescriptor(arg.descriptor)}, octosql.NoVariables(), nil
 }
 
+func (arg *TableValuedFunctionArgumentValueDescriptor) Visualize() *graph.Node {
+	n := graph.NewNode("TableValuedFunctionArgumentValueDescriptor")
+	n.AddField("descriptor", string(arg.descriptor))
+	return n
+}
+
 type TableValuedFunction struct {
 	name      string
 	arguments map[octosql.VariableName]TableValuedFunctionArgumentValue
-}
-
-func (tvf *TableValuedFunction) Visualize() *graph.Node {
-	n := graph.NewNode("TableValuedFunction(" + tvf.name + ")")
-	n.AddField("name", tvf.name)
-	for name, tvfav := range tvf.arguments {
-		n.AddChild(name.String(), tvfav.Visualize())
-	}
-	return n
 }
 
 func NewTableValuedFunction(name string, arguments map[octosql.VariableName]TableValuedFunctionArgumentValue) *TableValuedFunction {
@@ -185,4 +176,13 @@ func (node *TableValuedFunction) Physical(ctx context.Context, physicalCreator *
 	}
 
 	return outNodes, variables, nil
+}
+
+func (node *TableValuedFunction) Visualize() *graph.Node {
+	n := graph.NewNode("TableValuedFunction(" + node.name + ")")
+	n.AddField("name", node.name)
+	for name, arg := range node.arguments {
+		n.AddChild(name.String(), arg.Visualize())
+	}
+	return n
 }

@@ -3,15 +3,15 @@ package logical
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/config"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 )
 
@@ -47,6 +47,7 @@ var AggregateFunctions = map[Aggregate]struct{}{
 
 type Trigger interface {
 	Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Trigger, octosql.Variables, error)
+	Visualize() *graph.Node
 }
 
 type CountingTrigger struct {
@@ -65,6 +66,12 @@ func (w *CountingTrigger) Physical(ctx context.Context, physicalCreator *Physica
 	return physical.NewCountingTrigger(countExpr), vars, nil
 }
 
+func (w *CountingTrigger) Visualize() *graph.Node {
+	n := graph.NewNode("Counting Trigger")
+	n.AddChild("count", w.Count.Visualize())
+	return n
+}
+
 type DelayTrigger struct {
 	Delay Expression
 }
@@ -81,6 +88,12 @@ func (w *DelayTrigger) Physical(ctx context.Context, physicalCreator *PhysicalPl
 	return physical.NewDelayTrigger(delayExpr), vars, nil
 }
 
+func (w *DelayTrigger) Visualize() *graph.Node {
+	n := graph.NewNode("Delay Trigger")
+	n.AddChild("count", w.Delay.Visualize())
+	return n
+}
+
 type WatermarkTrigger struct {
 }
 
@@ -90,6 +103,11 @@ func NewWatermarkTrigger() *WatermarkTrigger {
 
 func (w *WatermarkTrigger) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Trigger, octosql.Variables, error) {
 	return physical.NewWatermarkTrigger(), octosql.NoVariables(), nil
+}
+
+func (w *WatermarkTrigger) Visualize() *graph.Node {
+	n := graph.NewNode("Watermark Trigger")
+	return n
 }
 
 type GroupBy struct {
@@ -102,26 +120,6 @@ type GroupBy struct {
 	as []octosql.VariableName
 
 	triggers []Trigger
-}
-
-func (groupBy *GroupBy) Visualize() *graph.Node {
-	n := graph.NewNode("Group By")
-	if groupBy.source != nil {
-		n.AddChild("source", groupBy.source.Visualize())
-	}
-
-	for idx := range groupBy.key {
-		n.AddChild("key_"+strconv.Itoa(idx), groupBy.key[idx].Visualize())
-	}
-
-	for i := range groupBy.fields {
-		value := fmt.Sprintf("%s(%s)", groupBy.aggregates[i], groupBy.fields[i])
-		if i < len(groupBy.as) && !groupBy.as[i].Empty() {
-			value += fmt.Sprintf(" as %s", groupBy.as[i])
-		}
-		n.AddField(fmt.Sprintf("field_%d", i), value)
-	}
-	return n
 }
 
 func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, aggregates []Aggregate, as []octosql.VariableName, triggers []Trigger) *GroupBy {
@@ -213,4 +211,28 @@ func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlan
 	}
 
 	return outNodes, variables, nil
+}
+
+func (node *GroupBy) Visualize() *graph.Node {
+	n := graph.NewNode("Group By")
+	if node.source != nil {
+		n.AddChild("source", node.source.Visualize())
+	}
+
+	for idx := range node.key {
+		n.AddChild("key_"+strconv.Itoa(idx), node.key[idx].Visualize())
+	}
+
+	for i, trigger := range node.triggers {
+		n.AddChild(fmt.Sprintf("trigger_%d", i), trigger.Visualize())
+	}
+
+	for i := range node.fields {
+		value := fmt.Sprintf("%s(%s)", node.aggregates[i], node.fields[i])
+		if i < len(node.as) && !node.as[i].Empty() {
+			value += fmt.Sprintf(" as %s", node.as[i])
+		}
+		n.AddField(fmt.Sprintf("field_%d", i), value)
+	}
+	return n
 }

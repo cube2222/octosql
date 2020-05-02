@@ -14,17 +14,6 @@ type Limit struct {
 	limitExpr Expression
 }
 
-func (limit *Limit) Visualize() *graph.Node {
-	n := graph.NewNode("Limit")
-	if limit.limitExpr != nil {
-		n.AddChild("limit", limit.limitExpr.Visualize())
-	}
-	if limit.data != nil {
-		n.AddChild("data", limit.data.Visualize())
-	}
-	return n
-}
-
 func NewLimit(data Node, expr Expression) Node {
 	return &Limit{data: data, limitExpr: expr}
 }
@@ -48,4 +37,15 @@ func (node *Limit) Physical(ctx context.Context, physicalCreator *PhysicalPlanCr
 	outNodes := physical.NewShuffle(1, physical.NewConstantStrategy(0), sourceNodes)
 
 	return []physical.Node{physical.NewLimit(outNodes[0], limitExpr)}, variables, nil
+}
+
+func (node *Limit) Visualize() *graph.Node {
+	n := graph.NewNode("Limit")
+	if node.limitExpr != nil {
+		n.AddChild("limit", node.limitExpr.Visualize())
+	}
+	if node.data != nil {
+		n.AddChild("data", node.data.Visualize())
+	}
+	return n
 }

@@ -1085,6 +1085,39 @@ func Test_various(t *testing.T) {
 			want:    ZeroValue(),
 			wantErr: true,
 		},
+		{
+			name: "decode_base32('M5ZGKZLO')",
+			args: args{
+				args: []Value{
+					MakeString("M5ZGKZLO"),
+				},
+				fun: FuncDecodeBase32,
+			},
+			want:    MakeString("green"),
+			wantErr: false,
+		},
+		{
+			name: "decode_base32('OB2XE4DMMU======')",
+			args: args{
+				args: []Value{
+					MakeString("OB2XE4DMMU======"),
+				},
+				fun: FuncDecodeBase32,
+			},
+			want:    MakeString("purple"),
+			wantErr: false,
+		},
+		{
+			name: "decode_base32('OB2XE=DMMU======')",
+			args: args{
+				args: []Value{
+					MakeString("OB2XE=DMMU======"),
+				},
+				fun: FuncDecodeBase32,
+			},
+			want:    ZeroValue(),
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

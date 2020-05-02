@@ -4,12 +4,14 @@ import (
 	"context"
 	"runtime"
 
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/metadata"
-	"github.com/pkg/errors"
 )
 
 var ErrFallbackToLookupJoin = errors.New("fallback to lookup join")
@@ -27,6 +29,17 @@ func NewJoin(source, joined Node, joinType execution.JoinType) *Join {
 		joined:   joined,
 		joinType: joinType,
 	}
+}
+
+func (node *Join) Visualize() *graph.Node {
+	n := graph.NewNode("Join")
+	if node.source != nil {
+		n.AddChild("source", node.source.Visualize())
+	}
+	if node.joined != nil {
+		n.AddChild("joined", node.joined.Visualize())
+	}
+	return n
 }
 
 func (node *Join) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {

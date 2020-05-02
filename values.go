@@ -1,6 +1,7 @@
 package octosql
 
 import (
+	"encoding/base32"
 	"fmt"
 	"log"
 	"reflect"
@@ -147,7 +148,7 @@ func NormalizeType(value interface{}) Value {
 	case float64:
 		return MakeFloat(value)
 	case []byte:
-		return MakeString(string(value))
+		return MakeString(base32.StdEncoding.EncodeToString(value))
 	case string:
 		return MakeString(value)
 	case []interface{}:

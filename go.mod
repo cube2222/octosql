@@ -10,6 +10,8 @@ require (
 	github.com/go-redis/redis v6.15.2+incompatible
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/golang/protobuf v1.3.1
+	github.com/golang/snappy v0.0.1 // indirect
+	github.com/kostya-sh/parquet-go v0.0.0-20180827163605-06b7130dc45c
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/lib/pq v1.0.0
 	github.com/mattn/go-runewidth v0.0.4 // indirect
@@ -19,6 +21,7 @@ require (
 	github.com/onsi/gomega v1.5.0 // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/spf13/cobra v0.0.5
+	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/net v0.0.0-20190522155817-f3200d17e092 // indirect
 	google.golang.org/appengine v1.5.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect

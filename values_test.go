@@ -1,12 +1,31 @@
 package octosql
 
 import (
+	"bytes"
+	"encoding/base32"
+	"fmt"
 	"math"
 	"testing"
 	"time"
 
 	"github.com/golang/protobuf/proto"
 )
+
+func stringToBase32(str string) string {
+	var buf bytes.Buffer
+	enc := base32.NewEncoder(base32.StdEncoding, &buf)
+	n, err := enc.Write([]byte(str))
+	if err != nil {
+		panic(fmt.Sprintf("couldn't base64 encode bytes: %s", err.Error()))
+	}
+	if n != len(str) {
+		panic(fmt.Sprintf("couldn't base64 encode bytes: wrote only %d of %d bytes", n, len(str)))
+	}
+	if err := enc.Close(); err != nil {
+		panic(fmt.Sprintf("couldn't close base64 encode bytes: %s", err.Error()))
+	}
+	return buf.String()
+}
 
 func TestNormalizeType(t *testing.T) {
 	tests := []struct {
@@ -26,7 +45,7 @@ func TestNormalizeType(t *testing.T) {
 				"array": []interface{}{[]interface{}{float32(1), uint8(2), int64(3)}, true},
 			},
 			want: MakeObject(map[string]Value{
-				"name": MakeString("Jakub"),
+				"name": MakeString(stringToBase32("Jakub")),
 				"age":  MakeInt(3),
 				"city": MakeObject(map[string]Value{
 					"name":       MakeString("warsaw"),

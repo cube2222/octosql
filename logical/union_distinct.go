@@ -12,21 +12,21 @@ type UnionDistinct struct {
 	first, second Node
 }
 
-func (ua *UnionDistinct) Visualize() *graph.Node {
-	n := graph.NewNode("Union Distinct")
-	if ua.first != nil {
-		n.AddChild("first", ua.first.Visualize())
-	}
-	if ua.second != nil {
-		n.AddChild("second", ua.second.Visualize())
-	}
-	return n
-}
-
 func NewUnionDistinct(first, second Node) *UnionDistinct {
 	return &UnionDistinct{first: first, second: second}
 }
 
-func (node *UnionDistinct) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
+func (node *UnionDistinct) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	return NewDistinct(NewUnionAll(node.first, node.second)).Physical(ctx, physicalCreator)
+}
+
+func (node *UnionDistinct) Visualize() *graph.Node {
+	n := graph.NewNode("Union Distinct")
+	if node.first != nil {
+		n.AddChild("first", node.first.Visualize())
+	}
+	if node.second != nil {
+		n.AddChild("second", node.second.Visualize())
+	}
+	return n
 }

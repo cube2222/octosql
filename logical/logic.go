@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
-	"github.com/pkg/errors"
 )
 
 type Formula interface {
@@ -21,12 +22,6 @@ type BooleanConstant struct {
 	Value bool
 }
 
-func (booleanConstant *BooleanConstant) Visualize() *graph.Node {
-	n := graph.NewNode("BooleanConstant")
-	n.AddField("Value", fmt.Sprint(booleanConstant.Value))
-	return n
-}
-
 func NewBooleanConstant(value bool) *BooleanConstant {
 	return &BooleanConstant{Value: value}
 }
@@ -35,23 +30,16 @@ func (f *BooleanConstant) Physical(ctx context.Context, physicalCreator *Physica
 	return physical.NewConstant(f.Value), octosql.NoVariables(), nil
 }
 
+func (f *BooleanConstant) Visualize() *graph.Node {
+	n := graph.NewNode("BooleanConstant")
+	n.AddField("Value", fmt.Sprint(f.Value))
+	return n
+}
+
 type InfixOperator struct {
 	Left     Formula
 	Operator string
 	Right    Formula
-}
-
-func (infixOperator *InfixOperator) Visualize() *graph.Node {
-	n := graph.NewNode("InfixOperator")
-	n.AddField("Operator", infixOperator.Operator)
-
-	if infixOperator.Left != nil {
-		n.AddChild("Left", infixOperator.Left.Visualize())
-	}
-	if infixOperator.Right != nil {
-		n.AddChild("Right", infixOperator.Right.Visualize())
-	}
-	return n
 }
 
 func NewInfixOperator(left Formula, right Formula, operator string) *InfixOperator {
@@ -83,19 +71,22 @@ func (f *InfixOperator) Physical(ctx context.Context, physicalCreator *PhysicalP
 	}
 }
 
+func (f *InfixOperator) Visualize() *graph.Node {
+	n := graph.NewNode("Infix Operator")
+	n.AddField("Operator", f.Operator)
+
+	if f.Left != nil {
+		n.AddChild("Left", f.Left.Visualize())
+	}
+	if f.Right != nil {
+		n.AddChild("Right", f.Right.Visualize())
+	}
+	return n
+}
+
 type PrefixOperator struct {
 	Child    Formula
 	Operator string
-}
-
-func (prefixOperator *PrefixOperator) Visualize() *graph.Node {
-	n := graph.NewNode("PrefixOperator")
-	n.AddField("Operator", prefixOperator.Operator)
-
-	if prefixOperator.Child != nil {
-		n.AddChild("Child", prefixOperator.Child.Visualize())
-	}
-	return n
 }
 
 func NewPrefixOperator(child Formula, operator string) *PrefixOperator {
@@ -116,23 +107,20 @@ func (f *PrefixOperator) Physical(ctx context.Context, physicalCreator *Physical
 	}
 }
 
+func (f *PrefixOperator) Visualize() *graph.Node {
+	n := graph.NewNode("Prefix Operator")
+	n.AddField("Operator", f.Operator)
+
+	if f.Child != nil {
+		n.AddChild("Child", f.Child.Visualize())
+	}
+	return n
+}
+
 type Predicate struct {
 	Left     Expression
 	Relation Relation
 	Right    Expression
-}
-
-func (predicate *Predicate) Visualize() *graph.Node {
-	n := graph.NewNode("Predicate")
-	n.AddField("Relation", string(predicate.Relation))
-
-	if predicate.Left != nil {
-		n.AddChild("Left", predicate.Left.Visualize())
-	}
-	if predicate.Right != nil {
-		n.AddChild("Right", predicate.Right.Visualize())
-	}
-	return n
 }
 
 func NewPredicate(left Expression, relation Relation, right Expression) *Predicate {
@@ -159,4 +147,17 @@ func (f *Predicate) Physical(ctx context.Context, physicalCreator *PhysicalPlanC
 	}
 
 	return physical.NewPredicate(left, relation, right), variables, nil
+}
+
+func (f *Predicate) Visualize() *graph.Node {
+	n := graph.NewNode("Predicate")
+	n.AddField("Relation", string(f.Relation))
+
+	if f.Left != nil {
+		n.AddChild("Left", f.Left.Visualize())
+	}
+	if f.Right != nil {
+		n.AddChild("Right", f.Right.Visualize())
+	}
+	return n
 }

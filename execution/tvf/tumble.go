@@ -10,6 +10,7 @@ import (
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/streaming/storage"
 )
 
 type Tumble struct {
@@ -38,26 +39,32 @@ func (r *Tumble) Document() docs.Documentation {
 	)
 }
 
-func (r *Tumble) Get(ctx context.Context, variables octosql.Variables) (execution.RecordStream, error) {
-	source, err := r.source.Get(ctx, variables)
+func (r *Tumble) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
+	tx := storage.GetStateTransactionFromContext(ctx)
+	sourceStreamID, err := execution.GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get source")
+		return nil, nil, errors.Wrap(err, "couldn't get source stream ID")
+	}
+
+	source, execOutput, err := r.source.Get(ctx, variables, sourceStreamID)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't get source")
 	}
 
 	duration, err := r.windowLength.ExpressionValue(ctx, variables)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get window length")
+		return nil, nil, errors.Wrap(err, "couldn't get window length")
 	}
 	if duration.GetType() != octosql.TypeDuration {
-		return nil, errors.Errorf("invalid tumble duration: %v", duration)
+		return nil, nil, errors.Errorf("invalid tumble duration: %v", duration)
 	}
 
 	offset, err := r.offset.ExpressionValue(ctx, variables)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get window offset")
+		return nil, nil, errors.Wrap(err, "couldn't get window offset")
 	}
 	if offset.GetType() != octosql.TypeDuration {
-		return nil, errors.Errorf("invalid tumble offset: %v", duration)
+		return nil, nil, errors.Errorf("invalid tumble offset: %v", offset)
 	}
 
 	return &TumbleStream{
@@ -65,7 +72,7 @@ func (r *Tumble) Get(ctx context.Context, variables octosql.Variables) (executio
 		timeField:    r.timeField,
 		windowLength: duration.AsDuration(),
 		offset:       offset.AsDuration(),
-	}, nil
+	}, execOutput, nil
 }
 
 type TumbleStream struct {
@@ -86,7 +93,7 @@ func (s *TumbleStream) Next(ctx context.Context) (*execution.Record, error) {
 
 	timeValue := srcRecord.Value(s.timeField)
 	if timeValue.GetType() != octosql.TypeTime {
-		return nil, fmt.Errorf("couldn't get time field '%v' as time, got: %v", s.timeField.String(), srcRecord.Value(s.timeField))
+		return nil, fmt.Errorf("couldn't get time field '%v' as time, got: %v", s.timeField.String(), srcRecord.Value(s.timeField).Show())
 	}
 
 	windowStart := timeValue.AsTime().Add(-1 * s.offset).Truncate(s.windowLength).Add(s.offset)
@@ -108,6 +115,10 @@ func (s *TumbleStream) Next(ctx context.Context) (*execution.Record, error) {
 	return newRecord, nil
 }
 
-func (s *TumbleStream) Close() error {
-	return s.source.Close()
+func (s *TumbleStream) Close(ctx context.Context, storage storage.Storage) error {
+	if err := s.source.Close(ctx, storage); err != nil {
+		return errors.Wrap(err, "couldn't close underlying stream")
+	}
+
+	return nil
 }

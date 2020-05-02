@@ -3,10 +3,23 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/cube2222/octosql/storage/excel"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"reflect"
+
+	"github.com/dgraph-io/badger/v2"
+	"github.com/go-chi/chi"
+
+	"github.com/go-chi/chi/middleware"
+
+	"github.com/cube2222/octosql/storage/excel"
+	"github.com/cube2222/octosql/storage/kafka"
+	"github.com/cube2222/octosql/storage/parquet"
+	"github.com/cube2222/octosql/streaming/storage"
+
+	"github.com/spf13/cobra"
 
 	"github.com/cube2222/octosql/app"
 	"github.com/cube2222/octosql/config"
@@ -22,11 +35,11 @@ import (
 	"github.com/cube2222/octosql/storage/redis"
 	"github.com/cube2222/octosql/storage/sql/mysql"
 	"github.com/cube2222/octosql/storage/sql/postgres"
-	"github.com/spf13/cobra"
 )
 
 var configPath string
 var outputFormat string
+var storageDirectory string
 var describe bool
 
 var rootCmd = &cobra.Command{
@@ -55,6 +68,8 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 				"postgres": postgres.NewDataSourceBuilderFactoryFromConfig,
 				"redis":    redis.NewDataSourceBuilderFactoryFromConfig,
 				"excel":    excel.NewDataSourceBuilderFactoryFromConfig,
+				"kafka":    kafka.NewDataSourceBuilderFactoryFromConfig,
+				"parquet":  parquet.NewDataSourceBuilderFactoryFromConfig,
 			},
 			cfg,
 		)
@@ -94,10 +109,36 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 			log.Fatal("couldn't parse query: ", err)
 		}
 
+		if storageDirectory == "" {
+			tempDir, err := ioutil.TempDir("", "octosql")
+			if err != nil {
+				log.Fatal("couldn't create temporary directory: ", err)
+			}
+			storageDirectory = tempDir
+		}
+
+		opts := badger.DefaultOptions(storageDirectory)
+		db, err := badger.Open(opts)
+		if err != nil {
+			log.Fatal("couldn't open in-memory badger database: ", err)
+		}
+
+		stateStorage := storage.NewBadgerStorage(db)
+
 		// Run query
-		err = app.RunPlan(ctx, plan)
+		err = app.RunPlan(ctx, stateStorage, plan)
 		if err != nil {
 			log.Fatal("couldn't run plan: ", err)
+		}
+
+		err = db.Close()
+		if err != nil {
+			log.Fatal("couldn't close the database: ", err)
+		}
+
+		err = os.RemoveAll(storageDirectory)
+		if err != nil {
+			log.Fatal("couldn't remove temporary directory: ", err)
 		}
 	},
 }
@@ -105,7 +146,14 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 func main() {
 	rootCmd.Flags().StringVarP(&configPath, "config", "c", os.Getenv("OCTOSQL_CONFIG"), "data source configuration path, defaults to $OCTOSQL_CONFIG")
 	rootCmd.Flags().StringVarP(&outputFormat, "output", "o", "table", "output format, one of [table json csv tabbed table_row_separated]")
+	rootCmd.Flags().StringVar(&storageDirectory, "storage-directory", "", "directory to store state storage in")
 	rootCmd.Flags().BoolVar(&describe, "describe", false, "Print out the physical query plan in graphviz format. You can use a command like \"dot -Tpng file > output.png\" to view it.")
+
+	go func() {
+		r := chi.NewRouter()
+		r.Mount("/debug", middleware.Profiler())
+		log.Fatal(http.ListenAndServe("127.0.0.1:3001", r))
+	}()
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

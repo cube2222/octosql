@@ -1,6 +1,7 @@
 package octosql
 
 import (
+	"encoding/base32"
 	"math"
 	"testing"
 	"time"
@@ -26,7 +27,7 @@ func TestNormalizeType(t *testing.T) {
 				"array": []interface{}{[]interface{}{float32(1), uint8(2), int64(3)}, true},
 			},
 			want: MakeObject(map[string]Value{
-				"name": MakeString("Jakub"),
+				"name": MakeString(base32.StdEncoding.EncodeToString([]byte("Jakub"))),
 				"age":  MakeInt(3),
 				"city": MakeObject(map[string]Value{
 					"name":       MakeString("warsaw"),

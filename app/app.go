@@ -4,15 +4,17 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/output"
+	"github.com/cube2222/octosql/output/badger"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/optimizer"
+	"github.com/cube2222/octosql/streaming/storage"
+
+	"github.com/pkg/errors"
 )
 
 type App struct {
@@ -31,11 +33,17 @@ func NewApp(cfg *config.Config, dataSourceRepository *physical.DataSourceReposit
 	}
 }
 
-func (app *App) RunPlan(ctx context.Context, plan logical.Node) error {
-	phys, variables, err := plan.Physical(ctx, logical.NewPhysicalPlanCreator(app.dataSourceRepository))
+func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan logical.Node) error {
+	sourceNodes, variables, err := plan.Physical(ctx, logical.NewPhysicalPlanCreator(app.dataSourceRepository, app.cfg.Physical))
 	if err != nil {
 		return errors.Wrap(err, "couldn't create physical plan")
 	}
+
+	// We only want one partition at the end, to print the output easily.
+	shuffled := physical.NewShuffle(1, physical.NewConstantStrategy(0), sourceNodes)
+
+	// Only the first partition is there.
+	var phys physical.Node = shuffled[0]
 
 	phys = optimizer.Optimize(ctx, optimizer.DefaultScenarios, phys)
 
@@ -44,30 +52,33 @@ func (app *App) RunPlan(ctx context.Context, plan logical.Node) error {
 		return nil
 	}
 
-	exec, err := phys.Materialize(ctx, physical.NewMaterializationContext(app.cfg))
+	exec, err := phys.Materialize(ctx, physical.NewMaterializationContext(app.cfg, stateStorage))
 	if err != nil {
 		return errors.Wrap(err, "couldn't materialize the physical plan into an execution plan")
 	}
 
-	stream, err := exec.Get(ctx, variables)
+	stream, execOutput, err := execution.GetAndStartAllShuffles(ctx, stateStorage, execution.NewStreamID("root"), []execution.Node{exec}, variables)
 	if err != nil {
 		return errors.Wrap(err, "couldn't get record stream from execution plan")
 	}
 
-	var rec *execution.Record
-	for rec, err = stream.Next(ctx); err == nil; rec, err = stream.Next(ctx) {
-		err := app.out.WriteRecord(rec)
-		if err != nil {
-			return errors.Wrap(err, "couldn't write record")
-		}
-	}
-	if err != execution.ErrEndOfStream {
-		return errors.Wrap(err, "couldn't get next record")
+	out := &badger.Output{
+		EventTimeField: phys.Metadata().EventTimeField(),
 	}
 
-	err = app.out.Close()
-	if err != nil {
-		return errors.Wrap(err, "couldn't close output writer")
+	outStreamID := &execution.StreamID{Id: "output"}
+
+	pullEngine := execution.NewPullEngine(out, stateStorage, []execution.RecordStream{stream[0]}, outStreamID, execOutput[0].WatermarkSource, true, ctx)
+
+	go pullEngine.Run()
+
+	printer := badger.NewStdOutPrinter(stateStorage.WithPrefix(outStreamID.AsPrefix()), out)
+	if err := printer.Run(ctx); err != nil {
+		return errors.Wrap(err, "couldn't run stdout printer")
+	}
+
+	if err := pullEngine.Close(ctx, stateStorage); err != nil {
+		return errors.Wrap(err, "couldn't close output pull engine")
 	}
 
 	return nil

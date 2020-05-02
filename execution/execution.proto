@@ -1,0 +1,9 @@
+syntax = "proto3";
+package execution;
+option go_package = "github.com/cube2222/octosql/execution";
+
+// StreamID is a unique identifier for a RecordStream node.
+// This StreamID should prefix all state storage keys this node uses.
+message StreamID {
+    string id = 1;
+}

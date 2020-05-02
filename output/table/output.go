@@ -31,7 +31,7 @@ func (o *Output) WriteRecord(record *execution.Record) error {
 func (o *Output) Close() error {
 	var fields []string
 	for _, record := range o.records {
-		for _, field := range record.Fields() {
+		for _, field := range record.ShowFields() {
 			found := false
 			for i := range fields {
 				if fields[i] == field.Name.String() {
@@ -45,6 +45,7 @@ func (o *Output) Close() error {
 	}
 
 	table := tablewriter.NewWriter(o.w)
+	table.SetColWidth(64)
 	table.SetRowLine(o.rowLines)
 	table.SetHeader(fields)
 	table.SetAutoFormatHeaders(false)

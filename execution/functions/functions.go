@@ -1,6 +1,7 @@
 package functions
 
 import (
+	"encoding/base32"
 	"fmt"
 	"log"
 	"math"
@@ -647,7 +648,7 @@ var FuncRegexpFind = execution.Function{
 
 		match := re.FindString(args[1].AsString())
 		if match == "" {
-			return ZeroValue(), nil
+			return MakeNull(), nil
 		}
 
 		return MakeString(match), nil
@@ -1263,6 +1264,28 @@ var FuncParseTime = execution.Function{
 		}
 
 		return MakeTime(t), nil
+	},
+}
+
+var FuncDecodeBase32 = execution.Function{
+	Name: "decode_base32",
+	ArgumentNames: [][]string{
+		{"text"},
+	},
+	Description: docs.List(
+		docs.Text("Decodes the text from Base32. Especially useful when using a datasource which stores text as byte fields."),
+	),
+	Validator: All(
+		ExactlyNArgs(1),
+		AllArgs(TypeOf(ZeroString())),
+	),
+	Logic: func(args ...Value) (Value, error) {
+		data, err := base32.StdEncoding.DecodeString(args[0].AsString())
+		if err != nil {
+			return ZeroValue(), errors.Wrap(err, "couldn't decode base32")
+		}
+
+		return MakeString(string(data)), nil
 	},
 }
 

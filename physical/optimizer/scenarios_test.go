@@ -834,6 +834,52 @@ func TestMergeDataSourceWithFilter(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "test",
+			args: args{
+				plan: &physical.Filter{
+					Formula: physical.NewPredicate(
+						physical.NewVariable("a.name"),
+						physical.Equal,
+						physical.NewVariable("b.surname"),
+					),
+
+					Source: &physical.DataSourceBuilder{
+						Materializer: nil,
+						PrimaryKeys:  []octosql.VariableName{"a.name"},
+						AvailableFilters: map[physical.FieldType]map[physical.Relation]struct{}{
+							physical.Primary: {
+								physical.Equal: struct{}{},
+							},
+							physical.Secondary: {},
+						},
+						Filter: physical.NewConstant(true),
+						Name:   "baz",
+						Alias:  "a",
+					},
+				},
+			},
+			want: &physical.DataSourceBuilder{
+				Materializer: nil,
+				PrimaryKeys:  []octosql.VariableName{"a.name"},
+				AvailableFilters: map[physical.FieldType]map[physical.Relation]struct{}{
+					physical.Primary: {
+						physical.Equal: struct{}{},
+					},
+					physical.Secondary: {},
+				},
+				Filter: physical.NewAnd(
+					physical.NewPredicate(
+						physical.NewVariable("a.name"),
+						physical.Equal,
+						physical.NewVariable("b.surname"),
+					),
+					physical.NewConstant(true),
+				),
+				Name:  "baz",
+				Alias: "a",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

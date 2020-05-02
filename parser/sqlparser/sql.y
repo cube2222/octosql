@@ -60,6 +60,9 @@ func skipToEnd(yylex interface{}) {
   tableValuedFunctionArguments TableValuedFunctionArguments
   tableValuedFunctionArgument *TableValuedFunctionArgument
   tableValuedFunctionArgumentValue TableValuedFunctionArgumentValue
+  commonTableExpression *CommonTableExpression
+  commonTableExpressions CommonTableExpressions
+  with 					*With
   empty         struct{}
   statement     Statement
   selStmt       SelectStatement
@@ -94,6 +97,8 @@ func skipToEnd(yylex interface{}) {
   orderBy       OrderBy
   order         *Order
   limit         *Limit
+  triggers 			[]Trigger
+  trigger				Trigger
   updateExprs   UpdateExprs
   setExprs      SetExprs
   updateExpr    *UpdateExpr
@@ -128,7 +133,7 @@ func skipToEnd(yylex interface{}) {
 
 %token LEX_ERROR
 %left <bytes> UNION
-%token <bytes> SELECT STREAM INSERT UPDATE DELETE FROM WHERE GROUP HAVING ORDER BY LIMIT OFFSET FOR
+%token <bytes> SELECT STREAM INSERT UPDATE DELETE FROM WHERE GROUP HAVING ORDER BY LIMIT OFFSET FOR WATERMARK DELAY COUNTING AFTER
 %token <bytes> ALL DISTINCT AS EXISTS ASC DESC INTO DUPLICATE KEY DEFAULT SET LOCK UNLOCK KEYS
 %token <bytes> VALUES LAST_INSERT_ID
 %token <bytes> NEXT VALUE SHARE MODE
@@ -213,6 +218,9 @@ func skipToEnd(yylex interface{}) {
 
 %type <statement> command
 %type <selStmt> select_statement base_select union_lhs union_rhs
+%type <bytes> comma_opt
+%type <commonTableExpression> cte
+%type <commonTableExpressions> cte_list
 %type <statement> stream_statement insert_statement update_statement delete_statement set_statement
 %type <statement> create_statement alter_statement rename_statement drop_statement truncate_statement flush_statement
 %type <ddl> create_table_prefix rename_list
@@ -261,6 +269,9 @@ func skipToEnd(yylex interface{}) {
 %type <str> asc_desc_opt
 %type <limit> limit_opt
 %type <str> lock_opt
+%type <triggers> trigger_opt
+%type <triggers> trigger_list
+%type <trigger> trigger
 %type <columns> ins_column_list column_list
 %type <partitions> opt_partition_clause partition_list
 %type <updateExprs> on_dup_opt
@@ -370,6 +381,10 @@ select_statement:
     sel.Lock = $4
     $$ = sel
   }
+| WITH cte_list comma_opt select_statement
+	{
+		$$ = &With{CommonTableExpressions: $2, Select: $4}
+	}
 | union_lhs union_op union_rhs order_by_opt limit_opt lock_opt
   {
     $$ = &Union{Type: $2, Left: $1, Right: $3, OrderBy: $4, Limit: $5, Lock: $6}
@@ -379,6 +394,33 @@ select_statement:
     $$ = &Select{Comments: Comments($2), Cache: $3, SelectExprs: SelectExprs{Nextval{Expr: $5}}, From: TableExprs{&AliasedTableExpr{Expr: $7}}}
   }
 
+comma_opt:
+	{
+	$$ = nil
+	}
+| ','
+	{
+	$$ = []byte(",")
+	}
+
+
+cte_list:
+	cte
+	{
+		$$ = []*CommonTableExpression{$1}
+	}
+|	cte_list ',' cte
+	{
+		$$ = append($1, $3)
+	}
+
+cte:
+	table_alias AS openb select_statement closeb
+	{
+		$$ = &CommonTableExpression{Name: $1, Select: $4}
+	}
+
+
 stream_statement:
   STREAM comment_opt select_expression FROM table_name
   {
@@ -387,17 +429,13 @@ stream_statement:
 
 // base_select is an unparenthesized SELECT with no order by clause or beyond.
 base_select:
-  SELECT comment_opt cache_opt distinct_opt straight_join_opt select_expression_list from_opt where_expression_opt group_by_opt having_opt
+  SELECT comment_opt cache_opt distinct_opt straight_join_opt select_expression_list from_opt where_expression_opt group_by_opt having_opt trigger_opt
   {
-    $$ = &Select{Comments: Comments($2), Cache: $3, Distinct: $4, Hints: $5, SelectExprs: $6, From: $7, Where: NewWhere(WhereStr, $8), GroupBy: GroupBy($9), Having: NewWhere(HavingStr, $10)}
+    $$ = &Select{Comments: Comments($2), Cache: $3, Distinct: $4, Hints: $5, SelectExprs: $6, From: $7, Where: NewWhere(WhereStr, $8), GroupBy: GroupBy($9), Having: NewWhere(HavingStr, $10), Trigger: $11}
   }
 
 union_lhs:
-  select_statement
-  {
-    $$ = $1
-  }
-| openb select_statement closeb
+	openb select_statement closeb
   {
     $$ = &ParenSelect{Select: $2}
   }
@@ -2966,6 +3004,39 @@ lock_opt:
     $$ = ShareModeStr
   }
 
+trigger_opt:
+  {
+    $$ = nil
+  }
+| TRIGGER trigger_list
+  {
+    $$ = $2
+  }
+
+trigger_list:
+	trigger
+	{
+		$$ = []Trigger{$1}
+	}
+| trigger_list ',' trigger
+	{
+		$$ = append($1, $3)
+	}
+
+trigger:
+	ON WATERMARK
+	{
+		$$ = &WatermarkTrigger{}
+	}
+| AFTER DELAY expression
+	{
+		$$ = &DelayTrigger{Delay: $3}
+	}
+| COUNTING expression
+	{
+		$$ = &CountingTrigger{Count: $2}
+	}
+
 // insert_data expands all combinations into a single rule.
 // This avoids a shift/reduce conflict while encountering the
 // following two possible constructs:
@@ -3322,6 +3393,7 @@ reserved_keyword:
 | TIMESTAMPADD
 | TIMESTAMPDIFF
 | TO
+| TRIGGER
 | TRUE
 | UNION
 | UNIQUE
@@ -3335,6 +3407,7 @@ reserved_keyword:
 | VALUES
 | WHEN
 | WHERE
+| WITH
 
 /*
   These are non-reserved Vitess, because they don't cause conflicts in the grammar.
@@ -3344,7 +3417,8 @@ reserved_keyword:
   Sorted alphabetically
 */
 non_reserved_keyword:
-  AGAINST
+	AFTER
+| AGAINST
 | ACTION
 | BEGIN
 | BIGINT
@@ -3361,9 +3435,11 @@ non_reserved_keyword:
 | COMMENT_KEYWORD
 | COMMIT
 | COMMITTED
+| COUNTING
 | DATE
 | DATETIME
 | DECIMAL
+| DELAY
 | DOUBLE
 | DUPLICATE
 | ENGINES
@@ -3437,7 +3513,6 @@ non_reserved_keyword:
 | TINYINT
 | TINYTEXT
 | TRANSACTION
-| TRIGGER
 | TRUNCATE
 | UNCOMMITTED
 | UNSIGNED
@@ -3455,7 +3530,7 @@ non_reserved_keyword:
 | VSCHEMA_TABLES
 | VITESS_TARGET
 | WARNINGS
-| WITH
+| WATERMARK
 | WRITE
 | YEAR
 | ZEROFILL

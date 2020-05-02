@@ -44,7 +44,7 @@ func (node *Offset) Materialize(ctx context.Context, matCtx *MaterializationCont
 }
 
 func (node *Offset) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality(), node.Source.Metadata().EventTimeField())
+	return metadata.NewNodeMetadataFromMetadata(node.Source.Metadata())
 }
 
 func (node *Offset) Visualize() *graph.Node {

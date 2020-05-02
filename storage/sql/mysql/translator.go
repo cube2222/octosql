@@ -3,9 +3,10 @@ package mysql
 import (
 	"context"
 
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
-	"github.com/pkg/errors"
 )
 
 // A structure that stores the relation ? -> expression

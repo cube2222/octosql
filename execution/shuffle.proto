@@ -1,0 +1,7 @@
+syntax = "proto3";
+package execution;
+option go_package = "github.com/cube2222/octosql/execution";
+
+message ShuffleID {
+    string id = 1;
+}

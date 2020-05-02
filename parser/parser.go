@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
@@ -71,54 +72,93 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		return nil, errors.Wrap(err, "couldn't parse from expression")
 	}
 
+	// If we get a join we want to parse triggers for it. It is done here, because otherwise passing statement.Triggers
+	// would have to get to like 4 functions, which is a bit of a pain, since the type check here.
+	if root, ok := root.(*logical.Join); ok {
+		triggers := make([]logical.Trigger, len(statement.Trigger))
+		for i := range statement.Trigger {
+			triggers[i], err = ParseTrigger(statement.Trigger[i])
+			if err != nil {
+				return nil, errors.Wrapf(err, "couldn't parse trigger with index %d", i)
+			}
+		}
+
+		root = root.WithTriggers(triggers)
+	}
+
+	// Separate star expressions so we can put them at last positions
+	nonStarExpressions := make([]sqlparser.SelectExpr, 0)
+	starExpressions := make([]sqlparser.SelectExpr, 0)
+
+	for i := range statement.SelectExprs {
+		if _, ok := statement.SelectExprs[i].(*sqlparser.StarExpr); ok {
+			starExpressions = append(starExpressions, statement.SelectExprs[i])
+		} else {
+			nonStarExpressions = append(nonStarExpressions, statement.SelectExprs[i])
+		}
+	}
+
+	// We want to have normal expressions first, star expressions later
+	statement.SelectExprs = append(nonStarExpressions, starExpressions...)
+
 	// A WHERE clause needs to have access to those variables, so this map comes first, keeping the old variables.
 	expressions := make([]logical.NamedExpression, len(statement.SelectExprs))
 	aggregateStars := make([]bool, len(statement.SelectExprs))
 	aggregates := make([]logical.Aggregate, len(statement.SelectExprs))
 	aggregatesAs := make([]octosql.VariableName, len(statement.SelectExprs))
 	aggregating := false
+
 	if len(statement.SelectExprs) >= 1 {
-		if _, ok := statement.SelectExprs[0].(*sqlparser.StarExpr); !ok {
-			for i := range statement.SelectExprs {
-				aliasedExpression, ok := statement.SelectExprs[i].(*sqlparser.AliasedExpr)
-				if !ok {
-					return nil, errors.Errorf("expected aliased expression in select on index %v, got %v %v",
-						i, statement.SelectExprs[i], reflect.TypeOf(statement.SelectExprs[i]))
+		for i := range statement.SelectExprs {
+			if starExpr, ok := statement.SelectExprs[i].(*sqlparser.StarExpr); ok {
+				expressions[i], err = ParseStarExpression(starExpr)
+				if err != nil { // just in case ParseStarExpression changes in the future
+					return nil, errors.Wrap(err, "couldn't parse star expression")
 				}
 
-				// Try to parse this as an aggregate expression.
-				aggregates[i], expressions[i], err = ParseAggregate(aliasedExpression.Expr)
-				if err == nil {
-					aggregating = true
-					if expressions[i] == nil {
-						aggregateStars[i] = true
-					}
-					aggregatesAs[i] = octosql.NewVariableName(aliasedExpression.As.String())
-					continue
-				}
-				if errors.Cause(err) != ErrNotAggregate {
-					return nil, errors.Wrapf(err, "couldn't parse aggregate with index %d", i)
-				}
-
-				// If this isn't an aggregate expression,
-				// then we parse it as a normal select expression.
-
-				expressions[i], err = ParseAliasedExpression(aliasedExpression)
-				if err != nil {
-					return nil, errors.Wrapf(err, "couldn't parse aliased expression with index %d", i)
-				}
+				continue
 			}
 
-			filteredExpressions := make([]logical.NamedExpression, 0, len(expressions))
-			// Filter out the stars, keep is true, so all values will stay anyways
-			for i := range expressions {
-				if expressions[i] != nil {
+			aliasedExpression, ok := statement.SelectExprs[i].(*sqlparser.AliasedExpr)
+			if !ok {
+				return nil, errors.Errorf("expected aliased expression in select on index %v, got %v %v",
+					i, statement.SelectExprs[i], reflect.TypeOf(statement.SelectExprs[i]))
+			}
+
+			// Try to parse this as an aggregate expression.
+			aggregates[i], expressions[i], err = ParseAggregate(aliasedExpression.Expr)
+			if err == nil {
+				aggregating = true
+				if expressions[i] == nil {
+					aggregateStars[i] = true
+				}
+				aggregatesAs[i] = octosql.NewVariableName(aliasedExpression.As.String())
+				continue
+			}
+			if errors.Cause(err) != ErrNotAggregate {
+				return nil, errors.Wrapf(err, "couldn't parse aggregate with index %d", i)
+			}
+
+			// If this isn't an aggregate expression,
+			// then we parse it as a normal select expression.
+
+			expressions[i], err = ParseAliasedExpression(aliasedExpression)
+			if err != nil {
+				return nil, errors.Wrapf(err, "couldn't parse aliased expression with index %d", i)
+			}
+		}
+
+		filteredExpressions := make([]logical.NamedExpression, 0, len(expressions))
+		// Filter out the stars, keep is true, so all values will stay anyways
+		for i := range expressions {
+			if expressions[i] != nil {
+				if _, ok := expressions[i].(*logical.StarExpression); !ok {
 					filteredExpressions = append(filteredExpressions, expressions[i])
 				}
 			}
-
-			root = logical.NewMap(filteredExpressions, root, true)
 		}
+
+		root = logical.NewMap(filteredExpressions, root, true)
 	}
 
 	if statement.Where != nil {
@@ -127,6 +167,10 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 			return nil, errors.Wrap(err, "couldn't parse where expression")
 		}
 		root = logical.NewFilter(filterFormula, root)
+	}
+
+	if statement.GroupBy != nil {
+		aggregating = true
 	}
 
 	if aggregating {
@@ -146,20 +190,35 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 			if !aggregateStars[i] {
 				fields[i] = expressions[i].Name()
 			} else {
-				fields[i] = "*star*"
+				fields[i] = octosql.StarExpressionName
 			}
 		}
 
-		// If the user doesn't specify an aggregate, we default to the first element in the group.
+		// If the user doesn't specify an aggregate, we default to the FIRST aggregate, or KEY if it's a part of the key.
 		// However, we don't want to change the name of that field.
 		for i := range aggregates {
 			if len(aggregates[i]) == 0 {
 				aggregates[i] = logical.First
+				for j := range key {
+					if namedKeyElement, ok := key[j].(logical.NamedExpression); ok {
+						if namedKeyElement.Name().Equal(fields[i]) {
+							aggregates[i] = logical.Key
+						}
+					}
+				}
 				aggregatesAs[i] = expressions[i].Name()
 			}
 		}
 
-		root = logical.NewGroupBy(root, key, fields, aggregates, aggregatesAs)
+		triggers := make([]logical.Trigger, len(statement.Trigger))
+		for i := range statement.Trigger {
+			triggers[i], err = ParseTrigger(statement.Trigger[i])
+			if err != nil {
+				return nil, errors.Wrapf(err, "couldn't parse trigger with index %d", i)
+			}
+		}
+
+		root = logical.NewGroupBy(root, key, fields, aggregates, aggregatesAs, triggers)
 	}
 
 	if statement.OrderBy != nil {
@@ -173,26 +232,53 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 
 	// Now we only keep the selected variables.
 	if len(statement.SelectExprs) >= 1 {
-		if _, ok := statement.SelectExprs[0].(*sqlparser.StarExpr); !ok {
-			nameExpressions := make([]logical.NamedExpression, len(statement.SelectExprs))
-			for i := range expressions {
-				if !aggregating {
-					nameExpressions[i] = logical.NewVariable(expressions[i].Name())
+		nameExpressions := make([]logical.NamedExpression, len(nonStarExpressions))
+
+		// Handle non star expressions
+		for i := range nonStarExpressions {
+			if !aggregating {
+				nameExpressions[i] = logical.NewVariable(expressions[i].Name())
+			} else {
+				if len(aggregatesAs[i]) > 0 {
+					nameExpressions[i] = logical.NewVariable(aggregatesAs[i])
 				} else {
-					if len(aggregatesAs[i]) > 0 {
-						nameExpressions[i] = logical.NewVariable(aggregatesAs[i])
+					if !aggregateStars[i] {
+						nameExpressions[i] = logical.NewVariable(octosql.NewVariableName(fmt.Sprintf("%v_%v", expressions[i].Name(), aggregates[i])))
 					} else {
-						if !aggregateStars[i] {
-							nameExpressions[i] = logical.NewVariable(octosql.NewVariableName(fmt.Sprintf("%v_%v", expressions[i].Name(), aggregates[i])))
-						} else {
-							nameExpressions[i] = logical.NewVariable(octosql.NewVariableName(fmt.Sprintf("%v_%v", "*star*", aggregates[i])))
-						}
+						nameExpressions[i] = logical.NewVariable(octosql.NewVariableName(fmt.Sprintf("%v_%v", octosql.StarExpressionName, aggregates[i])))
 					}
 				}
 			}
 
-			root = logical.NewMap(nameExpressions, root, false)
+			// We check for duplicated columns
+			for j := 0; j < i; j++ {
+				if nameExpressions[j].Name() == nameExpressions[i].Name() {
+					return nil, errors.New("select expressions contain duplicated columns")
+				}
+			}
 		}
+
+		// Handle star expressions collisions
+		for i := len(nonStarExpressions); i < len(statement.SelectExprs); i++ {
+			qualifier := expressions[i].Name().Source()
+
+			// TODO: Actually it's not that simple, because "SELECT *, p.name as mename FROM people p" is legit
+			if qualifier == "" { // a * expression collides with anything else
+				if len(statement.SelectExprs) > 1 {
+					return nil, errors.New("select expressions contain a non-qualified star expression and some other fields")
+				}
+			} else {
+				for j := 0; j < i; j++ { // a qualifier.* collides with any other qualifier.*something* field
+					if expressions[j].Name().Source() == qualifier {
+						return nil, errors.Errorf("a star expression with qualifier %v collides with %v", qualifier, expressions[j].Name())
+					}
+				}
+			}
+
+			nameExpressions = append(nameExpressions, expressions[i])
+		}
+
+		root = logical.NewMap(nameExpressions, root, false)
 	}
 
 	if len(statement.Distinct) > 0 {
@@ -216,6 +302,26 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 	return root, nil
 }
 
+func ParseWith(statement *sqlparser.With) (logical.Node, error) {
+	source, err := ParseNode(statement.Select)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't parse underlying select in WITH statement")
+	}
+
+	nodes := make([]logical.Node, len(statement.CommonTableExpressions))
+	names := make([]string, len(statement.CommonTableExpressions))
+	for i, cte := range statement.CommonTableExpressions {
+		node, err := ParseNode(cte.Select)
+		if err != nil {
+			return nil, errors.Wrapf(err, "couldn't parse common table expression %s with index %d", cte.Name, i)
+		}
+		nodes[i] = node
+		names[i] = cte.Name.String()
+	}
+
+	return logical.NewWith(names, nodes, source), nil
+}
+
 func ParseNode(statement sqlparser.SelectStatement) (logical.Node, error) {
 	switch statement := statement.(type) {
 	case *sqlparser.Select:
@@ -226,6 +332,9 @@ func ParseNode(statement sqlparser.SelectStatement) (logical.Node, error) {
 
 	case *sqlparser.ParenSelect:
 		return ParseNode(statement.Select)
+
+	case *sqlparser.With:
+		return ParseWith(statement)
 
 	default:
 		// Union
@@ -280,16 +389,12 @@ func ParseJoinTableExpression(expr *sqlparser.JoinTableExpr) (logical.Node, erro
 
 	var source, joined logical.Node
 	switch expr.Join {
-	case sqlparser.LeftJoinStr:
+	case sqlparser.LeftJoinStr, sqlparser.JoinStr:
 		source = leftTable
 		joined = rightTable
 	case sqlparser.RightJoinStr:
 		source = rightTable
 		joined = leftTable
-	case sqlparser.JoinStr:
-		// TODO: Add cardinality based heuristics
-		source = leftTable
-		joined = rightTable
 	default:
 		return nil, errors.Errorf("invalid join expression: %v", expr.Join)
 	}
@@ -305,9 +410,9 @@ func ParseJoinTableExpression(expr *sqlparser.JoinTableExpr) (logical.Node, erro
 
 	switch expr.Join {
 	case sqlparser.LeftJoinStr, sqlparser.RightJoinStr:
-		return logical.NewLeftJoin(source, joined), nil
+		return logical.NewJoin(source, joined, execution.LEFT_JOIN), nil
 	case sqlparser.JoinStr:
-		return logical.NewInnerJoin(source, joined), nil
+		return logical.NewJoin(source, joined, execution.INNER_JOIN), nil
 	default:
 		return nil, errors.Errorf("invalid join expression: %v", expr.Join)
 	}
@@ -358,6 +463,8 @@ func ParseTableValuedFunctionArgument(expr sqlparser.TableValuedFunctionArgument
 	}
 }
 
+var ErrNotAggregate = errors.New("expression is not aggregate")
+
 func ParseAggregate(expr sqlparser.Expr) (logical.Aggregate, logical.NamedExpression, error) {
 	switch expr := expr.(type) {
 	case *sqlparser.FuncExpr:
@@ -400,7 +507,28 @@ func ParseAggregate(expr sqlparser.Expr) (logical.Aggregate, logical.NamedExpres
 	return "", nil, errors.Wrapf(ErrNotAggregate, "invalid group by select expression type")
 }
 
-var ErrNotAggregate = errors.New("expression is not aggregate")
+func ParseTrigger(trigger sqlparser.Trigger) (logical.Trigger, error) {
+	switch trigger := trigger.(type) {
+	case *sqlparser.CountingTrigger:
+		countExpr, err := ParseExpression(trigger.Count)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't parse count expression")
+		}
+		return logical.NewCountingTrigger(countExpr), nil
+
+	case *sqlparser.DelayTrigger:
+		delayExpr, err := ParseExpression(trigger.Delay)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't parse delay expression")
+		}
+		return logical.NewDelayTrigger(delayExpr), nil
+
+	case *sqlparser.WatermarkTrigger:
+		return logical.NewWatermarkTrigger(), nil
+	}
+
+	return nil, errors.Errorf("invalid trigger type: %v", trigger)
+}
 
 func ParseAliasedExpression(expr *sqlparser.AliasedExpr) (logical.NamedExpression, error) {
 	subExpr, err := ParseExpression(expr.Expr)
@@ -415,6 +543,10 @@ func ParseAliasedExpression(expr *sqlparser.AliasedExpr) (logical.NamedExpressio
 		return nil, errors.Errorf("expressions in select statement and aggregate expressions must be named")
 	}
 	return logical.NewAliasedExpression(octosql.NewVariableName(expr.As.String()), subExpr), nil
+}
+
+func ParseStarExpression(expr *sqlparser.StarExpr) (logical.NamedExpression, error) {
+	return logical.NewStarExpression(expr.TableName.Name.String()), nil
 }
 
 func ParseFunctionArgument(expr *sqlparser.AliasedExpr) (logical.Expression, error) {

@@ -32,7 +32,7 @@ func (o *Output) WriteRecord(record *execution.Record) error {
 func (o *Output) Close() error {
 	var fields []string
 	for _, record := range o.records {
-		for _, field := range record.Fields() {
+		for _, field := range record.ShowFields() {
 			found := false
 			for i := range fields {
 				if fields[i] == field.Name.String() {

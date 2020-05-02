@@ -281,6 +281,7 @@ type Statement interface {
 
 func (*Union) iStatement()      {}
 func (*Select) iStatement()     {}
+func (*With) iStatement()       {}
 func (*Stream) iStatement()     {}
 func (*Insert) iStatement()     {}
 func (*Update) iStatement()     {}
@@ -306,14 +307,13 @@ type SelectStatement interface {
 	iSelectStatement()
 	iStatement()
 	iInsertRows()
-	AddOrder(*Order)
-	SetLimit(*Limit)
 	SQLNode
 }
 
 func (*Select) iSelectStatement()      {}
 func (*Union) iSelectStatement()       {}
 func (*ParenSelect) iSelectStatement() {}
+func (*With) iSelectStatement()        {}
 
 // Select represents a SELECT statement.
 type Select struct {
@@ -329,6 +329,7 @@ type Select struct {
 	OrderBy     OrderBy
 	Limit       *Limit
 	Lock        string
+	Trigger     Triggers
 }
 
 // Select.Distinct
@@ -348,16 +349,6 @@ const (
 	SQLCacheStr   = "sql_cache "
 	SQLNoCacheStr = "sql_no_cache "
 )
-
-// AddOrder adds an order by element
-func (node *Select) AddOrder(order *Order) {
-	node.OrderBy = append(node.OrderBy, order)
-}
-
-// SetLimit sets the limit clause
-func (node *Select) SetLimit(limit *Limit) {
-	node.Limit = limit
-}
 
 // Format formats the node.
 func (node *Select) Format(buf *TrackedBuffer) {
@@ -434,16 +425,6 @@ type ParenSelect struct {
 	Select SelectStatement
 }
 
-// AddOrder adds an order by element
-func (node *ParenSelect) AddOrder(order *Order) {
-	panic("unreachable")
-}
-
-// SetLimit sets the limit clause
-func (node *ParenSelect) SetLimit(limit *Limit) {
-	panic("unreachable")
-}
-
 // Format formats the node.
 func (node *ParenSelect) Format(buf *TrackedBuffer) {
 	buf.Myprintf("(%v)", node.Select)
@@ -475,16 +456,6 @@ const (
 	UnionDistinctStr = "union distinct"
 )
 
-// AddOrder adds an order by element
-func (node *Union) AddOrder(order *Order) {
-	node.OrderBy = append(node.OrderBy, order)
-}
-
-// SetLimit sets the limit clause
-func (node *Union) SetLimit(limit *Limit) {
-	node.Limit = limit
-}
-
 // Format formats the node.
 func (node *Union) Format(buf *TrackedBuffer) {
 	buf.Myprintf("%v %s %v%v%v%s", node.Left, node.Type, node.Right,
@@ -500,6 +471,63 @@ func (node *Union) walkSubtree(visit Visit) error {
 		node.Left,
 		node.Right,
 	)
+}
+
+type With struct {
+	CommonTableExpressions CommonTableExpressions
+	Select                 SelectStatement
+}
+
+func (node *With) Format(buf *TrackedBuffer) {
+	buf.Myprintf("WITH %v %v", node.CommonTableExpressions, node.Select)
+}
+
+func (node *With) walkSubtree(visit Visit) error {
+	if err := Walk(visit, node.CommonTableExpressions); err != nil {
+		return err
+	}
+	if err := Walk(visit, node.Select); err != nil {
+		return err
+	}
+	return nil
+}
+
+type CommonTableExpressions []*CommonTableExpression
+
+func (node CommonTableExpressions) Format(buf *TrackedBuffer) {
+	var prefix string
+	for _, n := range node {
+		buf.Myprintf("%s%v", prefix, n)
+		prefix = ", "
+	}
+}
+
+func (node CommonTableExpressions) walkSubtree(visit Visit) error {
+	for _, n := range node {
+		if err := Walk(visit, n); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type CommonTableExpression struct {
+	Name   TableIdent
+	Select SelectStatement
+}
+
+func (node *CommonTableExpression) Format(buf *TrackedBuffer) {
+	buf.Myprintf("%s AS (%v)", node.Name, node.Select)
+}
+
+func (node *CommonTableExpression) walkSubtree(visit Visit) error {
+	if err := Walk(visit, node.Name); err != nil {
+		return err
+	}
+	if err := Walk(visit, node.Select); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Stream represents a SELECT statement.
@@ -584,6 +612,7 @@ func (*Select) iInsertRows()      {}
 func (*Union) iInsertRows()       {}
 func (Values) iInsertRows()       {}
 func (*ParenSelect) iInsertRows() {}
+func (*With) iInsertRows()        {}
 
 // Update represents an UPDATE statement.
 // If you add fields here, consider adding them to calls to validateUnshardedRoute.
@@ -3603,6 +3632,71 @@ func (node *Limit) walkSubtree(visit Visit) error {
 		node.Offset,
 		node.Rowcount,
 	)
+}
+
+// Triggers represents a TRIGGER clause.
+type Triggers []Trigger
+
+// Format formats the node.
+func (node Triggers) Format(buf *TrackedBuffer) {
+	prefix := "TRIGGER "
+	for _, n := range node {
+		buf.Myprintf("%s%v", prefix, n)
+		prefix = ", "
+	}
+}
+
+func (node Triggers) walkSubtree(visit Visit) error {
+	for _, n := range node {
+		if err := Walk(visit, n); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type Trigger interface {
+	SQLNode
+	iTrigger()
+}
+
+func (w *WatermarkTrigger) iTrigger() {}
+func (w *DelayTrigger) iTrigger()     {}
+func (w *CountingTrigger) iTrigger()  {}
+
+type WatermarkTrigger struct {
+}
+
+func (w *WatermarkTrigger) Format(buf *TrackedBuffer) {
+	buf.Myprintf("WATERMARK")
+}
+
+func (w *WatermarkTrigger) walkSubtree(visit Visit) error {
+	return nil
+}
+
+type DelayTrigger struct {
+	Delay Expr
+}
+
+func (w *DelayTrigger) Format(buf *TrackedBuffer) {
+	buf.Myprintf("DELAY %v", w.Delay)
+}
+
+func (w *DelayTrigger) walkSubtree(visit Visit) error {
+	return Walk(visit, w.Delay)
+}
+
+type CountingTrigger struct {
+	Count Expr
+}
+
+func (w *CountingTrigger) Format(buf *TrackedBuffer) {
+	buf.Myprintf("COUNT %v", w.Count)
+}
+
+func (w *CountingTrigger) walkSubtree(visit Visit) error {
+	return Walk(visit, w.Count)
 }
 
 // Values represents a VALUES clause.

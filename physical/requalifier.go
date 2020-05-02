@@ -40,10 +40,14 @@ func (node *Requalifier) Materialize(ctx context.Context, matCtx *Materializatio
 }
 
 func (node *Requalifier) Metadata() *metadata.NodeMetadata {
-	eventTimeField := node.Source.Metadata().EventTimeField()
+	sourceMetadata := node.Source.Metadata()
+	eventTimeField := sourceMetadata.EventTimeField()
 	eventTimeField = octosql.NewVariableName(fmt.Sprintf("%s.%s", node.Qualifier, eventTimeField.Name()))
 
-	return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality(), eventTimeField)
+	namespace := metadata.EmptyNamespace()
+	namespace.AddPrefix(node.Qualifier)
+
+	return metadata.NewNodeMetadata(sourceMetadata.Cardinality(), eventTimeField, namespace)
 }
 
 func (node *Requalifier) Visualize() *graph.Node {

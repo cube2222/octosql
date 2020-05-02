@@ -2,8 +2,10 @@ package parquet
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
 	"sort"
 	"time"
 
@@ -303,6 +305,9 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 				v = parsed
 			}
 		}
+		if int96, ok := v.(parquet.Int96); ok {
+			v = int(binary.LittleEndian.Uint64(int96[:8]))
+		}
 		aliasedRecord[octosql.NewVariableName(fmt.Sprintf("%s.%s", rs.alias, k))] = octosql.NormalizeType(v)
 	}
 
@@ -314,6 +319,8 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 	sort.Slice(fields, func(i, j int) bool {
 		return fields[i] < fields[j]
 	})
+
+	log.Println(execution.NewRecord(fields, aliasedRecord).Show())
 
 	return execution.NewRecord(fields, aliasedRecord), nil
 }

@@ -1,6 +1,8 @@
 package octosql
 
 import (
+	"bytes"
+	"encoding/base32"
 	"fmt"
 	"log"
 	"reflect"
@@ -147,7 +149,19 @@ func NormalizeType(value interface{}) Value {
 	case float64:
 		return MakeFloat(value)
 	case []byte:
-		return MakeString(string(value))
+		var buf bytes.Buffer
+		enc := base32.NewEncoder(base32.StdEncoding, &buf)
+		n, err := enc.Write(value)
+		if err != nil {
+			panic(fmt.Sprintf("couldn't base64 encode bytes: %s", err.Error()))
+		}
+		if n != len(value) {
+			panic(fmt.Sprintf("couldn't base64 encode bytes: wrote only %d of %d bytes", n, len(value)))
+		}
+		if err := enc.Close(); err != nil {
+			panic(fmt.Sprintf("couldn't close base64 encode bytes: %s", err.Error()))
+		}
+		return MakeString(buf.String())
 	case string:
 		return MakeString(value)
 	case []interface{}:

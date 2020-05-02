@@ -2,6 +2,7 @@ package parquet
 
 import (
 	"context"
+	"encoding/base32"
 	"testing"
 
 	"github.com/cube2222/octosql"
@@ -37,19 +38,19 @@ func TestParquetRecordStream_Get(t *testing.T) {
 				[]*execution.Record{
 					execution.NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
-						[]interface{}{"green", 1, 152849, 3, 2014},
+						[]interface{}{base32.StdEncoding.EncodeToString([]byte("green")), 1, 152849, 3, 2014},
 					),
 					execution.NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
-						[]interface{}{"black", 2, 106332, 2, 1988},
+						[]interface{}{base32.StdEncoding.EncodeToString([]byte("black")), 2, 106332, 2, 1988},
 					),
 					execution.NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
-						[]interface{}{"purple", 3, 99148, 2, 2009},
+						[]interface{}{base32.StdEncoding.EncodeToString([]byte("purple")), 3, 99148, 2, 2009},
 					),
 					execution.NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
-						[]interface{}{"orange", 4, 97521, 2, 1979},
+						[]interface{}{base32.StdEncoding.EncodeToString([]byte("orange")), 4, 97521, 2, 1979},
 					),
 				},
 			),

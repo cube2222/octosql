@@ -2,19 +2,29 @@ package logical
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
 )
 
 type Formula interface {
+	graph.Visualizer
+
 	Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Formula, octosql.Variables, error)
 }
 
 type BooleanConstant struct {
 	Value bool
+}
+
+func (booleanConstant *BooleanConstant) Visualize() *graph.Node {
+	n := graph.NewNode("BooleanConstant")
+	n.AddField("Value", fmt.Sprint(booleanConstant.Value))
+	return n
 }
 
 func NewBooleanConstant(value bool) *BooleanConstant {
@@ -29,6 +39,19 @@ type InfixOperator struct {
 	Left     Formula
 	Operator string
 	Right    Formula
+}
+
+func (infixOperator *InfixOperator) Visualize() *graph.Node {
+	n := graph.NewNode("InfixOperator")
+	n.AddField("Operator", infixOperator.Operator)
+
+	if infixOperator.Left != nil {
+		n.AddChild("Left", infixOperator.Left.Visualize())
+	}
+	if infixOperator.Right != nil {
+		n.AddChild("Right", infixOperator.Right.Visualize())
+	}
+	return n
 }
 
 func NewInfixOperator(left Formula, right Formula, operator string) *InfixOperator {
@@ -65,6 +88,16 @@ type PrefixOperator struct {
 	Operator string
 }
 
+func (prefixOperator *PrefixOperator) Visualize() *graph.Node {
+	n := graph.NewNode("PrefixOperator")
+	n.AddField("Operator", prefixOperator.Operator)
+
+	if prefixOperator.Child != nil {
+		n.AddChild("Child", prefixOperator.Child.Visualize())
+	}
+	return n
+}
+
 func NewPrefixOperator(child Formula, operator string) *PrefixOperator {
 	return &PrefixOperator{Child: child, Operator: operator}
 }
@@ -87,6 +120,19 @@ type Predicate struct {
 	Left     Expression
 	Relation Relation
 	Right    Expression
+}
+
+func (predicate *Predicate) Visualize() *graph.Node {
+	n := graph.NewNode("Predicate")
+	n.AddField("Relation", string(predicate.Relation))
+
+	if predicate.Left != nil {
+		n.AddChild("Left", predicate.Left.Visualize())
+	}
+	if predicate.Right != nil {
+		n.AddChild("Right", predicate.Right.Visualize())
+	}
+	return n
 }
 
 func NewPredicate(left Expression, relation Relation, right Expression) *Predicate {

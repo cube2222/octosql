@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
 )
@@ -11,6 +12,17 @@ import (
 type Interval struct {
 	count Expression
 	unit  Expression
+}
+
+func (interval *Interval) Visualize() *graph.Node {
+	n := graph.NewNode("InnerJoin")
+	if interval.count != nil {
+		n.AddChild("count", interval.count.Visualize())
+	}
+	if interval.unit != nil {
+		n.AddChild("unit", interval.unit.Visualize())
+	}
+	return n
 }
 
 func NewInterval(count Expression, unit Expression) *Interval {

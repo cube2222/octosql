@@ -16,6 +16,7 @@ import (
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/metadata"
+	"github.com/cube2222/octosql/streaming/storage"
 )
 
 var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
@@ -129,7 +130,7 @@ func (it *ColStrIter) Next() (interface{}, error) {
 
 		//if new record is reached return current value
 		if it.rLevels[it.descriptionIterator] == 0 && len(elements) > 0 {
-			break;
+			break
 		}
 		//if data is not defined insert nil in it's place
 		if it.dLevels[it.descriptionIterator] == it.col.MaxD() {
@@ -181,7 +182,7 @@ func (it *ColStrIter) Next() (interface{}, error) {
 		it.descriptionIterator++
 		//if data is not repeated stop reading after first element
 		if it.col.MaxR() == 0 {
-			break;
+			break
 		}
 	}
 	//if column has repeated elements return list instead of single value
@@ -194,7 +195,7 @@ func (it *ColStrIter) Next() (interface{}, error) {
 
 func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 	return physical.NewDataSourceBuilderFactory(
-		func(ctx context.Context, matCtx *physical.MaterializationContext, dbConfig map[string]interface{}, filter physical.Formula, alias string) (execution.Node, error) {
+		func(ctx context.Context, matCtx *physical.MaterializationContext, dbConfig map[string]interface{}, filter physical.Formula, alias string, partition int) (execution.Node, error) {
 			path, err := config.GetString(dbConfig, "path")
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't get path")
@@ -208,6 +209,7 @@ func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 		nil,
 		availableFilters,
 		metadata.BoundedFitsInLocalStorage,
+		1,
 	)
 }
 
@@ -216,17 +218,17 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 	return NewDataSourceBuilderFactory(), nil
 }
 
-func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables) (execution.RecordStream, error) {
+func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
 	file, err := parquet.OpenFile(ds.path)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't open file")
+		return nil, nil, errors.Wrap(err, "couldn't open file")
 	}
 
 	columns := file.Schema.Columns()
 
 	for _, col := range columns {
 		if col.MaxR() > 1 {
-			return nil, fmt.Errorf("not supported nested repeated elements in column '%s'", col)
+			return nil, nil, fmt.Errorf("not supported nested repeated elements in column '%s'", col)
 		}
 	}
 
@@ -236,12 +238,18 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables) (exe
 	}
 
 	return &RecordStream{
-		file:            file,
-		isDone:          false,
-		columnIterators: colIters,
-		columns:         columns,
-		alias:           ds.alias,
-	}, nil
+			file:            file,
+			isDone:          false,
+			columnIterators: colIters,
+			columns:         columns,
+			alias:           ds.alias,
+		},
+		execution.NewExecutionOutput(
+			execution.NewZeroWatermarkGenerator(),
+			map[string]execution.ShuffleData{},
+			nil,
+		),
+		nil
 }
 
 type RecordStream struct {
@@ -252,7 +260,7 @@ type RecordStream struct {
 	alias           string
 }
 
-func (rs *RecordStream) Close() error {
+func (rs *RecordStream) Close(ctx context.Context, storage storage.Storage) error {
 	if err := rs.file.Close(); err != nil {
 		return errors.Wrap(err, "couldn't close underlying file")
 	}

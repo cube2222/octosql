@@ -16,6 +16,7 @@ import (
 
 	"github.com/cube2222/octosql/storage/excel"
 	"github.com/cube2222/octosql/storage/kafka"
+	"github.com/cube2222/octosql/storage/parquet"
 	"github.com/cube2222/octosql/streaming/storage"
 
 	"github.com/spf13/cobra"
@@ -68,6 +69,7 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 				"redis":    redis.NewDataSourceBuilderFactoryFromConfig,
 				"excel":    excel.NewDataSourceBuilderFactoryFromConfig,
 				"kafka":    kafka.NewDataSourceBuilderFactoryFromConfig,
+				"parquet":  parquet.NewDataSourceBuilderFactoryFromConfig,
 			},
 			cfg,
 		)

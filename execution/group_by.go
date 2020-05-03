@@ -86,6 +86,7 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 		outputEventTimeField: node.outEventTimeField,
 		aggregates:           aggregates,
 		outputFieldNames:     outputFieldNames,
+		streamID:             streamID,
 	}
 	processFunc := &ProcessByKey{
 		eventTimeField:  node.eventTimeField,
@@ -115,6 +116,8 @@ type GroupByStream struct {
 
 	outputFieldNames     []octosql.VariableName
 	outputEventTimeField octosql.VariableName
+
+	streamID *StreamID
 }
 
 var recordCountPrefix = []byte("$record_count$")
@@ -195,6 +198,7 @@ func (gb *GroupByStream) AddRecord(ctx context.Context, tx storage.StateTransact
 }
 
 var previouslyTriggeredValuePrefix = []byte("$previously_triggered_value$")
+var previouslyTriggeredCountPrefix = []byte("$previously_triggered_count$")
 
 func (gb *GroupByStream) Trigger(ctx context.Context, tx storage.StateTransaction, key octosql.Value) ([]*Record, error) {
 	output := make([]*Record, 0, 2)
@@ -260,6 +264,29 @@ func (gb *GroupByStream) Trigger(ctx context.Context, tx storage.StateTransactio
 		if firstNoUndo.Equal(output[1]) {
 			return nil, nil
 		}
+	}
+
+	// Otherwise we assign IDs to outgoing records
+	previouslyTriggeredCountState := storage.NewValueState(tx.WithPrefix(previouslyTriggeredCountPrefix))
+	var triggeredCount octosql.Value
+
+	if err := previouslyTriggeredCountState.Get(&triggeredCount); err == storage.ErrNotFound {
+		triggeredCount = octosql.MakeInt(0)
+	} else if err != nil {
+		return nil, errors.Wrap(err, "couldn't get count of previously triggered records")
+	}
+
+	triggeredCountValue := triggeredCount.AsInt()
+
+	// Set IDs for records
+	for i := range output {
+		WithID(NewRecordIDFromStreamIDWithOffset(gb.streamID, triggeredCountValue+i))(output[i])
+	}
+
+	newTriggeredCount := octosql.MakeInt(triggeredCountValue + len(output))
+
+	if err := previouslyTriggeredCountState.Set(&newTriggeredCount); err != nil {
+		return nil, errors.Wrap(err, "couldn't update count of previously triggered records")
 	}
 
 	return output, nil

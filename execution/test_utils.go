@@ -40,13 +40,14 @@ func (rms *recordMultiSet) Insert(rec *Record) {
 }
 
 func (rms *recordMultiSet) GetCount(rec *Record) int {
+	count := 0
 	for i := range rms.set {
 		if rms.equalityFunc(rms.set[i], rec) == nil {
-			return rms.count[i]
+			count += rms.count[i]
 		}
 	}
 
-	return 0
+	return count
 }
 
 func (rms *recordMultiSet) Erase(rec *Record) {
@@ -62,8 +63,8 @@ func (rms *recordMultiSet) Erase(rec *Record) {
 }
 
 func (rms *recordMultiSet) isContainedIn(other *recordMultiSet) bool {
-	for i, rec := range rms.set {
-		myCount := rms.count[i]
+	for _, rec := range rms.set {
+		myCount := rms.GetCount(rec)
 		otherCount := other.GetCount(rec)
 		if myCount > otherCount {
 			return false
@@ -195,6 +196,7 @@ func EqualityOfFieldsAndValues(record1 *Record, record2 *Record) error {
 	if len(record1.Fields()) != len(record2.Fields()) {
 		return errors.Errorf("field counts not equal: %d and %d", len(record1.Fields()), len(record2.Fields()))
 	}
+
 	fields1 := record1.Fields()
 	fields2 := record2.Fields()
 	for i := range fields1 {
@@ -208,6 +210,10 @@ func EqualityOfFieldsAndValues(record1 *Record, record2 *Record) error {
 		}
 	}
 	return nil
+}
+
+func EqualityOfEverythingButIDs(record1 *Record, record2 *Record) error {
+	return EqualityOfAll(EqualityOfFieldsAndValues, EqualityOfEventTimeField, EqualityOfUndo)(record1, record2)
 }
 
 func DefaultEquality(record1 *Record, record2 *Record) error {
@@ -234,42 +240,18 @@ func AreStreamsEqualNoOrderingWithRetractionReductionAndIDChecking(ctx context.C
 	if err != nil {
 		return errors.Wrap(err, "couldn't read got streams records")
 	}
-	if len(gotRecords) == 0 {
-		return nil
+
+	if err := areIDsUniqueAndFromSameStream(gotRecords); err != nil {
+		return errors.Wrap(err, "record ids aren't unique, or don't come from the same stream")
 	}
 
-	seenIDs := make(map[int64]struct{})
-	var wantID string
-
-	for i, rec := range gotRecords {
-		// All recordIDs should be of form X.index, where X is the same streamID for every record and indexes are distinct
-		// Store the first streamID prefix from the record
-		recordIDBase, numberAsInt, err := splitID(rec.ID())
-		if err != nil {
-			return errors.Wrap(err, "couldn't parse record ID")
-		}
-
-		if i == 0 {
-			wantID = recordIDBase
-		} else {
-			if wantID != recordIDBase {
-				return errors.Errorf("got a record with base %v but expected it to be %v", recordIDBase, wantID)
-			}
-		}
-
-		_, ok := seenIDs[numberAsInt]
-		if ok {
-			return errors.Errorf("ids with number %v were repeated", numberAsInt)
-		}
-		seenIDs[numberAsInt] = struct{}{}
-
+	for _, rec := range gotRecords {
 		// Store record with respect to whether it's a retraction or not
-		baseRecord := NewRecordFromRecord(rec, WithNoUndo(), WithID(NewRecordID("phantom_id")), WithEventTimeField(""))
 
 		if rec.IsUndo() {
-			firstMultiSet.Erase(baseRecord)
+			firstMultiSet.Erase(rec)
 		} else {
-			firstMultiSet.Insert(baseRecord)
+			firstMultiSet.Insert(rec)
 		}
 	}
 
@@ -280,12 +262,10 @@ func AreStreamsEqualNoOrderingWithRetractionReductionAndIDChecking(ctx context.C
 	}
 
 	for _, rec := range wantRecords {
-		baseRecord := NewRecordFromRecord(rec, WithNoUndo(), WithID(NewRecordID("phantom_id")), WithEventTimeField(""))
-
 		if rec.IsUndo() {
-			secondMultiSet.Erase(baseRecord)
+			secondMultiSet.Erase(rec)
 		} else {
-			secondMultiSet.Insert(baseRecord)
+			secondMultiSet.Insert(rec)
 		}
 	}
 
@@ -293,6 +273,83 @@ func AreStreamsEqualNoOrderingWithRetractionReductionAndIDChecking(ctx context.C
 	secondContained := secondMultiSet.isContainedIn(firstMultiSet)
 	if !(firstContained && secondContained) {
 		return errors.Errorf("different sets: \n %s \n and \n %s", firstMultiSet.Show(), secondMultiSet.Show())
+	}
+
+	return nil
+}
+
+func AreStreamsEqualNoOrderingWithIDCheck(ctx context.Context, stateStorage storage.Storage, gotStream, wantStream RecordStream, opts ...AreEqualOpt) error {
+	config := &AreEqualConfig{
+		Equality: DefaultEquality,
+	}
+	for _, opt := range opts {
+		opt(config)
+	}
+
+	firstMultiSet := newMultiSet(config.Equality)
+	secondMultiSet := newMultiSet(config.Equality)
+
+	log.Println("first stream")
+	gotRecords, err := ReadAll(ctx, stateStorage, gotStream)
+	if err != nil {
+		return errors.Wrap(err, "couldn't read first streams records")
+	}
+	for _, rec := range gotRecords {
+		firstMultiSet.Insert(rec)
+	}
+	log.Println("read first stream")
+
+	log.Println("second stream")
+	wantRecords, err := ReadAll(ctx, stateStorage, wantStream)
+	if err != nil {
+		return errors.Wrap(err, "couldn't read second streams records")
+	}
+	for _, rec := range wantRecords {
+		secondMultiSet.Insert(rec)
+	}
+	log.Println("read second stream")
+
+	firstContained := firstMultiSet.isContainedIn(secondMultiSet)
+	secondContained := secondMultiSet.isContainedIn(firstMultiSet)
+	if !(firstContained && secondContained) {
+		return errors.Errorf("different sets: \n %s \n and \n %s", firstMultiSet.Show(), secondMultiSet.Show())
+	}
+
+	if err := areIDsUniqueAndFromSameStream(gotRecords); err != nil {
+		return errors.Wrap(err, "record ids aren't unique, or don't come from the same stream")
+	}
+
+	return nil
+}
+
+func areIDsUniqueAndFromSameStream(records []*Record) error {
+	if len(records) == 0 {
+		return nil
+	}
+
+	seenIDs := make(map[int64]struct{})
+	var wantID string
+
+	// All recordIDs should be of form X.index, where X is the same streamID for every record and indexes are distinct
+	for i, rec := range records {
+		recordIDBase, offsetAsInt, err := splitID(rec.ID())
+		if err != nil {
+			return errors.Wrapf(err, "couldn't parse record ID %v", rec.ID().ID)
+		}
+
+		if i == 0 {
+			wantID = recordIDBase
+		} else {
+			if wantID != recordIDBase {
+				return errors.Errorf("got a record with base %v but expected it to be %v", recordIDBase, wantID)
+			}
+		}
+
+		_, ok := seenIDs[offsetAsInt]
+		if ok {
+			return errors.Errorf("ids with number %v were repeated", offsetAsInt)
+		}
+		seenIDs[offsetAsInt] = struct{}{}
 	}
 
 	return nil

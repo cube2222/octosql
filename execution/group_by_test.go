@@ -63,7 +63,7 @@ func TestGroupBy_SimpleBatch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream)
+	err := AreStreamsEqualNoOrderingWithIDCheck(ctx, stateStorage, stream, want, WithEqualityBasedOn(EqualityOfEverythingButIDs))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestGroupBy_BatchWithUndos(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream)
+	err := AreStreamsEqualNoOrderingWithIDCheck(ctx, stateStorage, stream, want, WithEqualityBasedOn(EqualityOfEverythingButIDs))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +227,7 @@ func TestGroupBy_WithOutputUndos(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream)
+	err := AreStreamsEqualNoOrderingWithIDCheck(ctx, stateStorage, stream, want, WithEqualityBasedOn(EqualityOfEverythingButIDs))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -290,7 +290,7 @@ func TestGroupBy_newRecordsNoChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream)
+	err := AreStreamsEqualNoOrderingWithIDCheck(ctx, stateStorage, stream, want, WithEqualityBasedOn(EqualityOfEverythingButIDs))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -378,7 +378,7 @@ func TestGroupBy_EventTimes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream)
+	err := AreStreamsEqualNoOrderingWithIDCheck(ctx, stateStorage, stream, want, WithEqualityBasedOn(EqualityOfEverythingButIDs))
 	if err != nil {
 		t.Fatal(err)
 	}

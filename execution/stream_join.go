@@ -17,6 +17,19 @@ const (
 	OUTER_JOIN JoinType = 2
 )
 
+func (j JoinType) String() string {
+	switch j {
+	case INNER_JOIN:
+		return "Inner Join"
+	case LEFT_JOIN:
+		return "Left Join"
+	case OUTER_JOIN:
+		return "Outer Join"
+	default:
+		return "Unknown Join"
+	}
+}
+
 type StreamJoin struct {
 	leftSource, rightSource Node
 	leftKey, rightKey       []Expression

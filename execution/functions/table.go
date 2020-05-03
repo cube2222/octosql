@@ -48,6 +48,7 @@ var usableFunctions = []execution.Function{
 	FuncCoalesce,
 	FuncNullIf,
 	FuncParseTime,
+	FuncDecodeBase32,
 }
 
 func init() {

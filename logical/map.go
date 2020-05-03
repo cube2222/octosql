@@ -5,31 +5,17 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
-	"github.com/pkg/errors"
 )
 
 type Map struct {
 	expressions []NamedExpression
 	source      Node
 	keep        bool
-}
-
-func (mapNode *Map) Visualize() *graph.Node {
-	n := graph.NewNode("Map")
-	n.AddField("keep", fmt.Sprint(mapNode.keep))
-
-	if mapNode.source != nil {
-		n.AddChild("source", mapNode.source.Visualize())
-	}
-	if len(mapNode.expressions) != 0 {
-		for idx, expr := range mapNode.expressions {
-			n.AddChild("expr_"+strconv.Itoa(idx), expr.Visualize())
-		}
-	}
-	return n
 }
 
 func NewMap(expressions []NamedExpression, child Node, keep bool) *Map {
@@ -74,4 +60,19 @@ func (node *Map) Physical(ctx context.Context, physicalCreator *PhysicalPlanCrea
 	}
 
 	return outputNodes, variables, nil
+}
+
+func (node *Map) Visualize() *graph.Node {
+	n := graph.NewNode("Map")
+	n.AddField("keep", fmt.Sprint(node.keep))
+
+	if node.source != nil {
+		n.AddChild("source", node.source.Visualize())
+	}
+	if len(node.expressions) != 0 {
+		for idx, expr := range node.expressions {
+			n.AddChild("expr_"+strconv.Itoa(idx), expr.Visualize())
+		}
+	}
+	return n
 }

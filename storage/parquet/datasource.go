@@ -2,6 +2,7 @@ package parquet
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"sort"
@@ -430,6 +431,9 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 				if err == nil {
 					v = parsed
 				}
+			}
+			if int96, ok := v.(parquet.Int96); ok {
+				v = int(binary.LittleEndian.Uint64(int96[:8]))
 			}
 			aliasedRecord[octosql.NewVariableName(fmt.Sprintf("%s.%s", rs.alias, k))] = octosql.NormalizeType(v)
 		}

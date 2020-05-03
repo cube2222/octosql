@@ -3,25 +3,15 @@ package logical
 import (
 	"context"
 
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
-	"github.com/pkg/errors"
 )
 
 type UnionAll struct {
 	first, second Node
-}
-
-func (ua *UnionAll) Visualize() *graph.Node {
-	n := graph.NewNode("Union All")
-	if ua.first != nil {
-		n.AddChild("first", ua.first.Visualize())
-	}
-	if ua.second != nil {
-		n.AddChild("second", ua.second.Visualize())
-	}
-	return n
 }
 
 func NewUnionAll(first, second Node) *UnionAll {
@@ -56,4 +46,15 @@ func (node *UnionAll) Physical(ctx context.Context, physicalCreator *PhysicalPla
 	}
 
 	return append(leftNodes, rightNodes...), variables, nil
+}
+
+func (node *UnionAll) Visualize() *graph.Node {
+	n := graph.NewNode("Union All")
+	if node.first != nil {
+		n.AddChild("first", node.first.Visualize())
+	}
+	if node.second != nil {
+		n.AddChild("second", node.second.Visualize())
+	}
+	return n
 }

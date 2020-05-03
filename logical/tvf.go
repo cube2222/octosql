@@ -3,13 +3,15 @@ package logical
 import (
 	"context"
 
-	"github.com/pkg/errors"
-
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
+	"github.com/pkg/errors"
 )
 
 type TableValuedFunctionArgumentValue interface {
+	graph.Visualizer
+
 	iTableValuedFunctionArgumentValue()
 	Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.TableValuedFunctionArgumentValue, octosql.Variables, error)
 }
@@ -35,6 +37,14 @@ func (arg *TableValuedFunctionArgumentValueExpression) Physical(ctx context.Cont
 	return []physical.TableValuedFunctionArgumentValue{physical.NewTableValuedFunctionArgumentValueExpression(physExpression)}, variables, nil
 }
 
+func (arg *TableValuedFunctionArgumentValueExpression) Visualize() *graph.Node {
+	n := graph.NewNode("TableValuedFunctionArgumentValueExpression")
+	if arg.expression != nil {
+		n.AddChild("expression", arg.expression.Visualize())
+	}
+	return n
+}
+
 type TableValuedFunctionArgumentValueTable struct {
 	source Node
 }
@@ -57,6 +67,14 @@ func (arg *TableValuedFunctionArgumentValueTable) Physical(ctx context.Context, 
 	return outputArguments, variables, nil
 }
 
+func (arg *TableValuedFunctionArgumentValueTable) Visualize() *graph.Node {
+	n := graph.NewNode("TableValuedFunctionArgumentValueTable")
+	if arg.source != nil {
+		n.AddChild("source", arg.source.Visualize())
+	}
+	return n
+}
+
 type TableValuedFunctionArgumentValueDescriptor struct {
 	descriptor octosql.VariableName
 }
@@ -67,6 +85,12 @@ func NewTableValuedFunctionArgumentValueDescriptor(descriptor octosql.VariableNa
 
 func (arg *TableValuedFunctionArgumentValueDescriptor) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.TableValuedFunctionArgumentValue, octosql.Variables, error) {
 	return []physical.TableValuedFunctionArgumentValue{physical.NewTableValuedFunctionArgumentValueDescriptor(arg.descriptor)}, octosql.NoVariables(), nil
+}
+
+func (arg *TableValuedFunctionArgumentValueDescriptor) Visualize() *graph.Node {
+	n := graph.NewNode("TableValuedFunctionArgumentValueDescriptor")
+	n.AddField("descriptor", string(arg.descriptor))
+	return n
 }
 
 type TableValuedFunction struct {
@@ -152,4 +176,13 @@ func (node *TableValuedFunction) Physical(ctx context.Context, physicalCreator *
 	}
 
 	return outNodes, variables, nil
+}
+
+func (node *TableValuedFunction) Visualize() *graph.Node {
+	n := graph.NewNode("TableValuedFunction(" + node.name + ")")
+	n.AddField("name", node.name)
+	for name, arg := range node.arguments {
+		n.AddChild(name.String(), arg.Visualize())
+	}
+	return n
 }

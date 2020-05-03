@@ -346,6 +346,12 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 		for i, columnName := range rs.columns {
 			newName := octosql.NewVariableName(fmt.Sprintf("%s.%s", rs.alias, columnName))
 			fields[i] = newName
+
+			// MySQL parses strings as []byte. We just assume strings are what we want really.
+			if data, ok := cols[i].([]byte); ok {
+				cols[i] = string(data)
+			}
+
 			resultMap[newName] = octosql.NormalizeType(cols[i])
 		}
 

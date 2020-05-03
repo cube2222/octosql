@@ -2,6 +2,7 @@ package optimizer
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/cube2222/octosql"
@@ -15,6 +16,7 @@ var DefaultScenarios = []Scenario{
 	MergeDataSourceBuilderWithRequalifier,
 	MergeDataSourceBuilderWithFilter,
 	PushFilterBelowMap,
+	RemoveEmptyMaps,
 }
 
 var MergeRequalifiers = Scenario{
@@ -76,11 +78,28 @@ var MergeDataSourceBuilderWithRequalifier = Scenario{
 	Reassembler: func(match *Match) physical.Node {
 		dataSourceBuilder := match.Nodes["data_source_builder"].(*physical.DataSourceBuilder)
 
+		newFilter := dataSourceBuilder.Filter.Transform(
+			context.Background(),
+			&physical.Transformers{
+				NamedExprT: func(expr physical.NamedExpression) physical.NamedExpression {
+					switch expr := expr.(type) {
+					case *physical.Variable:
+						if expr.Name.Source() == "" {
+							return expr
+						}
+						newName := octosql.NewVariableName(fmt.Sprintf("%s.%s", match.Strings["qualifier"], expr.Name.Name()))
+						return physical.NewVariable(newName)
+					default:
+						return expr
+					}
+				},
+			})
+
 		return &physical.DataSourceBuilder{
 			Materializer:     dataSourceBuilder.Materializer,
 			PrimaryKeys:      dataSourceBuilder.PrimaryKeys,
 			AvailableFilters: dataSourceBuilder.AvailableFilters,
-			Filter:           dataSourceBuilder.Filter, // TODO: fixme variable names
+			Filter:           newFilter,
 			Name:             dataSourceBuilder.Name,
 			Alias:            match.Strings["qualifier"],
 		}
@@ -335,5 +354,27 @@ var PushFilterBelowMap = Scenario{
 		}
 
 		return out
+	},
+}
+
+var RemoveEmptyMaps = Scenario{
+	Name:        "remove empty maps",
+	Description: "Removes maps that have no expressions and keep set to true",
+	CandidateMatcher: &MapMatcher{
+		Keep:        &AnyPrimitiveMatcher{Name: "keep"},
+		Expressions: &AnyNamedExpressionListMatcher{Name: "expressions"},
+		Source:      &AnyNodeMatcher{Name: "source"},
+	},
+
+	CandidateApprover: func(match *Match) bool {
+		expressions := match.NamedExpressionLists["expressions"]
+		keep := match.Primitives["keep"]
+		keepCast := keep.(bool)
+
+		return len(expressions) == 0 && keepCast
+	},
+
+	Reassembler: func(match *Match) physical.Node {
+		return match.Nodes["source"]
 	},
 }

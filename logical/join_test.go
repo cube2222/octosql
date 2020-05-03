@@ -7,6 +7,7 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/metadata"
 )
@@ -25,6 +26,11 @@ func NewStubNode(metadata *metadata.NodeMetadata, variables octosql.Variables) *
 
 func (sb *StubNode) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	return []physical.Node{physical.NewStubNode(sb.metadata)}, sb.variables, nil
+}
+
+func (sb *StubNode) Visualize() *graph.Node {
+	n := graph.NewNode("Stub Node")
+	return n
 }
 
 func TestJoin_Physical(t *testing.T) {

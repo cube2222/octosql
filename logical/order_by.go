@@ -3,9 +3,11 @@ package logical
 import (
 	"context"
 
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
+	"github.com/cube2222/octosql/physical"
 )
 
 type OrderDirection string
@@ -60,4 +62,15 @@ func (node *OrderBy) Physical(ctx context.Context, physicalCreator *PhysicalPlan
 	outNodes := physical.NewShuffle(1, physical.NewConstantStrategy(0), sourceNodes)
 
 	return []physical.Node{physical.NewOrderBy(expressions, directions, outNodes[0])}, variables, nil
+}
+
+func (node *OrderBy) Visualize() *graph.Node {
+	n := graph.NewNode("Order By")
+	if node.source != nil {
+		n.AddChild("source", node.source.Visualize())
+	}
+	for i := range n.Children {
+		n.AddChild(string(node.directions[i]), node.expressions[i].Visualize())
+	}
+	return n
 }

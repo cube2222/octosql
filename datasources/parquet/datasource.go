@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"log"
 	"sort"
 	"time"
@@ -26,15 +25,11 @@ var availableFilters = map[physical.FieldType]map[physical.Relation]struct{}{
 	physical.Secondary: make(map[physical.Relation]struct{}),
 }
 
-type DataSource struct {
-	path  string
-	alias string
-}
-
 type ColStrIter struct {
 	file *parquet.File
 	col  parquet.Column
 
+	// Only one of these is used at a time
 	bools      []bool
 	int32s     []int32
 	int64s     []int64
@@ -64,6 +59,7 @@ func NewColStrIter(f *parquet.File, col parquet.Column) *ColStrIter {
 		dLevels: make([]uint16, batchSize),
 		rLevels: make([]uint16, batchSize),
 	}
+
 	switch col.Type() {
 	case parquetformat.Type_BOOLEAN:
 		it.bools = make([]bool, batchSize)
@@ -93,20 +89,23 @@ func NewColStrIter(f *parquet.File, col parquet.Column) *ColStrIter {
 	return &it
 }
 
+var ErrNoNewElement = errors.New("all groups have been processed and there is no new element")
+
 func (it *ColStrIter) Next() (interface{}, error) {
 	var err error
-	var s interface{}
+	var value interface{}
 	elements := make([]interface{}, 0)
 
 	for {
-		//if there is no active row group create one
+		// If there is no active row group create one
 		if it.columnChunkReader == nil {
-			//if all row groups have been processed return current value
+
+			// If all row groups have been processed return current value
 			if it.rowGroups == len(it.file.MetaData.RowGroups) {
 				if len(elements) > 0 {
 					return elements, nil
 				}
-				return nil, io.EOF
+				return nil, ErrNoNewElement
 			}
 
 			it.columnChunkReader, err = it.file.NewReader(it.col, it.rowGroups)
@@ -116,7 +115,8 @@ func (it *ColStrIter) Next() (interface{}, error) {
 
 			it.rowGroups++
 		}
-		// if all data in chunk has been processed load next chunk
+
+		// If all data in chunk has been processed load next chunk
 		if it.descriptionIterator >= it.numberOfLoadedElements {
 			it.numberOfLoadedElements, err = it.columnChunkReader.Read(it.values, it.dLevels, it.rLevels)
 			if err == parquet.EndOfChunk {
@@ -130,28 +130,29 @@ func (it *ColStrIter) Next() (interface{}, error) {
 			it.dataIterator = 0
 		}
 
-		//if new record is reached return current value
+		// If new record is reached return current value
 		if it.rLevels[it.descriptionIterator] == 0 && len(elements) > 0 {
 			break
 		}
-		//if data is not defined insert nil in it's place
+
+		// If data is not defined insert nil in it's place
 		if it.dLevels[it.descriptionIterator] == it.col.MaxD() {
 			if it.col.MaxR() == 0 {
 				switch it.col.Type() {
 				case parquetformat.Type_BOOLEAN:
-					s = it.bools[it.dataIterator]
+					value = it.bools[it.dataIterator]
 				case parquetformat.Type_INT32:
-					s = it.int32s[it.dataIterator]
+					value = it.int32s[it.dataIterator]
 				case parquetformat.Type_INT64:
-					s = it.int64s[it.dataIterator]
+					value = it.int64s[it.dataIterator]
 				case parquetformat.Type_INT96:
-					s = it.int96s[it.dataIterator]
+					value = it.int96s[it.dataIterator]
 				case parquetformat.Type_FLOAT:
-					s = it.float32s[it.dataIterator]
+					value = it.float32s[it.dataIterator]
 				case parquetformat.Type_DOUBLE:
-					s = it.float64s[it.dataIterator]
+					value = it.float64s[it.dataIterator]
 				case parquetformat.Type_BYTE_ARRAY, parquetformat.Type_FIXED_LEN_BYTE_ARRAY:
-					s = it.byteArrays[it.dataIterator]
+					value = it.byteArrays[it.dataIterator]
 				default:
 					panic("unknown type")
 				}
@@ -182,17 +183,26 @@ func (it *ColStrIter) Next() (interface{}, error) {
 		}
 
 		it.descriptionIterator++
-		//if data is not repeated stop reading after first element
+
+		// If data is not repeated stop reading after first element
 		if it.col.MaxR() == 0 {
 			break
 		}
 	}
-	//if column has repeated elements return list instead of single value
+
+	// If column has repeated elements return list instead of single value
 	if it.col.MaxR() > 0 {
-		s = elements
+		value = elements
 	}
 
-	return s, nil
+	return value, nil
+}
+
+type DataSource struct {
+	path         string
+	alias        string
+	batchSize    int
+	stateStorage storage.Storage
 }
 
 func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
@@ -202,10 +212,16 @@ func NewDataSourceBuilderFactory() physical.DataSourceBuilderFactory {
 			if err != nil {
 				return nil, errors.Wrap(err, "couldn't get path")
 			}
+			batchSize, err := config.GetInt(dbConfig, "batchSize", config.WithDefault(1000))
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't get batch size")
+			}
 
 			return &DataSource{
-				path:  path,
-				alias: alias,
+				path:         path,
+				alias:        alias,
+				batchSize:    batchSize,
+				stateStorage: matCtx.Storage,
 			}, nil
 		},
 		nil,
@@ -221,106 +237,314 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 }
 
 func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
-	file, err := parquet.OpenFile(ds.path)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't open file")
+	rs := &RecordStream{
+		stateStorage: ds.stateStorage,
+		streamID:     streamID,
+		filePath:     ds.path,
+		isDone:       false,
+		alias:        ds.alias,
+		batchSize:    ds.batchSize,
 	}
 
-	columns := file.Schema.Columns()
+	ctx, cancel := context.WithCancel(ctx)
+	rs.workerCtxCancel = cancel
+	rs.workerCloseErrChan = make(chan error, 1)
 
-	for _, col := range columns {
-		if col.MaxR() > 1 {
-			return nil, nil, fmt.Errorf("not supported nested repeated elements in column '%s'", col)
-		}
-	}
-
-	colIters := make([]*ColStrIter, len(columns))
-	for i, col := range columns {
-		colIters[i] = NewColStrIter(file, col)
-	}
-
-	return &RecordStream{
-			file:            file,
-			isDone:          false,
-			columnIterators: colIters,
-			columns:         columns,
-			alias:           ds.alias,
-		},
+	return rs,
 		execution.NewExecutionOutput(
 			execution.NewZeroWatermarkGenerator(),
 			map[string]execution.ShuffleData{},
-			nil,
+			[]execution.Task{func() error {
+				err := rs.RunWorker(ctx)
+				if err == context.Canceled || err == context.DeadlineExceeded {
+					rs.workerCloseErrChan <- err
+					return nil
+				} else {
+					err := errors.Wrap(err, "parquet worker error")
+					rs.workerCloseErrChan <- err
+					return err
+				}
+			}},
 		),
 		nil
 }
 
 type RecordStream struct {
+	stateStorage    storage.Storage
+	streamID        *execution.StreamID
+	filePath        string
 	file            *parquet.File
 	columnIterators []*ColStrIter
 	columns         []parquet.Column
 	isDone          bool
 	alias           string
+	offset          int
+	batchSize       int
+
+	workerCtxCancel    func()
+	workerCloseErrChan chan error
 }
 
 func (rs *RecordStream) Close(ctx context.Context, storage storage.Storage) error {
+	rs.workerCtxCancel()
+	err := <-rs.workerCloseErrChan
+	if err == context.Canceled || err == context.DeadlineExceeded {
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't stop parquet worker")
+	}
+
 	if err := rs.file.Close(); err != nil {
 		return errors.Wrap(err, "couldn't close underlying file")
+	}
+
+	if err := storage.DropAll(rs.streamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
+	}
+
+	return nil
+}
+
+func (rs *RecordStream) RunWorker(ctx context.Context) error {
+	for { // outer for is loading offset value and moving file iterator
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
+
+		if err := rs.loadOffset(tx); err != nil {
+			return errors.Wrap(err, "couldn't reinitialize offset for parquet read batch worker")
+		}
+
+		tx.Abort() // We only read data above, no need to risk failing now.
+
+		// Load/Reload file
+		file, err := parquet.OpenFile(rs.filePath)
+		if err != nil {
+			return errors.Wrap(err, "couldn't open file")
+		}
+		rs.file = file
+
+		columns := file.Schema.Columns()
+		for _, col := range columns {
+			if col.MaxR() > 1 {
+				return errors.Wrapf(err, "not supported nested repeated elements in column '%s'", col)
+			}
+		}
+		rs.columns = columns
+
+		colIters := make([]*ColStrIter, len(columns))
+		for i, col := range columns {
+			colIters[i] = NewColStrIter(file, col)
+		}
+		rs.columnIterators = colIters
+
+		// Moving file iterator by `rs.offset`
+		for i := 0; i < rs.offset; i++ {
+			_, err := rs.readRecordFromFile()
+			if err == execution.ErrEndOfStream {
+				return ctx.Err()
+			} else if err != nil {
+				return errors.Wrapf(err, "couldn't move parquet file iterator by %d offset", rs.offset)
+			}
+		}
+
+		for { // inner for is calling RunWorkerInternal
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
+
+			tx := rs.stateStorage.BeginTransaction().WithPrefix(rs.streamID.AsPrefix())
+
+			err := rs.RunWorkerInternal(ctx, tx)
+			if errors.Cause(err) == execution.ErrNewTransactionRequired {
+				tx.Abort()
+				continue
+			} else if waitableError := execution.GetErrWaitForChanges(err); waitableError != nil {
+				tx.Abort()
+				err = waitableError.ListenForChanges(ctx)
+				if err != nil {
+					log.Println("parquet worker: couldn't listen for changes: ", err)
+				}
+				err = waitableError.Close()
+				if err != nil {
+					log.Println("parquet worker: couldn't close storage changes subscription: ", err)
+				}
+				continue
+			} else if err == execution.ErrEndOfStream {
+				err = tx.Commit()
+				if err != nil {
+					log.Println("parquet worker: couldn't commit transaction: ", err)
+					continue
+				}
+				return ctx.Err()
+			} else if err != nil {
+				tx.Abort()
+				log.Printf("parquet worker: error running parquet read batch worker: %s, reinitializing from storage", err)
+				break
+			}
+
+			err = tx.Commit()
+			if err != nil {
+				log.Println("parquet worker: couldn't commit transaction: ", err)
+				continue
+			}
+		}
+	}
+}
+
+var outputQueuePrefix = []byte("$output_queue$")
+
+func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateTransaction) error {
+	outputQueue := execution.NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
+
+	if rs.isDone {
+		err := outputQueue.Push(ctx, &QueueElement{
+			Type: &QueueElement_EndOfStream{
+				EndOfStream: true,
+			},
+		})
+		if err != nil {
+			return errors.Wrapf(err, "couldn't push parquet EndOfStream to output record queue")
+		}
+
+		return execution.ErrEndOfStream
+	}
+
+	batch := make([]*execution.Record, 0)
+	for i := 0; i < rs.batchSize; i++ {
+		record, err := rs.readRecordFromFile()
+		if err == execution.ErrEndOfStream {
+			break
+		} else if err != nil {
+			return errors.Wrap(err, "couldn't read record from parquet file")
+		}
+
+		aliasedRecord := make(map[octosql.VariableName]octosql.Value)
+		for k, v := range record {
+			if str, ok := v.(string); ok {
+				parsed, err := time.Parse(time.RFC3339, str)
+				if err == nil {
+					v = parsed
+				}
+			}
+			if int96, ok := v.(parquet.Int96); ok {
+				v = int(binary.LittleEndian.Uint64(int96[:8]))
+			}
+			aliasedRecord[octosql.NewVariableName(fmt.Sprintf("%s.%s", rs.alias, k))] = octosql.NormalizeType(v)
+		}
+
+		fields := make([]octosql.VariableName, 0)
+		for k := range aliasedRecord {
+			fields = append(fields, k)
+		}
+
+		sort.Slice(fields, func(i, j int) bool {
+			return fields[i] < fields[j]
+		})
+
+		batch = append(batch, execution.NewRecord(
+			fields,
+			aliasedRecord,
+			execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(rs.streamID, rs.offset+i))))
+	}
+
+	for i := range batch {
+		err := outputQueue.Push(ctx, &QueueElement{
+			Type: &QueueElement_Record{
+				Record: batch[i],
+			},
+		})
+		if err != nil {
+			return errors.Wrapf(err, "couldn't push parquet record with index %d in batch to output record queue", i)
+		}
+	}
+
+	rs.offset = rs.offset + len(batch)
+	if err := rs.saveOffset(tx); err != nil {
+		return errors.Wrap(err, "couldn't save parquet offset")
+	}
+
+	return nil
+}
+
+func (rs *RecordStream) readRecordFromFile() (map[string]interface{}, error) {
+	recordMap := make(map[string]interface{})
+	gotNonNilValue := false // Indicates whether we got at least 1 non-nil record field from column iterators
+
+	// If at least one row has remaining elements create new record
+	for i, it := range rs.columnIterators {
+		value, err := it.Next()
+		if err == ErrNoNewElement {
+		} else if err != nil {
+			return nil, errors.Wrap(err, "couldn't decode parquet record")
+		} else {
+			gotNonNilValue = true
+		}
+
+		recordMap[rs.columns[i].String()] = value
+	}
+
+	if !gotNonNilValue {
+		rs.isDone = true
+		return nil, execution.ErrEndOfStream
+	}
+
+	return recordMap, nil
+}
+
+var offsetPrefix = []byte("parquet_offset")
+
+func (rs *RecordStream) loadOffset(tx storage.StateTransaction) error {
+	offsetState := storage.NewValueState(tx.WithPrefix(offsetPrefix))
+
+	var offset octosql.Value
+	err := offsetState.Get(&offset)
+	if err == storage.ErrNotFound {
+		offset = octosql.MakeInt(0)
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't load parquet offset from state storage")
+	}
+
+	rs.offset = offset.AsInt()
+
+	return nil
+}
+
+func (rs *RecordStream) saveOffset(tx storage.StateTransaction) error {
+	offsetState := storage.NewValueState(tx.WithPrefix(offsetPrefix))
+
+	offset := octosql.MakeInt(rs.offset)
+	err := offsetState.Set(&offset)
+	if err != nil {
+		return errors.Wrap(err, "couldn't save parquet offset to state storage")
 	}
 
 	return nil
 }
 
 func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
-	if rs.isDone {
+	tx := storage.GetStateTransactionFromContext(ctx).WithPrefix(rs.streamID.AsPrefix())
+	outputQueue := execution.NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
+
+	var queueElement QueueElement
+	err := outputQueue.Pop(ctx, &queueElement)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't pop queue element")
+	}
+
+	switch queueElement := queueElement.Type.(type) {
+	case *QueueElement_Record:
+		return queueElement.Record, nil
+	case *QueueElement_EndOfStream:
 		return nil, execution.ErrEndOfStream
+	case *QueueElement_Error:
+		return nil, errors.New(queueElement.Error)
+	default:
+		panic("invalid queue element type")
 	}
-
-	recordMap := make(map[string]interface{})
-
-	isDone := true
-	//if at least one row has remaining elements create new record
-	for i, it := range rs.columnIterators {
-		s, err := it.Next()
-		if err == io.EOF {
-			s = nil
-		} else if err != nil {
-			return nil, errors.Wrap(err, "couldn't decode parquet record")
-		} else {
-			isDone = false
-		}
-
-		recordMap[rs.columns[i].String()] = s
-	}
-
-	if isDone {
-		rs.isDone = true
-		return nil, execution.ErrEndOfStream
-	}
-
-	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
-	for k, v := range recordMap {
-		if str, ok := v.(string); ok {
-			parsed, err := time.Parse(time.RFC3339, str)
-			if err == nil {
-				v = parsed
-			}
-		}
-		if int96, ok := v.(parquet.Int96); ok {
-			v = int(binary.LittleEndian.Uint64(int96[:8]))
-		}
-		aliasedRecord[octosql.NewVariableName(fmt.Sprintf("%s.%s", rs.alias, k))] = octosql.NormalizeType(v)
-	}
-
-	fields := make([]octosql.VariableName, 0)
-	for k := range aliasedRecord {
-		fields = append(fields, k)
-	}
-
-	sort.Slice(fields, func(i, j int) bool {
-		return fields[i] < fields[j]
-	})
-
-	log.Println(execution.NewRecord(fields, aliasedRecord).Show())
-
-	return execution.NewRecord(fields, aliasedRecord), nil
 }

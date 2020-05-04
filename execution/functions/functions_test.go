@@ -1118,6 +1118,28 @@ func Test_various(t *testing.T) {
 			want:    ZeroValue(),
 			wantErr: true,
 		},
+		{
+			name: "decode_base32('YO74HPY=')",
+			args: args{
+				args: []Value{
+					MakeString("YO74HPY="),
+				},
+				fun: FuncDecodeBase32,
+			},
+			want:    MakeString("ÿÿ"),
+			wantErr: false,
+		},
+		{
+			name: "decode_base32('IVHFKTJAEAQDAMBQ')",
+			args: args{
+				args: []Value{
+					MakeString("IVHFKTJAEAQDAMBQ"),
+				},
+				fun: FuncDecodeBase32,
+			},
+			want:    MakeString("ENUM   000"),
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

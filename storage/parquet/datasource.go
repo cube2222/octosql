@@ -555,7 +555,6 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 						return v
 					}
 				case logicalType.BSON != nil:
-				// TODO
 				case logicalType.UUID != nil:
 					convert = func(v interface{}) interface{} {
 						data := v.([]byte)

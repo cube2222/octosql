@@ -25,8 +25,6 @@ func TestParquetRecordStream_Get(t *testing.T) {
 	ctx := context.Background()
 	streamId := execution.GetRawStreamID()
 
-	fields := []octosql.VariableName{"bool_ct", "bool_lt", "int8_ct", "int8_lt", "int16_ct", "int16_lt", "int32_ct", "int32_lt", "int64_ct", "int64_lt", "int96_ct", "uint8_ct", "uint8_lt", "uint16_ct", "uint16_lt", "uint32_ct", "uint32_lt", "uint64_ct", "uint64_lt", "float_ct", "float_lt", "double_ct", "double_lt", "utf8", "string", "10_byte_array_ct", "10_byte_array_lt", "date_ct", "date_lt", "decimal_int32_ct", "decimal_int32_lt", "decimal_int64_ct", "decimal_int64_lt", "decimal_byte_array_ct", "decimal_byte_array_lt", "decimal_flba_ct", "decimal_flba_lt", "enum_ct", "enum_lt", "time_millis_ct", "time_utc_millis_lt", "time_nonutc_millis_lt", "time_micros_ct", "time_utc_micros_lt", "time_nonutc_micros_lt", "time_utc_nanos", "time_nonutc_nanos", "timestamp_millis_ct", "timestamp_utc_millis_lt", "timestamp_nonutc_millis_lt", "timestamp_micros_ct", "timestamp_utc_micros_lt", "timestamp_nonutc_micros_lt", "timestamp_utc_nanos", "timestamp_nonutc_nanos", "interval_ct", "interval_lt", "json_ct", "json_lt", "bson_ct", "bson_lt", "uuid", "uint64_dictionary", "optional_uint32", "twice_repeated_uint16", "optional_undefined_null", "map_int32_int32.key_value.key", "map_int32_int32.key_value.value", "map_key_value_bool_bool.key_value.key", "map_key_value_bool_bool.key_value.value", "map_logical.key_value.key", "map_logical.key_value.value", "list_float.list.value", "list_double.list.value"}
-
 	tests := []struct {
 		name           string
 		path           string
@@ -34,29 +32,60 @@ func TestParquetRecordStream_Get(t *testing.T) {
 		wantFieldOrder []octosql.VariableName
 		want           []map[octosql.VariableName]interface{}
 	}{
-		// {
-		// 	name:  "reading bikes.parquet - happy path",
-		// 	path:  "fixtures/bikes.parquet",
-		// 	alias: "b",
-		// 	want: []*execution.Record{
-		// 		execution.NewRecordFromSliceWithNormalize(
-		// 			[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
-		// 			[]interface{}{base32.StdEncoding.EncodeToString([]byte("green")), 1, 152849, 3, 2014},
-		// 			execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0))),
-		// 		execution.NewRecordFromSliceWithNormalize(
-		// 			[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
-		// 			[]interface{}{base32.StdEncoding.EncodeToString([]byte("black")), 2, 106332, 2, 1988},
-		// 			execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1))),
-		// 		execution.NewRecordFromSliceWithNormalize(
-		// 			[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
-		// 			[]interface{}{base32.StdEncoding.EncodeToString([]byte("purple")), 3, 99148, 2, 2009},
-		// 			execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2))),
-		// 		execution.NewRecordFromSliceWithNormalize(
-		// 			[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
-		// 			[]interface{}{base32.StdEncoding.EncodeToString([]byte("orange")), 4, 97521, 2, 1979},
-		// 			execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 3))),
-		// 	},
-		// },
+		{
+			name:           "reading bikes.parquet - happy path",
+			path:           "fixtures/bikes.parquet",
+			alias:          "b",
+			wantFieldOrder: []octosql.VariableName{"b.id", "b.wheels", "b.year", "b.ownerid", "b.color"},
+			want: []map[octosql.VariableName]interface{}{
+				{
+					"b.id":      1,
+					"b.wheels":  3,
+					"b.year":    2014,
+					"b.ownerid": 152849,
+					"b.color":   base32.StdEncoding.EncodeToString([]byte("green")),
+				},
+				{
+					"b.id":      2,
+					"b.wheels":  2,
+					"b.year":    1988,
+					"b.ownerid": 106332,
+					"b.color":   base32.StdEncoding.EncodeToString([]byte("black")),
+				},
+				{
+					"b.id":      3,
+					"b.wheels":  2,
+					"b.year":    2009,
+					"b.ownerid": 99148,
+					"b.color":   base32.StdEncoding.EncodeToString([]byte("purple")),
+				},
+				{
+					"b.id":      4,
+					"b.wheels":  2,
+					"b.year":    1979,
+					"b.ownerid": 97521,
+					"b.color":   base32.StdEncoding.EncodeToString([]byte("orange")),
+				},
+			},
+			// want: []*execution.Record{
+			// 	execution.NewRecordFromSliceWithNormalize(
+			// 		[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
+			// 		[]interface{}{base32.StdEncoding.EncodeToString([]byte("green")), 1, 152849, 3, 2014},
+			// 		execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0))),
+			// 	execution.NewRecordFromSliceWithNormalize(
+			// 		[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
+			// 		[]interface{}{base32.StdEncoding.EncodeToString([]byte("black")), 2, 106332, 2, 1988},
+			// 		execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1))),
+			// 	execution.NewRecordFromSliceWithNormalize(
+			// 		[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
+			// 		[]interface{}{base32.StdEncoding.EncodeToString([]byte("purple")), 3, 99148, 2, 2009},
+			// 		execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2))),
+			// 	execution.NewRecordFromSliceWithNormalize(
+			// 		[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
+			// 		[]interface{}{base32.StdEncoding.EncodeToString([]byte("orange")), 4, 97521, 2, 1979},
+			// 		execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 3))),
+			// },
+		},
 		{
 			// Okay so a few questionable values (they are questionable looking at `output` values, maybe some of them are just wrong...):
 			// 	- why is there a 4th almost fully nil record? In output there are 6 but "Total rows: 3" (whaaat)
@@ -68,7 +97,7 @@ func TestParquetRecordStream_Get(t *testing.T) {
 			name:           "killer test for all types of data",
 			path:           "fixtures/generated_alltypes.uncompressed.parquet",
 			alias:          "",
-			wantFieldOrder: fields,
+			wantFieldOrder: []octosql.VariableName{"bool_ct", "bool_lt", "int8_ct", "int8_lt", "int16_ct", "int16_lt", "int32_ct", "int32_lt", "int64_ct", "int64_lt", "int96_ct", "uint8_ct", "uint8_lt", "uint16_ct", "uint16_lt", "uint32_ct", "uint32_lt", "uint64_ct", "uint64_lt", "float_ct", "float_lt", "double_ct", "double_lt", "utf8", "string", "10_byte_array_ct", "10_byte_array_lt", "date_ct", "date_lt", "decimal_int32_ct", "decimal_int32_lt", "decimal_int64_ct", "decimal_int64_lt", "decimal_byte_array_ct", "decimal_byte_array_lt", "decimal_flba_ct", "decimal_flba_lt", "enum_ct", "enum_lt", "time_millis_ct", "time_utc_millis_lt", "time_nonutc_millis_lt", "time_micros_ct", "time_utc_micros_lt", "time_nonutc_micros_lt", "time_utc_nanos", "time_nonutc_nanos", "timestamp_millis_ct", "timestamp_utc_millis_lt", "timestamp_nonutc_millis_lt", "timestamp_micros_ct", "timestamp_utc_micros_lt", "timestamp_nonutc_micros_lt", "timestamp_utc_nanos", "timestamp_nonutc_nanos", "interval_ct", "interval_lt", "json_ct", "json_lt", "bson_ct", "bson_lt", "uuid", "uint64_dictionary", "optional_uint32", "twice_repeated_uint16", "optional_undefined_null", "map_int32_int32.key_value.key", "map_int32_int32.key_value.value", "map_key_value_bool_bool.key_value.key", "map_key_value_bool_bool.key_value.value", "map_logical.key_value.key", "map_logical.key_value.value", "list_float.list.value", "list_double.list.value"},
 			want: []map[octosql.VariableName]interface{}{
 				{
 					"bool_ct":                               false,

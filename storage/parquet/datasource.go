@@ -464,6 +464,18 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 							return float64(v) * math.Pow10(int(-logicalType.DECIMAL.Scale))
 						case int64:
 							return float64(v) * math.Pow10(int(-logicalType.DECIMAL.Scale))
+						case []byte:
+							var value float64
+							// This reads the unsigned value.
+							for i := range v {
+								j := len(v) - i - 1
+								value += float64(v[j]) * math.Pow(2, float64(8*i))
+							}
+							// This applies two's complement to get a signed one.
+							if v[0]&0b10000000 == 0b10000000 {
+								value -= math.Pow(2, float64(8*len(v)))
+							}
+							return value * math.Pow10(int(-logicalType.DECIMAL.Scale))
 						default:
 							return v
 						}

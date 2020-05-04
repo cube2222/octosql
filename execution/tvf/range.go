@@ -4,7 +4,7 @@ import (
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 
 	"context"
 

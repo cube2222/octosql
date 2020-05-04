@@ -9,7 +9,7 @@ import (
 	"github.com/oklog/ulid"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 // A RecordStream node should use its StreamID as a prefix to all storage operations.

@@ -11,7 +11,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 // This is used to start the whole plan. It starts each phase (separated by shuffles) one by one

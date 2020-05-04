@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 func RecordReceived(t *testing.T, ctx context.Context, trigger Trigger, stateStorage storage.Storage, key octosql.Value, eventTime time.Time) {

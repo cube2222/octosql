@@ -1,0 +1,12 @@
+syntax = "proto3";
+package sql;
+option go_package = "github.com/cube2222/octosql/datasources/sql";
+import "execution/record.proto";
+
+message QueueElement {
+    oneof type {
+        execution.Record record = 1;
+        bool endOfStream = 2;
+        string error = 3;
+    }
+}

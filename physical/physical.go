@@ -11,7 +11,7 @@ import (
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 // Transformers is a structure containing functions to transform each of the physical plan components.

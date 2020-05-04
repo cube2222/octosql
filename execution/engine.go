@@ -10,7 +10,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/pkg/errors"
 
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 var ErrNewTransactionRequired = fmt.Errorf("new transaction required")

@@ -3,10 +3,11 @@ package execution
 import (
 	"context"
 
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/storage"
 )
 
 type JoinType int

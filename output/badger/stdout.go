@@ -13,7 +13,7 @@ import (
 
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/output/table"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 type RecordsLister interface {

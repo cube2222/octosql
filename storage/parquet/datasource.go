@@ -555,7 +555,12 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 						return v
 					}
 				case logicalType.BSON != nil:
-					// TODO
+				// TODO
+				case logicalType.UUID != nil:
+					convert = func(v interface{}) interface{} {
+						data := v.([]byte)
+						return fmt.Sprintf("%.8x-%.4x-%.4x-%.4x-%.12x", data[:4], data[4:6], data[6:8], data[8:10], data[10:16])
+					}
 				}
 
 				if convert != nil {

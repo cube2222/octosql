@@ -67,24 +67,6 @@ func TestParquetRecordStream_Get(t *testing.T) {
 					"b.color":   base32.StdEncoding.EncodeToString([]byte("orange")),
 				},
 			},
-			// want: []*execution.Record{
-			// 	execution.NewRecordFromSliceWithNormalize(
-			// 		[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
-			// 		[]interface{}{base32.StdEncoding.EncodeToString([]byte("green")), 1, 152849, 3, 2014},
-			// 		execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 0))),
-			// 	execution.NewRecordFromSliceWithNormalize(
-			// 		[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
-			// 		[]interface{}{base32.StdEncoding.EncodeToString([]byte("black")), 2, 106332, 2, 1988},
-			// 		execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 1))),
-			// 	execution.NewRecordFromSliceWithNormalize(
-			// 		[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
-			// 		[]interface{}{base32.StdEncoding.EncodeToString([]byte("purple")), 3, 99148, 2, 2009},
-			// 		execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 2))),
-			// 	execution.NewRecordFromSliceWithNormalize(
-			// 		[]octosql.VariableName{"b.color", "b.id", "b.ownerid", "b.wheels", "b.year"},
-			// 		[]interface{}{base32.StdEncoding.EncodeToString([]byte("orange")), 4, 97521, 2, 1979},
-			// 		execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(streamId, 3))),
-			// },
 		},
 		{
 			// Okay so a few questionable values (they are questionable looking at `output` values, maybe some of them are just wrong...):

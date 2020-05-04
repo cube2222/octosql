@@ -1,9 +1,10 @@
 package storage
 
 import (
-	"github.com/cube2222/octosql"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
 )
 
 /*

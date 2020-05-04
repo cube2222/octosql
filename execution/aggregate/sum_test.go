@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 func TestSumInt(t *testing.T) {

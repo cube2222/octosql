@@ -8,7 +8,7 @@ import (
 	"github.com/cube2222/octosql"
 	. "github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/execution/aggregate"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 func TestGroupBy_SimpleBatch(t *testing.T) {

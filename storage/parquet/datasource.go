@@ -480,7 +480,6 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 							return v
 						}
 					}
-					// TODO
 				case logicalType.DATE != nil:
 					convert = func(v interface{}) interface{} {
 						epochStart := time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)

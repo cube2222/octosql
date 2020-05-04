@@ -262,6 +262,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 					return nil
 				} else {
 					err := errors.Wrap(err, "parquet worker error")
+					log.Println("parquet error: ", err)
 					rs.workerCloseErrChan <- err
 					return err
 				}
@@ -333,7 +334,8 @@ func (rs *RecordStream) RunWorker(ctx context.Context) error {
 		columns := file.Schema.Columns()
 		for _, col := range columns {
 			if col.MaxR() > 1 {
-				return errors.Wrapf(err, "not supported nested repeated elements in column '%s'", col)
+				log.Println("1")
+				return errors.Errorf("not supported nested repeated elements in column '%s'", col)
 			}
 		}
 		rs.columns = columns

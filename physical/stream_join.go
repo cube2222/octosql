@@ -2,6 +2,7 @@ package physical
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
@@ -108,5 +109,23 @@ func (node *StreamJoin) Visualize() *graph.Node {
 	n := graph.NewNode("Stream Join")
 	n.AddChild("source", node.Source.Visualize())
 	n.AddChild("joined", node.Joined.Visualize())
+
+	for i, expr := range node.SourceKey {
+		n.AddChild(fmt.Sprintf("source_key_%d", i), expr.Visualize())
+	}
+
+	for i, expr := range node.JoinedKey {
+		n.AddChild(fmt.Sprintf("joined_key_%d", i), expr.Visualize())
+	}
+
+	for i, trigger := range node.Triggers {
+		n.AddChild(fmt.Sprintf("trigger_%d", i), trigger.Visualize())
+	}
+
+	n.AddChild("join_type", graph.NewNode(node.JoinType.String()))
+
+	if node.EventTimeField.String() != "" {
+		n.AddChild("event_time_field", graph.NewNode(node.EventTimeField.String()))
+	}
 	return n
 }

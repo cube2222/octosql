@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/storage/sql"
+	"github.com/cube2222/octosql/datasources/sql"
 
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/physical"

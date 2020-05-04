@@ -9,8 +9,8 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
+	"github.com/cube2222/octosql/datasources/sql"
 	"github.com/cube2222/octosql/physical"
-	"github.com/cube2222/octosql/storage/sql"
 )
 
 type PostgresTemplate struct{}

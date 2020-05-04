@@ -1,23 +1,23 @@
-package mysql
+package postgres
 
 import (
 	"reflect"
 	"testing"
 
+	"github.com/cube2222/octosql/datasources/sql"
 	"github.com/cube2222/octosql/physical"
-	"github.com/cube2222/octosql/storage/sql"
 )
 
 func TestFormulaToSQL(t *testing.T) {
 	type args struct {
 		formula physical.Formula
-		aliases *mySQLPlaceholders
+		aliases *postgresPlaceholders
 	}
 	tests := []struct {
 		name        string
 		args        args
 		want        string
-		wantAliases *mySQLPlaceholders
+		wantAliases *postgresPlaceholders
 	}{
 		{
 			name: "simple formula test",
@@ -27,14 +27,15 @@ func TestFormulaToSQL(t *testing.T) {
 					physical.MoreThan,
 					physical.NewVariable("const_0"),
 				),
-				aliases: newMySQLPlaceholders("u"),
+				aliases: newPostgresPlaceholders("u"),
 			},
-			want: "(u.id) > (?)",
-			wantAliases: &mySQLPlaceholders{
-				PlaceholderToExpression: []physical.Expression{
-					physical.NewVariable("const_0"),
+			want: "(u.id) > ($1)",
+			wantAliases: &postgresPlaceholders{
+				PlaceholderToExpression: map[string]physical.Expression{
+					"$1": physical.NewVariable("const_0"),
 				},
-				Alias: "u",
+				Alias:   "u",
+				Counter: 2,
 			},
 		},
 		{
@@ -48,14 +49,15 @@ func TestFormulaToSQL(t *testing.T) {
 						physical.NewVariable("table.age"),
 					),
 				),
-				aliases: newMySQLPlaceholders("table"),
+				aliases: newPostgresPlaceholders("table"),
 			},
-			want: "(TRUE) AND ((?) = (table.age))",
-			wantAliases: &mySQLPlaceholders{
-				PlaceholderToExpression: []physical.Expression{
-					physical.NewVariable("const_0"),
+			want: "(TRUE) AND (($1) = (table.age))",
+			wantAliases: &postgresPlaceholders{
+				PlaceholderToExpression: map[string]physical.Expression{
+					"$1": physical.NewVariable("const_0"),
 				},
-				Alias: "table",
+				Alias:   "table",
+				Counter: 2,
 			},
 		},
 		{
@@ -71,11 +73,12 @@ func TestFormulaToSQL(t *testing.T) {
 						physical.NewConstant(false),
 					),
 				),
-				aliases: newMySQLPlaceholders("alias"),
+				aliases: newPostgresPlaceholders("alias"),
 			},
 			want: "((alias.age) <> (alias.IQ)) OR (NOT (FALSE))",
-			wantAliases: &mySQLPlaceholders{
-				PlaceholderToExpression: []physical.Expression{},
+			wantAliases: &postgresPlaceholders{
+				PlaceholderToExpression: map[string]physical.Expression{},
+				Counter:                 1,
 				Alias:                   "alias",
 			},
 		},
@@ -87,19 +90,20 @@ func TestFormulaToSQL(t *testing.T) {
 					physical.MoreThan,
 					physical.NewVariable("c.age"),
 				),
-				aliases: newMySQLPlaceholders("a"),
+				aliases: newPostgresPlaceholders("a"),
 			},
-			want: "(?) > (?)",
-			wantAliases: &mySQLPlaceholders{
-				PlaceholderToExpression: []physical.Expression{
-					physical.NewVariable("b.age"),
-					physical.NewVariable("c.age"),
+			want: "($1) > ($2)",
+			wantAliases: &postgresPlaceholders{
+				PlaceholderToExpression: map[string]physical.Expression{
+					"$1": physical.NewVariable("b.age"),
+					"$2": physical.NewVariable("c.age"),
 				},
-				Alias: "a",
+				Counter: 3,
+				Alias:   "a",
 			},
 		},
 		{
-			name: "complicated test with different formulas and mySQLPlaceholders",
+			name: "complicated test with different formulas and postgresPlaceholders",
 			// ((a.age > b.age AND a.sex = const_0) OR (const_1 < b.id)
 			args: args{
 				formula: physical.NewOr(
@@ -125,18 +129,19 @@ func TestFormulaToSQL(t *testing.T) {
 					),
 				),
 
-				aliases: newMySQLPlaceholders("a"),
+				aliases: newPostgresPlaceholders("a"),
 			},
 
-			want: "(((a.age) > (?)) AND ((a.sex) = (?))) OR ((?) < (?))",
-			wantAliases: &mySQLPlaceholders{
-				PlaceholderToExpression: []physical.Expression{
-					physical.NewVariable("b.age"),
-					physical.NewVariable("const_0"),
-					physical.NewVariable("const_1"),
-					physical.NewVariable("b.id"),
+			want: "(((a.age) > ($1)) AND ((a.sex) = ($2))) OR (($3) < ($4))",
+			wantAliases: &postgresPlaceholders{
+				PlaceholderToExpression: map[string]physical.Expression{
+					"$1": physical.NewVariable("b.age"),
+					"$2": physical.NewVariable("const_0"),
+					"$3": physical.NewVariable("const_1"),
+					"$4": physical.NewVariable("b.id"),
 				},
-				Alias: "a",
+				Counter: 5,
+				Alias:   "a",
 			},
 		},
 	}
@@ -147,7 +152,7 @@ func TestFormulaToSQL(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(tt.args.aliases, tt.wantAliases) {
-				t.Errorf("formulaToSQL mySQLPlaceholders = %v, want %v", tt.args.aliases, tt.wantAliases)
+				t.Errorf("formulaToSQL postgresPlaceholders = %v, want %v", tt.args.aliases, tt.wantAliases)
 			}
 		})
 	}

@@ -9,7 +9,7 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/execution/aggregate"
+	"github.com/cube2222/octosql/execution/aggregates"
 	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
 )
@@ -192,7 +192,7 @@ func (node *GroupBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 
 	aggregatePrototypes := make([]execution.AggregatePrototype, len(node.Aggregates))
 	for i := range node.Aggregates {
-		aggregatePrototypes[i] = aggregate.AggregateTable[string(node.Aggregates[i])]
+		aggregatePrototypes[i] = aggregates.AggregateTable[string(node.Aggregates[i])]
 	}
 
 	triggerPrototypes := make([]execution.TriggerPrototype, len(node.Triggers))

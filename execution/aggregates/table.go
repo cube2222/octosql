@@ -1,4 +1,4 @@
-package aggregate
+package aggregates
 
 import "github.com/cube2222/octosql/execution"
 

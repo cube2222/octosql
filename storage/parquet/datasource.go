@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"time"
 
 	"github.com/kostya-sh/parquet-go/parquet"
@@ -457,6 +458,16 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 						return string(v.([]byte))
 					}
 				case logicalType.DECIMAL != nil:
+					convert = func(v interface{}) interface{} {
+						switch v := v.(type) {
+						case int32:
+							return float64(v) * math.Pow10(int(-logicalType.DECIMAL.Scale))
+						case int64:
+							return float64(v) * math.Pow10(int(-logicalType.DECIMAL.Scale))
+						default:
+							return v
+						}
+					}
 					// TODO
 				case logicalType.DATE != nil:
 					convert = func(v interface{}) interface{} {
@@ -547,7 +558,6 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 						v = convert(v)
 					}
 				}
-
 			}
 			octoValues[i] = octosql.NormalizeType(v)
 		}

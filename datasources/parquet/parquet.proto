@@ -1,6 +1,6 @@
 syntax = "proto3";
 package parquet;
-option go_package = "github.com/cube2222/octosql/storage/parquet";
+option go_package = "github.com/cube2222/octosql/datasources/parquet";
 import "execution/record.proto";
 
 message QueueElement {

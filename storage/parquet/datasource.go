@@ -334,7 +334,6 @@ func (rs *RecordStream) RunWorker(ctx context.Context) error {
 		columns := file.Schema.Columns()
 		for _, col := range columns {
 			if col.MaxR() > 1 {
-				log.Println("1")
 				return errors.Errorf("not supported nested repeated elements in column '%s'", col)
 			}
 		}
@@ -450,10 +449,9 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 				v = int(binary.LittleEndian.Uint64(int96[:8]))
 			}
 			// Info here: https://github.com/apache/parquet-format/blob/master/LogicalTypes.md
-			if rs.columnsLogicalTypes[i] != nil && v != nil {
+			if logicalType := rs.columnsLogicalTypes[i]; logicalType != nil && v != nil {
 				var convert func(interface{}) interface{}
 
-				logicalType := rs.columnsLogicalTypes[i]
 				switch {
 				case logicalType.STRING != nil:
 					convert = func(v interface{}) interface{} {
@@ -467,6 +465,7 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 						case int64:
 							return float64(v) * math.Pow10(int(-logicalType.DECIMAL.Scale))
 						case []byte:
+							// The byte slice represents a big endian two's complement signed integer
 							var value float64
 							// This reads the unsigned value.
 							for i := range v {
@@ -489,6 +488,7 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 					}
 				case logicalType.TIME != nil:
 					convert = func(v interface{}) interface{} {
+						// We try to match each supported unit.
 						if logicalType.TIME.Unit.IsSetMILLIS() {
 							return time.Millisecond * time.Duration(v.(int32))
 						} else if logicalType.TIME.Unit.IsSetMICROS() {
@@ -502,17 +502,23 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 						if logicalType.TIMESTAMP.IsAdjustedToUTC {
 							var seconds int64
 							var nanoseconds int64
+							// We try to match each supported unit.
 							if logicalType.TIMESTAMP.Unit.IsSetMILLIS() {
-								seconds = value / 1000
-								nanoseconds = (value % 1000) * 1000000
+								millisecondsInSecond := int64(time.Second / time.Millisecond)
+								nanosecondsInMillisecond := int64(time.Millisecond / time.Nanosecond)
+								seconds = value / millisecondsInSecond
+								nanoseconds = (value % millisecondsInSecond) * nanosecondsInMillisecond
 								return time.Unix(seconds, nanoseconds)
 							} else if logicalType.TIMESTAMP.Unit.IsSetMICROS() {
-								seconds = value / 1000000
-								nanoseconds = (value % 1000000) * 1000
+								microsecondsInSecond := int64(time.Second / time.Microsecond)
+								nanosecondsInMicrosecond := int64(time.Microsecond / time.Nanosecond)
+								seconds = value / microsecondsInSecond
+								nanoseconds = (value % microsecondsInSecond) * nanosecondsInMicrosecond
 								return time.Unix(seconds, nanoseconds)
 							}
 						} else {
 							epochStart := time.Date(1970, 1, 1, 0, 0, 0, 0, time.Local)
+							// We try to match each supported unit.
 							if logicalType.TIMESTAMP.Unit.IsSetMILLIS() {
 								return epochStart.Add(time.Millisecond * time.Duration(value))
 							} else if logicalType.TIMESTAMP.Unit.IsSetMICROS() {
@@ -551,15 +557,15 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 						var object map[string]interface{}
 						if err := json.Unmarshal(v.([]byte), &object); err != nil {
 							log.Printf("couldn't decode '%s' as json in parquet: %s", v.([]byte), err.Error())
-						} else {
-							return object
+							return v
 						}
-						return v
+						return object
 					}
 				case logicalType.BSON != nil:
 				case logicalType.UUID != nil:
 					convert = func(v interface{}) interface{} {
 						data := v.([]byte)
+						// This is how we readably format uuid bytes
 						return fmt.Sprintf("%.8x-%.4x-%.4x-%.4x-%.12x", data[:4], data[4:6], data[6:8], data[8:10], data[10:16])
 					}
 				}

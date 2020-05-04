@@ -115,7 +115,7 @@ func TestParquetRecordStream_Get(t *testing.T) {
 					"decimal_int32_lt":                      -1e-05,
 					"decimal_int64_ct":                      -1e-10,
 					"decimal_int64_lt":                      -1e-10,
-					"decimal_byte_array_ct":                 -1e-2, // for some reason, encoding "ÿÿ" isn't working (?)
+					"decimal_byte_array_ct":                 -1e-2,
 					"decimal_byte_array_lt":                 -1e-2,
 					"decimal_flba_ct":                       -1e-5,
 					"decimal_flba_lt":                       -1e-5,
@@ -146,9 +146,9 @@ func TestParquetRecordStream_Get(t *testing.T) {
 					"uuid":                                  "ffffffff-ffff-ffff-ffff-ffffffffffff",
 					"uint64_dictionary":                     -1,
 					"optional_uint32":                       4294967295,
-					"twice_repeated_uint16":                 []interface{}{0}, // don't really understand why is this like that
+					"twice_repeated_uint16":                 []interface{}{0},
 					"optional_undefined_null":               nil,
-					"map_int32_int32.key_value.key":         []interface{}{-1, 0}, // don't really understand why these are pairs
+					"map_int32_int32.key_value.key":         []interface{}{-1, 0},
 					"map_int32_int32.key_value.value":       []interface{}{-1, 0},
 					"map_key_value_bool_bool.key_value.key": []interface{}{false, false},
 					"map_key_value_bool_bool.key_value.value": []interface{}{false, false},

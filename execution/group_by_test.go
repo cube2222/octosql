@@ -7,7 +7,7 @@ import (
 
 	"github.com/cube2222/octosql"
 	. "github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/streaming/aggregate"
+	"github.com/cube2222/octosql/execution/aggregate"
 	"github.com/cube2222/octosql/streaming/storage"
 )
 

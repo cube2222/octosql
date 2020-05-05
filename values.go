@@ -72,6 +72,7 @@ func ZeroString() Value {
 func MakeTime(v time.Time) Value {
 	t, err := ptypes.TimestampProto(v)
 	if err != nil {
+		log.Println(v)
 		panic(err)
 	}
 	return Value{Value: &Value_Time{Time: t}}

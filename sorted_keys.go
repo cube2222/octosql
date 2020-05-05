@@ -9,8 +9,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-//Delimiters must be less than 128 and different from identifiers
-//Identifiers must all be unique and less than 128
+// Delimiters must be less than 128 and different from identifiers
+// Identifiers must all be unique and less than 128
 const (
 	NullIdentifier      = 1  /* Nonexistent */
 	PhantomIdentifier   = 2  /* Nonexsitent */
@@ -293,22 +293,30 @@ func MonotonicUnmarshalString(b []byte) (string, error) {
 
 /* Marshal Timestamp */
 func MonotonicMarshalTime(t time.Time) []byte {
-	bytes := MonotonicMarshalInt64(t.UnixNano())
+	bytes := make([]byte, 1+8+1+8)
+
 	bytes[0] = TimestampIdentifier
+	seconds := MonotonicMarshalInt64(t.Unix())
+	copy(bytes[1:9], seconds[1:9]) // Omit integer
+
+	bytes[9] = TimestampIdentifier
+	nanoseconds := MonotonicMarshalInt64(int64(t.Nanosecond()))
+	copy(bytes[10:18], nanoseconds[1:9]) // Omit integer identifier
 
 	return bytes
 }
 
 func MonotonicUnmarshalTime(b []byte) (time.Time, error) {
-	value, err := MonotonicUnmarshalInt64(b)
+	seconds, err := MonotonicUnmarshalInt64(b[:9])
 	if err != nil {
-		return time.Now(), errors.Wrap(err, "incorrect time key representation")
+		return time.Now(), errors.Wrap(err, "incorrect seconds representation")
+	}
+	nanoseconds, err := MonotonicUnmarshalInt64(b[9:18])
+	if err != nil {
+		return time.Now(), errors.Wrap(err, "incorrect nanoseconds representation")
 	}
 
-	seconds := value / int64(time.Second)
-	nanoseconds := value % int64(time.Second)
-
-	return time.Unix(seconds, nanoseconds), nil
+	return time.Unix(seconds, nanoseconds).UTC(), nil
 }
 
 /* Marshal Duration */
@@ -362,7 +370,7 @@ func recursiveMonotonicUnmarshalTuple(b []byte) ([]Value, int, error) {
 		identifier := b[index]
 
 		if identifier == TupleDelimiter {
-			return values, index + 1, nil //this is +1 because we return length and index starts at 0
+			return values, index + 1, nil // this is +1 because we return length and index starts at 0
 		}
 
 		if identifier == TupleIdentifier {
@@ -385,7 +393,7 @@ func recursiveMonotonicUnmarshalTuple(b []byte) ([]Value, int, error) {
 			}
 
 			values = append(values, MakeObject(object))
-			index += tupleLength + 1 //+1 here because of ObjectIdentifier
+			index += tupleLength + 1 // +1 here because of ObjectIdentifier
 		} else {
 			elementLength, err := getMarshalLength(b[index:])
 			if err != nil {
@@ -498,7 +506,9 @@ func getConstantMarshalLength(identifier byte) (int, error) {
 	switch identifier {
 	case NullIdentifier, PhantomIdentifier:
 		return NonexistentMarshalLength, nil
-	case IntIdentifier, FloatIdentifier, TimestampIdentifier, DurationIdentifier:
+	case TimestampIdentifier:
+		return 2 * NumberMarshalLength, nil
+	case IntIdentifier, FloatIdentifier, DurationIdentifier:
 		return NumberMarshalLength, nil
 	case BoolIdentifier:
 		return BoolMarshalLength, nil
@@ -520,7 +530,7 @@ func getStringMarshalLength(b []byte) (int, error) {
 
 	for index := 1; index < length; index++ {
 		if b[index] == StringDelimiter {
-			return index + 1, nil //this is +1 because we return length and index starts at 0
+			return index + 1, nil // this is +1 because we return length and index starts at 0
 		}
 	}
 

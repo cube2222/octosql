@@ -377,7 +377,6 @@ func TestPercentileWatermarkGeneratorStream_GetWatermark(t *testing.T) {
 	assert.Equal(t, src, execOutput.WatermarkSource)
 
 	ws := execOutput.WatermarkSource
-	tx = tx.WithPrefix(streamID.AsPrefix())
 
 	// event times seen : 1, 0, 5, 3, 2, 2, 4, 1, 6, 8, 7, 9, 7, 8, 42
 

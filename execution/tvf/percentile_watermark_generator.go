@@ -104,6 +104,10 @@ var (
 )
 
 func (s *PercentileWatermarkGeneratorStream) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
+	return s.getWatermark(tx.WithPrefix(s.streamID.AsPrefix()))
+}
+
+func (s *PercentileWatermarkGeneratorStream) getWatermark(tx storage.StateTransaction) (time.Time, error) {
 	watermarkStorage := storage.NewValueState(tx.WithPrefix(percentileWatermarkPrefix))
 
 	var currentWatermark octosql.Value
@@ -204,7 +208,7 @@ func (s *PercentileWatermarkGeneratorStream) Next(ctx context.Context) (*executi
 		}
 
 		// Setting new watermark value
-		oldWatermark, err := s.GetWatermark(ctx, tx)
+		oldWatermark, err := s.getWatermark(tx)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't get old watermark value from storage")
 		}

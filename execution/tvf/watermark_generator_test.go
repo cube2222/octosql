@@ -176,7 +176,6 @@ func TestWatermarkGeneratorStream_GetWatermark(t *testing.T) {
 	assert.Equal(t, src, execOutput.WatermarkSource)
 
 	ws := execOutput.WatermarkSource
-	tx = tx.WithPrefix(streamID.AsPrefix())
 
 	ExpectWatermarkValue(t, ctx, ws, tx, time.Time{})
 

@@ -3,9 +3,10 @@ package parquet
 import (
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"log"
-	"sort"
+	"math"
 	"time"
 
 	"github.com/kostya-sh/parquet-go/parquet"
@@ -261,6 +262,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 					return nil
 				} else {
 					err := errors.Wrap(err, "parquet worker error")
+					log.Println("parquet error: ", err)
 					rs.workerCloseErrChan <- err
 					return err
 				}
@@ -270,16 +272,18 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 }
 
 type RecordStream struct {
-	stateStorage    storage.Storage
-	streamID        *execution.StreamID
-	filePath        string
-	file            *parquet.File
-	columnIterators []*ColStrIter
-	columns         []parquet.Column
-	isDone          bool
-	alias           string
-	offset          int
-	batchSize       int
+	stateStorage        storage.Storage
+	streamID            *execution.StreamID
+	filePath            string
+	file                *parquet.File
+	columnIterators     []*ColStrIter
+	columnNames         []octosql.VariableName
+	columns             []parquet.Column
+	columnsLogicalTypes []*parquetformat.LogicalType
+	isDone              bool
+	alias               string
+	offset              int
+	batchSize           int
 
 	workerCtxCancel    func()
 	workerCloseErrChan chan error
@@ -330,10 +334,25 @@ func (rs *RecordStream) RunWorker(ctx context.Context) error {
 		columns := file.Schema.Columns()
 		for _, col := range columns {
 			if col.MaxR() > 1 {
-				return errors.Wrapf(err, "not supported nested repeated elements in column '%s'", col)
+				return errors.Errorf("not supported nested repeated elements in column '%s'", col)
 			}
 		}
 		rs.columns = columns
+
+		rs.columnNames = make([]octosql.VariableName, len(columns))
+		for i := range columns {
+			rs.columnNames[i] = octosql.NewVariableName(fmt.Sprintf("%s.%s", rs.alias, columns[i].String()))
+		}
+
+		columnLogicalTypes := make(map[string]*parquetformat.LogicalType)
+		for _, schemaElement := range file.MetaData.Schema {
+			columnLogicalTypes[schemaElement.Name] = schemaElement.LogicalType
+		}
+
+		rs.columnsLogicalTypes = make([]*parquetformat.LogicalType, len(rs.columnNames))
+		for i, column := range rs.columns {
+			rs.columnsLogicalTypes[i] = columnLogicalTypes[column.String()]
+		}
 
 		colIters := make([]*ColStrIter, len(columns))
 		for i, col := range columns {
@@ -417,39 +436,158 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 
 	batch := make([]*execution.Record, 0)
 	for i := 0; i < rs.batchSize; i++ {
-		record, err := rs.readRecordFromFile()
+		recordValues, err := rs.readRecordFromFile()
 		if err == execution.ErrEndOfStream {
 			break
 		} else if err != nil {
 			return errors.Wrap(err, "couldn't read record from parquet file")
 		}
 
-		aliasedRecord := make(map[octosql.VariableName]octosql.Value)
-		for k, v := range record {
-			if str, ok := v.(string); ok {
-				parsed, err := time.Parse(time.RFC3339, str)
-				if err == nil {
-					v = parsed
-				}
-			}
+		octoValues := make([]octosql.Value, len(rs.columns))
+		for i, v := range recordValues {
 			if int96, ok := v.(parquet.Int96); ok {
 				v = int(binary.LittleEndian.Uint64(int96[:8]))
 			}
-			aliasedRecord[octosql.NewVariableName(fmt.Sprintf("%s.%s", rs.alias, k))] = octosql.NormalizeType(v)
+			// Info here: https://github.com/apache/parquet-format/blob/master/LogicalTypes.md
+			if logicalType := rs.columnsLogicalTypes[i]; logicalType != nil && v != nil {
+				var convert func(interface{}) interface{}
+
+				switch {
+				case logicalType.STRING != nil:
+					convert = func(v interface{}) interface{} {
+						return string(v.([]byte))
+					}
+				case logicalType.DECIMAL != nil:
+					convert = func(v interface{}) interface{} {
+						switch v := v.(type) {
+						case int32:
+							return float64(v) * math.Pow10(int(-logicalType.DECIMAL.Scale))
+						case int64:
+							return float64(v) * math.Pow10(int(-logicalType.DECIMAL.Scale))
+						case []byte:
+							// The byte slice represents a big endian two's complement signed integer
+							var value float64
+							// This reads the unsigned value.
+							for i := range v {
+								j := len(v) - i - 1
+								value += float64(v[j]) * math.Pow(2, float64(8*i))
+							}
+							// This applies two's complement to get a signed one.
+							if v[0]&0b10000000 == 0b10000000 {
+								value -= math.Pow(2, float64(8*len(v)))
+							}
+							return value * math.Pow10(int(-logicalType.DECIMAL.Scale))
+						default:
+							return v
+						}
+					}
+				case logicalType.DATE != nil:
+					convert = func(v interface{}) interface{} {
+						epochStart := time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+						return epochStart.Add(time.Hour * 24 * time.Duration(v.(int32)))
+					}
+				case logicalType.TIME != nil:
+					convert = func(v interface{}) interface{} {
+						// We try to match each supported unit.
+						if logicalType.TIME.Unit.IsSetMILLIS() {
+							return time.Millisecond * time.Duration(v.(int32))
+						} else if logicalType.TIME.Unit.IsSetMICROS() {
+							return time.Microsecond * time.Duration(v.(int64))
+						}
+						return v
+					}
+				case logicalType.TIMESTAMP != nil:
+					convert = func(v interface{}) interface{} {
+						value := v.(int64)
+						if logicalType.TIMESTAMP.IsAdjustedToUTC {
+							var seconds int64
+							var nanoseconds int64
+							// We try to match each supported unit.
+							if logicalType.TIMESTAMP.Unit.IsSetMILLIS() {
+								millisecondsInSecond := int64(time.Second / time.Millisecond)
+								nanosecondsInMillisecond := int64(time.Millisecond / time.Nanosecond)
+								seconds = value / millisecondsInSecond
+								nanoseconds = (value % millisecondsInSecond) * nanosecondsInMillisecond
+								return time.Unix(seconds, nanoseconds)
+							} else if logicalType.TIMESTAMP.Unit.IsSetMICROS() {
+								microsecondsInSecond := int64(time.Second / time.Microsecond)
+								nanosecondsInMicrosecond := int64(time.Microsecond / time.Nanosecond)
+								seconds = value / microsecondsInSecond
+								nanoseconds = (value % microsecondsInSecond) * nanosecondsInMicrosecond
+								return time.Unix(seconds, nanoseconds)
+							}
+						} else {
+							epochStart := time.Date(1970, 1, 1, 0, 0, 0, 0, time.Local)
+							// We try to match each supported unit.
+							if logicalType.TIMESTAMP.Unit.IsSetMILLIS() {
+								return epochStart.Add(time.Millisecond * time.Duration(value))
+							} else if logicalType.TIMESTAMP.Unit.IsSetMICROS() {
+								return epochStart.Add(time.Microsecond * time.Duration(value))
+							}
+						}
+						return v
+					}
+				case logicalType.INTEGER != nil:
+					convert = func(v interface{}) interface{} {
+						if logicalType.INTEGER.IsSigned {
+							if logicalType.INTEGER.BitWidth == 64 {
+								return v.(int64)
+							} else if logicalType.INTEGER.BitWidth == 32 {
+								return v.(int32)
+							} else if logicalType.INTEGER.BitWidth == 16 {
+								return int16(v.(int32))
+							} else if logicalType.INTEGER.BitWidth == 8 {
+								return int8(v.(int32))
+							}
+						} else {
+							if logicalType.INTEGER.BitWidth == 64 {
+								return uint64(v.(int64))
+							} else if logicalType.INTEGER.BitWidth == 32 {
+								return uint32(v.(int32))
+							} else if logicalType.INTEGER.BitWidth == 16 {
+								return uint16(v.(int32))
+							} else if logicalType.INTEGER.BitWidth == 8 {
+								return uint8(v.(int32))
+							}
+						}
+						return v
+					}
+				case logicalType.JSON != nil:
+					convert = func(v interface{}) interface{} {
+						var object map[string]interface{}
+						if err := json.Unmarshal(v.([]byte), &object); err != nil {
+							log.Printf("couldn't decode '%s' as json in parquet: %s", v.([]byte), err.Error())
+							return v
+						}
+						return object
+					}
+				case logicalType.BSON != nil:
+				case logicalType.UUID != nil:
+					convert = func(v interface{}) interface{} {
+						data := v.([]byte)
+						// This is how we readably format uuid bytes
+						return fmt.Sprintf("%.8x-%.4x-%.4x-%.4x-%.12x", data[:4], data[4:6], data[6:8], data[8:10], data[10:16])
+					}
+				}
+
+				if convert != nil {
+					switch typed := v.(type) {
+					case []interface{}:
+						for i := range typed {
+							typed[i] = convert(typed[i])
+							v = typed
+						}
+					case interface{}:
+						v = convert(v)
+					}
+				}
+			}
+			octoValues[i] = octosql.NormalizeType(v)
 		}
 
-		fields := make([]octosql.VariableName, 0)
-		for k := range aliasedRecord {
-			fields = append(fields, k)
-		}
-
-		sort.Slice(fields, func(i, j int) bool {
-			return fields[i] < fields[j]
-		})
-
-		batch = append(batch, execution.NewRecord(
-			fields,
-			aliasedRecord,
+		batch = append(batch, execution.NewRecordFromSlice(
+			rs.columnNames,
+			octoValues,
 			execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(rs.streamID, rs.offset+i))))
 	}
 
@@ -472,8 +610,8 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 	return nil
 }
 
-func (rs *RecordStream) readRecordFromFile() (map[string]interface{}, error) {
-	recordMap := make(map[string]interface{})
+func (rs *RecordStream) readRecordFromFile() ([]interface{}, error) {
+	values := make([]interface{}, len(rs.columns))
 	gotNonNilValue := false // Indicates whether we got at least 1 non-nil record field from column iterators
 
 	// If at least one row has remaining elements create new record
@@ -486,7 +624,7 @@ func (rs *RecordStream) readRecordFromFile() (map[string]interface{}, error) {
 			gotNonNilValue = true
 		}
 
-		recordMap[rs.columns[i].String()] = value
+		values[i] = value
 	}
 
 	if !gotNonNilValue {
@@ -494,7 +632,7 @@ func (rs *RecordStream) readRecordFromFile() (map[string]interface{}, error) {
 		return nil, execution.ErrEndOfStream
 	}
 
-	return recordMap, nil
+	return values, nil
 }
 
 var offsetPrefix = []byte("parquet_offset")

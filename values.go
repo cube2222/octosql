@@ -133,11 +133,15 @@ func NormalizeType(value interface{}) Value {
 		return MakeInt(value)
 	case int8:
 		return MakeInt(int(value))
+	case int16:
+		return MakeInt(int(value))
 	case int32:
 		return MakeInt(int(value))
 	case int64:
 		return MakeInt(int(value))
 	case uint8:
+		return MakeInt(int(value))
+	case uint16:
 		return MakeInt(int(value))
 	case uint32:
 		return MakeInt(int(value))

@@ -42,7 +42,7 @@ func (node *Filter) Materialize(ctx context.Context, matCtx *MaterializationCont
 }
 
 func (node *Filter) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality(), node.Source.Metadata().EventTimeField())
+	return metadata.NewNodeMetadataFromMetadata(node.Source.Metadata())
 }
 
 func (node *Filter) Visualize() *graph.Node {

@@ -7,7 +7,7 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/docs"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 func TestOrderBy_Get(t *testing.T) {
@@ -266,6 +266,11 @@ func TestOrderBy_Get(t *testing.T) {
 			err = AreStreamsEqual(ctx, tt.want, ordered)
 			if err != nil {
 				t.Errorf("Error in AreStreamsEqual(): %v", err)
+				return
+			}
+
+			if err := ordered.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close order_by stream: %v", err)
 				return
 			}
 		})

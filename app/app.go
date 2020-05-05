@@ -12,7 +12,7 @@ import (
 	"github.com/cube2222/octosql/output/badger"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/optimizer"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 
 	"github.com/pkg/errors"
 )
@@ -68,15 +68,17 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 
 	outStreamID := &execution.StreamID{Id: "output"}
 
-	pullEngine := execution.NewPullEngine(out, stateStorage, stream[0], outStreamID, execOutput[0].WatermarkSource, true)
+	pullEngine := execution.NewPullEngine(out, stateStorage, []execution.RecordStream{stream[0]}, outStreamID, execOutput[0].WatermarkSource, true, ctx)
 
-	go func() {
-		pullEngine.Run(ctx)
-	}()
+	go pullEngine.Run()
 
 	printer := badger.NewStdOutPrinter(stateStorage.WithPrefix(outStreamID.AsPrefix()), out)
 	if err := printer.Run(ctx); err != nil {
 		return errors.Wrap(err, "couldn't run stdout printer")
+	}
+
+	if err := pullEngine.Close(ctx, stateStorage); err != nil {
+		return errors.Wrap(err, "couldn't close output pull engine")
 	}
 
 	return nil

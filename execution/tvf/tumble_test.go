@@ -7,7 +7,7 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 func TestTumble_Get(t *testing.T) {
@@ -169,6 +169,15 @@ func TestTumble_Get(t *testing.T) {
 			err = execution.AreStreamsEqual(ctx, got, want)
 			if err != nil {
 				t.Errorf("Tumble.Get() AreStreamsEqual error = %v", err)
+			}
+
+			if err := got.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close tumble stream: %v", err)
+				return
+			}
+			if err := want.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+				return
 			}
 
 			if err := tx.Commit(); err != nil {

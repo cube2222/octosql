@@ -8,9 +8,8 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 type WatermarkGenerator struct {
@@ -25,10 +24,6 @@ func NewWatermarkGenerator(source execution.Node, timeField octosql.VariableName
 		timeField: timeField,
 		offset:    offset,
 	}
-}
-
-func (w *WatermarkGenerator) Document() docs.Documentation {
-	panic("implement me")
 }
 
 func (w *WatermarkGenerator) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
@@ -52,6 +47,7 @@ func (w *WatermarkGenerator) Get(ctx context.Context, variables octosql.Variable
 	}
 
 	ws := &WatermarkGeneratorStream{
+		streamID:  streamID,
 		source:    source,
 		timeField: w.timeField,
 		offset:    offset.AsDuration(),
@@ -61,6 +57,7 @@ func (w *WatermarkGenerator) Get(ctx context.Context, variables octosql.Variable
 }
 
 type WatermarkGeneratorStream struct {
+	streamID  *execution.StreamID
 	source    execution.RecordStream
 	timeField octosql.VariableName
 	offset    time.Duration
@@ -99,7 +96,8 @@ func (s *WatermarkGeneratorStream) Next(ctx context.Context) (*execution.Record,
 	// watermark value stored equals to (max_record_time - offset) that's why we multiply offset by -1
 	timeValueWithOffset := timeValue.AsTime().Add(-1 * s.offset)
 
-	tx := storage.GetStateTransactionFromContext(ctx)
+	tx := storage.GetStateTransactionFromContext(ctx).WithPrefix(s.streamID.AsPrefix())
+
 	currentWatermark, err := s.GetWatermark(ctx, tx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get current watermark value")
@@ -118,6 +116,14 @@ func (s *WatermarkGeneratorStream) Next(ctx context.Context) (*execution.Record,
 	return srcRecord, nil
 }
 
-func (s *WatermarkGeneratorStream) Close() error {
-	return s.source.Close()
+func (s *WatermarkGeneratorStream) Close(ctx context.Context, storage storage.Storage) error {
+	if err := s.source.Close(ctx, storage); err != nil {
+		return errors.Wrap(err, "couldn't close underlying stream")
+	}
+
+	if err := storage.DropAll(s.streamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
+	}
+
+	return nil
 }

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 func TestLimit_Get(t *testing.T) {
@@ -21,14 +21,14 @@ func TestLimit_Get(t *testing.T) {
 		{
 			name:      "negative limit value",
 			vars:      octosql.NoVariables(),
-			node:      NewLimit(NewDummyNode(nil), NewDummyValue(octosql.MakeInt(-42))),
+			node:      NewLimit(NewDummyNode(nil), NewConstantValue(octosql.MakeInt(-42))),
 			want:      nil,
 			wantError: true,
 		},
 		{
 			name:      "limit value not int",
 			vars:      octosql.NoVariables(),
-			node:      NewLimit(NewDummyNode(nil), NewDummyValue(octosql.MakeFloat(2.0))),
+			node:      NewLimit(NewDummyNode(nil), NewConstantValue(octosql.MakeFloat(2.0))),
 			want:      nil,
 			wantError: true,
 		},
@@ -66,7 +66,7 @@ func TestLimit_Get(t *testing.T) {
 							2.23e7,
 						}),
 				},
-			), NewDummyValue(octosql.MakeInt(3))),
+			), NewConstantValue(octosql.MakeInt(3))),
 			want: NewDummyNode([]*Record{
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{
@@ -105,7 +105,7 @@ func TestLimit_Get(t *testing.T) {
 							1,
 						}),
 				},
-			}, NewDummyValue(octosql.MakeInt(0))),
+			}, NewConstantValue(octosql.MakeInt(0))),
 			want:      NewDummyNode([]*Record{}),
 			wantError: false,
 		},
@@ -138,6 +138,15 @@ func TestLimit_Get(t *testing.T) {
 			err = AreStreamsEqualNoOrdering(ctx, stateStorage, rs, want)
 			if err != nil {
 				t.Errorf("limitedStream comparison error: %v", err)
+			}
+
+			if err := rs.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close limited stream: %v", err)
+				return
+			}
+			if err := want.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+				return
 			}
 		})
 	}

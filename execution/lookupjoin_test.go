@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 func TestLookupJoin(t *testing.T) {
@@ -314,6 +314,15 @@ func TestLookupJoin(t *testing.T) {
 			err := AreStreamsEqualNoOrdering(context.Background(), stateStorage, stream, want)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("LookupJoin error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if err := stream.Close(context.Background(), stateStorage); err != nil {
+				t.Errorf("Couldn't close group_by stream: %v", err)
+				return
+			}
+			if err := want.Close(context.Background(), stateStorage); err != nil {
+				t.Errorf("Couldn't close wanted in_memory stream: %v", err)
 				return
 			}
 		})

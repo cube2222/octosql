@@ -3,9 +3,11 @@ package logical
 import (
 	"context"
 
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
+	"github.com/cube2222/octosql/physical"
 )
 
 type Interval struct {
@@ -42,4 +44,15 @@ func (v *Interval) Physical(ctx context.Context, physicalCreator *PhysicalPlanCr
 		),
 		variables,
 		nil
+}
+
+func (v *Interval) Visualize() *graph.Node {
+	n := graph.NewNode("Interval")
+	if v.count != nil {
+		n.AddChild("count", v.count.Visualize())
+	}
+	if v.unit != nil {
+		n.AddChild("unit", v.unit.Visualize())
+	}
+	return n
 }

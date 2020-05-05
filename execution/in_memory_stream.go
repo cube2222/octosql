@@ -6,7 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 type InMemoryStream struct {
@@ -30,7 +30,11 @@ func NewInMemoryStream(ctx context.Context, data []*Record) *InMemoryStream {
 	}
 }
 
-func (ims *InMemoryStream) Close() error {
+func (ims *InMemoryStream) Close(ctx context.Context, storage storage.Storage) error {
+	if err := storage.DropAll(ims.streamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
+	}
+
 	return nil
 }
 

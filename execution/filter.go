@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 
 	"github.com/pkg/errors"
 )
@@ -43,10 +43,9 @@ type FilteredStream struct {
 	source    RecordStream
 }
 
-func (stream *FilteredStream) Close() error {
-	err := stream.source.Close()
-	if err != nil {
-		return errors.Wrap(err, "Couldn't close underlying stream")
+func (stream *FilteredStream) Close(ctx context.Context, storage storage.Storage) error {
+	if err := stream.source.Close(ctx, storage); err != nil {
+		return errors.Wrap(err, "couldn't close underlying stream")
 	}
 
 	return nil

@@ -2,14 +2,19 @@ package logical
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
+	"github.com/cube2222/octosql/physical"
 )
 
 type Formula interface {
+	graph.Visualizer
+
 	Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Formula, octosql.Variables, error)
 }
 
@@ -23,6 +28,12 @@ func NewBooleanConstant(value bool) *BooleanConstant {
 
 func (f *BooleanConstant) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Formula, octosql.Variables, error) {
 	return physical.NewConstant(f.Value), octosql.NoVariables(), nil
+}
+
+func (f *BooleanConstant) Visualize() *graph.Node {
+	n := graph.NewNode("BooleanConstant")
+	n.AddField("Value", fmt.Sprint(f.Value))
+	return n
 }
 
 type InfixOperator struct {
@@ -60,6 +71,19 @@ func (f *InfixOperator) Physical(ctx context.Context, physicalCreator *PhysicalP
 	}
 }
 
+func (f *InfixOperator) Visualize() *graph.Node {
+	n := graph.NewNode("Infix Operator")
+	n.AddField("Operator", f.Operator)
+
+	if f.Left != nil {
+		n.AddChild("Left", f.Left.Visualize())
+	}
+	if f.Right != nil {
+		n.AddChild("Right", f.Right.Visualize())
+	}
+	return n
+}
+
 type PrefixOperator struct {
 	Child    Formula
 	Operator string
@@ -81,6 +105,16 @@ func (f *PrefixOperator) Physical(ctx context.Context, physicalCreator *Physical
 	default:
 		return nil, nil, errors.Wrapf(err, "invalid logic prefix operator %v", f.Operator)
 	}
+}
+
+func (f *PrefixOperator) Visualize() *graph.Node {
+	n := graph.NewNode("Prefix Operator")
+	n.AddField("Operator", f.Operator)
+
+	if f.Child != nil {
+		n.AddChild("Child", f.Child.Visualize())
+	}
+	return n
 }
 
 type Predicate struct {
@@ -113,4 +147,17 @@ func (f *Predicate) Physical(ctx context.Context, physicalCreator *PhysicalPlanC
 	}
 
 	return physical.NewPredicate(left, relation, right), variables, nil
+}
+
+func (f *Predicate) Visualize() *graph.Node {
+	n := graph.NewNode("Predicate")
+	n.AddField("Relation", string(f.Relation))
+
+	if f.Left != nil {
+		n.AddChild("Left", f.Left.Visualize())
+	}
+	if f.Right != nil {
+		n.AddChild("Right", f.Right.Visualize())
+	}
+	return n
 }

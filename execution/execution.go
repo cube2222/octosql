@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 
 	"github.com/pkg/errors"
 )
@@ -34,6 +34,16 @@ type ShuffleData struct {
 	Variables octosql.Variables
 }
 
+func mergeNextShuffles(first, second map[string]ShuffleData) (map[string]ShuffleData, error) {
+	result := first
+
+	for key, value := range second {
+		result[key] = value
+	}
+
+	return result, nil
+}
+
 func NewExecutionOutput(ws WatermarkSource, nextShuffles map[string]ShuffleData, tasksToRun []Task) *ExecutionOutput {
 	return &ExecutionOutput{
 		WatermarkSource: ws,
@@ -51,6 +61,33 @@ func (s *ZeroWatermarkGenerator) GetWatermark(ctx context.Context, tx storage.St
 
 func NewZeroWatermarkGenerator() *ZeroWatermarkGenerator {
 	return &ZeroWatermarkGenerator{}
+}
+
+type UnionWatermarkGenerator struct {
+	sources []WatermarkSource
+}
+
+func NewUnionWatermarkGenerator(sources []WatermarkSource) *UnionWatermarkGenerator {
+	return &UnionWatermarkGenerator{
+		sources: sources,
+	}
+}
+
+func (uwg *UnionWatermarkGenerator) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
+	minimalTime := maxWatermark
+
+	for i := range uwg.sources {
+		sourceTime, err := uwg.sources[i].GetWatermark(ctx, tx)
+		if err != nil {
+			return minimalTime, errors.Wrapf(err, "couldn't get watermark for source with id %v", i)
+		}
+
+		if minimalTime.After(sourceTime) {
+			minimalTime = sourceTime
+		}
+	}
+
+	return minimalTime, nil
 }
 
 type Node interface {
@@ -252,7 +289,7 @@ func (re *RecordExpression) ExpressionValue(ctx context.Context, variables octos
 	values := make([]octosql.Value, 0)
 
 	for _, f := range fields {
-		if f.Source() == "sys" { // TODO: some better way to do this?
+		if f.Source() == SystemSource { // TODO: some better way to do this?
 			continue
 		}
 

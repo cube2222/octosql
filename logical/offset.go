@@ -2,7 +2,9 @@ package logical
 
 import (
 	"context"
+
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
 )
@@ -35,4 +37,15 @@ func (node *Offset) Physical(ctx context.Context, physicalCreator *PhysicalPlanC
 	outNodes := physical.NewShuffle(1, physical.NewConstantStrategy(0), sourceNodes)
 
 	return []physical.Node{physical.NewOffset(outNodes[0], offsetExpr)}, variables, nil
+}
+
+func (node *Offset) Visualize() *graph.Node {
+	n := graph.NewNode("Offset")
+	if node.data != nil {
+		n.AddChild("data", node.data.Visualize())
+	}
+	if node.offsetExpr != nil {
+		n.AddChild("offset", node.offsetExpr.Visualize())
+	}
+	return n
 }

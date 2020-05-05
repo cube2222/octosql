@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 func TestFilteredStream_Next(t *testing.T) {
@@ -174,6 +174,15 @@ func TestFilteredStream_Next(t *testing.T) {
 			err := AreStreamsEqual(ctx, stream, tt.want)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("FilteredStream.Next() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if err := stream.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close filter stream: %v", err)
+				return
+			}
+			if err := tt.want.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close wanted in_memory stream: %v", err)
 				return
 			}
 		})

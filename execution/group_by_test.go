@@ -7,8 +7,8 @@ import (
 
 	"github.com/cube2222/octosql"
 	. "github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/streaming/aggregate"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/execution/aggregates"
+	"github.com/cube2222/octosql/storage"
 )
 
 func TestGroupBy_SimpleBatch(t *testing.T) {
@@ -34,9 +34,9 @@ func TestGroupBy_SimpleBatch(t *testing.T) {
 			octosql.NewVariableName("livesleft"),
 		},
 		[]AggregatePrototype{
-			aggregate.AggregateTable["key"],
-			aggregate.AggregateTable["avg"],
-			aggregate.AggregateTable["count"],
+			aggregates.AggregateTable["key"],
+			aggregates.AggregateTable["avg"],
+			aggregates.AggregateTable["count"],
 		},
 		octosql.NewVariableName(""),
 		[]octosql.VariableName{
@@ -63,9 +63,18 @@ func TestGroupBy_SimpleBatch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream)
+	err := AreStreamsEqualNoOrderingWithIDCheck(ctx, stateStorage, stream, want, WithEqualityBasedOn(EqualityOfEverythingButIDs))
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if err := stream.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close group_by stream: %v", err)
+		return
+	}
+	if err := want.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+		return
 	}
 }
 
@@ -99,9 +108,9 @@ func TestGroupBy_BatchWithUndos(t *testing.T) {
 			octosql.NewVariableName("livesleft"),
 		},
 		[]AggregatePrototype{
-			aggregate.AggregateTable["key"],
-			aggregate.AggregateTable["avg"],
-			aggregate.AggregateTable["count"],
+			aggregates.AggregateTable["key"],
+			aggregates.AggregateTable["avg"],
+			aggregates.AggregateTable["count"],
 		},
 		octosql.NewVariableName(""),
 		[]octosql.VariableName{
@@ -128,9 +137,18 @@ func TestGroupBy_BatchWithUndos(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream)
+	err := AreStreamsEqualNoOrderingWithIDCheck(ctx, stateStorage, stream, want, WithEqualityBasedOn(EqualityOfEverythingButIDs))
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if err := stream.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close group_by stream: %v", err)
+		return
+	}
+	if err := want.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+		return
 	}
 }
 
@@ -168,9 +186,9 @@ func TestGroupBy_WithOutputUndos(t *testing.T) {
 			octosql.NewVariableName("livesleft"),
 		},
 		[]AggregatePrototype{
-			aggregate.AggregateTable["key"],
-			aggregate.AggregateTable["avg"],
-			aggregate.AggregateTable["count"],
+			aggregates.AggregateTable["key"],
+			aggregates.AggregateTable["avg"],
+			aggregates.AggregateTable["count"],
 		},
 		octosql.NewVariableName(""),
 		[]octosql.VariableName{
@@ -209,9 +227,18 @@ func TestGroupBy_WithOutputUndos(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream)
+	err := AreStreamsEqualNoOrderingWithIDCheck(ctx, stateStorage, stream, want, WithEqualityBasedOn(EqualityOfEverythingButIDs))
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if err := stream.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close group_by stream: %v", err)
+		return
+	}
+	if err := want.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+		return
 	}
 }
 
@@ -238,8 +265,8 @@ func TestGroupBy_newRecordsNoChanges(t *testing.T) {
 			octosql.NewVariableName("livesleft"),
 		},
 		[]AggregatePrototype{
-			aggregate.AggregateTable["key"],
-			aggregate.AggregateTable["avg"],
+			aggregates.AggregateTable["key"],
+			aggregates.AggregateTable["avg"],
 		},
 		octosql.NewVariableName(""),
 		[]octosql.VariableName{
@@ -263,9 +290,18 @@ func TestGroupBy_newRecordsNoChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream)
+	err := AreStreamsEqualNoOrderingWithIDCheck(ctx, stateStorage, stream, want, WithEqualityBasedOn(EqualityOfEverythingButIDs))
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if err := stream.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close group_by stream: %v", err)
+		return
+	}
+	if err := want.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+		return
 	}
 }
 
@@ -307,10 +343,10 @@ func TestGroupBy_EventTimes(t *testing.T) {
 			octosql.NewVariableName("livesleft"),
 		},
 		[]AggregatePrototype{
-			aggregate.AggregateTable["key"],
-			aggregate.AggregateTable["key"],
-			aggregate.AggregateTable["avg"],
-			aggregate.AggregateTable["count"],
+			aggregates.AggregateTable["key"],
+			aggregates.AggregateTable["key"],
+			aggregates.AggregateTable["avg"],
+			aggregates.AggregateTable["count"],
 		},
 		octosql.NewVariableName("t"),
 		[]octosql.VariableName{
@@ -342,8 +378,17 @@ func TestGroupBy_EventTimes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := AreStreamsEqualNoOrdering(ctx, stateStorage, want, stream)
+	err := AreStreamsEqualNoOrderingWithIDCheck(ctx, stateStorage, stream, want, WithEqualityBasedOn(EqualityOfEverythingButIDs))
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if err := stream.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close group_by stream: %v", err)
+		return
+	}
+	if err := want.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+		return
 	}
 }

@@ -2,7 +2,9 @@ package logical
 
 import (
 	"context"
+
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
 )
@@ -35,4 +37,15 @@ func (node *Limit) Physical(ctx context.Context, physicalCreator *PhysicalPlanCr
 	outNodes := physical.NewShuffle(1, physical.NewConstantStrategy(0), sourceNodes)
 
 	return []physical.Node{physical.NewLimit(outNodes[0], limitExpr)}, variables, nil
+}
+
+func (node *Limit) Visualize() *graph.Node {
+	n := graph.NewNode("Limit")
+	if node.limitExpr != nil {
+		n.AddChild("limit", node.limitExpr.Visualize())
+	}
+	if node.data != nil {
+		n.AddChild("data", node.data.Visualize())
+	}
+	return n
 }

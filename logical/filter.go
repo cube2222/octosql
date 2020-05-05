@@ -3,9 +3,11 @@ package logical
 import (
 	"context"
 
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
+	"github.com/cube2222/octosql/physical"
 )
 
 type Filter struct {
@@ -38,4 +40,15 @@ func (node *Filter) Physical(ctx context.Context, physicalCreator *PhysicalPlanC
 	}
 
 	return outputNodes, variables, nil
+}
+
+func (node *Filter) Visualize() *graph.Node {
+	n := graph.NewNode("Filter")
+	if node.formula != nil {
+		n.AddChild("formula", node.formula.Visualize())
+	}
+	if node.source != nil {
+		n.AddChild("source", node.source.Visualize())
+	}
+	return n
 }

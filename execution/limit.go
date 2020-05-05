@@ -2,7 +2,7 @@ package execution
 
 import (
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 
 	"context"
 
@@ -61,10 +61,13 @@ type LimitedStream struct {
 	streamID *StreamID
 }
 
-func (node *LimitedStream) Close() error {
-	err := node.rs.Close()
-	if err != nil {
+func (node *LimitedStream) Close(ctx context.Context, storage storage.Storage) error {
+	if err := node.rs.Close(ctx, storage); err != nil {
 		return errors.Wrap(err, "couldn't close underlying stream")
+	}
+
+	if err := storage.DropAll(node.streamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
 	}
 
 	return nil

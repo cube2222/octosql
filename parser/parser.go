@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
@@ -69,6 +70,20 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 	root, err = ParseTableExpression(statement.From[0], true)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't parse from expression")
+	}
+
+	// If we get a join we want to parse triggers for it. It is done here, because otherwise passing statement.Triggers
+	// would have to get to like 4 functions, which is a bit of a pain, since the type check here.
+	if root, ok := root.(*logical.Join); ok {
+		triggers := make([]logical.Trigger, len(statement.Trigger))
+		for i := range statement.Trigger {
+			triggers[i], err = ParseTrigger(statement.Trigger[i])
+			if err != nil {
+				return nil, errors.Wrapf(err, "couldn't parse trigger with index %d", i)
+			}
+		}
+
+		root = root.WithTriggers(triggers)
 	}
 
 	// Separate star expressions so we can put them at last positions
@@ -374,16 +389,12 @@ func ParseJoinTableExpression(expr *sqlparser.JoinTableExpr) (logical.Node, erro
 
 	var source, joined logical.Node
 	switch expr.Join {
-	case sqlparser.LeftJoinStr:
+	case sqlparser.LeftJoinStr, sqlparser.JoinStr:
 		source = leftTable
 		joined = rightTable
 	case sqlparser.RightJoinStr:
 		source = rightTable
 		joined = leftTable
-	case sqlparser.JoinStr:
-		// TODO: Add cardinality based heuristics
-		source = leftTable
-		joined = rightTable
 	default:
 		return nil, errors.Errorf("invalid join expression: %v", expr.Join)
 	}
@@ -399,9 +410,9 @@ func ParseJoinTableExpression(expr *sqlparser.JoinTableExpr) (logical.Node, erro
 
 	switch expr.Join {
 	case sqlparser.LeftJoinStr, sqlparser.RightJoinStr:
-		return logical.NewLeftJoin(source, joined), nil
+		return logical.NewJoin(source, joined, execution.LEFT_JOIN), nil
 	case sqlparser.JoinStr:
-		return logical.NewInnerJoin(source, joined), nil
+		return logical.NewJoin(source, joined, execution.INNER_JOIN), nil
 	default:
 		return nil, errors.Errorf("invalid join expression: %v", expr.Join)
 	}

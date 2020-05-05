@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 func TestOffset_Get(t *testing.T) {
@@ -21,14 +21,14 @@ func TestOffset_Get(t *testing.T) {
 		{
 			name:      "negative offset value",
 			vars:      octosql.NoVariables(),
-			node:      NewOffset(NewDummyNode(nil), NewDummyValue(octosql.MakeInt(-42))),
+			node:      NewOffset(NewDummyNode(nil), NewConstantValue(octosql.MakeInt(-42))),
 			want:      nil,
 			wantError: true,
 		},
 		{
 			name:      "offset value not int",
 			vars:      octosql.NoVariables(),
-			node:      NewOffset(NewDummyNode(nil), NewDummyValue(octosql.MakeFloat(2.0))),
+			node:      NewOffset(NewDummyNode(nil), NewConstantValue(octosql.MakeFloat(2.0))),
 			want:      nil,
 			wantError: true,
 		},
@@ -66,7 +66,7 @@ func TestOffset_Get(t *testing.T) {
 							2.23e7,
 						}),
 				},
-			), NewDummyValue(octosql.MakeInt(2))),
+			), NewConstantValue(octosql.MakeInt(2))),
 			want: NewDummyNode([]*Record{
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{
@@ -105,7 +105,7 @@ func TestOffset_Get(t *testing.T) {
 							2,
 						}),
 				},
-			}, NewDummyValue(octosql.MakeInt(4))),
+			}, NewConstantValue(octosql.MakeInt(4))),
 			want:      NewDummyNode([]*Record{}),
 			wantError: false,
 		},

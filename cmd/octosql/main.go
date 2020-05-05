@@ -14,9 +14,14 @@ import (
 
 	"github.com/go-chi/chi/middleware"
 
-	"github.com/cube2222/octosql/storage/excel"
-	"github.com/cube2222/octosql/storage/kafka"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/datasources/csv"
+	"github.com/cube2222/octosql/datasources/excel"
+	"github.com/cube2222/octosql/datasources/json"
+	"github.com/cube2222/octosql/datasources/kafka"
+	"github.com/cube2222/octosql/datasources/parquet"
+	"github.com/cube2222/octosql/datasources/redis"
+	"github.com/cube2222/octosql/datasources/sql/mysql"
+	"github.com/cube2222/octosql/datasources/sql/postgres"
 
 	"github.com/spf13/cobra"
 
@@ -29,11 +34,7 @@ import (
 	"github.com/cube2222/octosql/parser"
 	"github.com/cube2222/octosql/parser/sqlparser"
 	"github.com/cube2222/octosql/physical"
-	"github.com/cube2222/octosql/storage/csv"
-	"github.com/cube2222/octosql/storage/json"
-	"github.com/cube2222/octosql/storage/redis"
-	"github.com/cube2222/octosql/storage/sql/mysql"
-	"github.com/cube2222/octosql/storage/sql/postgres"
+	"github.com/cube2222/octosql/storage"
 )
 
 var configPath string
@@ -68,6 +69,7 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 				"redis":    redis.NewDataSourceBuilderFactoryFromConfig,
 				"excel":    excel.NewDataSourceBuilderFactoryFromConfig,
 				"kafka":    kafka.NewDataSourceBuilderFactoryFromConfig,
+				"parquet":  parquet.NewDataSourceBuilderFactoryFromConfig,
 			},
 			cfg,
 		)

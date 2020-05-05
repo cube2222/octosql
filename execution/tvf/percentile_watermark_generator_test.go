@@ -9,7 +9,7 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 func TestPercentileWatermarkGenerator_Get(t *testing.T) {
@@ -260,6 +260,15 @@ func TestPercentileWatermarkGenerator_Stream(t *testing.T) {
 				t.Errorf("PercentileWatermarkGenerator.Get() AreStreamsEqual error = %v", err)
 			}
 
+			if err := got.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close percentile watermark generator stream: %v", err)
+				return
+			}
+			if err := wanted.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+				return
+			}
+
 			if err := tx.Commit(); err != nil {
 				t.Fatal(err)
 			}
@@ -354,11 +363,12 @@ func TestPercentileWatermarkGeneratorStream_GetWatermark(t *testing.T) {
 	}
 
 	stateStorage := storage.GetTestStorage(t)
+	streamID := execution.GetRawStreamID()
 
 	tx := stateStorage.BeginTransaction()
 	ctx = storage.InjectStateTransaction(ctx, tx)
 
-	src, execOutput, err := wg.Get(ctx, variables, execution.GetRawStreamID())
+	src, execOutput, err := wg.Get(ctx, variables, streamID)
 	if err != nil {
 		t.Errorf("PercentileWatermarkGenerator.Get() error = %v", err)
 		return
@@ -367,6 +377,7 @@ func TestPercentileWatermarkGeneratorStream_GetWatermark(t *testing.T) {
 	assert.Equal(t, src, execOutput.WatermarkSource)
 
 	ws := execOutput.WatermarkSource
+	tx = tx.WithPrefix(streamID.AsPrefix())
 
 	// event times seen : 1, 0, 5, 3, 2, 2, 4, 1, 6, 8, 7, 9, 7, 8, 42
 
@@ -420,4 +431,9 @@ func TestPercentileWatermarkGeneratorStream_GetWatermark(t *testing.T) {
 
 	NextRecord(t, ctx, src)                                           // event: 42 ; deque: 7 9 7 8 42; sorted: 7 7 8 9 42
 	ExpectWatermarkValue(t, ctx, ws, tx, baseTime.Add(time.Second*7)) // update
+
+	if err := src.Close(ctx, stateStorage); err != nil {
+		t.Errorf("Couldn't close percentile watermark generator stream: %v", err)
+		return
+	}
 }

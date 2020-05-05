@@ -9,7 +9,7 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 type TableOutput struct {
@@ -146,8 +146,20 @@ func (o *TableOutput) GetErrorMessage(ctx context.Context, tx storage.StateTrans
 	return octoError.AsString(), nil
 }
 
-func (o *TableOutput) Close() error {
-	return nil // TODO: Cleanup?
+func (o *TableOutput) Close(ctx context.Context, storage storage.Storage) error {
+	if err := storage.DropAll(recordsPrefix); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with records prefix")
+	}
+
+	if err := storage.DropAll(endOfStreamPrefix); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with end of stream prefix")
+	}
+
+	if err := storage.DropAll(errorPrefix); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with error prefix")
+	}
+
+	return nil
 }
 
 func (o *TableOutput) ListRecords(ctx context.Context, tx storage.StateTransaction) ([]*execution.Record, error) {

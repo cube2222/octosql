@@ -6,7 +6,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 type Distinct struct {
@@ -37,7 +37,7 @@ func (node *Distinct) Get(ctx context.Context, variables octosql.Variables, stre
 
 	// The trigger for distinct is counting trigger with value 1, because triggering of Distinct
 	// is strongly related to triggering of the underlying source, so that's the simplest approach
-	trigger, err := NewCountingTrigger(NewDummyValue(octosql.MakeInt(1))).Get(ctx, variables)
+	trigger, err := NewCountingTrigger(NewConstantValue(octosql.MakeInt(1))).Get(ctx, variables)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't create trigger for distinct")
 	}
@@ -49,18 +49,18 @@ func (node *Distinct) Get(ctx context.Context, variables octosql.Variables, stre
 	processFunc := &ProcessByKey{
 		eventTimeField:  node.eventTimeField,
 		trigger:         trigger,
-		keyExpression:   []Expression{&RecordExpression{}},
+		keyExpressions:  [][]Expression{{&RecordExpression{}}},
 		processFunction: distinct,
 		variables:       variables,
 	}
 
-	distinctPullEngine := NewPullEngine(processFunc, node.storage, source, streamID, execOutput.WatermarkSource, true)
+	distinctPullEngine := NewPullEngine(processFunc, node.storage, []RecordStream{source}, streamID, execOutput.WatermarkSource, true, ctx)
 
 	return distinctPullEngine,
 		NewExecutionOutput(
 			distinctPullEngine,
 			execOutput.NextShuffles,
-			append(execOutput.TasksToRun, func() error { distinctPullEngine.Run(ctx); return nil }),
+			append(execOutput.TasksToRun, func() error { distinctPullEngine.Run(); return nil }),
 		),
 		nil
 }

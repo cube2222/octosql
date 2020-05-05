@@ -9,9 +9,9 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/execution/aggregates"
 	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
-	"github.com/cube2222/octosql/streaming/aggregate"
 )
 
 type Aggregate string
@@ -192,7 +192,7 @@ func (node *GroupBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 
 	aggregatePrototypes := make([]execution.AggregatePrototype, len(node.Aggregates))
 	for i := range node.Aggregates {
-		aggregatePrototypes[i] = aggregate.AggregateTable[string(node.Aggregates[i])]
+		aggregatePrototypes[i] = aggregates.AggregateTable[string(node.Aggregates[i])]
 	}
 
 	triggerPrototypes := make([]execution.TriggerPrototype, len(node.Triggers))
@@ -222,18 +222,17 @@ func (node *GroupBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 }
 
 func (node *GroupBy) groupingByEventTime(sourceMetadata *metadata.NodeMetadata) bool {
-	groupingByEventTime := false
 	if !sourceMetadata.EventTimeField().Empty() {
 		for i := range node.Key {
 			if variable, ok := node.Key[i].(*Variable); ok {
-				if variable.Name == sourceMetadata.EventTimeField() {
-					groupingByEventTime = true
+				if variable.ExpressionName() == sourceMetadata.EventTimeField() {
+					return true
 				}
 			}
 		}
 	}
 
-	return groupingByEventTime
+	return false
 }
 
 func (node *GroupBy) Metadata() *metadata.NodeMetadata {
@@ -254,7 +253,7 @@ func (node *GroupBy) Metadata() *metadata.NodeMetadata {
 		}
 	}
 
-	return metadata.NewNodeMetadata(cardinality, outEventTimeField)
+	return metadata.NewNodeMetadata(cardinality, outEventTimeField, metadata.EmptyNamespace())
 }
 
 func (node *GroupBy) Visualize() *graph.Node {
@@ -276,5 +275,9 @@ func (node *GroupBy) Visualize() *graph.Node {
 		n.AddField(fmt.Sprintf("field_%d", i), value)
 	}
 
+	eventTimeField := node.Metadata().EventTimeField()
+	if eventTimeField != "" {
+		n.AddChild("event_time_field", graph.NewNode(eventTimeField.String()))
+	}
 	return n
 }

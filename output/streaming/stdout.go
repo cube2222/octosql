@@ -33,18 +33,20 @@ func (sp *StreamPrinter) Run(ctx context.Context) error {
 		if err == execution.ErrEndOfStream {
 			err := tx.Commit()
 			if err != nil {
+				log.Println("couldn't commit transaction: ", err)
 				continue
 			}
 			break
 		} else if errors.Cause(err) == execution.ErrNewTransactionRequired {
-			err := tx.Commit()
+			_ := tx.Commit()
 			if err != nil {
-				continue
+				log.Println("couldn't commit transaction: ", err)
 			}
 			continue
 		} else if waitableError := execution.GetErrWaitForChanges(err); waitableError != nil {
 			err := tx.Commit()
 			if err != nil {
+				log.Println("couldn't commit transaction: ", err)
 				continue
 			}
 			err = waitableError.ListenForChanges(ctx)

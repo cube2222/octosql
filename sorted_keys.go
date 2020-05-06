@@ -13,7 +13,7 @@ import (
 // Identifiers must all be unique and less than 128
 const (
 	NullIdentifier      = 1  /* Nonexistent */
-	PhantomIdentifier   = 2  /* Nonexsitent */
+	PhantomIdentifier   = 2  /* Nonexistent */
 	IntIdentifier       = 3  /* Number */
 	FloatIdentifier     = 4  /* Number */
 	BoolIdentifier      = 5  /* Bool */
@@ -297,7 +297,7 @@ func MonotonicMarshalTime(t time.Time) []byte {
 
 	bytes[0] = TimestampIdentifier
 	seconds := MonotonicMarshalInt64(t.Unix())
-	copy(bytes[1:9], seconds[1:9]) // Omit integer
+	copy(bytes[1:9], seconds[1:9]) // Omit integer identifier
 
 	bytes[9] = TimestampIdentifier
 	nanoseconds := MonotonicMarshalInt64(int64(t.Nanosecond()))
@@ -307,6 +307,7 @@ func MonotonicMarshalTime(t time.Time) []byte {
 }
 
 func MonotonicUnmarshalTime(b []byte) (time.Time, error) {
+	// MonotonicUnmarshalInt64 ignores the first byte.
 	seconds, err := MonotonicUnmarshalInt64(b[:9])
 	if err != nil {
 		return time.Now(), errors.Wrap(err, "incorrect seconds representation")

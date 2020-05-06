@@ -81,12 +81,7 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 			log.Fatal(err)
 		}
 
-		// stream json
-		// live csv
-		// live table
-		// batch csv
-		// batch table
-		var outputSinkFn func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (execution.IntermediateRecordStore, output.Printer)
+		var outputSinkFn app.OutputSinkFn
 		switch outputFormat {
 		case "stream-json":
 			outputSinkFn = func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (store execution.IntermediateRecordStore, printer output.Printer) {
@@ -126,7 +121,7 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 			log.Fatal("invalid output type")
 		}
 
-		app := app.NewApp(cfg, dataSourceRespository, nil, describe)
+		app := app.NewApp(cfg, dataSourceRespository, outputSinkFn, describe)
 
 		// Parse query
 		stmt, err := sqlparser.Parse(query)
@@ -160,7 +155,7 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 		stateStorage := storage.NewBadgerStorage(db)
 
 		// Run query
-		err = app.RunPlan(ctx, stateStorage, outputSinkFn, plan)
+		err = app.RunPlan(ctx, stateStorage, plan)
 		if err != nil {
 			log.Fatal("couldn't run plan: ", err)
 		}

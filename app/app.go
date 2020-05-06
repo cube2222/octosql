@@ -17,28 +17,25 @@ import (
 	"github.com/pkg/errors"
 )
 
+type OutputSinkFn func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (execution.IntermediateRecordStore, output.Printer)
+
 type App struct {
 	cfg                  *config.Config
 	dataSourceRepository *physical.DataSourceRepository
-	out                  interface{}
+	outputSinkFn         OutputSinkFn
 	describe             bool
 }
 
-func NewApp(cfg *config.Config, dataSourceRepository *physical.DataSourceRepository, out interface{}, describe bool) *App {
+func NewApp(cfg *config.Config, dataSourceRepository *physical.DataSourceRepository, outputSinkFn OutputSinkFn, describe bool) *App {
 	return &App{
 		cfg:                  cfg,
 		dataSourceRepository: dataSourceRepository,
-		out:                  out,
+		outputSinkFn:         outputSinkFn,
 		describe:             describe,
 	}
 }
 
-func (app *App) RunPlan(
-	ctx context.Context,
-	stateStorage storage.Storage,
-	outputSinkFn func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (execution.IntermediateRecordStore, output.Printer),
-	plan logical.Node,
-) error {
+func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan logical.Node) error {
 	sourceNodes, variables, err := plan.Physical(ctx, logical.NewPhysicalPlanCreator(app.dataSourceRepository, app.cfg.Physical))
 	if err != nil {
 		return errors.Wrap(err, "couldn't create physical plan")
@@ -69,7 +66,7 @@ func (app *App) RunPlan(
 
 	outStreamID := &execution.StreamID{Id: "output"}
 
-	outputSink, printer := outputSinkFn(stateStorage, outStreamID, phys.Metadata().EventTimeField())
+	outputSink, printer := app.outputSinkFn(stateStorage, outStreamID, phys.Metadata().EventTimeField())
 
 	pullEngine := execution.NewPullEngine(outputSink, stateStorage, []execution.RecordStream{stream[0]}, outStreamID, execOutput[0].WatermarkSource, false, ctx)
 	go pullEngine.Run()

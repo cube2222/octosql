@@ -162,18 +162,8 @@ func (o *TableOutput) GetErrorMessage(ctx context.Context, tx storage.StateTrans
 }
 
 func (o *TableOutput) Close(ctx context.Context, storage storage.Storage) error {
-	storage = storage.WithPrefix(o.StreamID.AsPrefix())
-
-	if err := storage.DropAll(recordsPrefix); err != nil {
-		return errors.Wrap(err, "couldn't clear storage with records prefix")
-	}
-
-	if err := storage.DropAll(endOfStreamPrefix); err != nil {
-		return errors.Wrap(err, "couldn't clear storage with end of stream prefix")
-	}
-
-	if err := storage.DropAll(errorPrefix); err != nil {
-		return errors.Wrap(err, "couldn't clear storage with error prefix")
+	if err := storage.DropAll(o.StreamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
 	}
 
 	return nil

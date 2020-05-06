@@ -138,6 +138,9 @@ func (o *InstantStreamOutput) GetErrorMessage(ctx context.Context, tx storage.St
 }
 
 func (o *InstantStreamOutput) Close(ctx context.Context, storage storage.Storage) error {
-	storage = storage.WithPrefix(o.StreamID.AsPrefix())
-	return nil // TODO: Cleanup?
+	if err := storage.DropAll(o.StreamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
+	}
+
+	return nil
 }

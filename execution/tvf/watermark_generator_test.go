@@ -38,18 +38,22 @@ func TestWatermarkGenerator_Get(t *testing.T) {
 					execution.NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"id", "time"},
 						[]interface{}{1, baseTime},
+						execution.WithEventTimeField(octosql.NewVariableName("time")),
 					),
 					execution.NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"id", "time"},
 						[]interface{}{2, baseTime.Add(time.Second * 10)},
+						execution.WithEventTimeField(octosql.NewVariableName("time")),
 					),
 					execution.NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"id", "time"},
 						[]interface{}{3, baseTime.Add(time.Second * 8)},
+						execution.WithEventTimeField(octosql.NewVariableName("time")),
 					),
 					execution.NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"id", "time"},
 						[]interface{}{4, baseTime.Add(time.Second * 13)},
+						execution.WithEventTimeField(octosql.NewVariableName("time")),
 					),
 				}),
 				timeField: "time",
@@ -64,18 +68,22 @@ func TestWatermarkGenerator_Get(t *testing.T) {
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time"},
 					[]interface{}{1, baseTime},
+					execution.WithEventTimeField(octosql.NewVariableName("time")),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time"},
 					[]interface{}{2, baseTime.Add(time.Second * 10)},
+					execution.WithEventTimeField(octosql.NewVariableName("time")),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time"},
 					[]interface{}{3, baseTime.Add(time.Second * 8)},
+					execution.WithEventTimeField(octosql.NewVariableName("time")),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time"},
 					[]interface{}{4, baseTime.Add(time.Second * 13)},
+					execution.WithEventTimeField(octosql.NewVariableName("time")),
 				),
 			}),
 			wantErr: false,

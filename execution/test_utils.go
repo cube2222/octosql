@@ -446,25 +446,6 @@ func NewRecordFromSliceWithNormalize(fields []octosql.VariableName, data []inter
 	return NewRecordFromSlice(fields, normalized, opts...)
 }
 
-func NewRecordFromMapWithNormalize(fieldsMap map[octosql.VariableName]interface{}, opts ...RecordOption) *Record {
-	fields := make([]octosql.VariableName, 0)
-	for k := range fieldsMap {
-		fields = append(fields, k)
-	}
-
-	sort.Slice(fields, func(i, j int) bool {
-		return fields[i] < fields[j]
-	})
-
-	normalized := make([]octosql.Value, len(fieldsMap))
-
-	for i, field := range fields {
-		normalized[i] = octosql.NormalizeType(fieldsMap[field])
-	}
-
-	return NewRecordFromSlice(fields, normalized, opts...)
-}
-
 func NewDummyNode(data []*Record) *DummyNode {
 	return &DummyNode{
 		data,

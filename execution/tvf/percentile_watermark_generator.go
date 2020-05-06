@@ -228,6 +228,8 @@ func (s *PercentileWatermarkGeneratorStream) Next(ctx context.Context) (*executi
 		return nil, errors.Wrap(err, "couldn't update events seen")
 	}
 
+	srcRecord = execution.NewRecordFromRecord(srcRecord, execution.WithEventTimeField(s.timeField))
+
 	return srcRecord, nil
 }
 

@@ -16,19 +16,18 @@ import (
 type StreamPrinter struct {
 	stateStorage storage.Storage
 	rs           execution.RecordStream
+	printfn      func(record *execution.Record)
 }
 
-func NewStdOutPrinter(stateStorage storage.Storage, recordStream execution.RecordStream) *StreamPrinter {
+func NewStreamPrinter(stateStorage storage.Storage, recordStream execution.RecordStream, printfn func(record *execution.Record)) *StreamPrinter {
 	return &StreamPrinter{
 		stateStorage: stateStorage,
 		rs:           recordStream,
+		printfn:      printfn,
 	}
 }
 
 func (sp *StreamPrinter) Run(ctx context.Context) error {
-	w := bufio.NewWriter(os.Stdout)
-	enc := json.NewEncoder(w)
-
 	for {
 		tx := sp.stateStorage.BeginTransaction()
 		ctx := storage.InjectStateTransaction(ctx, tx)
@@ -64,6 +63,22 @@ func (sp *StreamPrinter) Run(ctx context.Context) error {
 			return errors.Wrap(err, "couldn't get next record")
 		}
 
+		sp.printfn(rec)
+
+		err = tx.Commit()
+		if err != nil {
+			log.Println("error committing output print transaction (this can lead to duplicate output records): ", err)
+			continue
+		}
+	}
+	return nil
+}
+
+func JSONPrinter() func(rec *execution.Record) {
+	w := bufio.NewWriter(os.Stdout)
+	enc := json.NewEncoder(w)
+
+	return func(rec *execution.Record) {
 		kvs := make(map[string]interface{})
 		for _, field := range rec.ShowFields() {
 			kvs[field.Name.String()] = rec.Value(field.Name).ToRawValue()
@@ -75,12 +90,5 @@ func (sp *StreamPrinter) Run(ctx context.Context) error {
 		if err := w.Flush(); err != nil {
 			log.Println("error flushing stdout buffered writer: ", err)
 		}
-
-		err = tx.Commit()
-		if err != nil {
-			log.Println("error committing output print transaction (this can lead to duplicate output records): ", err)
-			continue
-		}
 	}
-	return nil
 }

@@ -14,7 +14,7 @@ import (
 	"github.com/cube2222/octosql/storage"
 )
 
-type StreamOutput struct {
+type AfterWatermarkStreamOutput struct {
 	EventTimeField octosql.VariableName
 	Trigger        trigger.WatermarkTrigger
 }
@@ -23,15 +23,14 @@ var recordsPrefix = []byte("$records$")
 var outputRecordsPrefix = []byte("$output_records$")
 var retractionsPrefix = []byte("$retractions$")
 var triggerPrefix = []byte("$trigger$")
-var watermarkPrefix = []byte("$watermark$")
 var errorPrefix = []byte("$error$")
 var endOfStreamPrefix = []byte("$end_of_stream$")
 
-func (o *StreamOutput) ReadyForMore(ctx context.Context, tx storage.StateTransaction) error {
+func (o *AfterWatermarkStreamOutput) ReadyForMore(ctx context.Context, tx storage.StateTransaction) error {
 	return nil
 }
 
-func (o *StreamOutput) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *execution.Record) error {
+func (o *AfterWatermarkStreamOutput) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *execution.Record) error {
 	if inputIndex != 0 {
 		return errors.Errorf("only one input stream allowed for output, got input index %d", inputIndex)
 	}
@@ -83,7 +82,7 @@ func getRetractionKey(record *execution.Record) octosql.Value {
 	return octosql.MakeObject(recordKV)
 }
 
-func (o *StreamOutput) Next(ctx context.Context, tx storage.StateTransaction) (*execution.Record, error) {
+func (o *AfterWatermarkStreamOutput) Next(ctx context.Context, tx storage.StateTransaction) (*execution.Record, error) {
 	// If no element to get and end of stream then end of stream else wait. Also check error.
 	records := execution.NewOutputQueue(tx.WithPrefix(outputRecordsPrefix))
 	var record execution.Record
@@ -118,7 +117,7 @@ func (o *StreamOutput) Next(ctx context.Context, tx storage.StateTransaction) (*
 	return &record, nil
 }
 
-func (o *StreamOutput) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
+func (o *AfterWatermarkStreamOutput) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
 	if err := o.Trigger.UpdateWatermark(ctx, tx.WithPrefix(triggerPrefix), watermark); err != nil {
 		return errors.Wrap(err, "couldn't update watermark in trigger")
 	}
@@ -173,11 +172,11 @@ func (o *StreamOutput) UpdateWatermark(ctx context.Context, tx storage.StateTran
 	return nil
 }
 
-func (o *StreamOutput) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
+func (o *AfterWatermarkStreamOutput) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
 	panic("not implemented")
 }
 
-func (o *StreamOutput) MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error {
+func (o *AfterWatermarkStreamOutput) MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error {
 	endOfStreamState := storage.NewValueState(tx.WithPrefix(endOfStreamPrefix))
 
 	phantom := octosql.MakePhantom()
@@ -192,7 +191,7 @@ func (o *StreamOutput) MarkEndOfStream(ctx context.Context, tx storage.StateTran
 	return nil
 }
 
-func (o *StreamOutput) GetEndOfStream(ctx context.Context, tx storage.StateTransaction) (bool, error) {
+func (o *AfterWatermarkStreamOutput) GetEndOfStream(ctx context.Context, tx storage.StateTransaction) (bool, error) {
 	endOfStreamState := storage.NewValueState(tx.WithPrefix(endOfStreamPrefix))
 
 	var octoEndOfStream octosql.Value
@@ -206,7 +205,7 @@ func (o *StreamOutput) GetEndOfStream(ctx context.Context, tx storage.StateTrans
 	return true, nil
 }
 
-func (o *StreamOutput) MarkError(ctx context.Context, tx storage.StateTransaction, err error) error {
+func (o *AfterWatermarkStreamOutput) MarkError(ctx context.Context, tx storage.StateTransaction, err error) error {
 	errorState := storage.NewValueState(tx.WithPrefix(errorPrefix))
 
 	octoError := octosql.MakeString(err.Error())
@@ -217,7 +216,7 @@ func (o *StreamOutput) MarkError(ctx context.Context, tx storage.StateTransactio
 	return nil
 }
 
-func (o *StreamOutput) GetErrorMessage(ctx context.Context, tx storage.StateTransaction) (string, error) {
+func (o *AfterWatermarkStreamOutput) GetErrorMessage(ctx context.Context, tx storage.StateTransaction) (string, error) {
 	errorState := storage.NewValueState(tx.WithPrefix(errorPrefix))
 
 	var octoError octosql.Value
@@ -231,6 +230,6 @@ func (o *StreamOutput) GetErrorMessage(ctx context.Context, tx storage.StateTran
 	return octoError.AsString(), nil
 }
 
-func (o *StreamOutput) Close(ctx context.Context, storage storage.Storage) error {
+func (o *AfterWatermarkStreamOutput) Close(ctx context.Context, storage storage.Storage) error {
 	return nil // TODO: Cleanup?
 }

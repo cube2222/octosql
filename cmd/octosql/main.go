@@ -27,10 +27,6 @@ import (
 
 	"github.com/cube2222/octosql/app"
 	"github.com/cube2222/octosql/config"
-	"github.com/cube2222/octosql/output"
-	csvoutput "github.com/cube2222/octosql/output/csv"
-	jsonoutput "github.com/cube2222/octosql/output/json"
-	"github.com/cube2222/octosql/output/table"
 	"github.com/cube2222/octosql/parser"
 	"github.com/cube2222/octosql/parser/sqlparser"
 	"github.com/cube2222/octosql/physical"
@@ -77,23 +73,23 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 			log.Fatal(err)
 		}
 
-		var out output.Output
-		switch outputFormat {
-		case "table":
-			out = table.NewOutput(os.Stdout, false)
-		case "table_row_separated":
-			out = table.NewOutput(os.Stdout, true)
-		case "json":
-			out = jsonoutput.NewOutput(os.Stdout)
-		case "csv":
-			out = csvoutput.NewOutput(',', os.Stdout)
-		case "tabbed":
-			out = csvoutput.NewOutput('\t', os.Stdout)
-		default:
-			log.Fatal("invalid output type")
-		}
+		// var out output.Output
+		// switch outputFormat {
+		// case "table":
+		// 	out = table.NewOutput(os.Stdout, false)
+		// case "table_row_separated":
+		// 	out = table.NewOutput(os.Stdout, true)
+		// case "json":
+		// 	out = jsonoutput.NewOutput(os.Stdout)
+		// case "csv":
+		// 	out = csvoutput.NewOutput(',', os.Stdout)
+		// case "tabbed":
+		// 	out = csvoutput.NewOutput('\t', os.Stdout)
+		// default:
+		// 	log.Fatal("invalid output type")
+		// }
 
-		app := app.NewApp(cfg, dataSourceRespository, out, describe)
+		app := app.NewApp(cfg, dataSourceRespository, nil, describe)
 
 		// Parse query
 		stmt, err := sqlparser.Parse(query)
@@ -117,10 +113,11 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 			storageDirectory = tempDir
 		}
 
+		log.Println(storageDirectory)
 		opts := badger.DefaultOptions(storageDirectory)
 		db, err := badger.Open(opts)
 		if err != nil {
-			log.Fatal("couldn't open in-memory badger database: ", err)
+			log.Fatal("couldn't open badger database: ", err)
 		}
 
 		stateStorage := storage.NewBadgerStorage(db)

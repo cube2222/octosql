@@ -14,6 +14,4 @@ There are a few parts to implementing a data source. Usually it's best to copy a
 ## Important
 
 * Datasource PR's without proper tests will not be accepted.
-* It's best if you create an issue to notify everybody about what you're working on, even if you're not sure if you are able to finish it. Because:
-    * No work will be duplicated.
-    * Datasources which may better fit streaming semantics (Kafka, Redis streams, Prometheus) should wait until ergonomic streaming support is designed, otherwise your code may quickly be completely rewritten.
+* It's best if you create an issue to notify everybody about what you're working on, even if you're not sure if you are able to finish it. Because no work will be duplicated.

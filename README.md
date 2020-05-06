@@ -13,10 +13,12 @@ OctoSQL is a query tool that allows you to join, analyse and transform data from
 - [Configuration](#configuration)
   - [JSON](#json)
   - [CSV](#csv)
+  - [Excel](#excel)
+  - [Parquet](#parquet)
   - [PostgreSQL](#postgresql)
   - [MySQL](#mysql)
   - [Redis](#redis)
-  - [Excel](#excel)
+  - [Kafka](#kafka)
 - [Documentation](#documentation)
 - [Architecture](#architecture)
 - [Datasource Pushdown Operations](#datasource-pushdown-operations)
@@ -116,55 +118,90 @@ JSON file in one of the following forms:
 - one record per line, no commas
 - JSON list of records
 ##### options:
-- path - path to file containing the data, required
-- arrayFormat - if the JSON list of records format should be used, defaults to false
+- path - path to file containing the data, **required**
+- arrayFormat - if the JSON list of records format should be used, **optional**: defaults to `false`
+- batchSize - number of records extracted from json file at the same time, **optional**: defaults to `1000`
 
 ---
 #### CSV
-CSV file separated using commas. The first row should contain column names.
+CSV file separated using commas.\
+The file may or may not have column names as it's first row.
 ##### options:
-- path - path to file containing the data, required
-- headerRow - whether the first row of the CSV file contains column names or not, defaults to true
-- separator - columns separator, defaults to ","
+- path - path to file containing the data, **required**
+- headerRow - whether the first row of the CSV file contains column names or not, **optional**: defaults to `true`
+- separator - columns separator, **optional**: defaults to `","`
+- batchSize - number of records extracted from csv file at the same time, **optional**: defaults to `1000`
+
 ---
 #### Excel
-A single table in an Excel spreadsheet.
-The table may or may not have column names as it's first row.
+A single table in an Excel spreadsheet.\
+The table may or may not have column names as it's first row.\
 The table can be in any sheet, and start at any point, but it cannot
 contain spaces between columns nor spaces between rows.
 ##### options:
-- path - path to file, required
-- headerRow - does the first row contain column names, optional: defaults to true
-- sheet - name of the sheet in which data is stored, optional: defaults to "Sheet1"
-- rootCell - name of cell (i.e "A3", "BA14") which is the leftmost cell of the first
+- path - path to file, **required**
+- headerRow - does the first row contain column names, **optional**: defaults to `true`
+- sheet - name of the sheet in which data is stored, **optional**: defaults to `"Sheet1"`
+- rootCell - name of cell (i.e "A3", "BA14") which is the leftmost cell of the first, **optional**: defaults to `"A1"`
 - timeColumns - a list of columns to parse as datetime values with second precision
-row, optional: defaults to "A1"
+row, **optional**: defaults to `[]`
+- batchSize - number of records extracted from excel file at the same time, **optional**: defaults to `1000`
+
+___
+#### Parquet
+A single Parquet file.\
+Nested repeated elements are *not supported*.\
+Currently *unsupported* logical types:\
+&nbsp;&nbsp;&nbsp;&nbsp; \- ENUM \
+&nbsp;&nbsp;&nbsp;&nbsp; \- TIME with NANOS precision \
+&nbsp;&nbsp;&nbsp;&nbsp; \- TIMESTAMP with NANOS precision (both UTC and non-UTC) \
+&nbsp;&nbsp;&nbsp;&nbsp; \- INTERVAL \
+&nbsp;&nbsp;&nbsp;&nbsp; \- MAP
+##### options
+- path - path to file, **required**
+- batchSize - number of records extracted from parquet file at the same time, **optional**: defaults to `1000`
+
 ---
 #### PostgreSQL
 Single PostgreSQL database table.
 ##### options:
-- address - address including port number, defaults to localhost:5432
-- user - required
-- password - required
-- databaseName - required
-- tableName - required
+- address - address including port number, **optional**: defaults to `localhost:5432`
+- user - **required**
+- password - **required**
+- databaseName - **required**
+- tableName - **required**
+- batchSize - number of records extracted from PostgreSQL database at the same time, **optional**: defaults to `1000`
+
 ---
 #### MySQL
 Single MySQL database table.
 ##### options:
-- address - address including port number, defaults to localhost:3306
-- user - required
-- password - required
-- databaseName - required
-- tableName - required
+- address - address including port number, **optional**: defaults to `localhost:3306`
+- user - **required**
+- password - **required**
+- databaseName - **required**
+- tableName - **required**
+- batchSize - number of records extracted from MySQL database at the same time, **optional**: defaults to `1000`
+
 ---
 #### Redis
 Redis database with the given index. Currently only hashes are supported.
 ##### options:
-- address - address including port number, defaults to localhost:6379
-- password - defaults to ""
-- databaseIndex - index number of Redis database, defaults to 0
-- databaseKeyName - column name of Redis key in OctoSQL records, defaults to "key"
+- address - address including port number, **optional**: defaults to `localhost:6379`
+- password - **optional**: defaults to `""`
+- databaseIndex - index number of Redis database, **optional**: defaults to `0`
+- databaseKeyName - column name of Redis key in OctoSQL records, **optional**: defaults to `"key"`
+- batchSize - number of records extracted from Redis database at the same time, **optional**: defaults to `1000`
+
+___
+#### Kafka
+## TODO
+##### **optional**
+- brokers - list of broker addresses (separately hosts and ports) used to connect to the kafka cluster, **optional**: defaults to `["localhost"], ["9092"]`
+- topic - name of topic to read messages from, **required**
+- startOffset - offset from which the first batch of messages will be read, **optional**: defaults to `-1`
+- batchSize - number of records extracted from Redis database at the same time, **optional**: defaults to `1`
+- json - should the messegas be decoded as JSON, **optional**: defaults to `false`
 
 ## Documentation
 Documentation for the available functions: https://github.com/cube2222/octosql/wiki/Function-Documentation
@@ -206,18 +243,21 @@ The physical plan gets materialized into an execution plan. This phase has to be
 ### Stream
 Starting the execution plan creates a stream, which underneath may hold more streams, or parts of the execution plan to create streams in the future. This stream works in a pull based model.
 
-## Database Pushdown Operations
-|Datasource	|Equality	|In	|> < <= =>	|
+## Datasource Pushdown Operations
+|Datasource	|Equality	|In	| \> < <= >=	|
 |---	|---	|---	|---	|
 |MySQL	|supported	|supported	|supported	|
 |PostgreSQL	|supported	|supported	|supported	|
 |Redis	|supported	|supported	|scan	|
+|Kafka	|scan	|scan	|scan	|
+|Parquet	|scan	|scan	|scan	|
 |JSON	|scan	|scan	|scan	|
 |CSV	|scan	|scan	|scan	|
 
-Where scan means that the whole table needs to be scanned for each access. We are planning to add an in memory index in the future, which would allow us to store small tables in-memory, saving us a lot of unnecessary reads.
+Where `scan` means that the whole table needs to be scanned for each access.
 
 ## Roadmap
+TODO - well, we need to update this big time
 - Additional Datasources.
 - SQL Constructs:
   - JSON Query

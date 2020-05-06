@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/logical"
-	"github.com/cube2222/octosql/output/badger"
-	"github.com/cube2222/octosql/output/badger/table"
+	"github.com/cube2222/octosql/output"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/optimizer"
 	"github.com/cube2222/octosql/storage"
@@ -33,7 +33,12 @@ func NewApp(cfg *config.Config, dataSourceRepository *physical.DataSourceReposit
 	}
 }
 
-func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan logical.Node) error {
+func (app *App) RunPlan(
+	ctx context.Context,
+	stateStorage storage.Storage,
+	outputSinkFn func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (execution.IntermediateRecordStore, output.Printer),
+	plan logical.Node,
+) error {
 	sourceNodes, variables, err := plan.Physical(ctx, logical.NewPhysicalPlanCreator(app.dataSourceRepository, app.cfg.Physical))
 	if err != nil {
 		return errors.Wrap(err, "couldn't create physical plan")
@@ -62,33 +67,13 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		return errors.Wrap(err, "couldn't get record stream from execution plan")
 	}
 
-	// out := &badger.TableOutput{
-	// 	//EventTimeField: phys.Metadata().EventTimeField(),
-	// }
-	//
-	// outStreamID := &execution.StreamID{Id: "output"}
-	//
-	// log.Printf("%T", execOutput[0].WatermarkSource)
-	// pullEngine := execution.NewPullEngine(out, stateStorage, []execution.RecordStream{stream[0]}, outStreamID, execOutput[0].WatermarkSource, true, ctx)
-	//
-	// go pullEngine.Run()
-
-	// printer := streaming.NewStreamPrinter(stateStorage, pullEngine, streaming.JSONPrinter())
-	// if err := printer.Run(ctx); err != nil {
-	// 	return errors.Wrap(err, "couldn't run stdout printer")
-	// }
-
-	out := &badger.TableOutput{
-		EventTimeField: phys.Metadata().EventTimeField(),
-	}
-
 	outStreamID := &execution.StreamID{Id: "output"}
 
-	pullEngine := execution.NewPullEngine(out, stateStorage, []execution.RecordStream{stream[0]}, outStreamID, execOutput[0].WatermarkSource, true, ctx)
+	outputSink, printer := outputSinkFn(stateStorage, outStreamID, phys.Metadata().EventTimeField())
 
+	pullEngine := execution.NewPullEngine(outputSink, stateStorage, []execution.RecordStream{stream[0]}, outStreamID, execOutput[0].WatermarkSource, false, ctx)
 	go pullEngine.Run()
 
-	printer := badger.NewWholeTablePrinter(stateStorage.WithPrefix(outStreamID.AsPrefix()), out, table.TableFormatter(false))
 	if err := printer.Run(ctx); err != nil {
 		return errors.Wrap(err, "couldn't run stdout printer")
 	}

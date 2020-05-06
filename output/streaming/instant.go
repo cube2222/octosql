@@ -12,6 +12,13 @@ import (
 )
 
 type InstantStreamOutput struct {
+	StreamID *execution.StreamID
+}
+
+func NewInstantStreamOutput(streamID *execution.StreamID) *InstantStreamOutput {
+	return &InstantStreamOutput{
+		StreamID: streamID,
+	}
 }
 
 func (o *InstantStreamOutput) ReadyForMore(ctx context.Context, tx storage.StateTransaction) error {
@@ -19,6 +26,7 @@ func (o *InstantStreamOutput) ReadyForMore(ctx context.Context, tx storage.State
 }
 
 func (o *InstantStreamOutput) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *execution.Record) error {
+	tx = tx.WithPrefix(o.StreamID.AsPrefix())
 	if inputIndex != 0 {
 		return errors.Errorf("only one input stream allowed for output, got input index %d", inputIndex)
 	}
@@ -32,6 +40,7 @@ func (o *InstantStreamOutput) AddRecord(ctx context.Context, tx storage.StateTra
 }
 
 func (o *InstantStreamOutput) Next(ctx context.Context, tx storage.StateTransaction) (*execution.Record, error) {
+	tx = tx.WithPrefix(o.StreamID.AsPrefix())
 	// If no element to get and end of stream then end of stream else wait. Also check error.
 	records := execution.NewOutputQueue(tx.WithPrefix(outputRecordsPrefix))
 	var record execution.Record
@@ -75,6 +84,7 @@ func (o *InstantStreamOutput) GetWatermark(ctx context.Context, tx storage.State
 }
 
 func (o *InstantStreamOutput) MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error {
+	tx = tx.WithPrefix(o.StreamID.AsPrefix())
 	endOfStreamState := storage.NewValueState(tx.WithPrefix(endOfStreamPrefix))
 
 	phantom := octosql.MakePhantom()
@@ -86,6 +96,7 @@ func (o *InstantStreamOutput) MarkEndOfStream(ctx context.Context, tx storage.St
 }
 
 func (o *InstantStreamOutput) GetEndOfStream(ctx context.Context, tx storage.StateTransaction) (bool, error) {
+	tx = tx.WithPrefix(o.StreamID.AsPrefix())
 	endOfStreamState := storage.NewValueState(tx.WithPrefix(endOfStreamPrefix))
 
 	var octoEndOfStream octosql.Value
@@ -100,6 +111,7 @@ func (o *InstantStreamOutput) GetEndOfStream(ctx context.Context, tx storage.Sta
 }
 
 func (o *InstantStreamOutput) MarkError(ctx context.Context, tx storage.StateTransaction, err error) error {
+	tx = tx.WithPrefix(o.StreamID.AsPrefix())
 	errorState := storage.NewValueState(tx.WithPrefix(errorPrefix))
 
 	octoError := octosql.MakeString(err.Error())
@@ -111,6 +123,7 @@ func (o *InstantStreamOutput) MarkError(ctx context.Context, tx storage.StateTra
 }
 
 func (o *InstantStreamOutput) GetErrorMessage(ctx context.Context, tx storage.StateTransaction) (string, error) {
+	tx = tx.WithPrefix(o.StreamID.AsPrefix())
 	errorState := storage.NewValueState(tx.WithPrefix(errorPrefix))
 
 	var octoError octosql.Value
@@ -125,5 +138,6 @@ func (o *InstantStreamOutput) GetErrorMessage(ctx context.Context, tx storage.St
 }
 
 func (o *InstantStreamOutput) Close(ctx context.Context, storage storage.Storage) error {
+	storage = storage.WithPrefix(o.StreamID.AsPrefix())
 	return nil // TODO: Cleanup?
 }

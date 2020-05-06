@@ -1,11 +1,8 @@
 package streaming
 
 import (
-	"bufio"
 	"context"
-	"encoding/json"
 	"log"
-	"os"
 
 	"github.com/pkg/errors"
 
@@ -15,14 +12,14 @@ import (
 
 type StreamPrinter struct {
 	stateStorage storage.Storage
-	rs           execution.RecordStream
+	recordSink   execution.IntermediateRecordStore
 	printfn      func(record *execution.Record)
 }
 
-func NewStreamPrinter(stateStorage storage.Storage, recordStream execution.RecordStream, printfn func(record *execution.Record)) *StreamPrinter {
+func NewStreamPrinter(stateStorage storage.Storage, recordSink execution.IntermediateRecordStore, printfn func(record *execution.Record)) *StreamPrinter {
 	return &StreamPrinter{
 		stateStorage: stateStorage,
-		rs:           recordStream,
+		recordSink:   recordSink,
 		printfn:      printfn,
 	}
 }
@@ -32,7 +29,7 @@ func (sp *StreamPrinter) Run(ctx context.Context) error {
 		tx := sp.stateStorage.BeginTransaction()
 		ctx := storage.InjectStateTransaction(ctx, tx)
 
-		rec, err := sp.rs.Next(ctx)
+		rec, err := sp.recordSink.Next(ctx, tx)
 		if err == execution.ErrEndOfStream {
 			err := tx.Commit()
 			if err != nil {
@@ -72,23 +69,4 @@ func (sp *StreamPrinter) Run(ctx context.Context) error {
 		}
 	}
 	return nil
-}
-
-func JSONPrinter() func(rec *execution.Record) {
-	w := bufio.NewWriter(os.Stdout)
-	enc := json.NewEncoder(w)
-
-	return func(rec *execution.Record) {
-		kvs := make(map[string]interface{})
-		for _, field := range rec.ShowFields() {
-			kvs[field.Name.String()] = rec.Value(field.Name).ToRawValue()
-		}
-
-		if err := enc.Encode(kvs); err != nil {
-			log.Println("error encoding record for output print: ", err)
-		}
-		if err := w.Flush(); err != nil {
-			log.Println("error flushing stdout buffered writer: ", err)
-		}
-	}
 }

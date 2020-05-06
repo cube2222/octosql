@@ -1,4 +1,4 @@
-package badger
+package batch
 
 import (
 	"bytes"
@@ -89,6 +89,7 @@ func (printer *LiveTablePrinter) Run(ctx context.Context) error {
 		if len(errorMessage) > 0 {
 			return errors.New(errorMessage)
 		} else if endOfStream {
+			tm.Clear()
 			_, err := buf.WriteTo(os.Stdout)
 			return err
 		}

@@ -11,6 +11,10 @@ import (
 	"github.com/cube2222/octosql/storage"
 )
 
+var outputRecordsPrefix = []byte("$output_records$")
+var errorPrefix = []byte("$error$")
+var endOfStreamPrefix = []byte("$end_of_stream$")
+
 type InstantStreamOutput struct {
 	StreamID *execution.StreamID
 }

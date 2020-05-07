@@ -3,7 +3,6 @@ package batch
 import (
 	"bytes"
 	"context"
-	"io"
 	"os"
 	"sort"
 	"time"
@@ -15,7 +14,7 @@ import (
 	"github.com/cube2222/octosql/storage"
 )
 
-type TableFormatter func(w io.Writer, records []*execution.Record, watermark time.Time, err error) error
+const REFRESH_DELAY = time.Second / 4
 
 type RecordsLister interface {
 	ListRecords(ctx context.Context, tx storage.StateTransaction) ([]*execution.Record, error)
@@ -39,7 +38,7 @@ func NewLiveTablePrinter(stateStorage storage.Storage, recordsLister RecordsList
 }
 
 func (printer *LiveTablePrinter) Run(ctx context.Context) error {
-	for range time.Tick(time.Second / 4) {
+	for range time.Tick(REFRESH_DELAY) {
 		tx := printer.stateStorage.BeginTransaction()
 
 		records, err := printer.recordsLister.ListRecords(ctx, tx)
@@ -97,22 +96,22 @@ func (printer *LiveTablePrinter) Run(ctx context.Context) error {
 	panic("unreachable")
 }
 
-type WholeTablePrinter struct {
+type BatchTablePrinter struct {
 	recordsLister  RecordsLister
 	stateStorage   storage.Storage
 	tableFormatter TableFormatter
 }
 
-func NewWholeTablePrinter(stateStorage storage.Storage, recordsLister RecordsLister, tableFormatter TableFormatter) *WholeTablePrinter {
-	return &WholeTablePrinter{
+func NewWholeTablePrinter(stateStorage storage.Storage, recordsLister RecordsLister, tableFormatter TableFormatter) *BatchTablePrinter {
+	return &BatchTablePrinter{
 		recordsLister:  recordsLister,
 		stateStorage:   stateStorage,
 		tableFormatter: tableFormatter,
 	}
 }
 
-func (printer *WholeTablePrinter) Run(ctx context.Context) error {
-	for range time.Tick(time.Second / 4) {
+func (printer *BatchTablePrinter) Run(ctx context.Context) error {
+	for range time.Tick(REFRESH_DELAY) {
 		tx := printer.stateStorage.BeginTransaction()
 
 		endOfStream, err := printer.recordsLister.GetEndOfStream(ctx, tx)

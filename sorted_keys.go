@@ -293,26 +293,26 @@ func MonotonicUnmarshalString(b []byte) (string, error) {
 
 /* Marshal Timestamp */
 func MonotonicMarshalTime(t time.Time) []byte {
-	bytes := make([]byte, 1+8+1+8)
+	bytes := make([]byte, 2*NumberMarshalLength)
 
 	bytes[0] = TimestampIdentifier
 	seconds := MonotonicMarshalInt64(t.Unix())
-	copy(bytes[1:9], seconds[1:9]) // Omit integer identifier
+	copy(bytes[1:NumberMarshalLength], seconds[1:NumberMarshalLength]) // Omit integer identifier
 
 	bytes[9] = TimestampIdentifier
 	nanoseconds := MonotonicMarshalInt64(int64(t.Nanosecond()))
-	copy(bytes[10:18], nanoseconds[1:9]) // Omit integer identifier
+	copy(bytes[NumberMarshalLength+1:2*NumberMarshalLength], nanoseconds[1:NumberMarshalLength]) // Omit integer identifier
 
 	return bytes
 }
 
 func MonotonicUnmarshalTime(b []byte) (time.Time, error) {
 	// MonotonicUnmarshalInt64 ignores the first byte.
-	seconds, err := MonotonicUnmarshalInt64(b[:9])
+	seconds, err := MonotonicUnmarshalInt64(b[:NumberMarshalLength])
 	if err != nil {
 		return time.Now(), errors.Wrap(err, "incorrect seconds representation")
 	}
-	nanoseconds, err := MonotonicUnmarshalInt64(b[9:18])
+	nanoseconds, err := MonotonicUnmarshalInt64(b[NumberMarshalLength : 2*NumberMarshalLength])
 	if err != nil {
 		return time.Now(), errors.Wrap(err, "incorrect nanoseconds representation")
 	}

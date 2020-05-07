@@ -14,20 +14,7 @@ import (
 
 func TableFormatter(separator rune) batch.TableFormatter {
 	return func(w io.Writer, records []*execution.Record, watermark time.Time, errToPrint error) error {
-		var fields []string
-		for _, record := range records {
-			for _, field := range record.ShowFields() {
-				found := false
-				for i := range fields {
-					if fields[i] == field.Name.String() {
-						found = true
-					}
-				}
-				if !found {
-					fields = append(fields, field.Name.String())
-				}
-			}
-		}
+		fields := batch.GetAllFields(records)
 
 		out := csv.NewWriter(w)
 		out.Comma = separator

@@ -13,14 +13,14 @@ import (
 type StreamPrinter struct {
 	stateStorage storage.Storage
 	recordSink   execution.IntermediateRecordStore
-	printfn      func(record *execution.Record)
+	printFn      func(record *execution.Record)
 }
 
-func NewStreamPrinter(stateStorage storage.Storage, recordSink execution.IntermediateRecordStore, printfn func(record *execution.Record)) *StreamPrinter {
+func NewStreamPrinter(stateStorage storage.Storage, recordSink execution.IntermediateRecordStore, printFn func(record *execution.Record)) *StreamPrinter {
 	return &StreamPrinter{
 		stateStorage: stateStorage,
 		recordSink:   recordSink,
-		printfn:      printfn,
+		printFn:      printFn,
 	}
 }
 
@@ -61,7 +61,7 @@ func (sp *StreamPrinter) Run(ctx context.Context) error {
 			return errors.Wrap(err, "couldn't get next record")
 		}
 
-		sp.printfn(rec)
+		sp.printFn(rec)
 
 		err = tx.Commit()
 		if err != nil {

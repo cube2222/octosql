@@ -83,6 +83,10 @@ func (o *InstantStreamOutput) UpdateWatermark(ctx context.Context, tx storage.St
 	return nil
 }
 
+func (o *InstantStreamOutput) TriggerKeys(ctx context.Context, tx storage.StateTransaction, batchSize int) (int, error) {
+	return 0, nil
+}
+
 func (o *InstantStreamOutput) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
 	panic("not implemented")
 }

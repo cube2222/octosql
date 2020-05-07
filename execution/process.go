@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/ptypes"
+	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
@@ -19,7 +20,7 @@ type ProcessFunction interface {
 type Trigger interface {
 	RecordReceived(ctx context.Context, tx storage.StateTransaction, key octosql.Value, eventTime time.Time) error
 	UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error
-	PollKeysToFire(ctx context.Context, tx storage.StateTransaction) ([]octosql.Value, error)
+	PollKeysToFire(ctx context.Context, tx storage.StateTransaction, batchSize int) ([]octosql.Value, error)
 	KeysFired(ctx context.Context, tx storage.StateTransaction, key []octosql.Value) error
 }
 
@@ -68,45 +69,13 @@ func (p *ProcessByKey) AddRecord(ctx context.Context, tx storage.StateTransactio
 		return errors.Wrap(err, "couldn't mark record received in trigger")
 	}
 
-	err = p.triggerKeys(ctx, tx)
-	if err != nil {
-		return errors.Wrap(err, "couldn't trigger keys")
-	}
-
-	return nil
-}
-
-func (p *ProcessByKey) triggerKeys(ctx context.Context, tx storage.StateTransaction) error {
-	outputQueue := NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
-
-	keys, err := p.trigger.PollKeysToFire(ctx, tx)
-	if err != nil {
-		return errors.Wrap(err, "couldn't poll keys to fire")
-	}
-
-	for _, key := range keys {
-		records, err := p.processFunction.Trigger(ctx, tx, key)
-		if err != nil {
-			return errors.Wrap(err, "couldn't trigger process function")
-		}
-
-		for i := range records {
-			err := outputQueue.Push(ctx, &QueueElement{
-				Type: &QueueElement_Record{
-					Record: records[i],
-				},
-			})
-			if err != nil {
-				return errors.Wrap(err, "couldn't push record to output queue")
-			}
-		}
-	}
-
 	return nil
 }
 
 var outputWatermarkPrefix = []byte("$output_watermark$")
+var pendingWatermarkPrefix = []byte("$pending_watermark$")
 var endOfStreamPrefix = []byte("$end_of_stream$")
+var pendingEndOfStreamPrefix = []byte("$pending_end_of_stream$")
 var outputQueuePrefix = []byte("$output_queue$")
 
 func (p *ProcessByKey) Next(ctx context.Context, tx storage.StateTransaction) (*Record, error) {
@@ -156,28 +125,91 @@ func (p *ProcessByKey) Next(ctx context.Context, tx storage.StateTransaction) (*
 }
 
 func (p *ProcessByKey) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
-	outputQueue := NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
-
 	err := p.trigger.UpdateWatermark(ctx, tx, watermark)
 	if err != nil {
 		return errors.Wrap(err, "couldn't update watermark in trigger")
 	}
 
-	err = p.triggerKeys(ctx, tx)
-	if err != nil {
-		return errors.Wrap(err, "couldn't trigger keys")
-	}
-
-	timestamp, err := ptypes.TimestampProto(watermark)
+	t, err := ptypes.TimestampProto(watermark)
 	if err != nil {
 		return errors.Wrap(err, "couldn't convert time to proto timestamp")
 	}
-	err = outputQueue.Push(ctx, &QueueElement{Type: &QueueElement_Watermark{Watermark: timestamp}})
-	if err != nil {
-		return errors.Wrap(err, "couldn't push item to output queue")
+	pendingWatermarkState := storage.NewValueState(tx.WithPrefix(pendingWatermarkPrefix))
+	if err := pendingWatermarkState.Set(t); err != nil {
+		return errors.Wrap(err, "couldn't set pending watermark state")
 	}
 
 	return nil
+}
+
+func (p *ProcessByKey) TriggerKeys(ctx context.Context, tx storage.StateTransaction, batchSize int) (int, error) {
+	outputQueue := NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
+
+	keys, err := p.trigger.PollKeysToFire(ctx, tx, batchSize)
+	if err != nil {
+		return 0, errors.Wrap(err, "couldn't poll keys to fire")
+	}
+
+	if len(keys) == 0 {
+		// Send any pending watermark
+		pendingWatermarkState := storage.NewValueState(tx.WithPrefix(pendingWatermarkPrefix))
+		var t timestamp.Timestamp
+		err := pendingWatermarkState.Get(&t)
+		if err == storage.ErrNotFound {
+		} else if err != nil {
+			return 0, errors.Wrap(err, "couldn't get pending watermark state")
+		} else if err == nil {
+
+			if err := outputQueue.Push(ctx, &QueueElement{
+				Type: &QueueElement_Watermark{
+					Watermark: &t,
+				},
+			}); err != nil {
+				return 0, errors.Wrap(err, "couldn't push record to output queue")
+			}
+
+			if err := pendingWatermarkState.Clear(); err != nil {
+				return 0, errors.Wrap(err, "couldn't clear pending watermark state")
+			}
+		}
+
+		// Send any pending end of stream
+		pendingEndOfStreamState := storage.NewValueState(tx.WithPrefix(pendingEndOfStreamPrefix))
+		var phantom octosql.Value
+		err = pendingEndOfStreamState.Get(&phantom)
+		if err == storage.ErrNotFound {
+		} else if err != nil {
+			return 0, errors.Wrap(err, "couldn't get pending end of stream state")
+		} else if err == nil {
+
+			outputQueue := NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
+			if err := outputQueue.Push(ctx, &QueueElement{Type: &QueueElement_EndOfStream{EndOfStream: true}}); err != nil {
+				return 0, errors.Wrap(err, "couldn't push end of stream to output queue")
+			}
+		}
+
+		return 0, nil
+	}
+
+	for _, key := range keys {
+		records, err := p.processFunction.Trigger(ctx, tx, key)
+		if err != nil {
+			return 0, errors.Wrap(err, "couldn't trigger process function")
+		}
+
+		for i := range records {
+			err := outputQueue.Push(ctx, &QueueElement{
+				Type: &QueueElement_Record{
+					Record: records[i],
+				},
+			})
+			if err != nil {
+				return 0, errors.Wrap(err, "couldn't push record to output queue")
+			}
+		}
+	}
+
+	return len(keys), nil
 }
 
 func (p *ProcessByKey) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
@@ -194,10 +226,10 @@ func (p *ProcessByKey) GetWatermark(ctx context.Context, tx storage.StateTransac
 }
 
 func (p *ProcessByKey) MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error {
-	outputQueue := NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
-	err := outputQueue.Push(ctx, &QueueElement{Type: &QueueElement_EndOfStream{EndOfStream: true}})
-	if err != nil {
-		return errors.Wrap(err, "couldn't push item to output queue")
+	phantom := octosql.MakePhantom()
+	pendingEndOfStreamState := storage.NewValueState(tx.WithPrefix(pendingEndOfStreamPrefix))
+	if err := pendingEndOfStreamState.Set(&phantom); err != nil {
+		return errors.Wrap(err, "couldn't set pending end of stream state")
 	}
 	return nil
 }

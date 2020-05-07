@@ -92,6 +92,10 @@ func (o *TableOutput) UpdateWatermark(ctx context.Context, tx storage.StateTrans
 	return nil
 }
 
+func (o *TableOutput) TriggerKeys(ctx context.Context, tx storage.StateTransaction, batchSize int) (int, error) {
+	return 0, nil
+}
+
 func (o *TableOutput) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
 	tx = tx.WithPrefix(o.StreamID.AsPrefix())
 	watermarkState := storage.NewValueState(tx.WithPrefix(watermarkPrefix))

@@ -114,9 +114,6 @@ func (engine *PullEngine) Run() {
 		}
 
 		triggeredCount, err := engine.irs.TriggerKeys(engine.ctx, engine.getPrefixedTx(tx), engine.batchSizeManager.RecordsLeftToTake())
-		if engine.streamID != nil {
-			log.Println(engine.streamID, "trigger keys", triggeredCount)
-		}
 		if triggeredCount == 0 && err == nil {
 			// Nothing triggered, just go forth, if the stream hasn't ended yet.
 			if endOfStreamReached {

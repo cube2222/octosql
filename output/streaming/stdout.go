@@ -38,8 +38,7 @@ func (sp *StreamPrinter) Run(ctx context.Context) error {
 			}
 			break
 		} else if errors.Cause(err) == execution.ErrNewTransactionRequired {
-			_ := tx.Commit()
-			if err != nil {
+			if err := tx.Commit(); err != nil {
 				log.Println("couldn't commit transaction: ", err)
 			}
 			continue

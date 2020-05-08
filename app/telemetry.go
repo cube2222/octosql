@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
+	"time"
 
 	"github.com/cube2222/octosql/physical"
 )
@@ -87,7 +89,11 @@ func SendTelemetry(ctx context.Context, telemetry *Telemetry) {
 		return
 	}
 
-	go http.DefaultClient.Do(req)
+	start := time.Now()
+	go func() {
+		http.DefaultClient.Do(req.WithContext(ctx))
+		log.Println("telemetry took: ", time.Since(start))
+	}()
 }
 
 func GetDeviceID() string {

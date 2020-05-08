@@ -38,7 +38,7 @@ func GetErrWaitForChanges(err error) *ErrWaitForChanges {
 }
 
 // Based on protocol buffer max timestamp value.
-var maxWatermark = time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
+var MaxWatermark = time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
 
 type WatermarkSource interface {
 	GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error)
@@ -220,7 +220,7 @@ func (engine *PullEngine) loop(ctx context.Context, tx storage.StateTransaction)
 	}
 
 	if areAllEndOfStream {
-		err := engine.irs.UpdateWatermark(ctx, prefixedTx, maxWatermark)
+		err := engine.irs.UpdateWatermark(ctx, prefixedTx, MaxWatermark)
 		if err != nil {
 			return errors.Wrap(err, "couldn't mark end of stream max watermark in intermediate record store")
 		}

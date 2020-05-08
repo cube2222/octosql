@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/output"
-	"github.com/cube2222/octosql/output/badger"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/physical/optimizer"
 	"github.com/cube2222/octosql/storage"
@@ -17,18 +17,20 @@ import (
 	"github.com/pkg/errors"
 )
 
+type OutputSinkFn func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (execution.IntermediateRecordStore, output.Printer)
+
 type App struct {
 	cfg                  *config.Config
 	dataSourceRepository *physical.DataSourceRepository
-	out                  output.Output
+	outputSinkFn         OutputSinkFn
 	describe             bool
 }
 
-func NewApp(cfg *config.Config, dataSourceRepository *physical.DataSourceRepository, out output.Output, describe bool) *App {
+func NewApp(cfg *config.Config, dataSourceRepository *physical.DataSourceRepository, outputSinkFn OutputSinkFn, describe bool) *App {
 	return &App{
 		cfg:                  cfg,
 		dataSourceRepository: dataSourceRepository,
-		out:                  out,
+		outputSinkFn:         outputSinkFn,
 		describe:             describe,
 	}
 }
@@ -62,17 +64,13 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 		return errors.Wrap(err, "couldn't get record stream from execution plan")
 	}
 
-	out := &badger.Output{
-		EventTimeField: phys.Metadata().EventTimeField(),
-	}
-
 	outStreamID := &execution.StreamID{Id: "output"}
 
-	pullEngine := execution.NewPullEngine(out, stateStorage, []execution.RecordStream{stream[0]}, outStreamID, execOutput[0].WatermarkSource, true, ctx)
+	outputSink, printer := app.outputSinkFn(stateStorage, outStreamID, phys.Metadata().EventTimeField())
 
+	pullEngine := execution.NewPullEngine(outputSink, stateStorage, []execution.RecordStream{stream[0]}, outStreamID, execOutput[0].WatermarkSource, false, ctx)
 	go pullEngine.Run()
 
-	printer := badger.NewStdOutPrinter(stateStorage.WithPrefix(outStreamID.AsPrefix()), out)
 	if err := printer.Run(ctx); err != nil {
 		return errors.Wrap(err, "couldn't run stdout printer")
 	}

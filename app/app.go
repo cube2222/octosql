@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
@@ -46,6 +48,12 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 
 	// Only the first partition is there.
 	var phys physical.Node = shuffled[0]
+
+	if strings.TrimSpace(os.Getenv("OCTOSQL_TELEMETRY")) != "0" {
+		var telemetry Telemetry
+		phys.Transform(ctx, TelemetryTransformer(&telemetry))
+		SendTelemetry(ctx, &telemetry)
+	}
 
 	phys = optimizer.Optimize(ctx, optimizer.DefaultScenarios, phys)
 

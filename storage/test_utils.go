@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dgraph-io/badger/v2/options"
 	"github.com/oklog/ulid"
 
 	"github.com/cube2222/octosql"
@@ -131,7 +132,7 @@ func GetTestStorage(t *testing.T) Storage {
 		}
 
 		opts := badger.DefaultOptions(dirname)
-		db, err := badger.Open(opts)
+		db, err := badger.Open(opts.WithValueLogLoadingMode(options.FileIO))
 		if err != nil {
 			t.Fatal("couldn't open in-memory badger database: ", err)
 		}

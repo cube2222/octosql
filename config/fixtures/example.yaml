@@ -2,11 +2,11 @@ dataSources:
   - name: cities
     type: csv
     config:
-      path: "storage/csv/fixtures/cities.csv"
-  - name: people
+      path: "datasources/csv/fixtures/cities.csv"
+  - name: bikes
     type: json
     config:
-      path: "storage/json/fixtures/people.json"
+      path: "datasources/json/fixtures/bikes.json"
   - name: users_ids
     type: postgres
     config:

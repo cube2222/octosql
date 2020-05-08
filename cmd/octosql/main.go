@@ -10,6 +10,7 @@ import (
 	"reflect"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v2/options"
 	"github.com/go-chi/chi"
 
 	"github.com/go-chi/chi/middleware"
@@ -118,7 +119,7 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 		}
 
 		opts := badger.DefaultOptions(storageDirectory)
-		db, err := badger.Open(opts)
+		db, err := badger.Open(opts.WithValueLogLoadingMode(options.FileIO))
 		if err != nil {
 			log.Fatal("couldn't open in-memory badger database: ", err)
 		}

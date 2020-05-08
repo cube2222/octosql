@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/dgraph-io/badger/v2/options"
 	"github.com/oklog/ulid"
 
 	"github.com/cube2222/octosql"
@@ -131,6 +133,10 @@ func GetTestStorage(t *testing.T) Storage {
 		}
 
 		opts := badger.DefaultOptions(dirname)
+		if runtime.GOOS == "windows" { // TODO - fix while refactoring config
+			opts = opts.WithValueLogLoadingMode(options.FileIO)
+		}
+
 		db, err := badger.Open(opts)
 		if err != nil {
 			t.Fatal("couldn't open in-memory badger database: ", err)

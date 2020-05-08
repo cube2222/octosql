@@ -49,14 +49,8 @@ func TelemetryTransformer(telemetry *Telemetry) *physical.Transformers {
 				telemetry.Features.Limit = true
 			case *physical.Offset:
 				telemetry.Features.Offset = true
-			case *physical.LeftJoin:
-				telemetry.Features.LeftJoin = true
-			case *physical.InnerJoin:
-				telemetry.Features.InnerJoin = true
 			case *physical.Distinct:
 				telemetry.Features.Distinct = true
-			case *physical.UnionAll:
-				telemetry.Features.UnionAll = true
 			case *physical.OrderBy:
 				telemetry.Features.OrderBy = true
 			case *physical.TableValuedFunction:

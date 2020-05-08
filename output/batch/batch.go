@@ -10,16 +10,12 @@ import (
 type TableFormatter func(w io.Writer, records []*execution.Record, watermark time.Time, err error) error
 
 func GetAllFields(records []*execution.Record) []string {
+	fieldsFound := make(map[string]bool)
 	var fields []string
 	for _, record := range records {
 		for _, field := range record.ShowFields() {
-			found := false
-			for i := range fields {
-				if fields[i] == field.Name.String() {
-					found = true
-				}
-			}
-			if !found {
+			if fieldName := field.Name.String(); !fieldsFound[fieldName] {
+				fieldsFound[fieldName] = true
 				fields = append(fields, field.Name.String())
 			}
 		}

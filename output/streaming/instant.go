@@ -47,6 +47,7 @@ func (o *InstantStreamOutput) Next(ctx context.Context, tx storage.StateTransact
 	tx = tx.WithPrefix(o.StreamID.AsPrefix())
 	// If no element to get and end of stream then end of stream else wait. Also check error.
 	records := execution.NewOutputQueue(tx.WithPrefix(outputRecordsPrefix))
+
 	var record execution.Record
 	err := records.Pop(ctx, &record)
 	if execution.GetErrWaitForChanges(err) != nil {
@@ -76,6 +77,7 @@ func (o *InstantStreamOutput) Next(ctx context.Context, tx storage.StateTransact
 	} else if err != nil {
 		return nil, errors.Wrap(err, "couldn't get record from records queue")
 	}
+
 	return &record, nil
 }
 
@@ -84,7 +86,7 @@ func (o *InstantStreamOutput) UpdateWatermark(ctx context.Context, tx storage.St
 }
 
 func (o *InstantStreamOutput) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
-	panic("not implemented")
+	panic("stream output shouldn't ever be asked about watermark")
 }
 
 func (o *InstantStreamOutput) MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error {

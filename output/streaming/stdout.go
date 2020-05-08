@@ -31,8 +31,7 @@ func (sp *StreamPrinter) Run(ctx context.Context) error {
 
 		rec, err := sp.recordSink.Next(ctx, tx)
 		if err == execution.ErrEndOfStream {
-			err := tx.Commit()
-			if err != nil {
+			if err := tx.Commit(); err != nil {
 				log.Println("couldn't commit transaction: ", err)
 				continue
 			}
@@ -43,17 +42,14 @@ func (sp *StreamPrinter) Run(ctx context.Context) error {
 			}
 			continue
 		} else if waitableError := execution.GetErrWaitForChanges(err); waitableError != nil {
-			err := tx.Commit()
-			if err != nil {
+			if err := tx.Commit(); err != nil {
 				log.Println("couldn't commit transaction: ", err)
 				continue
 			}
-			err = waitableError.ListenForChanges(ctx)
-			if err != nil {
+			if err = waitableError.ListenForChanges(ctx); err != nil {
 				log.Println("couldn't listen for changes: ", err)
 			}
-			err = waitableError.Close()
-			if err != nil {
+			if err = waitableError.Close(); err != nil {
 				log.Println("couldn't close subscription: ", err)
 			}
 			continue
@@ -63,8 +59,7 @@ func (sp *StreamPrinter) Run(ctx context.Context) error {
 
 		sp.printFn(rec)
 
-		err = tx.Commit()
-		if err != nil {
+		if err := tx.Commit(); err != nil {
 			log.Println("error committing output print transaction (this can lead to duplicate output records): ", err)
 			continue
 		}

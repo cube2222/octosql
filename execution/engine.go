@@ -110,6 +110,7 @@ func (engine *PullEngine) Run() {
 		}
 
 		if engine.batchSizeManager.RecordsLeftToTake() == 0 {
+			// Refresh transaction takes care of committing and creating new transactions.
 			tx = engine.refreshTransaction(tx)
 		}
 
@@ -153,7 +154,7 @@ func (engine *PullEngine) Run() {
 			err := tx.Commit()
 			if err == nil {
 				endOfStreamReached = true
-			} else if err != nil {
+			} else {
 				log.Println("engine: couldn't commit: ", err)
 			}
 

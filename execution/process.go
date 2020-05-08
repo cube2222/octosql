@@ -153,19 +153,20 @@ func (p *ProcessByKey) TriggerKeys(ctx context.Context, tx storage.StateTransact
 	if len(keys) == 0 {
 		// Send any pending watermark
 		pendingWatermarkState := storage.NewValueState(tx.WithPrefix(pendingWatermarkPrefix))
+
 		var t timestamp.Timestamp
 		err := pendingWatermarkState.Get(&t)
 		if err == storage.ErrNotFound {
 		} else if err != nil {
 			return 0, errors.Wrap(err, "couldn't get pending watermark state")
-		} else if err == nil {
+		} else {
 
 			if err := outputQueue.Push(ctx, &QueueElement{
 				Type: &QueueElement_Watermark{
 					Watermark: &t,
 				},
 			}); err != nil {
-				return 0, errors.Wrap(err, "couldn't push record to output queue")
+				return 0, errors.Wrap(err, "couldn't push watermark to output queue")
 			}
 
 			if err := pendingWatermarkState.Clear(); err != nil {
@@ -175,15 +176,20 @@ func (p *ProcessByKey) TriggerKeys(ctx context.Context, tx storage.StateTransact
 
 		// Send any pending end of stream
 		pendingEndOfStreamState := storage.NewValueState(tx.WithPrefix(pendingEndOfStreamPrefix))
+
 		var phantom octosql.Value
 		err = pendingEndOfStreamState.Get(&phantom)
 		if err == storage.ErrNotFound {
 		} else if err != nil {
 			return 0, errors.Wrap(err, "couldn't get pending end of stream state")
-		} else if err == nil {
+		} else {
 
 			outputQueue := NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
-			if err := outputQueue.Push(ctx, &QueueElement{Type: &QueueElement_EndOfStream{EndOfStream: true}}); err != nil {
+			if err := outputQueue.Push(ctx, &QueueElement{
+				Type: &QueueElement_EndOfStream{
+					EndOfStream: true,
+				},
+			}); err != nil {
 				return 0, errors.Wrap(err, "couldn't push end of stream to output queue")
 			}
 		}

@@ -10,6 +10,25 @@ import (
 
 func EqualNodes(node1, node2 Node) error {
 	switch node1 := node1.(type) {
+	case *With:
+		if node2, ok := node2.(*With); ok {
+			if len(node1.cteNames) != len(node2.cteNames) {
+				return errors.Errorf("counts of cte's not equal: %d vs %d", len(node1.cteNames), len(node2.cteNames))
+			}
+			for i := range node1.cteNames {
+				if node1.cteNames[i] != node2.cteNames[i] {
+					return errors.Errorf("cte names with index %d not equal: %s vs %s", i, node1.cteNames[i], node2.cteNames[i])
+				}
+				if err := EqualNodes(node1.cteNodes[i], node2.cteNodes[i]); err != nil {
+					return errors.Wrapf(err, "cte nodes with index %d not equal: %+v, %+v", i, node1.cteNodes[i], node2.cteNodes[i])
+				}
+			}
+			if err := EqualNodes(node1.source, node2.source); err != nil {
+				return errors.Wrapf(err, "source node not equal: %+v, %+v", node1.source, node2.source)
+			}
+			return nil
+		}
+
 	case *UnionAll:
 		if node2, ok := node2.(*UnionAll); ok {
 			if err := EqualNodes(node1.first, node2.first); err != nil {
@@ -45,6 +64,11 @@ func EqualNodes(node1, node2 Node) error {
 			if err := EqualNodes(node1.source, node2.source); err != nil {
 				return errors.Wrap(err, "sources not equal")
 			}
+
+			if node1.keep != node2.keep {
+				return errors.New("keep values for maps are not equal")
+			}
+
 			return nil
 		}
 
@@ -100,14 +124,19 @@ func EqualNodes(node1, node2 Node) error {
 			return nil
 		}
 
-	case *LeftJoin:
-		if node2, ok := node2.(*LeftJoin); ok {
+	case *Join:
+		if node2, ok := node2.(*Join); ok {
 			if err := EqualNodes(node1.source, node2.source); err != nil {
 				return errors.Wrap(err, "source nodes underneath not equal")
 			}
 			if err := EqualNodes(node1.joined, node2.joined); err != nil {
 				return errors.Wrap(err, "joined nodes underneath not equal")
 			}
+
+			if node1.joinType != node2.joinType {
+				return errors.New("joins differ on isLeftJoin")
+			}
+
 			return nil
 		}
 
@@ -258,6 +287,14 @@ func EqualFormula(expr1, expr2 Formula) error {
 
 func EqualExpressions(expr1, expr2 Expression) error {
 	switch expr1 := expr1.(type) {
+	case *StarExpression:
+		if expr2, ok := expr2.(*StarExpression); ok {
+			if expr1.Name() != expr2.Name() {
+				return errors.Errorf("qualifiers not equal: %v %v", expr1.Name().Source(), expr2.Name().Source())
+			}
+
+			return nil
+		}
 	case *Constant:
 		if expr2, ok := expr2.(*Constant); ok {
 			if expr1.value != expr2.value {

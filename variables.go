@@ -1,10 +1,13 @@
 package octosql
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
 )
+
+const StarExpressionName = "*star*"
 
 type VariableName string
 
@@ -15,11 +18,11 @@ func NewVariableName(varname string) VariableName {
 	return VariableName(strings.ToLower(varname))
 }
 
-func (vn *VariableName) String() string {
-	return string(*vn)
+func (vn VariableName) String() string {
+	return string(vn)
 }
 
-func (vn *VariableName) Source() string {
+func (vn VariableName) Source() string {
 	parts := strings.Split(vn.String(), ".")
 	if len(parts) == 1 {
 		return ""
@@ -28,7 +31,7 @@ func (vn *VariableName) Source() string {
 	}
 }
 
-func (vn *VariableName) Name() string {
+func (vn VariableName) Name() string {
 	i := strings.Index(vn.String(), ".")
 	if i == -1 {
 		return vn.String()
@@ -36,12 +39,12 @@ func (vn *VariableName) Name() string {
 	return vn.String()[i+1:]
 }
 
-func (vn *VariableName) Empty() bool {
-	return len(*vn) == 0
+func (vn VariableName) Empty() bool {
+	return len(vn) == 0
 }
 
-func (vn *VariableName) Equal(other VariableName) bool {
-	return *vn == other
+func (vn VariableName) Equal(other VariableName) bool {
+	return vn == other
 }
 
 type Variables map[VariableName]Value
@@ -78,10 +81,25 @@ func (vs Variables) MergeWith(other Variables) (Variables, error) {
 	return out, nil
 }
 
+func (vs Variables) DeterministicOrder() []VariableName {
+	fields := make([]VariableName, len(vs))
+	i := 0
+	for field := range vs {
+		fields[i] = field
+		i++
+	}
+
+	sort.Slice(fields, func(i, j int) bool {
+		return fields[i] < fields[j]
+	})
+
+	return fields
+}
+
 func StringsToVariableNames(strings []string) []VariableName {
 	result := make([]VariableName, len(strings))
 	for i, s := range strings {
-		result[i] = VariableName(s) //TODO: it can be either this, or NewVariableName
+		result[i] = NewVariableName(s)
 	}
 
 	return result

@@ -1,589 +1,263 @@
 package aggregates
 
 import (
-	"reflect"
+	"context"
 	"testing"
-	"time"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/storage"
 )
 
-func TestMin(t *testing.T) {
-	now := time.Now().Add(time.Hour - 1)
+func TestMinInt(t *testing.T) {
+	ctx := context.Background()
 
-	type kv struct {
-		key   octosql.Value
-		value octosql.Value
-	}
-	tests := []struct {
-		name    string
-		args    []kv
-		key     octosql.Value
-		want    octosql.Value
-		wantErr bool
-	}{
-		{
-			name: "one element",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key")}),
-					value: octosql.MakeInt(5),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key")}),
-			want: octosql.MakeInt(5),
-		},
-		{
-			name: "two elements",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeInt(6),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeInt(5),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-			want: octosql.MakeInt(5),
-		},
-		{
-			name: "two elements",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeInt(5),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeInt(6),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-			want: octosql.MakeInt(5),
-		},
-		{
-			name: "many single-element groups",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeInt(6),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeInt(4),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-			want: octosql.MakeInt(4),
-		},
-		{
-			name: "many single-element groups",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeInt(6),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeInt(4),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-			want: octosql.MakeInt(6),
-		},
-		{
-			name: "many groups",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeInt(6),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeInt(4),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeInt(7),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeInt(7),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeInt(8),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeInt(9),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-			want: octosql.MakeInt(4),
-		},
-		{
-			name: "many groups",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeInt(6),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeInt(4),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeInt(7),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeInt(5),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeInt(8),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeInt(9),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-			want: octosql.MakeInt(6),
-		},
-		{
-			name: "one element",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key")}),
-					value: octosql.MakeFloat(5.0),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key")}),
-			want: octosql.MakeFloat(5.0),
-		},
-		{
-			name: "two elements",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeFloat(6.0),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeFloat(5.0),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-			want: octosql.MakeFloat(5.0),
-		},
-		{
-			name: "two elements",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeFloat(5.0),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeFloat(6.0),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-			want: octosql.MakeFloat(5.0),
-		},
-		{
-			name: "many single-element groups",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeFloat(6.0),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeFloat(4.0),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-			want: octosql.MakeFloat(4.0),
-		},
-		{
-			name: "many single-element groups",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeFloat(6.0),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeFloat(4.0),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-			want: octosql.MakeFloat(6.0),
-		},
-		{
-			name: "many groups",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeFloat(6.0),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeFloat(4.0),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeFloat(7.0),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeFloat(7.0),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeFloat(8.0),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeFloat(9.0),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-			want: octosql.MakeFloat(4.0),
-		},
-		{
-			name: "many groups",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeFloat(6.0),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeFloat(4.0),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeFloat(7.0),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeFloat(5.0),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeFloat(8.0),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeFloat(9.0),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-			want: octosql.MakeFloat(6.0),
-		},
-		{
-			name: "one element",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key")}),
-					value: octosql.MakeString("aab"),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key")}),
-			want: octosql.MakeString("aab"),
-		},
-		{
-			name: "two elements",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeString("abb"),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeString("aaa"),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-			want: octosql.MakeString("aaa"),
-		},
-		{
-			name: "two elements",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeString("aaa"),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeString("abb"),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-			want: octosql.MakeString("aaa"),
-		},
-		{
-			name: "many single-element groups",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeString("abb"),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeString("aaa"),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-			want: octosql.MakeString("aaa"),
-		},
-		{
-			name: "many single-element groups",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeString("abb"),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeString("aaa"),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-			want: octosql.MakeString("abb"),
-		},
-		{
-			name: "many groups",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeString("aaa"),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeString("aaa"),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeString("abb"),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeString("aba"),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeString("abb"),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeString("abc"),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-			want: octosql.MakeString("aaa"),
-		},
-		{
-			name: "many groups",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeString("aaa"),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeString("aaa"),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeString("abb"),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeString("aba"),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeString("abb"),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeString("abc"),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-			want: octosql.MakeString("aaa"),
-		},
-		{
-			name: "one element",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key")}),
-					value: octosql.MakeTime(now),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key")}),
-			want: octosql.MakeTime(now),
-		},
-		{
-			name: "two elements",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeTime(now.Add(time.Hour)),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeTime(now),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-			want: octosql.MakeTime(now),
-		},
-		{
-			name: "two elements",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeTime(now),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeTime(now.Add(time.Hour)),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-			want: octosql.MakeTime(now),
-		},
-		{
-			name: "many single-element groups",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeTime(now.Add(time.Hour)),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeTime(now),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-			want: octosql.MakeTime(now),
-		},
-		{
-			name: "many single-element groups",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeTime(now.Add(time.Hour)),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeTime(now),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-			want: octosql.MakeTime(now.Add(time.Hour)),
-		},
-		{
-			name: "many groups",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeTime(now),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeTime(now),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeTime(now.Add(time.Hour * 2)),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeTime(now.Add(time.Hour)),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeTime(now.Add(time.Hour * 2)),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeTime(now.Add(time.Hour * 3)),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-			want: octosql.MakeTime(now),
-		},
-		{
-			name: "many groups",
-			args: []kv{
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeTime(now),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeTime(now),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key1": octosql.MakeInt(1)})}),
-					value: octosql.MakeTime(now.Add(time.Hour * 2)),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeTime(now.Add(time.Hour)),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeTime(now.Add(time.Hour * 2)),
-				},
-				{
-					key:   octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-					value: octosql.MakeTime(now.Add(time.Hour * 3)),
-				},
-			},
-			key:  octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-			want: octosql.MakeTime(now),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			agg := &Min{
-				mins: execution.NewHashMap(),
-			}
-			for i := range tt.args {
-				if err := agg.AddRecord(tt.args[i].key, tt.args[i].value); err != nil {
-					if !tt.wantErr {
-						t.Errorf("Min.AddRecord() error = %v", err)
-					}
-					return
-				}
-			}
+	prefix := []byte("min")
 
-			got, err := agg.GetAggregated(tt.key)
-			if err != nil {
-				if !tt.wantErr {
-					t.Errorf("Min.GetAggregated() error = %v", err)
-				}
-				return
-			}
-			if tt.wantErr {
-				t.Errorf("Min: wanted error")
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Min.GetAggregated() = %v, want %v", got, tt.want)
-			}
-		})
-	}
+	stateStorage := storage.GetTestStorage(t)
+	tx := stateStorage.BeginTransaction().WithPrefix(prefix)
+
+	aggr := NewMinAggregate()
+
+	// Empty storage
+	ExpectZeroValue(t, ctx, aggr, tx)
+
+	// AddValue
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(11))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(11))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(11))
+
+	// RetractValue
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(11))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(11))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	ExpectZeroValue(t, ctx, aggr, tx)
+
+	// Mixed + multiple values
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	ExpectZeroValue(t, ctx, aggr, tx)
+
+	// Early retractions
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectZeroValue(t, ctx, aggr, tx)
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectZeroValue(t, ctx, aggr, tx)
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(2))
+
+	ExpectZeroValue(t, ctx, aggr, tx)
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectZeroValue(t, ctx, aggr, tx)
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(2))
+
+	ExpectZeroValue(t, ctx, aggr, tx)
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(3))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(3))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(3))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(3))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(3))
+
+	ExpectZeroValue(t, ctx, aggr, tx)
+}
+
+func TestMinString(t *testing.T) {
+	ctx := context.Background()
+
+	prefix := []byte("min")
+
+	stateStorage := storage.GetTestStorage(t)
+	tx := stateStorage.BeginTransaction().WithPrefix(prefix)
+
+	aggr := NewMinAggregate()
+
+	// Empty storage
+	ExpectZeroValue(t, ctx, aggr, tx)
+
+	// AddValue
+	AddValue(t, ctx, aggr, tx, octosql.MakeString("abc"))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeString("abc"))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeString("b"))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeString("abc"))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeString("aa"))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeString("aa"))
+
+	// RetractValue
+	RetractValue(t, ctx, aggr, tx, octosql.MakeString("abc"))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeString("aa"))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeString("aa"))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeString("b"))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeString("b"))
+
+	ExpectZeroValue(t, ctx, aggr, tx)
+
+	// Mixed + multiple values
+	AddValue(t, ctx, aggr, tx, octosql.MakeString("abc"))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeString("abc"))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeString("abc"))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeString("abc"))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeString("abc"))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeString("abc"))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeString("abc"))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeString("abc"))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeString("b"))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeString("abc"))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeString("abc"))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeString("abc"))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeString("dddd"))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeString("abc"))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeString("b"))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeString("b"))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeString("dddd"))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeString("dddd"))
+
+	ExpectZeroValue(t, ctx, aggr, tx)
+}
+
+func TestMinBool(t *testing.T) {
+	ctx := context.Background()
+
+	prefix := []byte("min")
+
+	stateStorage := storage.GetTestStorage(t)
+	tx := stateStorage.BeginTransaction().WithPrefix(prefix)
+
+	aggr := NewMinAggregate()
+
+	// Empty storage
+	ExpectZeroValue(t, ctx, aggr, tx)
+
+	// AddValue
+	AddValue(t, ctx, aggr, tx, octosql.MakeBool(true))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeBool(true))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeBool(false))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeBool(false))
+
+	// RetractValue
+	RetractValue(t, ctx, aggr, tx, octosql.MakeBool(true))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeBool(false))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeBool(false))
+
+	ExpectZeroValue(t, ctx, aggr, tx)
+
+	// Mixed + multiple values
+	AddValue(t, ctx, aggr, tx, octosql.MakeBool(true))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeBool(true))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeBool(true))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeBool(true))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeBool(false))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeBool(false))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeBool(false))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeBool(true))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeBool(true))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeBool(true))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeBool(false))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeBool(true))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeBool(false))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeBool(false))
+
+	ExpectZeroValue(t, ctx, aggr, tx)
 }

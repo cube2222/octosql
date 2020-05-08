@@ -5,37 +5,37 @@ import (
 	"testing"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/storage"
 )
 
 func TestLimit_Get(t *testing.T) {
 	ctx := context.Background()
-	const NO_ERROR = ""
 
 	tests := []struct {
-		name       string
-		vars       octosql.Variables
-		node       *Limit
-		wantStream *InMemoryStream
-		wantError  string
+		name      string
+		vars      octosql.Variables
+		node      *Limit
+		want      Node
+		wantError bool
 	}{
 		{
-			name:       "negative limit value",
-			vars:       octosql.NoVariables(),
-			node:       NewLimit(NewDummyNode(nil), NewDummyValue(octosql.MakeInt(-42))),
-			wantStream: nil,
-			wantError:  "negative limit value",
+			name:      "negative limit value",
+			vars:      octosql.NoVariables(),
+			node:      NewLimit(NewDummyNode(nil), NewConstantValue(octosql.MakeInt(-42))),
+			want:      nil,
+			wantError: true,
 		},
 		{
-			name:       "limit value not int",
-			vars:       octosql.NoVariables(),
-			node:       NewLimit(NewDummyNode(nil), NewDummyValue(octosql.MakeFloat(2.0))),
-			wantStream: nil,
-			wantError:  "limit value not int",
+			name:      "limit value not int",
+			vars:      octosql.NoVariables(),
+			node:      NewLimit(NewDummyNode(nil), NewConstantValue(octosql.MakeFloat(2.0))),
+			want:      nil,
+			wantError: true,
 		},
 		{
 			name: "normal limit get",
 			vars: octosql.NoVariables(),
-			node: NewLimit(&DummyNode{
+			node: NewLimit(NewDummyNode(
 				[]*Record{
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{
@@ -66,8 +66,8 @@ func TestLimit_Get(t *testing.T) {
 							2.23e7,
 						}),
 				},
-			}, NewDummyValue(octosql.MakeInt(3))),
-			wantStream: NewInMemoryStream([]*Record{
+			), NewConstantValue(octosql.MakeInt(3))),
+			want: NewDummyNode([]*Record{
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{
 						"num",
@@ -90,7 +90,7 @@ func TestLimit_Get(t *testing.T) {
 						false,
 					}),
 			}),
-			wantError: NO_ERROR,
+			wantError: false,
 		},
 		{
 			name: "zero limit get",
@@ -105,86 +105,48 @@ func TestLimit_Get(t *testing.T) {
 							1,
 						}),
 				},
-			}, NewDummyValue(octosql.MakeInt(0))),
-			wantStream: NewInMemoryStream([]*Record{}),
-			wantError:  NO_ERROR,
+			}, NewConstantValue(octosql.MakeInt(0))),
+			want:      NewDummyNode([]*Record{}),
+			wantError: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rs, err := tt.node.Get(ctx, tt.vars)
+			stateStorage := storage.GetTestStorage(t)
 
-			if (err == nil) != (tt.wantError == NO_ERROR) {
-				t.Errorf("exactly one of test.wantError, tt.node.Get() is not nil")
+			tx := stateStorage.BeginTransaction()
+			ctx := storage.InjectStateTransaction(ctx, tx)
+
+			rs, _, err := tt.node.Get(ctx, tt.vars, GetRawStreamID())
+			if (err != nil) != tt.wantError {
+				t.Errorf("Unexpected error %v, wanted: %v", err, tt.wantError)
+				return
+			} else if tt.wantError {
 				return
 			}
 
+			want, _, err := tt.want.Get(ctx, tt.vars, GetRawStreamID())
 			if err != nil {
-				if err.Error() != tt.wantError {
-					t.Errorf("Unexpected error %v, wanted: %v", err.Error(), tt.wantError)
-				}
+				t.Fatal("couldn't get wanted record stream: ", err)
+			}
+
+			if err := tx.Commit(); err != nil {
+				t.Fatal(err)
+			}
+
+			err = AreStreamsEqualNoOrdering(ctx, stateStorage, rs, want)
+			if err != nil {
+				t.Errorf("limitedStream comparison error: %v", err)
+			}
+
+			if err := rs.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close limited stream: %v", err)
 				return
 			}
-
-			equal, err := AreStreamsEqual(ctx, rs, tt.wantStream)
-			if !equal {
-				t.Errorf("limitedStream doesn't work as expected")
-			}
-			if err != nil {
-				t.Errorf("limitedStream comparison error: %v", err)
-			}
-		})
-	}
-}
-
-func TestLimitedStream_Next(t *testing.T) {
-	tests := []struct {
-		name       string
-		stream     *LimitedStream
-		wantStream *InMemoryStream
-	}{
-		{
-			name: "Simplest limitedStream possible",
-			stream: newLimitedStream(
-				NewInMemoryStream([]*Record{
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
-							"num",
-						},
-						[]interface{}{
-							1,
-						}),
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{
-							"num",
-						},
-						[]interface{}{
-							2,
-						}),
-				}),
-				1,
-			),
-			wantStream: NewInMemoryStream([]*Record{
-				NewRecordFromSliceWithNormalize(
-					[]octosql.VariableName{
-						"num",
-					},
-					[]interface{}{
-						1,
-					}),
-			}),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			equal, err := AreStreamsEqual(context.Background(), tt.stream, tt.wantStream)
-			if !equal {
-				t.Errorf("limitedStream doesn't work as intended")
-			}
-			if err != nil {
-				t.Errorf("limitedStream comparison error: %v", err)
+			if err := want.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+				return
 			}
 		})
 	}

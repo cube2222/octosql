@@ -2,8 +2,12 @@ package physical
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/graph"
+	"github.com/cube2222/octosql/physical/metadata"
+
 	"github.com/pkg/errors"
 )
 
@@ -14,6 +18,8 @@ type Formula interface {
 	SplitByAnd() []Formula
 	ExtractPredicates() []*Predicate
 	Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Formula, error)
+	DoesMatchNamespace(namespace *metadata.Namespace) bool
+	graph.Visualizer
 }
 
 type Constant struct {
@@ -44,6 +50,16 @@ func (f *Constant) ExtractPredicates() []*Predicate {
 
 func (f *Constant) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Formula, error) {
 	return execution.NewConstant(f.Value), nil
+}
+
+func (f *Constant) DoesMatchNamespace(namespace *metadata.Namespace) bool {
+	return true
+}
+
+func (f *Constant) Visualize() *graph.Node {
+	n := graph.NewNode("Constant")
+	n.AddField("value", fmt.Sprint(f.Value))
+	return n
 }
 
 type And struct {
@@ -85,6 +101,17 @@ func (f *And) Materialize(ctx context.Context, matCtx *MaterializationContext) (
 	return execution.NewAnd(materializedLeft, materializedRight), nil
 }
 
+func (f *And) DoesMatchNamespace(namespace *metadata.Namespace) bool {
+	return f.Left.DoesMatchNamespace(namespace) && f.Right.DoesMatchNamespace(namespace)
+}
+
+func (f *And) Visualize() *graph.Node {
+	n := graph.NewNode("And")
+	n.AddChild("left", f.Left.Visualize())
+	n.AddChild("right", f.Right.Visualize())
+	return n
+}
+
 type Or struct {
 	Left, Right Formula
 }
@@ -124,6 +151,17 @@ func (f *Or) Materialize(ctx context.Context, matCtx *MaterializationContext) (e
 	return execution.NewOr(materializedLeft, materializedRight), nil
 }
 
+func (f *Or) DoesMatchNamespace(namespace *metadata.Namespace) bool {
+	return f.Left.DoesMatchNamespace(namespace) && f.Right.DoesMatchNamespace(namespace)
+}
+
+func (f *Or) Visualize() *graph.Node {
+	n := graph.NewNode("Or")
+	n.AddChild("left", f.Left.Visualize())
+	n.AddChild("right", f.Right.Visualize())
+	return n
+}
+
 type Not struct {
 	Child Formula
 }
@@ -156,6 +194,16 @@ func (f *Not) Materialize(ctx context.Context, matCtx *MaterializationContext) (
 		return nil, errors.Wrap(err, "couldn't materialize operand")
 	}
 	return execution.NewNot(materialized), nil
+}
+
+func (f *Not) DoesMatchNamespace(namespace *metadata.Namespace) bool {
+	return f.Child.DoesMatchNamespace(namespace)
+}
+
+func (f *Not) Visualize() *graph.Node {
+	n := graph.NewNode("Not")
+	n.AddChild("source", f.Child.Visualize())
+	return n
 }
 
 type Predicate struct {
@@ -198,4 +246,16 @@ func (f *Predicate) Materialize(ctx context.Context, matCtx *MaterializationCont
 		return nil, errors.Wrap(err, "couldn't materialize right operand")
 	}
 	return execution.NewPredicate(materializedLeft, f.Relation.Materialize(ctx, matCtx), materializedRight), nil
+}
+
+func (f *Predicate) DoesMatchNamespace(namespace *metadata.Namespace) bool {
+	return f.Left.DoesMatchNamespace(namespace) && f.Right.DoesMatchNamespace(namespace)
+}
+
+func (f *Predicate) Visualize() *graph.Node {
+	n := graph.NewNode("Predicate")
+	n.AddField("relation", string(f.Relation))
+	n.AddChild("left", f.Left.Visualize())
+	n.AddChild("right", f.Right.Visualize())
+	return n
 }

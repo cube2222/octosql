@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/pkg/errors"
 )
@@ -71,5 +72,16 @@ func (node *OrderBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 }
 
 func (node *OrderBy) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMetadata(metadata.BoundedFitsInLocalStorage, node.Source.Metadata().EventTimeField())
+	return metadata.NewNodeMetadataFromMetadata(node.Source.Metadata())
+}
+
+func (node *OrderBy) Visualize() *graph.Node {
+	n := graph.NewNode("Order By")
+	n.AddChild("source", node.Source.Visualize())
+
+	for i := range n.Children {
+		n.AddChild(string(node.Directions[i]), node.Expressions[i].Visualize())
+	}
+
+	return n
 }

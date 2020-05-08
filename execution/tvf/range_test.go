@@ -6,6 +6,7 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/storage"
 )
 
 func TestRange_Get(t *testing.T) {
@@ -21,7 +22,7 @@ func TestRange_Get(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    execution.RecordStream
+		want    execution.Node
 		wantErr bool
 	}{
 		{
@@ -36,7 +37,7 @@ func TestRange_Get(t *testing.T) {
 					"end":   octosql.MakeInt(10),
 				}),
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewDummyNode([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"i"},
 					[]interface{}{1},
@@ -88,7 +89,7 @@ func TestRange_Get(t *testing.T) {
 					"end":   octosql.MakeInt(10),
 				}),
 			},
-			want: execution.NewInMemoryStream([]*execution.Record{
+			want: execution.NewDummyNode([]*execution.Record{
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"i"},
 					[]interface{}{5},
@@ -124,7 +125,7 @@ func TestRange_Get(t *testing.T) {
 					"end":   octosql.MakeInt(3),
 				}),
 			},
-			want:    execution.NewInMemoryStream([]*execution.Record{}),
+			want:    execution.NewDummyNode([]*execution.Record{}),
 			wantErr: false,
 		},
 		{
@@ -139,7 +140,7 @@ func TestRange_Get(t *testing.T) {
 					"end":   octosql.MakeInt(3),
 				}),
 			},
-			want:    execution.NewInMemoryStream([]*execution.Record{}),
+			want:    execution.NewDummyNode([]*execution.Record{}),
 			wantErr: false,
 		},
 	}
@@ -149,17 +150,39 @@ func TestRange_Get(t *testing.T) {
 				start: tt.fields.start,
 				end:   tt.fields.end,
 			}
-			got, err := r.Get(ctx, tt.args.variables)
+
+			stateStorage := storage.GetTestStorage(t)
+
+			tx := stateStorage.BeginTransaction()
+			ctx := storage.InjectStateTransaction(ctx, tx)
+
+			got, _, err := r.Get(ctx, tt.args.variables, execution.GetRawStreamID())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Range.Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			eq, err := execution.AreStreamsEqual(ctx, got, tt.want)
+			want, _, err := tt.want.Get(ctx, tt.args.variables, execution.GetRawStreamID())
+			if err != nil {
+				t.Errorf("Range.Get() error = %v", err)
+				return
+			}
+
+			err = execution.AreStreamsEqual(ctx, got, want)
 			if err != nil {
 				t.Errorf("Range.Get() AreStreamsEqual error = %v", err)
 			}
-			if !eq {
-				t.Errorf("Range.Get() streams not equal")
+
+			if err := got.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close range stream: %v", err)
+				return
+			}
+			if err := want.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+				return
+			}
+
+			if err := tx.Commit(); err != nil {
+				t.Fatal(err)
 			}
 		})
 	}

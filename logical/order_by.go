@@ -3,9 +3,11 @@ package logical
 import (
 	"context"
 
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
+	"github.com/cube2222/octosql/physical"
 )
 
 type OrderDirection string
@@ -24,10 +26,10 @@ func NewOrderBy(expressions []Expression, directions []OrderDirection, source No
 	}
 }
 
-func (node *OrderBy) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
-	sourceNode, variables, err := node.source.Physical(ctx, physicalCreator)
+func (node *OrderBy) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
+	sourceNodes, variables, err := node.source.Physical(ctx, physicalCreator)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get physical plan of source node in order by")
+		return nil, nil, errors.Wrap(err, "couldn't get physical plan of source nodes in order by")
 	}
 
 	expressions := make([]physical.Expression, len(node.expressions))
@@ -56,5 +58,19 @@ func (node *OrderBy) Physical(ctx context.Context, physicalCreator *PhysicalPlan
 		}
 	}
 
-	return physical.NewOrderBy(expressions, directions, sourceNode), variables, nil
+	// OrderBy operates on a single, joined stream.
+	outNodes := physical.NewShuffle(1, physical.NewConstantStrategy(0), sourceNodes)
+
+	return []physical.Node{physical.NewOrderBy(expressions, directions, outNodes[0])}, variables, nil
+}
+
+func (node *OrderBy) Visualize() *graph.Node {
+	n := graph.NewNode("Order By")
+	if node.source != nil {
+		n.AddChild("source", node.source.Visualize())
+	}
+	for i := range n.Children {
+		n.AddChild(string(node.directions[i]), node.expressions[i].Visualize())
+	}
+	return n
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/pkg/errors"
 )
@@ -43,5 +44,12 @@ func (node *Offset) Materialize(ctx context.Context, matCtx *MaterializationCont
 }
 
 func (node *Offset) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality(), node.Source.Metadata().EventTimeField())
+	return metadata.NewNodeMetadataFromMetadata(node.Source.Metadata())
+}
+
+func (node *Offset) Visualize() *graph.Node {
+	n := graph.NewNode("Offset")
+	n.AddChild("offset", node.OffsetExpr.Visualize())
+	n.AddChild("source", node.Source.Visualize())
+	return n
 }

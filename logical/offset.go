@@ -2,7 +2,9 @@ package logical
 
 import (
 	"context"
+
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
 )
@@ -16,10 +18,10 @@ func NewOffset(data Node, expr Expression) Node {
 	return &Offset{data: data, offsetExpr: expr}
 }
 
-func (node *Offset) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
-	dataNode, variables, err := node.data.Physical(ctx, physicalCreator)
+func (node *Offset) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
+	sourceNodes, variables, err := node.data.Physical(ctx, physicalCreator)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get physical plan for data node")
+		return nil, nil, errors.Wrap(err, "couldn't get physical plan for source nodes")
 	}
 
 	offsetExpr, offsetVariables, err := node.offsetExpr.Physical(ctx, physicalCreator)
@@ -31,5 +33,19 @@ func (node *Offset) Physical(ctx context.Context, physicalCreator *PhysicalPlanC
 		return nil, nil, errors.Wrap(err, "couldn't get offset node variables")
 	}
 
-	return physical.NewOffset(dataNode, offsetExpr), variables, nil
+	// Offset operates on a single, joined stream.
+	outNodes := physical.NewShuffle(1, physical.NewConstantStrategy(0), sourceNodes)
+
+	return []physical.Node{physical.NewOffset(outNodes[0], offsetExpr)}, variables, nil
+}
+
+func (node *Offset) Visualize() *graph.Node {
+	n := graph.NewNode("Offset")
+	if node.data != nil {
+		n.AddChild("data", node.data.Visualize())
+	}
+	if node.offsetExpr != nil {
+		n.AddChild("offset", node.offsetExpr.Visualize())
+	}
+	return n
 }

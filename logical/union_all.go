@@ -3,9 +3,11 @@ package logical
 import (
 	"context"
 
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/physical"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
+	"github.com/cube2222/octosql/physical"
 )
 
 type UnionAll struct {
@@ -16,25 +18,43 @@ func NewUnionAll(first, second Node) *UnionAll {
 	return &UnionAll{first: first, second: second}
 }
 
-func (node *UnionAll) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
+func (node *UnionAll) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	variables := octosql.NoVariables()
-	firstNode, firstVariables, err := node.first.Physical(ctx, physicalCreator)
+	leftNodes, firstVariables, err := node.first.Physical(ctx, physicalCreator)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get physical plan for first node")
+		return nil, nil, errors.Wrap(err, "couldn't get physical plan for left nodes")
 	}
 	variables, err = variables.MergeWith(firstVariables)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get first node variables")
 	}
 
-	secondNode, secondVariables, err := node.second.Physical(ctx, physicalCreator)
+	rightNodes, secondVariables, err := node.second.Physical(ctx, physicalCreator)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get physical plan for second node")
+		return nil, nil, errors.Wrap(err, "couldn't get physical plan for right nodes")
 	}
 	variables, err = variables.MergeWith(secondVariables)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get second node variables")
 	}
 
-	return physical.NewUnionAll(firstNode, secondNode), variables, nil
+	for partition := range leftNodes {
+		leftNodes[partition] = physical.NewNextShuffleMetadataChange("_union_left", partition, leftNodes[partition])
+	}
+	for partition := range rightNodes {
+		rightNodes[partition] = physical.NewNextShuffleMetadataChange("_union_right", partition, rightNodes[partition])
+	}
+
+	return append(leftNodes, rightNodes...), variables, nil
+}
+
+func (node *UnionAll) Visualize() *graph.Node {
+	n := graph.NewNode("Union All")
+	if node.first != nil {
+		n.AddChild("first", node.first.Visualize())
+	}
+	if node.second != nil {
+		n.AddChild("second", node.second.Visualize())
+	}
+	return n
 }

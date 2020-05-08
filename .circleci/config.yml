@@ -7,6 +7,7 @@ workflows:
       - test-mysql
       - test-postgres
       - test-redis
+      - test-kafka
       - release:
           requires:
             - lint
@@ -14,12 +15,13 @@ workflows:
             - test-mysql
             - test-postgres
             - test-redis
+            - test-kafka
 
 version: 2
 jobs:
   lint:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.14
 
     working_directory: /go/src/github.com/cube2222/octosql
     steps:
@@ -30,7 +32,7 @@ jobs:
 
   test:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.14
     environment:
       GO111MODULE: "on"
 
@@ -41,15 +43,19 @@ jobs:
       - run: go test -v
       - run: go test -v ./cmd/...
       - run: go test -v ./config/...
+      - run: go test -v ./datasources/json/...
+      - run: go test -v ./datasources/csv/...
+      - run: go test -v ./datasources/excel/...
+      - run: go test -v ./datasources/parquet/...
       - run: go test -v ./execution/...
       - run: go test -v ./logical/...
       - run: go test -v ./parser/...
       - run: go test -v ./physical/...
-      - run: go test -v ./storage/json/...
+      - run: go test -v ./storage/...
 
   test-mysql:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.14
         environment:
           GO111MODULE: "on"
       - image: circleci/mysql:latest
@@ -62,11 +68,11 @@ jobs:
       - checkout
 
       - run: sleep 4
-      - run: go test -v ./storage/mysql/...
+      - run: go test -v ./datasources/sql/mysql...
 
   test-postgres:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.14
         environment:
           GO111MODULE: "on"
       - image: circleci/postgres:latest
@@ -79,11 +85,11 @@ jobs:
     steps:
       - checkout
 
-      - run: go test -v ./storage/postgres/...
+      - run: go test -v ./datasources/sql/postgres...
 
   test-redis:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.14
         environment:
           GO111MODULE: "on"
       - image: circleci/redis:latest
@@ -92,11 +98,24 @@ jobs:
     steps:
       - checkout
 
-      - run: go test -v ./storage/redis/...
+      - run: go test -v ./datasources/redis/...
+
+  test-kafka:
+    docker:
+      - image: circleci/golang:1.14
+        environment:
+          GO111MODULE: "on"
+      - image: spotify/kafka:latest
+
+    working_directory: /go/src/github.com/cube2222/octosql
+    steps:
+      - checkout
+
+      - run: go test -v ./datasources/kafka/...
 
   release:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.14
     environment:
       GO111MODULE: "on"
 

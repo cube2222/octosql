@@ -1,108 +1,100 @@
 package aggregates
 
 import (
+	"context"
 	"time"
 
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/docs"
-	"github.com/cube2222/octosql/execution"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/storage"
 )
 
 type Average struct {
-	averages   *execution.HashMap
-	counts     *execution.HashMap
-	typedValue octosql.Value
+	underlyingSum   *Sum
+	underlyingCount *Count
 }
 
-func NewAverage() *Average {
+func NewAverageAggregate() *Average {
 	return &Average{
-		averages: execution.NewHashMap(),
-		counts:   execution.NewHashMap(),
+		underlyingSum:   NewSumAggregate(),
+		underlyingCount: NewCountAggregate(),
 	}
 }
 
-func (agg *Average) Document() docs.Documentation {
-	return docs.Section(
-		agg.String(),
-		docs.Body(
-			docs.Section("Description", docs.Text("Averages Floats, Ints or Durations in the group. You may not mix types.")),
-		),
-	)
-}
+func (agg *Average) AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
+	valueType := value.GetType()
 
-func (agg *Average) AddRecord(key octosql.Value, value octosql.Value) error {
-	if octosql.AreEqual(agg.typedValue, octosql.ZeroValue()) {
-		agg.typedValue = value
+	if !isAppropriateType(valueType) {
+		return errors.Errorf("type of value passed (%s) isn't appropriate for calculating average", valueType)
 	}
 
-	if agg.typedValue.GetType() != value.GetType() {
-		return errors.Errorf("mixed types in avg: %v and %v with values %v and %v",
-			value.GetType(), agg.typedValue.GetType(),
-			value, agg.typedValue)
-	}
-
-	var floatValue float64
-	switch value.GetType() {
-	case octosql.TypeFloat:
-		floatValue = value.AsFloat()
-	case octosql.TypeInt:
-		floatValue = float64(value.AsInt())
-	case octosql.TypeDuration:
-		floatValue = float64(value.AsDuration())
-	default:
-		return errors.Errorf("invalid type in average: %v with value %v", value.GetType(), value)
-	}
-
-	count, previousValueExists, err := agg.counts.Get(key)
+	err := agg.underlyingSum.AddValue(ctx, tx, value)
 	if err != nil {
-		return errors.Wrap(err, "couldn't get current element count out of hashmap")
+		return errors.Wrap(err, "couldn't add value to sum for avg")
 	}
 
-	average, _, err := agg.averages.Get(key)
+	err = agg.underlyingCount.AddValue(ctx, tx, value)
 	if err != nil {
-		return errors.Wrap(err, "couldn't get current average out of hashmap")
-	}
-
-	var newAverage float64
-	var newCount int
-	if previousValueExists {
-		newCount = count.(int) + 1
-		newAverage = (average.(float64)*float64(newCount-1) + floatValue) / float64(newCount)
-	} else {
-		newCount = 1
-		newAverage = floatValue
-	}
-
-	err = agg.counts.Set(key, newCount)
-	if err != nil {
-		return errors.Wrap(err, "couldn't put new element count into hashmap")
-	}
-
-	err = agg.averages.Set(key, newAverage)
-	if err != nil {
-		return errors.Wrap(err, "couldn't put new average into hashmap")
+		return errors.Wrap(err, "couldn't add element to elements count for avg")
 	}
 
 	return nil
 }
 
-func (agg *Average) GetAggregated(key octosql.Value) (octosql.Value, error) {
-	average, ok, err := agg.averages.Get(key)
+func isAppropriateType(valueType octosql.Type) bool {
+	return valueType == octosql.TypeInt || valueType == octosql.TypeFloat || valueType == octosql.TypeDuration
+}
+
+func (agg *Average) RetractValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
+	valueType := value.GetType()
+
+	if !isAppropriateType(valueType) {
+		return errors.Errorf("type of value passed (%s) isn't appropriate for calculating average", valueType)
+	}
+
+	err := agg.underlyingSum.RetractValue(ctx, tx, value)
 	if err != nil {
-		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get average out of hashmap")
+		return errors.Wrap(err, "couldn't retract value from sum for avg")
 	}
 
-	if !ok {
-		return octosql.ZeroValue(), errors.Errorf("average for key not found")
+	err = agg.underlyingCount.RetractValue(ctx, tx, value)
+	if err != nil {
+		return errors.Wrap(err, "couldn't add element to elements count for avg")
 	}
 
-	switch agg.typedValue.GetType() {
+	return nil
+}
+
+func (agg *Average) GetValue(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error) {
+	currentSum, err := agg.underlyingSum.GetValue(ctx, tx)
+	if err != nil {
+		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get current sum for avg")
+	}
+
+	currentCount, err := agg.underlyingCount.GetValue(ctx, tx)
+	if err != nil {
+		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get current elements count for avg")
+	}
+
+	if currentCount.AsInt() <= 0 { // no values or early retractions
+		return octosql.MakeInt(0), nil
+	}
+
+	var currentAvg octosql.Value
+
+	switch currentSum.GetType() {
+	case octosql.TypeInt:
+		currentAvg = octosql.MakeFloat(float64(currentSum.AsInt()) / float64(currentCount.AsInt()))
+	case octosql.TypeFloat:
+		currentAvg = octosql.MakeFloat(currentSum.AsFloat() / float64(currentCount.AsInt()))
 	case octosql.TypeDuration:
-		return octosql.MakeDuration(time.Duration(average.(float64))), nil
+		currentAvg = octosql.MakeDuration(currentSum.AsDuration() / time.Duration(currentCount.AsInt()))
 	default:
-		return octosql.MakeFloat(average.(float64)), nil
+		panic("unreachable")
 	}
+
+	return currentAvg, nil
 }
 
 func (agg *Average) String() string {

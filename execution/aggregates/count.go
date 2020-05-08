@@ -1,63 +1,88 @@
 package aggregates
 
 import (
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/docs"
-	"github.com/cube2222/octosql/execution"
+	"context"
+
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/storage"
 )
 
+var currentCountPrefix = []byte("$current_count$")
+
 type Count struct {
-	counts *execution.HashMap
 }
 
-func NewCount() *Count {
-	return &Count{
-		counts: execution.NewHashMap(),
+func NewCountAggregate() *Count {
+	return &Count{}
+}
+
+func (agg *Count) AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
+	currentCountStorage := storage.NewValueState(tx.WithPrefix(currentCountPrefix))
+
+	var currentCount octosql.Value
+	err := currentCountStorage.Get(&currentCount)
+	if err == storage.ErrNotFound {
+		currentCount = octosql.MakeInt(0)
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't get current count from storage")
 	}
-}
 
-func (agg *Count) Document() docs.Documentation {
-	return docs.Section(
-		agg.String(),
-		docs.Body(
-			docs.Section("Description", docs.Text("Averages elements in the group.")),
-		),
-	)
-}
+	currentCount = octosql.MakeInt(currentCount.AsInt() + 1)
 
-func (agg *Count) AddRecord(key octosql.Value, value octosql.Value) error {
-	count, previousValueExists, err := agg.counts.Get(key)
+	err = currentCountStorage.Set(&currentCount)
 	if err != nil {
-		return errors.Wrap(err, "couldn't get current count out of hashmap")
-	}
-
-	var newCount int
-	if previousValueExists {
-		newCount = count.(int) + 1
-	} else {
-		newCount = 1
-	}
-
-	err = agg.counts.Set(key, newCount)
-	if err != nil {
-		return errors.Wrap(err, "couldn't put new count into hashmap")
+		return errors.Wrap(err, "couldn't set current count in storage")
 	}
 
 	return nil
 }
 
-func (agg *Count) GetAggregated(key octosql.Value) (octosql.Value, error) {
-	count, ok, err := agg.counts.Get(key)
-	if err != nil {
-		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get count out of hashmap")
+func (agg *Count) RetractValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
+	currentCountStorage := storage.NewValueState(tx.WithPrefix(currentCountPrefix))
+
+	var currentCount octosql.Value
+	err := currentCountStorage.Get(&currentCount)
+	if err == storage.ErrNotFound {
+		currentCount = octosql.MakeInt(0)
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't get current count from storage")
 	}
 
-	if !ok {
-		return octosql.ZeroValue(), errors.Errorf("count for key not found")
+	currentCount = octosql.MakeInt(currentCount.AsInt() - 1)
+
+	if currentCount.AsInt() == 0 { // storage was just cleared, no need to store count or retractions count
+		err = currentCountStorage.Clear()
+		if err != nil {
+			return errors.Wrap(err, "couldn't clear current count from storage")
+		}
+	} else {
+		err = currentCountStorage.Set(&currentCount)
+		if err != nil {
+			return errors.Wrap(err, "couldn't set current count in storage")
+		}
 	}
 
-	return octosql.MakeInt(count.(int)), nil
+	return nil
+}
+
+func (agg *Count) GetValue(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error) {
+	currentCountStorage := storage.NewValueState(tx.WithPrefix(currentCountPrefix))
+
+	var currentCount octosql.Value
+	err := currentCountStorage.Get(&currentCount)
+	if err == storage.ErrNotFound {
+		return octosql.MakeInt(0), nil
+	} else if err != nil {
+		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get current count from storage")
+	}
+
+	if currentCount.AsInt() < 0 {
+		return octosql.MakeInt(0), nil
+	}
+
+	return currentCount, nil
 }
 
 func (agg *Count) String() string {

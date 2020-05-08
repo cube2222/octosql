@@ -6,8 +6,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/cube2222/octosql"
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/storage"
 )
 
 type Requalifier struct {
@@ -19,17 +21,23 @@ func NewRequalifier(qualifier string, child Node) *Requalifier {
 	return &Requalifier{qualifier: qualifier, source: child}
 }
 
-func (node *Requalifier) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
-	recordStream, err := node.source.Get(ctx, variables)
+func (node *Requalifier) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
+	tx := storage.GetStateTransactionFromContext(ctx)
+	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get record stream")
+		return nil, nil, errors.Wrap(err, "couldn't get source stream ID")
+	}
+
+	recordStream, execOutput, err := node.source.Get(ctx, variables, sourceStreamID)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't get record stream")
 	}
 
 	return &RequalifiedStream{
 		qualifier: node.qualifier,
 		variables: variables,
 		source:    recordStream,
-	}, nil
+	}, execOutput, nil
 }
 
 type RequalifiedStream struct {
@@ -41,10 +49,9 @@ type RequalifiedStream struct {
 // TODO: Do table name validation on logical -> physical plan transformation
 var simpleQualifierMatcher = regexp.MustCompile("[a-zA-Z0-9-_]+")
 
-func (stream *RequalifiedStream) Close() error {
-	err := stream.source.Close()
-	if err != nil {
-		return errors.Wrap(err, "Couldn't close underlying stream")
+func (stream *RequalifiedStream) Close(ctx context.Context, storage storage.Storage) error {
+	if err := stream.source.Close(ctx, storage); err != nil {
+		return errors.Wrap(err, "couldn't close underlying stream")
 	}
 
 	return nil
@@ -63,6 +70,9 @@ func (stream *RequalifiedStream) Next(ctx context.Context) (*Record, error) {
 	fields := make([]octosql.VariableName, len(record.Fields()))
 	values := make(map[octosql.VariableName]octosql.Value)
 	for i := range oldFields {
+		if oldFields[i].Name.Source() == SystemSource {
+			continue
+		}
 		name := string(oldFields[i].Name)
 		if dotIndex := strings.Index(name, "."); dotIndex != -1 {
 			if simpleQualifierMatcher.MatchString(name[:dotIndex]) {
@@ -75,5 +85,12 @@ func (stream *RequalifiedStream) Next(ctx context.Context) (*Record, error) {
 		values[qualifiedName] = record.Value(oldFields[i].Name)
 	}
 
-	return NewRecord(fields, values), nil
+	eventTimeField := record.EventTimeField()
+	if !eventTimeField.Empty() {
+		eventTimeField = octosql.NewVariableName(fmt.Sprintf("%s.%s", stream.qualifier, eventTimeField.Name()))
+	}
+
+	out := NewRecord(fields, values, WithMetadataFrom(record), WithEventTimeField(eventTimeField))
+
+	return out, nil
 }

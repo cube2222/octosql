@@ -1,9 +1,10 @@
 package execution
 
 import (
-	"github.com/cube2222/octosql"
-
 	"context"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/storage"
 
 	"github.com/pkg/errors"
 )
@@ -17,17 +18,23 @@ func NewFilter(formula Formula, child Node) *Filter {
 	return &Filter{formula: formula, source: child}
 }
 
-func (node *Filter) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
-	recordStream, err := node.source.Get(ctx, variables)
+func (node *Filter) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
+	tx := storage.GetStateTransactionFromContext(ctx)
+	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get record stream")
+		return nil, nil, errors.Wrap(err, "couldn't get source stream ID")
+	}
+
+	recordStream, execOutput, err := node.source.Get(ctx, variables, sourceStreamID)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't get record stream")
 	}
 
 	return &FilteredStream{
 		formula:   node.formula,
 		variables: variables,
 		source:    recordStream,
-	}, nil
+	}, execOutput, nil
 }
 
 type FilteredStream struct {
@@ -36,10 +43,9 @@ type FilteredStream struct {
 	source    RecordStream
 }
 
-func (stream *FilteredStream) Close() error {
-	err := stream.source.Close()
-	if err != nil {
-		return errors.Wrap(err, "Couldn't close underlying stream")
+func (stream *FilteredStream) Close(ctx context.Context, storage storage.Storage) error {
+	if err := stream.source.Close(ctx, storage); err != nil {
+		return errors.Wrap(err, "couldn't close underlying stream")
 	}
 
 	return nil

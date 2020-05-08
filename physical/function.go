@@ -2,9 +2,13 @@ package physical
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/execution/functions"
+	"github.com/cube2222/octosql/graph"
+	"github.com/cube2222/octosql/physical/metadata"
+
 	"github.com/pkg/errors"
 )
 
@@ -58,4 +62,22 @@ func (fe *FunctionExpression) Materialize(ctx context.Context, matCtx *Materiali
 	}
 
 	return execution.NewFunctionExpression(function, materialized), nil
+}
+
+func (fe *FunctionExpression) DoesMatchNamespace(namespace *metadata.Namespace) bool {
+	for _, expr := range fe.arguments {
+		if !expr.DoesMatchNamespace(namespace) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (fe *FunctionExpression) Visualize() *graph.Node {
+	n := graph.NewNode(fe.name)
+	for i, arg := range fe.arguments {
+		n.AddChild(fmt.Sprintf("arg_%d", i), arg.Visualize())
+	}
+	return n
 }

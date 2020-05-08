@@ -1,74 +1,93 @@
 package aggregates
 
 import (
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/docs"
-	"github.com/cube2222/octosql/execution"
+	"context"
+
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/storage"
 )
 
 type Min struct {
-	mins       *execution.HashMap
-	typedValue octosql.Value
 }
 
-func NewMin() *Min {
-	return &Min{
-		mins: execution.NewHashMap(),
+func NewMinAggregate() *Min {
+	return &Min{}
+}
+
+var currentMinPrefix = []byte("$current_min$")
+
+func (agg *Min) AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
+	currentMinStorage := storage.NewMap(tx.WithPrefix(currentMinPrefix))
+
+	var currentValueCount octosql.Value
+	err := currentMinStorage.Get(&value, &currentValueCount)
+	if err == storage.ErrNotFound {
+		currentValueCount = octosql.MakeInt(0)
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't get current value count from min storage")
 	}
-}
 
-func (agg *Min) Document() docs.Documentation {
-	return docs.Section(
-		agg.String(),
-		docs.Body(
-			docs.Section("Description", docs.Text("Takes the minimum element in the group. Works with Ints, Floats, Strings, Booleans, Times, Durations.")),
-		),
-	)
-}
+	currentValueCount = octosql.MakeInt(currentValueCount.AsInt() + 1)
 
-func (agg *Min) AddRecord(key octosql.Value, value octosql.Value) error {
-	min, previousValueExists, err := agg.mins.Get(key)
+	err = currentMinStorage.Set(&value, &currentValueCount)
 	if err != nil {
-		return errors.Wrap(err, "couldn't get current min out of hashmap")
-	}
-
-	if octosql.AreEqual(agg.typedValue, octosql.ZeroValue()) {
-		agg.typedValue = value
-	}
-
-	if !previousValueExists {
-		min = value
-	} else {
-		octoMin := min.(octosql.Value)
-		cmp, err := octosql.Compare(value, octoMin)
-		if err != nil {
-			return errors.Wrap(err, "couldn't compare current min with new value")
-		}
-		if cmp == octosql.LessThan {
-			min = value
-		}
-	}
-
-	err = agg.mins.Set(key, min)
-	if err != nil {
-		return errors.Wrap(err, "couldn't put new min into hashmap")
+		return errors.Wrap(err, "couldn't set current value in min storage")
 	}
 
 	return nil
 }
 
-func (agg *Min) GetAggregated(key octosql.Value) (octosql.Value, error) {
-	min, ok, err := agg.mins.Get(key)
-	if err != nil {
-		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get min out of hashmap")
+func (agg *Min) RetractValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
+	currentMinStorage := storage.NewMap(tx.WithPrefix(currentMinPrefix))
+
+	var currentValueCount octosql.Value
+	err := currentMinStorage.Get(&value, &currentValueCount)
+	if err == storage.ErrNotFound {
+		currentValueCount = octosql.MakeInt(0)
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't get current value count from min storage")
 	}
 
-	if !ok {
-		return octosql.ZeroValue(), errors.Errorf("min for key not found")
+	currentValueCount = octosql.MakeInt(currentValueCount.AsInt() - 1)
+
+	if currentValueCount.AsInt() == 0 { // current value was just cleared, no need to store its count or retractions count
+		err = currentMinStorage.Delete(&value)
+		if err != nil {
+			return errors.Wrap(err, "couldn't delete current value from min storage")
+		}
+	} else {
+		err = currentMinStorage.Set(&value, &currentValueCount)
+		if err != nil {
+			return errors.Wrap(err, "couldn't set current value count in min storage")
+		}
 	}
 
-	return min.(octosql.Value), nil
+	return nil
+}
+
+func (agg *Min) GetValue(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error) {
+	currentMinStorage := storage.NewMap(tx.WithPrefix(currentMinPrefix))
+
+	var currentMin octosql.Value
+	var currentMinCount octosql.Value
+
+	it := currentMinStorage.GetIterator()
+	defer func() {
+		_ = it.Close()
+	}()
+
+	for {
+		err := it.Next(&currentMin, &currentMinCount)
+		if err != nil {
+			return octosql.ZeroValue(), errors.Wrap(err, "couldn't get current min from storage")
+		}
+
+		if currentMinCount.AsInt() > 0 {
+			return currentMin, nil
+		}
+	}
 }
 
 func (agg *Min) String() string {

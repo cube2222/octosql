@@ -2,10 +2,14 @@ package logical
 
 import (
 	"context"
+	"fmt"
+	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
-	"github.com/pkg/errors"
 )
 
 type Map struct {
@@ -18,7 +22,7 @@ func NewMap(expressions []NamedExpression, child Node, keep bool) *Map {
 	return &Map{expressions: expressions, source: child, keep: keep}
 }
 
-func (node *Map) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Node, octosql.Variables, error) {
+func (node *Map) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	physicalExprs := make([]physical.NamedExpression, len(node.expressions))
 	variables := octosql.NoVariables()
 	for i := range node.expressions {
@@ -40,15 +44,35 @@ func (node *Map) Physical(ctx context.Context, physicalCreator *PhysicalPlanCrea
 		physicalExprs[i] = physicalExpr
 	}
 
-	child, childVariables, err := node.source.Physical(ctx, physicalCreator)
+	sourceNodes, sourceVariables, err := node.source.Physical(ctx, physicalCreator)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get physical plan for map source node")
+		return nil, nil, errors.Wrap(err, "couldn't get physical plan for map source nodes")
 	}
 
-	variables, err = childVariables.MergeWith(variables)
+	variables, err = sourceVariables.MergeWith(variables)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't merge variables for map source")
 	}
 
-	return physical.NewMap(physicalExprs, child, node.keep), variables, nil
+	outputNodes := make([]physical.Node, len(sourceNodes))
+	for i := range outputNodes {
+		outputNodes[i] = physical.NewMap(physicalExprs, sourceNodes[i], node.keep)
+	}
+
+	return outputNodes, variables, nil
+}
+
+func (node *Map) Visualize() *graph.Node {
+	n := graph.NewNode("Map")
+	n.AddField("keep", fmt.Sprint(node.keep))
+
+	if node.source != nil {
+		n.AddChild("source", node.source.Visualize())
+	}
+	if len(node.expressions) != 0 {
+		for idx, expr := range node.expressions {
+			n.AddChild("expr_"+strconv.Itoa(idx), expr.Visualize())
+		}
+	}
+	return n
 }

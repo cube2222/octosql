@@ -1,74 +1,93 @@
 package aggregates
 
 import (
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/docs"
-	"github.com/cube2222/octosql/execution"
+	"context"
+
 	"github.com/pkg/errors"
+
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/storage"
 )
 
+var currentMaxPrefix = []byte("$current_max$")
+
 type Max struct {
-	maxes      *execution.HashMap
-	typedValue octosql.Value
 }
 
-func NewMax() *Max {
-	return &Max{
-		maxes: execution.NewHashMap(),
+func NewMaxAggregate() *Max {
+	return &Max{}
+}
+
+func (agg *Max) AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
+	currentMaxStorage := storage.NewMap(tx.WithPrefix(currentMaxPrefix))
+
+	var currentValueCount octosql.Value
+	err := currentMaxStorage.Get(&value, &currentValueCount)
+	if err == storage.ErrNotFound {
+		currentValueCount = octosql.MakeInt(0)
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't get current value count from max storage")
 	}
-}
 
-func (agg *Max) Document() docs.Documentation {
-	return docs.Section(
-		agg.String(),
-		docs.Body(
-			docs.Section("Description", docs.Text("Takes the maximum element in the group. Works with Ints, Floats, Strings, Booleans, Times, Durations.")),
-		),
-	)
-}
+	currentValueCount = octosql.MakeInt(currentValueCount.AsInt() + 1)
 
-func (agg *Max) AddRecord(key octosql.Value, value octosql.Value) error {
-	max, previousValueExists, err := agg.maxes.Get(key)
+	err = currentMaxStorage.Set(&value, &currentValueCount)
 	if err != nil {
-		return errors.Wrap(err, "couldn't get current max out of hashmap")
-	}
-
-	if octosql.AreEqual(agg.typedValue, octosql.ZeroValue()) {
-		agg.typedValue = value
-	}
-
-	if !previousValueExists {
-		max = value
-	} else {
-		octoMax := max.(octosql.Value)
-		cmp, err := octosql.Compare(value, octoMax)
-		if err != nil {
-			return errors.Wrap(err, "couldn't compare current max with new value")
-		}
-		if cmp == octosql.GreaterThan {
-			max = value
-		}
-	}
-
-	err = agg.maxes.Set(key, max)
-	if err != nil {
-		return errors.Wrap(err, "couldn't put new max into hashmap")
+		return errors.Wrap(err, "couldn't set current value in max storage")
 	}
 
 	return nil
 }
 
-func (agg *Max) GetAggregated(key octosql.Value) (octosql.Value, error) {
-	max, ok, err := agg.maxes.Get(key)
-	if err != nil {
-		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get max out of hashmap")
+func (agg *Max) RetractValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error {
+	currentMaxStorage := storage.NewMap(tx.WithPrefix(currentMaxPrefix))
+
+	var currentValueCount octosql.Value
+	err := currentMaxStorage.Get(&value, &currentValueCount)
+	if err == storage.ErrNotFound {
+		currentValueCount = octosql.MakeInt(0)
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't get current value count from max storage")
 	}
 
-	if !ok {
-		return octosql.ZeroValue(), errors.Errorf("max for key not found")
+	currentValueCount = octosql.MakeInt(currentValueCount.AsInt() - 1)
+
+	if currentValueCount.AsInt() == 0 { // current value was just cleared, no need to store its count or retractions count
+		err = currentMaxStorage.Delete(&value)
+		if err != nil {
+			return errors.Wrap(err, "couldn't delete current value from max storage")
+		}
+	} else {
+		err = currentMaxStorage.Set(&value, &currentValueCount)
+		if err != nil {
+			return errors.Wrap(err, "couldn't set current value count in max storage")
+		}
 	}
 
-	return max.(octosql.Value), nil
+	return nil
+}
+
+func (agg *Max) GetValue(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error) {
+	currentMaxStorage := storage.NewMap(tx.WithPrefix(currentMaxPrefix))
+
+	var currentMax octosql.Value
+	var currentMaxCount octosql.Value
+
+	it := currentMaxStorage.GetIterator(storage.WithReverse())
+	defer func() {
+		_ = it.Close()
+	}()
+
+	for {
+		err := it.Next(&currentMax, &currentMaxCount)
+		if err != nil {
+			return octosql.ZeroValue(), errors.Wrap(err, "couldn't get current max from storage")
+		}
+
+		if currentMaxCount.AsInt() > 0 {
+			return currentMax, nil
+		}
+	}
 }
 
 func (agg *Max) String() string {

@@ -2,11 +2,14 @@ package physical
 
 import (
 	"context"
+	"fmt"
+
+	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
-	"github.com/pkg/errors"
 )
 
 type Map struct {
@@ -70,24 +73,66 @@ func getOuterName(expr Expression) octosql.VariableName {
 	case *Variable:
 		return expr.Name
 	case *AliasedExpression:
-		return expr.Name
+		return expr.ExpressionAlias
 	default:
 		return octosql.NewVariableName("")
 	}
 }
 
 func (node *Map) Metadata() *metadata.NodeMetadata {
+	sourceMetadata := node.Source.Metadata()
+	sourceNamespace := sourceMetadata.Namespace()
+	cardinality := sourceMetadata.Cardinality()
+	namespace := metadata.EmptyNamespace()
+
+	wasMergedWithSource := false
 	if node.Keep {
-		return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality(), node.Source.Metadata().EventTimeField())
+		namespace.MergeWith(sourceNamespace)
+		wasMergedWithSource = true
 	}
 
-	eventTimeField := node.Source.Metadata().EventTimeField()
+	for _, expr := range node.Expressions {
+		if starExpr, ok := expr.(*StarExpression); ok {
+			qualifier := starExpr.Qualifier
+			if qualifier == "" && !wasMergedWithSource {
+				namespace.MergeWith(sourceMetadata.Namespace())
+				wasMergedWithSource = true
+			} else if sourceNamespace.DoesContainPrefix(qualifier) {
+				namespace.AddPrefix(qualifier)
+			}
+		}
+	}
+
+	if node.Keep {
+		return metadata.NewNodeMetadata(cardinality, sourceMetadata.EventTimeField(), namespace)
+	}
+
+	eventTimeField := sourceMetadata.EventTimeField()
 	var newEventTimeField octosql.VariableName
 	for _, expr := range node.Expressions {
+		if expr, ok := expr.(*StarExpression); ok {
+			if expr.Qualifier == "" || expr.Qualifier == eventTimeField.Source() {
+				newEventTimeField = eventTimeField
+				break
+			}
+		}
 		if isVariableNameRecursive(expr, eventTimeField) {
 			newEventTimeField = getOuterName(expr)
 			break
 		}
 	}
-	return metadata.NewNodeMetadata(node.Source.Metadata().Cardinality(), newEventTimeField)
+	return metadata.NewNodeMetadata(cardinality, newEventTimeField, namespace)
+}
+
+func (node *Map) Visualize() *graph.Node {
+	n := graph.NewNode("Map")
+
+	n.AddChild("source", node.Source.Visualize())
+	for i, expr := range node.Expressions {
+		n.AddChild(fmt.Sprintf("expr_%d", i), expr.Visualize())
+	}
+
+	n.AddField("keep", fmt.Sprint(node.Keep))
+
+	return n
 }

@@ -1,119 +1,393 @@
 package aggregates
 
 import (
-	"reflect"
+	"context"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/docs"
-	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/storage"
 )
 
-type AddRecordMock struct {
-	i      int
-	keys   []octosql.Value
-	values []octosql.Value
+func TestDistinctSum(t *testing.T) {
+	ctx := context.Background()
 
-	t *testing.T
+	prefix := []byte("distinct")
+
+	stateStorage := storage.GetTestStorage(t)
+	tx := stateStorage.BeginTransaction().WithPrefix(prefix)
+
+	aggr := NewDistinctAggregate(NewSumAggregate())
+
+	assert.Equal(t, aggr.String(), "sum_distinct")
+
+	// Empty storage
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	// AddValue
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(11))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(23))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(11))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(23))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(11))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(23))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(36))
+
+	// Wrong type passed
+	AddValueError(t, ctx, aggr, tx, octosql.MakeDuration(1234))
+
+	AddValueError(t, ctx, aggr, tx, octosql.MakeTime(time.Now()))
+
+	AddValueError(t, ctx, aggr, tx, octosql.MakeFloat(123.123))
+
+	// RetractValue
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(24))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(11))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(24))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(11))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(24))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(11))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	// Mixed
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(25))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(25))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	// Early retractions
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(2))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(2))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
 }
 
-func (mock *AddRecordMock) Document() docs.Documentation {
-	panic("implement me")
+func TestDistinctCount(t *testing.T) {
+	ctx := context.Background()
+
+	prefix := []byte("distinct")
+
+	stateStorage := storage.GetTestStorage(t)
+	tx := stateStorage.BeginTransaction().WithPrefix(prefix)
+
+	aggr := NewDistinctAggregate(NewCountAggregate())
+
+	assert.Equal(t, aggr.String(), "count_distinct")
+
+	// Empty storage
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	// AddValue
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(11))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(2))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(11))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(2))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(11))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(2))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(3))
+
+	// RetractValue
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(2))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(11))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(2))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(11))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(2))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(11))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	// Mixed
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(2))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(2))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	// Early retractions
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(1))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
 }
 
-func (mock *AddRecordMock) AddRecord(key octosql.Value, value octosql.Value) error {
-	if !reflect.DeepEqual(mock.keys[mock.i], key) {
-		mock.t.Errorf("invalid %v call key: got %v wanted %v", mock.i, key, mock.keys[mock.i])
-	}
-	if !reflect.DeepEqual(mock.values[mock.i], value) {
-		mock.t.Errorf("invalid %v call value: got %v wanted %v", mock.i, value, mock.values[mock.i])
-	}
-	mock.i++
-	return nil
-}
+func TestDistinctAvg(t *testing.T) {
+	ctx := context.Background()
 
-func (*AddRecordMock) GetAggregated(key octosql.Value) (octosql.Value, error) {
-	panic("implement me")
-}
+	prefix := []byte("distinct")
 
-func (*AddRecordMock) String() string {
-	panic("implement me")
-}
+	stateStorage := storage.GetTestStorage(t)
+	tx := stateStorage.BeginTransaction().WithPrefix(prefix)
 
-func TestDistinct_AddRecord(t *testing.T) {
-	outerKeys := []octosql.Value{
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key2"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key2"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key2"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key3"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key3"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key3"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key3"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key3"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key3"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-	}
+	aggr := NewDistinctAggregate(NewAverageAggregate())
 
-	outerValues := []octosql.Value{
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"value": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"value": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(2)}), octosql.MakeObject(map[string]octosql.Value{"value": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("value2"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"value": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("value2"), octosql.MakeInt(2)}), octosql.MakeObject(map[string]octosql.Value{"value": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"value": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("value2"), octosql.MakeInt(3)}), octosql.MakeObject(map[string]octosql.Value{"value": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("value3"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"value": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("value3"), octosql.MakeInt(2)}), octosql.MakeObject(map[string]octosql.Value{"value": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("value3"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"value": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("value3"), octosql.MakeInt(2)}), octosql.MakeObject(map[string]octosql.Value{"value": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("value3"), octosql.MakeInt(3)}), octosql.MakeObject(map[string]octosql.Value{"value": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("value3"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"value": octosql.MakeInt(1)})}),
-	}
+	assert.Equal(t, aggr.String(), "avg_distinct")
 
-	distinctKeys := []octosql.Value{
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key2"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key2"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key2"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key3"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key3"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("key"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("key3"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"key": octosql.MakeInt(1)})}),
-	}
+	// Empty storage
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
 
-	distinctValues := []octosql.Value{
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"value": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(2)}), octosql.MakeObject(map[string]octosql.Value{"value": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("value2"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"value": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("value2"), octosql.MakeInt(2)}), octosql.MakeObject(map[string]octosql.Value{"value": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("value2"), octosql.MakeInt(3)}), octosql.MakeObject(map[string]octosql.Value{"value": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("value3"), octosql.MakeInt(1)}), octosql.MakeObject(map[string]octosql.Value{"value": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("value3"), octosql.MakeInt(2)}), octosql.MakeObject(map[string]octosql.Value{"value": octosql.MakeInt(1)})}),
-		octosql.MakeTuple([]octosql.Value{octosql.MakeString("value"), octosql.MakeInt(1), octosql.MakeTuple([]octosql.Value{octosql.MakeString("value3"), octosql.MakeInt(3)}), octosql.MakeObject(map[string]octosql.Value{"value": octosql.MakeInt(1)})}),
-	}
+	// AddValue
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(5))
 
-	mock := &AddRecordMock{
-		keys:   distinctKeys,
-		values: distinctValues,
-		t:      t,
-	}
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(5.0))
 
-	distinct := &Distinct{
-		underlying: mock,
-		groupSets:  execution.NewHashMap(),
-	}
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(11))
 
-	for i := range outerKeys {
-		err := distinct.AddRecord(outerKeys[i], outerValues[i])
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-	}
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(8.0))
 
-	if mock.i != len(distinctKeys) {
-		t.Errorf("invalid call count: got %v wanted %v", mock.i, len(distinctKeys))
-	}
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(11))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(8.0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(11))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(8.0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(9.66666666))
+
+	// RetractValue
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(5))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(12.0))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(11))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(12.0))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(11))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(12.0))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(11))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(13.0))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	// Mixed
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(3))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(3.0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(7.5))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(9.333333333))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(12))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(8.0))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(13))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(3.0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(3))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(3.0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(3))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(3))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(3.0))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(3))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(3.0))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(3))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	// Early retractions
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(123))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(321))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(123))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(123))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(123))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(321))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
+
+	AddValue(t, ctx, aggr, tx, octosql.MakeInt(123))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeFloat(123.0))
+
+	RetractValue(t, ctx, aggr, tx, octosql.MakeInt(123))
+
+	ExpectValue(t, ctx, aggr, tx, octosql.MakeInt(0))
 }

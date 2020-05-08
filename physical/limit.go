@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
 	"github.com/pkg/errors"
 )
@@ -43,5 +44,12 @@ func (node *Limit) Materialize(ctx context.Context, matCtx *MaterializationConte
 }
 
 func (node *Limit) Metadata() *metadata.NodeMetadata {
-	return metadata.NewNodeMetadata(metadata.BoundedFitsInLocalStorage, node.Source.Metadata().EventTimeField())
+	return metadata.NewNodeMetadata(metadata.BoundedFitsInLocalStorage, node.Source.Metadata().EventTimeField(), node.Source.Metadata().Namespace())
+}
+
+func (node *Limit) Visualize() *graph.Node {
+	n := graph.NewNode("Limit")
+	n.AddChild("limit", node.LimitExpr.Visualize())
+	n.AddChild("source", node.Source.Visualize())
+	return n
 }

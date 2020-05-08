@@ -2,6 +2,7 @@ package execution
 
 import (
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/storage"
 
 	"context"
 
@@ -18,10 +19,16 @@ func NewMap(expressions []NamedExpression, child Node, keep bool) *Map {
 	return &Map{expressions: expressions, source: child, keep: keep}
 }
 
-func (node *Map) Get(ctx context.Context, variables octosql.Variables) (RecordStream, error) {
-	recordStream, err := node.source.Get(ctx, variables)
+func (node *Map) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
+	tx := storage.GetStateTransactionFromContext(ctx)
+	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get record stream")
+		return nil, nil, errors.Wrap(err, "couldn't get source stream ID")
+	}
+
+	recordStream, execOutput, err := node.source.Get(ctx, variables, sourceStreamID)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't get record stream")
 	}
 
 	return &MappedStream{
@@ -29,7 +36,7 @@ func (node *Map) Get(ctx context.Context, variables octosql.Variables) (RecordSt
 		variables:   variables,
 		source:      recordStream,
 		keep:        node.keep,
-	}, nil
+	}, execOutput, nil
 }
 
 type MappedStream struct {
@@ -39,10 +46,9 @@ type MappedStream struct {
 	keep        bool
 }
 
-func (stream *MappedStream) Close() error {
-	err := stream.source.Close()
-	if err != nil {
-		return errors.Wrap(err, "Couldn't close underlying stream")
+func (stream *MappedStream) Close(ctx context.Context, storage storage.Storage) error {
+	if err := stream.source.Close(ctx, storage); err != nil {
+		return errors.Wrap(err, "couldn't close underlying stream")
 	}
 
 	return nil
@@ -57,7 +63,9 @@ func (stream *MappedStream) Next(ctx context.Context) (*Record, error) {
 		return nil, errors.Wrap(err, "couldn't get source record")
 	}
 
-	variables, err := stream.variables.MergeWith(srcRecord.AsVariables())
+	recordVariables := srcRecord.AsVariables()
+
+	variables, err := stream.variables.MergeWith(recordVariables)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't merge given variables with record variables")
 	}
@@ -65,13 +73,31 @@ func (stream *MappedStream) Next(ctx context.Context) (*Record, error) {
 	fieldNames := make([]octosql.VariableName, 0)
 	outValues := make(map[octosql.VariableName]octosql.Value)
 	for _, expr := range stream.expressions {
-		fieldNames = append(fieldNames, expr.Name())
+		switch expr := expr.(type) {
+		case *StarExpression:
+			// A star expression is based only on the incoming record
+			expressionName := expr.Fields(recordVariables)
+			fieldNames = append(fieldNames, expressionName...)
 
-		value, err := expr.ExpressionValue(ctx, variables)
-		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't get expression %v", expr.Name())
+			for _, name := range expressionName {
+				value, err := variables.Get(name)
+				if err != nil {
+					panic(err)
+				}
+
+				outValues[name] = value
+			}
+
+		default: // anything else than a star expression
+			expressionName := expr.Name()
+			fieldNames = append(fieldNames, expressionName)
+
+			value, err := expr.ExpressionValue(ctx, variables)
+			if err != nil {
+				return nil, errors.Wrapf(err, "couldn't get expression %v", expressionName)
+			}
+			outValues[expressionName] = value
 		}
-		outValues[expr.Name()] = value
 	}
 
 	if stream.keep {

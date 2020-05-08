@@ -5,9 +5,16 @@ import (
 	"testing"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/storage"
 )
 
 func TestMappedStream_Next(t *testing.T) {
+	stateStorage := storage.GetTestStorage(t)
+
+	tx := stateStorage.BeginTransaction()
+	defer tx.Abort()
+	ctx := storage.InjectStateTransaction(context.Background(), tx)
+
 	fieldNames := []octosql.VariableName{
 		octosql.NewVariableName("age"),
 		octosql.NewVariableName("something"),
@@ -49,37 +56,33 @@ func TestMappedStream_Next(t *testing.T) {
 				variables: map[octosql.VariableName]octosql.Value{
 					octosql.NewVariableName("something_from_above"): octosql.MakeString("yeah"),
 				},
-				source: NewInMemoryStream(
-					[]*Record{
-						NewRecordFromSliceWithNormalize(
-							fieldNames,
-							[]interface{}{3, "test1", "test2"},
-						),
-						NewRecordFromSliceWithNormalize(
-							fieldNames,
-							[]interface{}{5, "test2", "test0"},
-						),
-						NewRecordFromSliceWithNormalize(
-							fieldNames,
-							[]interface{}{4, "test4", "test5"},
-						),
-					},
-				),
+				source: NewInMemoryStream(ctx, []*Record{
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{3, "test1", "test2"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{5, "test2", "test0"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{4, "test4", "test5"},
+					),
+				}),
 				keep: false,
 			},
-			want: NewInMemoryStream(
-				[]*Record{
-					NewRecordFromSliceWithNormalize(fieldNamesNew,
-						[]interface{}{3, "yeah"},
-					),
-					NewRecordFromSliceWithNormalize(fieldNamesNew,
-						[]interface{}{5, "yeah"},
-					),
-					NewRecordFromSliceWithNormalize(fieldNamesNew,
-						[]interface{}{4, "yeah"},
-					),
-				},
-			),
+			want: NewInMemoryStream(ctx, []*Record{
+				NewRecordFromSliceWithNormalize(fieldNamesNew,
+					[]interface{}{3, "yeah"},
+				),
+				NewRecordFromSliceWithNormalize(fieldNamesNew,
+					[]interface{}{5, "yeah"},
+				),
+				NewRecordFromSliceWithNormalize(fieldNamesNew,
+					[]interface{}{4, "yeah"},
+				),
+			}),
 			wantErr: false,
 		},
 		{
@@ -98,40 +101,36 @@ func TestMappedStream_Next(t *testing.T) {
 				variables: map[octosql.VariableName]octosql.Value{
 					octosql.NewVariableName("something_from_above"): octosql.MakeString("yeah"),
 				},
-				source: NewInMemoryStream(
-					[]*Record{
-						NewRecordFromSliceWithNormalize(
-							fieldNames,
-							[]interface{}{3, "test1", "test2"},
-						),
-						NewRecordFromSliceWithNormalize(
-							fieldNames,
-							[]interface{}{5, "test2", "test0"},
-						),
-						NewRecordFromSliceWithNormalize(
-							fieldNames,
-							[]interface{}{4, "test4", "test5"},
-						),
-					},
-				),
+				source: NewInMemoryStream(ctx, []*Record{
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{3, "test1", "test2"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{5, "test2", "test0"},
+					),
+					NewRecordFromSliceWithNormalize(
+						fieldNames,
+						[]interface{}{4, "test4", "test5"},
+					),
+				}),
 				keep: true,
 			},
-			want: NewInMemoryStream(
-				[]*Record{
-					NewRecordFromSliceWithNormalize(
-						fieldNamesAll,
-						[]interface{}{3, "yeah", 3, "test1", "test2"},
-					),
-					NewRecordFromSliceWithNormalize(
-						fieldNamesAll,
-						[]interface{}{5, "yeah", 5, "test2", "test0"},
-					),
-					NewRecordFromSliceWithNormalize(
-						fieldNamesAll,
-						[]interface{}{4, "yeah", 4, "test4", "test5"},
-					),
-				},
-			),
+			want: NewInMemoryStream(ctx, []*Record{
+				NewRecordFromSliceWithNormalize(
+					fieldNamesAll,
+					[]interface{}{3, "yeah", 3, "test1", "test2"},
+				),
+				NewRecordFromSliceWithNormalize(
+					fieldNamesAll,
+					[]interface{}{5, "yeah", 5, "test2", "test0"},
+				),
+				NewRecordFromSliceWithNormalize(
+					fieldNamesAll,
+					[]interface{}{4, "yeah", 4, "test4", "test5"},
+				),
+			}),
 			wantErr: false,
 		},
 		{
@@ -149,28 +148,25 @@ func TestMappedStream_Next(t *testing.T) {
 									),
 								},
 							),
+							stateStorage,
 						),
 					),
 				},
 				variables: map[octosql.VariableName]octosql.Value{},
-				source: NewInMemoryStream(
-					[]*Record{
-						NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{},
-							[]interface{}{},
-						),
-					},
-				),
+				source: NewInMemoryStream(ctx, []*Record{
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{},
+						[]interface{}{},
+					),
+				}),
 				keep: false,
 			},
-			want: NewInMemoryStream(
-				[]*Record{
-					NewRecordFromSliceWithNormalize(
-						[]octosql.VariableName{octosql.NewVariableName("awesome")},
-						[]interface{}{5},
-					),
-				},
-			),
+			want: NewInMemoryStream(ctx, []*Record{
+				NewRecordFromSliceWithNormalize(
+					[]octosql.VariableName{octosql.NewVariableName("awesome")},
+					[]interface{}{5},
+				),
+			}),
 			wantErr: false,
 		},
 		{
@@ -194,33 +190,30 @@ func TestMappedStream_Next(t *testing.T) {
 									),
 								},
 							),
+							stateStorage,
 						),
 					),
 				},
 				variables: map[octosql.VariableName]octosql.Value{},
-				source: NewInMemoryStream(
-					[]*Record{
-						NewRecordFromSliceWithNormalize(
-							[]octosql.VariableName{},
-							[]interface{}{},
-						),
-					},
-				),
+				source: NewInMemoryStream(ctx, []*Record{
+					NewRecordFromSliceWithNormalize(
+						[]octosql.VariableName{},
+						[]interface{}{},
+					),
+				}),
 				keep: false,
 			},
-			want: NewInMemoryStream(
-				[]*Record{
-					NewRecordFromSlice(
-						[]octosql.VariableName{"awesome"},
-						[]octosql.Value{
-							octosql.MakeTuple([]octosql.Value{
-								octosql.MakeInt(5),
-								octosql.MakeInt(3),
-							}),
-						},
-					),
-				},
-			),
+			want: NewInMemoryStream(ctx, []*Record{
+				NewRecordFromSlice(
+					[]octosql.VariableName{"awesome"},
+					[]octosql.Value{
+						octosql.MakeTuple([]octosql.Value{
+							octosql.MakeInt(5),
+							octosql.MakeInt(3),
+						}),
+					},
+				),
+			}),
 			wantErr: false,
 		},
 	}
@@ -232,13 +225,19 @@ func TestMappedStream_Next(t *testing.T) {
 				source:      tt.fields.source,
 				keep:        tt.fields.keep,
 			}
-			equal, err := AreStreamsEqual(context.Background(), stream, tt.want)
+			err := AreStreamsEqual(ctx, stream, tt.want)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("MappedStream.Next() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if err == nil && !equal {
-				t.Errorf("MappedStream.Next() streams not equal")
+
+			if err := stream.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close mapped stream: %v", err)
+				return
+			}
+			if err := tt.want.Close(ctx, stateStorage); err != nil {
+				t.Errorf("Couldn't close wanted in_memory stream: %v", err)
+				return
 			}
 		})
 	}

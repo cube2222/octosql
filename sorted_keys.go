@@ -312,6 +312,7 @@ func MonotonicUnmarshalTime(b []byte) (time.Time, error) {
 	if err != nil {
 		return time.Now(), errors.Wrap(err, "incorrect seconds representation")
 	}
+
 	nanoseconds, err := MonotonicUnmarshalInt64(b[NumberMarshalLength : 2*NumberMarshalLength])
 	if err != nil {
 		return time.Now(), errors.Wrap(err, "incorrect nanoseconds representation")

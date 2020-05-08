@@ -2,6 +2,7 @@ package csv
 
 import (
 	"encoding/csv"
+	"fmt"
 	"io"
 	"time"
 
@@ -14,6 +15,9 @@ import (
 
 func TableFormatter(separator rune) batch.TableFormatter {
 	return func(w io.Writer, records []*execution.Record, watermark time.Time, errToPrint error) error {
+		if errToPrint != nil {
+			fmt.Fprintf(w, "Error: %s", errToPrint.Error())
+		}
 		fields := batch.GetAllFields(records)
 
 		out := csv.NewWriter(w)

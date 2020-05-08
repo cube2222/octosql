@@ -23,12 +23,12 @@ func TableFormatter(rowLines bool) batch.TableFormatter {
 		table.SetAutoFormatHeaders(false)
 
 		for _, record := range records {
-			var out []string
+			var row []string
 			for _, field := range fields {
 				value := record.Value(octosql.NewVariableName(field))
-				out = append(out, value.Show())
+				row = append(row, value.Show())
 			}
-			table.Append(out)
+			table.Append(row)
 		}
 
 		table.Render()

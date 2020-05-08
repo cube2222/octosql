@@ -96,26 +96,26 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 		case "live-csv":
 			outputSinkFn = func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (store execution.IntermediateRecordStore, printer output.Printer) {
 				sink := batch.NewTableOutput(streamID, eventTimeField)
-				out := batch.NewLiveTablePrinter(stateStorage, sink, batchcsv.TableFormatter(','))
-				return sink, out
+				output := batch.NewLiveTablePrinter(stateStorage, sink, batchcsv.TableFormatter(','))
+				return sink, output
 			}
 		case "live-table":
 			outputSinkFn = func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (store execution.IntermediateRecordStore, printer output.Printer) {
 				sink := batch.NewTableOutput(streamID, eventTimeField)
-				out := batch.NewLiveTablePrinter(stateStorage, sink, batchtable.TableFormatter(false))
-				return sink, out
+				output := batch.NewLiveTablePrinter(stateStorage, sink, batchtable.TableFormatter(false))
+				return sink, output
 			}
 		case "batch-csv":
 			outputSinkFn = func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (store execution.IntermediateRecordStore, printer output.Printer) {
 				sink := batch.NewTableOutput(streamID, eventTimeField)
-				out := batch.NewWholeTablePrinter(stateStorage, sink, batchcsv.TableFormatter(','))
-				return sink, out
+				output := batch.NewWholeTablePrinter(stateStorage, sink, batchcsv.TableFormatter(','))
+				return sink, output
 			}
 		case "batch-table":
 			outputSinkFn = func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (store execution.IntermediateRecordStore, printer output.Printer) {
 				sink := batch.NewTableOutput(streamID, eventTimeField)
-				out := batch.NewWholeTablePrinter(stateStorage, sink, batchtable.TableFormatter(false))
-				return sink, out
+				output := batch.NewWholeTablePrinter(stateStorage, sink, batchtable.TableFormatter(false))
+				return sink, output
 			}
 		default:
 			log.Fatal("invalid output type")
@@ -145,7 +145,6 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 			storageDirectory = tempDir
 		}
 
-		log.Println(storageDirectory)
 		opts := badger.DefaultOptions(storageDirectory)
 		db, err := badger.Open(opts)
 		if err != nil {

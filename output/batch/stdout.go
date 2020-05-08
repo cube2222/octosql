@@ -24,15 +24,15 @@ type RecordsLister interface {
 }
 
 type LiveTablePrinter struct {
-	recordsLister  RecordsLister
 	stateStorage   storage.Storage
+	recordsLister  RecordsLister
 	tableFormatter TableFormatter
 }
 
 func NewLiveTablePrinter(stateStorage storage.Storage, recordsLister RecordsLister, tableFormatter TableFormatter) *LiveTablePrinter {
 	return &LiveTablePrinter{
-		recordsLister:  recordsLister,
 		stateStorage:   stateStorage,
+		recordsLister:  recordsLister,
 		tableFormatter: tableFormatter,
 	}
 }
@@ -85,27 +85,29 @@ func (printer *LiveTablePrinter) Run(ctx context.Context) error {
 
 		tx.Abort()
 
-		if len(errorMessage) > 0 {
-			return errors.New(errorMessage)
+		if errorToPrint != nil {
+			return errorToPrint
 		} else if endOfStream {
 			tm.Clear()
-			_, err := buf.WriteTo(os.Stdout)
-			return err
+			if _, err := buf.WriteTo(os.Stdout); err != nil {
+				return errors.Wrap(err, "couldn't write final output to stdout")
+			}
+			return nil
 		}
 	}
 	panic("unreachable")
 }
 
 type BatchTablePrinter struct {
-	recordsLister  RecordsLister
 	stateStorage   storage.Storage
+	recordsLister  RecordsLister
 	tableFormatter TableFormatter
 }
 
 func NewWholeTablePrinter(stateStorage storage.Storage, recordsLister RecordsLister, tableFormatter TableFormatter) *BatchTablePrinter {
 	return &BatchTablePrinter{
-		recordsLister:  recordsLister,
 		stateStorage:   stateStorage,
+		recordsLister:  recordsLister,
 		tableFormatter: tableFormatter,
 	}
 }
@@ -160,8 +162,8 @@ func (printer *BatchTablePrinter) Run(ctx context.Context) error {
 
 		tx.Abort()
 
-		if len(errorMessage) > 0 {
-			return errors.New(errorMessage)
+		if errorToPrint != nil {
+			return errorToPrint
 		} else if endOfStream {
 			return nil
 		}

@@ -66,8 +66,17 @@ func (bsm *BatchSizeManager) ShouldTakeNextRecord() bool {
 	if bsm.curBatchSize >= bsm.batchSize {
 		return false
 	}
-	bsm.curBatchSize++
 	return true
+}
+
+// You can use this to process records in a way other than one by one.
+func (bsm *BatchSizeManager) RecordsLeftToTake() int {
+	return bsm.batchSize - bsm.curBatchSize
+}
+
+// You can use this to process records in a way other than one by one.
+func (bsm *BatchSizeManager) MarkRecordsProcessed(count int) {
+	bsm.curBatchSize += count
 }
 
 func (bsm *BatchSizeManager) Reset() {

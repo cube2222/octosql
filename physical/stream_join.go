@@ -125,7 +125,7 @@ func (node *StreamJoin) Visualize() *graph.Node {
 	n.AddChild("join_type", graph.NewNode(node.JoinType.String()))
 
 	if node.EventTimeField.String() != "" {
-		n.AddChild("event_time_field", graph.NewNode(node.EventTimeField.String()))
+		n.AddField("event_time_field", node.EventTimeField.String())
 	}
 	return n
 }

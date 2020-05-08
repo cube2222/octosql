@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pkg/errors"
+
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
-	"github.com/pkg/errors"
 )
 
 type Requalifier struct {
@@ -42,7 +43,9 @@ func (node *Requalifier) Materialize(ctx context.Context, matCtx *Materializatio
 func (node *Requalifier) Metadata() *metadata.NodeMetadata {
 	sourceMetadata := node.Source.Metadata()
 	eventTimeField := sourceMetadata.EventTimeField()
-	eventTimeField = octosql.NewVariableName(fmt.Sprintf("%s.%s", node.Qualifier, eventTimeField.Name()))
+	if !eventTimeField.Empty() {
+		eventTimeField = octosql.NewVariableName(fmt.Sprintf("%s.%s", node.Qualifier, eventTimeField.Name()))
+	}
 
 	namespace := metadata.EmptyNamespace()
 	namespace.AddPrefix(node.Qualifier)

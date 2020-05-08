@@ -629,6 +629,10 @@ func (rs *LookupJoinStream) UpdateWatermark(ctx context.Context, tx storage.Stat
 	return nil
 }
 
+func (j *LookupJoinStream) TriggerKeys(ctx context.Context, tx storage.StateTransaction, batchSize int) (int, error) {
+	return 0, nil
+}
+
 func (rs *LookupJoinStream) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
 	outputWatermarkState := storage.NewValueState(tx.WithPrefix(outputWatermarkPrefix))
 	var octoWatermark octosql.Value
@@ -717,6 +721,10 @@ func (j *JobOutputQueueIntermediateRecordStore) Next(ctx context.Context, tx sto
 
 func (j *JobOutputQueueIntermediateRecordStore) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
 	return nil
+}
+
+func (j *JobOutputQueueIntermediateRecordStore) TriggerKeys(ctx context.Context, tx storage.StateTransaction, batchSize int) (int, error) {
+	return 0, nil
 }
 
 func (j *JobOutputQueueIntermediateRecordStore) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {

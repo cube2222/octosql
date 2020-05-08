@@ -74,7 +74,7 @@ func NewUnionWatermarkGenerator(sources []WatermarkSource) *UnionWatermarkGenera
 }
 
 func (uwg *UnionWatermarkGenerator) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
-	minimalTime := maxWatermark
+	minimalTime := MaxWatermark
 
 	for i := range uwg.sources {
 		sourceTime, err := uwg.sources[i].GetWatermark(ctx, tx)

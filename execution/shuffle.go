@@ -456,6 +456,10 @@ func (node *ShuffleSender) UpdateWatermark(ctx context.Context, tx storage.State
 	return nil
 }
 
+func (node *ShuffleSender) TriggerKeys(ctx context.Context, tx storage.StateTransaction, batchSize int) (int, error) {
+	return 0, nil
+}
+
 func (node *ShuffleSender) MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error {
 	if err := node.sendToAllOutputPartitions(ctx, tx, &QueueElement{
 		Type: &QueueElement_EndOfStream{

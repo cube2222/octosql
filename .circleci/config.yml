@@ -2,20 +2,20 @@ workflows:
   version: 2
   test-release:
     jobs:
-      #      - lint
-      #      - test
-      #      - test-mysql
-      #      - test-postgres
-      #      - test-redis
-      #      - test-kafka
-      - release
-#          requires:
-#            - lint
-#            - test
-#            - test-mysql
-#            - test-postgres
-#            - test-redis
-#            - test-kafka
+      - lint
+      - test
+      - test-mysql
+      - test-postgres
+      - test-redis
+      - test-kafka
+      - release:
+          requires:
+            - lint
+            - test
+            - test-mysql
+            - test-postgres
+            - test-redis
+            - test-kafka
 
 version: 2
 jobs:

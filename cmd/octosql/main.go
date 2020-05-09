@@ -9,6 +9,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"runtime/debug"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/dgraph-io/badger/v2/options"
@@ -182,6 +183,9 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 }
 
 func main() {
+	info, ok := debug.ReadBuildInfo()
+	log.Println(ok)
+	log.Println(*info)
 	rootCmd.SetVersionTemplate(fmt.Sprintf("OctoSQL Version: %s Checksum: %s", VERSION, CHECKSUM))
 	rootCmd.Version = CHECKSUM
 	rootCmd.Flags().StringVarP(&configPath, "config", "c", os.Getenv("OCTOSQL_CONFIG"), "data source configuration path, defaults to $OCTOSQL_CONFIG")

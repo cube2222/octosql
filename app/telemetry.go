@@ -20,27 +20,43 @@ import (
 )
 
 type Telemetry struct {
-	Version    string
-	DeviceID   string
-	OS         string
-	Arch       string
-	GoVersion  string
-	NumCPU     int
-	GoMaxProcs int
-	Features   struct {
+	Version         string
+	DeviceID        string
+	OS              string
+	Arch            string
+	GoVersion       string
+	NumCPU          int
+	GoMaxProcs      int
+	ExpressionCount int
+	ExpressionsUsed struct {
+		Function       bool
+		NodeExpression bool
+		StarExpression bool
+		Tuple          bool
+	}
+	FormulaCount int
+	FormulasUsed struct {
+		In     bool
+		Like   bool
+		Regexp bool
+	}
+	NodeCount int
+	NodesUsed struct {
 		GroupBy             bool
 		Limit               bool
 		Offset              bool
-		LeftJoin            bool
-		InnerJoin           bool
+		LookupJoin          bool
+		StreamJoin          bool
 		Distinct            bool
 		UnionAll            bool
 		Interval            bool
 		OrderBy             bool
-		Like                bool
-		Regexp              bool
-		Function            bool
 		TableValuedFunction bool
+	}
+	TriggersUsed struct {
+		Counting  bool
+		Delay     bool
+		Watermark bool
 	}
 	FunctionsUsed            map[string]bool
 	TableValuedFunctionsUsed map[string]bool
@@ -51,45 +67,75 @@ type Telemetry struct {
 func TelemetryTransformer(telemetry *Telemetry) *physical.Transformers {
 	return &physical.Transformers{
 		ExprT: func(expr physical.Expression) physical.Expression {
+			telemetry.ExpressionCount++
+
 			switch expr := expr.(type) {
 			case *physical.FunctionExpression:
-				telemetry.Features.Function = true
+				telemetry.ExpressionsUsed.Function = true
 				telemetry.FunctionsUsed[expr.Name] = true
+			case *physical.NodeExpression:
+				telemetry.ExpressionsUsed.NodeExpression = true
+			case *physical.StarExpression:
+				telemetry.ExpressionsUsed.StarExpression = true
+			case *physical.Tuple:
+				telemetry.ExpressionsUsed.Tuple = true
 			}
 
 			return expr
 		},
+		FormulaT: func(formula physical.Formula) physical.Formula {
+			telemetry.FormulaCount++
+
+			switch formula := formula.(type) {
+			case *physical.Predicate:
+				switch formula.Relation {
+				case physical.In:
+					telemetry.FormulasUsed.In = true
+				case physical.Like:
+					telemetry.FormulasUsed.Like = true
+				case physical.Regexp:
+					telemetry.FormulasUsed.Regexp = true
+				}
+			}
+
+			return formula
+		},
 		NodeT: func(node physical.Node) physical.Node {
+			telemetry.NodeCount++
+
 			switch node := node.(type) {
-			case *physical.GroupBy:
-				telemetry.Features.GroupBy = true
-			case *physical.Limit:
-				telemetry.Features.Limit = true
-			case *physical.Offset:
-				telemetry.Features.Offset = true
 			case *physical.Distinct:
-				telemetry.Features.Distinct = true
+				telemetry.NodesUsed.Distinct = true
+			case *physical.GroupBy:
+				telemetry.NodesUsed.GroupBy = true
+			case *physical.Limit:
+				telemetry.NodesUsed.Limit = true
+			case *physical.LookupJoin:
+				telemetry.NodesUsed.LookupJoin = true
+			case *physical.Offset:
+				telemetry.NodesUsed.Offset = true
 			case *physical.OrderBy:
-				telemetry.Features.OrderBy = true
+				telemetry.NodesUsed.OrderBy = true
+			case *physical.StreamJoin:
+				telemetry.NodesUsed.StreamJoin = true
 			case *physical.TableValuedFunction:
-				telemetry.Features.TableValuedFunction = true
+				telemetry.NodesUsed.TableValuedFunction = true
 				telemetry.TableValuedFunctionsUsed[node.Name] = true
 			}
 
 			return node
 		},
-		FormulaT: func(formula physical.Formula) physical.Formula {
-			switch formula := formula.(type) {
-			case *physical.Predicate:
-				switch formula.Relation {
-				case physical.Like:
-					telemetry.Features.Like = true
-				case physical.Regexp:
-					telemetry.Features.Regexp = true
-				}
+		TriggerT: func(trigger physical.Trigger) physical.Trigger {
+			switch trigger.(type) {
+			case *physical.CountingTrigger:
+				telemetry.TriggersUsed.Counting = true
+			case *physical.DelayTrigger:
+				telemetry.TriggersUsed.Delay = true
+			case *physical.WatermarkTrigger:
+				telemetry.TriggersUsed.Watermark = true
 			}
 
-			return formula
+			return trigger
 		},
 	}
 }

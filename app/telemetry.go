@@ -3,10 +3,17 @@ package app
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"path"
 	"time"
+
+	"github.com/mitchellh/go-homedir"
+	"github.com/oklog/ulid"
 
 	"github.com/cube2222/octosql/physical"
 )
@@ -31,6 +38,8 @@ type Telemetry struct {
 	}
 	FunctionsUsed            map[string]bool
 	TableValuedFunctionsUsed map[string]bool
+	// TODO: Add datasource types of config.
+	// TODO: Add datasource types of query.
 }
 
 func TelemetryTransformer(telemetry *Telemetry) *physical.Transformers {
@@ -97,8 +106,23 @@ func SendTelemetry(ctx context.Context, telemetry *Telemetry) {
 	}()
 }
 
-func GetDeviceID() string {
-	// TODO: Create if doesn't exist.
-	// TODO: On error send whatever.
-	return ""
+func GetDeviceID(ctx context.Context) string {
+	dir, err := homedir.Dir()
+	if err != nil {
+		return "error1"
+	}
+	deviceIDFilePath := path.Join(dir, ".octosql", "deviceid")
+	storedID, err := ioutil.ReadFile(deviceIDFilePath)
+	if err == os.ErrNotExist {
+		log.Println("not exist")
+		newID := ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader).String()
+		err := ioutil.WriteFile(deviceIDFilePath, []byte(newID), os.ModePerm)
+		if err != nil {
+			return "error2"
+		}
+		return newID
+	} else if err != nil {
+		return "error3"
+	}
+	return string(storedID)
 }

@@ -23,6 +23,11 @@ import (
 func RunTelemetry(ctx context.Context, version string, datasources []config.DataSourceConfig, plan physical.Node) {
 	var telemetry Telemetry
 
+	telemetry.FunctionsUsed = make(map[string]bool)
+	telemetry.TableValuedFunctionsUsed = make(map[string]bool)
+	telemetry.DatasourceTypesInConfig = make(map[string]bool)
+	telemetry.DatasourceTypesUsed = make(map[string]bool)
+
 	telemetry.DeviceID = GetDeviceID(ctx)
 	telemetry.OS = runtime.GOOS
 	telemetry.Arch = runtime.GOARCH

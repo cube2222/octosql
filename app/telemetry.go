@@ -63,13 +63,13 @@ type Telemetry struct {
 		NodeExpression bool `json:"node_expression"`
 		StarExpression bool `json:"star_expression"`
 		Tuple          bool `json:"tuple"`
-	}
+	} `json:"expressions_used"`
 	FormulaCount int `json:"formula_count"`
 	FormulasUsed struct {
 		In     bool `json:"in"`
 		Like   bool `json:"like"`
 		Regexp bool `json:"regexp"`
-	}
+	} `json:"formulas_used"`
 	NodeCount int `json:"node_count"`
 	NodesUsed struct {
 		GroupBy             bool `json:"group_by"`
@@ -82,12 +82,12 @@ type Telemetry struct {
 		Interval            bool `json:"interval"`
 		OrderBy             bool `json:"order_by"`
 		TableValuedFunction bool `json:"table_valued_function"`
-	}
+	} `json:"nodes_used"`
 	TriggersUsed struct {
 		Counting  bool `json:"counting"`
 		Delay     bool `json:"delay"`
 		Watermark bool `json:"watermark"`
-	}
+	} `json:"triggers_used"`
 	FunctionsUsed            map[string]bool `json:"functions_used"`
 	TableValuedFunctionsUsed map[string]bool `json:"table_valued_functions_used"`
 	DatasourceTypesInConfig  map[string]bool `json:"datasource_types_in_config"`

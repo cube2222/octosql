@@ -20,13 +20,14 @@ import (
 )
 
 type Telemetry struct {
-	Version   string
-	DeviceID  string
-	OS        string
-	Arch      string
-	GoVersion string
-	NumCPU    int
-	Features  struct {
+	Version    string
+	DeviceID   string
+	OS         string
+	Arch       string
+	GoVersion  string
+	NumCPU     int
+	GoMaxProcs int
+	Features   struct {
 		GroupBy             bool
 		Limit               bool
 		Offset              bool
@@ -99,6 +100,7 @@ func SendTelemetry(ctx context.Context, telemetry *Telemetry) {
 	telemetry.Arch = runtime.GOARCH
 	telemetry.GoVersion = runtime.Version()
 	telemetry.NumCPU = runtime.NumCPU()
+	telemetry.GoMaxProcs = runtime.GOMAXPROCS(0)
 
 	data, err := json.Marshal(telemetry)
 	if err != nil {

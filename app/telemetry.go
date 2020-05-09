@@ -12,9 +12,9 @@ import (
 )
 
 type Telemetry struct {
-	Version, Checksum string
-	DeviceID          string
-	Features          struct {
+	Version  string
+	DeviceID string
+	Features struct {
 		GroupBy             bool
 		Limit               bool
 		Offset              bool

@@ -186,7 +186,7 @@ func main() {
 	} else {
 		version = "unknown"
 	}
-	rootCmd.SetVersionTemplate(fmt.Sprintf("OctoSQL Version: %s", version))
+	rootCmd.SetVersionTemplate(fmt.Sprintf("OctoSQL Version: %s\n", version))
 	rootCmd.Version = version
 
 	rootCmd.Flags().StringVarP(&configPath, "config", "c", os.Getenv("OCTOSQL_CONFIG"), "data source configuration path, defaults to $OCTOSQL_CONFIG")

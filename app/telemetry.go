@@ -133,6 +133,7 @@ func GetDeviceID(ctx context.Context) string {
 		}
 		return newID
 	} else if err != nil {
+		log.Println(err)
 		return "error3"
 	}
 	return string(storedID)

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"runtime"
 	"time"
 
 	"github.com/mitchellh/go-homedir"
@@ -19,9 +20,13 @@ import (
 )
 
 type Telemetry struct {
-	Version  string
-	DeviceID string
-	Features struct {
+	Version   string
+	DeviceID  string
+	OS        string
+	Arch      string
+	GoVersion string
+	NumCPU    int
+	Features  struct {
 		GroupBy             bool
 		Limit               bool
 		Offset              bool
@@ -89,6 +94,12 @@ func TelemetryTransformer(telemetry *Telemetry) *physical.Transformers {
 }
 
 func SendTelemetry(ctx context.Context, telemetry *Telemetry) {
+	telemetry.DeviceID = GetDeviceID(ctx)
+	telemetry.OS = runtime.GOOS
+	telemetry.Arch = runtime.GOARCH
+	telemetry.GoVersion = runtime.Version()
+	telemetry.NumCPU = runtime.NumCPU()
+
 	data, err := json.Marshal(telemetry)
 	if err != nil {
 		return

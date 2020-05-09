@@ -16,8 +16,27 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/oklog/ulid"
 
+	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/physical"
 )
+
+func RunTelemetry(ctx context.Context, version string, datasources []config.DataSourceConfig, plan physical.Node) {
+	var telemetry Telemetry
+
+	telemetry.DeviceID = GetDeviceID(ctx)
+	telemetry.OS = runtime.GOOS
+	telemetry.Arch = runtime.GOARCH
+	telemetry.GoVersion = runtime.Version()
+	telemetry.NumCPU = runtime.NumCPU()
+	telemetry.GoMaxProcs = runtime.GOMAXPROCS(0)
+	telemetry.Version = version
+
+	for _, datasourceConfig := range datasources {
+		telemetry.DatasourceTypesInConfig[datasourceConfig.Type] = true
+	}
+	plan.Transform(ctx, TelemetryTransformer(&telemetry, datasources))
+	SendTelemetry(ctx, &telemetry)
+}
 
 type Telemetry struct {
 	Version         string
@@ -60,11 +79,11 @@ type Telemetry struct {
 	}
 	FunctionsUsed            map[string]bool
 	TableValuedFunctionsUsed map[string]bool
-	// TODO: Add datasource types of config.
-	// TODO: Add datasource types of query.
+	DatasourceTypesInConfig  map[string]bool
+	DatasourceTypesUsed      map[string]bool
 }
 
-func TelemetryTransformer(telemetry *Telemetry) *physical.Transformers {
+func TelemetryTransformer(telemetry *Telemetry, datasources []config.DataSourceConfig) *physical.Transformers {
 	return &physical.Transformers{
 		ExprT: func(expr physical.Expression) physical.Expression {
 			telemetry.ExpressionCount++
@@ -121,6 +140,13 @@ func TelemetryTransformer(telemetry *Telemetry) *physical.Transformers {
 			case *physical.TableValuedFunction:
 				telemetry.NodesUsed.TableValuedFunction = true
 				telemetry.TableValuedFunctionsUsed[node.Name] = true
+			case *physical.DataSourceBuilder:
+				for i := range datasources {
+					if datasources[i].Name == node.Name {
+						telemetry.DatasourceTypesUsed[datasources[i].Type] = true
+						break
+					}
+				}
 			}
 
 			return node
@@ -141,13 +167,6 @@ func TelemetryTransformer(telemetry *Telemetry) *physical.Transformers {
 }
 
 func SendTelemetry(ctx context.Context, telemetry *Telemetry) {
-	telemetry.DeviceID = GetDeviceID(ctx)
-	telemetry.OS = runtime.GOOS
-	telemetry.Arch = runtime.GOARCH
-	telemetry.GoVersion = runtime.Version()
-	telemetry.NumCPU = runtime.NumCPU()
-	telemetry.GoMaxProcs = runtime.GOMAXPROCS(0)
-
 	data, err := json.Marshal(telemetry)
 	if err != nil {
 		return

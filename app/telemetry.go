@@ -124,8 +124,7 @@ func GetDeviceID(ctx context.Context) string {
 	}
 	deviceIDFilePath := path.Join(dir, ".octosql", "deviceid")
 	storedID, err := ioutil.ReadFile(deviceIDFilePath)
-	if err == os.ErrNotExist {
-		log.Println("not exist")
+	if os.IsNotExist(err) {
 		newID := ulid.MustNew(ulid.Timestamp(time.Now()), rand.Reader).String()
 		err := ioutil.WriteFile(deviceIDFilePath, []byte(newID), os.ModePerm)
 		if err != nil {
@@ -133,7 +132,6 @@ func GetDeviceID(ctx context.Context) string {
 		}
 		return newID
 	} else if err != nil {
-		log.Println(err)
 		return "error3"
 	}
 	return string(storedID)

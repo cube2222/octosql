@@ -22,20 +22,20 @@ import (
 type OutputSinkFn func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (execution.IntermediateRecordStore, output.Printer)
 
 type App struct {
-	version              string
+	telemetryInfo        TelemetryInfo
 	cfg                  *config.Config
 	dataSourceRepository *physical.DataSourceRepository
 	outputSinkFn         OutputSinkFn
 	describe             bool
 }
 
-func NewApp(cfg *config.Config, version string, dataSourceRepository *physical.DataSourceRepository, outputSinkFn OutputSinkFn, describe bool) *App {
+func NewApp(cfg *config.Config, telemetryInfo TelemetryInfo, dataSourceRepository *physical.DataSourceRepository, outputSinkFn OutputSinkFn, describe bool) *App {
 	return &App{
-		version:              version,
 		cfg:                  cfg,
 		dataSourceRepository: dataSourceRepository,
 		outputSinkFn:         outputSinkFn,
 		describe:             describe,
+		telemetryInfo:        telemetryInfo,
 	}
 }
 
@@ -52,7 +52,7 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 	var phys physical.Node = shuffled[0]
 
 	if strings.TrimSpace(os.Getenv("OCTOSQL_TELEMETRY")) != "0" {
-		RunTelemetry(ctx, app.version, app.cfg.DataSources, phys)
+		RunTelemetry(ctx, app.telemetryInfo, app.cfg.DataSources, phys)
 	}
 
 	phys = optimizer.Optimize(ctx, optimizer.DefaultScenarios, phys)

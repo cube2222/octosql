@@ -125,7 +125,12 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 			log.Fatal("invalid output type")
 		}
 
-		app := app.NewApp(cfg, version, dataSourceRespository, outputSinkFn, describe)
+		telemetryInfo := app.TelemetryInfo{
+			OutputFormat: outputFormat,
+			Version:      version,
+		}
+
+		app := app.NewApp(cfg, telemetryInfo, dataSourceRespository, outputSinkFn, describe)
 
 		// Parse query
 		stmt, err := sqlparser.Parse(query)

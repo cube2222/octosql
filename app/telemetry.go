@@ -20,7 +20,7 @@ import (
 	"github.com/cube2222/octosql/physical"
 )
 
-func RunTelemetry(ctx context.Context, version string, datasources []config.DataSourceConfig, plan physical.Node) {
+func RunTelemetry(ctx context.Context, telemetryInfo TelemetryInfo, datasources []config.DataSourceConfig, plan physical.Node) {
 	var telemetry Telemetry
 
 	telemetry.FunctionsUsed = make(map[string]bool)
@@ -34,13 +34,19 @@ func RunTelemetry(ctx context.Context, version string, datasources []config.Data
 	telemetry.GoVersion = runtime.Version()
 	telemetry.NumCPU = runtime.NumCPU()
 	telemetry.GoMaxProcs = runtime.GOMAXPROCS(0)
-	telemetry.Version = version
+	telemetry.OutputFormat = telemetryInfo.OutputFormat
+	telemetry.Version = telemetryInfo.Version
 
 	for _, datasourceConfig := range datasources {
 		telemetry.DatasourceTypesInConfig[datasourceConfig.Type] = true
 	}
 	plan.Transform(ctx, TelemetryTransformer(&telemetry, datasources))
 	SendTelemetry(ctx, &telemetry)
+}
+
+type TelemetryInfo struct {
+	OutputFormat string
+	Version      string
 }
 
 type Telemetry struct {
@@ -86,6 +92,7 @@ type Telemetry struct {
 	TableValuedFunctionsUsed map[string]bool
 	DatasourceTypesInConfig  map[string]bool
 	DatasourceTypesUsed      map[string]bool
+	OutputFormat             string
 }
 
 func TelemetryTransformer(telemetry *Telemetry, datasources []config.DataSourceConfig) *physical.Transformers {

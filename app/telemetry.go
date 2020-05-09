@@ -50,49 +50,49 @@ type TelemetryInfo struct {
 }
 
 type Telemetry struct {
-	Version         string
-	DeviceID        string
-	OS              string
-	Arch            string
-	GoVersion       string
-	NumCPU          int
-	GoMaxProcs      int
-	ExpressionCount int
+	Version         string `json:"version"`
+	DeviceID        string `json:"device_id"`
+	OS              string `json:"os"`
+	Arch            string `json:"arch"`
+	GoVersion       string `json:"go_version"`
+	NumCPU          int    `json:"num_cpu"`
+	GoMaxProcs      int    `json:"go_max_procs"`
+	ExpressionCount int    `json:"expression_count"`
 	ExpressionsUsed struct {
-		Function       bool
-		NodeExpression bool
-		StarExpression bool
-		Tuple          bool
+		Function       bool `json:"function"`
+		NodeExpression bool `json:"node_expression"`
+		StarExpression bool `json:"star_expression"`
+		Tuple          bool `json:"tuple"`
 	}
-	FormulaCount int
+	FormulaCount int `json:"formula_count"`
 	FormulasUsed struct {
-		In     bool
-		Like   bool
-		Regexp bool
+		In     bool `json:"in"`
+		Like   bool `json:"like"`
+		Regexp bool `json:"regexp"`
 	}
-	NodeCount int
+	NodeCount int `json:"node_count"`
 	NodesUsed struct {
-		GroupBy             bool
-		Limit               bool
-		Offset              bool
-		LookupJoin          bool
-		StreamJoin          bool
-		Distinct            bool
-		UnionAll            bool
-		Interval            bool
-		OrderBy             bool
-		TableValuedFunction bool
+		GroupBy             bool `json:"group_by"`
+		Limit               bool `json:"limit"`
+		Offset              bool `json:"offset"`
+		LookupJoin          bool `json:"lookup_join"`
+		StreamJoin          bool `json:"stream_join"`
+		Distinct            bool `json:"distinct"`
+		UnionAll            bool `json:"union_all"`
+		Interval            bool `json:"interval"`
+		OrderBy             bool `json:"order_by"`
+		TableValuedFunction bool `json:"table_valued_function"`
 	}
 	TriggersUsed struct {
-		Counting  bool
-		Delay     bool
-		Watermark bool
+		Counting  bool `json:"counting"`
+		Delay     bool `json:"delay"`
+		Watermark bool `json:"watermark"`
 	}
-	FunctionsUsed            map[string]bool
-	TableValuedFunctionsUsed map[string]bool
-	DatasourceTypesInConfig  map[string]bool
-	DatasourceTypesUsed      map[string]bool
-	OutputFormat             string
+	FunctionsUsed            map[string]bool `json:"functions_used"`
+	TableValuedFunctionsUsed map[string]bool `json:"table_valued_functions_used"`
+	DatasourceTypesInConfig  map[string]bool `json:"datasource_types_in_config"`
+	DatasourceTypesUsed      map[string]bool `json:"datasource_types_used"`
+	OutputFormat             string          `json:"output_format"`
 }
 
 func TelemetryTransformer(telemetry *Telemetry, datasources []config.DataSourceConfig) *physical.Transformers {

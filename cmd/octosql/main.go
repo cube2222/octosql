@@ -9,6 +9,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"runtime/debug"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/dgraph-io/badger/v2/options"
@@ -43,6 +44,7 @@ import (
 	"github.com/cube2222/octosql/storage"
 )
 
+var version string
 var configPath string
 var outputFormat string
 var storageDirectory string
@@ -123,7 +125,12 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 			log.Fatal("invalid output type")
 		}
 
-		app := app.NewApp(cfg, dataSourceRespository, outputSinkFn, describe)
+		telemetryInfo := app.TelemetryInfo{
+			OutputFormat: outputFormat,
+			Version:      version,
+		}
+
+		app := app.NewApp(cfg, telemetryInfo, dataSourceRespository, outputSinkFn, describe)
 
 		// Parse query
 		stmt, err := sqlparser.Parse(query)
@@ -178,6 +185,15 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 }
 
 func main() {
+	info, ok := debug.ReadBuildInfo()
+	if ok {
+		version = info.Main.Version
+	} else {
+		version = "unknown"
+	}
+	rootCmd.SetVersionTemplate(fmt.Sprintf("OctoSQL Version: %s\n", version))
+	rootCmd.Version = version
+
 	rootCmd.Flags().StringVarP(&configPath, "config", "c", os.Getenv("OCTOSQL_CONFIG"), "data source configuration path, defaults to $OCTOSQL_CONFIG")
 	rootCmd.Flags().StringVarP(&outputFormat, "output", "o", "live-table", "output format, one of [table json csv tabbed table_row_separated]")
 	rootCmd.Flags().StringVar(&storageDirectory, "storage-directory", "", "directory to store state storage in")

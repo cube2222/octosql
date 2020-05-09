@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
@@ -20,18 +22,20 @@ import (
 type OutputSinkFn func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (execution.IntermediateRecordStore, output.Printer)
 
 type App struct {
+	telemetryInfo        TelemetryInfo
 	cfg                  *config.Config
 	dataSourceRepository *physical.DataSourceRepository
 	outputSinkFn         OutputSinkFn
 	describe             bool
 }
 
-func NewApp(cfg *config.Config, dataSourceRepository *physical.DataSourceRepository, outputSinkFn OutputSinkFn, describe bool) *App {
+func NewApp(cfg *config.Config, telemetryInfo TelemetryInfo, dataSourceRepository *physical.DataSourceRepository, outputSinkFn OutputSinkFn, describe bool) *App {
 	return &App{
 		cfg:                  cfg,
 		dataSourceRepository: dataSourceRepository,
 		outputSinkFn:         outputSinkFn,
 		describe:             describe,
+		telemetryInfo:        telemetryInfo,
 	}
 }
 
@@ -46,6 +50,10 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 
 	// Only the first partition is there.
 	var phys physical.Node = shuffled[0]
+
+	if strings.TrimSpace(os.Getenv("OCTOSQL_TELEMETRY")) != "0" {
+		RunTelemetry(ctx, app.telemetryInfo, app.cfg.DataSources, phys)
+	}
 
 	phys = optimizer.Optimize(ctx, optimizer.DefaultScenarios, phys)
 

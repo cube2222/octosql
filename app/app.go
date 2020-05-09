@@ -22,14 +22,17 @@ import (
 type OutputSinkFn func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (execution.IntermediateRecordStore, output.Printer)
 
 type App struct {
+	version, checksum    string
 	cfg                  *config.Config
 	dataSourceRepository *physical.DataSourceRepository
 	outputSinkFn         OutputSinkFn
 	describe             bool
 }
 
-func NewApp(cfg *config.Config, dataSourceRepository *physical.DataSourceRepository, outputSinkFn OutputSinkFn, describe bool) *App {
+func NewApp(cfg *config.Config, version, checksum string, dataSourceRepository *physical.DataSourceRepository, outputSinkFn OutputSinkFn, describe bool) *App {
 	return &App{
+		version:              version,
+		checksum:             checksum,
 		cfg:                  cfg,
 		dataSourceRepository: dataSourceRepository,
 		outputSinkFn:         outputSinkFn,
@@ -51,6 +54,8 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 
 	if strings.TrimSpace(os.Getenv("OCTOSQL_TELEMETRY")) != "0" {
 		var telemetry Telemetry
+		telemetry.Version = app.version
+		telemetry.Checksum = app.checksum
 		phys.Transform(ctx, TelemetryTransformer(&telemetry))
 		SendTelemetry(ctx, &telemetry)
 	}

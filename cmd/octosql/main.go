@@ -43,6 +43,10 @@ import (
 	"github.com/cube2222/octosql/storage"
 )
 
+// VERSION and CHECKSUM are set by linker.
+var VERSION string = "VERSION_TO_BE_LINKED"
+var CHECKSUM string = "CHECKSUM_TO_BE_LINKED"
+
 var configPath string
 var outputFormat string
 var storageDirectory string
@@ -123,7 +127,7 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 			log.Fatal("invalid output type")
 		}
 
-		app := app.NewApp(cfg, dataSourceRespository, outputSinkFn, describe)
+		app := app.NewApp(cfg, VERSION, CHECKSUM, dataSourceRespository, outputSinkFn, describe)
 
 		// Parse query
 		stmt, err := sqlparser.Parse(query)
@@ -178,6 +182,8 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 }
 
 func main() {
+	rootCmd.SetVersionTemplate(fmt.Sprintf("OctoSQL Version: %s Checksum: %s", VERSION, CHECKSUM))
+	rootCmd.Version = CHECKSUM
 	rootCmd.Flags().StringVarP(&configPath, "config", "c", os.Getenv("OCTOSQL_CONFIG"), "data source configuration path, defaults to $OCTOSQL_CONFIG")
 	rootCmd.Flags().StringVarP(&outputFormat, "output", "o", "live-table", "output format, one of [table json csv tabbed table_row_separated]")
 	rootCmd.Flags().StringVar(&storageDirectory, "storage-directory", "", "directory to store state storage in")

@@ -72,15 +72,13 @@ type Telemetry struct {
 	} `json:"formulas_used"`
 	NodeCount int `json:"node_count"`
 	NodesUsed struct {
+		Distinct            bool `json:"distinct"`
 		GroupBy             bool `json:"group_by"`
 		Limit               bool `json:"limit"`
-		Offset              bool `json:"offset"`
 		LookupJoin          bool `json:"lookup_join"`
-		StreamJoin          bool `json:"stream_join"`
-		Distinct            bool `json:"distinct"`
-		UnionAll            bool `json:"union_all"`
-		Interval            bool `json:"interval"`
+		Offset              bool `json:"offset"`
 		OrderBy             bool `json:"order_by"`
+		StreamJoin          bool `json:"stream_join"`
 		TableValuedFunction bool `json:"table_valued_function"`
 	} `json:"nodes_used"`
 	TriggersUsed struct {
@@ -135,6 +133,13 @@ func TelemetryTransformer(telemetry *Telemetry, datasources []config.DataSourceC
 			telemetry.NodeCount++
 
 			switch node := node.(type) {
+			case *physical.DataSourceBuilder:
+				for i := range datasources {
+					if datasources[i].Name == node.Name {
+						telemetry.DatasourceTypesUsed[datasources[i].Type] = true
+						break
+					}
+				}
 			case *physical.Distinct:
 				telemetry.NodesUsed.Distinct = true
 			case *physical.GroupBy:
@@ -152,13 +157,6 @@ func TelemetryTransformer(telemetry *Telemetry, datasources []config.DataSourceC
 			case *physical.TableValuedFunction:
 				telemetry.NodesUsed.TableValuedFunction = true
 				telemetry.TableValuedFunctionsUsed[node.Name] = true
-			case *physical.DataSourceBuilder:
-				for i := range datasources {
-					if datasources[i].Name == node.Name {
-						telemetry.DatasourceTypesUsed[datasources[i].Type] = true
-						break
-					}
-				}
 			}
 
 			return node

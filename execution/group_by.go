@@ -102,7 +102,11 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 		NewExecutionOutput(
 			groupByPullEngine,
 			execOutput.NextShuffles,
-			append(execOutput.TasksToRun, func() error { groupByPullEngine.Run(); return nil }),
+			append(append(execOutput.TasksToRun,
+				func() error { groupByPullEngine.Run(); return nil }),
+				func() error {
+					return processFunc.RunGarbageCollector(ctx, node.storage.WithPrefix(streamID.AsPrefix()))
+				}),
 		),
 		nil
 }

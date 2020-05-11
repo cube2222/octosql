@@ -111,7 +111,11 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 		NewExecutionOutput(
 			streamJoinPullEngine,
 			mergedNextShuffles,
-			append(leftExec.TasksToRun, append(rightExec.TasksToRun, func() error { streamJoinPullEngine.Run(); return nil })...),
+			append(append(leftExec.TasksToRun, append(rightExec.TasksToRun,
+				func() error { streamJoinPullEngine.Run(); return nil })...),
+				func() error {
+					return processFunc.RunGarbageCollector(ctx, node.storage.WithPrefix(streamID.AsPrefix()))
+				}),
 		), nil
 }
 

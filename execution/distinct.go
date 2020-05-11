@@ -60,7 +60,11 @@ func (node *Distinct) Get(ctx context.Context, variables octosql.Variables, stre
 		NewExecutionOutput(
 			distinctPullEngine,
 			execOutput.NextShuffles,
-			append(execOutput.TasksToRun, func() error { distinctPullEngine.Run(); return nil }),
+			append(append(execOutput.TasksToRun,
+				func() error { distinctPullEngine.Run(); return nil }),
+				func() error {
+					return processFunc.RunGarbageCollector(ctx, node.storage.WithPrefix(streamID.AsPrefix()))
+				}),
 		),
 		nil
 }

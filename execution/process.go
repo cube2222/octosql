@@ -32,6 +32,8 @@ type ProcessByKey struct {
 	variables       octosql.Variables
 }
 
+var eventTimesSeenPrefix = []byte("event_times_seen") // used to keep track of every event time seen and to collect garbage
+
 func (p *ProcessByKey) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *Record) error {
 	recordVariables := record.AsVariables()
 	variables, err := p.variables.MergeWith(recordVariables)
@@ -53,15 +55,28 @@ func (p *ProcessByKey) AddRecord(ctx context.Context, tx storage.StateTransactio
 		}
 	}
 
+	eventTime := MaxWatermark
+	if len(p.eventTimeField) > 0 {
+		eventTime = record.EventTime().AsTime()
+
+		// Adding event time to storage
+		eventTimeMap := storage.NewMap(tx.WithPrefix(eventTimesSeenPrefix))
+
+		octoEventTime := octosql.MakeTime(eventTime)
+		phantom := octosql.MakePhantom()
+		if err := eventTimeMap.Set(&octoEventTime, &phantom); err != nil {
+			return errors.Wrap(err, "couldn't add record event time to storage")
+		}
+
+		// Records stored are now additionally prefixed by event times, so garbage collector can erase the oldest ones
+		eventTimeBytes := append(append([]byte("$"), octoEventTime.MonotonicMarshal()...), '$')
+		tx = tx.WithPrefix(eventTimeBytes)
+	}
+
 	keyTuple := octosql.MakeTuple(key)
 	err = p.processFunction.AddRecord(ctx, tx, inputIndex, keyTuple, record)
 	if err != nil {
 		return errors.Wrap(err, "couldn't add record to process function")
-	}
-
-	eventTime := MaxWatermark
-	if len(p.eventTimeField) > 0 {
-		eventTime = record.EventTime().AsTime()
 	}
 
 	err = p.trigger.RecordReceived(ctx, tx, keyTuple, eventTime)
@@ -70,6 +85,49 @@ func (p *ProcessByKey) AddRecord(ctx context.Context, tx storage.StateTransactio
 	}
 
 	return nil
+}
+
+func (p *ProcessByKey) RunGarbageCollector(ctx context.Context, prefixedStorage storage.Storage) error {
+	for {
+		tx := prefixedStorage.BeginTransaction()
+
+		// Check current output watermark value
+		watermark, err := p.GetWatermark(ctx, tx)
+		if err != nil {
+			return errors.Wrap(err, "couldn't get output watermark value")
+		}
+
+		// Collect every event time earlier than watermark - 10min
+		boundary := watermark.Add(-10 * time.Minute) // TODO - make this configurable
+
+		eventTimeMap := storage.NewMap(tx.WithPrefix(eventTimesSeenPrefix))
+		eventTimeSlice := make([]time.Time, 0)
+
+		var key, value octosql.Value
+		it := eventTimeMap.GetIterator()
+		for err := it.Next(&key, &value); err != storage.ErrEndOfIterator; err = it.Next(&key, &value) {
+			eventTime := key.AsTime()
+
+			if eventTime.Before(boundary) {
+				eventTimeSlice = append(eventTimeSlice, eventTime)
+			} else {
+				break
+			}
+		}
+		if err := it.Close(); err != nil {
+			return errors.Wrap(err, "couldn't close event time map iterator")
+		}
+
+		// Drop every "old enough" event time from storage
+		for _, eventTime := range eventTimeSlice {
+			eventTimeBytes := append(append([]byte("$"), octosql.MakeTime(eventTime).MonotonicMarshal()...), '$')
+			if err := prefixedStorage.DropAll(eventTimeBytes); err != nil {
+				return errors.Wrapf(err, "couldn't clear storage prefixed with event time %v", eventTime)
+			}
+		}
+
+		time.Sleep(time.Minute)
+	}
 }
 
 var outputWatermarkPrefix = []byte("$output_watermark$")

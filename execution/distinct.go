@@ -54,17 +54,32 @@ func (node *Distinct) Get(ctx context.Context, variables octosql.Variables, stre
 		variables:       variables,
 	}
 
+	gbCtx, cancel := context.WithCancel(ctx)
+	processFunc.garbageCollectorCtxCancel = cancel
+	processFunc.garbageCollectorCloseErrChan = make(chan error, 1)
+
 	distinctPullEngine := NewPullEngine(processFunc, node.storage, []RecordStream{source}, streamID, execOutput.WatermarkSource, true, ctx)
 
 	return distinctPullEngine,
 		NewExecutionOutput(
 			distinctPullEngine,
 			execOutput.NextShuffles,
-			append(append(execOutput.TasksToRun,
-				func() error { distinctPullEngine.Run(); return nil }),
-				func() error {
-					return processFunc.RunGarbageCollector(ctx, node.storage.WithPrefix(streamID.AsPrefix()))
-				}),
+			append(execOutput.TasksToRun,
+				[]Task{
+					func() error { distinctPullEngine.Run(); return nil },
+					func() error {
+						err := processFunc.RunGarbageCollector(gbCtx, node.storage.WithPrefix(streamID.AsPrefix()))
+						if err == context.Canceled || err == context.DeadlineExceeded {
+							processFunc.garbageCollectorCloseErrChan <- err
+							return nil
+						} else {
+							err := errors.Wrap(err, "distinct garbage collector error")
+							processFunc.garbageCollectorCloseErrChan <- err
+							return err
+						}
+					},
+				}...,
+			),
 		),
 		nil
 }

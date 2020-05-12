@@ -105,18 +105,34 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 		variables:       variables,
 	}
 
+	gbCtx, cancel := context.WithCancel(ctx)
+	processFunc.garbageCollectorCtxCancel = cancel
+	processFunc.garbageCollectorCloseErrChan = make(chan error, 1)
+
 	streamJoinPullEngine := NewPullEngine(processFunc, node.storage, []RecordStream{leftStream, rightStream}, streamID, watermarkSource, true, ctx)
 
 	return streamJoinPullEngine,
 		NewExecutionOutput(
 			streamJoinPullEngine,
 			mergedNextShuffles,
-			append(append(leftExec.TasksToRun, append(rightExec.TasksToRun,
-				func() error { streamJoinPullEngine.Run(); return nil })...),
-				func() error {
-					return processFunc.RunGarbageCollector(ctx, node.storage.WithPrefix(streamID.AsPrefix()))
-				}),
-		), nil
+			append(leftExec.TasksToRun, append(rightExec.TasksToRun,
+				[]Task{
+					func() error { streamJoinPullEngine.Run(); return nil },
+					func() error {
+						err := processFunc.RunGarbageCollector(gbCtx, node.storage.WithPrefix(streamID.AsPrefix()))
+						if err == context.Canceled || err == context.DeadlineExceeded {
+							processFunc.garbageCollectorCloseErrChan <- err
+							return nil
+						} else {
+							err := errors.Wrap(err, "stream join garbage collector error")
+							processFunc.garbageCollectorCloseErrChan <- err
+							return err
+						}
+					},
+				}...,
+			)...),
+		),
+		nil
 }
 
 type JoinedStream struct {

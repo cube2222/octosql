@@ -96,17 +96,32 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 		variables:       variables,
 	}
 
+	gbCtx, cancel := context.WithCancel(ctx)
+	processFunc.garbageCollectorCtxCancel = cancel
+	processFunc.garbageCollectorCloseErrChan = make(chan error, 1)
+
 	groupByPullEngine := NewPullEngine(processFunc, node.storage, []RecordStream{source}, streamID, execOutput.WatermarkSource, true, ctx)
 
 	return groupByPullEngine, // groupByPullEngine now indicates new watermark source
 		NewExecutionOutput(
 			groupByPullEngine,
 			execOutput.NextShuffles,
-			append(append(execOutput.TasksToRun,
-				func() error { groupByPullEngine.Run(); return nil }),
-				func() error {
-					return processFunc.RunGarbageCollector(ctx, node.storage.WithPrefix(streamID.AsPrefix()))
-				}),
+			append(execOutput.TasksToRun,
+				[]Task{
+					func() error { groupByPullEngine.Run(); return nil },
+					func() error {
+						err := processFunc.RunGarbageCollector(gbCtx, node.storage.WithPrefix(streamID.AsPrefix()))
+						if err == context.Canceled || err == context.DeadlineExceeded {
+							processFunc.garbageCollectorCloseErrChan <- err
+							return nil
+						} else {
+							err := errors.Wrap(err, "group_by garbage collector error")
+							processFunc.garbageCollectorCloseErrChan <- err
+							return err
+						}
+					},
+				}...,
+			),
 		),
 		nil
 }

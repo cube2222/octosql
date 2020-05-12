@@ -30,6 +30,9 @@ type ProcessByKey struct {
 	keyExpressions  [][]Expression
 	processFunction ProcessFunction
 	variables       octosql.Variables
+
+	garbageCollectorCtxCancel    func()
+	garbageCollectorCloseErrChan chan error
 }
 
 var eventTimesSeenPrefix = []byte("event_times_seen") // used to keep track of every event time seen and to collect garbage
@@ -89,6 +92,12 @@ func (p *ProcessByKey) AddRecord(ctx context.Context, tx storage.StateTransactio
 
 func (p *ProcessByKey) RunGarbageCollector(ctx context.Context, prefixedStorage storage.Storage) error {
 	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		tx := prefixedStorage.BeginTransaction()
 
 		// Check current output watermark value
@@ -120,7 +129,9 @@ func (p *ProcessByKey) RunGarbageCollector(ctx context.Context, prefixedStorage 
 
 		// Drop every "old enough" event time from storage
 		for _, eventTime := range eventTimeSlice {
-			eventTimeBytes := append(append([]byte("$"), octosql.MakeTime(eventTime).MonotonicMarshal()...), '$')
+			octoEventTime := octosql.MakeTime(eventTime)
+			eventTimeBytes := append(append([]byte("$"), octoEventTime.MonotonicMarshal()...), '$')
+
 			if err := prefixedStorage.DropAll(eventTimeBytes); err != nil {
 				return errors.Wrapf(err, "couldn't clear storage prefixed with event time %v", eventTime)
 			}
@@ -319,5 +330,12 @@ func (p *ProcessByKey) ReadyForMore(ctx context.Context, tx storage.StateTransac
 }
 
 func (p *ProcessByKey) Close(ctx context.Context, storage storage.Storage) error {
+	p.garbageCollectorCtxCancel()
+	err := <-p.garbageCollectorCloseErrChan
+	if err == context.Canceled || err == context.DeadlineExceeded {
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't stop garbage collector")
+	}
+
 	return nil
 }

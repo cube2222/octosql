@@ -106,38 +106,41 @@ func (p *ProcessByKey) RunGarbageCollector(ctx context.Context, prefixedStorage 
 			return errors.Wrap(err, "couldn't get output watermark value")
 		}
 
-		// Collect every event time earlier than watermark - 10min
-		boundary := watermark.Add(-10 * time.Minute) // TODO - make this configurable
+		// we don't want to clear whole storage when sending MaxWatermark - on EndOfStream and WatermarkTrigger
+		if watermark != MaxWatermark {
+			// Collect every event time earlier than watermark - 10min
+			boundary := watermark.Add(-10 * time.Minute) // TODO - make this configurable
 
-		eventTimeMap := storage.NewMap(tx.WithPrefix(eventTimesSeenPrefix))
-		eventTimeSlice := make([]time.Time, 0)
+			eventTimeMap := storage.NewMap(tx.WithPrefix(eventTimesSeenPrefix))
+			eventTimeSlice := make([]time.Time, 0)
 
-		var key, value octosql.Value
-		it := eventTimeMap.GetIterator()
-		for err := it.Next(&key, &value); err != storage.ErrEndOfIterator; err = it.Next(&key, &value) {
-			eventTime := key.AsTime()
+			var key, value octosql.Value
+			it := eventTimeMap.GetIterator()
+			for err := it.Next(&key, &value); err != storage.ErrEndOfIterator; err = it.Next(&key, &value) {
+				eventTime := key.AsTime()
 
-			if eventTime.Before(boundary) {
-				eventTimeSlice = append(eventTimeSlice, eventTime)
-			} else {
-				break
+				if eventTime.Before(boundary) {
+					eventTimeSlice = append(eventTimeSlice, eventTime)
+				} else {
+					break
+				}
+			}
+			if err := it.Close(); err != nil {
+				return errors.Wrap(err, "couldn't close event time map iterator")
+			}
+
+			// Drop every "old enough" event time from storage
+			for _, eventTime := range eventTimeSlice {
+				octoEventTime := octosql.MakeTime(eventTime)
+				eventTimeBytes := append(append([]byte("$"), octoEventTime.MonotonicMarshal()...), '$')
+
+				if err := prefixedStorage.DropAll(eventTimeBytes); err != nil {
+					return errors.Wrapf(err, "couldn't clear storage prefixed with event time %v", eventTime)
+				}
 			}
 		}
-		if err := it.Close(); err != nil {
-			return errors.Wrap(err, "couldn't close event time map iterator")
-		}
 
-		// Drop every "old enough" event time from storage
-		for _, eventTime := range eventTimeSlice {
-			octoEventTime := octosql.MakeTime(eventTime)
-			eventTimeBytes := append(append([]byte("$"), octoEventTime.MonotonicMarshal()...), '$')
-
-			if err := prefixedStorage.DropAll(eventTimeBytes); err != nil {
-				return errors.Wrapf(err, "couldn't clear storage prefixed with event time %v", eventTime)
-			}
-		}
-
-		time.Sleep(time.Minute)
+		time.Sleep(10 * time.Millisecond) // TODO - this is very poor in testing, make this configurable?
 	}
 }
 

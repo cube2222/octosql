@@ -299,7 +299,11 @@ func (gb *GroupByStream) Trigger(ctx context.Context, tx storage.StateTransactio
 
 	// Set IDs for records
 	for i := range output {
-		WithID(NewRecordIDFromStreamIDWithOffset(gb.streamID, triggeredCountValue+i))(output[i])
+		keyHash, err := key.Hash()
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't ket hash for key")
+		}
+		WithID(NewRecordIDFromStreamIDWithKeyHashAndOffset(gb.streamID, keyHash, triggeredCountValue+i))(output[i])
 	}
 
 	newTriggeredCount := octosql.MakeInt(triggeredCountValue + len(output))

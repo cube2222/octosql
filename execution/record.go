@@ -246,6 +246,13 @@ func NewRecordIDFromStreamIDWithOffset(streamID *StreamID, offset int) *RecordID
 	}
 }
 
+// NewRecordIDFromStreamIDWithKeyHashAndOffset can be used to get a new RecordID deterministically based on the streamID, key hash and record offset.
+func NewRecordIDFromStreamIDWithKeyHashAndOffset(streamID *StreamID, keyHash uint64, offset int) *RecordID {
+	return &RecordID{
+		ID: fmt.Sprintf("%s.%d.%d", streamID.Id, keyHash, offset),
+	}
+}
+
 // This is a helper function to use a record ID as a storage prefix.
 func (id *RecordID) AsPrefix() []byte {
 	return []byte("$" + id.ID + "$")

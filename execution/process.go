@@ -61,33 +61,36 @@ func (p *ProcessByKey) AddRecord(ctx context.Context, tx storage.StateTransactio
 	keyTuple := octosql.MakeTuple(key)
 
 	eventTime := MaxWatermark
+	eventTimePrefixedTx := tx
 	if len(p.eventTimeField) > 0 {
 		eventTime = record.EventTime().AsTime()
+
+		// Adding record event time to keyTuple so that during Trigger prefixing process function is possible
+		keyTuple = octosql.MakeTuple(append([]octosql.Value{octosql.MakeTime(eventTime)}, key...))
 
 		// Adding keyTuple to event time storage
 		eventTimeMap := storage.NewMap(tx.WithPrefix(eventTimesSeenPrefix))
 
 		octoEventTime := octosql.MakeTime(eventTime)
-		var keysRecordsTuple octosql.Value
-		err := eventTimeMap.Get(&octoEventTime, &keysRecordsTuple)
+		var recordsTuple octosql.Value
+		err := eventTimeMap.Get(&octoEventTime, &recordsTuple)
 		if err == storage.ErrNotFound {
-			keysRecordsTuple = octosql.ZeroTuple()
+			recordsTuple = octosql.ZeroTuple()
 		} else if err != nil {
 			return errors.Wrap(err, "couldn't get records event time tuple from storage")
 		}
 
-		// We need to store both keyTuple (to perform KeysFired in trigger) and record (to perform retraction in process function)
-		// 0: keyTuple, 1: record, 2: inputIndex
-		keyRecordTuple := octosql.MakeTuple([]octosql.Value{keyTuple, record, octosql.MakeInt(inputIndex)})
-
-		keysRecordsTuple = octosql.MakeTuple(append(keysRecordsTuple.AsSlice(), keyRecordTuple))
-		if err := eventTimeMap.Set(&octoEventTime, &keysRecordsTuple); err != nil {
+		recordsTuple = octosql.MakeTuple(append(recordsTuple.AsSlice(), keyTuple.AsSlice()...))
+		if err := eventTimeMap.Set(&octoEventTime, &recordsTuple); err != nil {
 			return errors.Wrap(err, "couldn't add records event time tuple to storage")
 		}
+
+		eventTimeBytes := append(append([]byte("$"), octoEventTime.MonotonicMarshal()...), '$')
+		eventTimePrefixedTx = tx.WithPrefix(eventTimeBytes)
 	}
 
 	// Here garbage collector will just drop event time prefixes
-	err = p.processFunction.AddRecord(ctx, tx, inputIndex, keyTuple, record)
+	err = p.processFunction.AddRecord(ctx, eventTimePrefixedTx, inputIndex, keyTuple, record)
 	if err != nil {
 		return errors.Wrap(err, "couldn't add record to process function")
 	}
@@ -133,24 +136,15 @@ func (p *ProcessByKey) RunGarbageCollector(ctx context.Context, prefixedStorage 
 				if eventTime.Before(boundary) {
 					octoEventTimeSlice = append(octoEventTimeSlice, key)
 
-					keyTuples := make([]octosql.Value, 0)
+					eventTimeBytes := append(append([]byte("$"), key.MonotonicMarshal()...), '$')
 
-					keysRecordsSlice := value.AsSlice()
-					for _, keyRecord := range keysRecordsSlice {
-						keyTuple := keyRecord.AsSlice()[0]
-						keyTuples = append(keyTuples, keyTuple)
-
-						recordTuple := keyRecord.AsSlice()[1]
-						inputIndex := keyRecord.AsSlice()[2]
-
-						// Retract every "old enough" record from process function
-						if err = p.processFunction.AddRecord(ctx, tx, inputIndex.AsInt(), keyTuple, recordTuple); err != nil {
-							return errors.Wrap(err, "couldn't retract old enough record from process function")
-						}
+					// Drop event time prefix from process function storage
+					if err := prefixedStorage.DropAll(eventTimeBytes); err != nil {
+						return errors.Wrapf(err, "couldn't clear storage prefixed wit event time %v", eventTime)
 					}
 
-					// Mark every "old enough" key as fired -> trigger will delete this key itself
-					if err = p.trigger.KeysFired(ctx, tx, keyTuples); err != nil {
+					// Mark every "old enough" key as fired -> trigger will delete this key
+					if err = p.trigger.KeysFired(ctx, tx, value.AsSlice()); err != nil {
 						return errors.Wrap(err, "couldn't mark old enough keys as fired in trigger")
 					}
 				} else {
@@ -299,7 +293,12 @@ func (p *ProcessByKey) TriggerKeys(ctx context.Context, tx storage.StateTransact
 	}
 
 	for _, key := range keys {
-		records, err := p.processFunction.Trigger(ctx, tx, key)
+		// Prefixing transaction for process function with record event time
+		octoEventTime := key.AsSlice()[0]
+		eventTimeBytes := append(append([]byte("$"), octoEventTime.MonotonicMarshal()...), '$')
+		eventTimePrefixedTx := tx.WithPrefix(eventTimeBytes)
+
+		records, err := p.processFunction.Trigger(ctx, eventTimePrefixedTx, key)
 		if err != nil {
 			return 0, errors.Wrap(err, "couldn't trigger process function")
 		}

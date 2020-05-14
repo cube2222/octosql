@@ -293,10 +293,13 @@ func (p *ProcessByKey) TriggerKeys(ctx context.Context, tx storage.StateTransact
 	}
 
 	for _, key := range keys {
-		// Prefixing transaction for process function with record event time
-		octoEventTime := key.AsSlice()[0]
-		eventTimeBytes := append(append([]byte("$"), octoEventTime.MonotonicMarshal()...), '$')
-		eventTimePrefixedTx := tx.WithPrefix(eventTimeBytes)
+		eventTimePrefixedTx := tx
+		if len(p.eventTimeField) > 0 {
+			// Prefixing transaction for process function with record event time
+			octoEventTime := key.AsSlice()[0]
+			eventTimeBytes := append(append([]byte("$"), octoEventTime.MonotonicMarshal()...), '$')
+			eventTimePrefixedTx = tx.WithPrefix(eventTimeBytes)
+		}
 
 		records, err := p.processFunction.Trigger(ctx, eventTimePrefixedTx, key)
 		if err != nil {

@@ -104,7 +104,7 @@ func (p *ProcessByKey) AddRecord(ctx context.Context, tx storage.StateTransactio
 	return nil
 }
 
-func (p *ProcessByKey) RunGarbageCollector(ctx context.Context, prefixedStorage storage.Storage) error {
+func (p *ProcessByKey) RunGarbageCollector(ctx context.Context, prefixedStorage storage.Storage, gbBoundary, gbCycle int) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -123,7 +123,7 @@ func (p *ProcessByKey) RunGarbageCollector(ctx context.Context, prefixedStorage 
 		// We don't want to clear whole storage when sending MaxWatermark - on EndOfStream and WatermarkTrigger
 		if watermark != MaxWatermark {
 			// Collect every event time earlier than watermark - 10min
-			boundary := watermark.Add(-10 * time.Minute) // TODO - make this configurable
+			boundary := watermark.Add(time.Duration(-1*gbBoundary) * time.Minute)
 
 			eventTimeMap := storage.NewMap(tx.WithPrefix(eventTimesSeenPrefix))
 			octoEventTimeSlice := make([]octosql.Value, 0)
@@ -163,7 +163,7 @@ func (p *ProcessByKey) RunGarbageCollector(ctx context.Context, prefixedStorage 
 			}
 		}
 
-		time.Sleep(10 * time.Millisecond) // TODO - this is very poor in testing, make this configurable?
+		time.Sleep(time.Duration(gbCycle) * time.Millisecond)
 	}
 }
 

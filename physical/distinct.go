@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical/metadata"
@@ -31,6 +32,16 @@ func (node *Distinct) Transform(ctx context.Context, transformers *Transformers)
 }
 
 func (node *Distinct) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
+	garbageCollectionBoundary, err := config.GetInt(matCtx.Config.Execution, "garbageCollectionBoundary", config.WithDefault(10))
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get garbageCollectionBoundary configuration")
+	}
+
+	garbageCollectionCycle, err := config.GetInt(matCtx.Config.Execution, "garbageCollectionCycle", config.WithDefault(60000))
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get garbageCollectionCycle configuration")
+	}
+
 	childNode, err := node.Source.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize source node in distinct")
@@ -38,7 +49,7 @@ func (node *Distinct) Materialize(ctx context.Context, matCtx *MaterializationCo
 
 	eventTimeField := node.Source.Metadata().EventTimeField()
 
-	return execution.NewDistinct(matCtx.Storage, childNode, eventTimeField), nil
+	return execution.NewDistinct(matCtx.Storage, childNode, eventTimeField, garbageCollectionBoundary, garbageCollectionCycle), nil
 }
 
 func (node *Distinct) Metadata() *metadata.NodeMetadata {

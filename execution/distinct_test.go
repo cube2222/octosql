@@ -603,7 +603,7 @@ func TestDistinct_Get(t *testing.T) {
 			stateStorage := storage.GetTestStorage(t)
 			ctx := context.Background()
 
-			distinct := NewDistinct(stateStorage, tt.args.source, "")
+			distinct := NewDistinct(stateStorage, tt.args.source, "", 10, 10)
 
 			stream := GetTestStream(t, stateStorage, octosql.NoVariables(), distinct)
 
@@ -662,7 +662,7 @@ func TestDistinct_Retractions(t *testing.T) {
 
 	source := NewDummyNode(inputRecords)
 
-	distinct := NewDistinct(stateStorage, source, "")
+	distinct := NewDistinct(stateStorage, source, "", 10, 10)
 
 	stream := GetTestStream(t, stateStorage, octosql.NoVariables(), distinct)
 

@@ -41,6 +41,7 @@ func RunTelemetry(ctx context.Context, telemetryInfo TelemetryInfo, datasources 
 		telemetry.DatasourceTypesInConfig[datasourceConfig.Type] = true
 	}
 	plan.Transform(ctx, TelemetryTransformer(&telemetry, datasources))
+	log.Printf("Sending telemetry: %+v", telemetry)
 	SendTelemetry(ctx, &telemetry)
 }
 

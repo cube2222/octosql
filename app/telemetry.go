@@ -191,7 +191,7 @@ func SendTelemetry(ctx context.Context, telemetry *Telemetry) {
 	start := time.Now()
 	go func() {
 		http.DefaultClient.Do(req.WithContext(ctx))
-		log.Println("telemetry took: ", time.Since(start))
+		log.Println("Telemetry took: ", time.Since(start))
 	}()
 }
 

@@ -32,12 +32,11 @@ type GroupBy struct {
 
 	triggerPrototype TriggerPrototype
 
-	garbageCollectorBoundary int // number of minutes subtracted from watermark to create boundary for garbage collection
-	garbageCollectorCycle    int // number of miliseconds for garbage collector to sleep between records check
+	gcInfo *GarbageCollectorInfo
 }
 
-func NewGroupBy(storage storage.Storage, source Node, key []Expression, fields []octosql.VariableName, aggregatePrototypes []aggregates.AggregatePrototype, eventTimeField octosql.VariableName, as []octosql.VariableName, outEventTimeField octosql.VariableName, triggerPrototype TriggerPrototype, garbageCollectorBoundary, garbageCollectorCycle int) *GroupBy {
-	return &GroupBy{storage: storage, source: source, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, eventTimeField: eventTimeField, as: as, outEventTimeField: outEventTimeField, triggerPrototype: triggerPrototype, garbageCollectorBoundary: garbageCollectorBoundary, garbageCollectorCycle: garbageCollectorCycle}
+func NewGroupBy(storage storage.Storage, source Node, key []Expression, fields []octosql.VariableName, aggregatePrototypes []aggregates.AggregatePrototype, eventTimeField octosql.VariableName, as []octosql.VariableName, outEventTimeField octosql.VariableName, triggerPrototype TriggerPrototype, gcInfo *GarbageCollectorInfo) *GroupBy {
+	return &GroupBy{storage: storage, source: source, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, eventTimeField: eventTimeField, as: as, outEventTimeField: outEventTimeField, triggerPrototype: triggerPrototype, gcInfo: gcInfo}
 }
 
 func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
@@ -112,7 +111,7 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 				[]Task{
 					func() error { groupByPullEngine.Run(); return nil },
 					func() error {
-						err := processFunc.RunGarbageCollector(gbCtx, node.storage.WithPrefix(streamID.AsPrefix()), node.garbageCollectorBoundary, node.garbageCollectorCycle)
+						err := processFunc.RunGarbageCollector(gbCtx, node.storage.WithPrefix(streamID.AsPrefix()), node.gcInfo.garbageCollectorBoundary, node.gcInfo.garbageCollectorCycle)
 						if err == context.Canceled || err == context.DeadlineExceeded {
 							processFunc.garbageCollectorCloseErrChan <- err
 							return nil

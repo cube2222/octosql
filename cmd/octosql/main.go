@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"reflect"
 	"runtime"
 	"runtime/debug"
@@ -48,6 +49,7 @@ var version string
 var configPath string
 var outputFormat string
 var storageDirectory string
+var logFilePath string
 var describe bool
 
 var rootCmd = &cobra.Command{
@@ -153,8 +155,28 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 			}
 			storageDirectory = tempDir
 		}
+		defer func() {
+			err = os.RemoveAll(storageDirectory)
+			if err != nil {
+				log.SetOutput(os.Stderr)
+				log.Fatal("couldn't remove temporary directory: ", err)
+			}
+		}()
+
+		if logFilePath == "" {
+			logFilePath = path.Join(storageDirectory, "octosql.log")
+		}
+		logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, os.ModePerm)
+		if err != nil {
+			log.Fatalf("couldn't open file for logs %s: %s", logFilePath, err)
+		}
+		defer logFile.Close()
+		log.SetOutput(logFile)
+		log.Printf("Starting OctoSQL...")
+		log.Printf("Using Configuration: %+v", *cfg)
 
 		opts := badger.DefaultOptions(storageDirectory)
+		opts.Logger = badgerLogger{}
 		if runtime.GOOS == "windows" { // TODO - fix while refactoring config
 			opts = opts.WithValueLogLoadingMode(options.FileIO)
 		}
@@ -163,6 +185,12 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 		if err != nil {
 			log.Fatal("couldn't open badger database: ", err)
 		}
+		defer func() {
+			err = db.Close()
+			if err != nil {
+				log.Fatal("couldn't close the database: ", err)
+			}
+		}()
 
 		stateStorage := storage.NewBadgerStorage(db)
 
@@ -170,16 +198,6 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 		err = app.RunPlan(ctx, stateStorage, plan)
 		if err != nil {
 			log.Fatal("couldn't run plan: ", err)
-		}
-
-		err = db.Close()
-		if err != nil {
-			log.Fatal("couldn't close the database: ", err)
-		}
-
-		err = os.RemoveAll(storageDirectory)
-		if err != nil {
-			log.Fatal("couldn't remove temporary directory: ", err)
 		}
 	},
 }
@@ -197,6 +215,7 @@ func main() {
 	rootCmd.Flags().StringVarP(&configPath, "config", "c", os.Getenv("OCTOSQL_CONFIG"), "data source configuration path, defaults to $OCTOSQL_CONFIG")
 	rootCmd.Flags().StringVarP(&outputFormat, "output", "o", "live-table", "output format, one of [table json csv tabbed table_row_separated]")
 	rootCmd.Flags().StringVar(&storageDirectory, "storage-directory", "", "directory to store state storage in")
+	rootCmd.Flags().StringVar(&logFilePath, "log-file", "", "Logs output file, will append if the file exists.")
 	rootCmd.Flags().BoolVar(&describe, "describe", false, "Print out the physical query plan in graphviz format. You can use a command like \"dot -Tpng file > output.png\" to view it.")
 
 	go func() {

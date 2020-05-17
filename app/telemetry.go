@@ -41,6 +41,7 @@ func RunTelemetry(ctx context.Context, telemetryInfo TelemetryInfo, datasources 
 		telemetry.DatasourceTypesInConfig[datasourceConfig.Type] = true
 	}
 	plan.Transform(ctx, TelemetryTransformer(&telemetry, datasources))
+	log.Printf("Sending telemetry: %+v", telemetry)
 	SendTelemetry(ctx, &telemetry)
 }
 
@@ -190,7 +191,7 @@ func SendTelemetry(ctx context.Context, telemetry *Telemetry) {
 	start := time.Now()
 	go func() {
 		http.DefaultClient.Do(req.WithContext(ctx))
-		log.Println("telemetry took: ", time.Since(start))
+		log.Println("Telemetry took: ", time.Since(start))
 	}()
 }
 

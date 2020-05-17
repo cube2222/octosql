@@ -32,12 +32,12 @@ func (node *Distinct) Transform(ctx context.Context, transformers *Transformers)
 }
 
 func (node *Distinct) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
-	garbageCollectionBoundary, err := config.GetInt(matCtx.Config.Execution, "garbageCollectionBoundary", config.WithDefault(10))
+	garbageCollectionBoundary, err := config.GetInt(matCtx.Config.Execution, "garbageCollectionBoundary", config.WithDefault(600))
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get garbageCollectionBoundary configuration")
 	}
 
-	garbageCollectionCycle, err := config.GetInt(matCtx.Config.Execution, "garbageCollectionCycle", config.WithDefault(60000))
+	garbageCollectionCycle, err := config.GetInt(matCtx.Config.Execution, "garbageCollectionCycle", config.WithDefault(60))
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get garbageCollectionCycle configuration")
 	}
@@ -49,7 +49,7 @@ func (node *Distinct) Materialize(ctx context.Context, matCtx *MaterializationCo
 
 	eventTimeField := node.Source.Metadata().EventTimeField()
 
-	return execution.NewDistinct(matCtx.Storage, childNode, eventTimeField, garbageCollectionBoundary, garbageCollectionCycle), nil
+	return execution.NewDistinct(matCtx.Storage, childNode, eventTimeField, execution.NewGarbageCollectorInfo(garbageCollectionBoundary, garbageCollectionCycle)), nil
 }
 
 func (node *Distinct) Metadata() *metadata.NodeMetadata {

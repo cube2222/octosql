@@ -176,12 +176,12 @@ func (node *GroupBy) Transform(ctx context.Context, transformers *Transformers) 
 }
 
 func (node *GroupBy) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
-	garbageCollectionBoundary, err := config.GetInt(matCtx.Config.Execution, "garbageCollectionBoundary", config.WithDefault(10))
+	garbageCollectionBoundary, err := config.GetInt(matCtx.Config.Execution, "garbageCollectionBoundary", config.WithDefault(600))
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get garbageCollectionBoundary configuration")
 	}
 
-	garbageCollectionCycle, err := config.GetInt(matCtx.Config.Execution, "garbageCollectionCycle", config.WithDefault(60000))
+	garbageCollectionCycle, err := config.GetInt(matCtx.Config.Execution, "garbageCollectionCycle", config.WithDefault(60))
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get garbageCollectionCycle configuration")
 	}
@@ -229,7 +229,7 @@ func (node *GroupBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 
 	meta := node.Metadata()
 
-	return execution.NewGroupBy(matCtx.Storage, source, key, node.Fields, aggregatePrototypes, eventTimeField, node.As, meta.EventTimeField(), triggerPrototype, garbageCollectionBoundary, garbageCollectionCycle), nil
+	return execution.NewGroupBy(matCtx.Storage, source, key, node.Fields, aggregatePrototypes, eventTimeField, node.As, meta.EventTimeField(), triggerPrototype, execution.NewGarbageCollectorInfo(garbageCollectionBoundary, garbageCollectionCycle)), nil
 }
 
 func (node *GroupBy) groupingByEventTime(sourceMetadata *metadata.NodeMetadata) bool {

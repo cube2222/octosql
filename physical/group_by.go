@@ -201,7 +201,7 @@ func (node *GroupBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 		key[i] = keyPart
 	}
 
-	aggregatePrototypes := make([]execution.AggregatePrototype, len(node.Aggregates))
+	aggregatePrototypes := make([]aggregates.AggregatePrototype, len(node.Aggregates))
 	for i := range node.Aggregates {
 		aggregatePrototypes[i] = aggregates.AggregateTable[string(node.Aggregates[i])]
 	}

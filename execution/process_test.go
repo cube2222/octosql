@@ -21,18 +21,18 @@ func TestExample(t *testing.T) {
 	streamID := GetRawStreamID()
 
 	groupBy := &GroupByStream{
-		prefixes:             [][]byte{[]byte("whatever")},
-		inputFields:          []octosql.VariableName{"value"},
+		prefixes:             [][]byte{[]byte("whatever"), []byte("still_whatever")},
+		inputFields:          []octosql.VariableName{"event_time", "livesleft"},
 		eventTimeField:       "event_time",
 		outputEventTimeField: "event_time",
-		aggregates:           []Aggregate{aggregates.NewSumAggregate()},
-		outputFieldNames:     []octosql.VariableName{"value_sum"},
+		aggregates:           []Aggregate{aggregates.NewKeyAggregate(), aggregates.NewSumAggregate()},
+		outputFieldNames:     []octosql.VariableName{"event_time", "livesleft_sum"},
 		streamID:             streamID,
 	}
 	processFunc := &ProcessByKey{
 		eventTimeField:  octosql.NewVariableName("event_time"),
 		trigger:         trigger.NewWatermarkTrigger(),
-		keyExpressions:  [][]Expression{{NewVariable("key"), NewVariable("event_time")}},
+		keyExpressions:  [][]Expression{{NewVariable("event_time")}},
 		processFunction: groupBy,
 		variables:       octosql.NoVariables(),
 	}
@@ -40,6 +40,35 @@ func TestExample(t *testing.T) {
 	prefixedStateStorage := stateStorage.WithPrefix(streamID.AsPrefix())
 
 	now := time.Now().UTC()
+
+	fields := []octosql.VariableName{"cat", "livesleft", "event_time"}
+
+	firstWindow := now
+	record11 := NewRecordFromSliceWithNormalize(fields, []interface{}{"Buster", 100, firstWindow}, WithEventTimeField(octosql.NewVariableName("event_time")))
+	record12 := NewRecordFromSliceWithNormalize(fields, []interface{}{"Precious", 101, firstWindow}, WithEventTimeField(octosql.NewVariableName("event_time")))
+	record13 := NewRecordFromSliceWithNormalize(fields, []interface{}{"Nala", 102, firstWindow}, WithEventTimeField(octosql.NewVariableName("event_time")))
+	record14 := NewRecordFromSliceWithNormalize(fields, []interface{}{"Tiger", 103, firstWindow}, WithEventTimeField(octosql.NewVariableName("event_time")))
+	record15 := NewRecordFromSliceWithNormalize(fields, []interface{}{"Lucy", 104, firstWindow}, WithEventTimeField(octosql.NewVariableName("event_time")))
+
+	secondWindow := now.Add(time.Minute * 5)
+	record21 := NewRecordFromSliceWithNormalize(fields, []interface{}{"Buster", 9, secondWindow}, WithEventTimeField(octosql.NewVariableName("event_time")))
+	record22 := NewRecordFromSliceWithNormalize(fields, []interface{}{"Nala", 6, secondWindow}, WithEventTimeField(octosql.NewVariableName("event_time")))
+	record23 := NewRecordFromSliceWithNormalize(fields, []interface{}{"Lucy", 4, secondWindow}, WithEventTimeField(octosql.NewVariableName("event_time")))
+	record24 := NewRecordFromSliceWithNormalize(fields, []interface{}{"Tiger", 5, secondWindow}, WithEventTimeField(octosql.NewVariableName("event_time")))
+
+	thirdWindow := now.Add(time.Minute * 10)
+	record31 := NewRecordFromSliceWithNormalize(fields, []interface{}{"Buster", 8, thirdWindow}, WithEventTimeField(octosql.NewVariableName("event_time")))
+	record32 := NewRecordFromSliceWithNormalize(fields, []interface{}{"Nala", 6, thirdWindow}, WithEventTimeField(octosql.NewVariableName("event_time")))
+	record33 := NewRecordFromSliceWithNormalize(fields, []interface{}{"Lucy", 1, thirdWindow}, WithEventTimeField(octosql.NewVariableName("event_time")))
+	record34 := NewRecordFromSliceWithNormalize(fields, []interface{}{"Tiger", 2, thirdWindow}, WithEventTimeField(octosql.NewVariableName("event_time")))
+
+	// Garbage collector stuff
+	gbCtx, cancel := context.WithCancel(ctx)
+	processFunc.garbageCollectorCtxCancel = cancel
+	processFunc.garbageCollectorCloseErrChan = make(chan error, 1)
+	go func() {
+		_ = processFunc.RunGarbageCollector(gbCtx, prefixedStateStorage, 360, 1) // Check every 1 second, boundary: watermark - 6min
+	}()
 
 	// Next when no record available
 	{
@@ -60,7 +89,7 @@ func TestExample(t *testing.T) {
 	// Set watermark with no records pending
 	{
 		tx := prefixedStateStorage.BeginTransaction()
-		err := processFunc.UpdateWatermark(ctx, tx, now)
+		err := processFunc.UpdateWatermark(ctx, tx, now.Add(5*time.Minute)) // GC: No deletions
 		assert.NoError(t, err)
 		assert.NoError(t, tx.Commit())
 	}
@@ -93,24 +122,30 @@ func TestExample(t *testing.T) {
 	{
 		tx := prefixedStateStorage.BeginTransaction()
 		watermark, err := processFunc.GetWatermark(ctx, tx)
-		assert.Equal(t, now, watermark)
+		assert.Equal(t, now.Add(5*time.Minute), watermark)
 		assert.NoError(t, err)
 		assert.NoError(t, tx.Commit())
 	}
-	// Add records.
+	// Add records. (all from first, 2 from second, 2 from third)
 	{
 		tx := prefixedStateStorage.BeginTransaction()
-		err := processFunc.AddRecord(ctx, tx, 0, NewRecordFromSliceWithNormalize(
-			[]octosql.VariableName{"key", "event_time", "value"},
-			[]interface{}{"test", now.Add(time.Minute), 5},
-			WithEventTimeField("event_time"),
-		))
+		err := processFunc.AddRecord(ctx, tx, 0, record11)
 		assert.NoError(t, err)
-		err = processFunc.AddRecord(ctx, tx, 0, NewRecordFromSliceWithNormalize(
-			[]octosql.VariableName{"key", "event_time", "value"},
-			[]interface{}{"test", now.Add(time.Minute), 3},
-			WithEventTimeField("event_time"),
-		))
+		err = processFunc.AddRecord(ctx, tx, 0, record12)
+		assert.NoError(t, err)
+		err = processFunc.AddRecord(ctx, tx, 0, record13)
+		assert.NoError(t, err)
+		err = processFunc.AddRecord(ctx, tx, 0, record14)
+		assert.NoError(t, err)
+		err = processFunc.AddRecord(ctx, tx, 0, record15)
+		assert.NoError(t, err)
+		err = processFunc.AddRecord(ctx, tx, 0, record21)
+		assert.NoError(t, err)
+		err = processFunc.AddRecord(ctx, tx, 0, record22)
+		assert.NoError(t, err)
+		err = processFunc.AddRecord(ctx, tx, 0, record31)
+		assert.NoError(t, err)
+		err = processFunc.AddRecord(ctx, tx, 0, record32)
 		assert.NoError(t, err)
 		assert.NoError(t, tx.Commit())
 	}
@@ -122,35 +157,27 @@ func TestExample(t *testing.T) {
 		assert.Error(t, GetErrWaitForChanges(err))
 		assert.NoError(t, tx.Commit())
 	}
-	// Set watermark to trigger records.
+	// Set watermark to trigger records
 	{
 		tx := prefixedStateStorage.BeginTransaction()
-		err := processFunc.UpdateWatermark(ctx, tx, now.Add(2*time.Minute))
+		err := processFunc.UpdateWatermark(ctx, tx, now.Add(10*time.Minute)) // GC: First window deleted (10 - 6 = 4 > firstWindow)
 		assert.NoError(t, err)
 		assert.NoError(t, tx.Commit())
 	}
-	// Get watermark before triggering keys.
+	// Get watermark before triggering keys
 	{
 		tx := prefixedStateStorage.BeginTransaction()
 		watermark, err := processFunc.GetWatermark(ctx, tx)
-		assert.Equal(t, now, watermark)
+		assert.Equal(t, now.Add(5*time.Minute), watermark)
 		assert.NoError(t, err)
 		assert.NoError(t, tx.Commit())
 	}
-	// Next record before triggering keys.
-	{
-		tx := prefixedStateStorage.BeginTransaction()
-		rec, err := processFunc.Next(ctx, tx)
-		assert.Nil(t, rec)
-		assert.Error(t, GetErrWaitForChanges(err))
-		assert.NoError(t, tx.Commit())
-	}
 	// Trigger keys.
-	// This triggers the record under the watermark.
+	// This triggers the records under the watermark.
 	{
 		tx := prefixedStateStorage.BeginTransaction()
-		keys, err := processFunc.TriggerKeys(ctx, tx, 1)
-		assert.Equal(t, 1, keys)
+		keys, err := processFunc.TriggerKeys(ctx, tx, 3)
+		assert.Equal(t, 2, keys) // OMG this is actually happening (!!!)
 		assert.NoError(t, err)
 		assert.NoError(t, tx.Commit())
 	}
@@ -158,40 +185,52 @@ func TestExample(t *testing.T) {
 	// This puts the watermark into the output queue.
 	{
 		tx := prefixedStateStorage.BeginTransaction()
-		keys, err := processFunc.TriggerKeys(ctx, tx, 1)
+		keys, err := processFunc.TriggerKeys(ctx, tx, 3)
 		assert.Equal(t, 0, keys)
 		assert.NoError(t, err)
 		assert.NoError(t, tx.Commit())
 	}
-	// The watermark is in the output queue, still not applied.
-	{
-		tx := prefixedStateStorage.BeginTransaction()
-		watermark, err := processFunc.GetWatermark(ctx, tx)
-		assert.Equal(t, now, watermark)
-		assert.NoError(t, err)
-		assert.NoError(t, tx.Commit())
-	}
+
+	time.Sleep(2 * time.Second) // Now the garbage collector should delete records from first window
+
 	// Get record.
 	{
 		tx := prefixedStateStorage.BeginTransaction()
 		rec, err := processFunc.Next(ctx, tx)
 		assert.NoError(t, EqualityOfEverythingButIDs(NewRecordFromSliceWithNormalize(
-			[]octosql.VariableName{"value_sum"},
-			[]interface{}{8},
-			WithEventTimeField("event_time"), // TODO: Shouldn't be here, bug.
+			[]octosql.VariableName{"event_time", "livesleft_sum"},
+			[]interface{}{secondWindow, 15},
+			WithEventTimeField("event_time"),
+		), rec))
+		rec, err = processFunc.Next(ctx, tx)
+		assert.NoError(t, EqualityOfEverythingButIDs(NewRecordFromSliceWithNormalize(
+			[]octosql.VariableName{"event_time", "livesleft_sum"},
+			[]interface{}{thirdWindow, 14},
+			WithEventTimeField("event_time"),
 		), rec))
 		assert.NoError(t, err)
 		assert.NoError(t, tx.Commit())
 	}
-	// The watermark is in the output queue, still not applied.
+
+	// Adding record from window that should be cleared by GC
 	{
 		tx := prefixedStateStorage.BeginTransaction()
-		watermark, err := processFunc.GetWatermark(ctx, tx)
-		assert.Equal(t, now, watermark)
+		err := processFunc.AddRecord(ctx, tx, 0, record11)
 		assert.NoError(t, err)
 		assert.NoError(t, tx.Commit())
 	}
-	// Next with no record in queue, but will apply watermark.
+	// Trigger keys. No keys to trigger
+	{
+		tx := prefixedStateStorage.BeginTransaction()
+		keys, err := processFunc.TriggerKeys(ctx, tx, 3)
+		assert.Equal(t, 0, keys)
+		assert.NoError(t, err)
+		assert.NoError(t, tx.Commit())
+	}
+
+	time.Sleep(2 * time.Second) // Now the garbage collector should delete records from first window
+
+	// Next when no record available
 	{
 		tx := prefixedStateStorage.BeginTransaction()
 		rec, err := processFunc.Next(ctx, tx)
@@ -199,14 +238,70 @@ func TestExample(t *testing.T) {
 		assert.Error(t, GetErrWaitForChanges(err))
 		assert.NoError(t, tx.Commit())
 	}
-	// Read updated watermark.
+
+	// Add records. (last 2 from second, last 2 from third)
 	{
 		tx := prefixedStateStorage.BeginTransaction()
-		watermark, err := processFunc.GetWatermark(ctx, tx)
-		assert.Equal(t, now.Add(2*time.Minute), watermark)
+		err := processFunc.AddRecord(ctx, tx, 0, record23)
+		assert.NoError(t, err)
+		err = processFunc.AddRecord(ctx, tx, 0, record24)
+		assert.NoError(t, err)
+		err = processFunc.AddRecord(ctx, tx, 0, record33)
+		assert.NoError(t, err)
+		err = processFunc.AddRecord(ctx, tx, 0, record34)
 		assert.NoError(t, err)
 		assert.NoError(t, tx.Commit())
 	}
+	// Set watermark to trigger records
+	{
+		tx := prefixedStateStorage.BeginTransaction()
+		err := processFunc.UpdateWatermark(ctx, tx, now.Add(12*time.Minute)) // GC: Second window deleted (12 - 6 = 6 > secondWindow)
+		assert.NoError(t, err)
+		assert.NoError(t, tx.Commit())
+	}
+	// Trigger keys.
+	// This triggers the record under the watermark.
+	{
+		tx := prefixedStateStorage.BeginTransaction()
+		keys, err := processFunc.TriggerKeys(ctx, tx, 3)
+		assert.Equal(t, 1, keys) // ANOTHER event time deleted !!
+		assert.NoError(t, err)
+		assert.NoError(t, tx.Commit())
+	}
+	// Trigger keys. No keys to trigger
+	// This puts the watermark into the output queue.
+	{
+		tx := prefixedStateStorage.BeginTransaction()
+		keys, err := processFunc.TriggerKeys(ctx, tx, 3)
+		assert.Equal(t, 0, keys)
+		assert.NoError(t, err)
+		assert.NoError(t, tx.Commit())
+	}
+
+	time.Sleep(2 * time.Second) // Now the garbage collector should delete records from second window
+
+	// Get record.
+	{
+		tx := prefixedStateStorage.BeginTransaction()
+		rec, err := processFunc.Next(ctx, tx)
+		assert.NoError(t, EqualityOfEverythingButIDs(NewRecordFromSliceWithNormalize(
+			[]octosql.VariableName{"event_time", "livesleft_sum"},
+			[]interface{}{thirdWindow, 14},
+			WithEventTimeField("event_time"),
+			WithUndo(),
+		), rec))
+		rec, err = processFunc.Next(ctx, tx)
+		assert.NoError(t, EqualityOfEverythingButIDs(NewRecordFromSliceWithNormalize(
+			[]octosql.VariableName{"event_time", "livesleft_sum"},
+			[]interface{}{thirdWindow, 17},
+			WithEventTimeField("event_time"),
+		), rec))
+		assert.NoError(t, err)
+		assert.NoError(t, tx.Commit())
+	}
+
+	// Stop garbage collector
+	processFunc.garbageCollectorCtxCancel()
 }
 
 var recordElement = &QueueElement{Type: &QueueElement_Record{Record: NewRecordFromSlice(

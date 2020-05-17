@@ -344,7 +344,7 @@ func (p *ProcessByKey) RunGarbageCollector(ctx context.Context, prefixedStorage 
 		// We don't want to clear whole storage when sending MaxWatermark - on EndOfStream and WatermarkTrigger
 		if watermark != MaxWatermark {
 			// Collect every event time earlier than watermark - boundary (by default: watermark - 10min)
-			boundary := watermark.Add(time.Duration(-1*gbBoundary) * time.Minute)
+			boundary := watermark.Add(time.Duration(-1*gbBoundary) * time.Second)
 
 			eventTimeMap := storage.NewMap(tx.WithPrefix(eventTimesSeenPrefix))
 			octoEventTimeSlice := make([]octosql.Value, 0)
@@ -384,6 +384,6 @@ func (p *ProcessByKey) RunGarbageCollector(ctx context.Context, prefixedStorage 
 			}
 		}
 
-		time.Sleep(time.Duration(gbCycle) * time.Millisecond)
+		time.Sleep(time.Duration(gbCycle) * time.Second)
 	}
 }

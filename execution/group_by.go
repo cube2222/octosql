@@ -5,12 +5,11 @@ import (
 	"fmt"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/execution/aggregates"
 	"github.com/cube2222/octosql/storage"
 
 	"github.com/pkg/errors"
 )
-
-type AggregatePrototype func() Aggregate
 
 type Aggregate interface {
 	AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error
@@ -25,7 +24,7 @@ type GroupBy struct {
 	key     []Expression
 
 	fields              []octosql.VariableName
-	aggregatePrototypes []AggregatePrototype
+	aggregatePrototypes []aggregates.AggregatePrototype
 	eventTimeField      octosql.VariableName
 
 	as                []octosql.VariableName
@@ -37,7 +36,7 @@ type GroupBy struct {
 	garbageCollectorCycle    int // number of miliseconds for garbage collector to sleep between records check
 }
 
-func NewGroupBy(storage storage.Storage, source Node, key []Expression, fields []octosql.VariableName, aggregatePrototypes []AggregatePrototype, eventTimeField octosql.VariableName, as []octosql.VariableName, outEventTimeField octosql.VariableName, triggerPrototype TriggerPrototype, garbageCollectorBoundary, garbageCollectorCycle int) *GroupBy {
+func NewGroupBy(storage storage.Storage, source Node, key []Expression, fields []octosql.VariableName, aggregatePrototypes []aggregates.AggregatePrototype, eventTimeField octosql.VariableName, as []octosql.VariableName, outEventTimeField octosql.VariableName, triggerPrototype TriggerPrototype, garbageCollectorBoundary, garbageCollectorCycle int) *GroupBy {
 	return &GroupBy{storage: storage, source: source, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, eventTimeField: eventTimeField, as: as, outEventTimeField: outEventTimeField, triggerPrototype: triggerPrototype, garbageCollectorBoundary: garbageCollectorBoundary, garbageCollectorCycle: garbageCollectorCycle}
 }
 

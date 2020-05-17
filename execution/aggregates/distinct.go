@@ -7,17 +7,23 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/storage"
 )
+
+type Aggregate interface {
+	AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error
+	RetractValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error
+	GetValue(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error)
+	String() string
+}
 
 var currentDistinctPrefix = []byte("$current_distinct$")
 
 type Distinct struct {
-	underlying execution.Aggregate
+	underlying Aggregate
 }
 
-func NewDistinctAggregate(aggr execution.Aggregate) *Distinct {
+func NewDistinctAggregate(aggr Aggregate) *Distinct {
 	return &Distinct{
 		underlying: aggr,
 	}

@@ -33,7 +33,7 @@ func TestGroupBy_SimpleBatch(t *testing.T) {
 			octosql.NewVariableName("livesleft"),
 			octosql.NewVariableName("livesleft"),
 		},
-		[]AggregatePrototype{
+		[]aggregates.AggregatePrototype{
 			aggregates.AggregateTable["key"],
 			aggregates.AggregateTable["avg"],
 			aggregates.AggregateTable["count"],
@@ -109,7 +109,7 @@ func TestGroupBy_BatchWithUndos(t *testing.T) {
 			octosql.NewVariableName("livesleft"),
 			octosql.NewVariableName("livesleft"),
 		},
-		[]AggregatePrototype{
+		[]aggregates.AggregatePrototype{
 			aggregates.AggregateTable["key"],
 			aggregates.AggregateTable["avg"],
 			aggregates.AggregateTable["count"],
@@ -189,7 +189,7 @@ func TestGroupBy_WithOutputUndos(t *testing.T) {
 			octosql.NewVariableName("livesleft"),
 			octosql.NewVariableName("livesleft"),
 		},
-		[]AggregatePrototype{
+		[]aggregates.AggregatePrototype{
 			aggregates.AggregateTable["key"],
 			aggregates.AggregateTable["avg"],
 			aggregates.AggregateTable["count"],
@@ -270,7 +270,7 @@ func TestGroupBy_newRecordsNoChanges(t *testing.T) {
 			octosql.NewVariableName("ownerid"),
 			octosql.NewVariableName("livesleft"),
 		},
-		[]AggregatePrototype{
+		[]aggregates.AggregatePrototype{
 			aggregates.AggregateTable["key"],
 			aggregates.AggregateTable["avg"],
 		},
@@ -350,7 +350,7 @@ func TestGroupBy_EventTimes(t *testing.T) {
 			octosql.NewVariableName("livesleft"),
 			octosql.NewVariableName("livesleft"),
 		},
-		[]AggregatePrototype{
+		[]aggregates.AggregatePrototype{
 			aggregates.AggregateTable["key"],
 			aggregates.AggregateTable["key"],
 			aggregates.AggregateTable["avg"],

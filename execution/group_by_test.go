@@ -46,8 +46,7 @@ func TestGroupBy_SimpleBatch(t *testing.T) {
 		},
 		octosql.NewVariableName(""),
 		NewWatermarkTrigger(),
-		10,
-		10,
+		NewGarbageCollectorInfo(600, 1),
 	)
 
 	outFields := []octosql.VariableName{"ownerid", "livesleft_avg", "livesleft_count"}
@@ -122,8 +121,7 @@ func TestGroupBy_BatchWithUndos(t *testing.T) {
 		},
 		octosql.NewVariableName(""),
 		NewWatermarkTrigger(),
-		10,
-		10,
+		NewGarbageCollectorInfo(600, 1),
 	)
 
 	outFields := []octosql.VariableName{"ownerid", "livesleft_avg", "livesleft_count"}
@@ -202,8 +200,7 @@ func TestGroupBy_WithOutputUndos(t *testing.T) {
 		},
 		octosql.NewVariableName(""),
 		NewCountingTrigger(NewVariable(octosql.NewVariableName("count"))),
-		10,
-		10,
+		NewGarbageCollectorInfo(600, 1),
 	)
 
 	outFields := []octosql.VariableName{"ownerid", "livesleft_avg", "livesleft_count"}
@@ -281,8 +278,7 @@ func TestGroupBy_newRecordsNoChanges(t *testing.T) {
 		},
 		octosql.NewVariableName(""),
 		NewCountingTrigger(NewVariable(octosql.NewVariableName("count"))),
-		10,
-		10,
+		NewGarbageCollectorInfo(600, 1),
 	)
 
 	outFields := []octosql.VariableName{"ownerid", "livesleft_avg"}
@@ -365,8 +361,7 @@ func TestGroupBy_EventTimes(t *testing.T) {
 		},
 		octosql.NewVariableName("renamed_t"),
 		NewWatermarkTrigger(),
-		10,
-		10,
+		NewGarbageCollectorInfo(600, 1),
 	)
 
 	outFields := []octosql.VariableName{"renamed_t", "ownerid", "livesleft_avg", "livesleft_count"}

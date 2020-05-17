@@ -14,17 +14,15 @@ type Distinct struct {
 	source         Node
 	eventTimeField octosql.VariableName
 
-	garbageCollectorBoundary int // number of minutes subtracted from watermark to create boundary for garbage collection
-	garbageCollectorCycle    int // number of miliseconds for garbage collector to sleep between records check
+	gcInfo *GarbageCollectorInfo
 }
 
-func NewDistinct(storage storage.Storage, source Node, eventTimeField octosql.VariableName, garbageCollectorBoundary, garbageCollectorCycle int) *Distinct {
+func NewDistinct(storage storage.Storage, source Node, eventTimeField octosql.VariableName, gcInfo *GarbageCollectorInfo) *Distinct {
 	return &Distinct{
-		storage:                  storage,
-		source:                   source,
-		eventTimeField:           eventTimeField,
-		garbageCollectorBoundary: garbageCollectorBoundary,
-		garbageCollectorCycle:    garbageCollectorCycle,
+		storage:        storage,
+		source:         source,
+		eventTimeField: eventTimeField,
+		gcInfo:         gcInfo,
 	}
 }
 
@@ -73,7 +71,7 @@ func (node *Distinct) Get(ctx context.Context, variables octosql.Variables, stre
 				[]Task{
 					func() error { distinctPullEngine.Run(); return nil },
 					func() error {
-						err := processFunc.RunGarbageCollector(gbCtx, node.storage.WithPrefix(streamID.AsPrefix()), node.garbageCollectorBoundary, node.garbageCollectorCycle)
+						err := processFunc.RunGarbageCollector(gbCtx, node.storage.WithPrefix(streamID.AsPrefix()), node.gcInfo.garbageCollectorBoundary, node.gcInfo.garbageCollectorCycle)
 						if err == context.Canceled || err == context.DeadlineExceeded {
 							processFunc.garbageCollectorCloseErrChan <- err
 							return nil

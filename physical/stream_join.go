@@ -52,12 +52,12 @@ func (node *StreamJoin) Transform(ctx context.Context, transformers *Transformer
 }
 
 func (node *StreamJoin) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
-	garbageCollectionBoundary, err := config.GetInt(matCtx.Config.Execution, "garbageCollectionBoundary", config.WithDefault(10))
+	garbageCollectionBoundary, err := config.GetInt(matCtx.Config.Execution, "garbageCollectionBoundary", config.WithDefault(600))
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get garbageCollectionBoundary configuration")
 	}
 
-	garbageCollectionCycle, err := config.GetInt(matCtx.Config.Execution, "garbageCollectionCycle", config.WithDefault(60000))
+	garbageCollectionCycle, err := config.GetInt(matCtx.Config.Execution, "garbageCollectionCycle", config.WithDefault(60))
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get garbageCollectionCycle configuration")
 	}
@@ -102,7 +102,7 @@ func (node *StreamJoin) Materialize(ctx context.Context, matCtx *Materialization
 		triggerPrototype = execution.NewMultiTrigger(triggerPrototypes...)
 	}
 
-	return execution.NewStreamJoin(materializedSource, materializedJoined, materializedSourceKey, materializedJoinedKey, matCtx.Storage, node.EventTimeField, node.JoinType, triggerPrototype, garbageCollectionBoundary, garbageCollectionCycle), nil
+	return execution.NewStreamJoin(materializedSource, materializedJoined, materializedSourceKey, materializedJoinedKey, matCtx.Storage, node.EventTimeField, node.JoinType, triggerPrototype, execution.NewGarbageCollectorInfo(garbageCollectionBoundary, garbageCollectionCycle)), nil
 }
 
 func (node *StreamJoin) Metadata() *metadata.NodeMetadata {

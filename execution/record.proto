@@ -1,0 +1,8 @@
+syntax = "proto3";
+package execution;
+option go_package = "github.com/cube2222/octosql/execution";
+import "values.proto";
+
+message RecordData {
+    bytes data = 1;
+}

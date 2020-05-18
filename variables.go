@@ -47,14 +47,19 @@ func (vn VariableName) Equal(other VariableName) bool {
 	return vn == other
 }
 
-type Variables map[VariableName]Value
+type Variables struct {
+	previous            *Variables
+	previousRecordIndex int
+	asMap               map[VariableName]Value
+	record              *Record
+}
 
 func NoVariables() Variables {
-	return make(Variables)
+	return Variables{}
 }
 
 func NewVariables(variables map[VariableName]Value) Variables {
-	return Variables(variables)
+	return Variables{asMap: variables}
 }
 
 var ErrVariableNotFound = errors.New("variable not found")

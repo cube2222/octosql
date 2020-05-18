@@ -202,47 +202,48 @@ func NewNodeExpression(node Node, stateStorage storage.Storage) *NodeExpression 
 }
 
 func (ne *NodeExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
-	tx := ne.stateStorage.BeginTransaction()
-	// TODO: All of this has to be rewritten to be multithreaded using background jobs for the subqueries. Think about this.
-	recordStream, _, err := ne.node.Get(storage.InjectStateTransaction(ctx, tx), variables, GetRawStreamID())
-	if err != nil {
-		return octosql.ZeroValue(), errors.Wrap(err, "couldn't get record stream")
-	}
-	if err := tx.Commit(); err != nil {
-		return octosql.ZeroValue(), errors.Wrap(err, "couldn't commit transaction")
-	}
-
-	records, err := ReadAll(ctx, ne.stateStorage, recordStream)
-	if err != nil {
-		return octosql.ZeroValue(), errors.Wrap(err, "couldn't read whole subquery stream")
-	}
-
-	var firstRecord octosql.Value
-	outRecords := make([]octosql.Value, 0)
-	for _, curRecord := range records {
-		if octosql.AreEqual(firstRecord, octosql.ZeroValue()) {
-			firstRecord = curRecord.AsTuple()
-		}
-		outRecords = append(outRecords, curRecord.AsTuple())
-	}
-
-	if len(outRecords) > 1 {
-		return octosql.MakeTuple(outRecords), nil
-	}
-	if len(outRecords) == 0 {
-		return octosql.ZeroValue(), nil
-	}
-
-	// There is exactly one record
-	if len(firstRecord.AsSlice()) > 1 {
-		return firstRecord, nil
-	}
-	if len(firstRecord.AsSlice()) == 0 {
-		return octosql.ZeroValue(), nil
-	}
-
-	// There is exactly one field
-	return firstRecord.AsSlice()[0], nil
+	panic("unreachable")
+	// tx := ne.stateStorage.BeginTransaction()
+	// // TODO: All of this has to be rewritten to be multithreaded using background jobs for the subqueries. Think about this.
+	// recordStream, _, err := ne.node.Get(storage.InjectStateTransaction(ctx, tx), variables, GetRawStreamID())
+	// if err != nil {
+	// 	return octosql.ZeroValue(), errors.Wrap(err, "couldn't get record stream")
+	// }
+	// if err := tx.Commit(); err != nil {
+	// 	return octosql.ZeroValue(), errors.Wrap(err, "couldn't commit transaction")
+	// }
+	//
+	// records, err := ReadAll(ctx, ne.stateStorage, recordStream)
+	// if err != nil {
+	// 	return octosql.ZeroValue(), errors.Wrap(err, "couldn't read whole subquery stream")
+	// }
+	//
+	// var firstRecord octosql.Value
+	// outRecords := make([]octosql.Value, 0)
+	// for _, curRecord := range records {
+	// 	if octosql.AreEqual(firstRecord, octosql.ZeroValue()) {
+	// 		firstRecord = curRecord.AsTuple()
+	// 	}
+	// 	outRecords = append(outRecords, curRecord.AsTuple())
+	// }
+	//
+	// if len(outRecords) > 1 {
+	// 	return octosql.MakeTuple(outRecords), nil
+	// }
+	// if len(outRecords) == 0 {
+	// 	return octosql.ZeroValue(), nil
+	// }
+	//
+	// // There is exactly one record
+	// if len(firstRecord.AsSlice()) > 1 {
+	// 	return firstRecord, nil
+	// }
+	// if len(firstRecord.AsSlice()) == 0 {
+	// 	return octosql.ZeroValue(), nil
+	// }
+	//
+	// // There is exactly one field
+	// return firstRecord.AsSlice()[0], nil
 }
 
 type LogicExpression struct {
@@ -284,22 +285,23 @@ func NewRecordExpression() Expression {
 }
 
 func (re *RecordExpression) ExpressionValue(ctx context.Context, variables octosql.Variables) (octosql.Value, error) {
-	fields := variables.DeterministicOrder()
-	fieldValues := make([]octosql.Value, 0)
-	values := make([]octosql.Value, 0)
-
-	for _, f := range fields {
-		if f.Source() == SystemSource { // TODO: some better way to do this?
-			continue
-		}
-
-		v, _ := variables.Get(f)
-		values = append(values, v)
-		fieldValues = append(fieldValues, octosql.MakeString(f.String()))
-	}
-
-	fieldTuple := octosql.MakeTuple(fieldValues)
-	valueTuple := octosql.MakeTuple(values)
-
-	return octosql.MakeTuple([]octosql.Value{fieldTuple, valueTuple}), nil
+	panic("unreachable")
+	// fields := variables.DeterministicOrder()
+	// fieldValues := make([]octosql.Value, 0)
+	// values := make([]octosql.Value, 0)
+	//
+	// for _, f := range fields {
+	// 	if f.Source() == SystemSource { // TODO: some better way to do this?
+	// 		continue
+	// 	}
+	//
+	// 	v, _ := variables.Get(f)
+	// 	values = append(values, v)
+	// 	fieldValues = append(fieldValues, octosql.MakeString(f.String()))
+	// }
+	//
+	// fieldTuple := octosql.MakeTuple(fieldValues)
+	// valueTuple := octosql.MakeTuple(values)
+	//
+	// return octosql.MakeTuple([]octosql.Value{fieldTuple, valueTuple}), nil
 }

@@ -6,7 +6,7 @@ import "google/protobuf/timestamp.proto";
 
 message QueueElement {
     oneof type {
-        Record record = 1;
+        RecordData record = 1;
         google.protobuf.Timestamp watermark = 2;
         bool endOfStream = 3;
         string error = 4;

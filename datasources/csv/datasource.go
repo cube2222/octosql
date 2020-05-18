@@ -4,14 +4,21 @@ package csv
 // .csv reader trims leading white space(s)
 
 import (
+	"bytes"
 	"context"
 	"encoding/csv"
 	"fmt"
 	"io"
 	"log"
 	"os"
+	"strconv"
+	"time"
 	"unicode/utf8"
 
+	"github.com/apache/arrow/go/arrow"
+	"github.com/apache/arrow/go/arrow/array"
+	"github.com/apache/arrow/go/arrow/ipc"
+	"github.com/apache/arrow/go/arrow/memory"
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
@@ -83,6 +90,7 @@ func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (phy
 
 func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
 	rs := &RecordStream{
+		recordAllocator: memory.NewGoAllocator(),
 		stateStorage:    ds.stateStorage,
 		streamID:        streamID,
 		filePath:        ds.path,
@@ -118,6 +126,7 @@ func (ds *DataSource) Get(ctx context.Context, variables octosql.Variables, stre
 }
 
 type RecordStream struct {
+	recordAllocator memory.Allocator
 	stateStorage    storage.Storage
 	streamID        *execution.StreamID
 	filePath        string
@@ -241,6 +250,31 @@ func (rs *RecordStream) RunWorker(ctx context.Context) error {
 
 var outputQueuePrefix = []byte("$output_queue$")
 
+// ParseType tries to parse the given string into any type it succeeds to. Returns back the string on failure.
+func parseType(str string) arrow.DataType {
+	_, err := strconv.ParseInt(str, 10, 64)
+	if err == nil {
+		return &arrow.Int64Type{}
+	}
+
+	_, err = strconv.ParseFloat(str, 64)
+	if err == nil {
+		return &arrow.Float64Type{}
+	}
+
+	_, err = strconv.ParseBool(str)
+	if err == nil {
+		return &arrow.BooleanType{}
+	}
+
+	_, err = time.Parse(time.RFC3339Nano, str)
+	if err == nil {
+		return &arrow.TimestampType{}
+	}
+
+	return &arrow.StringType{}
+}
+
 func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateTransaction) error {
 	outputQueue := execution.NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
 
@@ -257,25 +291,92 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 		return execution.ErrEndOfStream
 	}
 
-	batch := make([]*execution.Record, 0)
+	batch := make([][]string, 0)
 	for i := 0; i < rs.batchSize; i++ {
-		aliasedRecord, err := rs.readRecordFromFileWithInitialize()
+		line, err := rs.readRecordFromFileWithInitialize()
 		if err == execution.ErrEndOfStream {
 			break
 		} else if err != nil {
 			return errors.Wrap(err, "couldn't read record from csv file")
 		}
 
-		batch = append(batch, execution.NewRecord(
-			rs.aliasedFields,
-			aliasedRecord,
-			execution.WithID(execution.NewRecordIDFromStreamIDWithOffset(rs.streamID, rs.offset+i))))
+		batch = append(batch, line)
+	}
+	if len(batch) == 0 {
+		return nil
+	}
+
+	fields := make([]arrow.Field, len(batch[0]))
+	for i := range batch[0] {
+		t := parseType(batch[0][i])
+		fields[i] = arrow.Field{
+			Name: rs.aliasedFields[i].String(),
+			Type: t,
+		}
+	}
+	schema := arrow.NewSchema(fields, nil)
+
+	b := array.NewRecordBuilder(rs.recordAllocator, schema)
+	defer b.Release()
+
+	for i := range batch[0] {
+		switch fields[i].Type.(type) {
+		case *arrow.Int64Type:
+			arrayBuilder := b.Field(i).(*array.Int64Builder)
+			arrayBuilder.Reserve(len(batch))
+			for line := range batch {
+				i, err := strconv.ParseInt(batch[line][i], 10, 64)
+				if err != nil {
+					return errors.Wrap(err, "couldn't parse int")
+				}
+				arrayBuilder.UnsafeAppend(i)
+			}
+		case *arrow.Float64Type:
+			arrayBuilder := b.Field(i).(*array.Float64Builder)
+			arrayBuilder.Reserve(len(batch))
+			for line := range batch {
+				f, err := strconv.ParseFloat(batch[line][i], 64)
+				if err != nil {
+					return errors.Wrap(err, "couldn't parse float")
+				}
+				arrayBuilder.UnsafeAppend(f)
+			}
+		case *arrow.StringType:
+			arrayBuilder := b.Field(i).(*array.StringBuilder)
+			arrayBuilder.Reserve(len(batch))
+			for line := range batch {
+				arrayBuilder.Append(batch[line][i])
+			}
+		case *arrow.TimestampType:
+			arrayBuilder := b.Field(i).(*array.TimestampBuilder)
+			arrayBuilder.Reserve(len(batch))
+			for line := range batch {
+				t, err := time.Parse(time.RFC3339Nano, batch[line][i])
+				if err != nil {
+					return errors.Wrap(err, "couldn't parse time")
+				}
+				arrayBuilder.UnsafeAppend(arrow.Timestamp(t.UnixNano()))
+			}
+		}
+	}
+
+	rec := b.NewRecord()
+
+	var buf bytes.Buffer
+	w := ipc.NewWriter(&buf, ipc.WithSchema(schema))
+	if err := w.Write(rec); err != nil {
+		log.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		log.Fatal(err)
 	}
 
 	for i := range batch {
 		err := outputQueue.Push(ctx, &QueueElement{
 			Type: &QueueElement_Record{
-				Record: batch[i],
+				Record: &execution.RecordData{
+					Data: buf.Bytes(),
+				},
 			},
 		})
 		if err != nil {
@@ -291,7 +392,7 @@ func (rs *RecordStream) RunWorkerInternal(ctx context.Context, tx storage.StateT
 	return nil
 }
 
-func (rs *RecordStream) readRecordFromFileWithInitialize() (map[octosql.VariableName]octosql.Value, error) {
+func (rs *RecordStream) readRecordFromFileWithInitialize() ([]string, error) {
 	if rs.first && rs.offset == 0 {
 		if rs.hasColumnHeader {
 			err := rs.initializeColumnsWithHeaderRow()
@@ -322,12 +423,7 @@ func (rs *RecordStream) readRecordFromFileWithInitialize() (map[octosql.Variable
 		return nil, errors.Wrap(err, "couldn't read record")
 	}
 
-	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
-	for i, v := range line {
-		aliasedRecord[rs.aliasedFields[i]] = execution.ParseType(v)
-	}
-
-	return aliasedRecord, nil
+	return line, nil
 }
 
 func (rs *RecordStream) initializeColumnsWithHeaderRow() error {
@@ -354,23 +450,13 @@ func (rs *RecordStream) initializeColumnsWithHeaderRow() error {
 	return nil
 }
 
-func (rs *RecordStream) initializeColumnsWithoutHeaderRow() (map[octosql.VariableName]octosql.Value, error) {
+func (rs *RecordStream) initializeColumnsWithoutHeaderRow() ([]string, error) {
 	line, err := rs.r.Read()
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't read row")
 	}
 
-	rs.aliasedFields = make([]octosql.VariableName, len(line))
-	for i := range line {
-		rs.aliasedFields[i] = octosql.NewVariableName(fmt.Sprintf("%s.col%d", rs.alias, i+1))
-	}
-
-	aliasedRecord := make(map[octosql.VariableName]octosql.Value)
-	for i, v := range line {
-		aliasedRecord[rs.aliasedFields[i]] = execution.ParseType(v)
-	}
-
-	return aliasedRecord, nil
+	return line, nil
 }
 
 func parseDataTypes(row []string) []octosql.Value {
@@ -424,7 +510,15 @@ func (rs *RecordStream) Next(ctx context.Context) (*execution.Record, error) {
 
 	switch queueElement := queueElement.Type.(type) {
 	case *QueueElement_Record:
-		return queueElement.Record, nil
+		r, err := ipc.NewReader(bytes.NewReader(queueElement.Record.Data))
+		if err != nil {
+			log.Fatal(err)
+		}
+		rec, err := r.Read()
+		if err != nil {
+			log.Fatal(err)
+		}
+		return execution.OctoRecord(rec), nil
 	case *QueueElement_EndOfStream:
 		return nil, execution.ErrEndOfStream
 	case *QueueElement_Error:

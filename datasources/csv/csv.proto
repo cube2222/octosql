@@ -5,7 +5,7 @@ import "execution/record.proto";
 
 message QueueElement {
     oneof type {
-        execution.Record record = 1;
+        execution.RecordData record = 1;
         bool endOfStream = 2;
         string error = 3;
     }

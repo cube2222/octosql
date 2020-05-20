@@ -15,7 +15,7 @@ import (
 	"github.com/cube2222/octosql/storage"
 )
 
-func TestExample(t *testing.T) {
+func TestProcessByKey_GarbageCollection(t *testing.T) {
 	ctx := context.Background()
 	stateStorage := storage.GetTestStorage(t)
 	streamID := GetRawStreamID()
@@ -126,9 +126,10 @@ func TestExample(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NoError(t, tx.Commit())
 	}
-	// Add records. (all from first, 2 from second, 2 from third)
+	// Add records. (all from first window, 2 from second window, 2 from third window)
 	{
 		tx := prefixedStateStorage.BeginTransaction()
+
 		err := processFunc.AddRecord(ctx, tx, 0, record11)
 		assert.NoError(t, err)
 		err = processFunc.AddRecord(ctx, tx, 0, record12)
@@ -139,14 +140,17 @@ func TestExample(t *testing.T) {
 		assert.NoError(t, err)
 		err = processFunc.AddRecord(ctx, tx, 0, record15)
 		assert.NoError(t, err)
+
 		err = processFunc.AddRecord(ctx, tx, 0, record21)
 		assert.NoError(t, err)
 		err = processFunc.AddRecord(ctx, tx, 0, record22)
 		assert.NoError(t, err)
+
 		err = processFunc.AddRecord(ctx, tx, 0, record31)
 		assert.NoError(t, err)
 		err = processFunc.AddRecord(ctx, tx, 0, record32)
 		assert.NoError(t, err)
+
 		assert.NoError(t, tx.Commit())
 	}
 	// Next when no record available
@@ -228,7 +232,7 @@ func TestExample(t *testing.T) {
 		assert.NoError(t, tx.Commit())
 	}
 
-	time.Sleep(2 * time.Second) // Now the garbage collector should delete records from first window
+	time.Sleep(2 * time.Second) // Now the garbage collector should delete additional record from first window
 
 	// Next when no record available
 	{
@@ -239,17 +243,20 @@ func TestExample(t *testing.T) {
 		assert.NoError(t, tx.Commit())
 	}
 
-	// Add records. (last 2 from second, last 2 from third)
+	// Add records. (last 2 from second window, last 2 from third window)
 	{
 		tx := prefixedStateStorage.BeginTransaction()
+
 		err := processFunc.AddRecord(ctx, tx, 0, record23)
 		assert.NoError(t, err)
 		err = processFunc.AddRecord(ctx, tx, 0, record24)
 		assert.NoError(t, err)
+
 		err = processFunc.AddRecord(ctx, tx, 0, record33)
 		assert.NoError(t, err)
 		err = processFunc.AddRecord(ctx, tx, 0, record34)
 		assert.NoError(t, err)
+
 		assert.NoError(t, tx.Commit())
 	}
 	// Set watermark to trigger records
@@ -260,7 +267,6 @@ func TestExample(t *testing.T) {
 		assert.NoError(t, tx.Commit())
 	}
 	// Trigger keys.
-	// This triggers the record under the watermark.
 	{
 		tx := prefixedStateStorage.BeginTransaction()
 		keys, err := processFunc.TriggerKeys(ctx, tx, 3)
@@ -269,7 +275,6 @@ func TestExample(t *testing.T) {
 		assert.NoError(t, tx.Commit())
 	}
 	// Trigger keys. No keys to trigger
-	// This puts the watermark into the output queue.
 	{
 		tx := prefixedStateStorage.BeginTransaction()
 		keys, err := processFunc.TriggerKeys(ctx, tx, 3)

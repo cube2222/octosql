@@ -2,6 +2,7 @@ package logical
 
 import (
 	"context"
+	"fmt"
 	"runtime"
 
 	"github.com/pkg/errors"
@@ -33,12 +34,15 @@ func NewJoin(source, joined Node, joinType execution.JoinType) *Join {
 
 func (node *Join) Visualize() *graph.Node {
 	n := graph.NewNode("Join")
-	if node.source != nil {
-		n.AddChild("source", node.source.Visualize())
+
+	n.AddChild("source", node.source.Visualize())
+	n.AddChild("joined", node.joined.Visualize())
+
+	for i, trigger := range node.triggers {
+		n.AddChild(fmt.Sprintf("trigger_%d", i), trigger.Visualize())
 	}
-	if node.joined != nil {
-		n.AddChild("joined", node.joined.Visualize())
-	}
+
+	n.AddChild("join_type", graph.NewNode(node.joinType.String()))
 	return n
 }
 

@@ -9,7 +9,7 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 func TestWatermarkGenerator_Get(t *testing.T) {
@@ -38,18 +38,22 @@ func TestWatermarkGenerator_Get(t *testing.T) {
 					execution.NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"id", "time"},
 						[]interface{}{1, baseTime},
+						execution.WithEventTimeField(octosql.NewVariableName("time")),
 					),
 					execution.NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"id", "time"},
 						[]interface{}{2, baseTime.Add(time.Second * 10)},
+						execution.WithEventTimeField(octosql.NewVariableName("time")),
 					),
 					execution.NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"id", "time"},
 						[]interface{}{3, baseTime.Add(time.Second * 8)},
+						execution.WithEventTimeField(octosql.NewVariableName("time")),
 					),
 					execution.NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"id", "time"},
 						[]interface{}{4, baseTime.Add(time.Second * 13)},
+						execution.WithEventTimeField(octosql.NewVariableName("time")),
 					),
 				}),
 				timeField: "time",
@@ -64,18 +68,22 @@ func TestWatermarkGenerator_Get(t *testing.T) {
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time"},
 					[]interface{}{1, baseTime},
+					execution.WithEventTimeField(octosql.NewVariableName("time")),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time"},
 					[]interface{}{2, baseTime.Add(time.Second * 10)},
+					execution.WithEventTimeField(octosql.NewVariableName("time")),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time"},
 					[]interface{}{3, baseTime.Add(time.Second * 8)},
+					execution.WithEventTimeField(octosql.NewVariableName("time")),
 				),
 				execution.NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"id", "time"},
 					[]interface{}{4, baseTime.Add(time.Second * 13)},
+					execution.WithEventTimeField(octosql.NewVariableName("time")),
 				),
 			}),
 			wantErr: false,
@@ -176,7 +184,6 @@ func TestWatermarkGeneratorStream_GetWatermark(t *testing.T) {
 	assert.Equal(t, src, execOutput.WatermarkSource)
 
 	ws := execOutput.WatermarkSource
-	tx = tx.WithPrefix(streamID.AsPrefix())
 
 	ExpectWatermarkValue(t, ctx, ws, tx, time.Time{})
 

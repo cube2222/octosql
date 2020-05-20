@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 type DelayTrigger struct {
@@ -40,12 +40,12 @@ func (dt *DelayTrigger) UpdateWatermark(ctx context.Context, tx storage.StateTra
 	return nil
 }
 
-func (dt *DelayTrigger) PollKeysToFire(ctx context.Context, tx storage.StateTransaction) ([]octosql.Value, error) {
+func (dt *DelayTrigger) PollKeysToFire(ctx context.Context, tx storage.StateTransaction, batchSize int) ([]octosql.Value, error) {
 	timeKeys := NewTimeSortedKeys(tx.WithPrefix(timeSortedKeys))
 
 	now := dt.clock()
 
-	keys, times, err := timeKeys.GetUntil(now)
+	keys, times, err := timeKeys.GetUntil(now, batchSize)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get first key by time")
 	}

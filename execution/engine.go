@@ -10,7 +10,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/pkg/errors"
 
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 var ErrNewTransactionRequired = fmt.Errorf("new transaction required")
@@ -38,7 +38,7 @@ func GetErrWaitForChanges(err error) *ErrWaitForChanges {
 }
 
 // Based on protocol buffer max timestamp value.
-var maxWatermark = time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
+var MaxWatermark = time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
 
 type WatermarkSource interface {
 	GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error)
@@ -52,6 +52,7 @@ type IntermediateRecordStore interface {
 	Next(ctx context.Context, tx storage.StateTransaction) (*Record, error)
 	UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error
 	GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error)
+	TriggerKeys(ctx context.Context, tx storage.StateTransaction, batchSize int) (int, error)
 	MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error
 	MarkError(ctx context.Context, tx storage.StateTransaction, err error) error
 	Close(ctx context.Context, storage storage.Storage) error
@@ -98,6 +99,7 @@ func (engine *PullEngine) getPrefixedTx(tx storage.StateTransaction) storage.Sta
 
 func (engine *PullEngine) Run() {
 	tx := engine.storage.BeginTransaction()
+	endOfStreamReached := false
 
 	for {
 		select {
@@ -107,18 +109,57 @@ func (engine *PullEngine) Run() {
 		default:
 		}
 
-		err := engine.loop(engine.ctx, tx)
+		if engine.batchSizeManager.RecordsLeftToTake() == 0 {
+			// Refresh transaction takes care of committing and creating new transactions.
+			tx = engine.refreshTransaction(tx)
+		}
+
+		triggeredCount, err := engine.irs.TriggerKeys(engine.ctx, engine.getPrefixedTx(tx), engine.batchSizeManager.RecordsLeftToTake())
+		if triggeredCount == 0 && err == nil {
+			// Nothing triggered, just go forth, if the stream hasn't ended yet.
+			if endOfStreamReached {
+				if err := tx.Commit(); err != nil {
+					log.Println("engine: couldn't commit: ", err)
+					continue
+				}
+				log.Println("engine: end of stream, all keys triggered, stopping loop")
+				engine.closeErrChan <- nil
+				return
+			}
+		} else if triggeredCount > 0 {
+			// We triggered possibly lot of records, it can be time to commit now.
+			engine.batchSizeManager.MarkRecordsProcessed(triggeredCount)
+			tx = engine.refreshTransaction(tx)
+
+			continue
+		} else if err != nil {
+			triggerErr := err
+			log.Println("couldn't trigger keys: ", err)
+			tx.Abort()
+			tx = engine.storage.BeginTransaction()
+			err := engine.irs.MarkError(engine.ctx, engine.getPrefixedTx(tx), triggerErr)
+			if err != nil {
+				log.Fatalf("couldn't mark error on intermediate record store: %s", err)
+			}
+			if err := tx.Commit(); err != nil {
+				log.Fatalf("couldn't commit marking error on intermediate record store: %s", err)
+			}
+
+			engine.closeErrChan <- triggerErr
+			return
+		}
+
+		err = engine.loop(engine.ctx, tx)
 		if err == ErrEndOfStream {
 			err := tx.Commit()
-			if err != nil {
+			if err == nil {
+				endOfStreamReached = true
+			} else {
 				log.Println("engine: couldn't commit: ", err)
-				tx = engine.storage.BeginTransaction()
-				continue
 			}
-			log.Println("engine: end of stream, stopping loop")
 
-			engine.closeErrChan <- engine.ctx.Err()
-			return
+			tx = engine.storage.BeginTransaction()
+			continue
 		} else if errors.Cause(err) == ErrNewTransactionRequired {
 			err := tx.Commit()
 			if err != nil {
@@ -157,21 +198,27 @@ func (engine *PullEngine) Run() {
 
 			engine.closeErrChan <- loopErr
 			return
-		}
-
-		if !engine.batchSizeManager.ShouldTakeNextRecord() {
-			err := tx.Commit()
-			if err != nil {
-				if errors.Cause(err) == badger.ErrTxnTooBig {
-					engine.batchSizeManager.CommitTooBig()
-				}
-				log.Println("engine: couldn't commit: ", err)
-			} else {
-				engine.batchSizeManager.CommitSuccessful()
-			}
-			tx = engine.storage.BeginTransaction()
+		} else if err == nil {
+			engine.batchSizeManager.MarkRecordsProcessed(1)
+			tx = engine.refreshTransaction(tx)
 		}
 	}
+}
+
+func (engine *PullEngine) refreshTransaction(tx storage.StateTransaction) storage.StateTransaction {
+	if !engine.batchSizeManager.ShouldTakeNextRecord() {
+		err := tx.Commit()
+		if err != nil {
+			if errors.Cause(err) == badger.ErrTxnTooBig {
+				engine.batchSizeManager.CommitTooBig()
+			}
+			log.Println("engine: couldn't commit: ", err)
+		} else {
+			engine.batchSizeManager.CommitSuccessful()
+		}
+		tx = engine.storage.BeginTransaction()
+	}
+	return tx
 }
 
 func (engine *PullEngine) loop(ctx context.Context, tx storage.StateTransaction) error {
@@ -220,7 +267,7 @@ func (engine *PullEngine) loop(ctx context.Context, tx storage.StateTransaction)
 	}
 
 	if areAllEndOfStream {
-		err := engine.irs.UpdateWatermark(ctx, prefixedTx, maxWatermark)
+		err := engine.irs.UpdateWatermark(ctx, prefixedTx, MaxWatermark)
 		if err != nil {
 			return errors.Wrap(err, "couldn't mark end of stream max watermark in intermediate record store")
 		}

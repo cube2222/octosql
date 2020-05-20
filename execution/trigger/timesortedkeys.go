@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 var timeSortedKeys = []byte("$time_sorted_keys$")
@@ -58,7 +58,7 @@ func (tsk *TimeSortedKeys) Update(key octosql.Value, t time.Time) error {
 	return nil
 }
 
-func (tsk *TimeSortedKeys) GetUntil(until time.Time) ([]octosql.Value, []time.Time, error) {
+func (tsk *TimeSortedKeys) GetUntil(until time.Time, batchSize int) ([]octosql.Value, []time.Time, error) {
 	byTimeAndKey := storage.NewMap(tsk.tx.WithPrefix(byTimeAndKeyPrefix))
 
 	var outValues []octosql.Value
@@ -85,6 +85,10 @@ func (tsk *TimeSortedKeys) GetUntil(until time.Time) ([]octosql.Value, []time.Ti
 
 		t := tuple[0].AsTime()
 		if t.After(until) {
+			break
+		}
+
+		if len(outValues) == batchSize {
 			break
 		}
 

@@ -56,3 +56,32 @@ message Value {
         Object object = 10;
     }
 }
+
+message Null {
+}
+
+message Phantom {
+}
+
+message SingleTuple {
+    repeated SingleValue fields = 1;
+}
+
+message SingleObject {
+    map<string, SingleValue> fields = 1;
+}
+
+message SingleValue {
+    oneof value {
+        Null null = 1;
+        Phantom phantom = 2;
+        int64 int = 3;
+        double float = 4;
+        bool bool = 5;
+        string string = 6;
+        google.protobuf.Timestamp time = 7;
+        google.protobuf.Duration duration = 8;
+        SingleTuple tuple = 9;
+        SingleObject object = 10;
+    }
+}

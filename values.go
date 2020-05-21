@@ -22,13 +22,11 @@ import (
 //	docs.Documented
 
 func MakeNull() Value {
-	return Value{Value: &Value_Nulls{Nulls: &Nulls{}}}
+	return Value{Value: &Value_Null{Null: &Nulls{}}}
 }
 func ZeroNull() Value {
-	return Value{Value: &Value_Nulls{Nulls: &Nulls{}}}
+	return Value{Value: &Value_Null{Null: &Nulls{}}}
 }
-
-type Phantom struct{}
 
 func MakePhantom() Value {
 	return Value{Value: &Value_Phantom{Phantom: &Phantoms{}}}
@@ -209,11 +207,17 @@ func NormalizeType(value interface{}) Value {
 	case []string:
 		return MakeString(value)
 	case [][]interface{}:
-		out := make([]Value, len(value))
-		for i := range value {
-			out[i] = NormalizeType(value[i])
-		}
-		return MakeTuple(out)
+		// if len(value) == 0 {
+		// 	return MakeTuple(nil)
+		// }
+		// out := make([]Value, len(value))
+		// for i := range value {
+		// 	t := reflect.TypeOf(value[0][k])
+		// 	toNormalize := reflect.MakeSlice(reflect.SliceOf(t), len(value), len(value))
+		//
+		// 	out[i] = NormalizeType(value[i])
+		// }
+		// return MakeTuple(out)
 	case []map[string]interface{}:
 		if len(value) == 0 {
 			return MakeObject(nil)
@@ -221,7 +225,7 @@ func NormalizeType(value interface{}) Value {
 		out := make(map[string]Value)
 		for k := range value[0] {
 			t := reflect.TypeOf(value[0][k])
-			toNormalize := reflect.MakeSlice(t, len(value), len(value))
+			toNormalize := reflect.MakeSlice(reflect.SliceOf(t), len(value), len(value))
 			for i := range value {
 				toNormalize.Index(i).Set(reflect.ValueOf(value[i][k]))
 			}
@@ -254,85 +258,110 @@ const (
 	GreaterThan Comparison = 1
 )
 
-func Compare(x, y Value) (Comparison, error) {
+func Compare(x, y Value) ([]Comparison, error) {
 	switch x.GetType() {
 	case TypeInt:
 		if y.GetType() != TypeInt {
-			return 0, errors.Errorf("type mismatch between values")
+			return nil, errors.Errorf("type mismatch between values")
 		}
 
 		x := x.AsInt()
 		y := y.AsInt()
 
-		if x == y {
-			return 0, nil
-		} else if x < y {
-			return -1, nil
+		out := make([]Comparison, len(x))
+		for i := range x {
+			if x[i] == y[i] {
+				out[i] = 0
+			} else if x[i] < y[i] {
+				out[i] = -1
+			} else {
+				out[i] = 1
+			}
 		}
 
-		return 1, nil
+		return out, nil
 	case TypeFloat:
 		if y.GetType() != TypeFloat {
-			return 0, errors.Errorf("type mismatch between values")
+			return nil, errors.Errorf("type mismatch between values")
 		}
 		x := x.AsFloat()
 		y := y.AsFloat()
 
-		if x == y {
-			return 0, nil
-		} else if x < y {
-			return -1, nil
+		out := make([]Comparison, len(x))
+		for i := range x {
+			if x[i] == y[i] {
+				out[i] = 0
+			} else if x[i] < y[i] {
+				out[i] = -1
+			} else {
+				out[i] = 1
+			}
 		}
 
-		return 1, nil
+		return out, nil
 	case TypeString:
 		if y.GetType() != TypeString {
-			return 0, errors.Errorf("type mismatch between values")
+			return nil, errors.Errorf("type mismatch between values")
 		}
 
 		x := x.AsString()
 		y := y.AsString()
 
-		if x == y {
-			return 0, nil
-		} else if x < y {
-			return -1, nil
+		out := make([]Comparison, len(x))
+		for i := range x {
+			if x[i] == y[i] {
+				out[i] = 0
+			} else if x[i] < y[i] {
+				out[i] = -1
+			} else {
+				out[i] = 1
+			}
 		}
 
-		return 1, nil
+		return out, nil
 	case TypeTime:
 		if y.GetType() != TypeTime {
-			return 0, errors.Errorf("type mismatch between values")
+			return nil, errors.Errorf("type mismatch between values")
 		}
 
 		x := x.AsTime()
 		y := y.AsTime()
 
-		if x == y {
-			return 0, nil
-		} else if x.Before(y) {
-			return -1, nil
+		out := make([]Comparison, len(x))
+		for i := range x {
+			if x[i] == y[i] {
+				out[i] = 0
+			} else if x[i].Before(y[i]) {
+				out[i] = -1
+			} else {
+				out[i] = 1
+			}
 		}
 
-		return 1, nil
+		return out, nil
 	case TypeBool:
 		if y.GetType() != TypeBool {
-			return 0, errors.Errorf("type mismatch between values")
+			return nil, errors.Errorf("type mismatch between values")
 		}
 
 		x := x.AsBool()
 		y := y.AsBool()
 
-		if x == y {
-			return 0, nil
-		} else if !x && y {
-			return -1, nil
+		out := make([]Comparison, len(x))
+		for i := range x {
+			if x[i] == y[i] {
+				out[i] = 0
+			} else if !x[i] && y[i] {
+				out[i] = -1
+			} else {
+				out[i] = 1
+			}
 		}
 
-		return 1, nil
+		return out, nil
 
 	case TypeNull, TypePhantom, TypeDuration, TypeTuple, TypeObject:
-		return 0, errors.Errorf("unsupported type in sorting")
+		return nil, errors.Errorf("unsupported type in sorting")
 	}
 
 	panic("unreachable")

@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/golang/protobuf/ptypes"
 	"github.com/pkg/errors"
 )
 
@@ -38,18 +39,18 @@ const (
 	MinimalStringLength = 1 + 1     // b[0] = type, b[1] = end of string
 )
 
-func (v *Value) MonotonicMarshal() []byte {
+func (v *SingleValue) MonotonicMarshal() []byte {
 	return monotonicMarshal(v)
 }
 
-func (v *Value) MonotonicUnmarshal(bytes []byte) error {
+func (v *SingleValue) MonotonicUnmarshal(bytes []byte) error {
 	if len(bytes) == 0 {
 		return errors.New("empty byte slice given to unmarshal")
 	}
 
 	identifier := int(bytes[0])
 
-	var finalValue Value
+	var finalValue SingleValue
 
 	switch identifier {
 	case NullIdentifier:
@@ -58,70 +59,75 @@ func (v *Value) MonotonicUnmarshal(bytes []byte) error {
 			return err
 		}
 
-		finalValue = MakeNull()
+		finalValue = SingleValue{Value: &SingleValue_Null{}}
 	case PhantomIdentifier:
 		err := MonotonicUnmarshalPhantom(bytes)
 		if err != nil {
 			return err
 		}
 
-		finalValue = MakePhantom()
+		finalValue = SingleValue{Value: &SingleValue_Phantom{}}
 	case IntIdentifier:
 		result, err := MonotonicUnmarshalInt64(bytes)
 		if err != nil {
 			return err
 		}
 
-		finalValue = MakeInt(int(result))
+		finalValue = SingleValue{Value: &SingleValue_Int{Int: result}}
 	case FloatIdentifier:
 		result, err := MonotonicUnmarshalFloat(bytes)
 		if err != nil {
 			return err
 		}
 
-		finalValue = MakeFloat(result)
+		finalValue = SingleValue{Value: &SingleValue_Float{Float: result}}
 	case BoolIdentifier:
 		result, err := MonotonicUnmarshalBool(bytes)
 		if err != nil {
 			return err
 		}
 
-		finalValue = MakeBool(result)
+		finalValue = SingleValue{Value: &SingleValue_Bool{Bool: result}}
 	case StringIdentifier:
 		result, err := MonotonicUnmarshalString(bytes)
 		if err != nil {
 			return err
 		}
 
-		finalValue = MakeString(result)
+		finalValue = SingleValue{Value: &SingleValue_String_{String_: result}}
 	case TimestampIdentifier:
 		result, err := MonotonicUnmarshalTime(bytes)
 		if err != nil {
 			return err
 		}
 
-		finalValue = MakeTime(result)
+		t, err := ptypes.TimestampProto(result)
+		if err != nil {
+			return err
+		}
+
+		finalValue = SingleValue{Value: &SingleValue_Time{Time: t}}
 	case DurationIdentifier:
 		result, err := MonotonicUnmarshalDuration(bytes)
 		if err != nil {
 			return err
 		}
 
-		finalValue = MakeDuration(result)
+		finalValue = SingleValue{Value: &SingleValue_Duration{Duration: ptypes.DurationProto(result)}}
 	case TupleIdentifier:
 		result, err := MonotonicUnmarshalTuple(bytes)
 		if err != nil {
 			return err
 		}
 
-		finalValue = MakeTuple(result)
+		finalValue = SingleValue{Value: &SingleValue_Tuple{Tuple: &SingleTuple{Fields: result}}}
 	case ObjectIdentifier:
 		result, err := UnmarshalObject(bytes)
 		if err != nil {
 			return err
 		}
 
-		finalValue = MakeObject(result)
+		finalValue = SingleValue{Value: &SingleValue_Object{Object: &SingleObject{Fields: result}}}
 	default:
 		panic("unsupported type")
 	}
@@ -130,28 +136,38 @@ func (v *Value) MonotonicUnmarshal(bytes []byte) error {
 	return nil
 }
 
-func monotonicMarshal(v *Value) []byte {
-	switch v.GetType() {
-	case TypeString:
-		return MonotonicMarshalString(v.AsString())
-	case TypeInt:
-		return MonotonicMarshalInt64(int64(v.AsInt()))
-	case TypeBool:
-		return MonotonicMarshalBool(v.AsBool())
-	case TypeNull:
+func monotonicMarshal(v *SingleValue) []byte {
+	switch v.Value.(type) {
+	case *SingleValue_String_:
+		return MonotonicMarshalString(v.GetString_())
+	case *SingleValue_Int:
+		return MonotonicMarshalInt64(v.GetInt())
+	case *SingleValue_Bool:
+		return MonotonicMarshalBool(v.GetBool())
+	case *SingleValue_Null:
 		return MonotonicMarshalNull()
-	case TypePhantom:
+	case *SingleValue_Phantom:
 		return MonotonicMarshalPhantom()
-	case TypeTime:
-		return MonotonicMarshalTime(v.AsTime())
-	case TypeDuration:
-		return MonotonicMarshalDuration(v.AsDuration())
-	case TypeFloat:
-		return MonotonicMarshalFloat(v.AsFloat())
-	case TypeTuple:
-		return MonotonicMarshalTuple(v.AsSlice())
-	case TypeObject:
-		return MarshalObject(v.AsMap())
+	case *SingleValue_Time:
+		t, err := ptypes.Timestamp(v.GetTime())
+		if err != nil {
+			panic(err)
+		}
+
+		return MonotonicMarshalTime(t)
+	case *SingleValue_Duration:
+		d, err := ptypes.Duration(v.GetDuration())
+		if err != nil {
+			panic(err)
+		}
+
+		return MonotonicMarshalDuration(d)
+	case *SingleValue_Float:
+		return MonotonicMarshalFloat(v.GetFloat())
+	case *SingleValue_Tuple:
+		return MonotonicMarshalTuple(v.GetTuple().Fields)
+	case *SingleValue_Object:
+		return MarshalObject(v.GetObject().Fields)
 	default:
 		panic("unknown type!")
 	}
@@ -339,12 +355,12 @@ func MonotonicUnmarshalDuration(b []byte) (time.Duration, error) {
 }
 
 /* Marshal Tuple */
-func MonotonicMarshalTuple(vs []Value) []byte {
+func MonotonicMarshalTuple(vs []*SingleValue) []byte {
 	result := make([]byte, 1)
 	result[0] = TupleIdentifier
 
 	for _, v := range vs {
-		vBytes := monotonicMarshal(&v)
+		vBytes := monotonicMarshal(v)
 		result = append(result, vBytes...)
 	}
 
@@ -353,20 +369,20 @@ func MonotonicMarshalTuple(vs []Value) []byte {
 	return result
 }
 
-func MonotonicUnmarshalTuple(b []byte) ([]Value, error) {
+func MonotonicUnmarshalTuple(b []byte) ([]*SingleValue, error) {
 	values, _, err := recursiveMonotonicUnmarshalTuple(b)
 	return values, err
 }
 
-func recursiveMonotonicUnmarshalTuple(b []byte) ([]Value, int, error) {
-	values := make([]Value, 0)
+func recursiveMonotonicUnmarshalTuple(b []byte) ([]*SingleValue, int, error) {
+	values := make([]*SingleValue, 0)
 	index := 1
 	length := len(b)
 	if length < MinimalTupleLength {
 		return nil, 0, errors.New("incorrect tuple length")
 	}
 
-	var value Value
+	var value SingleValue
 
 	for index < length {
 		identifier := b[index]
@@ -381,7 +397,7 @@ func recursiveMonotonicUnmarshalTuple(b []byte) ([]Value, int, error) {
 				return nil, 0, err
 			}
 
-			values = append(values, MakeTuple(tupleValues))
+			values = append(values, &SingleValue{Value: &SingleValue_Tuple{Tuple: &SingleTuple{Fields: tupleValues}}})
 			index += tupleLength
 		} else if identifier == ObjectIdentifier {
 			tupleValues, tupleLength, err := recursiveMonotonicUnmarshalTuple(b[index+1:])
@@ -394,7 +410,7 @@ func recursiveMonotonicUnmarshalTuple(b []byte) ([]Value, int, error) {
 				return nil, 0, err
 			}
 
-			values = append(values, MakeObject(object))
+			values = append(values, &SingleValue{Value: &SingleValue_Object{Object: &SingleObject{Fields: object}}})
 			index += tupleLength + 1 // +1 here because of ObjectIdentifier
 		} else {
 			elementLength, err := getMarshalLength(b[index:])
@@ -407,7 +423,7 @@ func recursiveMonotonicUnmarshalTuple(b []byte) ([]Value, int, error) {
 				return nil, 0, errors.Wrap(err, "couldn't unmarshal next element in tuple")
 			}
 
-			values = append(values, value)
+			values = append(values, &value)
 
 			index += elementLength
 		}
@@ -418,12 +434,12 @@ func recursiveMonotonicUnmarshalTuple(b []byte) ([]Value, int, error) {
 
 /* Marshal Object */
 
-func MarshalObject(o map[string]Value) []byte {
-	values := make([]Value, 0)
+func MarshalObject(o map[string]*SingleValue) []byte {
+	values := make([]*SingleValue, 0)
 	keys := sortedMapKeys(o)
 
 	for _, key := range keys {
-		values = append(values, MakeString(key))
+		values = append(values, &SingleValue{Value: &SingleValue_String_{String_: key}})
 		values = append(values, o[key])
 	}
 
@@ -434,7 +450,7 @@ func MarshalObject(o map[string]Value) []byte {
 	return bytes
 }
 
-func UnmarshalObject(b []byte) (map[string]Value, error) {
+func UnmarshalObject(b []byte) (map[string]*SingleValue, error) {
 	tuple, err := MonotonicUnmarshalTuple(b[1:])
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't unmarshal object")
@@ -444,22 +460,22 @@ func UnmarshalObject(b []byte) (map[string]Value, error) {
 }
 
 /* Auxiliary functions */
-func tupleToObject(tuple []Value) (map[string]Value, error) {
+func tupleToObject(tuple []*SingleValue) (map[string]*SingleValue, error) {
 	if len(tuple) < 2 || len(tuple)%2 == 1 {
 		return nil, errors.New("invalid object length")
 	}
 
-	result := make(map[string]Value)
+	result := make(map[string]*SingleValue)
 
 	for i := 0; i < len(tuple); i += 2 {
-		key := tuple[i].AsString()
+		key := tuple[i].GetString_()
 		result[key] = tuple[i+1]
 	}
 
 	return result, nil
 }
 
-func sortedMapKeys(m map[string]Value) []string {
+func sortedMapKeys(m map[string]*SingleValue) []string {
 	keys := make([]string, len(m))
 
 	index := 0

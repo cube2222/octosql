@@ -432,16 +432,18 @@ import (
 func TestName(t *testing.T) {
 	obj := []map[string]interface{}{
 		{
-			"name": "Jakub",
-			"age":  3,
+			"name":   "Jakub",
+			"age":    3,
+			"fields": []interface{}{"test", "test1"},
 			"city": map[string]interface{}{
 				"name":       "Berlin",
 				"population": 6000000,
 			},
 		},
 		{
-			"name": "Janek",
-			"age":  4,
+			"name":   "Janek",
+			"age":    4,
+			"fields": []interface{}{"test2", "test3"},
 			"city": map[string]interface{}{
 				"name":       "Warsaw",
 				"population": 3000000,
@@ -449,5 +451,5 @@ func TestName(t *testing.T) {
 		},
 	}
 	test := NormalizeType(obj)
-	log.Println(test.String())
+	log.Println(test.Show())
 }

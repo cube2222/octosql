@@ -2,12 +2,9 @@ package execution
 
 import (
 	"context"
-	"reflect"
-	"sort"
-
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
-
+	"github.com/golang/protobuf/ptypes"
 	"github.com/pkg/errors"
 )
 
@@ -18,132 +15,259 @@ const (
 	Descending OrderDirection = "desc"
 )
 
+type OrderByKey struct {
+	key []byte
+}
+
+func (k *OrderByKey) MonotonicMarshal() []byte {
+	return k.key
+}
+
+func (k *OrderByKey) MonotonicUnmarshal(data []byte) error {
+	k.key = make([]byte, len(data))
+	copy(k.key, data)
+	return nil
+}
+
+
 type OrderBy struct {
+	storage storage.Storage
+	eventTimeField      octosql.VariableName
 	expressions []Expression
 	directions  []OrderDirection
+	key     []Expression
 	source      Node
+	triggerPrototype TriggerPrototype
 }
 
-func NewOrderBy(exprs []Expression, directions []OrderDirection, source Node) *OrderBy {
-	return &OrderBy{
-		expressions: exprs,
-		directions:  directions,
-		source:      source,
-	}
+func NewOrderBy(storage storage.Storage, source Node, exprs []Expression, directions []OrderDirection, eventTimeField octosql.VariableName, triggerPrototype TriggerPrototype) *OrderBy {
+	return &OrderBy{storage: storage, source: source, expressions: exprs, directions: directions, eventTimeField: eventTimeField, triggerPrototype: triggerPrototype}
 }
 
-func isSorteable(x octosql.Value) bool {
-	switch x.GetType() {
-	case octosql.TypeBool:
-		return true
-	case octosql.TypeInt:
-		return true
-	case octosql.TypeFloat:
-		return true
-	case octosql.TypeString:
-		return true
-	case octosql.TypeTime:
-		return true
-	case octosql.TypeNull, octosql.TypePhantom, octosql.TypeDuration, octosql.TypeTuple, octosql.TypeObject:
-		return false
-	}
-
-	panic("unreachable")
-}
-
-func (ob *OrderBy) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
+func (node *OrderBy) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
 	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get source stream ID")
 	}
 
-	sourceStream, execOutput, err := ob.source.Get(ctx, variables, sourceStreamID)
+	source, execOutput, err := node.source.Get(ctx, variables, sourceStreamID)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get underlying stream in order by")
+		return nil, nil, errors.Wrap(err, "couldn't get stream for source in order by")
 	}
 
-	orderedStream, err := createOrderedStream(ctx, ob.expressions, ob.directions, variables, sourceStream)
+	trigger, err := node.triggerPrototype.Get(ctx, variables)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't create ordered stream from source stream")
+		return nil, nil, errors.Wrap(err, "couldn't get trigger from trigger prototype")
 	}
 
-	return orderedStream, NewExecutionOutput(NewZeroWatermarkGenerator(), execOutput.NextShuffles, execOutput.TasksToRun), nil
+	node.key = make([]Expression, 0)
+	if len(node.eventTimeField) > 0 {
+		node.key = append(node.key, node.expressions[0])
+	} else {
+		node.key = append(node.key, NewConstantValue(octosql.MakeString("key")))
+	}
+
+	orderBy := &OrderByStream{
+		variables:       variables,
+		expressions: node.expressions,
+		directions:  node.directions,
+	}
+
+	processFunc := &ProcessByKey{
+		eventTimeField:  node.eventTimeField,
+		trigger:         trigger,
+		keyExpressions:  [][]Expression{node.key},
+		processFunction: orderBy,
+		variables:       variables,
+	}
+
+	orderByPullEngine := NewPullEngine(processFunc, node.storage, []RecordStream{source}, streamID, execOutput.WatermarkSource, true, ctx)
+
+	return orderByPullEngine, // groupByPullEngine now indicates new watermark source
+		NewExecutionOutput(
+			orderByPullEngine,
+			execOutput.NextShuffles,
+			append(execOutput.TasksToRun, func() error { orderByPullEngine.Run(); return nil }),
+		),
+		nil
 }
 
-func createOrderedStream(ctx context.Context, expressions []Expression, directions []OrderDirection, variables octosql.Variables, sourceStream RecordStream) (stream RecordStream, outErr error) {
-	records := make([]*Record, 0)
+type OrderByStream struct {
+	expressions []Expression
+	directions  []OrderDirection
+	variables       octosql.Variables
+}
 
-	for {
-		rec, err := sourceStream.Next(ctx)
-		if err == ErrEndOfStream {
-			break
-		} else if err != nil {
-			return nil, errors.Wrap(err, "couldn't get all records")
-		}
+var recordValuePrefix = []byte("$record_value$")
+//todo record count prefix is from orderby
 
-		records = append(records, rec)
+func (ob *OrderByStream) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, key octosql.Value, record *Record) error {
+	if inputIndex > 0 {
+		panic("only one input stream allowed for order by")
 	}
 
-	defer func() {
-		if err := recover(); err != nil {
-			stream = nil
-			outErr = errors.Wrap(err.(error), "couldn't sort records")
+	keyPrefix := append(append([]byte("$"), key.MonotonicMarshal()...), '$')
+	txByKey := tx.WithPrefix(keyPrefix)
+
+	var recordValueMap *storage.Map
+	var recordCountMap *storage.Map
+
+
+	recordValueMap = storage.NewMap(txByKey.WithPrefix(recordValuePrefix))
+	recordCountMap = storage.NewMap(txByKey.WithPrefix(recordCountPrefix))
+
+	mapping := make(map[string]octosql.Value, len(record.Fields()))
+	for _, field := range record.Fields() {
+		mapping[field.Name.String()] = record.Value(field.Name)
+	}
+	variables := record.AsVariables()
+
+
+	recordPrefix := []byte("$")
+
+	for i := range ob.expressions {
+		expressionValue, err := ob.expressions[i].ExpressionValue(ctx, variables)
+		if err != nil {
+			return errors.Wrap(err, "couldn't evaluate expression")
 		}
-	}()
-	sort.Slice(records, func(i, j int) bool {
-		iRec := records[i]
-		jRec := records[j]
-
-		for num, expr := range expressions {
-			// TODO: Aggressive caching of these expressions...
-			iVars, err := variables.MergeWith(iRec.AsVariables())
-			if err != nil {
-				panic(errors.Wrap(err, "couldn't merge variables"))
-			}
-			jVars, err := variables.MergeWith(jRec.AsVariables())
-			if err != nil {
-				panic(errors.Wrap(err, "couldn't merge variables"))
-			}
-
-			x, err := expr.ExpressionValue(ctx, iVars)
-			if err != nil {
-				panic(errors.Wrapf(err, "couldn't get order by expression with index %v value", num))
-			}
-			y, err := expr.ExpressionValue(ctx, jVars)
-			if err != nil {
-				panic(errors.Wrapf(err, "couldn't get order by expression with index %v value", num))
-			}
-
-			if !isSorteable(x) {
-				panic(errors.Errorf("value %v of type %v is not comparable", x, reflect.TypeOf(x).String()))
-			}
-			if !isSorteable(y) {
-				panic(errors.Errorf("value %v of type %v is not comparable", y, reflect.TypeOf(y).String()))
-			}
-
-			cmp, err := octosql.Compare(x, y)
-			if err != nil {
-				panic(errors.Errorf("failed to compare values %v and %v", x, y))
-			}
-
-			answer := false
-
-			if cmp == 0 {
-				continue
-			} else if cmp > 0 {
-				answer = true
-			}
-
-			if directions[num] == Ascending {
-				answer = !answer
-			}
-
-			return answer
+		if ob.directions[i] == Ascending {
+			recordPrefix = append(recordPrefix, expressionValue.MonotonicMarshal()...)
+		} else {
+			recordPrefix = append(recordPrefix, expressionValue.ReversedMonotonicMarshal()...)
 		}
+		recordPrefix = append(recordPrefix, '$')
+	}
+	bytePref := append(append(recordPrefix, []byte(NewRecordFromRecord(record, WithNoUndo()).String())...), '$')
+	pref := OrderByKey{key: bytePref}
+	count  := octosql.MakePhantom()
+	err := recordCountMap.Get(&pref, &count)
 
-		return false
-	})
+	if !record.IsUndo() {
+		if err == storage.ErrNotFound {
+			err = recordValueMap.Set(&pref, record)
+			if err != nil {
+				return err
+			}
+			count = octosql.MakeInt(1)
+			err = recordCountMap.Set(&pref, &count)
+			if err != nil {
+				return err
+			}
+		} else if err != nil {
+			return err
+		} else {
+			// Keep track of record vs retraction count
+			count = octosql.MakeInt(count.AsInt() + 1)
+			err = recordCountMap.Set(&pref, &count)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		if err == storage.ErrNotFound {
+			return errors.Wrap(err, "couldn't retract record")
+		} else if err != nil {
+			return err
+		} else {
+			// Keep track of record vs retraction count
+			count = octosql.MakeInt(count.AsInt() - 1)
+			if count.AsInt() < 0 {
+				return errors.New( "couldn't retract record")
+			}
+			err = recordCountMap.Set(&pref, &count)
+			if err != nil {
+				return err
+			}
+		}
+	}
 
-	return NewInMemoryStream(ctx, records), nil
+	return nil
+}
+
+func (p *OrderByStream) Next(ctx context.Context, tx storage.StateTransaction) (*Record, error) {
+	outputQueue := NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
+
+	endOfStreamState := storage.NewValueState(tx.WithPrefix(endOfStreamPrefix))
+	var eos octosql.Value
+	err := endOfStreamState.Get(&eos)
+	if err == storage.ErrNotFound {
+	} else if err != nil {
+		return nil, errors.Wrap(err, "couldn't get end of stream value")
+	} else {
+		return nil, ErrEndOfStream
+	}
+
+	var element QueueElement
+	for err = outputQueue.Pop(ctx, &element); err == nil; err = outputQueue.Pop(ctx, &element) {
+		switch payload := element.Type.(type) {
+		case *QueueElement_Record:
+			return payload.Record, nil
+		case *QueueElement_Watermark:
+			outputWatermarkState := storage.NewValueState(tx.WithPrefix(outputWatermarkPrefix))
+			watermark, err := ptypes.Timestamp(payload.Watermark)
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't parse watermark timestamp")
+			}
+			octoWatermark := octosql.MakeTime(watermark)
+			err = outputWatermarkState.Set(&octoWatermark)
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't update output watermark")
+			}
+		case *QueueElement_EndOfStream:
+			octoEndOfStream := octosql.MakeBool(true)
+			err := endOfStreamState.Set(&octoEndOfStream)
+			if err != nil {
+				return nil, errors.Wrap(err, "couldn't update end of stream state")
+			}
+			return nil, ErrEndOfStream
+		case *QueueElement_Error:
+			return nil, errors.New(payload.Error)
+		default:
+			panic("invalid queue element type")
+		}
+	}
+
+	return nil, errors.Wrap(err, "couldn't pop element from output queue")
+}
+
+func (ob *OrderByStream) Trigger(ctx context.Context, tx storage.StateTransaction, key octosql.Value) ([]*Record, error) {
+	output := make([]*Record, 0)
+	keyPrefix := append(append([]byte("$"), key.MonotonicMarshal()...), '$')
+	txByKey := tx.WithPrefix(keyPrefix)
+
+
+	var recordValueMap *storage.Map
+	var recordCountMap *storage.Map
+
+
+	recordValueMap = storage.NewMap(txByKey.WithPrefix(recordValuePrefix))
+	recordCountMap = storage.NewMap(txByKey.WithPrefix(recordCountPrefix))
+
+
+
+
+	var err error
+	pref := OrderByKey{key: []byte("")}
+	var count octosql.Value
+	var value Record
+	iter := recordValueMap.GetIterator()
+	for err = iter.Next(&pref, &value); err == nil; err = iter.Next(&pref, &value) {
+		err := recordCountMap.Get(&pref, &count)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't get record count")
+		}
+		newValue := value
+		for i := 0; i < count.AsInt(); i++ {
+			output = append(output, &newValue)
+		}
+	}
+
+	if err != storage.ErrEndOfIterator {
+		return nil, errors.Wrap(err, "couldn't iterate over existing records")
+	}
+	if err := iter.Close(); err != nil {
+		return nil, errors.Wrap(err, "couldn't close record iterator")
+	}
+	return output, nil
 }

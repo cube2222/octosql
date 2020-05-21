@@ -352,6 +352,35 @@ func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage
 	return nil
 }
 
+func AreStreamsEqualWithOrdering(ctx context.Context, stateStorage storage.Storage, first, second RecordStream) error {
+
+	log.Println("first stream")
+	firstRecords, err := ReadAll(ctx, stateStorage, first)
+	if err != nil {
+		return errors.Wrap(err, "couldn't read first streams records")
+	}
+	log.Println("read first stream")
+
+	log.Println("second stream")
+	secondRecords, err := ReadAll(ctx, stateStorage, second)
+	if err != nil {
+		return errors.Wrap(err, "couldn't read second streams records")
+	}
+	log.Println("read second stream")
+
+	if len(firstRecords) == len(secondRecords) {
+		return errors.Wrap(err, "streams have different ammount of records")
+	}
+
+	for i := range firstRecords {
+		if !firstRecords[i].Equal(secondRecords[i]) {
+			return fmt.Errorf("records not equal: %s and %s", firstRecords[i].String(), secondRecords[i].String())
+		}
+	}
+
+	return nil
+}
+
 func AreStreamsEqualNoOrderingWithCount(ctx context.Context, stateStorage storage.Storage, first, second RecordStream, count int) error {
 	firstMultiSet := newMultiSet(DefaultEquality)
 	secondMultiSet := newMultiSet(DefaultEquality)

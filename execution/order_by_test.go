@@ -364,6 +364,7 @@ func TestOrderBy_Get(t *testing.T) {
 			if err := tx.Commit(); err != nil {
 				t.Fatal(err)
 			}
+
 			err := AreStreamsEqualWithOrdering(ctx, stateStorage, want, stream)
 			if (err != nil) == (tt.wantErr == false) {
 				t.Fatal(err)

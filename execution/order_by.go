@@ -138,17 +138,21 @@ func (ob *OrderByStream) AddRecord(ctx context.Context, tx storage.StateTransact
 		}
 		recordPrefix = append(recordPrefix, '$')
 	}
+
 	bytePref := append(append(recordPrefix, []byte(NewRecordFromRecord(record, WithNoUndo()).String())...), '$')
 	pref := OrderByKey{key: bytePref}
+
 	count  := octosql.MakePhantom()
 	err := recordCountMap.Get(&pref, &count)
 
 	if !record.IsUndo() {
 		if err == storage.ErrNotFound {
+
 			err = recordValueMap.Set(&pref, record)
 			if err != nil {
 				return err
 			}
+
 			count = octosql.MakeInt(1)
 			err = recordCountMap.Set(&pref, &count)
 			if err != nil {
@@ -175,6 +179,7 @@ func (ob *OrderByStream) AddRecord(ctx context.Context, tx storage.StateTransact
 			if count.AsInt() < 0 {
 				return errors.New( "couldn't retract record")
 			}
+
 			err = recordCountMap.Set(&pref, &count)
 			if err != nil {
 				return err
@@ -233,19 +238,15 @@ func (p *OrderByStream) Next(ctx context.Context, tx storage.StateTransaction) (
 
 func (ob *OrderByStream) Trigger(ctx context.Context, tx storage.StateTransaction, key octosql.Value) ([]*Record, error) {
 	output := make([]*Record, 0)
+
 	keyPrefix := append(append([]byte("$"), key.MonotonicMarshal()...), '$')
 	txByKey := tx.WithPrefix(keyPrefix)
-
 
 	var recordValueMap *storage.Map
 	var recordCountMap *storage.Map
 
-
 	recordValueMap = storage.NewMap(txByKey.WithPrefix(recordValuePrefix))
 	recordCountMap = storage.NewMap(txByKey.WithPrefix(recordCountPrefix))
-
-
-
 
 	var err error
 	pref := OrderByKey{key: []byte("")}
@@ -257,8 +258,9 @@ func (ob *OrderByStream) Trigger(ctx context.Context, tx storage.StateTransactio
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't get record count")
 		}
-		newValue := value
+
 		for i := 0; i < count.AsInt(); i++ {
+			newValue := value
 			output = append(output, &newValue)
 		}
 	}
@@ -266,8 +268,10 @@ func (ob *OrderByStream) Trigger(ctx context.Context, tx storage.StateTransactio
 	if err != storage.ErrEndOfIterator {
 		return nil, errors.Wrap(err, "couldn't iterate over existing records")
 	}
+
 	if err := iter.Close(); err != nil {
 		return nil, errors.Wrap(err, "couldn't close record iterator")
 	}
+
 	return output, nil
 }

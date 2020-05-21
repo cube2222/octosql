@@ -22,204 +22,300 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
-type Value struct {
-	// Types that are valid to be assigned to Value:
-	//	*Value_Null
-	//	*Value_Phantom
-	//	*Value_Int
-	//	*Value_Float
-	//	*Value_Bool
-	//	*Value_String_
-	//	*Value_Time
-	//	*Value_Duration
-	//	*Value_Tuple
-	//	*Value_Object
-	Value                isValue_Value `protobuf_oneof:"value"`
-	XXX_NoUnkeyedLiteral struct{}      `json:"-"`
-	XXX_unrecognized     []byte        `json:"-"`
-	XXX_sizecache        int32         `json:"-"`
+type Nulls struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *Value) Reset()         { *m = Value{} }
-func (m *Value) String() string { return proto.CompactTextString(m) }
-func (*Value) ProtoMessage()    {}
-func (*Value) Descriptor() ([]byte, []int) {
+func (m *Nulls) Reset()         { *m = Nulls{} }
+func (m *Nulls) String() string { return proto.CompactTextString(m) }
+func (*Nulls) ProtoMessage()    {}
+func (*Nulls) Descriptor() ([]byte, []int) {
 	return fileDescriptor_5d19e76c3b90e014, []int{0}
 }
 
-func (m *Value) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_Value.Unmarshal(m, b)
+func (m *Nulls) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Nulls.Unmarshal(m, b)
 }
-func (m *Value) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_Value.Marshal(b, m, deterministic)
+func (m *Nulls) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Nulls.Marshal(b, m, deterministic)
 }
-func (m *Value) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Value.Merge(m, src)
+func (m *Nulls) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Nulls.Merge(m, src)
 }
-func (m *Value) XXX_Size() int {
-	return xxx_messageInfo_Value.Size(m)
+func (m *Nulls) XXX_Size() int {
+	return xxx_messageInfo_Nulls.Size(m)
 }
-func (m *Value) XXX_DiscardUnknown() {
-	xxx_messageInfo_Value.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Value proto.InternalMessageInfo
-
-type isValue_Value interface {
-	isValue_Value()
+func (m *Nulls) XXX_DiscardUnknown() {
+	xxx_messageInfo_Nulls.DiscardUnknown(m)
 }
 
-type Value_Null struct {
-	Null bool `protobuf:"varint,1,opt,name=null,proto3,oneof"`
+var xxx_messageInfo_Nulls proto.InternalMessageInfo
+
+type Phantoms struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
-type Value_Phantom struct {
-	Phantom bool `protobuf:"varint,2,opt,name=phantom,proto3,oneof"`
+func (m *Phantoms) Reset()         { *m = Phantoms{} }
+func (m *Phantoms) String() string { return proto.CompactTextString(m) }
+func (*Phantoms) ProtoMessage()    {}
+func (*Phantoms) Descriptor() ([]byte, []int) {
+	return fileDescriptor_5d19e76c3b90e014, []int{1}
 }
 
-type Value_Int struct {
-	Int int64 `protobuf:"varint,3,opt,name=int,proto3,oneof"`
+func (m *Phantoms) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Phantoms.Unmarshal(m, b)
+}
+func (m *Phantoms) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Phantoms.Marshal(b, m, deterministic)
+}
+func (m *Phantoms) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Phantoms.Merge(m, src)
+}
+func (m *Phantoms) XXX_Size() int {
+	return xxx_messageInfo_Phantoms.Size(m)
+}
+func (m *Phantoms) XXX_DiscardUnknown() {
+	xxx_messageInfo_Phantoms.DiscardUnknown(m)
 }
 
-type Value_Float struct {
-	Float float64 `protobuf:"fixed64,4,opt,name=float,proto3,oneof"`
+var xxx_messageInfo_Phantoms proto.InternalMessageInfo
+
+type Ints struct {
+	Ints                 []int64  `protobuf:"varint,1,rep,packed,name=ints,proto3" json:"ints,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
-type Value_Bool struct {
-	Bool bool `protobuf:"varint,5,opt,name=bool,proto3,oneof"`
+func (m *Ints) Reset()         { *m = Ints{} }
+func (m *Ints) String() string { return proto.CompactTextString(m) }
+func (*Ints) ProtoMessage()    {}
+func (*Ints) Descriptor() ([]byte, []int) {
+	return fileDescriptor_5d19e76c3b90e014, []int{2}
 }
 
-type Value_String_ struct {
-	String_ string `protobuf:"bytes,6,opt,name=string,proto3,oneof"`
+func (m *Ints) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Ints.Unmarshal(m, b)
+}
+func (m *Ints) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Ints.Marshal(b, m, deterministic)
+}
+func (m *Ints) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Ints.Merge(m, src)
+}
+func (m *Ints) XXX_Size() int {
+	return xxx_messageInfo_Ints.Size(m)
+}
+func (m *Ints) XXX_DiscardUnknown() {
+	xxx_messageInfo_Ints.DiscardUnknown(m)
 }
 
-type Value_Time struct {
-	Time *timestamp.Timestamp `protobuf:"bytes,7,opt,name=time,proto3,oneof"`
-}
+var xxx_messageInfo_Ints proto.InternalMessageInfo
 
-type Value_Duration struct {
-	Duration *duration.Duration `protobuf:"bytes,8,opt,name=duration,proto3,oneof"`
-}
-
-type Value_Tuple struct {
-	Tuple *Tuple `protobuf:"bytes,9,opt,name=tuple,proto3,oneof"`
-}
-
-type Value_Object struct {
-	Object *Object `protobuf:"bytes,10,opt,name=object,proto3,oneof"`
-}
-
-func (*Value_Null) isValue_Value() {}
-
-func (*Value_Phantom) isValue_Value() {}
-
-func (*Value_Int) isValue_Value() {}
-
-func (*Value_Float) isValue_Value() {}
-
-func (*Value_Bool) isValue_Value() {}
-
-func (*Value_String_) isValue_Value() {}
-
-func (*Value_Time) isValue_Value() {}
-
-func (*Value_Duration) isValue_Value() {}
-
-func (*Value_Tuple) isValue_Value() {}
-
-func (*Value_Object) isValue_Value() {}
-
-func (m *Value) GetValue() isValue_Value {
+func (m *Ints) GetInts() []int64 {
 	if m != nil {
-		return m.Value
+		return m.Ints
 	}
 	return nil
 }
 
-func (m *Value) GetNull() bool {
-	if x, ok := m.GetValue().(*Value_Null); ok {
-		return x.Null
-	}
-	return false
+type Floats struct {
+	Floats               []float64 `protobuf:"fixed64,1,rep,packed,name=floats,proto3" json:"floats,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}  `json:"-"`
+	XXX_unrecognized     []byte    `json:"-"`
+	XXX_sizecache        int32     `json:"-"`
 }
 
-func (m *Value) GetPhantom() bool {
-	if x, ok := m.GetValue().(*Value_Phantom); ok {
-		return x.Phantom
-	}
-	return false
+func (m *Floats) Reset()         { *m = Floats{} }
+func (m *Floats) String() string { return proto.CompactTextString(m) }
+func (*Floats) ProtoMessage()    {}
+func (*Floats) Descriptor() ([]byte, []int) {
+	return fileDescriptor_5d19e76c3b90e014, []int{3}
 }
 
-func (m *Value) GetInt() int64 {
-	if x, ok := m.GetValue().(*Value_Int); ok {
-		return x.Int
-	}
-	return 0
+func (m *Floats) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Floats.Unmarshal(m, b)
+}
+func (m *Floats) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Floats.Marshal(b, m, deterministic)
+}
+func (m *Floats) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Floats.Merge(m, src)
+}
+func (m *Floats) XXX_Size() int {
+	return xxx_messageInfo_Floats.Size(m)
+}
+func (m *Floats) XXX_DiscardUnknown() {
+	xxx_messageInfo_Floats.DiscardUnknown(m)
 }
 
-func (m *Value) GetFloat() float64 {
-	if x, ok := m.GetValue().(*Value_Float); ok {
-		return x.Float
-	}
-	return 0
-}
+var xxx_messageInfo_Floats proto.InternalMessageInfo
 
-func (m *Value) GetBool() bool {
-	if x, ok := m.GetValue().(*Value_Bool); ok {
-		return x.Bool
-	}
-	return false
-}
-
-func (m *Value) GetString_() string {
-	if x, ok := m.GetValue().(*Value_String_); ok {
-		return x.String_
-	}
-	return ""
-}
-
-func (m *Value) GetTime() *timestamp.Timestamp {
-	if x, ok := m.GetValue().(*Value_Time); ok {
-		return x.Time
+func (m *Floats) GetFloats() []float64 {
+	if m != nil {
+		return m.Floats
 	}
 	return nil
 }
 
-func (m *Value) GetDuration() *duration.Duration {
-	if x, ok := m.GetValue().(*Value_Duration); ok {
-		return x.Duration
+type Bools struct {
+	Bools                []bool   `protobuf:"varint,1,rep,packed,name=bools,proto3" json:"bools,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *Bools) Reset()         { *m = Bools{} }
+func (m *Bools) String() string { return proto.CompactTextString(m) }
+func (*Bools) ProtoMessage()    {}
+func (*Bools) Descriptor() ([]byte, []int) {
+	return fileDescriptor_5d19e76c3b90e014, []int{4}
+}
+
+func (m *Bools) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Bools.Unmarshal(m, b)
+}
+func (m *Bools) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Bools.Marshal(b, m, deterministic)
+}
+func (m *Bools) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Bools.Merge(m, src)
+}
+func (m *Bools) XXX_Size() int {
+	return xxx_messageInfo_Bools.Size(m)
+}
+func (m *Bools) XXX_DiscardUnknown() {
+	xxx_messageInfo_Bools.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Bools proto.InternalMessageInfo
+
+func (m *Bools) GetBools() []bool {
+	if m != nil {
+		return m.Bools
 	}
 	return nil
 }
 
-func (m *Value) GetTuple() *Tuple {
-	if x, ok := m.GetValue().(*Value_Tuple); ok {
-		return x.Tuple
+type Strings struct {
+	Strings              []string `protobuf:"bytes,1,rep,name=strings,proto3" json:"strings,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *Strings) Reset()         { *m = Strings{} }
+func (m *Strings) String() string { return proto.CompactTextString(m) }
+func (*Strings) ProtoMessage()    {}
+func (*Strings) Descriptor() ([]byte, []int) {
+	return fileDescriptor_5d19e76c3b90e014, []int{5}
+}
+
+func (m *Strings) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Strings.Unmarshal(m, b)
+}
+func (m *Strings) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Strings.Marshal(b, m, deterministic)
+}
+func (m *Strings) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Strings.Merge(m, src)
+}
+func (m *Strings) XXX_Size() int {
+	return xxx_messageInfo_Strings.Size(m)
+}
+func (m *Strings) XXX_DiscardUnknown() {
+	xxx_messageInfo_Strings.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Strings proto.InternalMessageInfo
+
+func (m *Strings) GetStrings() []string {
+	if m != nil {
+		return m.Strings
 	}
 	return nil
 }
 
-func (m *Value) GetObject() *Object {
-	if x, ok := m.GetValue().(*Value_Object); ok {
-		return x.Object
+type Times struct {
+	Times                []*timestamp.Timestamp `protobuf:"bytes,1,rep,name=times,proto3" json:"times,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}               `json:"-"`
+	XXX_unrecognized     []byte                 `json:"-"`
+	XXX_sizecache        int32                  `json:"-"`
+}
+
+func (m *Times) Reset()         { *m = Times{} }
+func (m *Times) String() string { return proto.CompactTextString(m) }
+func (*Times) ProtoMessage()    {}
+func (*Times) Descriptor() ([]byte, []int) {
+	return fileDescriptor_5d19e76c3b90e014, []int{6}
+}
+
+func (m *Times) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Times.Unmarshal(m, b)
+}
+func (m *Times) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Times.Marshal(b, m, deterministic)
+}
+func (m *Times) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Times.Merge(m, src)
+}
+func (m *Times) XXX_Size() int {
+	return xxx_messageInfo_Times.Size(m)
+}
+func (m *Times) XXX_DiscardUnknown() {
+	xxx_messageInfo_Times.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Times proto.InternalMessageInfo
+
+func (m *Times) GetTimes() []*timestamp.Timestamp {
+	if m != nil {
+		return m.Times
 	}
 	return nil
 }
 
-// XXX_OneofWrappers is for the internal use of the proto package.
-func (*Value) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
-		(*Value_Null)(nil),
-		(*Value_Phantom)(nil),
-		(*Value_Int)(nil),
-		(*Value_Float)(nil),
-		(*Value_Bool)(nil),
-		(*Value_String_)(nil),
-		(*Value_Time)(nil),
-		(*Value_Duration)(nil),
-		(*Value_Tuple)(nil),
-		(*Value_Object)(nil),
+type Durations struct {
+	Durations            []*duration.Duration `protobuf:"bytes,1,rep,name=durations,proto3" json:"durations,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
+	XXX_unrecognized     []byte               `json:"-"`
+	XXX_sizecache        int32                `json:"-"`
+}
+
+func (m *Durations) Reset()         { *m = Durations{} }
+func (m *Durations) String() string { return proto.CompactTextString(m) }
+func (*Durations) ProtoMessage()    {}
+func (*Durations) Descriptor() ([]byte, []int) {
+	return fileDescriptor_5d19e76c3b90e014, []int{7}
+}
+
+func (m *Durations) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Durations.Unmarshal(m, b)
+}
+func (m *Durations) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Durations.Marshal(b, m, deterministic)
+}
+func (m *Durations) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Durations.Merge(m, src)
+}
+func (m *Durations) XXX_Size() int {
+	return xxx_messageInfo_Durations.Size(m)
+}
+func (m *Durations) XXX_DiscardUnknown() {
+	xxx_messageInfo_Durations.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Durations proto.InternalMessageInfo
+
+func (m *Durations) GetDurations() []*duration.Duration {
+	if m != nil {
+		return m.Durations
 	}
+	return nil
 }
 
 type Tuple struct {
@@ -233,7 +329,7 @@ func (m *Tuple) Reset()         { *m = Tuple{} }
 func (m *Tuple) String() string { return proto.CompactTextString(m) }
 func (*Tuple) ProtoMessage()    {}
 func (*Tuple) Descriptor() ([]byte, []int) {
-	return fileDescriptor_5d19e76c3b90e014, []int{1}
+	return fileDescriptor_5d19e76c3b90e014, []int{8}
 }
 
 func (m *Tuple) XXX_Unmarshal(b []byte) error {
@@ -272,7 +368,7 @@ func (m *Object) Reset()         { *m = Object{} }
 func (m *Object) String() string { return proto.CompactTextString(m) }
 func (*Object) ProtoMessage()    {}
 func (*Object) Descriptor() ([]byte, []int) {
-	return fileDescriptor_5d19e76c3b90e014, []int{2}
+	return fileDescriptor_5d19e76c3b90e014, []int{9}
 }
 
 func (m *Object) XXX_Unmarshal(b []byte) error {
@@ -300,39 +396,257 @@ func (m *Object) GetFields() map[string]*Value {
 	return nil
 }
 
+type Value struct {
+	// Types that are valid to be assigned to Value:
+	//	*Value_Null
+	//	*Value_Phantom
+	//	*Value_Int
+	//	*Value_Float
+	//	*Value_Bool
+	//	*Value_String_
+	//	*Value_Time
+	//	*Value_Duration
+	//	*Value_Tuple
+	//	*Value_Object
+	Value                isValue_Value `protobuf_oneof:"value"`
+	XXX_NoUnkeyedLiteral struct{}      `json:"-"`
+	XXX_unrecognized     []byte        `json:"-"`
+	XXX_sizecache        int32         `json:"-"`
+}
+
+func (m *Value) Reset()         { *m = Value{} }
+func (m *Value) String() string { return proto.CompactTextString(m) }
+func (*Value) ProtoMessage()    {}
+func (*Value) Descriptor() ([]byte, []int) {
+	return fileDescriptor_5d19e76c3b90e014, []int{10}
+}
+
+func (m *Value) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Value.Unmarshal(m, b)
+}
+func (m *Value) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Value.Marshal(b, m, deterministic)
+}
+func (m *Value) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Value.Merge(m, src)
+}
+func (m *Value) XXX_Size() int {
+	return xxx_messageInfo_Value.Size(m)
+}
+func (m *Value) XXX_DiscardUnknown() {
+	xxx_messageInfo_Value.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Value proto.InternalMessageInfo
+
+type isValue_Value interface {
+	isValue_Value()
+}
+
+type Value_Null struct {
+	Null *Nulls `protobuf:"bytes,1,opt,name=null,proto3,oneof"`
+}
+
+type Value_Phantom struct {
+	Phantom *Phantoms `protobuf:"bytes,2,opt,name=phantom,proto3,oneof"`
+}
+
+type Value_Int struct {
+	Int *Ints `protobuf:"bytes,3,opt,name=int,proto3,oneof"`
+}
+
+type Value_Float struct {
+	Float *Floats `protobuf:"bytes,4,opt,name=float,proto3,oneof"`
+}
+
+type Value_Bool struct {
+	Bool *Bools `protobuf:"bytes,5,opt,name=bool,proto3,oneof"`
+}
+
+type Value_String_ struct {
+	String_ *Strings `protobuf:"bytes,6,opt,name=string,proto3,oneof"`
+}
+
+type Value_Time struct {
+	Time *Times `protobuf:"bytes,7,opt,name=time,proto3,oneof"`
+}
+
+type Value_Duration struct {
+	Duration *Durations `protobuf:"bytes,8,opt,name=duration,proto3,oneof"`
+}
+
+type Value_Tuple struct {
+	Tuple *Tuple `protobuf:"bytes,9,opt,name=tuple,proto3,oneof"`
+}
+
+type Value_Object struct {
+	Object *Object `protobuf:"bytes,10,opt,name=object,proto3,oneof"`
+}
+
+func (*Value_Null) isValue_Value() {}
+
+func (*Value_Phantom) isValue_Value() {}
+
+func (*Value_Int) isValue_Value() {}
+
+func (*Value_Float) isValue_Value() {}
+
+func (*Value_Bool) isValue_Value() {}
+
+func (*Value_String_) isValue_Value() {}
+
+func (*Value_Time) isValue_Value() {}
+
+func (*Value_Duration) isValue_Value() {}
+
+func (*Value_Tuple) isValue_Value() {}
+
+func (*Value_Object) isValue_Value() {}
+
+func (m *Value) GetValue() isValue_Value {
+	if m != nil {
+		return m.Value
+	}
+	return nil
+}
+
+func (m *Value) GetNull() *Nulls {
+	if x, ok := m.GetValue().(*Value_Null); ok {
+		return x.Null
+	}
+	return nil
+}
+
+func (m *Value) GetPhantom() *Phantoms {
+	if x, ok := m.GetValue().(*Value_Phantom); ok {
+		return x.Phantom
+	}
+	return nil
+}
+
+func (m *Value) GetInt() *Ints {
+	if x, ok := m.GetValue().(*Value_Int); ok {
+		return x.Int
+	}
+	return nil
+}
+
+func (m *Value) GetFloat() *Floats {
+	if x, ok := m.GetValue().(*Value_Float); ok {
+		return x.Float
+	}
+	return nil
+}
+
+func (m *Value) GetBool() *Bools {
+	if x, ok := m.GetValue().(*Value_Bool); ok {
+		return x.Bool
+	}
+	return nil
+}
+
+func (m *Value) GetString_() *Strings {
+	if x, ok := m.GetValue().(*Value_String_); ok {
+		return x.String_
+	}
+	return nil
+}
+
+func (m *Value) GetTime() *Times {
+	if x, ok := m.GetValue().(*Value_Time); ok {
+		return x.Time
+	}
+	return nil
+}
+
+func (m *Value) GetDuration() *Durations {
+	if x, ok := m.GetValue().(*Value_Duration); ok {
+		return x.Duration
+	}
+	return nil
+}
+
+func (m *Value) GetTuple() *Tuple {
+	if x, ok := m.GetValue().(*Value_Tuple); ok {
+		return x.Tuple
+	}
+	return nil
+}
+
+func (m *Value) GetObject() *Object {
+	if x, ok := m.GetValue().(*Value_Object); ok {
+		return x.Object
+	}
+	return nil
+}
+
+// XXX_OneofWrappers is for the internal use of the proto package.
+func (*Value) XXX_OneofWrappers() []interface{} {
+	return []interface{}{
+		(*Value_Null)(nil),
+		(*Value_Phantom)(nil),
+		(*Value_Int)(nil),
+		(*Value_Float)(nil),
+		(*Value_Bool)(nil),
+		(*Value_String_)(nil),
+		(*Value_Time)(nil),
+		(*Value_Duration)(nil),
+		(*Value_Tuple)(nil),
+		(*Value_Object)(nil),
+	}
+}
+
 func init() {
-	proto.RegisterType((*Value)(nil), "octosql.Value")
+	proto.RegisterType((*Nulls)(nil), "octosql.Nulls")
+	proto.RegisterType((*Phantoms)(nil), "octosql.Phantoms")
+	proto.RegisterType((*Ints)(nil), "octosql.Ints")
+	proto.RegisterType((*Floats)(nil), "octosql.Floats")
+	proto.RegisterType((*Bools)(nil), "octosql.Bools")
+	proto.RegisterType((*Strings)(nil), "octosql.Strings")
+	proto.RegisterType((*Times)(nil), "octosql.Times")
+	proto.RegisterType((*Durations)(nil), "octosql.Durations")
 	proto.RegisterType((*Tuple)(nil), "octosql.Tuple")
 	proto.RegisterType((*Object)(nil), "octosql.Object")
 	proto.RegisterMapType((map[string]*Value)(nil), "octosql.Object.FieldsEntry")
+	proto.RegisterType((*Value)(nil), "octosql.Value")
 }
 
 func init() { proto.RegisterFile("values.proto", fileDescriptor_5d19e76c3b90e014) }
 
 var fileDescriptor_5d19e76c3b90e014 = []byte{
-	// 369 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x64, 0x51, 0xcd, 0x4a, 0xc3, 0x40,
-	0x10, 0xce, 0x36, 0x4d, 0xd2, 0x4e, 0x45, 0x65, 0x10, 0x59, 0x23, 0x68, 0x28, 0x52, 0xe2, 0x25,
-	0x15, 0x7b, 0x50, 0x3c, 0x8a, 0x4a, 0x3c, 0x09, 0xa1, 0x78, 0x4f, 0xda, 0xb4, 0x46, 0xb7, 0xd9,
-	0x98, 0x6c, 0x84, 0xbe, 0x81, 0x0f, 0xe9, 0xc3, 0xc8, 0xee, 0x26, 0x45, 0xdb, 0xdb, 0xce, 0x7c,
-	0x3f, 0x3b, 0xdf, 0x0c, 0xec, 0x7d, 0xc5, 0xac, 0x4e, 0xab, 0xa0, 0x28, 0xb9, 0xe0, 0xe8, 0xf0,
-	0x99, 0xe0, 0xd5, 0x27, 0x73, 0xcf, 0x97, 0x9c, 0x2f, 0x59, 0x3a, 0x56, 0xed, 0xa4, 0x5e, 0x8c,
-	0x45, 0xb6, 0x4a, 0x2b, 0x11, 0xaf, 0x0a, 0xcd, 0x74, 0xcf, 0xb6, 0x09, 0xf3, 0xba, 0x8c, 0x45,
-	0xc6, 0x73, 0x8d, 0x0f, 0x7f, 0x3a, 0x60, 0xbd, 0x4a, 0x6b, 0x3c, 0x82, 0x6e, 0x5e, 0x33, 0x46,
-	0x89, 0x47, 0xfc, 0x5e, 0x68, 0x44, 0xaa, 0x42, 0x17, 0x9c, 0xe2, 0x2d, 0xce, 0x05, 0x5f, 0xd1,
-	0x4e, 0x03, 0xb4, 0x0d, 0x44, 0x30, 0xb3, 0x5c, 0x50, 0xd3, 0x23, 0xbe, 0x19, 0x1a, 0x91, 0x2c,
-	0xf0, 0x18, 0xac, 0x05, 0xe3, 0xb1, 0xa0, 0x5d, 0x8f, 0xf8, 0x24, 0x34, 0x22, 0x5d, 0x4a, 0xf7,
-	0x84, 0x73, 0x46, 0xad, 0xd6, 0x5d, 0x56, 0x48, 0xc1, 0xae, 0x44, 0x99, 0xe5, 0x4b, 0x6a, 0x7b,
-	0xc4, 0xef, 0x87, 0x46, 0xd4, 0xd4, 0x78, 0x05, 0x5d, 0x19, 0x85, 0x3a, 0x1e, 0xf1, 0x07, 0xd7,
-	0x6e, 0xa0, 0x63, 0x04, 0x6d, 0x8c, 0x60, 0xda, 0xe6, 0x94, 0x5e, 0x92, 0x89, 0x37, 0xd0, 0x6b,
-	0xb3, 0xd1, 0x9e, 0x52, 0x9d, 0xec, 0xa8, 0x1e, 0x1a, 0x42, 0x68, 0x44, 0x1b, 0x32, 0x8e, 0xc0,
-	0x12, 0x75, 0xc1, 0x52, 0xda, 0x57, 0xaa, 0xfd, 0xa0, 0x59, 0x6e, 0x30, 0x95, 0x5d, 0x19, 0x41,
-	0xc1, 0x78, 0x09, 0x36, 0x4f, 0xde, 0xd3, 0x99, 0xa0, 0xa0, 0x88, 0x07, 0x1b, 0xe2, 0x8b, 0x6a,
-	0xcb, 0xe9, 0x35, 0xe1, 0xde, 0x01, 0x4b, 0xdd, 0x6b, 0x38, 0x06, 0x4b, 0xb9, 0xe0, 0x08, 0xec,
-	0x45, 0x96, 0xb2, 0x79, 0x45, 0x89, 0x67, 0xfe, 0xfb, 0x45, 0x6d, 0x3f, 0x6a, 0xd0, 0xe1, 0x37,
-	0x01, 0x5b, 0xdb, 0xe1, 0x64, 0x4b, 0x72, 0xba, 0xf5, 0x5f, 0xf0, 0xa4, 0xd0, 0xc7, 0x5c, 0x94,
-	0xeb, 0x56, 0xef, 0x3e, 0xc3, 0xe0, 0x4f, 0x1b, 0x0f, 0xc1, 0xfc, 0x48, 0xd7, 0xea, 0xa6, 0xfd,
-	0x48, 0x3e, 0xf1, 0xa2, 0x19, 0x4d, 0x9d, 0x73, 0x77, 0x0e, 0x0d, 0xde, 0x75, 0x6e, 0x49, 0x62,
-	0xab, 0xb5, 0x4d, 0x7e, 0x03, 0x00, 0x00, 0xff, 0xff, 0x3e, 0xba, 0x26, 0x88, 0x7b, 0x02, 0x00,
-	0x00,
+	// 532 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x6c, 0x92, 0xdf, 0x6e, 0xd3, 0x30,
+	0x14, 0xc6, 0x93, 0xa5, 0x4e, 0xda, 0x33, 0xfe, 0x0c, 0x0b, 0x21, 0xd3, 0x69, 0x50, 0xcc, 0x34,
+	0x06, 0x12, 0xe9, 0xd4, 0x5d, 0xf0, 0xe7, 0xb2, 0x1a, 0x53, 0x76, 0x03, 0xc8, 0x54, 0x5c, 0x70,
+	0xd7, 0x74, 0x69, 0x17, 0x70, 0xe3, 0x52, 0x3b, 0x48, 0x7b, 0x03, 0x9e, 0x86, 0x67, 0x44, 0x3e,
+	0x8e, 0xc3, 0x14, 0x76, 0x77, 0xe2, 0xef, 0x77, 0x8e, 0xce, 0x97, 0xf3, 0xc1, 0x9d, 0x5f, 0x73,
+	0x59, 0x17, 0x3a, 0xdd, 0x6c, 0x95, 0x51, 0x34, 0x51, 0x0b, 0xa3, 0xf4, 0x4f, 0x39, 0x7c, 0xba,
+	0x52, 0x6a, 0x25, 0x8b, 0x31, 0x3e, 0xe7, 0xf5, 0x72, 0x6c, 0xca, 0x75, 0xa1, 0xcd, 0x7c, 0xbd,
+	0x71, 0xe4, 0xf0, 0x49, 0x17, 0xb8, 0xac, 0xb7, 0x73, 0x53, 0xaa, 0xca, 0xe9, 0x3c, 0x01, 0xf2,
+	0xb1, 0x96, 0x52, 0x73, 0x80, 0xfe, 0xe7, 0xab, 0x79, 0x65, 0xd4, 0x5a, 0xf3, 0x21, 0xf4, 0x2e,
+	0x2a, 0xa3, 0x29, 0x85, 0x5e, 0x59, 0x19, 0xcd, 0xc2, 0x51, 0x74, 0x1c, 0x09, 0xac, 0xf9, 0x08,
+	0xe2, 0x73, 0xa9, 0xe6, 0x46, 0xd3, 0x47, 0x10, 0x2f, 0xb1, 0x42, 0x3d, 0x14, 0xcd, 0x17, 0x3f,
+	0x00, 0x32, 0x55, 0x4a, 0x6a, 0xfa, 0x10, 0x48, 0x6e, 0x0b, 0xd4, 0xfb, 0xc2, 0x7d, 0xf0, 0xe7,
+	0x90, 0x7c, 0x31, 0xdb, 0xb2, 0x5a, 0x69, 0xca, 0x20, 0xd1, 0xae, 0x44, 0x64, 0x20, 0xfc, 0x27,
+	0x7f, 0x07, 0x64, 0x66, 0x9d, 0xd0, 0x13, 0x20, 0x68, 0x09, 0x81, 0xdd, 0xc9, 0x30, 0x75, 0x7e,
+	0x52, 0xef, 0x27, 0x9d, 0x79, 0xc3, 0xc2, 0x81, 0xfc, 0x0c, 0x06, 0x67, 0x8d, 0x47, 0x4d, 0xdf,
+	0xc0, 0xc0, 0x1b, 0xf6, 0x23, 0x1e, 0xff, 0x37, 0xc2, 0xe3, 0xe2, 0x1f, 0xcb, 0xc7, 0x40, 0x66,
+	0xf5, 0x46, 0x16, 0xf4, 0x08, 0xe2, 0x65, 0x59, 0xc8, 0x4b, 0xdf, 0x7e, 0x2f, 0x6d, 0xfe, 0x7d,
+	0xfa, 0xd5, 0x5e, 0x44, 0x34, 0x2a, 0xff, 0x1d, 0x42, 0xfc, 0x29, 0xff, 0x5e, 0x2c, 0x0c, 0x3d,
+	0xed, 0xb4, 0xec, 0xb7, 0x2d, 0x0e, 0x48, 0xcf, 0x51, 0xfd, 0x50, 0x99, 0xed, 0xb5, 0xef, 0x1f,
+	0x5e, 0xc0, 0xee, 0x8d, 0x67, 0xba, 0x07, 0xd1, 0x8f, 0xe2, 0x9a, 0x85, 0xa3, 0xf0, 0x78, 0x20,
+	0x6c, 0x49, 0x0f, 0x81, 0x60, 0x06, 0xd8, 0xce, 0x28, 0xbc, 0x65, 0x0f, 0x27, 0xbe, 0xdf, 0x79,
+	0x1b, 0xf2, 0x3f, 0x11, 0x10, 0x7c, 0xa4, 0x87, 0xd0, 0xab, 0x6a, 0x29, 0x71, 0xcc, 0xcd, 0x16,
+	0x3c, 0x79, 0x16, 0x08, 0x54, 0xe9, 0x6b, 0x48, 0x36, 0xee, 0xf4, 0xcd, 0xec, 0x07, 0x2d, 0xe8,
+	0x23, 0x91, 0x05, 0xc2, 0x33, 0xf4, 0x19, 0x44, 0x65, 0x65, 0x58, 0x84, 0xe8, 0xdd, 0x16, 0xb5,
+	0x89, 0xc9, 0x02, 0x61, 0x35, 0xfa, 0x02, 0x08, 0x86, 0x81, 0xf5, 0x10, 0xba, 0xdf, 0x42, 0x2e,
+	0x3a, 0x59, 0x20, 0x9c, 0x6e, 0x17, 0xb4, 0xa9, 0x60, 0xa4, 0xb3, 0x20, 0x06, 0xc8, 0x2e, 0x68,
+	0x55, 0xfa, 0x0a, 0x62, 0x17, 0x0c, 0x16, 0x23, 0xb7, 0xd7, 0x72, 0x4d, 0x92, 0xb2, 0x40, 0x34,
+	0x84, 0x9d, 0x68, 0x73, 0xc0, 0x92, 0xce, 0x44, 0xcc, 0x89, 0x9d, 0x68, 0x55, 0x7a, 0x02, 0x7d,
+	0x7f, 0x6b, 0xd6, 0x47, 0x92, 0xb6, 0x64, 0x9b, 0x9e, 0x2c, 0x10, 0x2d, 0x45, 0x8f, 0x80, 0x18,
+	0x1b, 0x08, 0x36, 0xe8, 0x0e, 0xb6, 0xaf, 0xd6, 0x11, 0xca, 0xf4, 0x25, 0xc4, 0x0a, 0xaf, 0xcc,
+	0xa0, 0xe3, 0xdd, 0x1d, 0xdf, 0xae, 0xea, 0x80, 0x69, 0xd2, 0x5c, 0x74, 0x7a, 0xf0, 0x6d, 0x7f,
+	0x55, 0x9a, 0xab, 0x3a, 0x4f, 0x17, 0x6a, 0x3d, 0x5e, 0xd4, 0x79, 0x31, 0x99, 0x4c, 0x26, 0xe3,
+	0xa6, 0x31, 0x8f, 0x31, 0xa9, 0xa7, 0x7f, 0x03, 0x00, 0x00, 0xff, 0xff, 0x5e, 0x49, 0xfb, 0x2f,
+	0x04, 0x04, 0x00, 0x00,
 }

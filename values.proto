@@ -4,19 +4,34 @@ option go_package = "github.com/cube2222/octosql";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/duration.proto";
 
-message Value {
-    oneof value {
-        bool null = 1;
-        bool phantom = 2;
-        int64 int = 3;
-        double float = 4;
-        bool bool = 5;
-        string string = 6;
-        google.protobuf.Timestamp time = 7;
-        google.protobuf.Duration duration = 8;
-        Tuple tuple = 9;
-        Object object = 10;
-    }
+message Nulls {
+}
+
+message Phantoms {
+}
+
+message Ints {
+    repeated int64 ints = 1;
+}
+
+message Floats {
+    repeated double floats = 1;
+}
+
+message Bools {
+    repeated bool bools = 1;
+}
+
+message Strings {
+    repeated string strings = 1;
+}
+
+message Times {
+    repeated google.protobuf.Timestamp times = 1;
+}
+
+message Durations {
+    repeated google.protobuf.Duration durations = 1;
 }
 
 message Tuple {
@@ -25,4 +40,19 @@ message Tuple {
 
 message Object {
     map<string, Value> fields = 1;
+}
+
+message Value {
+    oneof value {
+        Nulls null = 1;
+        Phantoms phantom = 2;
+        Ints int = 3;
+        Floats float = 4;
+        Bools bool = 5;
+        Strings string = 6;
+        Times time = 7;
+        Durations duration = 8;
+        Tuple tuple = 9;
+        Object object = 10;
+    }
 }

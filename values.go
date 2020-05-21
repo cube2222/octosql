@@ -22,69 +22,82 @@ import (
 //	docs.Documented
 
 func MakeNull() Value {
-	return Value{Value: &Value_Null{Null: true}}
+	return Value{Value: &Value_Nulls{Nulls: &Nulls{}}}
 }
 func ZeroNull() Value {
-	return Value{Value: &Value_Null{Null: true}}
+	return Value{Value: &Value_Nulls{Nulls: &Nulls{}}}
 }
 
 type Phantom struct{}
 
 func MakePhantom() Value {
-	return Value{Value: &Value_Phantom{Phantom: true}}
+	return Value{Value: &Value_Phantom{Phantom: &Phantoms{}}}
 }
 func ZeroPhantom() Value {
-	return Value{Value: &Value_Phantom{Phantom: true}}
+	return Value{Value: &Value_Phantom{Phantom: &Phantoms{}}}
 }
 
 type Int int
 
-func MakeInt(v int) Value {
-	return Value{Value: &Value_Int{Int: int64(v)}}
+func MakeInt(v []int) Value {
+	ints := make([]int64, len(v))
+	for i := range v {
+		ints[i] = int64(v[i])
+	}
+	return Value{Value: &Value_Int{Int: &Ints{Ints: ints}}}
 }
+
 func ZeroInt() Value {
-	return Value{Value: &Value_Int{Int: int64(0)}}
+	return Value{Value: &Value_Int{Int: &Ints{}}}
 }
 
 type Float float64
 
-func MakeFloat(v float64) Value {
-	return Value{Value: &Value_Float{Float: v}}
+func MakeFloat(v []float64) Value {
+	return Value{Value: &Value_Float{Float: &Floats{Floats: v}}}
 }
 func ZeroFloat() Value {
-	return Value{Value: &Value_Float{Float: 0}}
+	return Value{Value: &Value_Float{Float: &Floats{}}}
 }
 
-func MakeBool(v bool) Value {
-	return Value{Value: &Value_Bool{Bool: v}}
+func MakeBool(v []bool) Value {
+	return Value{Value: &Value_Bool{Bool: &Bools{Bools: v}}}
 }
 func ZeroBool() Value {
-	return Value{Value: &Value_Bool{Bool: false}}
+	return Value{Value: &Value_Bool{Bool: &Bools{}}}
 }
 
-func MakeString(v string) Value {
-	return Value{Value: &Value_String_{String_: v}}
+func MakeString(v []string) Value {
+	return Value{Value: &Value_String_{String_: &Strings{Strings: v}}}
 }
 func ZeroString() Value {
-	return Value{Value: &Value_String_{String_: ""}}
+	return Value{Value: &Value_String_{String_: &Strings{}}}
 }
 
-func MakeTime(v time.Time) Value {
-	t, err := ptypes.TimestampProto(v)
-	if err != nil {
-		panic(err)
+func MakeTime(v []time.Time) Value {
+	times := make([]*timestamp.Timestamp, len(v))
+	for i := range v {
+		t, err := ptypes.TimestampProto(v[i])
+		if err != nil {
+			panic(err)
+		}
+		times[i] = t
 	}
-	return Value{Value: &Value_Time{Time: t}}
+	return Value{Value: &Value_Time{Time: &Times{Times: times}}}
 }
 func ZeroTime() Value {
-	return Value{Value: &Value_Time{Time: &timestamp.Timestamp{}}}
+	return Value{Value: &Value_Time{Time: &Times{}}}
 }
 
-func MakeDuration(v time.Duration) Value {
-	return Value{Value: &Value_Duration{Duration: ptypes.DurationProto(v)}}
+func MakeDuration(v []time.Duration) Value {
+	durations := make([]*duration.Duration, len(v))
+	for i := range v {
+		durations[i] = ptypes.DurationProto(v[i])
+	}
+	return Value{Value: &Value_Duration{Duration: &Durations{Durations: durations}}}
 }
 func ZeroDuration() Value {
-	return Value{Value: &Value_Duration{Duration: &duration.Duration{}}}
+	return Value{Value: &Value_Duration{Duration: &Durations{}}}
 }
 
 func MakeTuple(v []Value) Value {
@@ -127,56 +140,99 @@ func NormalizeType(value interface{}) Value {
 	switch value := value.(type) {
 	case nil:
 		return MakeNull()
-	case bool:
+	case []bool:
 		return MakeBool(value)
-	case int:
+	case []int:
 		return MakeInt(value)
-	case int8:
-		return MakeInt(int(value))
-	case int16:
-		return MakeInt(int(value))
-	case int32:
-		return MakeInt(int(value))
-	case int64:
-		return MakeInt(int(value))
-	case uint8:
-		return MakeInt(int(value))
-	case uint16:
-		return MakeInt(int(value))
-	case uint32:
-		return MakeInt(int(value))
-	case uint64:
-		return MakeInt(int(value))
-	case float32:
-		return MakeFloat(float64(value))
-	case float64:
+	case []int8:
+		ints := make([]int, len(value))
+		for i := range value {
+			ints[i] = int(value[i])
+		}
+		return MakeInt(ints)
+	case []int16:
+		ints := make([]int, len(value))
+		for i := range value {
+			ints[i] = int(value[i])
+		}
+		return MakeInt(ints)
+	case []int32:
+		ints := make([]int, len(value))
+		for i := range value {
+			ints[i] = int(value[i])
+		}
+		return MakeInt(ints)
+	case []int64:
+		ints := make([]int, len(value))
+		for i := range value {
+			ints[i] = int(value[i])
+		}
+		return MakeInt(ints)
+	case []uint8:
+		ints := make([]int, len(value))
+		for i := range value {
+			ints[i] = int(value[i])
+		}
+		return MakeInt(ints)
+	case []uint16:
+		ints := make([]int, len(value))
+		for i := range value {
+			ints[i] = int(value[i])
+		}
+		return MakeInt(ints)
+	case []uint32:
+		ints := make([]int, len(value))
+		for i := range value {
+			ints[i] = int(value[i])
+		}
+		return MakeInt(ints)
+	case []uint64:
+		ints := make([]int, len(value))
+		for i := range value {
+			ints[i] = int(value[i])
+		}
+		return MakeInt(ints)
+	case []float32:
+		floats := make([]float64, len(value))
+		for i := range value {
+			floats[i] = float64(value[i])
+		}
+		return MakeFloat(floats)
+	case []float64:
 		return MakeFloat(value)
-	case []byte:
-		return MakeString(base32.StdEncoding.EncodeToString(value))
-	case string:
+	case [][]byte:
+		encoded := make([]string, len(value))
+		for i := range value {
+			encoded[i] = base32.StdEncoding.EncodeToString(value[i])
+		}
+		return MakeString(encoded)
+	case []string:
 		return MakeString(value)
-	case []interface{}:
+	case [][]interface{}:
 		out := make([]Value, len(value))
 		for i := range value {
 			out[i] = NormalizeType(value[i])
 		}
 		return MakeTuple(out)
-	case map[string]interface{}:
+	case []map[string]interface{}:
+		if len(value) == 0 {
+			return MakeObject(nil)
+		}
 		out := make(map[string]Value)
-		for k, v := range value {
-			out[k] = NormalizeType(v)
+		for k := range value[0] {
+			t := reflect.TypeOf(value[0][k])
+			toNormalize := reflect.MakeSlice(t, len(value), len(value))
+			for i := range value {
+				toNormalize.Index(i).Set(reflect.ValueOf(value[i][k]))
+			}
+			out[k] = NormalizeType(toNormalize.Interface())
 		}
 		return MakeObject(out)
-	case *interface{}:
-		if value != nil {
-			return NormalizeType(*value)
-		}
-		return MakeNull()
-	case time.Time:
+	case []time.Time:
 		return MakeTime(value)
-	case time.Duration:
+	case []time.Duration:
 		return MakeDuration(value)
-	case struct{}:
+	case []struct{}:
 		return MakePhantom()
 	case Value:
 		return value
@@ -286,36 +342,51 @@ func ZeroValue() Value {
 	return Value{}
 }
 
-func (v Value) AsInt() int {
-	return int(v.GetInt())
-}
-
-func (v Value) AsFloat() float64 {
-	return v.GetFloat()
-}
-
-func (v Value) AsBool() bool {
-	return v.GetBool()
-}
-
-func (v Value) AsString() string {
-	return v.GetString_()
-}
-
-func (v Value) AsTime() time.Time {
-	t, err := ptypes.Timestamp(v.GetTime())
-	if err != nil {
-		panic(err)
+func (v Value) AsInt() []int {
+	oldInts := v.GetInt().Ints
+	ints := make([]int, len(oldInts))
+	for i := range oldInts {
+		ints[i] = int(oldInts[i])
 	}
-	return t
+	return ints
 }
 
-func (v Value) AsDuration() time.Duration {
-	d, err := ptypes.Duration(v.GetDuration())
-	if err != nil {
-		panic(err)
+func (v Value) AsFloat() []float64 {
+	return v.GetFloat().Floats
+}
+
+func (v Value) AsBool() []bool {
+	return v.GetBool().Bools
+}
+
+func (v Value) AsString() []string {
+	return v.GetString_().Strings
+}
+
+func (v Value) AsTime() []time.Time {
+	oldTimes := v.GetTime().Times
+	times := make([]time.Time, len(oldTimes))
+	for i := range oldTimes {
+		t, err := ptypes.Timestamp(oldTimes[i])
+		if err != nil {
+			panic(err)
+		}
+		times[i] = t
 	}
-	return d
+	return times
+}
+
+func (v Value) AsDuration() []time.Duration {
+	oldDurations := v.GetDuration().Durations
+	durations := make([]time.Duration, len(oldDurations))
+	for i := range oldDurations {
+		d, err := ptypes.Duration(oldDurations[i])
+		if err != nil {
+			panic(err)
+		}
+		durations[i] = d
+	}
+	return durations
 }
 
 func (v Value) AsSlice() []Value {
@@ -455,9 +526,11 @@ func (v Value) Show() string {
 	case TypeString:
 		return fmt.Sprintf("'%s'", v.AsString())
 	case TypeTime:
-		return v.AsTime().Format(time.RFC3339Nano)
+		// return v.AsTime().Format(time.RFC3339Nano)
+		return fmt.Sprintf("%+v", v.AsTime())
 	case TypeDuration:
-		return v.AsDuration().String()
+		// return v.AsDuration().String()
+		return fmt.Sprintf("%+v", v.AsDuration())
 	case TypeTuple:
 		valueStrings := make([]string, len(v.AsSlice()))
 		for i, value := range v.AsSlice() {

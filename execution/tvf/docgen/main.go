@@ -10,7 +10,14 @@ import (
 func main() {
 	var body []docs.Documentation
 
-	tvfs := []docs.Documented{&tvf.Range{}, &tvf.Tumble{}}
+	body = append(body, docs.TableOfContents(
+		[]string{"range", "tumble", "watermark generator: maximal difference", "watermark generator: percentile"},
+		[]string{"range", "tumble", "watermark_generator:_maximal_difference", "watermark_generator:_percentile"},
+	))
+	body = append(body, docs.Divider())
+	body = append(body, docs.Divider())
+
+	tvfs := []docs.Documented{&tvf.Range{}, &tvf.Tumble{}, &tvf.WatermarkGenerator{}, &tvf.PercentileWatermarkGenerator{}}
 	for i, el := range tvfs {
 		body = append(body, el.Document())
 		if i != len(tvfs)-1 {

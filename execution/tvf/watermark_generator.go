@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/storage"
 )
@@ -24,6 +25,16 @@ func NewWatermarkGenerator(source execution.Node, timeField octosql.VariableName
 		timeField: timeField,
 		offset:    offset,
 	}
+}
+
+func (r *WatermarkGenerator) Document() docs.Documentation {
+	return docs.Section(
+		"watermark generator: maximal difference",
+		docs.Body(
+			docs.Section("Calling", docs.List(docs.Text("max_diff_watermark(source => \\<Source\\>, time_field => \\<Descriptor\\>, offset => \\<interval\\>"))),
+			docs.Section("Description", docs.Text("Creating standard watermark that stores watermark value of \\<maximal record event time\\> - given offset.")),
+		),
+	)
 }
 
 func (w *WatermarkGenerator) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {

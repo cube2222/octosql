@@ -22,7 +22,7 @@ func main() {
 
 	var body []docs.Documentation
 
-	body = append(body, docs.TableOfContents(functionNames))
+	body = append(body, docs.TableOfContents(functionNames, functionNames))
 	body = append(body, docs.Divider())
 	body = append(body, docs.Divider())
 

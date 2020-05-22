@@ -22,7 +22,7 @@ func main() {
 
 	var body []docs.Documentation
 
-	body = append(body, docs.TableOfContents(aggregateNames))
+	body = append(body, docs.TableOfContents(aggregateNames, aggregateNames))
 	body = append(body, docs.Divider())
 	body = append(body, docs.Divider())
 

@@ -21,6 +21,11 @@ func main() {
 	}
 
 	var body []docs.Documentation
+
+	body = append(body, docs.TableOfContents(functionNames))
+	body = append(body, docs.Divider())
+	body = append(body, docs.Divider())
+
 	for i := range functionDocs {
 		body = append(body, functionDocs[i])
 		if i != len(functionDocs)-1 {

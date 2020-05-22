@@ -37,7 +37,7 @@ OctoSQL is a SQL query engine which allows you to write standard SQL queries on 
 
 OctoSQL does that by creating an internal representation of your query and later translating parts of it into the query languages or APIs of the source databases. Whenever a datasource doesn't support a given operation, OctoSQL will execute it in memory, so you don't have to worry about the specifics of the underlying datasources. 
 
-OctoSQL also includes temporal SQL extensions, to operate ergonomically on streams and respect their event-time (not the current system-time when the records are being processed)
+OctoSQL also includes temporal SQL extensions, to operate ergonomically on streams and respect their event-time (not the current system-time when the records are being processed).
 
 With OctoSQL you don't need O(n) client tools or a large data analysis system deployment. Everything's contained in a single binary.
 

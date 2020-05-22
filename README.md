@@ -1,10 +1,18 @@
 ![OctoSQL](images/octosql.svg)OctoSQL
 =======
-OctoSQL is a query tool that allows you to join, analyse and transform data from multiple databases and file formats using SQL.
+OctoSQL is a query tool that allows you to join, analyse and transform data from multiple databases, streaming sources and file formats using SQL.
 
 [![CircleCI](https://circleci.com/gh/cube2222/octosql.svg?style=shield)](https://circleci.com/gh/cube2222/octosql)
 [![GoDoc](https://godoc.org/github.com/cube2222/octosql?status.svg)](https://godoc.org/github.com/cube2222/octosql)
 [![Gitter](https://badges.gitter.im/octosql/general.svg)](https://gitter.im/octosql/general?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+
+## Problems OctoSQL Solves
+- You need to join / analyze data from multiple datasources. 
+    - (Think of enriching an Excel file by joining it with a PostgreSQL database)
+- You need stream aggregates over time, with live output updates.
+    - (Think of a live-updated leaderboard with cat images based on a "like" event stream)
+- You need aggregate streams per time window, with live output updates.
+    - (Think of a unique user count per hour, per country live summary)
 
 ## Table of Contents
 - [What is OctoSQL?](#what-is-octosql)
@@ -25,9 +33,11 @@ OctoSQL is a query tool that allows you to join, analyse and transform data from
 - [Roadmap](#roadmap)
 
 ## What is OctoSQL?
-OctoSQL is a SQL query engine which allows you to write standard SQL queries on data stored in multiple SQL databases, NoSQL databases and files in various formats trying to push down as much of the work as possible to the source databases, not transferring unnecessary data. 
+OctoSQL is a SQL query engine which allows you to write standard SQL queries on data stored in multiple SQL databases, NoSQL databases, streaming sources and files in various formats trying to push down as much of the work as possible to the source databases, not transferring unnecessary data. 
 
 OctoSQL does that by creating an internal representation of your query and later translating parts of it into the query languages or APIs of the source databases. Whenever a datasource doesn't support a given operation, OctoSQL will execute it in memory, so you don't have to worry about the specifics of the underlying datasources. 
+
+OctoSQL also includes temporal SQL extensions, to operate ergonomically on streams and respect their event-time (not the current system-time when the records are being processed)
 
 With OctoSQL you don't need O(n) client tools or a large data analysis system deployment. Everything's contained in a single binary.
 
@@ -92,7 +102,10 @@ Example output:
 | Ada     | Jasmine      |   49 |      351 |
 +---------+--------------+------+----------+
 ```
-You can choose between table, tabbed, json and csv output formats.
+You can choose between live-table batch-table live-csv batch-csv stream-json output formats. (The live-* types will update the terminal view repeatedly every second, the batch-* ones will write the output once before exiting, the stream-* ones will print records whenever they are available)
+
+### Temporal SQL Features
+**TODO**
 
 ## Configuration
 The configuration file has the following form
@@ -111,7 +124,14 @@ dataSources:
       <datasource_specific_key>: <datasource_specific_value>
       ...
     ...
+physical:
+  physical_plan_option: <value>
 ```
+
+Available OctoSQL-wide configuration options are:
+- physical
+    - groupByParallelism: The parallelism of group by's and joins. Will default to the CPU core count of your machine.
+
 ### Supported Datasources
 #### JSON
 JSON file in one of the following forms:
@@ -120,7 +140,7 @@ JSON file in one of the following forms:
 ##### options:
 - path - path to file containing the data, **required**
 - arrayFormat - if the JSON list of records format should be used, **optional**: defaults to `false`
-- batchSize - number of records extracted from json file at the same time, **optional**: defaults to `1000`
+- batchSize - number of records extracted from json file in one storage transaction, **optional**: defaults to `1000`
 
 ---
 #### CSV
@@ -130,7 +150,7 @@ The file may or may not have column names as it's first row.
 - path - path to file containing the data, **required**
 - headerRow - whether the first row of the CSV file contains column names or not, **optional**: defaults to `true`
 - separator - columns separator, **optional**: defaults to `","`
-- batchSize - number of records extracted from csv file at the same time, **optional**: defaults to `1000`
+- batchSize - number of records extracted from csv file in one storage transaction, **optional**: defaults to `1000`
 
 ---
 #### Excel
@@ -145,13 +165,13 @@ contain spaces between columns nor spaces between rows.
 - rootCell - name of cell (i.e "A3", "BA14") which is the leftmost cell of the first, **optional**: defaults to `"A1"`
 - timeColumns - a list of columns to parse as datetime values with second precision
 row, **optional**: defaults to `[]`
-- batchSize - number of records extracted from excel file at the same time, **optional**: defaults to `1000`
+- batchSize - number of records extracted from excel file in one storage transaction, **optional**: defaults to `1000`
 
 ___
 #### Parquet
 A single Parquet file.\
 Nested repeated elements are *not supported*.\
-Currently *unsupported* logical types:\
+Currently *unsupported* logical types, they will get parsed as the underlying primitive type:\
 &nbsp;&nbsp;&nbsp;&nbsp; \- ENUM \
 &nbsp;&nbsp;&nbsp;&nbsp; \- TIME with NANOS precision \
 &nbsp;&nbsp;&nbsp;&nbsp; \- TIMESTAMP with NANOS precision (both UTC and non-UTC) \
@@ -159,7 +179,7 @@ Currently *unsupported* logical types:\
 &nbsp;&nbsp;&nbsp;&nbsp; \- MAP
 ##### options
 - path - path to file, **required**
-- batchSize - number of records extracted from parquet file at the same time, **optional**: defaults to `1000`
+- batchSize - number of records extracted from parquet file in one storage transaction, **optional**: defaults to `1000`
 
 ---
 #### PostgreSQL
@@ -170,7 +190,7 @@ Single PostgreSQL database table.
 - password - **required**
 - databaseName - **required**
 - tableName - **required**
-- batchSize - number of records extracted from PostgreSQL database at the same time, **optional**: defaults to `1000`
+- batchSize - number of records extracted from PostgreSQL database in one storage transaction, **optional**: defaults to `1000`
 
 ---
 #### MySQL
@@ -181,7 +201,7 @@ Single MySQL database table.
 - password - **required**
 - databaseName - **required**
 - tableName - **required**
-- batchSize - number of records extracted from MySQL database at the same time, **optional**: defaults to `1000`
+- batchSize - number of records extracted from MySQL database in one storage transaction, **optional**: defaults to `1000`
 
 ---
 #### Redis
@@ -191,7 +211,7 @@ Redis database with the given index. Currently only hashes are supported.
 - password - **optional**: defaults to `""`
 - databaseIndex - index number of Redis database, **optional**: defaults to `0`
 - databaseKeyName - column name of Redis key in OctoSQL records, **optional**: defaults to `"key"`
-- batchSize - number of records extracted from Redis database at the same time, **optional**: defaults to `1000`
+- batchSize - number of records extracted from Redis database in one storage transaction, **optional**: defaults to `1000`
 
 ___
 #### Kafka
@@ -200,8 +220,8 @@ ___
 - brokers - list of broker addresses (separately hosts and ports) used to connect to the kafka cluster, **optional**: defaults to `["localhost"], ["9092"]`
 - topic - name of topic to read messages from, **required**
 - startOffset - offset from which the first batch of messages will be read, **optional**: defaults to `-1`
-- batchSize - number of records extracted from Redis database at the same time, **optional**: defaults to `1`
-- json - should the messegas be decoded as JSON, **optional**: defaults to `false`
+- batchSize - number of records extracted from Kafka in one storage transaction, **optional**: defaults to `1`
+- json - should the messages be decoded as JSON, **optional**: defaults to `false`
 
 ## Documentation
 Documentation for the available functions: https://github.com/cube2222/octosql/wiki/Function-Documentation
@@ -215,6 +235,12 @@ The SQL dialect documentation: TODO ;) in short though:
 Available SQL constructs: Select, Where, Order By, Group By, Offset, Limit, Left Join, Right Join, Inner Join, Distinct, Union, Union All, Subqueries, Operators, Table Valued Functions.
 
 Available SQL types: Int, Float, String, Bool, Time, Duration, Tuple (array), Object (e.g. JSON)
+
+### Describe
+You can describe the current plan in graphviz format using the -describe flag, like this:
+```bash
+octosql "..." --describe | dot -Tpng > output.png
+```
 
 ## Architecture
 An OctoSQL invocation gets processed in multiple phases.
@@ -262,8 +288,6 @@ TODO - well, we need to update this big time
 - SQL Constructs:
   - JSON Query
   - HAVING, ALL, ANY
-- Parallel expression evaluation.
-- Streams support (Kafka, Redis)
 - Push down functions, aggregates to databases that support them.
 - An in-memory index to save values of subqueries and save on rescanning tables which don't support a given operation, so as not to recalculate them each time.
 - MapReduce style distributed execution mode.
@@ -272,4 +296,3 @@ TODO - well, we need to update this big time
 - Querying a json or csv table from standard input.
 - Integration test suite
 - Tuple splitter, returning the row for each tuple element, with the given element instead of the tuple.
-- Describe-like functionality as in the diagram above.

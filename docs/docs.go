@@ -3,6 +3,7 @@ package docs
 import (
 	"fmt"
 	"io"
+	"strings"
 )
 
 type Documented interface {
@@ -15,6 +16,30 @@ func RenderDocumentation(d Documentation, w io.Writer) {
 
 type Documentation interface {
 	render(w io.Writer, headerLevel int, indentation int, parentIsList bool)
+}
+
+type tableOfContents struct {
+	functionNames []string
+}
+
+func (d *tableOfContents) render(w io.Writer, headerLevel int, indentation int, parentIsList bool) {
+	for i := 0; i <= headerLevel; i++ {
+		fmt.Fprint(w, "#")
+	}
+	fmt.Fprintf(w, " Table of Contents\n")
+
+	for i, functionName := range d.functionNames {
+		fmt.Fprintf(w, "* [%s]", functionName)
+		fmt.Fprintf(w, "(#%s)", strings.ToLower(functionName))
+
+		if i != len(d.functionNames)-1 {
+			fmt.Fprint(w, "\n")
+		}
+	}
+}
+
+func TableOfContents(functionNames []string) *tableOfContents {
+	return &tableOfContents{functionNames: functionNames}
 }
 
 type body struct {

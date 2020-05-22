@@ -8,11 +8,11 @@ OctoSQL is a query tool that allows you to join, analyse and transform data from
 
 ## Problems OctoSQL Solves
 - You need to join / analyze data from multiple datasources. 
-    - (Think of enriching an Excel file by joining it with a PostgreSQL database)
+    - Think of enriching an Excel file by joining it with a PostgreSQL database.
 - You need stream aggregates over time, with live output updates.
-    - (Think of a live-updated leaderboard with cat images based on a "like" event stream)
+    - Think of a live-updated leaderboard with cat images based on a "like" event stream.
 - You need aggregate streams per time window, with live output updates.
-    - (Think of a unique user count per hour, per country live summary)
+    - Think of a unique user count per hour, per country live summary.
 
 ## Table of Contents
 - [What is OctoSQL?](#what-is-octosql)

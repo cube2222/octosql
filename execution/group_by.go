@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/storage"
 
 	"github.com/pkg/errors"
@@ -13,6 +14,7 @@ import (
 type AggregatePrototype func() Aggregate
 
 type Aggregate interface {
+	docs.Documented
 	AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error
 	RetractValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error
 	GetValue(ctx context.Context, tx storage.StateTransaction) (octosql.Value, error)

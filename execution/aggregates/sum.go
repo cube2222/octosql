@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/storage"
 )
 
@@ -183,4 +184,13 @@ func (agg *Sum) GetValue(ctx context.Context, tx storage.StateTransaction) (octo
 
 func (agg *Sum) String() string {
 	return "sum"
+}
+
+func (agg *Sum) Document() docs.Documentation {
+	return docs.Section(
+		agg.String(),
+		docs.Body(
+			docs.Section("Description", docs.Text("Sums Floats, Ints or Durations in the group. You may not mix types.")),
+		),
+	)
 }

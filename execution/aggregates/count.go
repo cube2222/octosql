@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/storage"
 )
 
@@ -87,4 +88,13 @@ func (agg *Count) GetValue(ctx context.Context, tx storage.StateTransaction) (oc
 
 func (agg *Count) String() string {
 	return "count"
+}
+
+func (agg *Count) Document() docs.Documentation {
+	return docs.Section(
+		agg.String(),
+		docs.Body(
+			docs.Section("Description", docs.Text("Counts elements in the group.")),
+		),
+	)
 }

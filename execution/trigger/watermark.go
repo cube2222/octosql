@@ -93,7 +93,7 @@ func (wt *WatermarkTrigger) isSomethingReadyToFire(ctx context.Context, tx stora
 	return true, nil
 }
 
-func (wt *WatermarkTrigger) PollKeysToFire(ctx context.Context, tx storage.StateTransaction) ([]octosql.Value, error) {
+func (wt *WatermarkTrigger) PollKeysToFire(ctx context.Context, tx storage.StateTransaction, batchSize int) ([]octosql.Value, error) {
 	timeKeys := NewTimeSortedKeys(tx.WithPrefix(timeSortedKeys))
 	watermarkStorage := storage.NewValueState(tx.WithPrefix(watermarkPrefix))
 	readyToFire := storage.NewValueState(tx.WithPrefix(readyToFirePrefix))
@@ -118,7 +118,7 @@ func (wt *WatermarkTrigger) PollKeysToFire(ctx context.Context, tx storage.State
 		return nil, errors.Wrap(err, "couldn't get current watermark")
 	}
 
-	keys, times, err := timeKeys.GetUntil(watermark)
+	keys, times, err := timeKeys.GetUntil(watermark, batchSize)
 	if err != nil {
 		if err == storage.ErrNotFound {
 			panic("unreachable")

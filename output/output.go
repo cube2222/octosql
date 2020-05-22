@@ -1,12 +1,7 @@
 package output
 
-import (
-	"io"
+import "context"
 
-	"github.com/cube2222/octosql/execution"
-)
-
-type Output interface {
-	WriteRecord(record *execution.Record) error
-	io.Closer
+type Printer interface {
+	Run(ctx context.Context) error
 }

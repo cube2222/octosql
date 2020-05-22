@@ -26,14 +26,14 @@ func TestReadConfig(t *testing.T) {
 						Name: "cities",
 						Type: "csv",
 						Config: map[string]interface{}{
-							"path": "storage/csv/fixtures/cities.csv",
+							"path": "datasources/csv/fixtures/cities.csv",
 						},
 					},
 					{
-						Name: "people",
+						Name: "bikes",
 						Type: "json",
 						Config: map[string]interface{}{
-							"path": "storage/json/fixtures/people.json",
+							"path": "datasources/json/fixtures/bikes.json",
 						},
 					},
 					{

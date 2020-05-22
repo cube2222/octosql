@@ -277,7 +277,7 @@ func (node *GroupBy) Visualize() *graph.Node {
 
 	eventTimeField := node.Metadata().EventTimeField()
 	if eventTimeField != "" {
-		n.AddChild("event_time_field", graph.NewNode(eventTimeField.String()))
+		n.AddField("event_time_field", eventTimeField.String())
 	}
 	return n
 }

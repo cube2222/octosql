@@ -1,4 +1,4 @@
-package badger
+package batch
 
 import (
 	"context"
@@ -12,8 +12,16 @@ import (
 	"github.com/cube2222/octosql/storage"
 )
 
-type Output struct {
+type TableOutput struct {
+	StreamID       *execution.StreamID
 	EventTimeField octosql.VariableName
+}
+
+func NewTableOutput(streamID *execution.StreamID, eventTimeField octosql.VariableName) *TableOutput {
+	return &TableOutput{
+		StreamID:       streamID,
+		EventTimeField: eventTimeField,
+	}
 }
 
 var recordsPrefix = []byte("$records$")
@@ -21,11 +29,12 @@ var watermarkPrefix = []byte("$watermark$")
 var errorPrefix = []byte("$error$")
 var endOfStreamPrefix = []byte("$end_of_stream$")
 
-func (o *Output) ReadyForMore(ctx context.Context, tx storage.StateTransaction) error {
+func (o *TableOutput) ReadyForMore(ctx context.Context, tx storage.StateTransaction) error {
 	return nil
 }
 
-func (o *Output) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *execution.Record) error {
+func (o *TableOutput) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *execution.Record) error {
+	tx = tx.WithPrefix(o.StreamID.AsPrefix())
 	if inputIndex != 0 {
 		return errors.Errorf("only one input stream allowed for output, got input index %d", inputIndex)
 	}
@@ -67,11 +76,12 @@ func (o *Output) AddRecord(ctx context.Context, tx storage.StateTransaction, inp
 	return nil
 }
 
-func (o *Output) Next(ctx context.Context, tx storage.StateTransaction) (*execution.Record, error) {
+func (o *TableOutput) Next(ctx context.Context, tx storage.StateTransaction) (*execution.Record, error) {
 	panic("no next in output")
 }
 
-func (o *Output) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
+func (o *TableOutput) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
+	tx = tx.WithPrefix(o.StreamID.AsPrefix())
 	watermarkState := storage.NewValueState(tx.WithPrefix(watermarkPrefix))
 
 	octoWatermark := octosql.MakeTime(watermark)
@@ -82,7 +92,12 @@ func (o *Output) UpdateWatermark(ctx context.Context, tx storage.StateTransactio
 	return nil
 }
 
-func (o *Output) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
+func (o *TableOutput) TriggerKeys(ctx context.Context, tx storage.StateTransaction, batchSize int) (int, error) {
+	return 0, nil
+}
+
+func (o *TableOutput) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
+	tx = tx.WithPrefix(o.StreamID.AsPrefix())
 	watermarkState := storage.NewValueState(tx.WithPrefix(watermarkPrefix))
 
 	var octoWatermark octosql.Value
@@ -96,7 +111,8 @@ func (o *Output) GetWatermark(ctx context.Context, tx storage.StateTransaction) 
 	return octoWatermark.AsTime(), nil
 }
 
-func (o *Output) MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error {
+func (o *TableOutput) MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error {
+	tx = tx.WithPrefix(o.StreamID.AsPrefix())
 	endOfStreamState := storage.NewValueState(tx.WithPrefix(endOfStreamPrefix))
 
 	phantom := octosql.MakePhantom()
@@ -107,7 +123,8 @@ func (o *Output) MarkEndOfStream(ctx context.Context, tx storage.StateTransactio
 	return nil
 }
 
-func (o *Output) GetEndOfStream(ctx context.Context, tx storage.StateTransaction) (bool, error) {
+func (o *TableOutput) GetEndOfStream(ctx context.Context, tx storage.StateTransaction) (bool, error) {
+	tx = tx.WithPrefix(o.StreamID.AsPrefix())
 	endOfStreamState := storage.NewValueState(tx.WithPrefix(endOfStreamPrefix))
 
 	var octoEndOfStream octosql.Value
@@ -121,18 +138,20 @@ func (o *Output) GetEndOfStream(ctx context.Context, tx storage.StateTransaction
 	return true, nil
 }
 
-func (o *Output) MarkError(ctx context.Context, tx storage.StateTransaction, err error) error {
-	endOfStreamState := storage.NewValueState(tx.WithPrefix(errorPrefix))
+func (o *TableOutput) MarkError(ctx context.Context, tx storage.StateTransaction, err error) error {
+	tx = tx.WithPrefix(o.StreamID.AsPrefix())
+	errorState := storage.NewValueState(tx.WithPrefix(errorPrefix))
 
 	octoError := octosql.MakeString(err.Error())
-	if err := endOfStreamState.Set(&octoError); err != nil {
+	if err := errorState.Set(&octoError); err != nil {
 		return errors.Wrap(err, "couldn't mark error")
 	}
 
 	return nil
 }
 
-func (o *Output) GetErrorMessage(ctx context.Context, tx storage.StateTransaction) (string, error) {
+func (o *TableOutput) GetErrorMessage(ctx context.Context, tx storage.StateTransaction) (string, error) {
+	tx = tx.WithPrefix(o.StreamID.AsPrefix())
 	errorState := storage.NewValueState(tx.WithPrefix(errorPrefix))
 
 	var octoError octosql.Value
@@ -146,23 +165,16 @@ func (o *Output) GetErrorMessage(ctx context.Context, tx storage.StateTransactio
 	return octoError.AsString(), nil
 }
 
-func (o *Output) Close(ctx context.Context, storage storage.Storage) error {
-	if err := storage.DropAll(recordsPrefix); err != nil {
-		return errors.Wrap(err, "couldn't clear storage with records prefix")
-	}
-
-	if err := storage.DropAll(endOfStreamPrefix); err != nil {
-		return errors.Wrap(err, "couldn't clear storage with end of stream prefix")
-	}
-
-	if err := storage.DropAll(errorPrefix); err != nil {
-		return errors.Wrap(err, "couldn't clear storage with error prefix")
+func (o *TableOutput) Close(ctx context.Context, storage storage.Storage) error {
+	if err := storage.DropAll(o.StreamID.AsPrefix()); err != nil {
+		return errors.Wrap(err, "couldn't clear storage with streamID prefix")
 	}
 
 	return nil
 }
 
-func (o *Output) ListRecords(ctx context.Context, tx storage.StateTransaction) ([]*execution.Record, error) {
+func (o *TableOutput) ListRecords(ctx context.Context, tx storage.StateTransaction) ([]*execution.Record, error) {
+	tx = tx.WithPrefix(o.StreamID.AsPrefix())
 	records := storage.NewMap(tx.WithPrefix(recordsPrefix))
 
 	iter := records.GetIterator()

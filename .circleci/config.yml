@@ -119,13 +119,10 @@ jobs:
     environment:
       GO111MODULE: "on"
 
-    working_directory: /go/src/github.com/cube2222/octosql
     steps:
-      - checkout
-
-      - run: go install -v ./...
-      - run: GOOS=windows go install -v ./...
-      - run: GOOS=darwin go install -v ./...
+      - run: go get -u -v github.com/cube2222/octosql/cmd/octosql@${CIRCLE_SHA1}
+      - run: GOOS=windows go get -u -v github.com/cube2222/octosql/cmd/octosql@${CIRCLE_SHA1}
+      - run: GOOS=darwin go get -u -v github.com/cube2222/octosql/cmd/octosql@${CIRCLE_SHA1}
 
       - store_artifacts:
           path: "/go/bin"

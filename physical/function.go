@@ -19,25 +19,25 @@ to make the functions more versatile.
 */
 
 type FunctionExpression struct {
-	name      string
-	arguments []Expression
+	Name      string
+	Arguments []Expression
 }
 
 func NewFunctionExpression(name string, args []Expression) *FunctionExpression {
 	return &FunctionExpression{
-		name:      name,
-		arguments: args,
+		Name:      name,
+		Arguments: args,
 	}
 }
 
 func (fe *FunctionExpression) Transform(ctx context.Context, transformers *Transformers) Expression {
 	transformed := make([]Expression, 0)
-	for i := range fe.arguments {
-		transformedArg := fe.arguments[i].Transform(ctx, transformers)
+	for i := range fe.Arguments {
+		transformedArg := fe.Arguments[i].Transform(ctx, transformers)
 		transformed = append(transformed, transformedArg)
 	}
 
-	var expr Expression = NewFunctionExpression(fe.name, transformed)
+	var expr Expression = NewFunctionExpression(fe.Name, transformed)
 
 	if transformers.ExprT != nil {
 		expr = transformers.ExprT(expr)
@@ -46,14 +46,14 @@ func (fe *FunctionExpression) Transform(ctx context.Context, transformers *Trans
 }
 
 func (fe *FunctionExpression) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Expression, error) {
-	function, ok := functions.FunctionTable[fe.name]
+	function, ok := functions.FunctionTable[fe.Name]
 	if !ok {
-		return nil, errors.Errorf("No function %v found", fe.name)
+		return nil, errors.Errorf("No function %v found", fe.Name)
 	}
 
 	materialized := make([]execution.Expression, 0)
-	for i := range fe.arguments {
-		materializedArg, err := fe.arguments[i].Materialize(ctx, matCtx)
+	for i := range fe.Arguments {
+		materializedArg, err := fe.Arguments[i].Materialize(ctx, matCtx)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't materialize argument")
 		}
@@ -65,7 +65,7 @@ func (fe *FunctionExpression) Materialize(ctx context.Context, matCtx *Materiali
 }
 
 func (fe *FunctionExpression) DoesMatchNamespace(namespace *metadata.Namespace) bool {
-	for _, expr := range fe.arguments {
+	for _, expr := range fe.Arguments {
 		if !expr.DoesMatchNamespace(namespace) {
 			return false
 		}
@@ -75,8 +75,8 @@ func (fe *FunctionExpression) DoesMatchNamespace(namespace *metadata.Namespace) 
 }
 
 func (fe *FunctionExpression) Visualize() *graph.Node {
-	n := graph.NewNode(fe.name)
-	for i, arg := range fe.arguments {
+	n := graph.NewNode(fe.Name)
+	for i, arg := range fe.Arguments {
 		n.AddChild(fmt.Sprintf("arg_%d", i), arg.Visualize())
 	}
 	return n

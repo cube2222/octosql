@@ -7,13 +7,18 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"reflect"
+	"runtime"
+	"runtime/debug"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v2/options"
 	"github.com/go-chi/chi"
 
 	"github.com/go-chi/chi/middleware"
 
+	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/datasources/csv"
 	"github.com/cube2222/octosql/datasources/excel"
 	"github.com/cube2222/octosql/datasources/json"
@@ -22,24 +27,29 @@ import (
 	"github.com/cube2222/octosql/datasources/redis"
 	"github.com/cube2222/octosql/datasources/sql/mysql"
 	"github.com/cube2222/octosql/datasources/sql/postgres"
+	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/output"
+	"github.com/cube2222/octosql/output/batch"
+	batchcsv "github.com/cube2222/octosql/output/batch/csv"
+	batchtable "github.com/cube2222/octosql/output/batch/table"
+	"github.com/cube2222/octosql/output/streaming"
+	streamingjson "github.com/cube2222/octosql/output/streaming/json"
 
 	"github.com/spf13/cobra"
 
 	"github.com/cube2222/octosql/app"
 	"github.com/cube2222/octosql/config"
-	"github.com/cube2222/octosql/output"
-	csvoutput "github.com/cube2222/octosql/output/csv"
-	jsonoutput "github.com/cube2222/octosql/output/json"
-	"github.com/cube2222/octosql/output/table"
 	"github.com/cube2222/octosql/parser"
 	"github.com/cube2222/octosql/parser/sqlparser"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/storage"
 )
 
+var version string
 var configPath string
 var outputFormat string
 var storageDirectory string
+var logFilePath string
 var describe bool
 
 var rootCmd = &cobra.Command{
@@ -77,23 +87,52 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 			log.Fatal(err)
 		}
 
-		var out output.Output
+		var outputSinkFn app.OutputSinkFn
 		switch outputFormat {
-		case "table":
-			out = table.NewOutput(os.Stdout, false)
-		case "table_row_separated":
-			out = table.NewOutput(os.Stdout, true)
-		case "json":
-			out = jsonoutput.NewOutput(os.Stdout)
-		case "csv":
-			out = csvoutput.NewOutput(',', os.Stdout)
-		case "tabbed":
-			out = csvoutput.NewOutput('\t', os.Stdout)
+		case "stream-json":
+			outputSinkFn = func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (store execution.IntermediateRecordStore, printer output.Printer) {
+				sink := streaming.NewInstantStreamOutput(streamID)
+				output := streaming.NewStreamPrinter(
+					stateStorage,
+					sink,
+					streamingjson.JSONPrinter(),
+				)
+				return sink, output
+			}
+		case "live-csv":
+			outputSinkFn = func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (store execution.IntermediateRecordStore, printer output.Printer) {
+				sink := batch.NewTableOutput(streamID, eventTimeField)
+				output := batch.NewLiveTablePrinter(stateStorage, sink, batchcsv.TableFormatter(','))
+				return sink, output
+			}
+		case "live-table":
+			outputSinkFn = func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (store execution.IntermediateRecordStore, printer output.Printer) {
+				sink := batch.NewTableOutput(streamID, eventTimeField)
+				output := batch.NewLiveTablePrinter(stateStorage, sink, batchtable.TableFormatter(false))
+				return sink, output
+			}
+		case "batch-csv":
+			outputSinkFn = func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (store execution.IntermediateRecordStore, printer output.Printer) {
+				sink := batch.NewTableOutput(streamID, eventTimeField)
+				output := batch.NewWholeTablePrinter(stateStorage, sink, batchcsv.TableFormatter(','))
+				return sink, output
+			}
+		case "batch-table":
+			outputSinkFn = func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (store execution.IntermediateRecordStore, printer output.Printer) {
+				sink := batch.NewTableOutput(streamID, eventTimeField)
+				output := batch.NewWholeTablePrinter(stateStorage, sink, batchtable.TableFormatter(false))
+				return sink, output
+			}
 		default:
 			log.Fatal("invalid output type")
 		}
 
-		app := app.NewApp(cfg, dataSourceRespository, out, describe)
+		telemetryInfo := app.TelemetryInfo{
+			OutputFormat: outputFormat,
+			Version:      version,
+		}
+
+		app := app.NewApp(cfg, telemetryInfo, dataSourceRespository, outputSinkFn, describe)
 
 		// Parse query
 		stmt, err := sqlparser.Parse(query)
@@ -116,12 +155,42 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 			}
 			storageDirectory = tempDir
 		}
+		defer func() {
+			err = os.RemoveAll(storageDirectory)
+			if err != nil {
+				log.SetOutput(os.Stderr)
+				log.Fatal("couldn't remove temporary directory: ", err)
+			}
+		}()
+
+		if logFilePath == "" {
+			logFilePath = path.Join(storageDirectory, "octosql.log")
+		}
+		logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, os.ModePerm)
+		if err != nil {
+			log.Fatalf("couldn't open file for logs %s: %s", logFilePath, err)
+		}
+		defer logFile.Close()
+		log.SetOutput(logFile)
+		log.Printf("Starting OctoSQL...")
+		log.Printf("Using Configuration: %+v", *cfg)
 
 		opts := badger.DefaultOptions(storageDirectory)
+		opts.Logger = badgerLogger{}
+		if runtime.GOOS == "windows" { // TODO - fix while refactoring config
+			opts = opts.WithValueLogLoadingMode(options.FileIO)
+		}
+
 		db, err := badger.Open(opts)
 		if err != nil {
-			log.Fatal("couldn't open in-memory badger database: ", err)
+			log.Fatal("couldn't open badger database: ", err)
 		}
+		defer func() {
+			err = db.Close()
+			if err != nil {
+				log.Fatal("couldn't close the database: ", err)
+			}
+		}()
 
 		stateStorage := storage.NewBadgerStorage(db)
 
@@ -130,23 +199,23 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 		if err != nil {
 			log.Fatal("couldn't run plan: ", err)
 		}
-
-		err = db.Close()
-		if err != nil {
-			log.Fatal("couldn't close the database: ", err)
-		}
-
-		err = os.RemoveAll(storageDirectory)
-		if err != nil {
-			log.Fatal("couldn't remove temporary directory: ", err)
-		}
 	},
 }
 
 func main() {
+	info, ok := debug.ReadBuildInfo()
+	if ok {
+		version = info.Main.Version
+	} else {
+		version = "unknown"
+	}
+	rootCmd.SetVersionTemplate(fmt.Sprintf("OctoSQL Version: %s\n", version))
+	rootCmd.Version = version
+
 	rootCmd.Flags().StringVarP(&configPath, "config", "c", os.Getenv("OCTOSQL_CONFIG"), "data source configuration path, defaults to $OCTOSQL_CONFIG")
-	rootCmd.Flags().StringVarP(&outputFormat, "output", "o", "table", "output format, one of [table json csv tabbed table_row_separated]")
+	rootCmd.Flags().StringVarP(&outputFormat, "output", "o", "live-table", "output format, one of [table json csv tabbed table_row_separated]")
 	rootCmd.Flags().StringVar(&storageDirectory, "storage-directory", "", "directory to store state storage in")
+	rootCmd.Flags().StringVar(&logFilePath, "log-file", "", "Logs output file, will append if the file exists.")
 	rootCmd.Flags().BoolVar(&describe, "describe", false, "Print out the physical query plan in graphviz format. You can use a command like \"dot -Tpng file > output.png\" to view it.")
 
 	go func() {

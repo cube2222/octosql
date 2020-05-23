@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/storage"
 )
 
@@ -18,6 +19,18 @@ func NewCountingTrigger(fireEvery int) *CountingTrigger {
 	return &CountingTrigger{
 		fireEvery: fireEvery,
 	}
+}
+
+func (ct *CountingTrigger) Document() docs.Documentation {
+	return docs.Section(
+		"Counting Trigger",
+		docs.Body(
+			docs.Section("Description", docs.Text("Triggers after receiving number of records specified in its argument")),
+			docs.Section("Arguments", docs.List(
+				docs.Text("`fireEvery`: frequency of firing")),
+			),
+		),
+	)
 }
 
 var toSendPrefix = []byte("$to_send$")

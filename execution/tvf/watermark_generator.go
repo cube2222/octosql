@@ -31,8 +31,8 @@ func (r *WatermarkGenerator) Document() docs.Documentation {
 	return docs.Section(
 		"watermark generator: maximal difference",
 		docs.Body(
-			docs.Section("Calling", docs.List(docs.Text("max_diff_watermark(source => \\<Source\\>, time_field => \\<Descriptor\\>, offset => \\<interval\\>"))),
-			docs.Section("Description", docs.Text("Creating standard watermark that stores watermark value of \\<maximal record event time\\> - given offset.")),
+			docs.Section("Calling", docs.Text("max_diff_watermark(source => \\<Source\\>, time_field => \\<Descriptor\\>, offset => \\<interval\\>)")),
+			docs.Section("Description", docs.Text("Creating standard watermark that stores watermark value of `<maximal record event time> - given offset.`")),
 		),
 	)
 }

@@ -26,7 +26,7 @@ func (r *Range) Document() docs.Documentation {
 	return docs.Section(
 		"range",
 		docs.Body(
-			docs.Section("Calling", docs.List(docs.Text("range(range_start => \\<int\\>, range_end => \\<int\\>)"))),
+			docs.Section("Calling", docs.Text("range(range_start => \\<int\\>, range_end => \\<int\\>)")),
 			docs.Section("Description", docs.Text("Returns a list of numbers from range_start inclusive to range_end exclusive. The field name of the number will be i.")),
 		),
 	)

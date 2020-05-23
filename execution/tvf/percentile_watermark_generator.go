@@ -35,7 +35,7 @@ func (r *PercentileWatermarkGenerator) Document() docs.Documentation {
 	return docs.Section(
 		"watermark generator: percentile",
 		docs.Body(
-			docs.Section("Calling", docs.List(docs.Text("percentile_watermark(source => \\<Source\\>, time_field => \\<Descriptor\\>, events => \\<int\\>, percentile => \\<float\\>, frequency => \\<int\\>"))),
+			docs.Section("Calling", docs.Text("percentile_watermark(source => \\<Source\\>, time_field => \\<Descriptor\\>, events => \\<int\\>, percentile => \\<float\\>, frequency => \\<int\\>)")),
 			docs.Section("Description", docs.Body(
 				docs.Text("Creating percentile watermark that stores watermark value based on percentile of event_times of recently seen events.\nFields explanation:"),
 				docs.List(

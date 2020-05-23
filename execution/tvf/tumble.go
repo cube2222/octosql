@@ -33,7 +33,7 @@ func (r *Tumble) Document() docs.Documentation {
 	return docs.Section(
 		"tumble",
 		docs.Body(
-			docs.Section("Calling", docs.List(docs.Text("tumble(source => \\<Source\\>, time_field => \\<Descriptor\\>, window_length => \\<interval\\>, offset => \\<interval\\>)"))),
+			docs.Section("Calling", docs.Text("tumble(source => \\<Source\\>, time_field => \\<Descriptor\\>, window_length => \\<interval\\>, offset => \\<interval\\>)")),
 			docs.Section("Description", docs.Text("Adds window_start and window_end of the record, based on which window the time_field value falls into. The source may be specified as a subquery or as TABLE(tablename), and the time_field should be specified as DESCRIPTOR(field_name).")),
 		),
 	)

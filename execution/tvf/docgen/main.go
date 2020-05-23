@@ -12,7 +12,7 @@ func main() {
 
 	body = append(body, docs.TableOfContents(
 		[]string{"range", "tumble", "watermark generator: maximal difference", "watermark generator: percentile"},
-		[]string{"range", "tumble", "watermark_generator:_maximal_difference", "watermark_generator:_percentile"},
+		[]string{"range", "tumble", "watermark-generator-maximal-difference", "watermark-generator-percentile"},
 	))
 	body = append(body, docs.Divider())
 
@@ -29,7 +29,7 @@ func main() {
 		docs.Body(
 			append(
 				[]docs.Documentation{
-					docs.Text("Example: SELECT * FROM range(range_start => 1, range_end => 5) r"),
+					docs.Text("### Example: SELECT * FROM range(range_start => 1, range_end => 5) r"),
 				},
 				body...,
 			)...,

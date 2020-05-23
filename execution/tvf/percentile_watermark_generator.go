@@ -39,9 +39,9 @@ func (r *PercentileWatermarkGenerator) Document() docs.Documentation {
 			docs.Section("Description", docs.Body(
 				docs.Text("Creating percentile watermark that stores watermark value based on percentile of event_times of recently seen events.\nFields explanation:"),
 				docs.List(
-					docs.Text("events (must be positive) - represents amount of (most recent) events stored"),
-					docs.Text("percentile (must be positive and less than 100.0) - represents percentile of recently stored events that are BIGGER than watermark value. \n\tEx. if percentile = 35 then 35% of events stored must be bigger than watermark value, so watermark position is at 65th percentile of events stored (in sorted way)"),
-					docs.Text("frequency (must be positive) - represents amount of events to be seen before initiating next watermark update"),
+					docs.Text("`events` (must be positive) - represents amount of (most recent) events stored"),
+					docs.Text("`percentile` (must be positive and less than 100.0) - represents percentile of recently stored events that are BIGGER than watermark value. \n\tEx. if percentile = 35 then 35% of events stored must be bigger than watermark value, so watermark position is at 65th percentile of events stored (in sorted way)"),
+					docs.Text("`frequency` (must be positive) - represents amount of events to be seen before initiating next watermark update"),
 				),
 			)),
 		),

@@ -24,7 +24,6 @@ func main() {
 
 	body = append(body, docs.TableOfContents(functionNames, functionNames))
 	body = append(body, docs.Divider())
-	body = append(body, docs.Divider())
 
 	for i := range functionDocs {
 		body = append(body, functionDocs[i])

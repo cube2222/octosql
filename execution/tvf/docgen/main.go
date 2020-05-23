@@ -15,7 +15,6 @@ func main() {
 		[]string{"range", "tumble", "watermark_generator:_maximal_difference", "watermark_generator:_percentile"},
 	))
 	body = append(body, docs.Divider())
-	body = append(body, docs.Divider())
 
 	tvfs := []docs.Documented{&tvf.Range{}, &tvf.Tumble{}, &tvf.WatermarkGenerator{}, &tvf.PercentileWatermarkGenerator{}}
 	for i, el := range tvfs {

@@ -24,7 +24,6 @@ func main() {
 
 	body = append(body, docs.TableOfContents(aggregateNames, aggregateNames))
 	body = append(body, docs.Divider())
-	body = append(body, docs.Divider())
 
 	for i := range aggregateDocs {
 		body = append(body, aggregateDocs[i])

@@ -28,6 +28,7 @@ func (r *Range) Document() docs.Documentation {
 		docs.Body(
 			docs.Section("Calling", docs.Text("range(range_start => \\<int\\>, range_end => \\<int\\>)")),
 			docs.Section("Description", docs.Text("Returns a list of numbers from range_start inclusive to range_end exclusive. The field name of the number will be i.")),
+			docs.Section("Example", docs.Text("`SELECT * FROM range(range_start => 1, range_end => 5) r`")),
 		),
 	)
 }

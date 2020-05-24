@@ -24,12 +24,32 @@ func main() {
 		}
 	}
 
+	/*
+		WITH
+		                                with_watermark AS (SELECT *
+		                                                   FROM max_diff_watermark(source=>TABLE(events2),
+		                                                                           offset=>INTERVAL 5 SECONDS,
+		                                                                           time_field=>DESCRIPTOR(time)) e),
+		                                with_tumble AS (SELECT *
+		                                                FROM tumble(source=>TABLE(with_watermark),
+		                                                            time_field=>DESCRIPTOR(e.time),
+		                                                            window_length=> INTERVAL 1 MINUTE,
+		                                                            offset => INTERVAL 0 SECONDS) e),
+		                              SELECT e.window_end, e.team, COUNT(*) as goals
+		                              FROM with_tumble e
+		                              GROUP BY e.window_end, e.team
+		                              TRIGGER COUNTING 100, ON WATERMARK
+	*/
+
 	page := docs.Section(
 		"Table Valued Functions Documentation",
 		docs.Body(
 			append(
 				[]docs.Documentation{
-					docs.Text("### Example: SELECT * FROM range(range_start => 1, range_end => 5) r"),
+					docs.Section("How to write particular arguments", docs.List(
+						docs.Text("Underlying source => TABLE(\\<source\\>) (e.g. `TABLE(e)`)"),
+						docs.Text("Time field => DESCRIPTION(\\<time_field\\>) (e.g. `DESCRIPTOR(e.time)`)"),
+						docs.Text("Expression: any other value like integer constant, interval => no changes (e.g. `5`, `INTERVAL 1 SECOND`)"))),
 				},
 				body...,
 			)...,

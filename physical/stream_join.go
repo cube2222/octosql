@@ -3,6 +3,7 @@ package physical
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/config"
@@ -102,7 +103,7 @@ func (node *StreamJoin) Materialize(ctx context.Context, matCtx *Materialization
 		triggerPrototype = execution.NewMultiTrigger(triggerPrototypes...)
 	}
 
-	return execution.NewStreamJoin(materializedSource, materializedJoined, materializedSourceKey, materializedJoinedKey, matCtx.Storage, node.EventTimeField, node.JoinType, triggerPrototype, execution.NewGarbageCollectorInfo(garbageCollectionBoundary, garbageCollectionCycle)), nil
+	return execution.NewStreamJoin(materializedSource, materializedJoined, materializedSourceKey, materializedJoinedKey, matCtx.Storage, node.EventTimeField, node.JoinType, triggerPrototype, execution.NewGarbageCollectorInfo(time.Duration(garbageCollectionBoundary), time.Duration(garbageCollectionCycle))), nil
 }
 
 func (node *StreamJoin) Metadata() *metadata.NodeMetadata {

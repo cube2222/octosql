@@ -2,6 +2,7 @@ package physical
 
 import (
 	"context"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -49,7 +50,7 @@ func (node *Distinct) Materialize(ctx context.Context, matCtx *MaterializationCo
 
 	eventTimeField := node.Source.Metadata().EventTimeField()
 
-	return execution.NewDistinct(matCtx.Storage, childNode, eventTimeField, execution.NewGarbageCollectorInfo(garbageCollectionBoundary, garbageCollectionCycle)), nil
+	return execution.NewDistinct(matCtx.Storage, childNode, eventTimeField, execution.NewGarbageCollectorInfo(time.Duration(garbageCollectionBoundary), time.Duration(garbageCollectionCycle))), nil
 }
 
 func (node *Distinct) Metadata() *metadata.NodeMetadata {

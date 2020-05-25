@@ -236,7 +236,7 @@ The SQL dialect documentation: TODO ;) in short though:
 
 Available SQL constructs: Select, Where, Order By, Group By, Offset, Limit, Left Join, Right Join, Inner Join, Distinct, Union, Union All, Subqueries, Operators, Table Valued Functions.
 
-Available SQL types: Int, Float, String, Bool, Time, Tuple (array), Object (e.g. JSON)
+Available SQL types: Int, Float, String, Bool, Time, Duration, Tuple (array), Object (e.g. JSON)
 
 ### Describe
 You can describe the current plan in graphviz format using the -describe flag, like this:

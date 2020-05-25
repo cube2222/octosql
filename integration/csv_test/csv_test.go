@@ -17,7 +17,7 @@ func Test_CSV(t *testing.T) {
 	tx := stateStorage.BeginTransaction()
 	ctx := storage.InjectStateTransaction(context.Background(), tx)
 
-	peopleFields := []octosql.VariableName{"id", "name", "age", "eye_color"}
+	peopleFields := []octosql.VariableName{"p.age", "p.eye_color", "p.id", "p.name"}
 
 	type args struct {
 		query string
@@ -35,8 +35,8 @@ func Test_CSV(t *testing.T) {
 			},
 
 			want: execution.NewInMemoryStream(ctx, []*execution.Record{
-				execution.NewRecordFromSliceWithNormalize(peopleFields, []interface{}{1, "Bill", 7, "blue"}),
-				execution.NewRecordFromSliceWithNormalize(peopleFields, []interface{}{2, "Jenny", 14, "brown"}),
+				execution.NewRecordFromSliceWithNormalize(peopleFields, []interface{}{7, "blue", 1, "Bill"}),
+				execution.NewRecordFromSliceWithNormalize(peopleFields, []interface{}{14, "brown", 2, "Jenny"}),
 			}),
 		},
 	}
@@ -47,12 +47,18 @@ func Test_CSV(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotStream, err := integration.MainCopy(tt.args.query, configPath)
+			gotRecords, err := integration.MainCopy(tt.args.query, configPath)
 			if err != nil {
 				log.Fatal(err)
 			}
 
-			if err := execution.AreStreamsEqualNoOrdering(ctx, stateStorage, gotStream, tt.want); err != nil {
+			tx := stateStorage.BeginTransaction()
+			gotStream := execution.NewInMemoryStream(storage.InjectStateTransaction(ctx, tx), gotRecords)
+			if err := tx.Commit(); err != nil {
+				log.Fatal(err)
+			}
+
+			if err := execution.AreStreamsEqualNoOrderingWithRetractionReductionAndIDChecking(ctx, stateStorage, gotStream, tt.want, execution.WithEqualityBasedOn(execution.EqualityOfEverythingButIDs)); err != nil {
 				log.Fatal(err)
 			}
 		})

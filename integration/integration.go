@@ -30,7 +30,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func MainCopy(query, configPath string) (execution.RecordStream, error) {
+func MainCopy(query, configPath string) ([]*execution.Record, error) {
 	ctx := context.Background()
 	cfg, err := config.ReadConfig(configPath)
 	if err != nil {
@@ -127,17 +127,7 @@ func MainCopy(query, configPath string) (execution.RecordStream, error) {
 		return nil, errors.Wrap(err, "couldn't close pull engine")
 	}
 
-	for i := range records {
-		println(records[i].Show())
-	}
-
-	tx := stateStorage.BeginTransaction()
-	rs := execution.NewInMemoryStream(storage.InjectStateTransaction(ctx, tx), records)
-	if err := tx.Commit(); err != nil {
-		return nil, errors.Wrap(err, "couldn't commit transaction to create in memory stream")
-	}
-
-	return rs, nil
+	return records, nil
 }
 
 // This is an IRS that just stores the records sent to it
@@ -195,7 +185,6 @@ func (srs *SetRecordStore) ReadRecords(tx storage.StateTransaction) ([]*executio
 func (srs *SetRecordStore) getRecords(ctx context.Context, stateStorage storage.Storage) ([]*execution.Record, error) {
 	for range time.Tick(time.Second) {
 		tx := stateStorage.BeginTransaction()
-		println("Checking for end of stream...")
 		isEOS, err := srs.GetEndOfStream(ctx, tx)
 		if errors.Cause(err) == execution.ErrNewTransactionRequired {
 		} else if err != nil {

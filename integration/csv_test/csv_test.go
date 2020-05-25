@@ -47,12 +47,12 @@ func Test_CSV(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rs, err := integration.MainCopy(tt.args.query, configPath)
+			gotStream, err := integration.MainCopy(tt.args.query, configPath)
 			if err != nil {
 				log.Fatal(err)
 			}
 
-			if err := execution.AreStreamsEqualNoOrdering(ctx, stateStorage, rs, tt.want); err != nil {
+			if err := execution.AreStreamsEqualNoOrdering(ctx, stateStorage, gotStream, tt.want); err != nil {
 				log.Fatal(err)
 			}
 		})

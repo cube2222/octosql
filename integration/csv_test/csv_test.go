@@ -8,7 +8,7 @@ import (
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/integration"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 func Test_CSV(t *testing.T) {
@@ -48,15 +48,12 @@ func Test_CSV(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rs, err := integration.MainCopy(tt.args.query, configPath)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("wantErr = %v, got err = %v", tt.wantErr, err == nil)
-				return
-			} else if err != nil {
-				return
+			if err != nil {
+				log.Fatal(err)
 			}
 
-			if err := execution.AreStreamsEqualNoOrderingWithRetractionReductionAndIDChecking(ctx, stateStorage, rs, tt.want); err != nil {
-				t.Errorf("Streams not equal")
+			if err := execution.AreStreamsEqualNoOrdering(ctx, stateStorage, rs, tt.want); err != nil {
+				log.Fatal(err)
 			}
 		})
 	}

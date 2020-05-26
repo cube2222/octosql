@@ -1,4 +1,5 @@
-![OctoSQL](images/octosql.svg)OctoSQL
+![OctoSQL](images/octosql.svg)[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fcube2222%2Foctosql.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fcube2222%2Foctosql?ref=badge_shield)
+OctoSQL
 =======
 OctoSQL is a query tool that allows you to join, analyse and transform data from multiple databases and file formats using SQL.
 
@@ -233,3 +234,7 @@ Where scan means that the whole table needs to be scanned for each access. We ar
 - Integration test suite
 - Tuple splitter, returning the row for each tuple element, with the given element instead of the tuple.
 - Describe-like functionality as in the diagram above.
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fcube2222%2Foctosql.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fcube2222%2Foctosql?ref=badge_large)

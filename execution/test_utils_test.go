@@ -191,26 +191,26 @@ func TestAreStreamsEqualNoOrderingWithRetractionReduction(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "retractions, not correct ids - different bases",
-			args: args{
-				got: NewInMemoryStream(ctx, []*Record{
-					NewRecordFromSliceWithNormalize([]octosql.VariableName{"field1", "field2"}, []interface{}{1, "a"}, WithID(NewRecordID("A.10"))),
-					NewRecordFromSliceWithNormalize([]octosql.VariableName{"field1", "field2"}, []interface{}{1, "a"}, WithID(NewRecordID("B.12")), WithUndo()),
-					NewRecordFromSliceWithNormalize([]octosql.VariableName{"field1", "field2"}, []interface{}{2, "b"}, WithID(NewRecordID("A.20"))),
-					NewRecordFromSliceWithNormalize([]octosql.VariableName{"field1", "field2"}, []interface{}{3, "c"}, WithID(NewRecordID("A.30"))),
-				}),
-				want: nil,
-			},
-			wantErr: true,
-		},
-		{
-			name: "retractions, not correct ids - repeating IDS",
+			name: "retractions, not correct ids - repeating IDS 1",
 			args: args{
 				got: NewInMemoryStream(ctx, []*Record{
 					NewRecordFromSliceWithNormalize([]octosql.VariableName{"field1", "field2"}, []interface{}{1, "a"}, WithID(NewRecordID("A.1"))),
 					NewRecordFromSliceWithNormalize([]octosql.VariableName{"field1", "field2"}, []interface{}{1, "a"}, WithID(NewRecordID("A.2")), WithUndo()),
 					NewRecordFromSliceWithNormalize([]octosql.VariableName{"field1", "field2"}, []interface{}{3, "c"}, WithID(NewRecordID("A.2"))),
 					NewRecordFromSliceWithNormalize([]octosql.VariableName{"field1", "field2"}, []interface{}{3, "c"}, WithID(NewRecordID("A.1")), WithUndo()),
+				}),
+				want: nil,
+			},
+			wantErr: true,
+		},
+		{
+			name: "not correct ids - repeating IDS 2",
+			args: args{
+				got: NewInMemoryStream(ctx, []*Record{
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"field1", "field2"}, []interface{}{1, "a"}, WithID(NewRecordID("HU3721SJDISEKS.1"))),
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"field1", "field2"}, []interface{}{1, "a"}, WithID(NewRecordID("HU3721SISEKS.1")), WithUndo()),
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"field1", "field2"}, []interface{}{3, "c"}, WithID(NewRecordID("HU3721SJS.1"))),
+					NewRecordFromSliceWithNormalize([]octosql.VariableName{"field1", "field2"}, []interface{}{3, "c"}, WithID(NewRecordID("HU3721SJDISEKS.1"))),
 				}),
 				want: nil,
 			},

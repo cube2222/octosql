@@ -1,0 +1,10 @@
+A note about adding new tests:
+    - If you want to add a new data file, please do so
+      in the specified folder (i.e csv files in the fixtures/csv)
+    - Unfortunately the config.yaml file has to contain file paths
+      relative to the test executed - thus the "../fixtures/...".
+    - If you want to add a test that
+        - Tests a specific type of datasource then put it in
+          the appropriate datasource folder
+        - Tests that test some general query should go to the
+          "general" folder

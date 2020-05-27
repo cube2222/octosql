@@ -1,5 +1,0 @@
-dataSources:
-  - name: people
-    type: csv
-    config:
-      path: "fixtures/people.csv"

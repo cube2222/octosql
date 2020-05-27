@@ -183,8 +183,10 @@ func (srs *SetRecordStore) ReadRecords(tx storage.StateTransaction) ([]*executio
 }
 
 func (srs *SetRecordStore) getRecords(ctx context.Context, stateStorage storage.Storage) ([]*execution.Record, error) {
-	for range time.Tick(time.Second) {
+	for range time.Tick(420 * time.Millisecond) {
 		tx := stateStorage.BeginTransaction()
+
+		// Check for end of stream
 		isEOS, err := srs.GetEndOfStream(ctx, tx)
 		if errors.Cause(err) == execution.ErrNewTransactionRequired {
 		} else if err != nil {
@@ -193,6 +195,12 @@ func (srs *SetRecordStore) getRecords(ctx context.Context, stateStorage storage.
 
 		if isEOS {
 			break
+		}
+
+		// Check for errors
+		if err := srs.getError(tx); err == execution.ErrNewTransactionRequired {
+		} else if err != nil {
+			return nil, errors.Wrap(err, "pull engine marked an error during execution")
 		}
 	}
 
@@ -266,6 +274,19 @@ func (srs *SetRecordStore) MarkError(ctx context.Context, tx storage.StateTransa
 	}
 
 	return nil
+}
+
+func (srs *SetRecordStore) getError(tx storage.StateTransaction) error {
+	errorState := storage.NewValueState(tx.WithPrefix(srs.streamPrefix).WithPrefix(errorPrefix))
+	var errorString octosql.Value
+
+	if err := errorState.Get(&errorString); err == storage.ErrNotFound {
+		return nil
+	} else if err != nil {
+		return errors.Wrap(err, "couldn't check for error")
+	}
+
+	return errors.New(errorString.AsString())
 }
 
 func (srs *SetRecordStore) Close(ctx context.Context, storage storage.Storage) error {

@@ -1,0 +1,17 @@
+dataSources:
+  - name: people8
+    type: csv
+    config:
+      path: "../fixtures/csv/people_8.csv"
+  - name: people100
+    type: csv
+    config:
+      path: "../fixtures/csv/people_100.csv"
+  - name: bikes5
+    type: json
+    config:
+      path: "../fixtures/json/bikes_5.json"
+  - name: bikes45
+    type: json
+    config:
+      path: "../fixtures/json/bikes_45.json"

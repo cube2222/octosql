@@ -339,7 +339,7 @@ func NewGarbageCollectorInfo(garbageCollectorBoundary, garbageCollectorCycle tim
 }
 
 func (p *ProcessByKey) RunGarbageCollector(ctx context.Context, prefixedStorage storage.Storage, gbBoundary, gbCycle time.Duration) error {
-	for {
+	for range time.Tick(gbCycle * time.Second) {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -363,11 +363,12 @@ func (p *ProcessByKey) RunGarbageCollector(ctx context.Context, prefixedStorage 
 			octoEventTimeSlice := make([]octosql.Value, 0)
 			eventTimesBytesSlice := make([][]byte, 0)
 
-			var octoEventTime, keyTuple octosql.Value
+			var octoEventTime octosql.Value
 
 			// Iterating through event times seen
 			setIt := eventTimeSet.GetIterator()
-			for err := setIt.Next(&octoEventTime); err == nil; err = setIt.Next(&octoEventTime) {
+			var err error
+			for err = setIt.Next(&octoEventTime); err == nil; err = setIt.Next(&octoEventTime) {
 				eventTime := octoEventTime.AsTime()
 
 				if eventTime.Before(boundary) {
@@ -379,16 +380,9 @@ func (p *ProcessByKey) RunGarbageCollector(ctx context.Context, prefixedStorage 
 					// Iterating through all keyTuples with that event time
 					keyTuplesSet := storage.NewMultiSet(tx.WithPrefix(eventTimesPrefixedSetsPrefix).WithPrefix(eventTimeBytes))
 
-					allKeysTuple := make([]octosql.Value, 0)
-					keyTuplesIt := keyTuplesSet.GetIterator()
-					for err := keyTuplesIt.Next(&keyTuple); err == nil; err = keyTuplesIt.Next(&keyTuple) {
-						allKeysTuple = append(allKeysTuple, keyTuple)
-					}
-					if err != storage.ErrEndOfIterator {
-						return errors.Wrap(err, "couldn't get value from key tuples iterator")
-					}
-					if err := keyTuplesIt.Close(); err != nil {
-						return errors.Wrap(err, "couldn't close key tuples multiset iterator")
+					allKeysTuple, err := keyTuplesSet.ReadAll()
+					if err != nil {
+						return errors.Wrapf(err, "couldn't get all keys with event time %v", eventTime)
 					}
 
 					// Drop event time prefix from process function storage
@@ -405,7 +399,8 @@ func (p *ProcessByKey) RunGarbageCollector(ctx context.Context, prefixedStorage 
 					break
 				}
 			}
-			if err != nil && err != storage.ErrEndOfIterator {
+			if err == storage.ErrEndOfIterator {
+			} else if err != nil {
 				return errors.Wrap(err, "couldn't get value from event time iterator")
 			}
 			if err := setIt.Close(); err != nil {
@@ -424,7 +419,6 @@ func (p *ProcessByKey) RunGarbageCollector(ctx context.Context, prefixedStorage 
 				}
 			}
 		}
-
-		time.Sleep(gbCycle * time.Second)
 	}
+	panic("unreachable")
 }

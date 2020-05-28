@@ -73,12 +73,16 @@ func (node *OrderBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 		return nil, errors.Wrap(err, "couldn't get execution node from order by source")
 	}
 
-	meta := node.Metadata()
+	eventTimeField := octosql.NewVariableName("")
 
-	return execution.NewOrderBy(matCtx.Storage, sourceNode, exprs, directions, meta.EventTimeField(), triggerPrototype), nil
+	if node.orderByEventTime(node.Source.Metadata()) {
+		eventTimeField = node.Expressions[0].(*Variable).ExpressionName()
+	}
+
+	return execution.NewOrderBy(matCtx.Storage, sourceNode, exprs, directions, eventTimeField, triggerPrototype), nil
 }
 
-func (node *OrderBy) groupingByEventTime(sourceMetadata *metadata.NodeMetadata) bool {
+func (node *OrderBy) orderByEventTime(sourceMetadata *metadata.NodeMetadata) bool {
 	if !sourceMetadata.EventTimeField().Empty() {
 		if node.Directions[0] == Ascending && node.Expressions[0].(*Variable).ExpressionName() == sourceMetadata.EventTimeField() {
 			return true
@@ -89,20 +93,7 @@ func (node *OrderBy) groupingByEventTime(sourceMetadata *metadata.NodeMetadata) 
 }
 
 func (node *OrderBy) Metadata() *metadata.NodeMetadata {
-	sourceMetadata := node.Source.Metadata()
-	var cardinality = sourceMetadata.Cardinality()
-	if cardinality == metadata.BoundedDoesntFitInLocalStorage {
-		cardinality = metadata.BoundedFitsInLocalStorage
-	}
-
-	groupingByEventTime := node.groupingByEventTime(sourceMetadata)
-
-	outEventTimeField := octosql.NewVariableName("")
-	if groupingByEventTime {
-		outEventTimeField = node.Expressions[0].(*Variable).ExpressionName()
-	}
-
-	return metadata.NewNodeMetadata(cardinality, outEventTimeField, metadata.EmptyNamespace())
+	return metadata.NewNodeMetadataFromMetadata(node.Source.Metadata())
 }
 
 func (node *OrderBy) Visualize() *graph.Node {

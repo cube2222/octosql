@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 
 	"github.com/pkg/errors"
 )
@@ -74,7 +74,7 @@ func NewUnionWatermarkGenerator(sources []WatermarkSource) *UnionWatermarkGenera
 }
 
 func (uwg *UnionWatermarkGenerator) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
-	minimalTime := maxWatermark
+	minimalTime := MaxWatermark
 
 	for i := range uwg.sources {
 		sourceTime, err := uwg.sources[i].GetWatermark(ctx, tx)

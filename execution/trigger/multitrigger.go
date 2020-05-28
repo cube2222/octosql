@@ -8,13 +8,13 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 type Trigger interface {
 	RecordReceived(ctx context.Context, tx storage.StateTransaction, key octosql.Value, eventTime time.Time) error
 	UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error
-	PollKeysToFire(ctx context.Context, tx storage.StateTransaction) ([]octosql.Value, error)
+	PollKeysToFire(ctx context.Context, tx storage.StateTransaction, batchSize int) ([]octosql.Value, error)
 	KeysFired(ctx context.Context, tx storage.StateTransaction, key []octosql.Value) error
 }
 
@@ -56,11 +56,15 @@ func (m *MultiTrigger) UpdateWatermark(ctx context.Context, tx storage.StateTran
 	return nil
 }
 
-func (m *MultiTrigger) PollKeysToFire(ctx context.Context, tx storage.StateTransaction) ([]octosql.Value, error) {
+func (m *MultiTrigger) PollKeysToFire(ctx context.Context, tx storage.StateTransaction, batchSize int) ([]octosql.Value, error) {
 	var outKeys []octosql.Value
 	for i := range m.triggers {
-		keys, err := m.triggers[i].PollKeysToFire(ctx, tx.WithPrefix(m.prefixes[i]))
+		if batchSize == 0 {
+			return outKeys, nil
+		}
+		keys, err := m.triggers[i].PollKeysToFire(ctx, tx.WithPrefix(m.prefixes[i]), batchSize)
 		if err == nil && len(keys) > 0 {
+			batchSize -= len(keys)
 			// In all other triggers, mark these keys as fired.
 			// We don't want duplicates in the outKeys slice.
 			for j := range m.triggers {

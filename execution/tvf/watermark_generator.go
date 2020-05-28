@@ -9,7 +9,7 @@ import (
 
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 type WatermarkGenerator struct {
@@ -66,6 +66,10 @@ type WatermarkGeneratorStream struct {
 var watermarkPrefix = []byte("$watermark$")
 
 func (s *WatermarkGeneratorStream) GetWatermark(ctx context.Context, tx storage.StateTransaction) (time.Time, error) {
+	return s.getWatermark(tx.WithPrefix(s.streamID.AsPrefix()))
+}
+
+func (s *WatermarkGeneratorStream) getWatermark(tx storage.StateTransaction) (time.Time, error) {
 	watermarkStorage := storage.NewValueState(tx.WithPrefix(watermarkPrefix))
 
 	var currentWatermark octosql.Value
@@ -98,7 +102,7 @@ func (s *WatermarkGeneratorStream) Next(ctx context.Context) (*execution.Record,
 
 	tx := storage.GetStateTransactionFromContext(ctx).WithPrefix(s.streamID.AsPrefix())
 
-	currentWatermark, err := s.GetWatermark(ctx, tx)
+	currentWatermark, err := s.getWatermark(tx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't get current watermark value")
 	}
@@ -112,6 +116,8 @@ func (s *WatermarkGeneratorStream) Next(ctx context.Context) (*execution.Record,
 			return nil, errors.Wrap(err, "couldn't set new watermark value in storage")
 		}
 	}
+
+	srcRecord = execution.NewRecordFromRecord(srcRecord, execution.WithEventTimeField(s.timeField))
 
 	return srcRecord, nil
 }

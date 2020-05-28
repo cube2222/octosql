@@ -1,9 +1,0 @@
-syntax = "proto3";
-package execution;
-option go_package = "github.com/cube2222/octosql/output/badger";
-import "execution/record.proto";
-
-message RecordData {
-    repeated execution.RecordID ids = 1;
-    bool isUndo = 2;
-}

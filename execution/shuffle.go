@@ -11,7 +11,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 // This is used to start the whole plan. It starts each phase (separated by shuffles) one by one
@@ -454,6 +454,10 @@ func (node *ShuffleSender) UpdateWatermark(ctx context.Context, tx storage.State
 	}
 
 	return nil
+}
+
+func (node *ShuffleSender) TriggerKeys(ctx context.Context, tx storage.StateTransaction, batchSize int) (int, error) {
+	return 0, nil
 }
 
 func (node *ShuffleSender) MarkEndOfStream(ctx context.Context, tx storage.StateTransaction) error {

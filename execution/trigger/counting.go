@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/streaming/storage"
+	"github.com/cube2222/octosql/storage"
 )
 
 type CountingTrigger struct {
@@ -64,7 +64,7 @@ func (ct *CountingTrigger) UpdateWatermark(ctx context.Context, tx storage.State
 	return nil
 }
 
-func (ct *CountingTrigger) PollKeysToFire(ctx context.Context, tx storage.StateTransaction) ([]octosql.Value, error) {
+func (ct *CountingTrigger) PollKeysToFire(ctx context.Context, tx storage.StateTransaction, batchSize int) ([]octosql.Value, error) {
 	toSend := storage.NewValueState(tx.WithPrefix(toSendPrefix))
 	var out octosql.Value
 	err := toSend.Get(&out)

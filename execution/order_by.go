@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/streaming/storage"
-	"github.com/golang/protobuf/ptypes"
 	"github.com/pkg/errors"
 )
 
@@ -188,52 +187,6 @@ func (ob *OrderByStream) AddRecord(ctx context.Context, tx storage.StateTransact
 	}
 
 	return nil
-}
-
-func (p *OrderByStream) Next(ctx context.Context, tx storage.StateTransaction) (*Record, error) {
-	outputQueue := NewOutputQueue(tx.WithPrefix(outputQueuePrefix))
-
-	endOfStreamState := storage.NewValueState(tx.WithPrefix(endOfStreamPrefix))
-	var eos octosql.Value
-	err := endOfStreamState.Get(&eos)
-	if err == storage.ErrNotFound {
-	} else if err != nil {
-		return nil, errors.Wrap(err, "couldn't get end of stream value")
-	} else {
-		return nil, ErrEndOfStream
-	}
-
-	var element QueueElement
-	for err = outputQueue.Pop(ctx, &element); err == nil; err = outputQueue.Pop(ctx, &element) {
-		switch payload := element.Type.(type) {
-		case *QueueElement_Record:
-			return payload.Record, nil
-		case *QueueElement_Watermark:
-			outputWatermarkState := storage.NewValueState(tx.WithPrefix(outputWatermarkPrefix))
-			watermark, err := ptypes.Timestamp(payload.Watermark)
-			if err != nil {
-				return nil, errors.Wrap(err, "couldn't parse watermark timestamp")
-			}
-			octoWatermark := octosql.MakeTime(watermark)
-			err = outputWatermarkState.Set(&octoWatermark)
-			if err != nil {
-				return nil, errors.Wrap(err, "couldn't update output watermark")
-			}
-		case *QueueElement_EndOfStream:
-			octoEndOfStream := octosql.MakeBool(true)
-			err := endOfStreamState.Set(&octoEndOfStream)
-			if err != nil {
-				return nil, errors.Wrap(err, "couldn't update end of stream state")
-			}
-			return nil, ErrEndOfStream
-		case *QueueElement_Error:
-			return nil, errors.New(payload.Error)
-		default:
-			panic("invalid queue element type")
-		}
-	}
-
-	return nil, errors.Wrap(err, "couldn't pop element from output queue")
 }
 
 func (ob *OrderByStream) Trigger(ctx context.Context, tx storage.StateTransaction, key octosql.Value) ([]*Record, error) {

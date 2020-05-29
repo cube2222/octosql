@@ -373,30 +373,12 @@ func (p *ProcessByKey) RunGarbageCollector(ctx context.Context, prefixedStorage 
 			for err = setIt.Next(&octoEventTime, &phantom); err == nil; err = setIt.Next(&octoEventTime, &phantom) {
 				eventTime := octoEventTime.AsTime()
 
+				// Just store event time, clearing process can't happen here because of 2nd iterator creation
 				if eventTime.Before(boundary) {
 					eventTimeBytes := append(append([]byte("$"), octoEventTime.MonotonicMarshal()...), '$')
 
 					octoEventTimeSlice = append(octoEventTimeSlice, octoEventTime)
 					eventTimesBytesSlice = append(eventTimesBytesSlice, eventTimeBytes)
-
-					// Iterating through all keyTuples with that event time
-					keyTuplesSet := storage.NewMultiSet(tx.WithPrefix(eventTimesPrefixedSetsPrefix).WithPrefix(eventTimeBytes))
-
-					allKeysTuple, err := keyTuplesSet.ReadAll()
-					if err != nil {
-						return errors.Wrapf(err, "couldn't get all keys with event time %v", eventTime)
-					}
-
-					// Drop event time prefix from process function storage
-					if err := prefixedStorage.DropAll(eventTimeBytes); err != nil {
-						return errors.Wrapf(err, "couldn't clear storage prefixed wit event time %v", eventTime)
-					}
-
-					// Mark every "old enough" key as fired -> trigger will delete this key
-					octoAllKeysTuple := octosql.MakeTuple(allKeysTuple)
-					if err = p.trigger.KeysFired(ctx, tx, octoAllKeysTuple.AsSlice()); err != nil {
-						return errors.Wrap(err, "couldn't mark old enough keys as fired in trigger")
-					}
 				} else {
 					break
 				}
@@ -411,11 +393,33 @@ func (p *ProcessByKey) RunGarbageCollector(ctx context.Context, prefixedStorage 
 
 			// Drop every "old enough" event time from event time set and clear prefixed sets
 			for i := range octoEventTimeSlice {
+				eventTime := octoEventTimeSlice[i].AsTime()
+				eventTimeBytes := eventTimesBytesSlice[i]
+
+				// Iterating through all keyTuples with that event time
+				keyTuplesSet := storage.NewMultiSet(tx.WithPrefix(eventTimesPrefixedSetsPrefix).WithPrefix(eventTimeBytes))
+
+				allKeysTuple, err := keyTuplesSet.ReadAll()
+				if err != nil {
+					return errors.Wrapf(err, "couldn't get all keys with event time %v", eventTime)
+				}
+
+				// Mark every "old enough" key as fired -> trigger will delete this key
+				octoAllKeysTuple := octosql.MakeTuple(allKeysTuple)
+				if err = p.trigger.KeysFired(ctx, tx, octoAllKeysTuple.AsSlice()); err != nil {
+					return errors.Wrap(err, "couldn't mark old enough keys as fired in trigger")
+				}
+
+				// Drop event time prefix from process function storage
+				if err := prefixedStorage.DropAll(eventTimeBytes); err != nil {
+					return errors.Wrapf(err, "couldn't clear storage prefixed wit event time %v", eventTime)
+				}
+
+				// Clearing both storages after processing this event time
 				if err := eventTimeSet.Delete(&octoEventTimeSlice[i]); err != nil {
 					return errors.Wrapf(err, "couldn't delete event time %v from event time map", octoEventTime.AsTime())
 				}
 
-				keyTuplesSet := storage.NewMultiSet(tx.WithPrefix(eventTimesPrefixedSetsPrefix).WithPrefix(eventTimesBytesSlice[i]))
 				if err := keyTuplesSet.Clear(); err != nil {
 					return errors.Wrapf(err, "couldn't delete event time %v from event time map", octoEventTime.AsTime())
 				}

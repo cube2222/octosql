@@ -425,8 +425,8 @@ func AreStreamsEqualWithOrdering(ctx context.Context, stateStorage storage.Stora
 	}
 	log.Println("read second stream")
 
-	if len(firstRecords) == len(secondRecords) {
-		return errors.Wrap(err, "streams have different ammount of records")
+	if len(firstRecords) != len(secondRecords) {
+		return errors.Errorf("streams have different amount of records")
 	}
 
 	for i := range firstRecords {

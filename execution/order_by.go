@@ -29,14 +29,13 @@ func (k *OrderByKey) MonotonicUnmarshal(data []byte) error {
 	return nil
 }
 
-
 type OrderBy struct {
-	storage storage.Storage
-	eventTimeField      octosql.VariableName
-	expressions []Expression
-	directions  []OrderDirection
-	key     []Expression
-	source      Node
+	storage          storage.Storage
+	eventTimeField   octosql.VariableName
+	expressions      []Expression
+	directions       []OrderDirection
+	key              []Expression
+	source           Node
 	triggerPrototype TriggerPrototype
 }
 
@@ -69,7 +68,7 @@ func (node *OrderBy) Get(ctx context.Context, variables octosql.Variables, strea
 	}
 
 	orderBy := &OrderByStream{
-		variables:       variables,
+		variables:   variables,
 		expressions: node.expressions,
 		directions:  node.directions,
 	}
@@ -96,11 +95,11 @@ func (node *OrderBy) Get(ctx context.Context, variables octosql.Variables, strea
 type OrderByStream struct {
 	expressions []Expression
 	directions  []OrderDirection
-	variables       octosql.Variables
+	variables   octosql.Variables
 }
 
 var recordValuePrefix = []byte("$record_value$")
-//todo record count prefix is from orderby
+//recordCountPrefix defined in group_by
 
 func (ob *OrderByStream) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, key octosql.Value, record *Record) error {
 	if inputIndex > 0 {
@@ -109,13 +108,7 @@ func (ob *OrderByStream) AddRecord(ctx context.Context, tx storage.StateTransact
 
 	keyPrefix := append(append([]byte("$"), key.MonotonicMarshal()...), '$')
 	txByKey := tx.WithPrefix(keyPrefix)
-
-	var recordValueMap *storage.Map
-	var recordCountMap *storage.Map
-
-
-	recordValueMap = storage.NewMap(txByKey.WithPrefix(recordValuePrefix))
-	recordCountMap = storage.NewMap(txByKey.WithPrefix(recordCountPrefix))
+	recordValueMap := storage.NewMap(txByKey.WithPrefix(recordValuePrefix))
 
 	mapping := make(map[string]octosql.Value, len(record.Fields()))
 	for _, field := range record.Fields() {
@@ -123,13 +116,12 @@ func (ob *OrderByStream) AddRecord(ctx context.Context, tx storage.StateTransact
 	}
 	variables := record.AsVariables()
 
-
 	recordPrefix := []byte("$")
 
 	for i := range ob.expressions {
 		expressionValue, err := ob.expressions[i].ExpressionValue(ctx, variables)
 		if err != nil {
-			return errors.Wrap(err, "couldn't evaluate expression")
+			return errors.Wrapf(err, "couldn't evaluate expression with index %d", i)
 		}
 		if ob.directions[i] == Ascending {
 			recordPrefix = append(recordPrefix, expressionValue.MonotonicMarshal()...)
@@ -139,50 +131,57 @@ func (ob *OrderByStream) AddRecord(ctx context.Context, tx storage.StateTransact
 		recordPrefix = append(recordPrefix, '$')
 	}
 
+	//append whole record to prefix to avoid errors caused by two different records with the same key
 	bytePref := append(append(recordPrefix, []byte(NewRecordFromRecord(record, WithNoUndo()).String())...), '$')
 	pref := OrderByKey{key: bytePref}
 
-	count  := octosql.MakePhantom()
-	err := recordCountMap.Get(&pref, &count)
+
+	recordCountState := storage.NewValueState(txByKey.WithPrefix(recordCountPrefix).WithPrefix(bytePref))
+	var recordCount octosql.Value
+	err := recordCountState.Get(&recordCount)
 
 	if !record.IsUndo() {
 		if err == storage.ErrNotFound {
-
 			err = recordValueMap.Set(&pref, record)
 			if err != nil {
-				return err
+				return errors.Wrap(err, "couldn't add record")
 			}
 
-			count = octosql.MakeInt(1)
-			err = recordCountMap.Set(&pref, &count)
+			recordCount = octosql.MakeInt(1)
+			err = recordCountState.Set(&recordCount)
 			if err != nil {
-				return err
+				return errors.Wrap(err, "couldn't update record count")
 			}
 		} else if err != nil {
-			return err
+			return errors.Wrap(err, "couldn't get record count")
 		} else {
 			// Keep track of record vs retraction count
-			count = octosql.MakeInt(count.AsInt() + 1)
-			err = recordCountMap.Set(&pref, &count)
+			recordCount = octosql.MakeInt(recordCount.AsInt() + 1)
+			err = recordCountState.Set(&recordCount)
 			if err != nil {
-				return err
+				return errors.Wrap(err, "couldn't update record count")
 			}
 		}
 	} else {
 		if err == storage.ErrNotFound {
-			return errors.Wrap(err, "couldn't retract record")
-		} else if err != nil {
-			return err
-		} else {
-			// Keep track of record vs retraction count
-			count = octosql.MakeInt(count.AsInt() - 1)
-			if count.AsInt() < 0 {
-				return errors.New( "couldn't retract record")
+			err = recordValueMap.Set(&pref, record)
+			if err != nil {
+				return errors.Wrap(err, "couldn't add record")
 			}
 
-			err = recordCountMap.Set(&pref, &count)
+			recordCount = octosql.MakeInt(-1)
+			err = recordCountState.Set(&recordCount)
 			if err != nil {
-				return err
+				return errors.Wrap(err, "couldn't update record count")
+			}
+		} else if err != nil {
+			return errors.Wrap(err, "couldn't get record count")
+		} else {
+			// Keep track of record vs retraction count
+			recordCount = octosql.MakeInt(recordCount.AsInt() - 1)
+			err = recordCountState.Set(&recordCount)
+			if err != nil {
+				return errors.Wrap(err, "couldn't update record count")
 			}
 		}
 	}
@@ -195,20 +194,17 @@ func (ob *OrderByStream) Trigger(ctx context.Context, tx storage.StateTransactio
 
 	keyPrefix := append(append([]byte("$"), key.MonotonicMarshal()...), '$')
 	txByKey := tx.WithPrefix(keyPrefix)
+	recordValueMap := storage.NewMap(txByKey.WithPrefix(recordValuePrefix))
 
-	var recordValueMap *storage.Map
-	var recordCountMap *storage.Map
-
-	recordValueMap = storage.NewMap(txByKey.WithPrefix(recordValuePrefix))
-	recordCountMap = storage.NewMap(txByKey.WithPrefix(recordCountPrefix))
-
-	var err error
 	pref := OrderByKey{key: []byte("")}
+
 	var count octosql.Value
 	var value Record
+	var err error
 	iter := recordValueMap.GetIterator()
 	for err = iter.Next(&pref, &value); err == nil; err = iter.Next(&pref, &value) {
-		err := recordCountMap.Get(&pref, &count)
+		recordCountState := storage.NewValueState(txByKey.WithPrefix(recordCountPrefix).WithPrefix(pref.key))
+		err := recordCountState.Get(&count)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't get record count")
 		}
@@ -222,7 +218,6 @@ func (ob *OrderByStream) Trigger(ctx context.Context, tx storage.StateTransactio
 	if err != storage.ErrEndOfIterator {
 		return nil, errors.Wrap(err, "couldn't iterate over existing records")
 	}
-
 	if err := iter.Close(); err != nil {
 		return nil, errors.Wrap(err, "couldn't close record iterator")
 	}

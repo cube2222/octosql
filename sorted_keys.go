@@ -42,6 +42,7 @@ func (v *Value) MonotonicMarshal() []byte {
 	return monotonicMarshal(v)
 }
 
+//monotonically decreasing version of MonotonicMarshal
 func (v *Value) ReversedMonotonicMarshal() []byte {
 	marshal := monotonicMarshal(v)
 	var reversedMarshal []byte

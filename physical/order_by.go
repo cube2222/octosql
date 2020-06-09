@@ -59,9 +59,7 @@ func (node *OrderBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 		}
 	}
 
-
-	var triggerPrototype execution.TriggerPrototype
-	triggerPrototype = execution.NewWatermarkTrigger()
+	triggerPrototype := execution.NewWatermarkTrigger()
 
 	directions := make([]execution.OrderDirection, len(node.Expressions))
 	for i := range node.Directions {
@@ -73,23 +71,19 @@ func (node *OrderBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 		return nil, errors.Wrap(err, "couldn't get execution node from order by source")
 	}
 
-	eventTimeField := octosql.NewVariableName("")
-
-	if node.orderByEventTime(node.Source.Metadata()) {
-		eventTimeField = node.Expressions[0].(*Variable).ExpressionName()
-	}
+	eventTimeField := node.orderByEventTime(node.Source.Metadata())
 
 	return execution.NewOrderBy(matCtx.Storage, sourceNode, exprs, directions, eventTimeField, triggerPrototype), nil
 }
 
-func (node *OrderBy) orderByEventTime(sourceMetadata *metadata.NodeMetadata) bool {
+func (node *OrderBy) orderByEventTime(sourceMetadata *metadata.NodeMetadata) octosql.VariableName {
 	if !sourceMetadata.EventTimeField().Empty() {
 		if node.Directions[0] == Ascending && node.Expressions[0].(*Variable).ExpressionName() == sourceMetadata.EventTimeField() {
-			return true
+			sourceMetadata.EventTimeField()
 		}
 	}
 
-	return false
+	return octosql.NewVariableName("")
 }
 
 func (node *OrderBy) Metadata() *metadata.NodeMetadata {

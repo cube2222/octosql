@@ -12,9 +12,16 @@ use std::io;
 use std::time;
 use sled::{ConflictableTransactionError, IVec, open};
 use arrow::util::pretty::pretty_format_batches;
-use arrow::array::ArrayRef;
+use arrow::array::{ArrayRef, BooleanArray};
 use arrow::datatypes::{Field, Schema};
+use arrow::compute::kernels::filter;
 use std::sync::Arc;
+
+pub struct ProduceContext {
+}
+
+pub struct ExecutionContext {
+}
 
 pub enum Error {
     IOError(io::Error),
@@ -23,10 +30,10 @@ pub enum Error {
 
 pub trait Node {
     fn schema(&self) -> Result<Arc<Schema>, Error>;
-    fn run(&self, produce: &dyn Fn(RecordBatch) -> Result<(), Error>) -> Result<(), Error>;
+    fn run(&self, ctx: &ExecutionContext, produce: &dyn Fn(&ProduceContext, RecordBatch) -> Result<(), Error>) -> Result<(), Error>;
 }
 
-fn record_print(batch: RecordBatch) -> Result<(), Error> {
+fn record_print(ctx: &ExecutionContext, batch: RecordBatch) -> Result<(), Error> {
     println!("{}", batch.num_rows());
     //println!("{}", pretty_format_batches(&[batch]).unwrap());
     Ok(())
@@ -53,7 +60,7 @@ impl<'a> Node for CSVSource<'a> {
         Ok(r.schema())
     }
 
-    fn run(&self, produce: &dyn Fn(RecordBatch) -> Result<(), Error>) -> Result<(), Error> {
+    fn run(&self, ctx: &ExecutionContext, produce: &dyn Fn(&ProduceContext, RecordBatch) -> Result<(), Error>) -> Result<(), Error> {
         let file = File::open(self.path).unwrap();
         let mut r = csv::ReaderBuilder::new()
             .has_headers(true)
@@ -64,7 +71,7 @@ impl<'a> Node for CSVSource<'a> {
             let maybe_rec = r.next().unwrap();
             match maybe_rec {
                 None => break,
-                Some(rec) => produce(rec),
+                Some(rec) => produce(ProduceContext, rec),
             };
         }
         Ok(())
@@ -97,7 +104,7 @@ impl<'a, 'b> Node for Projection<'a, 'b> {
         self.schema_from_source_schema(source_schema)
     }
 
-    fn run(&self, produce: &dyn Fn(RecordBatch) -> Result<(), Error>) -> Result<(), Error> {
+    fn run(&self, ctx: &ExecutionContext, produce: &dyn Fn(&ProduceContext, RecordBatch) -> Result<(), Error>) -> Result<(), Error> {
         let source_schema = self.source.schema()?;
         let new_schema = self.schema_from_source_schema(source_schema.clone())?;
 
@@ -105,7 +112,7 @@ impl<'a, 'b> Node for Projection<'a, 'b> {
             .map(|&field| source_schema.index_of(field).unwrap())
             .collect();
 
-        self.source.run(&|batch| {
+        self.source.run(ctx, &|ctx, batch| {
             let new_columns: Vec<ArrayRef> = (&indices).into_iter()
                 .map(|&i| batch.column(i).clone())
                 .collect();
@@ -115,7 +122,75 @@ impl<'a, 'b> Node for Projection<'a, 'b> {
                 new_columns,
             ).unwrap();
 
-            produce(new_batch)?;
+            produce(ctx, new_batch)?;
+            Ok(())
+        });
+        Ok(())
+    }
+}
+
+pub struct Filter<'a> {
+    field: &'a str,
+    source: Box<dyn Node>,
+}
+
+impl<'a> Filter<'a> {
+    fn new(field: &'a str, source: Box<dyn Node>) -> Filter<'a> {
+        Filter { field, source }
+    }
+}
+
+impl<'a> Node for Filter<'a> {
+    fn schema(&self) -> Result<Arc<Schema>, Error> {
+        self.source.schema()
+    }
+
+    fn run(&self, ctx: &ExecutionContext, produce: &dyn Fn(&ProduceContext, RecordBatch) -> Result<(), Error>) -> Result<(), Error> {
+        let source_schema = self.source.schema()?;
+        let index_of_field = source_schema.index_of(field)?;
+
+        self.source.run(ctx, &|ctx, batch| {
+            let predicate_column = batch.column(index_of_field).as_any().downcast_ref::<BooleanArray>().unwrap();
+            let new_columns = batch
+                .columns()
+                .into_iter()
+                .map(|array_ref| {filter::filter(array_ref, predicate_column)})
+                .collect();
+            let new_batch = RecordBatch::try_new(
+                source_schema.clone(),
+                new_columns,
+            ).unwrap();
+            produce(ctx, batch);
+            Ok(())
+        });
+        Ok(())
+    }
+}
+
+pub struct GroupBy<'a, 'b, 'c> {
+    key: &'a str,
+    aggregated_fields: &'c [&'b str],
+    aggregates: [Box<Aggregate>],
+    source: Box<dyn Node>,
+}
+
+impl<'a, 'b, 'c> GroupBy<'a, 'b, 'c> {
+    fn new(field: &'a str, source: Box<dyn Node>) -> Filter<'a> {
+        Filter { field, source }
+    }
+}
+
+impl<'a, 'b, 'c> Node for GroupBy<'a, 'b, 'c> {
+    fn schema(&self) -> Result<Arc<Schema>, Error> {
+        self.source.schema()
+    }
+
+    fn run(&self, ctx: &ExecutionContext, produce: &dyn Fn(&ProduceContext, RecordBatch) -> Result<(), Error>) -> Result<(), Error> {
+        let source_schema = self.source.schema()?;
+        let index_of_field = source_schema.index_of(field)?;
+
+        self.source.run(ctx, &|ctx, batch| {
+
             Ok(())
         });
         Ok(())
@@ -313,8 +388,10 @@ fn main() {
     // dbg!(v2);
     //db.with_subscriber()
 
+    db.insert()
+
     let plan: Box<dyn Node> = Box::new(CSVSource::new("cats.csv"));
     let plan: Box<dyn Node> = Box::new(Projection::new(&["id", "name"], plan));
-    let res = plan.run(&record_print);
+    let res = plan.run(&ExecutionContext{}, &record_print);
     println!("{:?}", start_time.elapsed());
 }

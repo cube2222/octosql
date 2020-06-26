@@ -2,6 +2,7 @@ package physical
 
 import (
 	"context"
+	"github.com/cube2222/octosql"
 
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/graph"
@@ -58,6 +59,8 @@ func (node *OrderBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 		}
 	}
 
+	triggerPrototype := execution.NewWatermarkTrigger()
+
 	directions := make([]execution.OrderDirection, len(node.Expressions))
 	for i := range node.Directions {
 		directions[i] = execution.OrderDirection(node.Directions[i])
@@ -68,7 +71,19 @@ func (node *OrderBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 		return nil, errors.Wrap(err, "couldn't get execution node from order by source")
 	}
 
-	return execution.NewOrderBy(exprs, directions, sourceNode), nil
+	eventTimeField := node.orderByEventTime(node.Source.Metadata())
+
+	return execution.NewOrderBy(matCtx.Storage, sourceNode, exprs, directions, eventTimeField, triggerPrototype), nil
+}
+
+func (node *OrderBy) orderByEventTime(sourceMetadata *metadata.NodeMetadata) octosql.VariableName {
+	if !sourceMetadata.EventTimeField().Empty() {
+		if node.Directions[0] == Ascending && node.Expressions[0].(*Variable).ExpressionName() == sourceMetadata.EventTimeField() {
+			sourceMetadata.EventTimeField()
+		}
+	}
+
+	return octosql.NewVariableName("")
 }
 
 func (node *OrderBy) Metadata() *metadata.NodeMetadata {

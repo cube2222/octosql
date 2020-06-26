@@ -42,6 +42,16 @@ func (v *Value) MonotonicMarshal() []byte {
 	return monotonicMarshal(v)
 }
 
+//monotonically decreasing version of MonotonicMarshal
+func (v *Value) ReversedMonotonicMarshal() []byte {
+	marshal := monotonicMarshal(v)
+	var reversedMarshal []byte
+	for _, x := range marshal {
+		reversedMarshal = append(reversedMarshal, x ^ 255)
+	}
+	return reversedMarshal
+}
+
 func (v *Value) MonotonicUnmarshal(bytes []byte) error {
 	if len(bytes) == 0 {
 		return errors.New("empty byte slice given to unmarshal")

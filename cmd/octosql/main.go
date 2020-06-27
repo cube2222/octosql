@@ -213,7 +213,7 @@ func main() {
 	rootCmd.Version = version
 
 	rootCmd.Flags().StringVarP(&configPath, "config", "c", os.Getenv("OCTOSQL_CONFIG"), "data source configuration path, defaults to $OCTOSQL_CONFIG")
-	rootCmd.Flags().StringVarP(&outputFormat, "output", "o", "live-table", "output format, one of [table json csv tabbed table_row_separated]")
+	rootCmd.Flags().StringVarP(&outputFormat, "output", "o", "live-table", "output format, one of [stream-json live-csv live-table batch-csv batch-table]")
 	rootCmd.Flags().StringVar(&storageDirectory, "storage-directory", "", "directory to store state storage in")
 	rootCmd.Flags().StringVar(&logFilePath, "log-file", "", "Logs output file, will append if the file exists.")
 	rootCmd.Flags().BoolVar(&describe, "describe", false, "Print out the physical query plan in graphviz format. You can use a command like \"dot -Tpng file > output.png\" to view it.")

@@ -215,10 +215,11 @@ Redis database with the given index. Currently only hashes are supported.
 
 ___
 #### Kafka
-## TODO
+Multi-partition kafka topic.
 ##### **optional**
 - brokers - list of broker addresses (separately hosts and ports) used to connect to the kafka cluster, **optional**: defaults to `["localhost"], ["9092"]`
 - topic - name of topic to read messages from, **required**
+- partitions - topic partition count, **optional**: defaults to `1`
 - startOffset - offset from which the first batch of messages will be read, **optional**: defaults to `-1`
 - batchSize - number of records extracted from Kafka in one storage transaction, **optional**: defaults to `1`
 - json - should the messages be decoded as JSON, **optional**: defaults to `false`

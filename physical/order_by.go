@@ -79,7 +79,7 @@ func (node *OrderBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 func (node *OrderBy) orderByEventTime(sourceMetadata *metadata.NodeMetadata) octosql.VariableName {
 	if !sourceMetadata.EventTimeField().Empty() {
 		if node.Directions[0] == Ascending && node.Expressions[0].(*Variable).ExpressionName() == sourceMetadata.EventTimeField() {
-			sourceMetadata.EventTimeField()
+			return sourceMetadata.EventTimeField()
 		}
 	}
 

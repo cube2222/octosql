@@ -67,13 +67,13 @@ func TestOrderBy_Get(t *testing.T) {
 				source: NewDummyNode([]*Record{
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
-						[]interface{}{"b", 10}),
+						[]interface{}{"ba", 10}),
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
 						[]interface{}{"c", 7}),
 					NewRecordFromSliceWithNormalize(
 						[]octosql.VariableName{"name", "age"},
-						[]interface{}{"a", 2}),
+						[]interface{}{"b", 2}),
 				}),
 				expressions: []Expression{NewVariable(octosql.NewVariableName("name"))},
 				directions:  []OrderDirection{Descending},
@@ -85,10 +85,10 @@ func TestOrderBy_Get(t *testing.T) {
 					[]interface{}{"c", 7}),
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
-					[]interface{}{"b", 10}),
+					[]interface{}{"ba", 10}),
 				NewRecordFromSliceWithNormalize(
 					[]octosql.VariableName{"name", "age"},
-					[]interface{}{"a", 2}),
+					[]interface{}{"b", 2}),
 			},
 			wantErr: false,
 		},

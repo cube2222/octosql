@@ -88,7 +88,7 @@ func NewDataSourceBuilderFactory(partitions int) physical.DataSourceBuilderFacto
 func NewDataSourceBuilderFactoryFromConfig(dbConfig map[string]interface{}) (physical.DataSourceBuilderFactory, error) {
 	partitions, err := config.GetInt(dbConfig, "partitions", config.WithDefault(1))
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't get primaryKeys")
+		return nil, errors.Wrap(err, "couldn't get partitions")
 	}
 
 	return NewDataSourceBuilderFactory(partitions), nil

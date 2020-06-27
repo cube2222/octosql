@@ -49,6 +49,8 @@ func (v *Value) ReversedMonotonicMarshal() []byte {
 	for _, x := range marshal {
 		reversedMarshal = append(reversedMarshal, x ^ 255)
 	}
+	//add max byte to prevent errors with comparing when one value is prefix of another
+	reversedMarshal = append(reversedMarshal, 255)
 	return reversedMarshal
 }
 

@@ -12,6 +12,7 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/duration"
 	"github.com/golang/protobuf/ptypes/timestamp"
+	"github.com/mitchellh/hashstructure"
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql/docs"
@@ -509,6 +510,15 @@ func (v Value) ToRawValue() interface{} {
 		return out
 	default:
 		return nil
+	}
+}
+
+func (v *Value) Hash() (uint64, error) {
+	switch v.GetType() {
+	case TypeTuple:
+		return hashstructure.Hash(v.AsSlice(), nil)
+	default:
+		panic("not implemented")
 	}
 }
 

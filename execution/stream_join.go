@@ -38,9 +38,11 @@ type StreamJoin struct {
 	eventTimeField          octosql.VariableName
 	joinType                JoinType
 	triggerPrototype        TriggerPrototype
+
+	gcInfo *GarbageCollectorInfo
 }
 
-func NewStreamJoin(leftSource, rightSource Node, leftKey, rightKey []Expression, storage storage.Storage, eventTimeField octosql.VariableName, joinType JoinType, triggerPrototype TriggerPrototype) *StreamJoin {
+func NewStreamJoin(leftSource, rightSource Node, leftKey, rightKey []Expression, storage storage.Storage, eventTimeField octosql.VariableName, joinType JoinType, triggerPrototype TriggerPrototype, gcInfo *GarbageCollectorInfo) *StreamJoin {
 	return &StreamJoin{
 		leftKey:          leftKey,
 		rightKey:         rightKey,
@@ -50,6 +52,7 @@ func NewStreamJoin(leftSource, rightSource Node, leftKey, rightKey []Expression,
 		eventTimeField:   eventTimeField,
 		joinType:         joinType,
 		triggerPrototype: triggerPrototype,
+		gcInfo:           gcInfo,
 	}
 }
 
@@ -105,14 +108,34 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 		variables:       variables,
 	}
 
+	gbCtx, cancel := context.WithCancel(ctx)
+	processFunc.garbageCollectorCtxCancel = cancel
+	processFunc.garbageCollectorCloseErrChan = make(chan error, 1)
+
 	streamJoinPullEngine := NewPullEngine(processFunc, node.storage, []RecordStream{leftStream, rightStream}, streamID, watermarkSource, true, ctx)
 
 	return streamJoinPullEngine,
 		NewExecutionOutput(
 			streamJoinPullEngine,
 			mergedNextShuffles,
-			append(leftExec.TasksToRun, append(rightExec.TasksToRun, func() error { streamJoinPullEngine.Run(); return nil })...),
-		), nil
+			append(leftExec.TasksToRun, append(rightExec.TasksToRun,
+				[]Task{
+					func() error { streamJoinPullEngine.Run(); return nil },
+					func() error {
+						err := processFunc.RunGarbageCollector(gbCtx, node.storage.WithPrefix(streamID.AsPrefix()), node.gcInfo.garbageCollectorBoundary, node.gcInfo.garbageCollectorCycle)
+						if err == context.Canceled || err == context.DeadlineExceeded {
+							processFunc.garbageCollectorCloseErrChan <- err
+							return nil
+						} else {
+							err := errors.Wrap(err, "stream join garbage collector error")
+							processFunc.garbageCollectorCloseErrChan <- err
+							return err
+						}
+					},
+				}...,
+			)...),
+		),
+		nil
 }
 
 type JoinedStream struct {

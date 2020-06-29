@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/execution/aggregates"
 	"github.com/cube2222/octosql/graph"
@@ -175,6 +177,16 @@ func (node *GroupBy) Transform(ctx context.Context, transformers *Transformers) 
 }
 
 func (node *GroupBy) Materialize(ctx context.Context, matCtx *MaterializationContext) (execution.Node, error) {
+	garbageCollectionBoundary, err := config.GetInt(matCtx.Config.Execution, "garbageCollectionBoundary", config.WithDefault(600))
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get garbageCollectionBoundary configuration")
+	}
+
+	garbageCollectionCycle, err := config.GetInt(matCtx.Config.Execution, "garbageCollectionCycle", config.WithDefault(60))
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't get garbageCollectionCycle configuration")
+	}
+
 	source, err := node.Source.Materialize(ctx, matCtx)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't materialize Source node")
@@ -190,7 +202,7 @@ func (node *GroupBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 		key[i] = keyPart
 	}
 
-	aggregatePrototypes := make([]execution.AggregatePrototype, len(node.Aggregates))
+	aggregatePrototypes := make([]aggregates.AggregatePrototype, len(node.Aggregates))
 	for i := range node.Aggregates {
 		aggregatePrototypes[i] = aggregates.AggregateTable[string(node.Aggregates[i])]
 	}
@@ -218,7 +230,7 @@ func (node *GroupBy) Materialize(ctx context.Context, matCtx *MaterializationCon
 
 	meta := node.Metadata()
 
-	return execution.NewGroupBy(matCtx.Storage, source, key, node.Fields, aggregatePrototypes, eventTimeField, node.As, meta.EventTimeField(), triggerPrototype), nil
+	return execution.NewGroupBy(matCtx.Storage, source, key, node.Fields, aggregatePrototypes, eventTimeField, node.As, meta.EventTimeField(), triggerPrototype, execution.NewGarbageCollectorInfo(time.Duration(garbageCollectionBoundary), time.Duration(garbageCollectionCycle))), nil
 }
 
 func (node *GroupBy) groupingByEventTime(sourceMetadata *metadata.NodeMetadata) bool {

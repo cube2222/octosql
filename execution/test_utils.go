@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"sort"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -327,12 +326,12 @@ func areIDsUniqueAndFromSameStream(records []*Record) error {
 		return nil
 	}
 
-	seenIDs := make(map[int64]struct{})
+	seenIDs := make(map[string]struct{})
 	var wantID string
 
 	// All recordIDs should be of form X.index, where X is the same streamID for every record and indexes are distinct
 	for i, rec := range records {
-		recordIDBase, offsetAsInt, err := splitID(rec.ID())
+		recordIDBase, recordID, err := splitID(rec.ID())
 		if err != nil {
 			return errors.Wrapf(err, "couldn't parse record ID %v", rec.ID().ID)
 		}
@@ -345,28 +344,23 @@ func areIDsUniqueAndFromSameStream(records []*Record) error {
 			}
 		}
 
-		_, ok := seenIDs[offsetAsInt]
+		_, ok := seenIDs[recordID]
 		if ok {
-			return errors.Errorf("ids with number %v were repeated", offsetAsInt)
+			return errors.Errorf("ids with number %v were repeated", recordID)
 		}
-		seenIDs[offsetAsInt] = struct{}{}
+		seenIDs[recordID] = struct{}{}
 	}
 
 	return nil
 }
 
-func splitID(ID *RecordID) (string, int64, error) {
+func splitID(ID *RecordID) (string, string, error) {
 	splitByComa := strings.Split(ID.ID, ".")
-	if len(splitByComa) != 2 {
-		return "", 0, errors.Errorf("got a record ID that didn't split into two parts when split by a coma: %v", ID.ID)
+	if len(splitByComa) != 2 && len(splitByComa) != 3 {
+		return "", "", errors.Errorf("got a record ID that didn't split into two or three parts when split by a coma: %v", ID.ID)
 	}
 
-	numberAsInt, err := strconv.ParseInt(splitByComa[1], 10, 64)
-	if err != nil {
-		return "", 0, errors.Wrap(err, "couldn't parse second part of record ID as number")
-	}
-
-	return splitByComa[0], numberAsInt, nil
+	return splitByComa[0], strings.Join(splitByComa[1:], "."), nil
 }
 
 func AreStreamsEqualNoOrdering(ctx context.Context, stateStorage storage.Storage, first, second RecordStream, opts ...AreEqualOpt) error {

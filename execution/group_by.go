@@ -5,12 +5,11 @@ import (
 	"fmt"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/execution/aggregates"
 	"github.com/cube2222/octosql/storage"
 
 	"github.com/pkg/errors"
 )
-
-type AggregatePrototype func() Aggregate
 
 type Aggregate interface {
 	AddValue(ctx context.Context, tx storage.StateTransaction, value octosql.Value) error
@@ -25,17 +24,19 @@ type GroupBy struct {
 	key     []Expression
 
 	fields              []octosql.VariableName
-	aggregatePrototypes []AggregatePrototype
+	aggregatePrototypes []aggregates.AggregatePrototype
 	eventTimeField      octosql.VariableName
 
 	as                []octosql.VariableName
 	outEventTimeField octosql.VariableName
 
 	triggerPrototype TriggerPrototype
+
+	gcInfo *GarbageCollectorInfo
 }
 
-func NewGroupBy(storage storage.Storage, source Node, key []Expression, fields []octosql.VariableName, aggregatePrototypes []AggregatePrototype, eventTimeField octosql.VariableName, as []octosql.VariableName, outEventTimeField octosql.VariableName, triggerPrototype TriggerPrototype) *GroupBy {
-	return &GroupBy{storage: storage, source: source, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, eventTimeField: eventTimeField, as: as, outEventTimeField: outEventTimeField, triggerPrototype: triggerPrototype}
+func NewGroupBy(storage storage.Storage, source Node, key []Expression, fields []octosql.VariableName, aggregatePrototypes []aggregates.AggregatePrototype, eventTimeField octosql.VariableName, as []octosql.VariableName, outEventTimeField octosql.VariableName, triggerPrototype TriggerPrototype, gcInfo *GarbageCollectorInfo) *GroupBy {
+	return &GroupBy{storage: storage, source: source, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, eventTimeField: eventTimeField, as: as, outEventTimeField: outEventTimeField, triggerPrototype: triggerPrototype, gcInfo: gcInfo}
 }
 
 func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
@@ -96,13 +97,32 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 		variables:       variables,
 	}
 
+	gbCtx, cancel := context.WithCancel(ctx)
+	processFunc.garbageCollectorCtxCancel = cancel
+	processFunc.garbageCollectorCloseErrChan = make(chan error, 1)
+
 	groupByPullEngine := NewPullEngine(processFunc, node.storage, []RecordStream{source}, streamID, execOutput.WatermarkSource, true, ctx)
 
 	return groupByPullEngine, // groupByPullEngine now indicates new watermark source
 		NewExecutionOutput(
 			groupByPullEngine,
 			execOutput.NextShuffles,
-			append(execOutput.TasksToRun, func() error { groupByPullEngine.Run(); return nil }),
+			append(execOutput.TasksToRun,
+				[]Task{
+					func() error { groupByPullEngine.Run(); return nil },
+					func() error {
+						err := processFunc.RunGarbageCollector(gbCtx, node.storage.WithPrefix(streamID.AsPrefix()), node.gcInfo.garbageCollectorBoundary, node.gcInfo.garbageCollectorCycle)
+						if err == context.Canceled || err == context.DeadlineExceeded {
+							processFunc.garbageCollectorCloseErrChan <- err
+							return nil
+						} else {
+							err := errors.Wrap(err, "group_by garbage collector error")
+							processFunc.garbageCollectorCloseErrChan <- err
+							return err
+						}
+					},
+				}...,
+			),
 		),
 		nil
 }
@@ -280,7 +300,11 @@ func (gb *GroupByStream) Trigger(ctx context.Context, tx storage.StateTransactio
 
 	// Set IDs for records
 	for i := range output {
-		WithID(NewRecordIDFromStreamIDWithOffset(gb.streamID, triggeredCountValue+i))(output[i])
+		keyHash, err := key.Hash()
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't ket hash for key")
+		}
+		WithID(NewRecordIDFromStreamIDWithKeyHashAndOffset(gb.streamID, keyHash, triggeredCountValue+i))(output[i])
 	}
 
 	newTriggeredCount := octosql.MakeInt(triggeredCountValue + len(output))

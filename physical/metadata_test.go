@@ -153,48 +153,6 @@ func TestNamespace(t *testing.T) {
 			),
 		},
 		{
-			name: "limit",
-			node: &Limit{
-				Source: &StubNode{
-					NodeMetadata: metadata.NewNodeMetadata(
-						metadata.Unbounded,
-						octosql.NewVariableName("event_time_field"),
-						metadata.NewNamespace(
-							[]string{"a", "b"},
-						),
-					),
-				},
-			},
-			want: metadata.NewNodeMetadata(
-				metadata.BoundedFitsInLocalStorage,
-				octosql.NewVariableName("event_time_field"),
-				metadata.NewNamespace(
-					[]string{"a", "b"},
-				),
-			),
-		},
-		{
-			name: "offset",
-			node: &Offset{
-				Source: &StubNode{
-					NodeMetadata: metadata.NewNodeMetadata(
-						metadata.BoundedDoesntFitInLocalStorage,
-						octosql.NewVariableName("event_time_field"),
-						metadata.NewNamespace(
-							[]string{"a", "b"},
-						),
-					),
-				},
-			},
-			want: metadata.NewNodeMetadata(
-				metadata.BoundedDoesntFitInLocalStorage,
-				octosql.NewVariableName("event_time_field"),
-				metadata.NewNamespace(
-					[]string{"a", "b"},
-				),
-			),
-		},
-		{
 			name: "requalifier",
 			node: &Requalifier{
 				Source: &StubNode{

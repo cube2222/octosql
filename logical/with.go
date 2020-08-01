@@ -43,7 +43,7 @@ func (node *With) Physical(ctx context.Context, physicalCreator *PhysicalPlanCre
 		}
 
 		// Add this common table expression to the available datasources so further CTE's can access this one.
-		physicalCreator = physicalCreator.WithCommonTableExpression(node.cteNames[i], physicalNode)
+		*physicalCreator = *physicalCreator.WithCommonTableExpression(node.cteNames[i], physicalNode)
 	}
 
 	source, childVariables, err := node.source.Physical(ctx, physicalCreator)

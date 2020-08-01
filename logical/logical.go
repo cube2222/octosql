@@ -3,6 +3,7 @@ package logical
 import (
 	"context"
 	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -29,6 +30,7 @@ func NewPhysicalPlanCreator(repo *physical.DataSourceRepository, physicalConfig 
 func (creator *PhysicalPlanCreator) GetVariableName() (out octosql.VariableName) {
 	out = octosql.NewVariableName(fmt.Sprintf("const_%d", creator.variableCounter))
 	creator.variableCounter++
+	log.Printf("getting variable name: %s", out)
 	return
 }
 

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	memmap "github.com/bradleyjkemp/memviz"
+
 	"github.com/cube2222/octosql/execution"
 
 	"github.com/cube2222/octosql"
@@ -162,69 +163,40 @@ func TestParseNode(t *testing.T) {
 					(SELECT p.name, p.age FROM people p WHERE p.age > 4)
 					LIMIT 5`,
 			},
-			want: logical.NewLimit(
-				logical.NewUnionAll(
-					logical.NewMap(
-						[]logical.NamedExpression{
-							logical.NewVariable("c.name"),
+			want: logical.NewUnionAll(
+				logical.NewMap(
+					[]logical.NamedExpression{
+						logical.NewVariable("c.name"),
+						logical.NewVariable("c.age"),
+					},
+					logical.NewFilter(
+						logical.NewPredicate(
 							logical.NewVariable("c.age"),
-						},
-						logical.NewFilter(
-							logical.NewPredicate(
+							logical.MoreThan,
+							logical.NewConstant(100),
+						),
+						logical.NewMap(
+							[]logical.NamedExpression{
+								logical.NewVariable("c.name"),
 								logical.NewVariable("c.age"),
-								logical.MoreThan,
-								logical.NewConstant(100),
-							),
-							logical.NewMap(
-								[]logical.NamedExpression{
-									logical.NewVariable("c.name"),
-									logical.NewVariable("c.age"),
-								},
-								logical.NewDataSource("cities", "c"),
-								true,
-							),
+							},
+							logical.NewDataSource("cities", "c"),
+							true,
 						),
-						false,
 					),
-					logical.NewMap(
-						[]logical.NamedExpression{
-							logical.NewVariable("p.name"),
-							logical.NewVariable("p.age"),
-						},
-						logical.NewFilter(
-							logical.NewPredicate(
-								logical.NewVariable("p.age"),
-								logical.MoreThan,
-								logical.NewConstant(4),
-							),
-							logical.NewMap(
-								[]logical.NamedExpression{
-									logical.NewVariable("p.name"),
-									logical.NewVariable("p.age"),
-								},
-								logical.NewDataSource("people", "p"),
-								true,
-							),
-						),
-						false,
-					),
+					false,
 				),
-				logical.NewConstant(5),
-			),
-			wantErr: false,
-		},
-		{
-			name: "simple limit + offset",
-			args: args{
-				"SELECT p.name, p.age FROM people p LIMIT 3 OFFSET 2",
-			},
-			want: logical.NewLimit(
-				logical.NewOffset(
-					logical.NewMap(
-						[]logical.NamedExpression{
-							logical.NewVariable("p.name"),
+				logical.NewMap(
+					[]logical.NamedExpression{
+						logical.NewVariable("p.name"),
+						logical.NewVariable("p.age"),
+					},
+					logical.NewFilter(
+						logical.NewPredicate(
 							logical.NewVariable("p.age"),
-						},
+							logical.MoreThan,
+							logical.NewConstant(4),
+						),
 						logical.NewMap(
 							[]logical.NamedExpression{
 								logical.NewVariable("p.name"),
@@ -233,11 +205,31 @@ func TestParseNode(t *testing.T) {
 							logical.NewDataSource("people", "p"),
 							true,
 						),
-						false,
 					),
-					logical.NewConstant(2),
+					false,
 				),
-				logical.NewConstant(3),
+			),
+			wantErr: false,
+		},
+		{
+			name: "simple limit + offset",
+			args: args{
+				"SELECT p.name, p.age FROM people p LIMIT 3 OFFSET 2",
+			},
+			want: logical.NewMap(
+				[]logical.NamedExpression{
+					logical.NewVariable("p.name"),
+					logical.NewVariable("p.age"),
+				},
+				logical.NewMap(
+					[]logical.NamedExpression{
+						logical.NewVariable("p.name"),
+						logical.NewVariable("p.age"),
+					},
+					logical.NewDataSource("people", "p"),
+					true,
+				),
+				false,
 			),
 			wantErr: false,
 		},
@@ -864,7 +856,7 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 				logical.NewMap(
 					[]logical.NamedExpression{},
 					logical.NewRequalifier("x",
-						logical.NewTableValuedFunction( //test1
+						logical.NewTableValuedFunction( // test1
 							"func",
 							map[octosql.VariableName]logical.TableValuedFunctionArgumentValue{
 								octosql.NewVariableName("arg0"): logical.NewTableValuedFunctionArgumentValueTable(logical.NewDataSource("test1", "")),
@@ -942,7 +934,7 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 
 			statement := stmt.(sqlparser.SelectStatement)
 
-			got, err := ParseNode(statement)
+			got, _, err := ParseNode(statement)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ParseNode() error = %v, wantErr %v", err, tt.wantErr)
 				return

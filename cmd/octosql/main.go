@@ -28,6 +28,7 @@ import (
 	"github.com/cube2222/octosql/datasources/sql/mysql"
 	"github.com/cube2222/octosql/datasources/sql/postgres"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/output"
 	"github.com/cube2222/octosql/output/batch"
 	batchcsv "github.com/cube2222/octosql/output/batch/csv"
@@ -87,10 +88,12 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 			log.Fatal(err)
 		}
 
+		var streamingMode bool
 		var outputSinkFn app.OutputSinkFn
 		switch outputFormat {
 		case "stream-json":
-			outputSinkFn = func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (store execution.IntermediateRecordStore, printer output.Printer) {
+			streamingMode = true
+			outputSinkFn = func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName, outputOptions *app.OutputOptions) (store execution.IntermediateRecordStore, printer output.Printer) {
 				sink := streaming.NewInstantStreamOutput(streamID)
 				output := streaming.NewStreamPrinter(
 					stateStorage,
@@ -100,26 +103,26 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 				return sink, output
 			}
 		case "live-csv":
-			outputSinkFn = func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (store execution.IntermediateRecordStore, printer output.Printer) {
-				sink := batch.NewTableOutput(streamID, eventTimeField)
+			outputSinkFn = func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName, outputOptions *app.OutputOptions) (store execution.IntermediateRecordStore, printer output.Printer) {
+				sink := batch.NewTableOutput(streamID, eventTimeField, outputOptions.OrderByExpressions, outputOptions.OrderByDirections, outputOptions.Limit, outputOptions.Offset)
 				output := batch.NewLiveTablePrinter(stateStorage, sink, batchcsv.TableFormatter(','))
 				return sink, output
 			}
 		case "live-table":
-			outputSinkFn = func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (store execution.IntermediateRecordStore, printer output.Printer) {
-				sink := batch.NewTableOutput(streamID, eventTimeField)
+			outputSinkFn = func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName, outputOptions *app.OutputOptions) (store execution.IntermediateRecordStore, printer output.Printer) {
+				sink := batch.NewTableOutput(streamID, eventTimeField, outputOptions.OrderByExpressions, outputOptions.OrderByDirections, outputOptions.Limit, outputOptions.Offset)
 				output := batch.NewLiveTablePrinter(stateStorage, sink, batchtable.TableFormatter(false))
 				return sink, output
 			}
 		case "batch-csv":
-			outputSinkFn = func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (store execution.IntermediateRecordStore, printer output.Printer) {
-				sink := batch.NewTableOutput(streamID, eventTimeField)
+			outputSinkFn = func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName, outputOptions *app.OutputOptions) (store execution.IntermediateRecordStore, printer output.Printer) {
+				sink := batch.NewTableOutput(streamID, eventTimeField, outputOptions.OrderByExpressions, outputOptions.OrderByDirections, outputOptions.Limit, outputOptions.Offset)
 				output := batch.NewWholeTablePrinter(stateStorage, sink, batchcsv.TableFormatter(','))
 				return sink, output
 			}
 		case "batch-table":
-			outputSinkFn = func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName) (store execution.IntermediateRecordStore, printer output.Printer) {
-				sink := batch.NewTableOutput(streamID, eventTimeField)
+			outputSinkFn = func(stateStorage storage.Storage, streamID *execution.StreamID, eventTimeField octosql.VariableName, outputOptions *app.OutputOptions) (store execution.IntermediateRecordStore, printer output.Printer) {
+				sink := batch.NewTableOutput(streamID, eventTimeField, outputOptions.OrderByExpressions, outputOptions.OrderByDirections, outputOptions.Limit, outputOptions.Offset)
 				output := batch.NewWholeTablePrinter(stateStorage, sink, batchtable.TableFormatter(false))
 				return sink, output
 			}
@@ -143,9 +146,12 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 		if !ok {
 			log.Fatalf("invalid statement type, wanted sqlparser.SelectStatement got %v", reflect.TypeOf(stmt))
 		}
-		plan, err := parser.ParseNode(typed)
+		plan, outputOptions, err := parser.ParseNode(typed)
 		if err != nil {
 			log.Fatal("couldn't parse query: ", err)
+		}
+		if streamingMode {
+			plan = logical.NewOrderBy(outputOptions.OrderByExpressions, outputOptions.OrderByDirections, plan)
 		}
 
 		if storageDirectory == "" {
@@ -195,7 +201,7 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 		stateStorage := storage.NewBadgerStorage(db)
 
 		// Run query
-		err = app.RunPlan(ctx, stateStorage, plan)
+		err = app.RunPlan(ctx, stateStorage, plan, outputOptions)
 		if err != nil {
 			log.Fatal("couldn't run plan: ", err)
 		}

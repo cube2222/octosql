@@ -6,4 +6,5 @@ import "execution/record.proto";
 message RecordData {
     repeated execution.RecordID ids = 1;
     bool isUndo = 2;
+    execution.Record record = 3;
 }

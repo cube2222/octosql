@@ -97,7 +97,7 @@ func (app *App) RunPlan(ctx context.Context, stateStorage storage.Storage, plan 
 	var phys physical.Node = shuffled[0]
 
 	if strings.TrimSpace(os.Getenv("OCTOSQL_TELEMETRY")) != "0" {
-		RunTelemetry(ctx, app.telemetryInfo, app.cfg.DataSources, phys)
+		RunTelemetry(ctx, app.telemetryInfo, app.cfg.DataSources, phys, physicalOutputOptions)
 	}
 
 	phys = optimizer.Optimize(ctx, optimizer.DefaultScenarios, phys)

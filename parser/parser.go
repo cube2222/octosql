@@ -42,20 +42,6 @@ func ParseUnion(statement *sqlparser.Union) (logical.Node, error) {
 		return nil, errors.Errorf("unsupported union %+v of type %v", statement, statement.Type)
 	}
 
-	if statement.Limit != nil {
-		limitExpr, offsetExpr, err := parseTwoSubexpressions(statement.Limit.Rowcount, statement.Limit.Offset)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't parse limit/offset clause subexpression")
-		}
-
-		if offsetExpr != nil {
-			root = logical.NewOffset(root, offsetExpr)
-		}
-		if limitExpr != nil {
-			root = logical.NewLimit(root, limitExpr)
-		}
-	}
-
 	return root, nil
 }
 

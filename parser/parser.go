@@ -22,12 +22,12 @@ func ParseUnion(statement *sqlparser.Union) (logical.Node, error) {
 		return nil, errors.Errorf("order by is currently unsupported, got %+v", statement)
 	}
 
-	firstNode, err := ParseNode(statement.Left)
+	firstNode, _, err := ParseNode(statement.Left)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't parse first select expression")
 	}
 
-	secondNode, err := ParseNode(statement.Right)
+	secondNode, _, err := ParseNode(statement.Right)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't parse second select expression")
 	}
@@ -59,17 +59,18 @@ func ParseUnion(statement *sqlparser.Union) (logical.Node, error) {
 	return root, nil
 }
 
-func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
+func ParseSelect(statement *sqlparser.Select) (logical.Node, *logical.OutputOptions, error) {
 	var err error
 	var root logical.Node
+	var outputOptions logical.OutputOptions
 
 	if len(statement.From) != 1 {
-		return nil, errors.Errorf("currently only one expression in from supported, got %v", len(statement.From))
+		return nil, nil, errors.Errorf("currently only one expression in from supported, got %v", len(statement.From))
 	}
 
 	root, err = ParseTableExpression(statement.From[0], true)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't parse from expression")
+		return nil, nil, errors.Wrap(err, "couldn't parse from expression")
 	}
 
 	// If we get a join we want to parse triggers for it. It is done here, because otherwise passing statement.Triggers
@@ -79,7 +80,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		for i := range statement.Trigger {
 			triggers[i], err = ParseTrigger(statement.Trigger[i])
 			if err != nil {
-				return nil, errors.Wrapf(err, "couldn't parse trigger with index %d", i)
+				return nil, nil, errors.Wrapf(err, "couldn't parse trigger with index %d", i)
 			}
 		}
 
@@ -113,7 +114,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 			if starExpr, ok := statement.SelectExprs[i].(*sqlparser.StarExpr); ok {
 				expressions[i], err = ParseStarExpression(starExpr)
 				if err != nil { // just in case ParseStarExpression changes in the future
-					return nil, errors.Wrap(err, "couldn't parse star expression")
+					return nil, nil, errors.Wrap(err, "couldn't parse star expression")
 				}
 
 				continue
@@ -121,7 +122,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 
 			aliasedExpression, ok := statement.SelectExprs[i].(*sqlparser.AliasedExpr)
 			if !ok {
-				return nil, errors.Errorf("expected aliased expression in select on index %v, got %v %v",
+				return nil, nil, errors.Errorf("expected aliased expression in select on index %v, got %v %v",
 					i, statement.SelectExprs[i], reflect.TypeOf(statement.SelectExprs[i]))
 			}
 
@@ -136,7 +137,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 				continue
 			}
 			if errors.Cause(err) != ErrNotAggregate {
-				return nil, errors.Wrapf(err, "couldn't parse aggregate with index %d", i)
+				return nil, nil, errors.Wrapf(err, "couldn't parse aggregate with index %d", i)
 			}
 
 			// If this isn't an aggregate expression,
@@ -144,7 +145,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 
 			expressions[i], err = ParseAliasedExpression(aliasedExpression)
 			if err != nil {
-				return nil, errors.Wrapf(err, "couldn't parse aliased expression with index %d", i)
+				return nil, nil, errors.Wrapf(err, "couldn't parse aliased expression with index %d", i)
 			}
 		}
 
@@ -164,7 +165,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 	if statement.Where != nil {
 		filterFormula, err := ParseLogic(statement.Where.Expr)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't parse where expression")
+			return nil, nil, errors.Wrap(err, "couldn't parse where expression")
 		}
 		root = logical.NewFilter(filterFormula, root)
 	}
@@ -178,7 +179,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		for i := range statement.GroupBy {
 			key[i], err = ParseExpression(statement.GroupBy[i])
 			if err != nil {
-				return nil, errors.Wrapf(err, "couldn't parse group key expression with index %v", i)
+				return nil, nil, errors.Wrapf(err, "couldn't parse group key expression with index %v", i)
 			}
 		}
 		if len(key) == 0 {
@@ -214,7 +215,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		for i := range statement.Trigger {
 			triggers[i], err = ParseTrigger(statement.Trigger[i])
 			if err != nil {
-				return nil, errors.Wrapf(err, "couldn't parse trigger with index %d", i)
+				return nil, nil, errors.Wrapf(err, "couldn't parse trigger with index %d", i)
 			}
 		}
 
@@ -224,10 +225,11 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 	if statement.OrderBy != nil {
 		orderByExpressions, orderByDirections, err := parseOrderByExpressions(statement.OrderBy)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't parse arguments of order by")
+			return nil, nil, errors.Wrap(err, "couldn't parse arguments of order by")
 		}
 
-		root = logical.NewOrderBy(orderByExpressions, orderByDirections, root)
+		outputOptions.OrderByDirections = orderByDirections
+		outputOptions.OrderByExpressions = orderByExpressions
 	}
 
 	// Now we only keep the selected variables.
@@ -253,7 +255,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 			// We check for duplicated columns
 			for j := 0; j < i; j++ {
 				if nameExpressions[j].Name() == nameExpressions[i].Name() {
-					return nil, errors.New("select expressions contain duplicated columns")
+					return nil, nil, errors.New("select expressions contain duplicated columns")
 				}
 			}
 		}
@@ -265,12 +267,12 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 			// TODO: Actually it's not that simple, because "SELECT *, p.name as mename FROM people p" is legit
 			if qualifier == "" { // a * expression collides with anything else
 				if len(statement.SelectExprs) > 1 {
-					return nil, errors.New("select expressions contain a non-qualified star expression and some other fields")
+					return nil, nil, errors.New("select expressions contain a non-qualified star expression and some other fields")
 				}
 			} else {
 				for j := 0; j < i; j++ { // a qualifier.* collides with any other qualifier.*something* field
 					if expressions[j].Name().Source() == qualifier {
-						return nil, errors.Errorf("a star expression with qualifier %v collides with %v", qualifier, expressions[j].Name())
+						return nil, nil, errors.Errorf("a star expression with qualifier %v collides with %v", qualifier, expressions[j].Name())
 					}
 				}
 			}
@@ -288,47 +290,48 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 	if statement.Limit != nil {
 		limitExpr, offsetExpr, err := parseTwoSubexpressions(statement.Limit.Rowcount, statement.Limit.Offset)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't parse limit/offset clause subexpression")
+			return nil, nil, errors.Wrap(err, "couldn't parse limit/offset clause subexpression")
 		}
 
-		if offsetExpr != nil {
-			root = logical.NewOffset(root, offsetExpr)
-		}
 		if limitExpr != nil {
-			root = logical.NewLimit(root, limitExpr)
+			outputOptions.Limit = limitExpr
+		}
+		if offsetExpr != nil {
+			outputOptions.Offset = offsetExpr
 		}
 	}
 
-	return root, nil
+	return root, &outputOptions, nil
 }
 
-func ParseWith(statement *sqlparser.With) (logical.Node, error) {
-	source, err := ParseNode(statement.Select)
+func ParseWith(statement *sqlparser.With) (logical.Node, *logical.OutputOptions, error) {
+	source, outputOptions, err := ParseNode(statement.Select)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't parse underlying select in WITH statement")
+		return nil, nil, errors.Wrap(err, "couldn't parse underlying select in WITH statement")
 	}
 
 	nodes := make([]logical.Node, len(statement.CommonTableExpressions))
 	names := make([]string, len(statement.CommonTableExpressions))
 	for i, cte := range statement.CommonTableExpressions {
-		node, err := ParseNode(cte.Select)
+		node, _, err := ParseNode(cte.Select)
 		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't parse common table expression %s with index %d", cte.Name, i)
+			return nil, nil, errors.Wrapf(err, "couldn't parse common table expression %s with index %d", cte.Name, i)
 		}
 		nodes[i] = node
 		names[i] = cte.Name.String()
 	}
 
-	return logical.NewWith(names, nodes, source), nil
+	return logical.NewWith(names, nodes, source), outputOptions, nil
 }
 
-func ParseNode(statement sqlparser.SelectStatement) (logical.Node, error) {
+func ParseNode(statement sqlparser.SelectStatement) (logical.Node, *logical.OutputOptions, error) {
 	switch statement := statement.(type) {
 	case *sqlparser.Select:
 		return ParseSelect(statement)
 
 	case *sqlparser.Union:
-		return ParseUnion(statement)
+		plan, err := ParseUnion(statement)
+		return plan, &logical.OutputOptions{}, err
 
 	case *sqlparser.ParenSelect:
 		return ParseNode(statement.Select)
@@ -337,8 +340,7 @@ func ParseNode(statement sqlparser.SelectStatement) (logical.Node, error) {
 		return ParseWith(statement)
 
 	default:
-		// Union
-		return nil, errors.Errorf("unsupported select %+v of type %v", statement, reflect.TypeOf(statement))
+		return nil, nil, errors.Errorf("unsupported select %+v of type %v", statement, reflect.TypeOf(statement))
 	}
 }
 
@@ -366,7 +368,7 @@ func ParseAliasedTableExpression(expr *sqlparser.AliasedTableExpr, mustBeAliased
 		return logical.NewDataSource(subExpr.Name.String(), expr.As.String()), nil
 
 	case *sqlparser.Subquery:
-		subQuery, err := ParseNode(subExpr.Select)
+		subQuery, _, err := ParseNode(subExpr.Select)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't parse subquery")
 		}
@@ -619,7 +621,7 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 			return nil, errors.Errorf("expected select statement in subquery, go %v %v",
 				expr.Select, reflect.TypeOf(expr.Select))
 		}
-		subquery, err := ParseNode(selectExpr)
+		subquery, _, err := ParseNode(selectExpr)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't parse select expression")
 		}

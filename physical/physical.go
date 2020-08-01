@@ -38,6 +38,67 @@ func NewMaterializationContext(config *config.Config, storage storage.Storage) *
 	}
 }
 
+type OutputOptions struct {
+	OrderByExpressions []Expression
+	OrderByDirections  []OrderDirection
+	Limit              Expression
+	Offset             Expression
+}
+
+func NewOutputOptions(
+	orderByExpressions []Expression,
+	orderByDirections []OrderDirection,
+	limit Expression,
+	offset Expression,
+) *OutputOptions {
+	return &OutputOptions{
+		OrderByExpressions: orderByExpressions,
+		OrderByDirections:  orderByDirections,
+		Limit:              limit,
+		Offset:             offset,
+	}
+}
+
+func (opts *OutputOptions) Materialize(ctx context.Context, matCtx *MaterializationContext) (*execution.OutputOptions, error) {
+	orderByExpressions := make([]execution.Expression, len(opts.OrderByExpressions))
+	for i := range opts.OrderByExpressions {
+		materializedExpr, err := opts.OrderByExpressions[i].Materialize(ctx, matCtx)
+		if err != nil {
+			return nil, errors.Wrapf(
+				err,
+				"couldn't materialize order by expression with index %d", i,
+			)
+		}
+
+		orderByExpressions[i] = materializedExpr
+	}
+
+	orderByDirections := make([]execution.OrderDirection, len(opts.OrderByDirections))
+	for i, dir := range opts.OrderByDirections {
+		orderByDirections[i] = execution.OrderDirection(dir)
+	}
+
+	var limit execution.Expression
+	if opts.Limit != nil {
+		limitExpression, err := opts.Limit.Materialize(ctx, matCtx)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't materialize limit expression")
+		}
+		limit = limitExpression
+	}
+
+	var offset execution.Expression
+	if opts.Offset != nil {
+		offsetExpression, err := opts.Offset.Materialize(ctx, matCtx)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't materialize offset expression")
+		}
+		offset = offsetExpression
+	}
+
+	return execution.NewOutputOptions(orderByExpressions, orderByDirections, limit, offset), nil
+}
+
 // Node describes a single record stream source.
 type Node interface {
 	// Transform returns a new Node after recursively calling Transform

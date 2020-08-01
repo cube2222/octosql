@@ -19,6 +19,10 @@ type OrderByKey struct {
 	key []byte
 }
 
+func NewOrderByKey(key []byte) *OrderByKey {
+	return &OrderByKey{key: key}
+}
+
 func (k *OrderByKey) MonotonicMarshal() []byte {
 	return k.key
 }
@@ -99,6 +103,7 @@ type OrderByStream struct {
 }
 
 var recordValuePrefix = []byte("$record_value$")
+
 //recordCountPrefix defined in group_by
 
 func (ob *OrderByStream) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, key octosql.Value, record *Record) error {
@@ -134,7 +139,6 @@ func (ob *OrderByStream) AddRecord(ctx context.Context, tx storage.StateTransact
 	//append whole record to prefix to avoid errors caused by two different records with the same key
 	bytePref := append(append(recordPrefix, []byte(NewRecordFromRecord(record, WithNoUndo()).String())...), '$')
 	pref := OrderByKey{key: bytePref}
-
 
 	recordCountState := storage.NewValueState(txByKey.WithPrefix(recordCountPrefix).WithPrefix(bytePref))
 	var recordCount octosql.Value

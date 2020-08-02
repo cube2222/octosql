@@ -294,7 +294,6 @@ TODO - well, we need to update this big time
   - HAVING, ALL, ANY
 - Push down functions, aggregates to databases that support them.
 - An in-memory index to save values of subqueries and save on rescanning tables which don't support a given operation, so as not to recalculate them each time.
-- MapReduce style distributed execution mode.
 - Runtime statistics
 - Server mode
 - Querying a json or csv table from standard input.

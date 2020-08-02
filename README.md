@@ -173,7 +173,7 @@ row, **optional**: defaults to `[]`
 ___
 #### Parquet
 A single Parquet file.\
-Nested repeated elements are *not supported*.\
+Nested repeated elements are *not supported*. Otherwise repeated xor nested elements *are supported*.\
 Currently *unsupported* logical types, they will get parsed as the underlying primitive type:\
 &nbsp;&nbsp;&nbsp;&nbsp; \- ENUM \
 &nbsp;&nbsp;&nbsp;&nbsp; \- TIME with NANOS precision \

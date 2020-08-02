@@ -50,6 +50,7 @@ var version string
 var configPath string
 var outputFormat string
 var storageDirectory string
+var storageInMemory bool
 var logFilePath string
 var describe bool
 
@@ -161,6 +162,9 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 			}
 			storageDirectory = tempDir
 		}
+		if err := os.MkdirAll(storageDirectory, os.ModePerm); err != nil {
+			log.Fatal("couldn't create storage directory")
+		}
 		defer func() {
 			err = os.RemoveAll(storageDirectory)
 			if err != nil {
@@ -185,6 +189,12 @@ With OctoSQL you don't need O(n) client tools or a large data analysis system de
 		opts.Logger = badgerLogger{}
 		if runtime.GOOS == "windows" { // TODO - fix while refactoring config
 			opts = opts.WithValueLogLoadingMode(options.FileIO)
+		}
+		if storageInMemory {
+			opts = opts.
+				WithInMemory(true).
+				WithDir("").
+				WithValueDir("")
 		}
 
 		db, err := badger.Open(opts)
@@ -221,6 +231,7 @@ func main() {
 	rootCmd.Flags().StringVarP(&configPath, "config", "c", os.Getenv("OCTOSQL_CONFIG"), "data source configuration path, defaults to $OCTOSQL_CONFIG")
 	rootCmd.Flags().StringVarP(&outputFormat, "output", "o", "live-table", "output format, one of [stream-json live-csv live-table batch-csv batch-table]")
 	rootCmd.Flags().StringVar(&storageDirectory, "storage-directory", "", "directory to store state storage in")
+	rootCmd.Flags().BoolVar(&storageInMemory, "storage-in-memory", false, "EXPERIMENTAL: Use badger in-memory mode for storage.")
 	rootCmd.Flags().StringVar(&logFilePath, "log-file", "", "Logs output file, will append if the file exists.")
 	rootCmd.Flags().BoolVar(&describe, "describe", false, "Print out the physical query plan in graphviz format. You can use a command like \"dot -Tpng file > output.png\" to view it.")
 

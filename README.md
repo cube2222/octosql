@@ -220,7 +220,7 @@ ___
 #### Kafka
 Multi-partition kafka topic.
 ##### **optional**
-- brokers - list of broker addresses (separately hosts and ports) used to connect to the kafka cluster, **optional**: defaults to `["localhost"], ["9092"]`
+- brokers - list of broker addresses (separately hosts and ports) used to connect to the kafka cluster, **optional**: defaults to `["localhost:9092"]`
 - topic - name of topic to read messages from, **required**
 - partitions - topic partition count, **optional**: defaults to `1`
 - startOffset - offset from which the first batch of messages will be read, **optional**: defaults to `-1`

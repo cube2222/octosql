@@ -130,7 +130,10 @@ physical:
 
 Available OctoSQL-wide configuration options are:
 - physical
-    - groupByParallelism: The parallelism of group by's and joins. Will default to the CPU core count of your machine.
+    - groupByParallelism: The parallelism of group by's and distinct queries. Will default to the CPU core count of your machine.
+    - streamJoinParallelism: The parallelism of streaming joins. Will default to the CPU core count of your machine.
+- execution
+    - lookupJoinPrefetchCount: The count of simultaneously processed records in a lookup join.
 
 ### Supported Datasources
 #### JSON

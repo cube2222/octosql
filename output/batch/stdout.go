@@ -38,7 +38,7 @@ func NewLiveTablePrinter(stateStorage storage.Storage, recordsLister RecordsList
 }
 
 func (printer *LiveTablePrinter) Run(ctx context.Context) error {
-	writer := uilive.New()
+	liveWriter := uilive.New()
 
 	for range time.Tick(REFRESH_DELAY) {
 		tx := printer.stateStorage.BeginTransaction()
@@ -79,8 +79,8 @@ func (printer *LiveTablePrinter) Run(ctx context.Context) error {
 			return errors.Wrap(err, "couldn't format table")
 		}
 
-		buf.WriteTo(writer)
-		writer.Flush()
+		buf.WriteTo(liveWriter)
+		liveWriter.Flush()
 
 		tx.Abort()
 

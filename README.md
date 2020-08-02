@@ -130,7 +130,10 @@ physical:
 
 Available OctoSQL-wide configuration options are:
 - physical
-    - groupByParallelism: The parallelism of group by's and joins. Will default to the CPU core count of your machine.
+    - groupByParallelism: The parallelism of group by's and distinct queries. Will default to the CPU core count of your machine.
+    - streamJoinParallelism: The parallelism of streaming joins. Will default to the CPU core count of your machine.
+- execution
+    - lookupJoinPrefetchCount: The count of simultaneously processed records in a lookup join.
 
 ### Supported Datasources
 #### JSON
@@ -170,7 +173,7 @@ row, **optional**: defaults to `[]`
 ___
 #### Parquet
 A single Parquet file.\
-Nested repeated elements are *not supported*.\
+Nested repeated elements are *not supported*. Otherwise repeated xor nested elements *are supported*.\
 Currently *unsupported* logical types, they will get parsed as the underlying primitive type:\
 &nbsp;&nbsp;&nbsp;&nbsp; \- ENUM \
 &nbsp;&nbsp;&nbsp;&nbsp; \- TIME with NANOS precision \
@@ -217,7 +220,7 @@ ___
 #### Kafka
 Multi-partition kafka topic.
 ##### **optional**
-- brokers - list of broker addresses (separately hosts and ports) used to connect to the kafka cluster, **optional**: defaults to `["localhost"], ["9092"]`
+- brokers - list of broker addresses (separately hosts and ports) used to connect to the kafka cluster, **optional**: defaults to `["localhost:9092"]`
 - topic - name of topic to read messages from, **required**
 - partitions - topic partition count, **optional**: defaults to `1`
 - startOffset - offset from which the first batch of messages will be read, **optional**: defaults to `-1`
@@ -291,7 +294,6 @@ TODO - well, we need to update this big time
   - HAVING, ALL, ANY
 - Push down functions, aggregates to databases that support them.
 - An in-memory index to save values of subqueries and save on rescanning tables which don't support a given operation, so as not to recalculate them each time.
-- MapReduce style distributed execution mode.
 - Runtime statistics
 - Server mode
 - Querying a json or csv table from standard input.

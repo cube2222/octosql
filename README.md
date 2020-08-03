@@ -157,7 +157,7 @@ You can use multiple triggers simultaneously. (Show me the current sum every 10 
 ### Retractions
 A key can be triggered multiple times with partial results. How do we know a given record is a retriggering of some key, and not a new unrelated record?
 
-OctoSQL solves this problem using a dataflow-like architecture. This means whenever a new value is sent for a key, a retraction is send for the old value. In practice this means every update is accompanied by the old record with an *undo* flag set.
+OctoSQL solves this problem using a dataflow-like architecture. This means whenever a new value is sent for a key, a retraction is send for the old value. In practice this means every update is accompanied by the old record with an `undo` flag set.
 
 This can be visible when using a stream-* output format with partial results.
 

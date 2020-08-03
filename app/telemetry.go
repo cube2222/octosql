@@ -20,7 +20,7 @@ import (
 	"github.com/cube2222/octosql/physical"
 )
 
-func RunTelemetry(ctx context.Context, telemetryInfo TelemetryInfo, datasources []config.DataSourceConfig, plan physical.Node) {
+func RunTelemetry(ctx context.Context, telemetryInfo TelemetryInfo, datasources []config.DataSourceConfig, plan physical.Node, outputOptions *physical.OutputOptions) {
 	var telemetry Telemetry
 
 	telemetry.FunctionsUsed = make(map[string]bool)
@@ -41,6 +41,9 @@ func RunTelemetry(ctx context.Context, telemetryInfo TelemetryInfo, datasources 
 		telemetry.DatasourceTypesInConfig[datasourceConfig.Type] = true
 	}
 	plan.Transform(ctx, TelemetryTransformer(&telemetry, datasources))
+	telemetry.NodesUsed.Limit = outputOptions.Limit != nil
+	telemetry.NodesUsed.Offset = outputOptions.Offset != nil
+	telemetry.NodesUsed.OrderBy = telemetry.NodesUsed.OrderBy || len(outputOptions.OrderByExpressions) > 0
 	log.Printf("Sending telemetry: %+v", telemetry)
 	SendTelemetry(ctx, &telemetry)
 }
@@ -145,12 +148,8 @@ func TelemetryTransformer(telemetry *Telemetry, datasources []config.DataSourceC
 				telemetry.NodesUsed.Distinct = true
 			case *physical.GroupBy:
 				telemetry.NodesUsed.GroupBy = true
-			case *physical.Limit:
-				telemetry.NodesUsed.Limit = true
 			case *physical.LookupJoin:
 				telemetry.NodesUsed.LookupJoin = true
-			case *physical.Offset:
-				telemetry.NodesUsed.Offset = true
 			case *physical.OrderBy:
 				telemetry.NodesUsed.OrderBy = true
 			case *physical.StreamJoin:

@@ -3,6 +3,7 @@ package logical
 import (
 	"context"
 	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -29,6 +30,7 @@ func NewPhysicalPlanCreator(repo *physical.DataSourceRepository, physicalConfig 
 func (creator *PhysicalPlanCreator) GetVariableName() (out octosql.VariableName) {
 	out = octosql.NewVariableName(fmt.Sprintf("const_%d", creator.variableCounter))
 	creator.variableCounter++
+	log.Printf("getting variable name: %s", out)
 	return
 }
 
@@ -52,6 +54,69 @@ func (creator *PhysicalPlanCreator) WithCommonTableExpression(name string, nodes
 	}
 
 	return newCreator
+}
+
+type OutputOptions struct {
+	OrderByExpressions []Expression
+	OrderByDirections  []OrderDirection
+	Limit              Expression
+	Offset             Expression
+}
+
+func (opts *OutputOptions) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (*physical.OutputOptions, octosql.Variables, error) {
+	orderByExpressions := make([]physical.Expression, len(opts.OrderByExpressions))
+	variables := octosql.NoVariables()
+	for i := range opts.OrderByExpressions {
+		physicalExpr, exprVariables, err := opts.OrderByExpressions[i].Physical(ctx, physicalCreator)
+		if err != nil {
+			return nil, nil, errors.Wrapf(
+				err,
+				"couldn't get physical plan for order by expression with index %d", i,
+			)
+		}
+		variables, err = variables.MergeWith(exprVariables)
+		if err != nil {
+			return nil, nil, errors.Wrapf(
+				err,
+				"couldn't merge variables with those of order by expression with index %d", i,
+			)
+		}
+
+		orderByExpressions[i] = physicalExpr
+	}
+
+	orderByDirections := make([]physical.OrderDirection, len(opts.OrderByDirections))
+	for i, dir := range opts.OrderByDirections {
+		orderByDirections[i] = physical.OrderDirection(dir)
+	}
+
+	var limit physical.Expression
+	if opts.Limit != nil {
+		limitExpression, limitVariables, err := opts.Limit.Physical(ctx, physicalCreator)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "couldn't get physical plan for limit expression")
+		}
+		variables, err = variables.MergeWith(limitVariables)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "couldn't merge variables with those of limit expression")
+		}
+		limit = limitExpression
+	}
+
+	var offset physical.Expression
+	if opts.Offset != nil {
+		offsetExpression, offsetVariables, err := opts.Offset.Physical(ctx, physicalCreator)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "couldn't get physical plan for offset expression")
+		}
+		variables, err = variables.MergeWith(offsetVariables)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "couldn't merge variables with those of offset expression")
+		}
+		offset = offsetExpression
+	}
+
+	return physical.NewOutputOptions(orderByExpressions, orderByDirections, limit, offset), variables, nil
 }
 
 type Node interface {

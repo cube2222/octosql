@@ -6,14 +6,15 @@ require (
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible // indirect
 	github.com/bradleyjkemp/memmap v0.2.2 // indirect
 	github.com/bradleyjkemp/memviz v0.2.2
-	github.com/buger/goterm v0.0.0-20200322175922-2f3e71b85129
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/go-chi/chi v4.0.3+incompatible
 	github.com/go-redis/redis v6.15.2+incompatible
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/golang/protobuf v1.3.1
+	github.com/gosuri/uilive v0.0.4
 	github.com/kostya-sh/parquet-go v0.0.0-20180827163605-06b7130dc45c
 	github.com/lib/pq v1.0.0
+	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/mattn/go-runewidth v0.0.4 // indirect
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/hashstructure v1.0.0

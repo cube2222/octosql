@@ -13,14 +13,29 @@ import (
 )
 
 type TableOutput struct {
-	StreamID       *execution.StreamID
-	EventTimeField octosql.VariableName
+	StreamID            *execution.StreamID
+	EventTimeField      octosql.VariableName
+	OrderingExpressions []execution.Expression
+	OrderingDirections  []execution.OrderDirection
+	Limit               *int
+	Offset              *int
 }
 
-func NewTableOutput(streamID *execution.StreamID, eventTimeField octosql.VariableName) *TableOutput {
+func NewTableOutput(
+	streamID *execution.StreamID,
+	eventTimeField octosql.VariableName,
+	orderingExpressions []execution.Expression,
+	orderingDirections []execution.OrderDirection,
+	limit *int,
+	offset *int,
+) *TableOutput {
 	return &TableOutput{
-		StreamID:       streamID,
-		EventTimeField: eventTimeField,
+		StreamID:            streamID,
+		EventTimeField:      eventTimeField,
+		OrderingExpressions: orderingExpressions,
+		OrderingDirections:  orderingDirections,
+		Limit:               limit,
+		Offset:              offset,
 	}
 }
 
@@ -40,15 +55,33 @@ func (o *TableOutput) AddRecord(ctx context.Context, tx storage.StateTransaction
 	}
 	records := storage.NewMap(tx.WithPrefix(recordsPrefix))
 
+	variables := record.AsVariables()
+
+	orderingPrefix := []byte("$")
+	for i := range o.OrderingExpressions {
+		expressionValue, err := o.OrderingExpressions[i].ExpressionValue(ctx, variables)
+		if err != nil {
+			return errors.Wrapf(err, "couldn't evaluate expression with index %d", i)
+		}
+		if o.OrderingDirections[i] == execution.Ascending {
+			orderingPrefix = append(orderingPrefix, expressionValue.MonotonicMarshal()...)
+		} else {
+			orderingPrefix = append(orderingPrefix, expressionValue.ReversedMonotonicMarshal()...)
+		}
+		orderingPrefix = append(orderingPrefix, '$')
+	}
+
 	recordKV := map[string]octosql.Value{}
 	for _, field := range record.Fields() {
 		recordKV[field.Name.String()] = record.Value(field.Name)
 	}
 
-	key := octosql.MakeObject(recordKV)
+	objectKey := octosql.MakeObject(recordKV)
+
+	key := execution.NewOrderByKey(append(orderingPrefix, objectKey.MonotonicMarshal()...))
 
 	var recordData RecordData
-	err := records.Get(&key, &recordData)
+	err := records.Get(key, &recordData)
 	if err == storage.ErrNotFound {
 	} else if err != nil {
 		return errors.Wrap(err, "couldn't get current IDs for record value")
@@ -57,6 +90,7 @@ func (o *TableOutput) AddRecord(ctx context.Context, tx storage.StateTransaction
 	if len(recordData.Ids) == 0 {
 		recordData.Ids = append(recordData.Ids, record.ID())
 		recordData.IsUndo = record.IsUndo()
+		recordData.Record = record
 	} else if recordData.IsUndo != record.IsUndo() {
 		recordData.Ids = recordData.Ids[:len(recordData.Ids)-1]
 	} else {
@@ -64,11 +98,11 @@ func (o *TableOutput) AddRecord(ctx context.Context, tx storage.StateTransaction
 	}
 
 	if len(recordData.Ids) == 0 {
-		if err := records.Delete(&key); err != nil {
+		if err := records.Delete(key); err != nil {
 			return errors.Wrap(err, "couldn't delete record from output records")
 		}
 	} else {
-		if err := records.Set(&key, &recordData); err != nil {
+		if err := records.Set(key, &recordData); err != nil {
 			return errors.Wrap(err, "couldn't remove single record ID from output records")
 		}
 	}
@@ -179,21 +213,31 @@ func (o *TableOutput) ListRecords(ctx context.Context, tx storage.StateTransacti
 
 	iter := records.GetIterator()
 
+	offsetCounter, limitCounter := 0, 0
+
 	var outRecords []*execution.Record
 	var err error
-	var octoKey octosql.Value
+	var octoKey execution.OrderByKey
 	var recordData RecordData
 	for err = iter.Next(&octoKey, &recordData); err == nil; err = iter.Next(&octoKey, &recordData) {
-		object := octoKey.AsMap()
+		offsetCounter++
+		if o.Offset != nil && offsetCounter <= *o.Offset {
+			continue
+		}
+		if o.Limit != nil && limitCounter == *o.Limit {
+			break
+		}
+		limitCounter++
+
 		var fields []string
-		for k := range object {
-			fields = append(fields, k)
+		for _, k := range recordData.Record.Fields() {
+			fields = append(fields, k.Name.String())
 		}
 		sort.Strings(fields)
 
 		data := make([]octosql.Value, len(fields))
 		for i := range fields {
-			data[i] = object[fields[i]]
+			data[i] = recordData.Record.Value(octosql.NewVariableName(fields[i]))
 		}
 
 		variableNames := make([]octosql.VariableName, len(fields))
@@ -220,7 +264,7 @@ func (o *TableOutput) ListRecords(ctx context.Context, tx storage.StateTransacti
 			)
 		}
 	}
-	if err != storage.ErrEndOfIterator {
+	if err != nil && err != storage.ErrEndOfIterator {
 		return nil, errors.Wrap(err, "couldn't iterate over records")
 	}
 	if err := iter.Close(); err != nil {

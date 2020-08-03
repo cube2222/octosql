@@ -90,6 +90,27 @@ func (uwg *UnionWatermarkGenerator) GetWatermark(ctx context.Context, tx storage
 	return minimalTime, nil
 }
 
+type OutputOptions struct {
+	OrderByExpressions []Expression
+	OrderByDirections  []OrderDirection
+	Limit              Expression
+	Offset             Expression
+}
+
+func NewOutputOptions(
+	orderByExpressions []Expression,
+	orderByDirections []OrderDirection,
+	limit Expression,
+	offset Expression,
+) *OutputOptions {
+	return &OutputOptions{
+		OrderByExpressions: orderByExpressions,
+		OrderByDirections:  orderByDirections,
+		Limit:              limit,
+		Offset:             offset,
+	}
+}
+
 type Node interface {
 	Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error)
 }

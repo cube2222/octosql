@@ -74,7 +74,7 @@ func (vs Variables) MergeWith(other Variables) (Variables, error) {
 	}
 	for k, v := range other {
 		if vOld, ok := out[k]; ok {
-			return nil, errors.Errorf("%v already defined as %+v, wanted to add %+v", k, vOld, v)
+			return nil, errors.Errorf("%v already defined as %+v, wanted to add %+v", k, vOld.Show(), v.Show())
 		}
 		out[k] = v
 	}

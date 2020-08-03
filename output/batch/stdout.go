@@ -7,7 +7,7 @@ import (
 	"sort"
 	"time"
 
-	tm "github.com/buger/goterm"
+	"github.com/gosuri/uilive"
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql/execution"
@@ -38,6 +38,8 @@ func NewLiveTablePrinter(stateStorage storage.Storage, recordsLister RecordsList
 }
 
 func (printer *LiveTablePrinter) Run(ctx context.Context) error {
+	liveWriter := uilive.New()
+
 	for range time.Tick(REFRESH_DELAY) {
 		tx := printer.stateStorage.BeginTransaction()
 
@@ -77,21 +79,14 @@ func (printer *LiveTablePrinter) Run(ctx context.Context) error {
 			return errors.Wrap(err, "couldn't format table")
 		}
 
-		tm.Clear()
-		if _, err := tm.Printf(buf.String()); err != nil {
-			return errors.Wrap(err, "couldn't printf output")
-		}
-		tm.Flush()
+		buf.WriteTo(liveWriter)
+		liveWriter.Flush()
 
 		tx.Abort()
 
 		if errorToPrint != nil {
 			return errorToPrint
 		} else if endOfStream {
-			tm.Clear()
-			if _, err := buf.WriteTo(os.Stdout); err != nil {
-				return errors.Wrap(err, "couldn't write final output to stdout")
-			}
 			return nil
 		}
 	}

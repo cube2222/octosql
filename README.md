@@ -105,7 +105,7 @@ Example output:
 You can choose between live-table batch-table live-csv batch-csv stream-json output formats. (The live-* types will update the terminal view repeatedly every second, the batch-* ones will write the output once before exiting, the stream-* ones will print records whenever they are available)
 
 ### Temporal SQL Features
-OctoSQL features temporal SQL extensions inspired by the paper (One SQL to Rule Them All)[https://arxiv.org/abs/1905.12133].
+OctoSQL features temporal SQL extensions inspired by the paper [One SQL to Rule Them All](https://arxiv.org/abs/1905.12133).
 
 ## Configuration
 The configuration file has the following form

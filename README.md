@@ -128,14 +128,61 @@ Watermarks are a heuristic which try to approximate the "current time" when proc
 To achieve this, they are generated at streaming sources and propagate downstream through the whole processing pipeline.
 
 The generation of watermarks usually relies on heuristics which provide satisfactory results for our given use case. OctoSQL currently contains the following watermark generators:
-- Maximum difference watermark generator (with an *offset* argument):
+- Maximum difference watermark generator (with an *offset* argument)
   
   With an offset of 10 seconds, this generator says: When I've received an event for 12:00:00, then I'm sure I won't receive any event older than 11:59:50.
-- Percentile watermark generator (with a *percentile* argument):
+- Percentile watermark generator (with a *percentile* argument)
   
   With a percentile of 99.5, it will look at a specified number of recent events, and generate a watermark so that 99.5% of those events are before the watermark, and the remaining 0.5% are after it.
 
 Watermark generators are specified using table valued functions and are documented in [the wiki](https://github.com/cube2222/octosql/wiki/Table-Valued-Functions-Documentation).
+
+### Triggering
+Another matter is triggering of keys in aggregations.
+Sometimes you'd like to only see the value for a given key (hour) when you know it's done, but othertimes you'd like to see partial results (how's the unique user count going this hour).
+
+That's where you can use triggers. Triggers allow you to specify when a given aggregate (or join window for that matter) is emitted or updated. OctoSQL contains multiple triggers:
+- Watermark Trigger
+
+  This is the most straightforward trigger. It emits a value whenever the watermark for a given key (or the end of the stream) is reached. So basically the "show me when it's done".
+- Counting Trigger (with a *count* argument)
+
+  This trigger will emit a value for a key every time it receives *count* records with this key. The count is reset whenever the key is triggered.
+- Delay Trigger (with a *delay* argument)
+
+  This trigger will emit a value for a key whenever the key has been inactive for the *delay* period.
+
+You can use multiple triggers simultaneously. (Show me the current sum every 10 received events, but also the final value after having received the watermark.)
+
+### Retractions
+A key can be triggered multiple times with partial results. How do we know a given record is a retriggering of some key, and not a new unrelated record?
+
+OctoSQL solves this problem using a dataflow-like architecture. This means whenever a new value is sent for a key, a retraction is send for the old value. In practice this means every update is accompanied by the old record with an *undo* flag set.
+
+This can be visible when using a stream-* output format with partial results.
+
+### Example
+Here we can see how it all fits together:
+```
+octosql "WITH
+              with_watermark AS (SELECT *
+                                 FROM max_diff_watermark(source=>TABLE(events),
+                                                         offset=>INTERVAL 5 SECONDS,
+                                                         time_field=>DESCRIPTOR(time)) e),
+              with_tumble AS (SELECT *
+                              FROM tumble(source=>TABLE(with_watermark),
+                                          time_field=>DESCRIPTOR(e.time),
+                                          window_length=> INTERVAL 1 MINUTE,
+                                          offset => INTERVAL 0 SECONDS) e),
+              counts_per_team AS (SELECT e.window_end, e.team, COUNT(*) as goals
+                                  FROM with_tumble e
+                                  GROUP BY e.window_end, e.team TRIGGER COUNTING 100, ON WATERMARK)
+         SELECT *
+         FROM counts_per_team cpt
+         ORDER BY cpt.window_end DESC, cpt.goals ASC, cpt.team DESC"
+```
+
+**TODO: Describe step by step**
 
 ## Configuration
 The configuration file has the following form

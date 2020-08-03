@@ -162,7 +162,7 @@ OctoSQL solves this problem using a dataflow-like architecture. This means whene
 This can be visible when using a stream-* output format with partial results.
 
 ### Example
-Here we can see how it all fits together:
+Now we can see how it all fits together. In this example we have an events file, which contains records about points being scored in a game by multiple teams.
 ```sql
 WITH
       with_watermark AS (SELECT *
@@ -182,7 +182,15 @@ FROM counts_per_team cpt
 ORDER BY cpt.window_end DESC, cpt.goals ASC, cpt.team DESC
 ```
 
-**TODO: Describe step by step**
+We use common table expressions to break the query up into multiple stages.
+
+First we create the *with_watermark* intermediate table/stream. Here we use the table valued function *max_diff_watermark* to add watermarks to the events table - with an offset of 5 seconds based on the *time* record field.
+
+Then we use this intermediate table to create the *with_tumble* table, which adds a window_start and window_end field to each record, based on the record's *time* field. This assigns the records to 1 minute long windows.
+
+Next we create the *counts_per_team* table, which groups the records by their window end and team.
+
+Finally, we order those results by window end, goal count and team.
 
 ## Durability
 **TODO**

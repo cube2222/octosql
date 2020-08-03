@@ -381,7 +381,9 @@ Starting the execution plan creates a stream, which underneath may hold more str
 Where `scan` means that the whole table needs to be scanned for each access.
 
 ## Telemetry
-**TODO**
+OctoSQL sends application telemetry on each run to help us gauge user interest and feature use. This way we know somebody uses our software, feel our work is actually useful and can prioritize features based on actual usefulness.
+
+You can turn it off (though please don't) by setting the **OCTOSQL_TELEMETRY** environment variable to 0. Telemetry is also fully printed in the output log of OctoSQL, if you want to see what precisely is being sent.
 
 ## Roadmap
 TODO - well, we need to update this big time

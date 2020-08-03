@@ -184,6 +184,9 @@ ORDER BY cpt.window_end DESC, cpt.goals ASC, cpt.team DESC
 
 **TODO: Describe step by step**
 
+## Durability
+**TODO**
+
 ## Configuration
 The configuration file has the following form
 ```yaml

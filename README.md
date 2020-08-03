@@ -104,8 +104,38 @@ Example output:
 ```
 You can choose between live-table batch-table live-csv batch-csv stream-json output formats. (The live-* types will update the terminal view repeatedly every second, the batch-* ones will write the output once before exiting, the stream-* ones will print records whenever they are available)
 
-### Temporal SQL Features
+## Temporal SQL Features
 OctoSQL features temporal SQL extensions inspired by the paper [One SQL to Rule Them All](https://arxiv.org/abs/1905.12133).
+
+### Introduction
+Often when you're working with streams of events, you'd like to use the time dimension somehow:
+- Calculate average values for a day sliced by hours.
+- Get unique user counts per day.
+- and others
+
+All those examples have one thing in common: The time value of an event is crucial for correctness.
+
+A naive system could just use the current clock time whenever it receives an event. The correctness of this approach however, degrades quickly in the face of network problems, delivery delays, clock skew.
+
+This can be solved by using a value from the event as its time value. A new problem arises though: how do I know that I've received all events up to time X and can publish results for a given hour. You never know if there isn't somewhere a delayed event which should be factored in.
+
+This is where watermarks come into play.
+
+### Watermarks
+
+Watermarks are a heuristic which try to approximate the "current time" when processing events. Said differently: When I receive a watermark for 12:00 I can be sure enough I've received all events of interest up to 12:00.
+
+To achieve this, they are generated at streaming sources and propagate downstream through the whole processing pipeline.
+
+The generation of watermarks usually relies on heuristics which provide satisfactory results for our given use case. OctoSQL currently contains the following watermark generators:
+- Maximum difference watermark generator (with an *offset* argument):
+  
+  With an offset of 10 seconds, this generator says: When I've received an event for 12:00:00, then I'm sure I won't receive any event older than 11:59:50.
+- Percentile watermark generator (with a *percentile* argument):
+  
+  With a percentile of 99.5, it will look at a specified number of recent events, and generate a watermark so that 99.5% of those events are before the watermark, and the remaining 0.5% are after it.
+
+Watermark generators are specified using table valued functions and are documented in [the wiki](https://github.com/cube2222/octosql/wiki/Table-Valued-Functions-Documentation).
 
 ## Configuration
 The configuration file has the following form
@@ -285,6 +315,9 @@ Starting the execution plan creates a stream, which underneath may hold more str
 |CSV	|scan	|scan	|scan	|
 
 Where `scan` means that the whole table needs to be scanned for each access.
+
+## Telemetry
+**TODO**
 
 ## Roadmap
 TODO - well, we need to update this big time

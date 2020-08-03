@@ -12,7 +12,7 @@ import (
 	"github.com/cube2222/octosql/storage"
 )
 
-func TestWatermarkGenerator_Get(t *testing.T) {
+func TestMaximumDifferenceWatermarkGenerator_Get(t *testing.T) {
 	ctx := context.Background()
 	baseTime := time.Date(2019, 9, 3, 12, 0, 0, 0, time.UTC)
 
@@ -91,7 +91,7 @@ func TestWatermarkGenerator_Get(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			wg := &WatermarkGenerator{
+			wg := &MaximumDifferenceWatermarkGenerator{
 				source:    tt.fields.source,
 				timeField: tt.fields.timeField,
 				offset:    tt.fields.offset,
@@ -104,18 +104,18 @@ func TestWatermarkGenerator_Get(t *testing.T) {
 
 			got, _, err := wg.Get(ctx, tt.args.variables, execution.GetRawStreamID())
 			if (err != nil) != tt.wantErr {
-				t.Errorf("WatermarkGenerator.Get() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("MaximumDifferenceWatermarkGenerator.Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			want, _, err := tt.want.Get(ctx, tt.args.variables, execution.GetRawStreamID())
 			if err != nil {
-				t.Errorf("WatermarkGenerator.Get() error = %v", err)
+				t.Errorf("MaximumDifferenceWatermarkGenerator.Get() error = %v", err)
 				return
 			}
 
 			err = execution.AreStreamsEqual(ctx, got, want)
 			if err != nil {
-				t.Errorf("WatermarkGenerator.Get() AreStreamsEqual error = %v", err)
+				t.Errorf("MaximumDifferenceWatermarkGenerator.Get() AreStreamsEqual error = %v", err)
 			}
 
 			if err := got.Close(ctx, stateStorage); err != nil {
@@ -134,7 +134,7 @@ func TestWatermarkGenerator_Get(t *testing.T) {
 	}
 }
 
-func TestWatermarkGeneratorStream_GetWatermark(t *testing.T) {
+func TestMaximumDifferenceWatermarkGeneratorStream_GetWatermark(t *testing.T) {
 	ctx := context.Background()
 	baseTime := time.Date(2019, 9, 3, 12, 0, 0, 0, time.UTC)
 
@@ -163,7 +163,7 @@ func TestWatermarkGeneratorStream_GetWatermark(t *testing.T) {
 	timeField := octosql.NewVariableName("time")
 	offset := execution.NewVariable(octosql.NewVariableName("offset"))
 
-	wg := &WatermarkGenerator{
+	wg := &MaximumDifferenceWatermarkGenerator{
 		source:    source,
 		timeField: timeField,
 		offset:    offset,
@@ -177,7 +177,7 @@ func TestWatermarkGeneratorStream_GetWatermark(t *testing.T) {
 
 	src, execOutput, err := wg.Get(ctx, variables, streamID)
 	if err != nil {
-		t.Errorf("WatermarkGenerator.Get() error = %v", err)
+		t.Errorf("MaximumDifferenceWatermarkGenerator.Get() error = %v", err)
 		return
 	}
 

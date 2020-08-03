@@ -31,7 +31,7 @@ func main() {
 				[]docs.Documentation{
 					docs.Section("How to write particular arguments", docs.List(
 						docs.Text("Underlying source => TABLE(\\<source\\>) (e.g. `TABLE(e)`)"),
-						docs.Text("Time field => DESCRIPTION(\\<time_field\\>) (e.g. `DESCRIPTOR(e.time)`)"),
+						docs.Text("Time field => DESCRIPTOR(\\<time_field\\>) (e.g. `DESCRIPTOR(e.time)`)"),
 						docs.Text("Expression: any other value like integer constant, interval => no changes (e.g. `5`, `INTERVAL 1 SECOND`)"))),
 				},
 				body...,

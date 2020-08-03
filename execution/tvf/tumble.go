@@ -36,11 +36,11 @@ func (r *Tumble) Document() docs.Documentation {
 			docs.Section("Calling", docs.Text("tumble(source => \\<Source\\>, time_field => \\<Descriptor\\>, window_length => \\<interval\\>, offset => \\<interval\\>)")),
 			docs.Section("Description", docs.Text("Adds window_start and window_end of the record, based on which window the time_field value falls into. The source may be specified as a subquery or as TABLE(tablename), and the time_field should be specified as DESCRIPTOR(field_name).")),
 			docs.Section("Example", docs.Text("```\nWITH"+
-				"\n\twith_tumble AS (SELECT * FROM tumble("+
-				"\n\t\tsource=>TABLE(events),"+
-				"\n\t\ttime_field=>DESCRIPTOR(e.time),"+
-				"\n\t\twindow_length=> INTERVAL 1 MINUTE,"+
-				"\n\t\toffset => INTERVAL 0 SECONDS) e),"+
+				"\n     with_tumble AS (SELECT * FROM tumble("+
+				"\n                     source=>TABLE(events),"+
+				"\n                     time_field=>DESCRIPTOR(e.time),"+
+				"\n                     window_length=> INTERVAL 1 MINUTE,"+
+				"\n                     offset => INTERVAL 0 SECONDS) e),"+
 				"\nSELECT e.team, COUNT(*) as goals\nFROM with_tumble e\nGROUP BY e.team\nTRIGGER COUNTING 100, ON WATERMARK"+
 				"\n```")),
 		),

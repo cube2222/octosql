@@ -34,10 +34,10 @@ func (r *MaximumDifferenceWatermarkGenerator) Document() docs.Documentation {
 			docs.Section("Calling", docs.Text("max_diff_watermark(source => \\<Source\\>, time_field => \\<Descriptor\\>, offset => \\<interval\\>)")),
 			docs.Section("Description", docs.Text("Creating standard watermark that stores watermark value of `<maximal record event time> - given offset.`")),
 			docs.Section("Example", docs.Text("```\nWITH"+
-				"\n\twith_watermark AS (SELECT * FROM max_diff_watermark("+
-				"\n\t\tsource=>TABLE(events),"+
-				"\n\t\ttime_field=>DESCRIPTOR(time)),"+
-				"\n\t\toffset=>INTERVAL 5 SECONDS) e),"+
+				"\n     with_watermark AS (SELECT * FROM max_diff_watermark("+
+				"\n                        source=>TABLE(events),"+
+				"\n                        time_field=>DESCRIPTOR(time)),"+
+				"\n                        offset=>INTERVAL 5 SECONDS) e),"+
 				"\nSELECT e.team, COUNT(*) as goals\nFROM with_watermark e\nGROUP BY e.team\nTRIGGER COUNTING 100, ON WATERMARK"+
 				"\n```")),
 		),

@@ -45,12 +45,12 @@ func (r *PercentileWatermarkGenerator) Document() docs.Documentation {
 				),
 			)),
 			docs.Section("Example", docs.Text("```\nWITH"+
-				"\n\twith_watermark AS (SELECT * FROM percentile_watermark("+
-				"\n\t\tsource=>TABLE(events),"+
-				"\n\t\ttime_field=>DESCRIPTOR(time)) e),"+
-				"\n\t\tevents=>5,"+
-				"\n\t\tpercentile=>30.0,"+
-				"\n\t\tfrequency=>2) e),"+
+				"\n     with_watermark AS (SELECT * FROM percentile_watermark("+
+				"\n                        source=>TABLE(events),"+
+				"\n                        time_field=>DESCRIPTOR(time)) e),"+
+				"\n                        events=>5,"+
+				"\n                        percentile=>30.0,"+
+				"\n                        frequency=>2) e),"+
 				"\nSELECT e.team, COUNT(*) as goals\nFROM with_watermark e\nGROUP BY e.team\nTRIGGER COUNTING 100, ON WATERMARK"+
 				"\n```")),
 		),

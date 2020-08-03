@@ -193,7 +193,13 @@ Next we create the *counts_per_team* table, which groups the records by their wi
 Finally, we order those results by window end, goal count and team.
 
 ## Durability
-**TODO**
+OctoSQL in its current design is based on on-disk transactional storage.
+
+All state is saved this way. All interactions with datasources are designed so that no records get duplicated in the face of errors or application restarts.
+
+You can also kill the OctoSQL process and start it again with the same query and storage-directory (command line argument), it will start where it left off.
+
+By default, OctoSQL will create a temporary directory for the state and delete it after termination.
 
 ## Configuration
 The configuration file has the following form

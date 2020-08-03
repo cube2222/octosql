@@ -163,23 +163,23 @@ This can be visible when using a stream-* output format with partial results.
 
 ### Example
 Here we can see how it all fits together:
-```
-octosql "WITH
-              with_watermark AS (SELECT *
-                                 FROM max_diff_watermark(source=>TABLE(events),
-                                                         offset=>INTERVAL 5 SECONDS,
-                                                         time_field=>DESCRIPTOR(time)) e),
-              with_tumble AS (SELECT *
-                              FROM tumble(source=>TABLE(with_watermark),
-                                          time_field=>DESCRIPTOR(e.time),
-                                          window_length=> INTERVAL 1 MINUTE,
-                                          offset => INTERVAL 0 SECONDS) e),
-              counts_per_team AS (SELECT e.window_end, e.team, COUNT(*) as goals
-                                  FROM with_tumble e
-                                  GROUP BY e.window_end, e.team TRIGGER COUNTING 100, ON WATERMARK)
-         SELECT *
-         FROM counts_per_team cpt
-         ORDER BY cpt.window_end DESC, cpt.goals ASC, cpt.team DESC"
+```sql
+WITH
+      with_watermark AS (SELECT *
+                         FROM max_diff_watermark(source=>TABLE(events),
+                                                 offset=>INTERVAL 5 SECONDS,
+                                                 time_field=>DESCRIPTOR(time)) e),
+      with_tumble AS (SELECT *
+                      FROM tumble(source=>TABLE(with_watermark),
+                                  time_field=>DESCRIPTOR(e.time),
+                                  window_length=> INTERVAL 1 MINUTE,
+                                  offset => INTERVAL 0 SECONDS) e),
+      counts_per_team AS (SELECT e.window_end, e.team, COUNT(*) as goals
+                          FROM with_tumble e
+                          GROUP BY e.window_end, e.team TRIGGER COUNTING 100, ON WATERMARK)
+SELECT *
+FROM counts_per_team cpt
+ORDER BY cpt.window_end DESC, cpt.goals ASC, cpt.team DESC
 ```
 
 **TODO: Describe step by step**

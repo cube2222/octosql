@@ -133,7 +133,7 @@ The generation of watermarks usually relies on heuristics which provide satisfac
   With an offset of 10 seconds, this generator says: When I've received an event for 12:00:00, then I'm sure I won't receive any event older than 11:59:50.
 - Percentile watermark generator (with a `percentile` argument)
   
-  With a percentile of 99.5, it will look at a specified number of recent events, and generate a watermark so that 99.5% of those events are before the watermark, and the remaining 0.5% are after it.
+  With a percentile of 99.5, it will look at a specified number of recent events, and generate a watermark so that 99.5% of those events are after the watermark (not yet triggered), and the remaining 0.5% are before it. This way we set the watermark so that only a fraction of the recently seen events is potentially ignored as being late.
 
 Watermark generators are specified using table valued functions and are documented in [the wiki](https://github.com/cube2222/octosql/wiki/Table-Valued-Functions-Documentation).
 

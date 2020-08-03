@@ -145,12 +145,12 @@ That's where you can use triggers. Triggers allow you to specify when a given ag
 - Watermark Trigger
 
   This is the most straightforward trigger. It emits a value whenever the watermark for a given key (or the end of the stream) is reached. So basically the "show me when it's done".
-- Counting Trigger (with a *count* argument)
+- Counting Trigger (with a `count` argument)
 
-  This trigger will emit a value for a key every time it receives *count* records with this key. The count is reset whenever the key is triggered.
-- Delay Trigger (with a *delay* argument)
+  This trigger will emit a value for a key every time it receives `count` records with this key. The count is reset whenever the key is triggered.
+- Delay Trigger (with a `delay` argument)
 
-  This trigger will emit a value for a key whenever the key has been inactive for the *delay* period.
+  This trigger will emit a value for a key whenever the key has been inactive for the `delay` period.
 
 You can use multiple triggers simultaneously. (Show me the current sum every 10 received events, but also the final value after having received the watermark.)
 

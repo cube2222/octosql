@@ -186,7 +186,7 @@ We use common table expressions to break the query up into multiple stages.
 
 First we create the *with_watermark* intermediate table/stream. Here we use the table valued function *max_diff_watermark* to add watermarks to the events table - with an offset of 5 seconds based on the *time* record field.
 
-Then we use this intermediate table to create the *with_tumble* table, which adds a window_start and window_end field to each record, based on the record's *time* field. This assigns the records to 1 minute long windows.
+Then we use this intermediate table to create the *with_tumble* table, where we use the *tumble* table valued function to add a window_start and window_end field to each record, based on the record's *time* field. This assigns the records to 1 minute long windows.
 
 Next we create the *counts_per_team* table, which groups the records by their window end and team.
 

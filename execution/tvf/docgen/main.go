@@ -16,7 +16,7 @@ func main() {
 	))
 	body = append(body, docs.Divider())
 
-	tvfs := []docs.Documented{&tvf.Range{}, &tvf.Tumble{}, &tvf.WatermarkGenerator{}, &tvf.PercentileWatermarkGenerator{}}
+	tvfs := []docs.Documented{&tvf.Range{}, &tvf.Tumble{}, &tvf.MaximumDifferenceWatermarkGenerator{}, &tvf.PercentileWatermarkGenerator{}}
 	for i, el := range tvfs {
 		body = append(body, el.Document())
 		if i != len(tvfs)-1 {

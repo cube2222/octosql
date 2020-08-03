@@ -128,10 +128,10 @@ Watermarks are a heuristic which try to approximate the "current time" when proc
 To achieve this, they are generated at streaming sources and propagate downstream through the whole processing pipeline.
 
 The generation of watermarks usually relies on heuristics which provide satisfactory results for our given use case. OctoSQL currently contains the following watermark generators:
-- Maximum difference watermark generator (with an *offset* argument)
+- Maximum difference watermark generator (with an `offset` argument)
   
   With an offset of 10 seconds, this generator says: When I've received an event for 12:00:00, then I'm sure I won't receive any event older than 11:59:50.
-- Percentile watermark generator (with a *percentile* argument)
+- Percentile watermark generator (with a `percentile` argument)
   
   With a percentile of 99.5, it will look at a specified number of recent events, and generate a watermark so that 99.5% of those events are before the watermark, and the remaining 0.5% are after it.
 

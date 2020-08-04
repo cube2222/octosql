@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/storage"
 )
 
@@ -18,6 +19,7 @@ type ProcessFunction interface {
 }
 
 type Trigger interface {
+	docs.Documented
 	RecordReceived(ctx context.Context, tx storage.StateTransaction, key octosql.Value, eventTime time.Time) error
 	UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error
 	PollKeysToFire(ctx context.Context, tx storage.StateTransaction, batchSize int) ([]octosql.Value, error)

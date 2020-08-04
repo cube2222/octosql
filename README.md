@@ -334,6 +334,8 @@ Documentation for the available functions: https://github.com/cube2222/octosql/w
 
 Documentation for the available aggregates: https://github.com/cube2222/octosql/wiki/Aggregate-Documentation
 
+Documentation for the available triggers: https://github.com/cube2222/octosql/wiki/Trigger-Documentation
+
 Documentation for the available table valued functions: https://github.com/cube2222/octosql/wiki/Table-Valued-Functions-Documentation
 
 The SQL dialect documentation: TODO ;) in short though:

@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/storage"
 )
 
@@ -105,4 +106,13 @@ func (agg *Key) GetValue(ctx context.Context, tx storage.StateTransaction) (octo
 
 func (agg *Key) String() string {
 	return "key"
+}
+
+func (agg *Key) Document() docs.Documentation {
+	return docs.Section(
+		agg.String(),
+		docs.Body(
+			docs.Section("Description", docs.Text("Stores aggregated key")),
+		),
+	)
 }

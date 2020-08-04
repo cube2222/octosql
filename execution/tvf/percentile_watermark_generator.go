@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/storage"
 )
@@ -28,6 +29,32 @@ func NewPercentileWatermarkGenerator(source execution.Node, timeField octosql.Va
 		percentile: percentile,
 		frequency:  frequency,
 	}
+}
+
+func (r *PercentileWatermarkGenerator) Document() docs.Documentation {
+	return docs.Section(
+		"watermark generator: percentile",
+		docs.Body(
+			docs.Section("Calling", docs.Text("percentile_watermark(source => \\<Source\\>, time_field => \\<Descriptor\\>, events => \\<int\\>, percentile => \\<float\\>, frequency => \\<int\\>)")),
+			docs.Section("Description", docs.Body(
+				docs.Text("Creating percentile watermark that stores watermark value based on percentile of event_times of recently seen events.\nFields explanation:"),
+				docs.List(
+					docs.Text("`events` (must be positive) - represents amount of (most recent) events stored"),
+					docs.Text("`percentile` (must be positive and less than 100.0) - represents percentile of recently stored events that are BIGGER than watermark value. \n\tEx. if percentile = 35 then 35% of events stored must be bigger than watermark value, so watermark position is at 65th percentile of events stored (in sorted way)"),
+					docs.Text("`frequency` (must be positive) - represents amount of events to be seen before initiating next watermark update"),
+				),
+			)),
+			docs.Section("Example", docs.Text("```\nWITH"+
+				"\n     with_watermark AS (SELECT * FROM percentile_watermark("+
+				"\n                        source=>TABLE(events),"+
+				"\n                        time_field=>DESCRIPTOR(time)) e),"+
+				"\n                        events=>5,"+
+				"\n                        percentile=>30.0,"+
+				"\n                        frequency=>2) e),"+
+				"\nSELECT e.team, COUNT(*) as goals\nFROM with_watermark e\nGROUP BY e.team\nTRIGGER COUNTING 100, ON WATERMARK"+
+				"\n```")),
+		),
+	)
 }
 
 func (w *PercentileWatermarkGenerator) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {

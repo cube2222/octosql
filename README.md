@@ -20,6 +20,12 @@ OctoSQL is a query tool that allows you to join, analyse and transform data from
 - [What is OctoSQL?](#what-is-octosql)
 - [Installation](#installation)
 - [Quickstart](#quickstart)
+- [Temporal SQL Features](#temporal-sql-features)
+  - [Watermarks](#watermarks)
+  - [Triggers](#triggers)
+  - [Retractions](#retractions)
+  - [Example](#example)
+- [Durability](#durability)
 - [Configuration](#configuration)
   - [JSON](#json)
   - [CSV](#csv)
@@ -139,7 +145,7 @@ The generation of watermarks usually relies on heuristics which provide satisfac
 
 Watermark generators are specified using table valued functions and are documented in [the wiki](https://github.com/cube2222/octosql/wiki/Table-Valued-Functions-Documentation).
 
-### Triggering
+### Triggers
 Another matter is triggering of keys in aggregations.
 Sometimes you'd like to only see the value for a given key (hour) when you know it's done, but othertimes you'd like to see partial results (how's the unique user count going this hour).
 

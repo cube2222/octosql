@@ -61,7 +61,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, *logical.OutputOpti
 
 	// If we get a join we want to parse triggers for it. It is done here, because otherwise passing statement.Triggers
 	// would have to get to like 4 functions, which is a bit of a pain, since the type check here.
-	if root, ok := root.(*logical.Join); ok {
+	if joinRoot, ok := root.(*logical.Join); ok {
 		triggers := make([]logical.Trigger, len(statement.Trigger))
 		for i := range statement.Trigger {
 			triggers[i], err = ParseTrigger(statement.Trigger[i])
@@ -70,7 +70,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, *logical.OutputOpti
 			}
 		}
 
-		root = root.WithTriggers(triggers)
+		root = joinRoot.WithTriggers(triggers)
 	}
 
 	// Separate star expressions so we can put them at last positions

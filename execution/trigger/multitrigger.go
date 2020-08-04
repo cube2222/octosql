@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/storage"
 )
 
@@ -32,6 +33,18 @@ func NewMultiTrigger(triggers ...Trigger) *MultiTrigger {
 		prefixes: prefixes,
 		triggers: triggers,
 	}
+}
+
+func (m *MultiTrigger) Document() docs.Documentation {
+	return docs.Section(
+		"Multitrigger",
+		docs.Body(
+			docs.Section("Description", docs.Text("Operates on combination of all underlying triggers at once")),
+			docs.Section("Arguments", docs.List(
+				docs.Text("`triggers`: underlying triggers")),
+			),
+		),
+	)
 }
 
 func (m *MultiTrigger) RecordReceived(ctx context.Context, tx storage.StateTransaction, key octosql.Value, eventTime time.Time) error {

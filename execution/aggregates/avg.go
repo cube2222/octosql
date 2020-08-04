@@ -2,11 +2,13 @@ package aggregates
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/storage"
 )
 
@@ -99,4 +101,13 @@ func (agg *Average) GetValue(ctx context.Context, tx storage.StateTransaction) (
 
 func (agg *Average) String() string {
 	return "avg"
+}
+
+func (agg *Average) Document() docs.Documentation {
+	return docs.Section(
+		agg.String(),
+		docs.Body(
+			docs.Section("Description", docs.Text(fmt.Sprintf("Works like [%s](#%s) and [%s](#%s) combined", agg.underlyingSum.String(), agg.underlyingSum.String(), agg.underlyingCount.String(), agg.underlyingCount.String()))),
+		),
+	)
 }

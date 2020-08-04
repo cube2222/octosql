@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/storage"
 )
@@ -95,4 +96,13 @@ func (agg *Distinct) GetValue(ctx context.Context, tx storage.StateTransaction) 
 
 func (agg *Distinct) String() string {
 	return fmt.Sprintf("%s_distinct", agg.underlying.String())
+}
+
+func (agg *Distinct) Document() docs.Documentation {
+	return docs.Section(
+		agg.String(),
+		docs.Body(
+			docs.Section("Description", docs.Text(fmt.Sprintf("Works like [%s](#%s), only taking into account distinct elements per group.", agg.underlying.String(), agg.underlying.String()))),
+		),
+	)
 }

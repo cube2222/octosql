@@ -17,6 +17,31 @@ type Documentation interface {
 	render(w io.Writer, headerLevel int, indentation int, parentIsList bool)
 }
 
+type tableOfContents struct {
+	names  []string
+	hashes []string
+}
+
+func (d *tableOfContents) render(w io.Writer, headerLevel int, indentation int, parentIsList bool) {
+	for i := 0; i <= headerLevel; i++ {
+		fmt.Fprint(w, "#")
+	}
+	fmt.Fprintf(w, " Table of Contents\n")
+
+	for i := range d.names {
+		fmt.Fprintf(w, "* [%s]", d.names[i])
+		fmt.Fprintf(w, "(#%s)", d.hashes[i])
+
+		if i != len(d.names)-1 {
+			fmt.Fprint(w, "\n")
+		}
+	}
+}
+
+func TableOfContents(names, hashes []string) *tableOfContents {
+	return &tableOfContents{names: names, hashes: hashes}
+}
+
 type body struct {
 	elements []Documentation
 }

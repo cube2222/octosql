@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/storage"
 )
 
@@ -19,6 +20,16 @@ type WatermarkTrigger struct {
 
 func NewWatermarkTrigger() *WatermarkTrigger {
 	return &WatermarkTrigger{}
+}
+
+func (wt *WatermarkTrigger) Document() docs.Documentation {
+	return docs.Section(
+		"Watermark Trigger",
+		docs.Body(
+			docs.Section("Description", docs.Text("Triggers every record that has event time smaller than watermark value.")),
+			docs.Section("Arguments", docs.List()),
+		),
+	)
 }
 
 func (wt *WatermarkTrigger) RecordReceived(ctx context.Context, tx storage.StateTransaction, key octosql.Value, eventTime time.Time) error {

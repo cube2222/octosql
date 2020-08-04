@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/storage"
 )
 
@@ -92,4 +93,13 @@ func (agg *Min) GetValue(ctx context.Context, tx storage.StateTransaction) (octo
 
 func (agg *Min) String() string {
 	return "min"
+}
+
+func (agg *Min) Document() docs.Documentation {
+	return docs.Section(
+		agg.String(),
+		docs.Body(
+			docs.Section("Description", docs.Text("Takes the minimum element in the group. Works with any type.")),
+		),
+	)
 }

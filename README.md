@@ -340,7 +340,7 @@ Documentation for the available table valued functions: https://github.com/cube2
 
 The SQL dialect documentation: TODO ;) in short though:
 
-Available SQL constructs: Select, Where, Order By, Group By, Offset, Limit, Left Join, Right Join, Inner Join, Distinct, Union, Union All, Subqueries, Operators, Table Valued Functions.
+Available SQL constructs: Select, Where, Order By, Group By, Offset, Limit, Left Join, Right Join, Inner Join, Distinct, Union, Union All, Subqueries, Operators, Table Valued Functions, Trigger, Common Table Expressions.
 
 Available SQL types: Int, Float, String, Bool, Time, Duration, Tuple (array), Object (e.g. JSON)
 
@@ -396,7 +396,6 @@ OctoSQL sends application telemetry on each run to help us gauge user interest a
 You can turn it off (though please don't) by setting the **OCTOSQL_TELEMETRY** environment variable to 0. Telemetry is also fully printed in the output log of OctoSQL, if you want to see what precisely is being sent.
 
 ## Roadmap
-TODO - well, we need to update this big time
 - Additional Datasources.
 - SQL Constructs:
   - JSON Query

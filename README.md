@@ -396,7 +396,6 @@ OctoSQL sends application telemetry on each run to help us gauge user interest a
 You can turn it off (though please don't) by setting the **OCTOSQL_TELEMETRY** environment variable to 0. Telemetry is also fully printed in the output log of OctoSQL, if you want to see what precisely is being sent.
 
 ## Roadmap
-TODO - well, we need to update this big time
 - Additional Datasources.
 - SQL Constructs:
   - JSON Query

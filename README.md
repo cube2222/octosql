@@ -14,7 +14,7 @@ OctoSQL is a query tool that allows you to join, analyse and transform data from
 - You need aggregate streams per time window, with live output updates.
     - Think of a unique user count per hour, per country live summary.
 
-![Demo](images/demo.gif)
+![Demo](images/octosql-demo.gif)
 
 ## Table of Contents
 - [What is OctoSQL?](#what-is-octosql)

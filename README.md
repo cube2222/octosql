@@ -340,7 +340,7 @@ Documentation for the available table valued functions: https://github.com/cube2
 
 The SQL dialect documentation: TODO ;) in short though:
 
-Available SQL constructs: Select, Where, Order By, Group By, Offset, Limit, Left Join, Right Join, Inner Join, Distinct, Union, Union All, Subqueries, Operators, Table Valued Functions.
+Available SQL constructs: Select, Where, Order By, Group By, Offset, Limit, Left Join, Right Join, Inner Join, Distinct, Union, Union All, Subqueries, Operators, Table Valued Functions, Trigger.
 
 Available SQL types: Int, Float, String, Bool, Time, Duration, Tuple (array), Object (e.g. JSON)
 

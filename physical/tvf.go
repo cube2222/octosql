@@ -226,7 +226,7 @@ func (node *TableValuedFunction) Materialize(ctx context.Context, matCtx *Materi
 			return nil, errors.Errorf("couldn't materialize watermark offset expression")
 		}
 
-		return tvf.NewWatermarkGenerator(matSource, timeField, matOffset), nil
+		return tvf.NewMaximumDifferenceWatermarkGenerator(matSource, timeField, matOffset), nil
 
 	case "percentile_watermark":
 		source, err := node.getArgumentTable(octosql.NewVariableName("source"))

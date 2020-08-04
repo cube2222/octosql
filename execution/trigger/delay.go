@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/storage"
 )
 
@@ -20,6 +21,19 @@ func NewDelayTrigger(delay time.Duration, clock func() time.Time) *DelayTrigger 
 		delay: delay,
 		clock: clock,
 	}
+}
+
+func (dt *DelayTrigger) Document() docs.Documentation {
+	return docs.Section(
+		"Delay Trigger",
+		docs.Body(
+			docs.Section("Description", docs.Text("Every record it receives got send time equal to `clock() + delay`.\nTriggers every record that has send time smaller than time returned by `clock()`.")),
+			docs.Section("Arguments", docs.List(
+				docs.Text("`delay`: duration added to every record received"),
+				docs.Text("`clock`: function returning time")),
+			),
+		),
+	)
 }
 
 func (dt *DelayTrigger) RecordReceived(ctx context.Context, tx storage.StateTransaction, key octosql.Value, eventTime time.Time) error {

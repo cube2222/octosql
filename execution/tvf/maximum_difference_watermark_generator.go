@@ -8,25 +8,43 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/docs"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/storage"
 )
 
-type WatermarkGenerator struct {
+type MaximumDifferenceWatermarkGenerator struct {
 	source    execution.Node
 	timeField octosql.VariableName
 	offset    execution.Expression
 }
 
-func NewWatermarkGenerator(source execution.Node, timeField octosql.VariableName, offset execution.Expression) *WatermarkGenerator {
-	return &WatermarkGenerator{
+func NewMaximumDifferenceWatermarkGenerator(source execution.Node, timeField octosql.VariableName, offset execution.Expression) *MaximumDifferenceWatermarkGenerator {
+	return &MaximumDifferenceWatermarkGenerator{
 		source:    source,
 		timeField: timeField,
 		offset:    offset,
 	}
 }
 
-func (w *WatermarkGenerator) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
+func (r *MaximumDifferenceWatermarkGenerator) Document() docs.Documentation {
+	return docs.Section(
+		"watermark generator: maximal difference",
+		docs.Body(
+			docs.Section("Calling", docs.Text("max_diff_watermark(source => \\<Source\\>, time_field => \\<Descriptor\\>, offset => \\<interval\\>)")),
+			docs.Section("Description", docs.Text("Creating standard watermark that stores watermark value of `<maximal record event time> - given offset.`")),
+			docs.Section("Example", docs.Text("```\nWITH"+
+				"\n     with_watermark AS (SELECT * FROM max_diff_watermark("+
+				"\n                        source=>TABLE(events),"+
+				"\n                        time_field=>DESCRIPTOR(time)),"+
+				"\n                        offset=>INTERVAL 5 SECONDS) e),"+
+				"\nSELECT e.team, COUNT(*) as goals\nFROM with_watermark e\nGROUP BY e.team\nTRIGGER COUNTING 100, ON WATERMARK"+
+				"\n```")),
+		),
+	)
+}
+
+func (w *MaximumDifferenceWatermarkGenerator) Get(ctx context.Context, variables octosql.Variables, streamID *execution.StreamID) (execution.RecordStream, *execution.ExecutionOutput, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
 	sourceStreamID, err := execution.GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
 	if err != nil {

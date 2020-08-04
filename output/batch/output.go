@@ -2,6 +2,7 @@ package batch
 
 import (
 	"context"
+	"log"
 	"sort"
 	"time"
 
@@ -49,6 +50,7 @@ func (o *TableOutput) ReadyForMore(ctx context.Context, tx storage.StateTransact
 }
 
 func (o *TableOutput) AddRecord(ctx context.Context, tx storage.StateTransaction, inputIndex int, record *execution.Record) error {
+	log.Printf("*** Record received: %s", record.Show())
 	tx = tx.WithPrefix(o.StreamID.AsPrefix())
 	if inputIndex != 0 {
 		return errors.Errorf("only one input stream allowed for output, got input index %d", inputIndex)

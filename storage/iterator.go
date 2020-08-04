@@ -16,15 +16,17 @@ type Iterator interface {
 	io.Closer
 }
 
-//BadgerIterator is a wrapper around *badger.Iterator that implements
-//the Iterator interface
+// BadgerIterator is a wrapper around *badger.Iterator that implements
+// the Iterator interface
 type BadgerIterator struct {
+	tx           StateTransaction
 	it           *badger.Iterator
 	prefixLength int
 }
 
-func NewBadgerIterator(it *badger.Iterator, prefixLength int) *BadgerIterator {
+func NewBadgerIterator(tx StateTransaction, it *badger.Iterator, prefixLength int) *BadgerIterator {
 	return &BadgerIterator{
+		tx:           tx,
 		it:           it,
 		prefixLength: prefixLength,
 	}
@@ -56,6 +58,9 @@ func (bi *BadgerIterator) Next(value proto.Message) error {
 }
 
 func (bi *BadgerIterator) Close() error {
+	if err := bi.tx.Commit(); err != nil {
+		return err
+	}
 	bi.it.Close()
 	return nil
 }
@@ -65,7 +70,7 @@ func (bi *BadgerIterator) currentValue(value proto.Message) error {
 		return ErrEndOfIterator
 	}
 
-	item := bi.it.Item() //important: this doesn't call Next()
+	item := bi.it.Item() // important: this doesn't call Next()
 
 	err := item.Value(func(val []byte) error {
 		err := proto.Unmarshal(val, value)
@@ -84,10 +89,10 @@ func (bi *BadgerIterator) currentKey(key MonotonicallySerializable) error {
 		return ErrEndOfIterator
 	}
 
-	item := bi.it.Item() //important: this doesn't call Next()
+	item := bi.it.Item() // important: this doesn't call Next()
 
 	byteKey := item.Key()
-	strippedKey := byteKey[bi.prefixLength:] //TODO: maybe add function to do that
+	strippedKey := byteKey[bi.prefixLength:] // TODO: maybe add function to do that
 
 	err := key.MonotonicUnmarshal(strippedKey)
 	return err

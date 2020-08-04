@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"fmt"
+	"log"
 	"math/rand"
 	"time"
 
@@ -301,6 +302,8 @@ sourcePartitionsLoop:
 					}
 				}
 
+				log.Printf("*** Receiving from %d to %d: %s", sourcePartition, rs.partition, el.Record.Show())
+
 				return el.Record, nil
 
 			case *QueueElement_Watermark:
@@ -409,6 +412,8 @@ func (node *ShuffleSender) AddRecord(ctx context.Context, tx storage.StateTransa
 	if err != nil {
 		return errors.Wrap(err, "couldn't calculate output partition to send record to")
 	}
+
+	log.Printf("*** Sending from %d to %d: %s", node.partition, outputPartition, record.Show())
 
 	outputPartitionOutputQueue := NewOutputQueue(
 		tx.WithPrefix(node.shuffleID.AsPrefix()).WithPrefix(getQueuePrefix(node.partition, outputPartition)),

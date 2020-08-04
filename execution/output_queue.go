@@ -2,80 +2,134 @@ package execution
 
 import (
 	"context"
+	"sync"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql/storage"
 )
 
+var outputQueuesMutex = sync.RWMutex{}
+var outputQueues = make(map[string]chan proto.Message)
+var outputQueuesFirstElement = make(map[string]chan proto.Message)
+
 type OutputQueue struct {
-	tx storage.StateTransaction
+	tx            storage.StateTransaction
+	channel       chan proto.Message
+	firstElements chan proto.Message
 }
 
 func NewOutputQueue(tx storage.StateTransaction) *OutputQueue {
+	outputQueuesMutex.Lock()
+	id := tx.WithPrefix(queueElementsPrefix).Prefix()
+	channel, ok := outputQueues[id]
+	if !ok {
+		channel = make(chan proto.Message, 1024)
+		outputQueues[id] = channel
+		outputQueuesFirstElement[id] = make(chan proto.Message, 1024)
+	}
+	firstElements := outputQueuesFirstElement[id]
+	outputQueuesMutex.Unlock()
+
 	return &OutputQueue{
-		tx: tx,
+		channel:       channel,
+		firstElements: firstElements,
+		tx:            tx,
 	}
 }
 
 var queueElementsPrefix = []byte("$queue_elements$")
 
 func (q *OutputQueue) Push(ctx context.Context, element proto.Message) error {
-	queueElements := storage.NewDeque(q.tx.WithPrefix(queueElementsPrefix))
-
-	err := queueElements.PushBack(element)
-	if err != nil {
-		return errors.Wrap(err, "couldn't append element to queue")
-	}
+	q.channel <- element
 
 	return nil
 }
 
 func (q *OutputQueue) Peek(ctx context.Context, msg proto.Message) error {
-	queueElements := storage.NewDeque(q.tx.WithPrefix(queueElementsPrefix))
+	select {
+	case elem := <-q.firstElements:
+		q.firstElements <- elem
+		data, err := proto.Marshal(elem)
+		if err != nil {
+			return err
+		}
+		if err := proto.Unmarshal(data, msg); err != nil {
+			return err
+		}
+		return nil
+	default:
+	}
 
-	err := queueElements.PeekFront(msg)
-	if err == storage.ErrNotFound {
+	select {
+	case elem := <-q.channel:
+		q.firstElements <- elem
+		data, err := proto.Marshal(elem)
+		if err != nil {
+			return err
+		}
+		if err := proto.Unmarshal(data, msg); err != nil {
+			return err
+		}
+	default:
 		return storage.ErrNotFound
-	} else if err != nil {
-		return errors.Wrap(err, "couldn't pop element from queue")
 	}
 
 	return nil
 }
 
 func (q *OutputQueue) Pop(ctx context.Context, msg proto.Message) error {
-	queueElements := storage.NewDeque(q.tx.WithPrefix(queueElementsPrefix))
-
-	err := queueElements.PopFront(msg)
-	if err == storage.ErrNotFound {
-		// Now we create a storage subscription so we don't miss anything
-		// Then we create a new transaction at the present time to see if any data is there
-		// If not, we return the subscription to wait for any changes
-		// If yes, we return an error indicating the need for a new transaction
-		subscription := q.tx.GetUnderlyingStorage().Subscribe(ctx)
-
-		curTx := q.tx.GetUnderlyingStorage().BeginTransaction()
-		defer curTx.Abort()
-		curQueueElements := storage.NewDeque(curTx.WithPrefix(queueElementsPrefix))
-
-		err := curQueueElements.PeekFront(msg)
-		if err == storage.ErrNotFound {
-			return NewErrWaitForChanges(subscription)
-		} else {
-			if subErr := subscription.Close(); subErr != nil {
-				return errors.Wrap(subErr, "couldn't close subscription")
-			}
-			if err == nil {
-				return ErrNewTransactionRequired
-			} else {
-				return errors.Wrap(err, "couldn't check if there are elements in the queue out of transaction")
-			}
+	select {
+	case elem := <-q.firstElements:
+		data, err := proto.Marshal(elem)
+		if err != nil {
+			return err
 		}
-	} else if err != nil {
-		return errors.Wrap(err, "couldn't pop element from queue")
+		if err := proto.Unmarshal(data, msg); err != nil {
+			return err
+		}
+		return nil
+	default:
 	}
 
-	return nil
+	select {
+	case elem := <-q.channel:
+		data, err := proto.Marshal(elem)
+		if err != nil {
+			return err
+		}
+		if err := proto.Unmarshal(data, msg); err != nil {
+			return err
+		}
+		return nil
+	default:
+	}
+
+	subscription := storage.NewSubscription(ctx, func(ctx context.Context, changes chan<- struct{}) error {
+		select {
+		case elem := <-q.firstElements:
+			q.firstElements <- elem
+
+			select {
+			case changes <- struct{}{}:
+				return storage.ErrChangeSent
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+
+		case elem := <-q.channel:
+			q.firstElements <- elem
+
+			select {
+			case changes <- struct{}{}:
+				return storage.ErrChangeSent
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	})
+	return NewErrWaitForChanges(subscription)
 }

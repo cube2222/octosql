@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bytes"
+	"log"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/pkg/errors"
@@ -38,9 +39,8 @@ func InjectStateTransaction(ctx context.Context, tx StateTransaction) context.Co
 }
 
 type badgerTransaction struct {
-	tx      *badger.Txn
 	prefix  []byte
-	storage Storage
+	storage *BadgerStorage
 }
 
 func (tx *badgerTransaction) getKeyWithPrefix(key []byte) []byte {
@@ -51,13 +51,19 @@ func (tx *badgerTransaction) getKeyWithPrefix(key []byte) []byte {
 }
 
 func (tx *badgerTransaction) Set(key, value []byte) error {
-	return tx.tx.Set(tx.getKeyWithPrefix(key), value)
+	badgerTx := tx.storage.db.NewTransaction(true)
+	if err := badgerTx.Set(tx.getKeyWithPrefix(key), value); err != nil {
+		return err
+	}
+	return badgerTx.Commit()
 }
 
 func (tx *badgerTransaction) Get(key []byte) ([]byte, error) {
 	var value []byte
 
-	item, err := tx.tx.Get(tx.getKeyWithPrefix(key))
+	badgerTx := tx.storage.db.NewTransaction(false)
+
+	item, err := badgerTx.Get(tx.getKeyWithPrefix(key))
 	if err == badger.ErrKeyNotFound {
 		return nil, ErrNotFound
 	} else if err != nil {
@@ -68,11 +74,19 @@ func (tx *badgerTransaction) Get(key []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return value, err
+
+	if err := badgerTx.Commit(); err != nil {
+		return nil, err
+	}
+	return value, nil
 }
 
 func (tx *badgerTransaction) Delete(key []byte) error {
-	return tx.tx.Delete(tx.getKeyWithPrefix(key))
+	badgerTx := tx.storage.db.NewTransaction(true)
+	if err := badgerTx.Delete(tx.getKeyWithPrefix(key)); err != nil {
+		return err
+	}
+	return badgerTx.Commit()
 }
 
 func (tx *badgerTransaction) GetPrefixLength() int {
@@ -81,9 +95,8 @@ func (tx *badgerTransaction) GetPrefixLength() int {
 
 func (tx *badgerTransaction) WithPrefix(prefix []byte) StateTransaction {
 	return &badgerTransaction{
-		tx:      tx.tx,
 		prefix:  tx.getKeyWithPrefix(prefix),
-		storage: tx.storage.WithPrefix(prefix),
+		storage: tx.storage.WithPrefix(prefix).(*BadgerStorage),
 	}
 }
 
@@ -96,11 +109,13 @@ func (tx *badgerTransaction) Iterator(opts ...IteratorOption) Iterator {
 		Prefix: tx.prefix,
 	}
 
+	badgerTx := tx.storage.db.NewTransaction(false)
+
 	for _, opt := range opts {
 		opt(options)
 	}
 
-	it := tx.tx.NewIterator(options.ToBadgerOptions())
+	it := badgerTx.NewIterator(options.ToBadgerOptions())
 
 	if options.Reverse {
 		it.Seek(append(options.Prefix, 255))
@@ -108,15 +123,16 @@ func (tx *badgerTransaction) Iterator(opts ...IteratorOption) Iterator {
 		it.Rewind()
 	}
 
-	return NewBadgerIterator(it, tx.GetPrefixLength())
+	return NewBadgerIterator(tx, it, tx.GetPrefixLength())
 }
 
 func (tx *badgerTransaction) Commit() error {
-	return tx.tx.Commit()
+	return nil
 }
 
 func (tx *badgerTransaction) Abort() {
-	tx.tx.Discard()
+	log.Fatalf("%+v", errors.New("abort called"))
+	return
 }
 
 func (tx *badgerTransaction) GetUnderlyingStorage() Storage {

@@ -1,17 +1,32 @@
 package storage
 
 import (
+	"sync"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 )
 
+var valueStates = sync.Map{}
+
+type valueStateCell struct {
+	sync.Mutex
+	value []byte
+}
+
 type ValueState struct {
-	tx StateTransaction
+	valueStateCell *valueStateCell
+	tx             StateTransaction
 }
 
 func NewValueState(tx StateTransaction) *ValueState {
+	newValueStateCell := &valueStateCell{}
+
+	actualValueStateCell, _ := valueStates.LoadOrStore(tx.Prefix(), newValueStateCell)
+
 	return &ValueState{
-		tx: tx,
+		valueStateCell: actualValueStateCell.(*valueStateCell),
+		tx:             tx,
 	}
 }
 
@@ -21,35 +36,32 @@ func (vs *ValueState) Set(value proto.Message) error {
 		return errors.Wrap(err, "couldn't marshal value")
 	}
 
-	return vs.setBytes(byteValue)
-}
-
-func (vs *ValueState) setBytes(b []byte) error {
-	err := vs.tx.Set(nil, b)
-	if err != nil {
-		return errors.Wrap(err, "couldn't set value")
-	}
+	vs.valueStateCell.Lock()
+	vs.valueStateCell.value = byteValue
+	vs.valueStateCell.Unlock()
 
 	return nil
 }
 
 func (vs *ValueState) Get(value proto.Message) error {
-	data, err := vs.tx.Get(nil)
-	if err == ErrNotFound {
+	vs.valueStateCell.Lock()
+	byteValue := vs.valueStateCell.value
+	vs.valueStateCell.Unlock()
+
+	if byteValue == nil {
 		return ErrNotFound
-	} else if err != nil {
-		return errors.Wrap(err, "an error occurred while reading the value")
 	}
 
-	err = proto.Unmarshal(data, value)
-	return err
+	if err := proto.Unmarshal(byteValue, value); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (vs *ValueState) Clear() error {
-	err := vs.tx.Delete(nil)
-	if err != nil {
-		return errors.Wrap(err, "couldn't clear value state")
-	}
+	vs.valueStateCell.Lock()
+	vs.valueStateCell.value = nil
+	vs.valueStateCell.Unlock()
 
 	return nil
 }

@@ -27,7 +27,7 @@ func (k *keyValue) Less(than btree.Item) bool {
 		return true
 	}
 
-	return bytes.Compare(k.key, other.key) == 1
+	return bytes.Compare(k.key, other.key) == -1
 }
 
 type Map struct {
@@ -104,7 +104,7 @@ func (hm *Map) GetIterator(opts ...IteratorOption) *MapIterator {
 	defer hm.internal.Unlock()
 
 	var items []*keyValue
-	hm.internal.tree.Descend(func(item btree.Item) bool {
+	hm.internal.tree.Ascend(func(item btree.Item) bool {
 		items = append(items, item.(*keyValue))
 		return true
 	})

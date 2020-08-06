@@ -51,6 +51,7 @@ func (tx *badgerTransaction) getKeyWithPrefix(key []byte) []byte {
 }
 
 func (tx *badgerTransaction) Set(key, value []byte) error {
+	log.Printf("Set %s", key)
 	badgerTx := tx.storage.db.NewTransaction(true)
 	if err := badgerTx.Set(tx.getKeyWithPrefix(key), value); err != nil {
 		return err
@@ -59,6 +60,7 @@ func (tx *badgerTransaction) Set(key, value []byte) error {
 }
 
 func (tx *badgerTransaction) Get(key []byte) ([]byte, error) {
+	log.Printf("Get %s", key)
 	var value []byte
 
 	badgerTx := tx.storage.db.NewTransaction(false)

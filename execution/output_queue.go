@@ -2,7 +2,6 @@ package execution
 
 import (
 	"context"
-	"log"
 	"sync"
 
 	"github.com/golang/protobuf/proto"
@@ -44,7 +43,6 @@ func NewOutputQueue(tx storage.StateTransaction) *OutputQueue {
 var queueElementsPrefix = []byte("$queue_elements$")
 
 func (q *OutputQueue) Push(ctx context.Context, element proto.Message) error {
-	log.Printf("*** Push %s %s", q.tx.Prefix(), element)
 	q.internal.queue <- element
 
 	return nil
@@ -61,7 +59,6 @@ func (q *OutputQueue) Peek(ctx context.Context, msg proto.Message) error {
 		if err := proto.Unmarshal(data, msg); err != nil {
 			return err
 		}
-		log.Printf("*** Peek %s %s", q.tx.Prefix(), msg.String())
 		return nil
 	default:
 	}
@@ -76,7 +73,6 @@ func (q *OutputQueue) Peek(ctx context.Context, msg proto.Message) error {
 		if err := proto.Unmarshal(data, msg); err != nil {
 			return err
 		}
-		log.Printf("*** Peek %s %s", q.tx.Prefix(), msg.String())
 	default:
 		return storage.ErrNotFound
 	}
@@ -94,7 +90,6 @@ func (q *OutputQueue) Pop(ctx context.Context, msg proto.Message) error {
 		if err := proto.Unmarshal(data, msg); err != nil {
 			return err
 		}
-		log.Printf("*** Pop %s %s", q.tx.Prefix(), msg.String())
 		return nil
 	default:
 	}
@@ -108,12 +103,9 @@ func (q *OutputQueue) Pop(ctx context.Context, msg proto.Message) error {
 		if err := proto.Unmarshal(data, msg); err != nil {
 			return err
 		}
-		log.Printf("*** Pop %s %s", q.tx.Prefix(), msg.String())
 		return nil
 	default:
 	}
-
-	log.Printf("*** Pop sending subscription %s", q.tx.Prefix())
 
 	subscription := storage.NewSubscription(ctx, func(ctx context.Context, changes chan<- struct{}) error {
 		select {

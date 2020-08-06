@@ -9,9 +9,8 @@ import (
 	"github.com/cube2222/octosql/storage"
 )
 
-var outputQueuesMutex = sync.RWMutex{}
-var outputQueues = make(map[string]chan proto.Message)
-var outputQueuesFirstElement = make(map[string]chan proto.Message)
+var outputQueues = sync.Map{}
+var outputQueuesFirstElement = sync.Map{}
 
 type OutputQueue struct {
 	tx            storage.StateTransaction
@@ -20,20 +19,16 @@ type OutputQueue struct {
 }
 
 func NewOutputQueue(tx storage.StateTransaction) *OutputQueue {
-	outputQueuesMutex.Lock()
 	id := tx.WithPrefix(queueElementsPrefix).Prefix()
-	channel, ok := outputQueues[id]
-	if !ok {
-		channel = make(chan proto.Message, 1024)
-		outputQueues[id] = channel
-		outputQueuesFirstElement[id] = make(chan proto.Message, 1024)
-	}
-	firstElements := outputQueuesFirstElement[id]
-	outputQueuesMutex.Unlock()
+	newQueueChan := make(chan proto.Message, 1024)
+	newFirstElementsChan := make(chan proto.Message, 1024)
+
+	channel, _ := outputQueues.LoadOrStore(id, newQueueChan)
+	firstElements, _ := outputQueues.LoadOrStore(id, newFirstElementsChan)
 
 	return &OutputQueue{
-		channel:       channel,
-		firstElements: firstElements,
+		channel:       channel.(chan proto.Message),
+		firstElements: firstElements.(chan proto.Message),
 		tx:            tx,
 	}
 }

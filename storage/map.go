@@ -1,29 +1,53 @@
 package storage
 
 import (
-	"github.com/golang/protobuf/proto"
-	"github.com/pkg/errors"
+	"bytes"
+	"sync"
 
-	"github.com/cube2222/octosql"
+	"github.com/golang/protobuf/proto"
+	"github.com/google/btree"
+	"github.com/pkg/errors"
 )
 
-type Map struct {
-	tx StateTransaction
+var maps = sync.Map{}
+
+type sortedMap struct {
+	sync.Mutex
+	tree *btree.BTree
 }
 
-type MapIterator struct {
-	it Iterator
+type keyValue struct {
+	key   []byte
+	value []byte
+}
+
+func (k *keyValue) Less(than btree.Item) bool {
+	other, ok := than.(*keyValue)
+	if !ok {
+		return true
+	}
+
+	return bytes.Compare(k.key, other.key) == 1
+}
+
+type Map struct {
+	tx       StateTransaction
+	internal *sortedMap
 }
 
 func NewMap(tx StateTransaction) *Map {
-	return &Map{
-		tx: tx,
-	}
-}
+	tree := btree.New(2)
 
-func NewMapIterator(it Iterator) *MapIterator {
-	return &MapIterator{
-		it: it,
+	newSortedMap := &sortedMap{
+		Mutex: sync.Mutex{},
+		tree:  tree,
+	}
+
+	actualMap, _ := maps.LoadOrStore(tx.Prefix(), newSortedMap)
+
+	return &Map{
+		tx:       tx,
+		internal: actualMap.(*sortedMap),
 	}
 }
 
@@ -37,10 +61,13 @@ func (hm *Map) Set(key MonotonicallySerializable, value proto.Message) error {
 		return errors.Wrap(err, "couldn't marshal value")
 	}
 
-	err = hm.tx.Set(byteKey, byteValue)
-	if err != nil {
-		return errors.Wrap(err, "couldn't add element to map")
-	}
+	hm.internal.Lock()
+	defer hm.internal.Unlock()
+
+	hm.internal.tree.ReplaceOrInsert(&keyValue{
+		key:   byteKey,
+		value: byteValue,
+	})
 
 	return nil
 }
@@ -50,77 +77,90 @@ func (hm *Map) Set(key MonotonicallySerializable, value proto.Message) error {
 func (hm *Map) Get(key MonotonicallySerializable, value proto.Message) error {
 	byteKey := key.MonotonicMarshal()
 
-	data, err := hm.tx.Get(byteKey) //remove prefix from data
-	if err == ErrNotFound {
+	hm.internal.Lock()
+	defer hm.internal.Unlock()
+
+	out := hm.internal.tree.Get(&keyValue{
+		key: byteKey,
+	})
+	if out == nil {
 		return ErrNotFound
-	} else if err != nil {
-		return errors.Wrap(err, "couldn't get key from underlying store in Map.Get")
 	}
 
-	err = proto.Unmarshal(data, value)
-	return err
+	return proto.Unmarshal(out.(*keyValue).value, value)
 }
 
-//Returns an iterator with a specified prefix, that allows to iterate
-//over a specified range of keys
-func (hm *Map) GetIteratorWithPrefix(prefix []byte) *MapIterator {
-	it := hm.tx.WithPrefix(prefix).Iterator(WithDefault())
-
-	return NewMapIterator(it)
-}
+// Returns an iterator with a specified prefix, that allows to iterate
+// over a specified range of keys
+// func (hm *Map) GetIteratorWithPrefix(prefix []byte) *MapIterator {
+// 	it := hm.tx.WithPrefix(prefix).Iterator(WithDefault())
+//
+// 	return NewMapIterator(it)
+// }
 
 func (hm *Map) GetIterator(opts ...IteratorOption) *MapIterator {
-	allOpts := []IteratorOption{WithDefault()}
-	allOpts = append(allOpts, opts...)
-	it := hm.tx.Iterator(allOpts...)
-	return NewMapIterator(it)
+	// TODO: Handle reverse
+	hm.internal.Lock()
+	defer hm.internal.Unlock()
+
+	var items []*keyValue
+	hm.internal.tree.Descend(func(item btree.Item) bool {
+		items = append(items, item.(*keyValue))
+		return true
+	})
+	return NewMapIterator(items)
 }
 
 //Removes a key from the map even if it wasn't present in it to begin with.
 func (hm *Map) Delete(key MonotonicallySerializable) error {
-	bytes := key.MonotonicMarshal()
+	byteKey := key.MonotonicMarshal()
 
-	err := hm.tx.Delete(bytes)
-	if err != nil { //if errors.Wrap(nil, ...) returns nil should this be just errors.Wrap(err, ...)
-		return errors.Wrap(err, "couldn't delete key from badger storage")
-	}
+	hm.internal.Lock()
+	defer hm.internal.Unlock()
+
+	hm.internal.tree.Delete(&keyValue{
+		key: byteKey,
+	})
 
 	return nil
 }
 
-//Clears the contents of the map.
+// Clears the contents of the map.
 // Important: To call map.Clear() one must close any iterators opened on that map
 func (hm *Map) Clear() error {
-	it := hm.GetIterator()
-	defer it.Close()
-
-	var key octosql.Value
-	var value octosql.Value
-
-	err := it.Next(&key, &value)
-
-	for err != ErrEndOfIterator {
-		if err != nil {
-			return errors.Wrap(err, "failed to get next element from map")
-		}
-
-		bytes := key.MonotonicMarshal()
-
-		err2 := hm.tx.Delete(bytes)
-		if err2 != nil {
-			return errors.Wrap(err, "couldn't remove value from map")
-		}
-
-		err = it.Next(&key, &value)
-	}
-
+	hm.internal.tree = btree.New(2)
 	return nil
+}
+
+type MapIterator struct {
+	items []*keyValue
+	i     int
+}
+
+func NewMapIterator(items []*keyValue) *MapIterator {
+	return &MapIterator{
+		items: items,
+	}
 }
 
 func (mi *MapIterator) Next(key MonotonicallySerializable, value proto.Message) error {
-	return mi.it.NextWithKey(key, value)
+	if mi.i == len(mi.items) {
+		return ErrEndOfIterator
+	}
+
+	curItem := mi.items[mi.i]
+	mi.i++
+
+	if err := key.MonotonicUnmarshal(curItem.key); err != nil {
+		return err
+	}
+
+	if err := proto.Unmarshal(curItem.value, value); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (mi *MapIterator) Close() error {
-	return mi.it.Close()
+	return nil
 }

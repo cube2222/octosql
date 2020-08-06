@@ -10,7 +10,7 @@ import (
 	"github.com/cube2222/octosql/storage"
 )
 
-// TODO: All of this is not in order. Which is baaaaad. Because a record can be put behind an end of stream message.
+// TODO: All of this doesn't preserve ordering. Which is baaaaad. Because a record can be put behind an end of stream message.
 
 var outputQueues = sync.Map{}
 var outputQueuesFirstElement = sync.Map{}

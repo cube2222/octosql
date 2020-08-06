@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"log"
 	"sync"
 
 	"github.com/golang/protobuf/proto"
@@ -9,42 +10,50 @@ import (
 	"github.com/cube2222/octosql/storage"
 )
 
+// TODO: All of this is not in order. Which is baaaaad. Because a record can be put behind an end of stream message.
+
 var outputQueues = sync.Map{}
 var outputQueuesFirstElement = sync.Map{}
+var outputQueuesLockers = sync.Map{}
+
+type outputQueueInternals struct {
+	queue         chan proto.Message
+	firstElements chan proto.Message
+}
 
 type OutputQueue struct {
-	tx            storage.StateTransaction
-	channel       chan proto.Message
-	firstElements chan proto.Message
+	tx       storage.StateTransaction
+	internal *outputQueueInternals
 }
 
 func NewOutputQueue(tx storage.StateTransaction) *OutputQueue {
 	id := tx.WithPrefix(queueElementsPrefix).Prefix()
-	newQueueChan := make(chan proto.Message, 1024)
-	newFirstElementsChan := make(chan proto.Message, 1024)
+	newInternals := &outputQueueInternals{
+		queue:         make(chan proto.Message, 1024),
+		firstElements: make(chan proto.Message, 1024),
+	}
 
-	channel, _ := outputQueues.LoadOrStore(id, newQueueChan)
-	firstElements, _ := outputQueues.LoadOrStore(id, newFirstElementsChan)
+	internals, _ := outputQueues.LoadOrStore(id, newInternals)
 
 	return &OutputQueue{
-		channel:       channel.(chan proto.Message),
-		firstElements: firstElements.(chan proto.Message),
-		tx:            tx,
+		internal: internals.(*outputQueueInternals),
+		tx:       tx,
 	}
 }
 
 var queueElementsPrefix = []byte("$queue_elements$")
 
 func (q *OutputQueue) Push(ctx context.Context, element proto.Message) error {
-	q.channel <- element
+	log.Printf("*** Push %s %s", q.tx.Prefix(), element)
+	q.internal.queue <- element
 
 	return nil
 }
 
 func (q *OutputQueue) Peek(ctx context.Context, msg proto.Message) error {
 	select {
-	case elem := <-q.firstElements:
-		q.firstElements <- elem
+	case elem := <-q.internal.firstElements:
+		q.internal.firstElements <- elem
 		data, err := proto.Marshal(elem)
 		if err != nil {
 			return err
@@ -52,13 +61,14 @@ func (q *OutputQueue) Peek(ctx context.Context, msg proto.Message) error {
 		if err := proto.Unmarshal(data, msg); err != nil {
 			return err
 		}
+		log.Printf("*** Peek %s %s", q.tx.Prefix(), msg.String())
 		return nil
 	default:
 	}
 
 	select {
-	case elem := <-q.channel:
-		q.firstElements <- elem
+	case elem := <-q.internal.queue:
+		q.internal.firstElements <- elem
 		data, err := proto.Marshal(elem)
 		if err != nil {
 			return err
@@ -66,6 +76,7 @@ func (q *OutputQueue) Peek(ctx context.Context, msg proto.Message) error {
 		if err := proto.Unmarshal(data, msg); err != nil {
 			return err
 		}
+		log.Printf("*** Peek %s %s", q.tx.Prefix(), msg.String())
 	default:
 		return storage.ErrNotFound
 	}
@@ -75,7 +86,7 @@ func (q *OutputQueue) Peek(ctx context.Context, msg proto.Message) error {
 
 func (q *OutputQueue) Pop(ctx context.Context, msg proto.Message) error {
 	select {
-	case elem := <-q.firstElements:
+	case elem := <-q.internal.firstElements:
 		data, err := proto.Marshal(elem)
 		if err != nil {
 			return err
@@ -83,12 +94,13 @@ func (q *OutputQueue) Pop(ctx context.Context, msg proto.Message) error {
 		if err := proto.Unmarshal(data, msg); err != nil {
 			return err
 		}
+		log.Printf("*** Pop %s %s", q.tx.Prefix(), msg.String())
 		return nil
 	default:
 	}
 
 	select {
-	case elem := <-q.channel:
+	case elem := <-q.internal.queue:
 		data, err := proto.Marshal(elem)
 		if err != nil {
 			return err
@@ -96,14 +108,17 @@ func (q *OutputQueue) Pop(ctx context.Context, msg proto.Message) error {
 		if err := proto.Unmarshal(data, msg); err != nil {
 			return err
 		}
+		log.Printf("*** Pop %s %s", q.tx.Prefix(), msg.String())
 		return nil
 	default:
 	}
 
+	log.Printf("*** Pop sending subscription %s", q.tx.Prefix())
+
 	subscription := storage.NewSubscription(ctx, func(ctx context.Context, changes chan<- struct{}) error {
 		select {
-		case elem := <-q.firstElements:
-			q.firstElements <- elem
+		case elem := <-q.internal.firstElements:
+			q.internal.firstElements <- elem
 
 			select {
 			case changes <- struct{}{}:
@@ -112,8 +127,8 @@ func (q *OutputQueue) Pop(ctx context.Context, msg proto.Message) error {
 				return ctx.Err()
 			}
 
-		case elem := <-q.channel:
-			q.firstElements <- elem
+		case elem := <-q.internal.queue:
+			q.internal.firstElements <- elem
 
 			select {
 			case changes <- struct{}{}:

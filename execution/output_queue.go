@@ -27,15 +27,19 @@ type OutputQueue struct {
 
 func NewOutputQueue(tx storage.StateTransaction) *OutputQueue {
 	id := tx.WithPrefix(queueElementsPrefix).Prefix()
-	newInternals := &outputQueueInternals{
-		queue:         make(chan proto.Message, 1024),
-		firstElements: make(chan proto.Message, 1024),
+
+	actualInternals, ok := outputQueues.Load(id)
+	if !ok {
+		newInternals := &outputQueueInternals{
+			queue:         make(chan proto.Message, 1024),
+			firstElements: make(chan proto.Message, 1024),
+		}
+
+		actualInternals, _ = outputQueues.LoadOrStore(id, newInternals)
 	}
 
-	internals, _ := outputQueues.LoadOrStore(id, newInternals)
-
 	return &OutputQueue{
-		internal: internals.(*outputQueueInternals),
+		internal: actualInternals.(*outputQueueInternals),
 		tx:       tx,
 	}
 }

@@ -13,11 +13,19 @@ import (
 
 type CountingTrigger struct {
 	fireEvery int
+
+	keyCounts *storage.Map
+	toSend    *storage.ValueState
 }
 
-func NewCountingTrigger(fireEvery int) *CountingTrigger {
+var toSendPrefix = []byte("$to_send$")
+var keyCountsPrefix = []byte("$key_counts$")
+
+func NewCountingTrigger(prefix string, fireEvery int) *CountingTrigger {
 	return &CountingTrigger{
 		fireEvery: fireEvery,
+		keyCounts: storage.NewMapFromPrefix(prefix + string(keyCountsPrefix)),
+		toSend:    storage.NewValueStateFromPrefix(prefix + string(toSendPrefix)),
 	}
 }
 
@@ -33,14 +41,9 @@ func (ct *CountingTrigger) Document() docs.Documentation {
 	)
 }
 
-var toSendPrefix = []byte("$to_send$")
-var keyCountsPrefix = []byte("$key_counts$")
-
 func (ct *CountingTrigger) RecordReceived(ctx context.Context, tx storage.StateTransaction, key octosql.Value, eventTime time.Time) error {
-	keyCounts := storage.NewMap(tx.WithPrefix(keyCountsPrefix))
-
 	var countValue octosql.Value
-	err := keyCounts.Get(&key, &countValue)
+	err := ct.keyCounts.Get(&key, &countValue)
 	if err != nil {
 		if err == storage.ErrNotFound {
 			countValue = octosql.MakeInt(0)
@@ -52,7 +55,7 @@ func (ct *CountingTrigger) RecordReceived(ctx context.Context, tx storage.StateT
 
 	count += 1
 	if count == ct.fireEvery {
-		err := keyCounts.Delete(&key)
+		err := ct.keyCounts.Delete(&key)
 		if err != nil {
 			return errors.Wrap(err, "couldn't delete current count for key")
 		}
@@ -64,7 +67,7 @@ func (ct *CountingTrigger) RecordReceived(ctx context.Context, tx storage.StateT
 		}
 	} else {
 		countValue = octosql.MakeInt(count)
-		err := keyCounts.Set(&key, &countValue)
+		err := ct.keyCounts.Set(&key, &countValue)
 		if err != nil {
 			return errors.Wrap(err, "couldn't set new count for key")
 		}
@@ -96,12 +99,9 @@ func (ct *CountingTrigger) PollKeysToFire(ctx context.Context, tx storage.StateT
 }
 
 func (ct *CountingTrigger) KeysFired(ctx context.Context, tx storage.StateTransaction, keys []octosql.Value) error {
-	keyCounts := storage.NewMap(tx.WithPrefix(keyCountsPrefix))
-	toSend := storage.NewValueState(tx.WithPrefix(toSendPrefix))
-
 	var out octosql.Value
 	var foundToSend bool
-	err := toSend.Get(&out)
+	err := ct.toSend.Get(&out)
 	if err == nil {
 		foundToSend = true
 	} else if err != storage.ErrNotFound {
@@ -110,9 +110,9 @@ func (ct *CountingTrigger) KeysFired(ctx context.Context, tx storage.StateTransa
 
 	for _, key := range keys {
 		var countValue octosql.Value
-		err := keyCounts.Get(&key, &countValue)
+		err := ct.keyCounts.Get(&key, &countValue)
 		if err == nil {
-			err := keyCounts.Delete(&key)
+			err := ct.keyCounts.Delete(&key)
 			if err != nil {
 				return errors.Wrap(err, "couldn't delete current count for key")
 			}
@@ -122,7 +122,7 @@ func (ct *CountingTrigger) KeysFired(ctx context.Context, tx storage.StateTransa
 		}
 
 		if foundToSend && octosql.AreEqual(key, out) {
-			err := toSend.Clear()
+			err := ct.toSend.Clear()
 			if err != nil {
 				return errors.Wrap(err, "couldn't delete key to send")
 			}

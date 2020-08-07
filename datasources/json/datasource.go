@@ -153,8 +153,6 @@ func (rs *RecordStream) RunWorker(ctx context.Context) error {
 			return errors.Wrap(err, "couldn't reinitialize offset for json read batch worker")
 		}
 
-		tx.Abort() // We only read data above, no need to risk failing now.
-
 		// Load/Reload file
 		file, err := os.Open(rs.filePath)
 		if err != nil {

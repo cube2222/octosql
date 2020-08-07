@@ -82,8 +82,6 @@ func (printer *LiveTablePrinter) Run(ctx context.Context) error {
 		buf.WriteTo(liveWriter)
 		liveWriter.Flush()
 
-		tx.Abort()
-
 		if errorToPrint != nil {
 			return errorToPrint
 		} else if endOfStream {

@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/golang/protobuf/proto"
@@ -62,9 +63,11 @@ func NewRecord(fields []octosql.VariableName, data map[octosql.VariableName]octo
 }
 
 func NewRecordFromSlice(fields []octosql.VariableName, data []octosql.Value, opts ...RecordOption) *Record {
-	stringFields := octosql.VariableNamesToStrings(fields)
+	return NewRecordFromPointerSlice(fields, octosql.GetPointersFromValues(data), opts...)
+}
 
-	pointerData := octosql.GetPointersFromValues(data)
+func NewRecordFromPointerSlice(fields []octosql.VariableName, pointerData []*octosql.Value, opts ...RecordOption) *Record {
+	stringFields := octosql.VariableNamesToStrings(fields)
 
 	r := &Record{
 		FieldNames: stringFields,
@@ -230,6 +233,36 @@ func (r *Record) Hash() (uint64, error) {
 	}
 
 	return hashstructure.Hash(append(values, fields...), nil)
+}
+
+func (r *Record) Compare(other *Record) octosql.Comparison {
+	if len(r.FieldNames) != len(other.FieldNames) {
+		log.Fatal("record field names count mismatch")
+	}
+
+	for i := range r.FieldNames {
+		if r.FieldNames[i] != other.FieldNames[i] {
+			log.Fatal("record field names mismatch: %s and %s", r.FieldNames[i], other.FieldNames[i])
+		}
+
+		comp, err := octosql.Compare(*r.Data[i], *other.Data[i])
+		if err != nil {
+			log.Fatal("error comparing records: %+v", err)
+		}
+		if comp != 0 {
+			return comp
+		}
+	}
+
+	if r.Metadata.Undo != other.Metadata.Undo {
+		if !r.Metadata.Undo {
+			return -1
+		} else {
+			return 1
+		}
+	}
+
+	return 0
 }
 
 // GetRandomRecordID can be used to get a new random RecordID.

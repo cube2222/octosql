@@ -37,7 +37,7 @@ func (node *Distinct) Get(ctx context.Context, variables octosql.Variables, stre
 
 	// The trigger for distinct is counting trigger with value 1, because triggering of Distinct
 	// is strongly related to triggering of the underlying source, so that's the simplest approach
-	trigger, err := NewCountingTrigger(NewConstantValue(octosql.MakeInt(1))).Get(ctx, variables)
+	trigger, err := NewCountingTrigger(NewConstantValue(octosql.MakeInt(1))).Get(ctx, variables, string(streamID.AsPrefix())+triggerPrefix)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't create trigger for distinct")
 	}

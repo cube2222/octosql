@@ -40,6 +40,8 @@ func NewGroupBy(storage storage.Storage, source Node, key []Expression, fields [
 	return &GroupBy{storage: storage, source: source, key: key, fields: fields, aggregatePrototypes: aggregatePrototypes, eventTimeField: eventTimeField, as: as, outEventTimeField: outEventTimeField, triggerPrototype: triggerPrototype}
 }
 
+var triggerPrefix = "$trigger$"
+
 func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, streamID *StreamID) (RecordStream, *ExecutionOutput, error) {
 	tx := storage.GetStateTransactionFromContext(ctx)
 	sourceStreamID, err := GetSourceStreamID(tx.WithPrefix(streamID.AsPrefix()), octosql.MakePhantom())
@@ -76,7 +78,7 @@ func (node *GroupBy) Get(ctx context.Context, variables octosql.Variables, strea
 		}
 	}
 
-	trigger, err := node.triggerPrototype.Get(ctx, variables)
+	trigger, err := node.triggerPrototype.Get(ctx, variables, string(streamID.AsPrefix())+triggerPrefix)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get trigger from trigger prototype")
 	}

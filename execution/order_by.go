@@ -59,7 +59,7 @@ func (node *OrderBy) Get(ctx context.Context, variables octosql.Variables, strea
 		return nil, nil, errors.Wrap(err, "couldn't get stream for source in order by")
 	}
 
-	trigger, err := node.triggerPrototype.Get(ctx, variables)
+	trigger, err := node.triggerPrototype.Get(ctx, variables, string(streamID.AsPrefix())+triggerPrefix)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get trigger from trigger prototype")
 	}

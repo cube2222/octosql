@@ -2,7 +2,6 @@ package trigger
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"time"
 
@@ -13,13 +12,21 @@ import (
 	"github.com/cube2222/octosql/storage"
 )
 
-var watermarkPrefix = []byte("$watermark$")
+var watermarkPrefix = "$watermark$"
+var readyToFirePrefix = "$ready_to_fire$"
 
 type WatermarkTrigger struct {
+	timeKeys         *TimeSortedKeys
+	watermarkStorage *storage.ValueState
+	readyToFire      *storage.ValueState
 }
 
-func NewWatermarkTrigger() *WatermarkTrigger {
-	return &WatermarkTrigger{}
+func NewWatermarkTrigger(prefix string) *WatermarkTrigger {
+	return &WatermarkTrigger{
+		timeKeys:         NewTimeSortedKeys(prefix + timeSortedKeys),
+		watermarkStorage: storage.NewValueStateFromPrefix(prefix + watermarkPrefix),
+		readyToFire:      storage.NewValueStateFromPrefix(prefix + readyToFirePrefix),
+	}
 }
 
 func (wt *WatermarkTrigger) Document() docs.Documentation {
@@ -33,12 +40,9 @@ func (wt *WatermarkTrigger) Document() docs.Documentation {
 }
 
 func (wt *WatermarkTrigger) RecordReceived(ctx context.Context, tx storage.StateTransaction, key octosql.Value, eventTime time.Time) error {
-	timeKeys := NewTimeSortedKeys(tx.WithPrefix(timeSortedKeys))
-	watermarkStorage := storage.NewValueState(tx.WithPrefix(watermarkPrefix))
-
 	var octoWatermark octosql.Value
 	var watermark time.Time
-	err := watermarkStorage.Get(&octoWatermark)
+	err := wt.watermarkStorage.Get(&octoWatermark)
 	if err == nil {
 		watermark = octoWatermark.AsTime()
 	} else if err != storage.ErrNotFound {
@@ -51,7 +55,7 @@ func (wt *WatermarkTrigger) RecordReceived(ctx context.Context, tx storage.State
 		return nil
 	}
 
-	err = timeKeys.Update(key, eventTime)
+	err = wt.timeKeys.Update(key, eventTime)
 	if err != nil {
 		return errors.Wrap(err, "couldn't update Trigger time for key")
 	}
@@ -59,14 +63,9 @@ func (wt *WatermarkTrigger) RecordReceived(ctx context.Context, tx storage.State
 	return nil
 }
 
-var readyToFirePrefix = []byte(fmt.Sprint("$ready_to_fire$"))
-
 func (wt *WatermarkTrigger) UpdateWatermark(ctx context.Context, tx storage.StateTransaction, watermark time.Time) error {
-	watermarkStorage := storage.NewValueState(tx.WithPrefix(watermarkPrefix))
-	readyToFire := storage.NewValueState(tx.WithPrefix(readyToFirePrefix))
-
 	octoWatermark := octosql.MakeTime(watermark)
-	err := watermarkStorage.Set(&octoWatermark)
+	err := wt.watermarkStorage.Set(&octoWatermark)
 	if err != nil {
 		return errors.Wrap(err, "couldn't set new watermark value")
 	}
@@ -77,7 +76,7 @@ func (wt *WatermarkTrigger) UpdateWatermark(ctx context.Context, tx storage.Stat
 	}
 	if ready {
 		octoReady := octosql.MakeBool(true)
-		err := readyToFire.Set(&octoReady)
+		err := wt.readyToFire.Set(&octoReady)
 		if err != nil {
 			return errors.Wrap(err, "couldn't set ready to fire")
 		}
@@ -87,9 +86,7 @@ func (wt *WatermarkTrigger) UpdateWatermark(ctx context.Context, tx storage.Stat
 }
 
 func (wt *WatermarkTrigger) isSomethingReadyToFire(ctx context.Context, tx storage.StateTransaction, watermark time.Time) (bool, error) {
-	timeKeys := NewTimeSortedKeys(tx.WithPrefix(timeSortedKeys))
-
-	_, sendTime, err := timeKeys.GetFirst()
+	_, sendTime, err := wt.timeKeys.GetFirst()
 	if err != nil {
 		if err == storage.ErrNotFound {
 			return false, nil
@@ -105,12 +102,8 @@ func (wt *WatermarkTrigger) isSomethingReadyToFire(ctx context.Context, tx stora
 }
 
 func (wt *WatermarkTrigger) PollKeysToFire(ctx context.Context, tx storage.StateTransaction, batchSize int) ([]octosql.Value, error) {
-	timeKeys := NewTimeSortedKeys(tx.WithPrefix(timeSortedKeys))
-	watermarkStorage := storage.NewValueState(tx.WithPrefix(watermarkPrefix))
-	readyToFire := storage.NewValueState(tx.WithPrefix(readyToFirePrefix))
-
 	var octoReady octosql.Value
-	err := readyToFire.Get(&octoReady)
+	err := wt.readyToFire.Get(&octoReady)
 	if err == storage.ErrNotFound {
 		octoReady = octosql.MakeBool(false)
 	} else if err != nil {
@@ -122,14 +115,14 @@ func (wt *WatermarkTrigger) PollKeysToFire(ctx context.Context, tx storage.State
 
 	var octoWatermark octosql.Value
 	var watermark time.Time
-	err = watermarkStorage.Get(&octoWatermark)
+	err = wt.watermarkStorage.Get(&octoWatermark)
 	if err == nil {
 		watermark = octoWatermark.AsTime()
 	} else if err != storage.ErrNotFound {
 		return nil, errors.Wrap(err, "couldn't get current watermark")
 	}
 
-	keys, times, err := timeKeys.GetUntil(watermark, batchSize)
+	keys, times, err := wt.timeKeys.GetUntil(watermark, batchSize)
 	if err != nil {
 		if err == storage.ErrNotFound {
 			panic("unreachable")
@@ -142,7 +135,7 @@ func (wt *WatermarkTrigger) PollKeysToFire(ctx context.Context, tx storage.State
 			panic("unreachable")
 		}
 
-		err = timeKeys.Delete(keys[i], times[i])
+		err = wt.timeKeys.Delete(keys[i], times[i])
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't delete key")
 		}
@@ -154,7 +147,7 @@ func (wt *WatermarkTrigger) PollKeysToFire(ctx context.Context, tx storage.State
 	}
 	if !ready {
 		octoReady := octosql.MakeBool(false)
-		err := readyToFire.Set(&octoReady)
+		err := wt.readyToFire.Set(&octoReady)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't set ready to fire")
 		}

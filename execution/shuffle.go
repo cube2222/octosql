@@ -221,15 +221,28 @@ type ShuffleReceiver struct {
 	sourcePartitionCount int
 	partition            int
 
+	endOfStreamsMap       *storage.Map
+	watermarksMap         *storage.Map
+	partitionOutputQueues []*OutputQueue
+
 	received int
 }
 
 func NewShuffleReceiver(streamID *StreamID, shuffleID *ShuffleID, sourcePartitionCount int, partition int) *ShuffleReceiver {
+	partitionOutputQueues := make([]*OutputQueue, sourcePartitionCount)
+	for sourcePartition := range partitionOutputQueues {
+		partitionOutputQueues[sourcePartition] = NewOutputQueueFromPrefix(string(append(shuffleID.AsPrefix(), getQueuePrefix(sourcePartition, partition)...)))
+	}
+
 	return &ShuffleReceiver{
 		streamID:             streamID,
 		shuffleID:            shuffleID,
 		sourcePartitionCount: sourcePartitionCount,
 		partition:            partition,
+
+		endOfStreamsMap:       storage.NewMapFromPrefix(string(append(streamID.AsPrefix(), endsOfStreamsPrefix...))),
+		watermarksMap:         storage.NewMapFromPrefix(string(append(streamID.AsPrefix(), watermarksPrefix...))),
+		partitionOutputQueues: partitionOutputQueues,
 	}
 }
 
@@ -242,11 +255,6 @@ func getQueuePrefix(from, to int) []byte {
 var endsOfStreamsPrefix = []byte("$ends_of_streams$")
 
 func (rs *ShuffleReceiver) Next(ctx context.Context) (*Record, error) {
-	tx := storage.GetStateTransactionFromContext(ctx)
-	streamPrefixedTx := tx.WithPrefix(rs.streamID.AsPrefix())
-	endOfStreamsMap := storage.NewMap(streamPrefixedTx.WithPrefix(endsOfStreamsPrefix))
-	watermarksMap := storage.NewMap(streamPrefixedTx.WithPrefix(watermarksPrefix))
-
 	// We want to randomize the order so we don't always read from the first input if records are available.
 	sourceOrder := rand.Perm(rs.sourcePartitionCount)
 
@@ -259,7 +267,7 @@ sourcePartitionsLoop:
 		// First check if this stream hasn't been closed already.
 		sourcePartitionValue := octosql.MakeInt(sourcePartition)
 		var endOfStream octosql.Value
-		err := endOfStreamsMap.Get(&sourcePartitionValue, &endOfStream)
+		err := rs.endOfStreamsMap.Get(&sourcePartitionValue, &endOfStream)
 		if err == storage.ErrNotFound {
 		} else if err != nil {
 			return nil, errors.Wrapf(err, "couldn't get end of stream for source partition with index %d", sourcePartition)
@@ -268,9 +276,7 @@ sourcePartitionsLoop:
 			continue
 		}
 
-		sourcePartitionOutputQueue := NewOutputQueue(
-			tx.WithPrefix(rs.shuffleID.AsPrefix()).WithPrefix(getQueuePrefix(sourcePartition, rs.partition)),
-		)
+		sourcePartitionOutputQueue := rs.partitionOutputQueues[sourcePartition]
 
 	queuePoppingLoop:
 		for {
@@ -304,14 +310,14 @@ sourcePartitionsLoop:
 				return el.Record, nil
 
 			case *QueueElement_Watermark:
-				if err := watermarksMap.Set(&sourcePartitionValue, el.Watermark); err != nil {
+				if err := rs.watermarksMap.Set(&sourcePartitionValue, el.Watermark); err != nil {
 					return nil, errors.Wrapf(err, "couldn't set new watermark value for source partition with index %d", sourcePartition)
 				}
 				continue queuePoppingLoop
 
 			case *QueueElement_EndOfStream:
 				phantom := octosql.MakePhantom()
-				if err := endOfStreamsMap.Set(&sourcePartitionValue, &phantom); err != nil {
+				if err := rs.endOfStreamsMap.Set(&sourcePartitionValue, &phantom); err != nil {
 					return nil, errors.Wrapf(err, "couldn't set end of stream for source partition with index %d", sourcePartition)
 				}
 				continue sourcePartitionsLoop

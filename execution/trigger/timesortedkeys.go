@@ -10,29 +10,28 @@ import (
 	"github.com/cube2222/octosql/storage"
 )
 
-var timeSortedKeys = []byte("$time_sorted_keys$")
-var byTimeAndKeyPrefix = []byte("$by_time_and_key$")
-var byKeyToTimePrefix = []byte("$by_key_to_time$")
+var timeSortedKeys = "$time_sorted_keys$"
+var byTimeAndKeyPrefix = "$by_time_and_key$"
+var byKeyToTimePrefix = "$by_key_to_time$"
 
 type TimeSortedKeys struct {
-	tx storage.StateTransaction
+	byTimeAndKey *storage.Map
+	byKeyToTime  *storage.Map
 }
 
-func NewTimeSortedKeys(tx storage.StateTransaction) *TimeSortedKeys {
+func NewTimeSortedKeys(prefix string) *TimeSortedKeys {
 	return &TimeSortedKeys{
-		tx: tx,
+		byTimeAndKey: storage.NewMapFromPrefix(prefix + byTimeAndKeyPrefix),
+		byKeyToTime:  storage.NewMapFromPrefix(prefix + byKeyToTimePrefix),
 	}
 }
 
 func (tsk *TimeSortedKeys) Update(key octosql.Value, t time.Time) error {
-	byTimeAndKey := storage.NewMap(tsk.tx.WithPrefix(byTimeAndKeyPrefix))
-	byKeyToTime := storage.NewMap(tsk.tx.WithPrefix(byKeyToTimePrefix))
-
 	var oldTime octosql.Value
-	err := byKeyToTime.Get(&key, &oldTime)
+	err := tsk.byKeyToTime.Get(&key, &oldTime)
 	if err == nil {
 		oldTimeKey := octosql.MakeTuple([]octosql.Value{oldTime, key})
-		err := byTimeAndKey.Delete(&oldTimeKey)
+		err := tsk.byTimeAndKey.Delete(&oldTimeKey)
 		if err != nil {
 			return errors.Wrap(err, "couldn't delete old time for key")
 		}
@@ -45,12 +44,12 @@ func (tsk *TimeSortedKeys) Update(key octosql.Value, t time.Time) error {
 
 	newTimeKey := octosql.MakeTuple([]octosql.Value{octoTime, key})
 	null := octosql.MakeNull()
-	err = byTimeAndKey.Set(&newTimeKey, &null)
+	err = tsk.byTimeAndKey.Set(&newTimeKey, &null)
 	if err != nil {
 		return errors.Wrap(err, "couldn't set new time key")
 	}
 
-	err = byKeyToTime.Set(&key, &octoTime)
+	err = tsk.byKeyToTime.Set(&key, &octoTime)
 	if err != nil {
 		return errors.Wrap(err, "couldn't set new time for key")
 	}
@@ -59,12 +58,10 @@ func (tsk *TimeSortedKeys) Update(key octosql.Value, t time.Time) error {
 }
 
 func (tsk *TimeSortedKeys) GetUntil(until time.Time, batchSize int) ([]octosql.Value, []time.Time, error) {
-	byTimeAndKey := storage.NewMap(tsk.tx.WithPrefix(byTimeAndKeyPrefix))
-
 	var outValues []octosql.Value
 	var outTimes []time.Time
 
-	iter := byTimeAndKey.GetIterator()
+	iter := tsk.byTimeAndKey.GetIterator()
 	var key octosql.Value
 	var value octosql.Value
 	var err error
@@ -108,9 +105,7 @@ func (tsk *TimeSortedKeys) GetUntil(until time.Time, batchSize int) ([]octosql.V
 }
 
 func (tsk *TimeSortedKeys) GetFirst() (octosql.Value, time.Time, error) {
-	byTimeAndKey := storage.NewMap(tsk.tx.WithPrefix(byTimeAndKeyPrefix))
-
-	iter := byTimeAndKey.GetIterator()
+	iter := tsk.byTimeAndKey.GetIterator()
 	var key octosql.Value
 	var value octosql.Value
 	err := iter.Next(&key, &value)
@@ -144,10 +139,8 @@ func (tsk *TimeSortedKeys) GetFirst() (octosql.Value, time.Time, error) {
 }
 
 func (tsk *TimeSortedKeys) DeleteByKey(key octosql.Value) error {
-	byKeyToTime := storage.NewMap(tsk.tx.WithPrefix(byKeyToTimePrefix))
-
 	var t octosql.Value
-	err := byKeyToTime.Get(&key, &t)
+	err := tsk.byKeyToTime.Get(&key, &t)
 	if err != nil {
 		if err == storage.ErrNotFound {
 			return storage.ErrNotFound
@@ -159,15 +152,12 @@ func (tsk *TimeSortedKeys) DeleteByKey(key octosql.Value) error {
 }
 
 func (tsk *TimeSortedKeys) Delete(key octosql.Value, t time.Time) error {
-	byTimeAndKey := storage.NewMap(tsk.tx.WithPrefix(byTimeAndKeyPrefix))
-	byKeyToTime := storage.NewMap(tsk.tx.WithPrefix(byKeyToTimePrefix))
-
 	newTimeKey := octosql.MakeTuple([]octosql.Value{octosql.MakeTime(t), key})
-	err := byTimeAndKey.Delete(&newTimeKey)
+	err := tsk.byTimeAndKey.Delete(&newTimeKey)
 	if err != nil {
 		return errors.Wrap(err, "couldn't delete old time to send key")
 	}
-	err = byKeyToTime.Delete(&key)
+	err = tsk.byKeyToTime.Delete(&key)
 	if err != nil {
 		return errors.Wrap(err, "couldn't delete time to send for key")
 	}

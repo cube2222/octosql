@@ -16,17 +16,19 @@ type valueStateCell struct {
 
 type ValueState struct {
 	valueStateCell *valueStateCell
-	tx             StateTransaction
 }
 
 func NewValueState(tx StateTransaction) *ValueState {
+	return NewValueStateFromPrefix(tx.Prefix())
+}
+
+func NewValueStateFromPrefix(prefix string) *ValueState {
 	newValueStateCell := &valueStateCell{}
 
-	actualValueStateCell, _ := valueStates.LoadOrStore(tx.Prefix(), newValueStateCell)
+	actualValueStateCell, _ := valueStates.LoadOrStore(prefix, newValueStateCell)
 
 	return &ValueState{
 		valueStateCell: actualValueStateCell.(*valueStateCell),
-		tx:             tx,
 	}
 }
 

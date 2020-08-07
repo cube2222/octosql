@@ -31,11 +31,14 @@ func (k *keyValue) Less(than btree.Item) bool {
 }
 
 type Map struct {
-	tx       StateTransaction
 	internal *sortedMap
 }
 
 func NewMap(tx StateTransaction) *Map {
+	return NewMapFromPrefix(tx.Prefix())
+}
+
+func NewMapFromPrefix(prefix string) *Map {
 	tree := btree.New(2)
 
 	newSortedMap := &sortedMap{
@@ -43,10 +46,9 @@ func NewMap(tx StateTransaction) *Map {
 		tree:  tree,
 	}
 
-	actualMap, _ := maps.LoadOrStore(tx.Prefix(), newSortedMap)
+	actualMap, _ := maps.LoadOrStore(prefix, newSortedMap)
 
 	return &Map{
-		tx:       tx,
 		internal: actualMap.(*sortedMap),
 	}
 }

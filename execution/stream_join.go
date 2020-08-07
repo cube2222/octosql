@@ -80,7 +80,7 @@ func (node *StreamJoin) Get(ctx context.Context, variables octosql.Variables, st
 	// The source of watermarks for a stream join is the minimum of watermarks from its sources
 	watermarkSource := NewUnionWatermarkGenerator([]WatermarkSource{leftExec.WatermarkSource, rightExec.WatermarkSource})
 
-	trigger, err := node.triggerPrototype.Get(ctx, variables)
+	trigger, err := node.triggerPrototype.Get(ctx, variables, string(streamID.AsPrefix())+triggerPrefix)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get trigger from trigger prototype")
 	}

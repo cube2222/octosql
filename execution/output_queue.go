@@ -21,12 +21,15 @@ type outputQueueInternals struct {
 }
 
 type OutputQueue struct {
-	tx       storage.StateTransaction
 	internal *outputQueueInternals
 }
 
 func NewOutputQueue(tx storage.StateTransaction) *OutputQueue {
-	id := tx.WithPrefix(queueElementsPrefix).Prefix()
+	return NewOutputQueueFromPrefix(tx.Prefix())
+}
+
+func NewOutputQueueFromPrefix(prefix string) *OutputQueue {
+	id := prefix + string(queueElementsPrefix)
 
 	actualInternals, ok := outputQueues.Load(id)
 	if !ok {
@@ -40,7 +43,6 @@ func NewOutputQueue(tx storage.StateTransaction) *OutputQueue {
 
 	return &OutputQueue{
 		internal: actualInternals.(*outputQueueInternals),
-		tx:       tx,
 	}
 }
 

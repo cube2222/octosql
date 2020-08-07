@@ -3,7 +3,6 @@ package execution
 import (
 	"context"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql"
@@ -138,14 +137,11 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 	isRetraction := record.IsUndo() // is the incoming record a retraction
 
 	// We get the key of the new incoming record
-	WithNoUndo()(record) // reset the potential retraction information, since we want a record and its retraction "to find each other"
-	newRecordValue := recordToValue(record)
-	newRecordKey, err := proto.Marshal(&newRecordValue)
-	if err != nil {
-		return errors.Wrap(err, "couldn't marshall new record")
-	}
+	WithNoUndo()(record)      // reset the potential retraction information, since we want a record and its retraction "to find each other"
+	tuple := record.AsTuple() // TODO: Fixme
+	newRecordKey := tuple.MonotonicMarshal()
 
-	var myRecordSet *storage.MultiSet
+	var myRecordSet *MultiSet
 
 	// Important note:
 	// 1) If we are adding the record it's natural that we want to match it with every record from the other stream
@@ -153,9 +149,9 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 	// 	  This is because if records arrive in order R1, L1, L2, R2, R3 and then we retract L1, it has matched
 	//	  with R1 (when L1 was added) and with R2 and R3 (when they were added)
 	if isLeft {
-		myRecordSet = storage.NewMultiSet(txByKey.WithPrefix(leftStreamNewRecordsPrefix))
+		myRecordSet = NewMultiSet(txByKey.WithPrefix(leftStreamNewRecordsPrefix))
 	} else {
-		myRecordSet = storage.NewMultiSet(txByKey.WithPrefix(rightStreamNewRecordsPrefix))
+		myRecordSet = NewMultiSet(txByKey.WithPrefix(rightStreamNewRecordsPrefix))
 	}
 
 	// Keep track of the count of the record (fields + data, no metadata)
@@ -173,26 +169,26 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 	// 1) It's still present in the set, then we just remove it
 	// 2) It's not present, so it has already been triggered, so we send a retraction for it
 	if isRetraction {
-		present, err := myRecordSet.Contains(newRecordValue)
+		present, err := myRecordSet.Contains(record)
 		if err != nil {
 			return errors.Wrap(err, "couldn't check if record is present in the appropriate record set")
 		}
 
 		if present {
 			// Present, so remove it
-			if err := myRecordSet.Erase(newRecordValue); err != nil {
+			if err := myRecordSet.Erase(record); err != nil {
 				return errors.Wrap(err, "couldn't erase record from the appropriate record set")
 			}
 		} else {
 			// Otherwise send a retraction
 			retractionRecord := NewRecordFromRecord(record, WithUndo())
-			if err := myRecordSet.Insert(recordToValue(retractionRecord)); err != nil {
+			if err := myRecordSet.Insert(retractionRecord); err != nil {
 				return errors.Wrap(err, "couldn't insert retraction for record into the appropriate record set")
 			}
 		}
 	} else {
 		// Just insert it into the set
-		if err := myRecordSet.Insert(newRecordValue); err != nil {
+		if err := myRecordSet.Insert(record); err != nil {
 			return errors.Wrap(err, "couldn't insert new record into the appropriate record set")
 		}
 	}
@@ -329,61 +325,15 @@ func (js *JoinedStream) Trigger(ctx context.Context, tx storage.StateTransaction
 	return allRecordsToTrigger, nil
 }
 
-func recordToValue(rec *Record) octosql.Value {
-	fields := make([]octosql.Value, len(rec.FieldNames))
-	data := make([]octosql.Value, len(rec.Data))
-	eventTimeField := octosql.MakeString(rec.EventTimeField().String())
-
-	for i := range rec.FieldNames {
-		fields[i] = octosql.MakeString(rec.FieldNames[i])
-		data[i] = *rec.Data[i]
-	}
-
-	valuesTogether := make([]octosql.Value, 4)
-
-	valuesTogether[0] = octosql.MakeTuple(fields)
-	valuesTogether[1] = octosql.MakeTuple(data)
-	valuesTogether[2] = octosql.MakeBool(rec.IsUndo())
-	valuesTogether[3] = eventTimeField
-
-	return octosql.MakeTuple(valuesTogether)
-}
-
 func readAllAndTransformIntoRecords(tx storage.StateTransaction) ([]*Record, error) {
-	set := storage.NewMultiSet(tx)
+	set := NewMultiSet(tx)
 
 	recordValues, err := set.ReadAll()
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't read values from set")
 	}
 
-	records := make([]*Record, len(recordValues))
-
-	for i, recordValue := range recordValues {
-		records[i] = valueToRecord(recordValue)
-	}
-
-	return records, nil
-}
-
-func valueToRecord(val octosql.Value) *Record {
-	slice := val.AsSlice()
-
-	fieldNameValues := slice[0].AsSlice()
-	values := slice[1].AsSlice()
-	isUndo := slice[2].AsBool()
-	eventTimeField := octosql.NewVariableName(slice[3].AsString())
-
-	fieldNames := make([]octosql.VariableName, len(fieldNameValues))
-
-	for i, fieldName := range fieldNameValues {
-		fieldNames[i] = octosql.NewVariableName(fieldName.AsString())
-	}
-
-	if isUndo {
-		return NewRecordFromSlice(fieldNames, values, WithEventTimeField(eventTimeField), WithUndo())
-	}
-	return NewRecordFromSlice(fieldNames, values, WithEventTimeField(eventTimeField), WithNoUndo())
+	return recordValues, nil
 }
 
 func createPairsOfRecords(leftRecords, rightRecords []*Record, baseOffset int, streamID *StreamID, eventTimeField octosql.VariableName) []*Record {
@@ -447,7 +397,7 @@ func renameRecords(records []*Record, baseOffset int, streamID *StreamID) []*Rec
 }
 
 func mergeNewAndOldRecords(tx storage.StateTransaction, newRecords []*Record, newRecordsPrefix, oldRecordsPrefix []byte) error {
-	oldRecordsSet := storage.NewMultiSet(tx.WithPrefix(oldRecordsPrefix))
+	oldRecordsSet := NewMultiSet(tx.WithPrefix(oldRecordsPrefix))
 
 	for i := range newRecords {
 		record := newRecords[i]
@@ -455,16 +405,14 @@ func mergeNewAndOldRecords(tx storage.StateTransaction, newRecords []*Record, ne
 		isRetraction := record.IsUndo()
 		WithNoUndo()(record) // Reset the retraction value
 
-		recordValue := recordToValue(record)
-
 		if !isRetraction {
 			// If the record isn't a retraction we simply store it
-			if err := oldRecordsSet.Insert(recordValue); err != nil {
+			if err := oldRecordsSet.Insert(record); err != nil {
 				return errors.Wrap(err, "couldn't insert new record into old records set")
 			}
 		} else {
 			// Otherwise we remove one copy of this record (it should be present, since we handled counts in AddRecord)
-			present, err := oldRecordsSet.Contains(recordValue)
+			present, err := oldRecordsSet.Contains(record)
 			if err != nil {
 				return errors.Wrap(err, "couldn't check if record is present in the old records set")
 			}
@@ -472,13 +420,13 @@ func mergeNewAndOldRecords(tx storage.StateTransaction, newRecords []*Record, ne
 				panic("A record we are retracting isn't present in a set in JoinedStream.Trigger()")
 			}
 
-			if err := oldRecordsSet.Erase(recordValue); err != nil {
+			if err := oldRecordsSet.Erase(record); err != nil {
 				return errors.Wrap(err, "couldn't remove record from the old records set")
 			}
 		}
 	}
 
-	newRecordsSet := storage.NewMultiSet(tx.WithPrefix(newRecordsPrefix))
+	newRecordsSet := NewMultiSet(tx.WithPrefix(newRecordsPrefix))
 	if err := newRecordsSet.Clear(); err != nil {
 		return errors.Wrap(err, "couldn't clear new records set")
 	}

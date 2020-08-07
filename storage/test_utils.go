@@ -68,48 +68,6 @@ func TestMapIteratorCorrectness(iter *MapIterator, expectedKeys, expectedValues 
 	return true, nil
 }
 
-// The iterator of a set has no determined order
-func TestSetIteratorCorrectness(iter *MultiSetIterator, expectedValues []octosql.Value, expectedCounts []int) error {
-	var value octosql.Value
-
-	countSum := 0
-	for i := range expectedCounts {
-		countSum += expectedCounts[i]
-	}
-
-	seenCounts := make([]int, len(expectedCounts))
-
-	for i := 0; i < countSum; i++ {
-		err := iter.Next(&value)
-
-		if err == ErrEndOfIterator {
-			return errors.New("Got EndOfIterator when still expecting values")
-		} else if err != nil {
-			return errors.Wrap(err, "couldn't get next element from iterator")
-		}
-
-		for j := 0; j < len(expectedValues); j++ {
-			if octosql.AreEqual(expectedValues[j], value) {
-				seenCounts[j]++
-				break
-			}
-		}
-	}
-
-	err := iter.Next(&value)
-	if err != ErrEndOfIterator {
-		return errors.New("the iterator should've ended, but it didn't")
-	}
-
-	for i := range expectedValues {
-		if expectedCounts[i] != seenCounts[i] {
-			return errors.Errorf("Expected %d of value with index %d, but got %d", expectedCounts[i], i, seenCounts[i])
-		}
-	}
-
-	return nil
-}
-
 func reverseValues(values []octosql.Value) []octosql.Value {
 	length := len(values)
 	result := make([]octosql.Value, length)

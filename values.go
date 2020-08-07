@@ -275,7 +275,48 @@ func Compare(x, y Value) (Comparison, error) {
 
 		return 1, nil
 
-	case TypeNull, TypePhantom, TypeDuration, TypeTuple, TypeObject:
+	case TypeNull, TypePhantom:
+		return 0, nil
+
+	case TypeDuration:
+		if y.GetType() != TypeDuration {
+			return 0, errors.Errorf("type mismatch between values")
+		}
+
+		x := x.AsDuration()
+		y := y.AsDuration()
+
+		if x == y {
+			return 0, nil
+		} else if x.Nanoseconds() < y.Nanoseconds() {
+			return -1, nil
+		}
+
+		return 1, nil
+
+	case TypeTuple:
+		if y.GetType() != TypeTuple {
+			return 0, errors.Errorf("type mismatch between values")
+		}
+
+		x := x.GetTuple()
+		y := y.GetTuple()
+
+		if len(x.Fields) != len(y.Fields) {
+			return 0, errors.Errorf("length mismatch between tuples") // TODO: Fixme
+		}
+
+		for i := range x.Fields {
+			if comp, err := Compare(*x.Fields[i], *y.Fields[i]); err != nil {
+				return 0, err
+			} else if comp != 0 {
+				return comp, nil
+			}
+		}
+
+		return 0, nil
+
+	case TypeObject:
 		return 0, errors.Errorf("unsupported type in sorting")
 	}
 
@@ -325,6 +366,10 @@ func (v Value) AsSlice() []Value {
 		out[i] = *t.Fields[i]
 	}
 	return out
+}
+
+func (v Value) AsPointerSlice() []*Value {
+	return v.GetTuple().Fields
 }
 
 func (v Value) AsMap() map[string]Value {

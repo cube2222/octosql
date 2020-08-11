@@ -1,0 +1,1 @@
+This is a work in progress experiment PoC of rewriting OctoSQL in Rust, as I've been seeing 10-100x performance improvements using a more optimized design.

@@ -19,7 +19,7 @@ use datafusion::execution::physical_plan::PhysicalExpr;
 use datafusion::execution::physical_plan::hash_aggregate::HashAggregateExec;
 use std::sync::Arc;
 use arrow::error::ArrowError;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use crate::Error::Unexpected;
 use arrow::ipc::Utf8Builder;
 use std::iter::repeat;
@@ -266,11 +266,6 @@ impl Accumulator for SumAccumulator {
     }
 }
 
-pub trait Trigger: std::fmt::Debug {
-    fn add(&mut self, keys: Vec<ArrayRef>) -> bool;
-    fn trigger(&self) -> ScalarValue;
-}
-
 pub struct GroupBy {
     key: Vec<String>,
     aggregated_fields: Vec<String>,
@@ -346,6 +341,16 @@ impl Node for GroupBy {
 
         let mut accumulators_map: BTreeMap<Vec<GroupByScalar>, Vec<Box<dyn Accumulator>>> = BTreeMap::new();
 
+        let key_types: Vec<DataType> = match self.source.schema() {
+            Ok(schema) => self.key
+                .iter()
+                .map(|field| schema.field_with_name(field).unwrap().data_type())
+                .cloned()
+                .collect(),
+            _ => panic!("aaa"),
+        };
+        let mut trigger: Box<dyn Trigger> = Box::new(CountingTrigger::new(key_types, 100));
+
         self.source.run(ctx, &mut |ctx, batch| {
             let key_columns: Vec<ArrayRef> = key_indices
                 .iter()
@@ -379,18 +384,106 @@ impl Node for GroupBy {
                         acc.add(ScalarValue::Int64(aggregated_columns[i].as_any().downcast_ref::<Int64Array>().unwrap().value(i)), ScalarValue::Boolean(false));
                     })
             }
+
+            trigger.keys_received(key_columns);
+
+            // Check if we can trigger something
+            let mut output_columns = trigger.poll();
+            if output_columns[0].len() == 0 {
+                return Ok(())
+            }
+
+            let output_schema = self.schema()?;
+            for aggregate_index in 0..self.aggregates.len() {
+                match output_schema.fields()[key_indices.len() + aggregate_index].data_type() {
+                    DataType::Int64 => {
+                        let mut array = Int64Builder::new(accumulators_map.len());
+                        for row in 0..output_columns[0].len() {
+                            create_key(output_columns.as_slice(), row, &mut key_vec);
+
+                            let row_accumulators = accumulators_map.get(&key_vec).unwrap();
+
+                            match row_accumulators[aggregate_index].trigger() {
+                                ScalarValue::Int64(n) => array.append_value(n).unwrap(),
+                                _ => panic!("bug: key doesn't match schema"),
+                                // TODO: Maybe use as_any -> downcast?
+                            }
+                        }
+                        output_columns.push(Arc::new(array.finish()) as ArrayRef);
+                    }
+                    _ => unimplemented!(),
+                }
+            }
+
+            let new_batch = RecordBatch::try_new(
+                output_schema,
+                output_columns,
+            ).unwrap();
+
+            produce(&ProduceContext {}, new_batch);
+
             Ok(())
         }, &mut noop_meta_send);
 
-        let output_schema = self.schema()?;
-        let mut output_columns: Vec<ArrayRef> = Vec::with_capacity(output_schema.fields().len());
-        for key_index in 0..self.key.len() {
-            match output_schema.fields()[key_index].data_type() {
+        Ok(())
+    }
+}
+
+pub trait Trigger: std::fmt::Debug {
+    fn keys_received(&mut self, keys: Vec<ArrayRef>);
+    fn poll(&mut self) -> Vec<ArrayRef>;
+}
+
+#[derive(Debug)]
+pub struct CountingTrigger {
+    key_data_types: Vec<DataType>,
+    trigger_count: i64,
+    counts: BTreeMap<Vec<GroupByScalar>, i64>,
+    to_trigger: BTreeSet<Vec<GroupByScalar>>,
+}
+
+impl CountingTrigger {
+    fn new(key_data_types: Vec<DataType>,
+           trigger_count: i64) -> CountingTrigger {
+        CountingTrigger {
+            key_data_types,
+            trigger_count,
+            counts: Default::default(),
+            to_trigger: Default::default()
+        }
+    }
+}
+
+impl Trigger for CountingTrigger {
+    fn keys_received(&mut self, keys: Vec<ArrayRef>) {
+        let mut key_vec: Vec<GroupByScalar> = Vec::with_capacity(keys.len());
+        for i in 0..self.key_data_types.len() {
+            key_vec.push(GroupByScalar::Int64(0))
+        }
+
+        for row in 0..keys[0].len() {
+            create_key(keys.as_slice(), row, &mut key_vec);
+
+            let count = self.counts
+                .entry(key_vec.clone())
+                .or_insert(0);
+            *count += 1;
+            if *count == self.trigger_count {
+                *count = 0; // TODO: Delete
+                self.to_trigger.insert(key_vec.clone());
+            }
+        }
+    }
+
+    fn poll(&mut self) -> Vec<ArrayRef> {
+        let mut output_columns: Vec<ArrayRef> = Vec::with_capacity(self.key_data_types.len());
+        for key_index in 0..self.key_data_types.len() {
+            match self.key_data_types[key_index] {
                 DataType::Utf8 => {
-                    let mut array = StringBuilder::new(accumulators_map.len());
-                    accumulators_map
+                    let mut array = StringBuilder::new(self.to_trigger.len());
+                    self.to_trigger
                         .iter()
-                        .for_each(|(k, v)| {
+                        .for_each(|k| {
                             match &k[key_index] {
                                 GroupByScalar::Utf8(text) => array.append_value(text.as_str()).unwrap(),
                                 _ => panic!("bug: key doesn't match schema"),
@@ -400,10 +493,10 @@ impl Node for GroupBy {
                     output_columns.push(Arc::new(array.finish()) as ArrayRef);
                 }
                 DataType::Int64 => {
-                    let mut array = Int64Builder::new(accumulators_map.len());
-                    accumulators_map
+                    let mut array = Int64Builder::new(self.to_trigger.len());
+                    self.to_trigger
                         .iter()
-                        .for_each(|(k, v)| {
+                        .for_each(|k| {
                             match k[key_index] {
                                 GroupByScalar::Int64(n) => array.append_value(n).unwrap(),
                                 _ => panic!("bug: key doesn't match schema"),
@@ -415,32 +508,8 @@ impl Node for GroupBy {
                 _ => unimplemented!(),
             }
         }
-        for aggregate_index in 0..self.aggregates.len() {
-            match output_schema.fields()[key_indices.len() + aggregate_index].data_type() {
-                DataType::Int64 => {
-                    let mut array = Int64Builder::new(accumulators_map.len());
-                    accumulators_map
-                        .iter()
-                        .for_each(|(k, v)| {
-                            match v[aggregate_index].trigger() {
-                                ScalarValue::Int64(n) => array.append_value(n).unwrap(),
-                                _ => panic!("bug: key doesn't match schema"),
-                                // TODO: Maybe use as_any -> downcast?
-                            }
-                        });
-                    output_columns.push(Arc::new(array.finish()) as ArrayRef);
-                }
-                _ => unimplemented!(),
-            }
-        }
-
-        let new_batch = RecordBatch::try_new(
-            output_schema,
-            output_columns,
-        ).unwrap();
-
-        produce(&ProduceContext {}, new_batch);
-        Ok(())
+        self.to_trigger.clear();
+        output_columns
     }
 }
 
@@ -449,13 +518,13 @@ fn main() {
 
     let plan: Box<dyn Node> = Box::new(CSVSource::new("cats.csv"));
     //let plan: Box<dyn Node> = Box::new(Projection::new(&["id", "name"], plan));
-    let plan: Box<dyn Node> = Box::new(GroupBy::new(
-        vec![String::from("name"), String::from("description"), String::from("age")],
-        vec![String::from("livesleft")],
-        vec![Box::new(Sum {})],
-        vec![String::from("livesleft")],
-        plan,
-    ));
+    // let plan: Box<dyn Node> = Box::new(GroupBy::new(
+    //     vec![String::from("name"), String::from("description"), String::from("age")],
+    //     vec![String::from("livesleft")],
+    //     vec![Box::new(Sum {})],
+    //     vec![String::from("livesleft")],
+    //     plan,
+    // ));
     let plan: Box<dyn Node> = Box::new(GroupBy::new(
         vec![String::from("name")],
         vec![String::from("livesleft")],

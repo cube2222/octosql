@@ -116,7 +116,7 @@ impl<'a> Node for CSVSource<'a> {
                         columns.push(retraction_array as ArrayRef)
                     }
                     produce(&ProduceContext {}, RecordBatch::try_new(schema.clone(), columns).unwrap())
-                },
+                }
             };
         }
         Ok(())
@@ -325,6 +325,7 @@ impl Node for GroupBy {
             .collect();
 
         key_fields.append(&mut new_fields);
+        key_fields.push(Field::new("retraction", DataType::Boolean, false));
         Ok(Arc::new(Schema::new(key_fields)))
     }
 
@@ -340,6 +341,7 @@ impl Node for GroupBy {
             .collect();
 
         let mut accumulators_map: BTreeMap<Vec<GroupByScalar>, Vec<Box<dyn Accumulator>>> = BTreeMap::new();
+        let mut last_triggered_values: BTreeMap<Vec<GroupByScalar>, Vec<ScalarValue>> = BTreeMap::new();
 
         let key_types: Vec<DataType> = match self.source.schema() {
             Ok(schema) => self.key
@@ -390,17 +392,102 @@ impl Node for GroupBy {
             // Check if we can trigger something
             let mut output_columns = trigger.poll();
             if output_columns[0].len() == 0 {
-                return Ok(())
+                return Ok(());
             }
-
             let output_schema = self.schema()?;
-            for aggregate_index in 0..self.aggregates.len() {
-                match output_schema.fields()[key_indices.len() + aggregate_index].data_type() {
-                    DataType::Int64 => {
-                        let mut array = Int64Builder::new(accumulators_map.len());
+
+            let mut retraction_columns = Vec::with_capacity(self.output_names.len());
+
+            // Push retraction keys
+            for key_index in 0..self.key.len() {
+                match output_schema.fields()[key_index].data_type() {
+                    DataType::Utf8 => {
+                        let mut array = StringBuilder::new(output_columns[0].len());
                         for row in 0..output_columns[0].len() {
                             create_key(output_columns.as_slice(), row, &mut key_vec);
 
+                            if !last_triggered_values.contains_key(&key_vec) {
+                                continue
+                            }
+
+                            match &key_vec[key_index] {
+                                GroupByScalar::Utf8(text) => array.append_value(text.as_str()).unwrap(),
+                                _ => panic!("bug: key doesn't match schema"),
+                                // TODO: Maybe use as_any -> downcast?
+                            }
+                        }
+                        retraction_columns.push(Arc::new(array.finish()) as ArrayRef);
+                    }
+                    DataType::Int64 => {
+                        let mut array = Int64Builder::new(output_columns[0].len());
+                        for row in 0..output_columns[0].len() {
+                            create_key(output_columns.as_slice(), row, &mut key_vec);
+
+                            if !last_triggered_values.contains_key(&key_vec) {
+                                continue
+                            }
+
+                            match key_vec[key_index] {
+                                GroupByScalar::Int64(n) => array.append_value(n).unwrap(),
+                                _ => panic!("bug: key doesn't match schema"),
+                                // TODO: Maybe use as_any -> downcast?
+                            }
+                        }
+                        retraction_columns.push(Arc::new(array.finish()) as ArrayRef);
+                    }
+                    _ => unimplemented!(),
+                }
+            }
+
+            // Push retractions
+            for aggregate_index in 0..self.aggregates.len() {
+                match output_schema.fields()[key_indices.len() + aggregate_index].data_type() {
+                    DataType::Int64 => {
+                        let mut array = Int64Builder::new(output_columns[0].len());
+                        for row in 0..output_columns[0].len() {
+                            create_key(output_columns.as_slice(), row, &mut key_vec);
+
+                            let last_triggered = last_triggered_values.get(&key_vec);
+                            let last_triggered_row = match last_triggered {
+                                None => continue,
+                                Some(v) => v,
+                            };
+
+                            match last_triggered_row[aggregate_index] {
+                                ScalarValue::Int64(n) => array.append_value(n).unwrap(),
+                                _ => panic!("bug: key doesn't match schema"),
+                                // TODO: Maybe use as_any -> downcast?
+                            }
+                        }
+                        retraction_columns.push(Arc::new(array.finish()) as ArrayRef);
+                    }
+                    _ => unimplemented!(),
+                }
+            }
+            // Remove those values
+            for row in 0..output_columns[0].len() {
+                create_key(output_columns.as_slice(), row, &mut key_vec);
+                last_triggered_values.remove(&key_vec);
+            }
+            // Build retraction array
+            let mut retraction_array_builder = BooleanBuilder::new(retraction_columns[0].len() + output_columns[0].len());
+            for i in 0..retraction_columns[0].len() {
+                retraction_array_builder.append_value(true);
+            }
+            for i in 0..output_columns[0].len() {
+                retraction_array_builder.append_value(false);
+            }
+            let retraction_array = Arc::new(retraction_array_builder.finish());
+
+            // Push new values
+            for aggregate_index in 0..self.aggregates.len() {
+                match output_schema.fields()[key_indices.len() + aggregate_index].data_type() {
+                    DataType::Int64 => {
+                        let mut array = Int64Builder::new(output_columns[0].len());
+
+                        for row in 0..output_columns[0].len() {
+                            create_key(output_columns.as_slice(), row, &mut key_vec);
+                            // TODO: this key may not exist because of retractions.
                             let row_accumulators = accumulators_map.get(&key_vec).unwrap();
 
                             match row_accumulators[aggregate_index].trigger() {
@@ -408,12 +495,37 @@ impl Node for GroupBy {
                                 _ => panic!("bug: key doesn't match schema"),
                                 // TODO: Maybe use as_any -> downcast?
                             }
+
+                            let mut last_values_vec = last_triggered_values
+                                .entry(key_vec.clone())
+                                .or_default();
+                            last_values_vec.push(row_accumulators[aggregate_index].trigger());
                         }
                         output_columns.push(Arc::new(array.finish()) as ArrayRef);
                     }
                     _ => unimplemented!(),
                 }
             }
+
+            // Combine key columns
+            for col_index in 0..output_columns.len() {
+                match output_schema.fields()[col_index].data_type() {
+                    DataType::Utf8 => {
+                        let mut array = StringBuilder::new(retraction_columns[0].len() + output_columns[0].len());
+                        array.append_data(&[retraction_columns[col_index].data(), output_columns[col_index].data()]);
+                        output_columns[col_index] = Arc::new(array.finish()) as ArrayRef;
+                    }
+                    DataType::Int64 => {
+                        let mut array = Int64Builder::new(retraction_columns[0].len() + output_columns[0].len());
+                        array.append_data(&[retraction_columns[col_index].data(), output_columns[col_index].data()]);
+                        output_columns[col_index] = Arc::new(array.finish()) as ArrayRef;
+                    }
+                    _ => unimplemented!(),
+                }
+            }
+
+            // Add retraction array
+            output_columns.push(retraction_array as ArrayRef);
 
             let new_batch = RecordBatch::try_new(
                 output_schema,
@@ -449,7 +561,7 @@ impl CountingTrigger {
             key_data_types,
             trigger_count,
             counts: Default::default(),
-            to_trigger: Default::default()
+            to_trigger: Default::default(),
         }
     }
 }

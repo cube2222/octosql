@@ -10,6 +10,7 @@ use arrow::ipc::writer::FileWriter;
 use arrow::csv;
 use std::io;
 use std::time;
+use std::thread;
 use arrow::util::pretty::pretty_format_batches;
 use arrow::array::*;
 use arrow::datatypes::{Field, Schema, DataType};
@@ -23,6 +24,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::Error::Unexpected;
 use arrow::ipc::Utf8Builder;
 use std::iter::repeat;
+use std::sync::mpsc;
 
 pub struct ProduceContext {}
 
@@ -47,7 +49,7 @@ enum MetadataMessage {
     EndOfStream,
 }
 
-pub trait Node {
+pub trait Node: Send + Sync {
     fn schema(&self) -> Result<Arc<Schema>, Error>;
     fn run(&self, ctx: &ExecutionContext, produce: ProduceFn, meta_send: MetaSendFn) -> Result<(), Error>;
 }
@@ -125,11 +127,11 @@ impl<'a> Node for CSVSource<'a> {
 
 pub struct Projection<'a, 'b> {
     fields: &'b [&'a str],
-    source: Box<dyn Node>,
+    source: Arc<dyn Node>,
 }
 
 impl<'a, 'b> Projection<'a, 'b> {
-    fn new(fields: &'b [&'a str], source: Box<dyn Node>) -> Projection<'a, 'b> {
+    fn new(fields: &'b [&'a str], source: Arc<dyn Node>) -> Projection<'a, 'b> {
         Projection { fields, source }
     }
 
@@ -176,11 +178,11 @@ impl<'a, 'b> Node for Projection<'a, 'b> {
 
 pub struct Filter<'a> {
     field: &'a str,
-    source: Box<dyn Node>,
+    source: Arc<dyn Node>,
 }
 
 impl<'a> Filter<'a> {
-    fn new(field: &'a str, source: Box<dyn Node>) -> Filter<'a> {
+    fn new(field: &'a str, source: Arc<dyn Node>) -> Filter<'a> {
         Filter { field, source }
     }
 }
@@ -212,7 +214,7 @@ impl<'a> Node for Filter<'a> {
     }
 }
 
-pub trait Aggregate {
+pub trait Aggregate : Send + Sync {
     fn output_type(&self, input_schema: &DataType) -> Result<DataType, Error>;
     fn create_accumulator(&self) -> Box<dyn Accumulator>;
 }
@@ -271,7 +273,7 @@ pub struct GroupBy {
     aggregated_fields: Vec<String>,
     aggregates: Vec<Box<dyn Aggregate>>,
     output_names: Vec<String>,
-    source: Box<dyn Node>,
+    source: Arc<dyn Node>,
 }
 
 impl GroupBy {
@@ -280,7 +282,7 @@ impl GroupBy {
         aggregated_fields: Vec<String>,
         aggregates: Vec<Box<dyn Aggregate>>,
         output_names: Vec<String>,
-        source: Box<dyn Node>,
+        source: Arc<dyn Node>,
     ) -> GroupBy {
         return GroupBy {
             key,
@@ -407,7 +409,7 @@ impl Node for GroupBy {
                             create_key(output_columns.as_slice(), row, &mut key_vec);
 
                             if !last_triggered_values.contains_key(&key_vec) {
-                                continue
+                                continue;
                             }
 
                             match &key_vec[key_index] {
@@ -424,7 +426,7 @@ impl Node for GroupBy {
                             create_key(output_columns.as_slice(), row, &mut key_vec);
 
                             if !last_triggered_values.contains_key(&key_vec) {
-                                continue
+                                continue;
                             }
 
                             match key_vec[key_index] {
@@ -535,7 +537,7 @@ impl Node for GroupBy {
             produce(&ProduceContext {}, new_batch);
 
             Ok(())
-        }, &mut noop_meta_send);
+        }, &mut noop_meta_send)?;
 
         Ok(())
     }
@@ -625,29 +627,144 @@ impl Trigger for CountingTrigger {
     }
 }
 
+struct StreamJoin {
+    source: Arc<Node>,
+    source_key_fields: Vec<String>,
+    joined: Arc<Node>,
+    joined_key_fields: Vec<String>,
+}
+
+impl StreamJoin {
+    fn new(source: Arc<Node>,
+           source_key_fields: Vec<String>,
+           joined: Arc<Node>,
+           joined_key_fields: Vec<String>,
+    ) -> StreamJoin {
+        StreamJoin {
+            source,
+            source_key_fields,
+            joined,
+            joined_key_fields,
+        }
+    }
+}
+
+impl Node for StreamJoin {
+    fn schema(&self) -> Result<Arc<Schema>, Error> {
+        let source_schema_fields = self.source.schema()?.fields().clone();
+        let joined_schema_fields = self.joined.schema()?.fields().clone();
+        let new_fields: Vec<Field> = source_schema_fields.iter()
+            .map(|f| Field::new(f.name(), f.data_type().clone(), true))
+            .chain(
+                joined_schema_fields.iter()
+                    .map(|f| Field::new(f.name(), f.data_type().clone(), true))
+            ).collect();
+
+        // TODO: Check if source and joined key types match.
+
+        Ok(Arc::new(Schema::new(new_fields)))
+    }
+
+    fn run(&self, ctx: &ExecutionContext, produce: ProduceFn, meta_send: MetaSendFn) -> Result<(), Error> {
+        let source_schema = self.source.schema()?;
+        let source_key_indices: Vec<usize> = self.source_key_fields
+            .iter()
+            .map(|key_field| { source_schema.index_of(key_field).unwrap() })
+            .collect();
+        let joined_schema = self.joined.schema()?;
+        let joined_key_indices: Vec<usize> = self.joined_key_fields
+            .iter()
+            .map(|key_field| { joined_schema.index_of(key_field).unwrap() })
+            .collect();
+
+        let mut state_map: BTreeMap<Vec<GroupByScalar>, (Vec<Vec<ScalarValue>>, Vec<Vec<ScalarValue>>)> = BTreeMap::new();
+
+        let key_types: Vec<DataType> = match self.source.schema() {
+            Ok(schema) => self.source_key_fields
+                .iter()
+                .map(|field| schema.field_with_name(field).unwrap().data_type())
+                .cloned()
+                .collect(),
+            _ => panic!("aaa"),
+        };
+
+        let (sender, receiver) = mpsc::sync_channel::<(usize, RecordBatch)>(32);
+
+        let sender1 = sender.clone();
+        let source = self.source.clone();
+        let handle1 = std::thread::spawn(move || {
+            let res = source.run(&ExecutionContext{}, &mut |ctx, batch| {
+                sender1.send((0, Some(batch)));
+                Ok(())
+            }, &mut noop_meta_send);
+            sender1.send((0, None));
+        });
+        let sender = sender.clone();
+        let joined = self.joined.clone();
+        let handle2 = std::thread::spawn(move || {
+            let res = joined.run(&ExecutionContext{}, &mut |ctx, batch| {
+                sender2.send((1, batch));
+                Ok(())
+            }, &mut noop_meta_send);
+        });
+
+        std::mem::drop(sender);
+
+        let key_indices = vec![source_key_indices, joined_key_indices];
+
+        for (source_index, batch) in receiver {
+            let mut key_vec = Vec::with_capacity(self.source_key_fields.len());
+            for i in 0..key_columns.len() {
+                key_vec.push(GroupByScalar::Int64(0))
+            }
+
+            for row in 0..batch.columns()[0] {
+                let key_columns: Vec<ArrayRef> = key_indices[source_index]
+                    .iter()
+                    .map(|i| batch.column(i))
+                    .cloned()
+                    .collect();
+                create_key(key_columns, row, key_vec);
+
+                let (left, right) = state_map.entry(key_vec.clone())
+                    .or_default();
+
+                // New and old array must be stored, won't work otherwise.
+                // Create the output arrays as the final step based on the new arrays, not while creating the new entries.
+
+            }
+        }
+
+        handle1.join();
+        handle2.join();
+
+        Ok(())
+    }
+}
+
 fn main() {
     let start_time = std::time::Instant::now();
 
-    let plan: Box<dyn Node> = Box::new(CSVSource::new("cats.csv"));
-    //let plan: Box<dyn Node> = Box::new(Projection::new(&["id", "name"], plan));
-    // let plan: Box<dyn Node> = Box::new(GroupBy::new(
+    let plan: Arc<dyn Node> = Arc::new(CSVSource::new("cats.csv"));
+    //let plan: Arc<dyn Node> = Arc::new(Projection::new(&["id", "name"], plan));
+    // let plan: Arc<dyn Node> = Arc::new(GroupBy::new(
     //     vec![String::from("name"), String::from("description"), String::from("age")],
     //     vec![String::from("livesleft")],
     //     vec![Box::new(Sum {})],
     //     vec![String::from("livesleft")],
     //     plan,
     // ));
-    let plan: Box<dyn Node> = Box::new(GroupBy::new(
-        vec![String::from("name")],
-        vec![String::from("livesleft")],
-        vec![Box::new(Sum {})],
-        vec![String::from("livesleft")],
-        plan,
-    ));
+    // let plan: Arc<dyn Node> = Box::new(GroupBy::new(
+    //     vec![String::from("name")],
+    //     vec![String::from("livesleft")],
+    //     vec![Box::new(Sum {})],
+    //     vec![String::from("livesleft")],
+    //     plan,
+    // ));
+    let plan: Arc<dyn Node> = Arc::new(StreamJoin::new(plan.clone(), vec![], plan.clone(), vec![]));
     let res = plan.run(&ExecutionContext {}, &mut record_print, &mut noop_meta_send);
     println!("{:?}", start_time.elapsed());
 }
-
 
 // ****** Copied from datafusion
 

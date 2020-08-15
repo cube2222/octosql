@@ -15,18 +15,20 @@ use arrow::util::pretty::pretty_format_batches;
 use arrow::array::*;
 use arrow::datatypes::{Field, Schema, DataType};
 use arrow::compute::kernels::filter;
-use datafusion::logicalplan::ScalarValue;
+// use datafusion::logicalplan::ScalarValue;
 use datafusion::execution::physical_plan::PhysicalExpr;
 use datafusion::execution::physical_plan::hash_aggregate::HashAggregateExec;
 use datafusion::execution::physical_plan::common::get_scalar_value;
 use std::sync::Arc;
 use arrow::error::ArrowError;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use crate::Error::Unexpected;
 use arrow::ipc::{Utf8Builder, BoolBuilder};
 use std::iter::repeat;
 use std::sync::mpsc;
+use std::hash::Hash;
 
+const batch_size: usize = 8192;
 const retractions_fields: &str = "retraction";
 
 pub struct ProduceContext {}
@@ -83,7 +85,7 @@ impl<'a> Node for CSVSource<'a> {
         let r = csv::ReaderBuilder::new()
             .has_header(true)
             .infer_schema(Some(10))
-            .with_batch_size(8192 * 2)
+            .with_batch_size(batch_size * 2)
             .build(file).unwrap();
         let mut fields = r.schema().fields().clone();
         fields.push(Field::new(retractions_fields, DataType::Boolean, false));
@@ -96,10 +98,10 @@ impl<'a> Node for CSVSource<'a> {
         let mut r = csv::ReaderBuilder::new()
             .has_header(true)
             .infer_schema(Some(10))
-            .with_batch_size(8192)
+            .with_batch_size(batch_size)
             .build(file).unwrap();
-        let mut retraction_array_builder = BooleanBuilder::new(8192);
-        for i in 0..8192 {
+        let mut retraction_array_builder = BooleanBuilder::new(batch_size);
+        for i in 0..batch_size {
             retraction_array_builder.append_value(false);
         }
         let retraction_array = Arc::new(retraction_array_builder.finish());
@@ -110,10 +112,10 @@ impl<'a> Node for CSVSource<'a> {
                 None => break,
                 Some(rec) => {
                     let mut columns: Vec<ArrayRef> = rec.columns().iter().cloned().collect();
-                    if columns[0].len() == 8192 {
+                    if columns[0].len() == batch_size {
                         columns.push(retraction_array.clone() as ArrayRef)
                     } else {
-                        let mut retraction_array_builder = BooleanBuilder::new(8192);
+                        let mut retraction_array_builder = BooleanBuilder::new(batch_size);
                         for i in 0..columns[0].len() {
                             retraction_array_builder.append_value(false);
                         }
@@ -271,6 +273,43 @@ impl Accumulator for SumAccumulator {
     }
 }
 
+struct Count {}
+
+impl Aggregate for Count {
+    fn output_type(&self, input_type: &DataType) -> Result<DataType, Error> {
+        Ok(DataType::Int64)
+    }
+
+    fn create_accumulator(&self) -> Box<dyn Accumulator> {
+        Box::new(CountAccumulator { count: 0 })
+    }
+}
+
+#[derive(Debug)]
+struct CountAccumulator {
+    count: i64,
+}
+
+impl Accumulator for CountAccumulator {
+    fn add(&mut self, value: ScalarValue, retract: ScalarValue) -> bool {
+        let is_retraction = match retract {
+            ScalarValue::Boolean(x) => x,
+            _ => panic!("retraction shall be boolean"),
+        };
+        let multiplier = if !is_retraction { 1 } else { -1 };
+        if is_retraction {
+            self.count -= 1;
+        } else {
+            self.count += 1;
+        }
+        self.count != 0
+    }
+
+    fn trigger(&self) -> ScalarValue {
+        return ScalarValue::Int64(self.count);
+    }
+}
+
 pub struct GroupBy {
     key: Vec<String>,
     aggregated_fields: Vec<String>,
@@ -356,7 +395,7 @@ impl Node for GroupBy {
                 .collect(),
             _ => panic!("aaa"),
         };
-        let mut trigger: Box<dyn Trigger> = Box::new(CountingTrigger::new(key_types, 10));
+        let mut trigger: Box<dyn Trigger> = Box::new(CountingTrigger::new(key_types, 100));
 
         self.source.run(ctx, &mut |ctx, batch| {
             let key_columns: Vec<ArrayRef> = key_indices
@@ -388,6 +427,7 @@ impl Node for GroupBy {
                     .iter_mut()
                     .enumerate()
                     .for_each(|(i, acc)| {
+                        // TODO: remove if false
                         acc.add(ScalarValue::Int64(aggregated_columns[i].as_any().downcast_ref::<Int64Array>().unwrap().value(i)), ScalarValue::Boolean(false));
                     })
             }
@@ -654,7 +694,8 @@ impl StreamJoin {
 
 impl Node for StreamJoin {
     fn schema(&self) -> Result<Arc<Schema>, Error> { // Both without last row, and retraction added at end.
-        let source_schema_fields = self.source.schema()?.fields().clone();
+        let mut source_schema_fields = self.source.schema()?.fields().clone();
+        source_schema_fields.truncate(source_schema_fields.len() - 1);
         let joined_schema_fields = self.joined.schema()?.fields().clone();
         let new_fields: Vec<Field> = source_schema_fields.iter()
             .map(|f| Field::new(f.name(), f.data_type().clone(), true))
@@ -679,8 +720,10 @@ impl Node for StreamJoin {
             .iter()
             .map(|key_field| { joined_schema.index_of(key_field).unwrap() })
             .collect();
+        let output_schema = self.schema()?;
 
-        let mut state_map: BTreeMap<Vec<GroupByScalar>, (BTreeMap<Vec<ScalarValue>, i64>, BTreeMap<Vec<ScalarValue>, i64>)> = BTreeMap::new();
+        // TODO: Fixme HashMap => BTreeMap
+        let mut state_map: BTreeMap<Vec<GroupByScalar>, (HashMap<Vec<ScalarValue>, i64>, HashMap<Vec<ScalarValue>, i64>)> = BTreeMap::new();
 
         let key_types: Vec<DataType> = match self.source.schema() {
             Ok(schema) => self.source_key_fields
@@ -756,11 +799,11 @@ impl Node for StreamJoin {
                             let mut array = Int64Builder::new(required_capacity);
                             for (key, cur_new_rows) in &new_rows {
                                 if let Some((_, state_other_rows)) = state_map.get(key) {
-                                    for (other_row, count) in state_other_rows {
+                                    for (other_row, &count) in state_other_rows {
                                         for new_row in cur_new_rows {
                                             for repetition in 0..count {
-                                                if let ScalarValue::Int64(n) = new_row[column] {
-                                                    array.append_value(n);
+                                                if let ScalarValue::Int64(n) = &new_row[column] {
+                                                    array.append_value(*n);
                                                 } else {
                                                     panic!("invalid type");
                                                 }
@@ -772,14 +815,14 @@ impl Node for StreamJoin {
                             output_columns.push(Arc::new(array.finish()) as ArrayRef)
                         }
                         DataType::Utf8 => {
-                            let mut array = Utf8Builder::new(required_capacity);
+                            let mut array = StringBuilder::new(required_capacity);
                             for (key, cur_new_rows) in &new_rows {
                                 if let Some((_, state_other_rows)) = state_map.get(key) {
-                                    for (other_row, count) in state_other_rows {
+                                    for (other_row, &count) in state_other_rows {
                                         for new_row in cur_new_rows {
                                             for repetition in 0..count {
-                                                if let ScalarValue::Utf8(text) = new_row[column] {
-                                                    array.append_value(text);
+                                                if let ScalarValue::Utf8(text) = &new_row[column] {
+                                                    array.append_value(text.as_str());
                                                 } else {
                                                     panic!("invalid type");
                                                 }
@@ -800,11 +843,11 @@ impl Node for StreamJoin {
                             let mut array = Int64Builder::new(required_capacity);
                             for (key, cur_new_rows) in &new_rows {
                                 if let Some((_, state_other_rows)) = state_map.get(key) {
-                                    for (other_row, count) in state_other_rows {
+                                    for (other_row, &count) in state_other_rows {
                                         for new_row in cur_new_rows {
                                             for repetition in 0..count {
-                                                if let ScalarValue::Int64(n) = other_row[column] {
-                                                    array.append_value(n);
+                                                if let ScalarValue::Int64(n) = &other_row[column] {
+                                                    array.append_value(*n);
                                                 } else {
                                                     panic!("invalid type");
                                                 }
@@ -816,13 +859,13 @@ impl Node for StreamJoin {
                             output_columns.push(Arc::new(array.finish()) as ArrayRef)
                         }
                         DataType::Utf8 => {
-                            let mut array = Utf8Builder::new(required_capacity);
+                            let mut array = StringBuilder::new(required_capacity);
                             for (key, cur_new_rows) in &new_rows {
                                 if let Some((_, state_other_rows)) = state_map.get(key) {
-                                    for (other_row, count) in state_other_rows {
+                                    for (other_row, &count) in state_other_rows {
                                         for new_row in cur_new_rows {
                                             for repetition in 0..count {
-                                                if let ScalarValue::Utf8(text) = other_row[column] {
+                                                if let ScalarValue::Utf8(text) = &other_row[column] {
                                                     array.append_value(text.as_str());
                                                 } else {
                                                     panic!("invalid type");
@@ -838,12 +881,12 @@ impl Node for StreamJoin {
                     }
                 }
 
-                let retraction_column = batch.num_columns()-1;
+                let retraction_column = batch.num_columns() - 1;
 
-                let mut array = BoolBuilder::new(required_capacity);
+                let mut array = BooleanBuilder::new(required_capacity);
                 for (key, cur_new_rows) in &new_rows {
                     if let Some((_, state_other_rows)) = state_map.get(key) {
-                        for (other_row, count) in state_other_rows {
+                        for (other_row, &count) in state_other_rows {
                             for new_row in cur_new_rows {
                                 for repetition in 0..count {
                                     if let ScalarValue::Boolean(retraction) = new_row[retraction_column] {
@@ -864,11 +907,11 @@ impl Node for StreamJoin {
                             let mut array = Int64Builder::new(required_capacity);
                             for (key, cur_new_rows) in &new_rows {
                                 if let Some((state_other_rows, _)) = state_map.get(key) {
-                                    for (other_row, count) in state_other_rows {
+                                    for (other_row, &count) in state_other_rows {
                                         for new_row in cur_new_rows {
                                             for repetition in 0..count {
-                                                if let ScalarValue::Int64(n) = other_row[column] {
-                                                    array.append_value(n);
+                                                if let ScalarValue::Int64(n) = &other_row[column] {
+                                                    array.append_value(*n);
                                                 } else {
                                                     panic!("invalid type");
                                                 }
@@ -880,13 +923,13 @@ impl Node for StreamJoin {
                             output_columns.push(Arc::new(array.finish()) as ArrayRef)
                         }
                         DataType::Utf8 => {
-                            let mut array = Utf8Builder::new(required_capacity);
+                            let mut array = StringBuilder::new(required_capacity);
                             for (key, cur_new_rows) in &new_rows {
                                 if let Some((state_other_rows, _)) = state_map.get(key) {
-                                    for (other_row, count) in state_other_rows {
+                                    for (other_row, &count) in state_other_rows {
                                         for new_row in cur_new_rows {
                                             for repetition in 0..count {
-                                                if let ScalarValue::Utf8(text) = other_row[column] {
+                                                if let ScalarValue::Utf8(text) = &other_row[column] {
                                                     array.append_value(text.as_str());
                                                 } else {
                                                     panic!("invalid type");
@@ -907,12 +950,12 @@ impl Node for StreamJoin {
                         DataType::Int64 => {
                             let mut array = Int64Builder::new(required_capacity);
                             for (key, cur_new_rows) in &new_rows {
-                                if let Some((state_other_rows,_)) = state_map.get(key) {
-                                    for (other_row, count) in state_other_rows {
+                                if let Some((state_other_rows, _)) = state_map.get(key) {
+                                    for (other_row, &count) in state_other_rows {
                                         for new_row in cur_new_rows {
                                             for repetition in 0..count {
-                                                if let ScalarValue::Int64(n) = new_row[column] {
-                                                    array.append_value(n);
+                                                if let ScalarValue::Int64(n) = &new_row[column] {
+                                                    array.append_value(*n);
                                                 } else {
                                                     panic!("invalid type");
                                                 }
@@ -924,14 +967,14 @@ impl Node for StreamJoin {
                             output_columns.push(Arc::new(array.finish()) as ArrayRef)
                         }
                         DataType::Utf8 => {
-                            let mut array = Utf8Builder::new(required_capacity);
+                            let mut array = StringBuilder::new(required_capacity);
                             for (key, cur_new_rows) in &new_rows {
                                 if let Some((state_other_rows, _)) = state_map.get(key) {
-                                    for (other_row, count) in state_other_rows {
+                                    for (other_row, &count) in state_other_rows {
                                         for new_row in cur_new_rows {
                                             for repetition in 0..count {
-                                                if let ScalarValue::Utf8(text) = new_row[column] {
-                                                    array.append_value(text);
+                                                if let ScalarValue::Utf8(text) = &new_row[column] {
+                                                    array.append_value(text.as_str());
                                                 } else {
                                                     panic!("invalid type");
                                                 }
@@ -946,12 +989,12 @@ impl Node for StreamJoin {
                     }
                 }
 
-                let retraction_column = batch.num_columns()-1;
+                let retraction_column = batch.num_columns() - 1;
 
-                let mut array = BoolBuilder::new(required_capacity);
+                let mut array = BooleanBuilder::new(required_capacity);
                 for (key, cur_new_rows) in &new_rows {
                     if let Some((state_other_rows, _)) = state_map.get(key) {
-                        for (other_row, count) in state_other_rows {
+                        for (other_row, &count) in state_other_rows {
                             for new_row in cur_new_rows {
                                 for repetition in 0..count {
                                     if let ScalarValue::Boolean(retraction) = new_row[retraction_column] {
@@ -968,63 +1011,29 @@ impl Node for StreamJoin {
             }
 
             for (key, cur_new_rows) in new_rows {
-                let mut state = state_map.get(key);
+                for mut row in cur_new_rows {
+                    let (source_state, joined_state) = state_map.entry(key.clone()).or_insert((HashMap::default(), HashMap::default()));
+                    let retraction = if let ScalarValue::Boolean(retraction) = row[row.len() - 1] {
+                        retraction
+                    } else {
+                        panic!("invalid retraction type")
+                    };
+                    row.truncate(row.len() - 1);
+
+                    let my_rows = if source_index == 0 { source_state } else { joined_state };
+                    let my_entry = my_rows.entry(row).or_default();
+                    if !retraction {
+                        *my_entry += 1;
+                    } else {
+                        *my_entry -= 1;
+                    }
+                }
             }
 
-            // match batch.column(column).data_type() {
-            //     // TODO: As generic type based function.
-            //     DataType::Int64 => {
-            //         let array = batch.column(column).as_any().downcast_ref::<Int64Array>().expect("failed casting");
-            //         for row in 0..batch.num_rows() {
-            //             create_key(&key_columns, row, &mut key_vec);
-            //
-            //             let new_entries_columns = new_rows.entry(key_vec.clone())
-            //                 .or_default();
-            //             if new_entries_columns.len() == column {
-            //                 new_entries_columns.push(vec![ScalarValue::Int64(array.value(row))])
-            //             } else {
-            //                 new_entries_columns[column].push(ScalarValue::Int64(array.value(row)))
-            //             }
-            //         }
-            //     }
-            //     DataType::Boolean => {
-            //         let array = batch.column(column).as_any().downcast_ref::<BooleanArray>().expect("failed casting");
-            //         for row in 0..batch.num_rows() {
-            //             create_key(&key_columns, row, &mut key_vec);
-            //
-            //             let new_entries_columns = new_rows.entry(key_vec.clone())
-            //                 .or_default();
-            //             if new_entries_columns.len() == column {
-            //                 new_entries_columns.push(vec![ScalarValue::Boolean(array.value(row))])
-            //             } else {
-            //                 new_entries_columns[column].push(ScalarValue::Boolean(array.value(row)))
-            //             }
-            //         }
-            //     }
-            //     DataType::Utf8 => {
-            //         let array = batch.column(column).as_any().downcast_ref::<StringArray>().expect("failed casting");
-            //         for row in 0..batch.num_rows() {
-            //             create_key(&key_columns, row, &mut key_vec);
-            //
-            //             let new_entries_columns = new_rows.entry(key_vec.clone())
-            //                 .or_default();
-            //             if new_entries_columns.len() == column {
-            //                 new_entries_columns.push(vec![ScalarValue::Utf8(String::from(array.value(row)))])
-            //             } else {
-            //                 new_entries_columns[column].push(ScalarValue::Utf8(String::from(array.value(row))))
-            //             }
-            //         }
-            //     }
-            //     _ => panic!("test"),
-            // }
-
-            //for row in 0..batch.columns()[0] {
-            //    let columns = new_rows.entry(key_vec.clone())
-            //        .or_default();
-            //
-            //    // New and old array must be stored, won't work otherwise.
-            //    // Create the output arrays as the final step based on the new arrays, not while creating the new entries.
-            //}
+            let output_batch = RecordBatch::try_new(output_schema.clone(), output_columns)?;
+            if output_batch.num_rows() > 0 {
+                produce(&ProduceContext {}, output_batch);
+            }
         }
 
         handle1.join();
@@ -1037,7 +1046,9 @@ impl Node for StreamJoin {
 fn main() {
     let start_time = std::time::Instant::now();
 
-    let plan: Arc<dyn Node> = Arc::new(CSVSource::new("cats.csv"));
+    // let plan: Arc<dyn Node> = Arc::new(CSVSource::new("cats.csv"));
+    let goals: Arc<dyn Node> = Arc::new(CSVSource::new("goals_big.csv"));
+    let teams: Arc<dyn Node> = Arc::new(CSVSource::new("teams.csv"));
     //let plan: Arc<dyn Node> = Arc::new(Projection::new(&["id", "name"], plan));
     // let plan: Arc<dyn Node> = Arc::new(GroupBy::new(
     //     vec![String::from("name"), String::from("age")],
@@ -1053,10 +1064,59 @@ fn main() {
     //     vec![String::from("livesleft")],
     //     plan,
     // ));
-    let plan: Arc<dyn Node> = Arc::new(StreamJoin::new(plan.clone(), vec![], plan.clone(), vec![]));
+    let plan: Arc<dyn Node> = Arc::new(StreamJoin::new(goals.clone(), vec![String::from("team")], teams.clone(), vec![String::from("id")]));
+    let plan: Arc<dyn Node> = Arc::new(GroupBy::new(
+        vec![String::from("team")],
+        vec![String::from("team")],
+        vec![Box::new(Count {})],
+        vec![String::from("count")],
+        plan,
+    ));
     let res = plan.run(&ExecutionContext {}, &mut record_print, &mut noop_meta_send);
     println!("{:?}", start_time.elapsed());
 }
+
+/// ScalarValue enumeration
+#[derive(Debug, Clone, PartialEq)]
+pub enum ScalarValue {
+    Null,
+    Boolean(bool),
+    Float32(f32),
+    Float64(f64),
+    Int8(i8),
+    Int16(i16),
+    Int32(i32),
+    Int64(i64),
+    UInt8(u8),
+    UInt16(u16),
+    UInt32(u32),
+    UInt64(u64),
+    Utf8(String),
+    Struct(Vec<ScalarValue>),
+}
+
+impl Hash for ScalarValue {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            ScalarValue::Null => (),
+            ScalarValue::Boolean(x) => x.hash(state),
+            ScalarValue::Float32(x) => unimplemented!(),
+            ScalarValue::Float64(x) => unimplemented!(),
+            ScalarValue::Int8(x) => x.hash(state),
+            ScalarValue::Int16(x) => x.hash(state),
+            ScalarValue::Int32(x) => x.hash(state),
+            ScalarValue::Int64(x) => x.hash(state),
+            ScalarValue::UInt8(x) => x.hash(state),
+            ScalarValue::UInt16(x) => x.hash(state),
+            ScalarValue::UInt32(x) => x.hash(state),
+            ScalarValue::UInt64(x) => x.hash(state),
+            ScalarValue::Utf8(x) => x.hash(state),
+            ScalarValue::Struct(x) => x.hash(state),
+        }
+    }
+}
+
+impl Eq for ScalarValue {}
 
 // ****** Copied from datafusion
 
@@ -1136,6 +1196,10 @@ fn create_row(
     for i in 0..columns.len() {
         let col = &columns[i];
         match col.data_type() {
+            DataType::Boolean => {
+                let array = col.as_any().downcast_ref::<BooleanArray>().unwrap();
+                vec[i] = ScalarValue::Boolean(array.value(row))
+            }
             DataType::UInt8 => {
                 let array = col.as_any().downcast_ref::<UInt8Array>().unwrap();
                 vec[i] = ScalarValue::UInt8(array.value(row))

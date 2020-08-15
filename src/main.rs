@@ -428,7 +428,7 @@ impl Node for GroupBy {
                     .enumerate()
                     .for_each(|(i, acc)| {
                         // TODO: remove if false
-                        acc.add(ScalarValue::Int64(aggregated_columns[i].as_any().downcast_ref::<Int64Array>().unwrap().value(i)), ScalarValue::Boolean(false));
+                        acc.add(ScalarValue::Int64(aggregated_columns[i].as_any().downcast_ref::<Int64Array>().unwrap().value(row)), ScalarValue::Boolean(false));
                     })
             }
 

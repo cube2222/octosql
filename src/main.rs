@@ -18,13 +18,16 @@ use arrow::compute::kernels::filter;
 use datafusion::logicalplan::ScalarValue;
 use datafusion::execution::physical_plan::PhysicalExpr;
 use datafusion::execution::physical_plan::hash_aggregate::HashAggregateExec;
+use datafusion::execution::physical_plan::common::get_scalar_value;
 use std::sync::Arc;
 use arrow::error::ArrowError;
 use std::collections::{BTreeMap, BTreeSet};
 use crate::Error::Unexpected;
-use arrow::ipc::Utf8Builder;
+use arrow::ipc::{Utf8Builder, BoolBuilder};
 use std::iter::repeat;
 use std::sync::mpsc;
+
+const retractions_fields: &str = "retraction";
 
 pub struct ProduceContext {}
 
@@ -83,7 +86,7 @@ impl<'a> Node for CSVSource<'a> {
             .with_batch_size(8192 * 2)
             .build(file).unwrap();
         let mut fields = r.schema().fields().clone();
-        fields.push(Field::new("retraction", DataType::Boolean, false));
+        fields.push(Field::new(retractions_fields, DataType::Boolean, false));
 
         Ok(Arc::new(Schema::new(fields)))
     }
@@ -214,7 +217,7 @@ impl<'a> Node for Filter<'a> {
     }
 }
 
-pub trait Aggregate : Send + Sync {
+pub trait Aggregate: Send + Sync {
     fn output_type(&self, input_schema: &DataType) -> Result<DataType, Error>;
     fn create_accumulator(&self) -> Box<dyn Accumulator>;
 }
@@ -327,7 +330,7 @@ impl Node for GroupBy {
             .collect();
 
         key_fields.append(&mut new_fields);
-        key_fields.push(Field::new("retraction", DataType::Boolean, false));
+        key_fields.push(Field::new(retractions_fields, DataType::Boolean, false));
         Ok(Arc::new(Schema::new(key_fields)))
     }
 
@@ -353,7 +356,7 @@ impl Node for GroupBy {
                 .collect(),
             _ => panic!("aaa"),
         };
-        let mut trigger: Box<dyn Trigger> = Box::new(CountingTrigger::new(key_types, 100));
+        let mut trigger: Box<dyn Trigger> = Box::new(CountingTrigger::new(key_types, 10));
 
         self.source.run(ctx, &mut |ctx, batch| {
             let key_columns: Vec<ArrayRef> = key_indices
@@ -650,7 +653,7 @@ impl StreamJoin {
 }
 
 impl Node for StreamJoin {
-    fn schema(&self) -> Result<Arc<Schema>, Error> {
+    fn schema(&self) -> Result<Arc<Schema>, Error> { // Both without last row, and retraction added at end.
         let source_schema_fields = self.source.schema()?.fields().clone();
         let joined_schema_fields = self.joined.schema()?.fields().clone();
         let new_fields: Vec<Field> = source_schema_fields.iter()
@@ -677,7 +680,7 @@ impl Node for StreamJoin {
             .map(|key_field| { joined_schema.index_of(key_field).unwrap() })
             .collect();
 
-        let mut state_map: BTreeMap<Vec<GroupByScalar>, (Vec<Vec<ScalarValue>>, Vec<Vec<ScalarValue>>)> = BTreeMap::new();
+        let mut state_map: BTreeMap<Vec<GroupByScalar>, (BTreeMap<Vec<ScalarValue>, i64>, BTreeMap<Vec<ScalarValue>, i64>)> = BTreeMap::new();
 
         let key_types: Vec<DataType> = match self.source.schema() {
             Ok(schema) => self.source_key_fields
@@ -693,16 +696,15 @@ impl Node for StreamJoin {
         let sender1 = sender.clone();
         let source = self.source.clone();
         let handle1 = std::thread::spawn(move || {
-            let res = source.run(&ExecutionContext{}, &mut |ctx, batch| {
-                sender1.send((0, Some(batch)));
+            let res = source.run(&ExecutionContext {}, &mut |ctx, batch| {
+                sender1.send((0, batch));
                 Ok(())
             }, &mut noop_meta_send);
-            sender1.send((0, None));
         });
-        let sender = sender.clone();
+        let sender2 = sender.clone();
         let joined = self.joined.clone();
         let handle2 = std::thread::spawn(move || {
-            let res = joined.run(&ExecutionContext{}, &mut |ctx, batch| {
+            let res = joined.run(&ExecutionContext {}, &mut |ctx, batch| {
                 sender2.send((1, batch));
                 Ok(())
             }, &mut noop_meta_send);
@@ -713,26 +715,316 @@ impl Node for StreamJoin {
         let key_indices = vec![source_key_indices, joined_key_indices];
 
         for (source_index, batch) in receiver {
-            let mut key_vec = Vec::with_capacity(self.source_key_fields.len());
-            for i in 0..key_columns.len() {
-                key_vec.push(GroupByScalar::Int64(0))
+            let key_columns: Vec<ArrayRef> = key_indices[source_index]
+                .iter()
+                .map(|&i| batch.column(i))
+                .cloned()
+                .collect();
+
+            let mut new_rows: BTreeMap<Vec<GroupByScalar>, Vec<Vec<ScalarValue>>> = BTreeMap::new();
+
+            let mut required_capacity: usize = 0;
+
+            for row in 0..batch.num_rows() {
+                let mut key_vec = Vec::with_capacity(self.source_key_fields.len());
+                for i in 0..key_columns.len() {
+                    key_vec.push(GroupByScalar::Int64(0))
+                }
+                create_key(&key_columns, row, &mut key_vec);
+
+                if let Some((source_rows, joined_rows)) = state_map.get(&key_vec) {
+                    // The row will later be joined with the other source rows.
+                    required_capacity += if source_index == 0 { joined_rows.len() } else { source_rows.len() };
+                }
+
+                let mut row_vec = Vec::with_capacity(batch.num_columns());
+                for i in 0..batch.num_columns() {
+                    row_vec.push(ScalarValue::Int64(0))
+                }
+                create_row(batch.columns(), row, &mut row_vec);
+
+                let mut new_rows_for_key = new_rows.entry(key_vec).or_default();
+                new_rows_for_key.push(row_vec);
             }
 
-            for row in 0..batch.columns()[0] {
-                let key_columns: Vec<ArrayRef> = key_indices[source_index]
-                    .iter()
-                    .map(|i| batch.column(i))
-                    .cloned()
-                    .collect();
-                create_key(key_columns, row, key_vec);
+            let mut output_columns: Vec<ArrayRef> = Vec::with_capacity(source_schema.fields().len() + joined_schema.fields().len());
 
-                let (left, right) = state_map.entry(key_vec.clone())
-                    .or_default();
+            if source_index == 0 {
+                for column in 0..(source_schema.fields().len() - 1) { // Omit the retraction field, it goes last.
+                    match batch.column(column).data_type() {
+                        DataType::Int64 => {
+                            let mut array = Int64Builder::new(required_capacity);
+                            for (key, cur_new_rows) in &new_rows {
+                                if let Some((_, state_other_rows)) = state_map.get(key) {
+                                    for (other_row, count) in state_other_rows {
+                                        for new_row in cur_new_rows {
+                                            for repetition in 0..count {
+                                                if let ScalarValue::Int64(n) = new_row[column] {
+                                                    array.append_value(n);
+                                                } else {
+                                                    panic!("invalid type");
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            output_columns.push(Arc::new(array.finish()) as ArrayRef)
+                        }
+                        DataType::Utf8 => {
+                            let mut array = Utf8Builder::new(required_capacity);
+                            for (key, cur_new_rows) in &new_rows {
+                                if let Some((_, state_other_rows)) = state_map.get(key) {
+                                    for (other_row, count) in state_other_rows {
+                                        for new_row in cur_new_rows {
+                                            for repetition in 0..count {
+                                                if let ScalarValue::Utf8(text) = new_row[column] {
+                                                    array.append_value(text);
+                                                } else {
+                                                    panic!("invalid type");
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            output_columns.push(Arc::new(array.finish()) as ArrayRef)
+                        }
+                        _ => unimplemented!(),
+                    }
+                }
 
-                // New and old array must be stored, won't work otherwise.
-                // Create the output arrays as the final step based on the new arrays, not while creating the new entries.
+                for column in 0..(joined_schema.fields().len() - 1) {
+                    match joined_schema.field(column).data_type() {
+                        DataType::Int64 => {
+                            let mut array = Int64Builder::new(required_capacity);
+                            for (key, cur_new_rows) in &new_rows {
+                                if let Some((_, state_other_rows)) = state_map.get(key) {
+                                    for (other_row, count) in state_other_rows {
+                                        for new_row in cur_new_rows {
+                                            for repetition in 0..count {
+                                                if let ScalarValue::Int64(n) = other_row[column] {
+                                                    array.append_value(n);
+                                                } else {
+                                                    panic!("invalid type");
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            output_columns.push(Arc::new(array.finish()) as ArrayRef)
+                        }
+                        DataType::Utf8 => {
+                            let mut array = Utf8Builder::new(required_capacity);
+                            for (key, cur_new_rows) in &new_rows {
+                                if let Some((_, state_other_rows)) = state_map.get(key) {
+                                    for (other_row, count) in state_other_rows {
+                                        for new_row in cur_new_rows {
+                                            for repetition in 0..count {
+                                                if let ScalarValue::Utf8(text) = other_row[column] {
+                                                    array.append_value(text.as_str());
+                                                } else {
+                                                    panic!("invalid type");
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            output_columns.push(Arc::new(array.finish()) as ArrayRef)
+                        }
+                        _ => unimplemented!(),
+                    }
+                }
 
+                let retraction_column = batch.num_columns()-1;
+
+                let mut array = BoolBuilder::new(required_capacity);
+                for (key, cur_new_rows) in &new_rows {
+                    if let Some((_, state_other_rows)) = state_map.get(key) {
+                        for (other_row, count) in state_other_rows {
+                            for new_row in cur_new_rows {
+                                for repetition in 0..count {
+                                    if let ScalarValue::Boolean(retraction) = new_row[retraction_column] {
+                                        array.append_value(retraction);
+                                    } else {
+                                        panic!("invalid type");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                output_columns.push(Arc::new(array.finish()) as ArrayRef)
+            } else {
+                for column in 0..(source_schema.fields().len() - 1) {
+                    match source_schema.field(column).data_type() {
+                        DataType::Int64 => {
+                            let mut array = Int64Builder::new(required_capacity);
+                            for (key, cur_new_rows) in &new_rows {
+                                if let Some((state_other_rows, _)) = state_map.get(key) {
+                                    for (other_row, count) in state_other_rows {
+                                        for new_row in cur_new_rows {
+                                            for repetition in 0..count {
+                                                if let ScalarValue::Int64(n) = other_row[column] {
+                                                    array.append_value(n);
+                                                } else {
+                                                    panic!("invalid type");
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            output_columns.push(Arc::new(array.finish()) as ArrayRef)
+                        }
+                        DataType::Utf8 => {
+                            let mut array = Utf8Builder::new(required_capacity);
+                            for (key, cur_new_rows) in &new_rows {
+                                if let Some((state_other_rows, _)) = state_map.get(key) {
+                                    for (other_row, count) in state_other_rows {
+                                        for new_row in cur_new_rows {
+                                            for repetition in 0..count {
+                                                if let ScalarValue::Utf8(text) = other_row[column] {
+                                                    array.append_value(text.as_str());
+                                                } else {
+                                                    panic!("invalid type");
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            output_columns.push(Arc::new(array.finish()) as ArrayRef)
+                        }
+                        _ => unimplemented!(),
+                    }
+                }
+
+                for column in 0..(joined_schema.fields().len() - 1) { // Omit the retraction field, it goes last.
+                    match batch.column(column).data_type() {
+                        DataType::Int64 => {
+                            let mut array = Int64Builder::new(required_capacity);
+                            for (key, cur_new_rows) in &new_rows {
+                                if let Some((state_other_rows,_)) = state_map.get(key) {
+                                    for (other_row, count) in state_other_rows {
+                                        for new_row in cur_new_rows {
+                                            for repetition in 0..count {
+                                                if let ScalarValue::Int64(n) = new_row[column] {
+                                                    array.append_value(n);
+                                                } else {
+                                                    panic!("invalid type");
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            output_columns.push(Arc::new(array.finish()) as ArrayRef)
+                        }
+                        DataType::Utf8 => {
+                            let mut array = Utf8Builder::new(required_capacity);
+                            for (key, cur_new_rows) in &new_rows {
+                                if let Some((state_other_rows, _)) = state_map.get(key) {
+                                    for (other_row, count) in state_other_rows {
+                                        for new_row in cur_new_rows {
+                                            for repetition in 0..count {
+                                                if let ScalarValue::Utf8(text) = new_row[column] {
+                                                    array.append_value(text);
+                                                } else {
+                                                    panic!("invalid type");
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            output_columns.push(Arc::new(array.finish()) as ArrayRef)
+                        }
+                        _ => unimplemented!(),
+                    }
+                }
+
+                let retraction_column = batch.num_columns()-1;
+
+                let mut array = BoolBuilder::new(required_capacity);
+                for (key, cur_new_rows) in &new_rows {
+                    if let Some((state_other_rows, _)) = state_map.get(key) {
+                        for (other_row, count) in state_other_rows {
+                            for new_row in cur_new_rows {
+                                for repetition in 0..count {
+                                    if let ScalarValue::Boolean(retraction) = new_row[retraction_column] {
+                                        array.append_value(retraction);
+                                    } else {
+                                        panic!("invalid type");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                output_columns.push(Arc::new(array.finish()) as ArrayRef)
             }
+
+            for (key, cur_new_rows) in new_rows {
+                let mut state = state_map.get(key);
+            }
+
+            // match batch.column(column).data_type() {
+            //     // TODO: As generic type based function.
+            //     DataType::Int64 => {
+            //         let array = batch.column(column).as_any().downcast_ref::<Int64Array>().expect("failed casting");
+            //         for row in 0..batch.num_rows() {
+            //             create_key(&key_columns, row, &mut key_vec);
+            //
+            //             let new_entries_columns = new_rows.entry(key_vec.clone())
+            //                 .or_default();
+            //             if new_entries_columns.len() == column {
+            //                 new_entries_columns.push(vec![ScalarValue::Int64(array.value(row))])
+            //             } else {
+            //                 new_entries_columns[column].push(ScalarValue::Int64(array.value(row)))
+            //             }
+            //         }
+            //     }
+            //     DataType::Boolean => {
+            //         let array = batch.column(column).as_any().downcast_ref::<BooleanArray>().expect("failed casting");
+            //         for row in 0..batch.num_rows() {
+            //             create_key(&key_columns, row, &mut key_vec);
+            //
+            //             let new_entries_columns = new_rows.entry(key_vec.clone())
+            //                 .or_default();
+            //             if new_entries_columns.len() == column {
+            //                 new_entries_columns.push(vec![ScalarValue::Boolean(array.value(row))])
+            //             } else {
+            //                 new_entries_columns[column].push(ScalarValue::Boolean(array.value(row)))
+            //             }
+            //         }
+            //     }
+            //     DataType::Utf8 => {
+            //         let array = batch.column(column).as_any().downcast_ref::<StringArray>().expect("failed casting");
+            //         for row in 0..batch.num_rows() {
+            //             create_key(&key_columns, row, &mut key_vec);
+            //
+            //             let new_entries_columns = new_rows.entry(key_vec.clone())
+            //                 .or_default();
+            //             if new_entries_columns.len() == column {
+            //                 new_entries_columns.push(vec![ScalarValue::Utf8(String::from(array.value(row)))])
+            //             } else {
+            //                 new_entries_columns[column].push(ScalarValue::Utf8(String::from(array.value(row))))
+            //             }
+            //         }
+            //     }
+            //     _ => panic!("test"),
+            // }
+
+            //for row in 0..batch.columns()[0] {
+            //    let columns = new_rows.entry(key_vec.clone())
+            //        .or_default();
+            //
+            //    // New and old array must be stored, won't work otherwise.
+            //    // Create the output arrays as the final step based on the new arrays, not while creating the new entries.
+            //}
         }
 
         handle1.join();
@@ -748,13 +1040,13 @@ fn main() {
     let plan: Arc<dyn Node> = Arc::new(CSVSource::new("cats.csv"));
     //let plan: Arc<dyn Node> = Arc::new(Projection::new(&["id", "name"], plan));
     // let plan: Arc<dyn Node> = Arc::new(GroupBy::new(
-    //     vec![String::from("name"), String::from("description"), String::from("age")],
+    //     vec![String::from("name"), String::from("age")],
     //     vec![String::from("livesleft")],
     //     vec![Box::new(Sum {})],
     //     vec![String::from("livesleft")],
     //     plan,
     // ));
-    // let plan: Arc<dyn Node> = Box::new(GroupBy::new(
+    // let plan: Arc<dyn Node> = Arc::new(GroupBy::new(
     //     vec![String::from("name")],
     //     vec![String::from("livesleft")],
     //     vec![Box::new(Sum {})],
@@ -827,6 +1119,58 @@ fn create_key(
             DataType::Utf8 => {
                 let array = col.as_any().downcast_ref::<StringArray>().unwrap();
                 vec[i] = GroupByScalar::Utf8(String::from(array.value(row)))
+            }
+            _ => {
+                return Err(Error::Unexpected);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn create_row(
+    columns: &[ArrayRef],
+    row: usize,
+    vec: &mut Vec<ScalarValue>,
+) -> Result<(), Error> {
+    for i in 0..columns.len() {
+        let col = &columns[i];
+        match col.data_type() {
+            DataType::UInt8 => {
+                let array = col.as_any().downcast_ref::<UInt8Array>().unwrap();
+                vec[i] = ScalarValue::UInt8(array.value(row))
+            }
+            DataType::UInt16 => {
+                let array = col.as_any().downcast_ref::<UInt16Array>().unwrap();
+                vec[i] = ScalarValue::UInt16(array.value(row))
+            }
+            DataType::UInt32 => {
+                let array = col.as_any().downcast_ref::<UInt32Array>().unwrap();
+                vec[i] = ScalarValue::UInt32(array.value(row))
+            }
+            DataType::UInt64 => {
+                let array = col.as_any().downcast_ref::<UInt64Array>().unwrap();
+                vec[i] = ScalarValue::UInt64(array.value(row))
+            }
+            DataType::Int8 => {
+                let array = col.as_any().downcast_ref::<Int8Array>().unwrap();
+                vec[i] = ScalarValue::Int8(array.value(row))
+            }
+            DataType::Int16 => {
+                let array = col.as_any().downcast_ref::<Int16Array>().unwrap();
+                vec[i] = ScalarValue::Int16(array.value(row))
+            }
+            DataType::Int32 => {
+                let array = col.as_any().downcast_ref::<Int32Array>().unwrap();
+                vec[i] = ScalarValue::Int32(array.value(row))
+            }
+            DataType::Int64 => {
+                let array = col.as_any().downcast_ref::<Int64Array>().unwrap();
+                vec[i] = ScalarValue::Int64(array.value(row))
+            }
+            DataType::Utf8 => {
+                let array = col.as_any().downcast_ref::<StringArray>().unwrap();
+                vec[i] = ScalarValue::Utf8(String::from(array.value(row)))
             }
             _ => {
                 return Err(Error::Unexpected);

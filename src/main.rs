@@ -33,7 +33,14 @@ const retractions_fields: &str = "retraction";
 
 pub struct ProduceContext {}
 
-pub struct ExecutionContext {}
+pub struct VariableContext {
+    schema: Vec<Arc<Schema>>,
+    variables: Vec<Vec<ScalarValue>>
+}
+
+pub struct ExecutionContext {
+    variable_context: VariableContext
+}
 
 pub enum Error {
     IOError(io::Error),
@@ -1041,6 +1048,12 @@ impl Node for StreamJoin {
 
         Ok(())
     }
+}
+
+pub trait Expression: Send + Sync {
+    // DataType + Nullable
+    fn data_type(&self, context_schema: Vec<Arc<Schema>>, record_schema: Arc<Schema>) -> Result<(DataType, bool), Error>;
+    fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef, Error>;
 }
 
 fn main() {

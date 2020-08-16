@@ -3,6 +3,10 @@ This is a work in progress experiment PoC of rewriting OctoSQL in Rust, as I've 
 # Roadmap
 The current roadmap is to achieve feature parity with the Go version of OctoSQL. When this is done, we'll decide which one gets to stay.
 
+- [x] Projection
+- [x] Filter
+- [x] GroupBy
+  - [ ] Polishing
 - [x] Triggers
   - [x] Counting
   - [ ] Delay

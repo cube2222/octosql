@@ -31,6 +31,7 @@ The current roadmap is to achieve feature parity with the Go version of OctoSQL.
 - [ ] Nice output printing
 - [ ] Float support in stream join (currently not tested and possibly wacky)
 - [ ] Datasources
+  - [x] CSV
   - [ ] MySQL
   - [ ] PostgreSQL
   - [ ] JSON

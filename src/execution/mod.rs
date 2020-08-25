@@ -1,3 +1,4 @@
+pub mod map;
 pub mod stream_join;
 pub mod datafusion;
 pub mod trigger;

@@ -40,51 +40,45 @@ fn record_print(ctx: &ProduceContext, batch: RecordBatch) -> Result<(), Error> {
     Ok(())
 }
 
-pub struct Projection<'a, 'b> {
-    fields: &'b [&'a str],
+pub struct Map {
     source: Arc<dyn Node>,
+    expressions: Vec<Arc<dyn Expression>>,
 }
 
-impl<'a, 'b> Projection<'a, 'b> {
-    fn new(fields: &'b [&'a str], source: Arc<dyn Node>) -> Projection<'a, 'b> {
-        Projection { fields, source }
-    }
-
-    fn schema_from_source_schema(&self, source_schema: Arc<Schema>) -> Result<Arc<Schema>, Error> {
-        let new_schema_fields: Vec<Field> = self.fields
-            .into_iter()
-            .map(|&field| source_schema.index_of(field).unwrap())
-            .map(|i| source_schema.field(i).clone())
-            .collect();
-        Ok(Arc::new(Schema::new(new_schema_fields)))
+impl Map {
+    fn new(source: Arc<dyn Node>, expressions: Vec<Arc<dyn Expression>>) -> Map {
+        Map { source, expressions }
     }
 }
 
-impl<'a, 'b> Node for Projection<'a, 'b> {
+impl Node for Map {
+    // TODO: Just don't allow to use retractions field as field name.
     fn schema(&self) -> Result<Arc<Schema>, Error> {
         let source_schema = self.source.schema()?;
-        self.schema_from_source_schema(source_schema)
+        let mut new_schema_fields: Vec<Field> = self.expressions
+            .iter()
+            .map(|expr| expr.field_meta(&vec![], &source_schema).unwrap_or_else(|err| unimplemented!()))
+            .collect();
+        new_schema_fields.push(Field::new(retractions_field, DataType::Boolean, false));
+        Ok(Arc::new(Schema::new(new_schema_fields)))
     }
 
     fn run(&self, ctx: &ExecutionContext, produce: ProduceFn, meta_send: MetaSendFn) -> Result<(), Error> {
-        let source_schema = self.source.schema()?;
-        let new_schema = self.schema_from_source_schema(source_schema.clone())?;
+        let output_schema = self.schema()?;
 
-        let indices: Vec<usize> = self.fields.into_iter()
-            .map(|&field| source_schema.index_of(field).unwrap())
-            .collect();
-
-        self.source.run(ctx, &mut |ctx, batch| {
-            let new_columns: Vec<ArrayRef> = (&indices).into_iter()
-                .map(|&i| batch.column(i).clone())
+        self.source.run(ctx, &mut |produce_ctx, batch| {
+            let mut new_columns: Vec<ArrayRef> = self.expressions
+                .iter()
+                .map(|expr| expr.evaluate(ctx, &batch).unwrap_or_else(|err| unimplemented!()))
                 .collect();
+            new_columns.push(batch.column(batch.num_columns()-1).clone());
 
             let new_batch = RecordBatch::try_new(
-                new_schema.clone(),
+                output_schema.clone(),
                 new_columns,
             ).unwrap();
 
-            produce(ctx, new_batch)?;
+            produce(produce_ctx, new_batch)?;
             Ok(())
         }, &mut noop_meta_send);
         Ok(())
@@ -92,8 +86,7 @@ impl<'a, 'b> Node for Projection<'a, 'b> {
 }
 
 pub trait Expression: Send + Sync {
-    // DataType + Nullable
-    fn data_type(&self, context_schema: Vec<Arc<Schema>>, record_schema: Arc<Schema>) -> Result<(DataType, bool), Error>;
+    fn field_meta(&self, context_schema: &Vec<Arc<Schema>>, record_schema: &Arc<Schema>) -> Result<Field, Error>;
     fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef, Error>;
 }
 
@@ -101,31 +94,25 @@ struct FieldExpression {
     field: String
 }
 
+// TODO: Two phases, FieldExpression and RunningFieldExpression. First gets the schema and produces the second.
 impl Expression for FieldExpression {
-    fn data_type(&self, context_schema: Vec<Arc<Schema>>, record_schema: Arc<Schema>) -> Result<(DataType, bool), Error> {
-        unimplemented!()
+    fn field_meta(&self, context_schema: &Vec<Arc<Schema>>, record_schema: &Arc<Schema>) -> Result<Field, Error> {
+        Ok(record_schema.field_with_name(self.field.as_str()).unwrap().clone())
     }
     fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef, Error> {
-        unimplemented!()
+        let record_schema: Arc<Schema> = record.schema();
+        let field_index = record_schema.index_of(self.field.as_str()).unwrap();
+        Ok(record.column(field_index).clone())
     }
 }
-
-// struct Map {
-//     expressions: Vec<Expression>,
-//     source: Arc<dyn Node>,
-// }
-//
-// impl Node for Map {
-//
-// }
 
 fn main() {
     let start_time = std::time::Instant::now();
 
-    // let plan: Arc<dyn Node> = Arc::new(CSVSource::new("cats.csv"));
-    let goals: Arc<dyn Node> = Arc::new(CSVSource::new("goals_big.csv"));
-    let teams: Arc<dyn Node> = Arc::new(CSVSource::new("teams.csv"));
-    //let plan: Arc<dyn Node> = Arc::new(Projection::new(&["id", "name"], plan));
+    let plan: Arc<dyn Node> = Arc::new(CSVSource::new("cats.csv"));
+    // let goals: Arc<dyn Node> = Arc::new(CSVSource::new("goals_big.csv"));
+    // let teams: Arc<dyn Node> = Arc::new(CSVSource::new("teams.csv"));
+    let plan: Arc<dyn Node> = Arc::new(Map::new(plan, vec![Arc::new(FieldExpression{field: "id".to_string()}), Arc::new(FieldExpression{field: "livesleft".to_string()})]));
     // let plan: Arc<dyn Node> = Arc::new(GroupBy::new(
     //     vec![String::from("name"), String::from("age")],
     //     vec![String::from("livesleft")],
@@ -140,14 +127,14 @@ fn main() {
     //     vec![String::from("livesleft")],
     //     plan,
     // ));
-    let plan: Arc<dyn Node> = Arc::new(StreamJoin::new(goals.clone(), vec![String::from("team")], teams.clone(), vec![String::from("id")]));
-    let plan: Arc<dyn Node> = Arc::new(GroupBy::new(
-        vec![String::from("team")],
-        vec![String::from("team")],
-        vec![Box::new(Count {})],
-        vec![String::from("count")],
-        plan,
-    ));
+    // let plan: Arc<dyn Node> = Arc::new(StreamJoin::new(goals.clone(), vec![String::from("team")], teams.clone(), vec![String::from("id")]));
+    // let plan: Arc<dyn Node> = Arc::new(GroupBy::new(
+    //     vec![String::from("team")],
+    //     vec![String::from("team")],
+    //     vec![Box::new(Count {})],
+    //     vec![String::from("count")],
+    //     plan,
+    // ));
     let res = plan.run(&ExecutionContext {
         variable_context: Arc::new(VariableContext {
             previous: None,

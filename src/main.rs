@@ -1,4 +1,5 @@
 mod execution;
+mod logical;
 
 use crate::execution::execution::*;
 use crate::execution::csv::CSVSource;

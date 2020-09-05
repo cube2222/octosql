@@ -18,7 +18,7 @@ pub trait Accumulator: std::fmt::Debug {
     fn trigger(&self) -> ScalarValue;
 }
 
-struct Sum {}
+pub struct Sum {}
 
 impl Aggregate for Sum {
     fn output_type(&self, input_type: &DataType) -> Result<DataType, Error> {
@@ -102,7 +102,7 @@ impl Accumulator for CountAccumulator {
 pub struct GroupBy {
     key: Vec<String>,
     aggregated_fields: Vec<String>,
-    aggregates: Vec<Box<dyn Aggregate>>,
+    aggregates: Vec<Arc<dyn Aggregate>>,
     output_names: Vec<String>,
     source: Arc<dyn Node>,
 }
@@ -111,7 +111,7 @@ impl GroupBy {
     pub fn new(
         key: Vec<String>,
         aggregated_fields: Vec<String>,
-        aggregates: Vec<Box<dyn Aggregate>>,
+        aggregates: Vec<Arc<dyn Aggregate>>,
         output_names: Vec<String>,
         source: Arc<dyn Node>,
     ) -> GroupBy {

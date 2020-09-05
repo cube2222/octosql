@@ -5,25 +5,25 @@ use arrow::array::BooleanArray;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 
-pub struct Filter<'a> {
-    field: &'a str,
+pub struct Filter {
+    field: String,
     source: Arc<dyn Node>,
 }
 
-impl<'a> Filter<'a> {
-    fn new(field: &'a str, source: Arc<dyn Node>) -> Filter<'a> {
+impl Filter {
+    pub fn new(field: String, source: Arc<dyn Node>) -> Filter {
         Filter { field, source }
     }
 }
 
-impl<'a> Node for Filter<'a> {
+impl Node for Filter {
     fn schema(&self) -> Result<Arc<Schema>, Error> {
         self.source.schema()
     }
 
     fn run(&self, ctx: &ExecutionContext, produce: ProduceFn, meta_send: MetaSendFn) -> Result<(), Error> {
         let source_schema = self.source.schema()?;
-        let index_of_field = source_schema.index_of(self.field)?;
+        let index_of_field = source_schema.index_of(self.field.as_str())?;
 
         self.source.run(ctx, &mut |ctx, batch| {
             let predicate_column = batch.column(index_of_field).as_any().downcast_ref::<BooleanArray>().unwrap();

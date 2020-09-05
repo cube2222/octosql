@@ -6,19 +6,19 @@ use std::sync::Arc;
 use arrow::array::{BooleanBuilder, ArrayRef};
 use arrow::record_batch::RecordBatch;
 
-pub struct CSVSource<'a> {
-    path: &'a str
+pub struct CSVSource {
+    path: String
 }
 
-impl<'a> CSVSource<'a> {
-    pub fn new(path: &'a str) -> CSVSource<'a> {
+impl CSVSource {
+    pub fn new(path: String) -> CSVSource {
         CSVSource { path }
     }
 }
 
-impl<'a> Node for CSVSource<'a> {
+impl Node for CSVSource {
     fn schema(&self) -> Result<Arc<Schema>, Error> {
-        let file = File::open(self.path).unwrap();
+        let file = File::open(self.path.as_str()).unwrap();
         let r = csv::ReaderBuilder::new()
             .has_header(true)
             .infer_schema(Some(10))
@@ -31,7 +31,7 @@ impl<'a> Node for CSVSource<'a> {
     }
 
     fn run(&self, ctx: &ExecutionContext, produce: ProduceFn, meta_send: MetaSendFn) -> Result<(), Error> {
-        let file = File::open(self.path).unwrap();
+        let file = File::open(self.path.as_str()).unwrap();
         let mut r = csv::ReaderBuilder::new()
             .has_header(true)
             .infer_schema(Some(10))

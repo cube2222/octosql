@@ -1,7 +1,7 @@
-mod execution;
+mod physical;
 mod logical;
 
-use crate::execution::execution::{noop_meta_send, ExecutionContext, ProduceContext, VariableContext, retractions_field};
+use crate::physical::physical::{noop_meta_send, ExecutionContext, ProduceContext, VariableContext, retractions_field};
 use crate::logical::logical::Expression::Variable;
 use crate::logical::logical::MaterializationContext;
 use crate::logical::logical::Node::{Map, Source, GroupBy, Filter};
@@ -39,7 +39,7 @@ use crate::logical::logical::Aggregate::{Count, Sum};
 fn record_print(
     ctx: &ProduceContext,
     batch: RecordBatch,
-) -> Result<(), execution::execution::Error> {
+) -> Result<(), physical::physical::Error> {
     println!("{}", batch.num_rows());
     println!("{}", pretty_format_batches(&[batch]).unwrap());
     Ok(())

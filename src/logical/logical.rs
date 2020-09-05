@@ -1,10 +1,10 @@
-use crate::execution::csv::CSVSource;
-use crate::execution::execution;
-use crate::execution::filter::Filter;
-use crate::execution::group_by;
-use crate::execution::group_by::GroupBy;
-use crate::execution::map;
-use crate::execution::stream_join::StreamJoin;
+use crate::physical::csv::CSVSource;
+use crate::physical::physical;
+use crate::physical::filter::Filter;
+use crate::physical::group_by;
+use crate::physical::group_by::GroupBy;
+use crate::physical::map;
+use crate::physical::stream_join::StreamJoin;
 use std::sync::Arc;
 
 #[derive(Debug)]
@@ -41,7 +41,7 @@ pub enum Node {
 
 pub enum Expression {
     Variable(String),
-    Constant(execution::ScalarValue),
+    Constant(physical::ScalarValue),
 }
 
 pub enum Aggregate {
@@ -59,7 +59,7 @@ impl Node {
     pub fn physical(
         &self,
         mat_ctx: &MaterializationContext,
-    ) -> Result<Arc<dyn execution::Node>, Error> {
+    ) -> Result<Arc<dyn physical::Node>, Error> {
         match self {
             Node::Source { name } => Ok(Arc::new(CSVSource::new(name.clone()))),
             Node::Filter {

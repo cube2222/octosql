@@ -1,6 +1,6 @@
-use crate::execution::datafusion::{create_key, create_row, GroupByScalar};
-use crate::execution::execution::*;
-use crate::execution::trigger::*;
+use crate::physical::datafusion::{create_key, create_row, GroupByScalar};
+use crate::physical::physical::*;
+use crate::physical::trigger::*;
 use arrow::array::{
     ArrayBuilder, ArrayRef, BooleanBuilder, Int64Array, Int64Builder, StringBuilder,
 };

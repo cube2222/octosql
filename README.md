@@ -11,10 +11,12 @@ The current roadmap is to achieve feature parity with the Go version of OctoSQL.
   - [x] Counting
   - [ ] Delay
 - [x] Retractions
-  - [ ] Add retractions to Projection (don't allow the user to remove the retraction column)
+  - [x] Add retractions to Projection (don't allow the user to remove the retraction column)
 - [x] Stream join
-- [ ] Evaluation in execution context of variables (if we're in a subquery, we need to understand both the current record, and variables stemming from record flows above us)
-- [ ] Map (evaluate expressions, this is the only place where expressions are evaluated in OctoSQL, everything else gets evaluated expressions passed from here by name)
+- [ ] Expressions
+  - [x] Evaluation in record context.
+  - [ ] Evaluation in execution context of variables (if we're in a subquery, we need to understand both the current record, and variables stemming from record flows above us)
+- [x] Map (evaluate expressions, this is the only place where expressions are evaluated in OctoSQL, everything else gets evaluated expressions passed from here by name)
 - [ ] Watermarks
   - [ ] Metadata Message and Handling
   - [ ] Watermark trigger
@@ -23,10 +25,11 @@ The current roadmap is to achieve feature parity with the Go version of OctoSQL.
 - [ ] Shuffle
 - [ ] Subqueries
 - [ ] Lookup join
-- [ ] Physical Plan (fit for pattern matching)
+- [x] Physical Plan (fit for pattern matching)
   - [ ] Basic optimiser
   - [ ] Pushing down projections
   - [ ] Pushing down filters
+- [x] Logical Plan
 - [ ] SQL
 - [ ] Nice output printing
 - [ ] Float support in stream join (currently not tested and possibly wacky)

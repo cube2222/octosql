@@ -45,7 +45,7 @@ fn record_print(ctx: &ProduceContext, batch: RecordBatch) -> Result<(), Error> {
 fn main() {
     let start_time = std::time::Instant::now();
 
-    let plan: Arc<dyn Node> = Arc::new(CSVSource::new("cats.csv"));
+    let plan: Arc<dyn Node> = Arc::new(CSVSource::new(String::from("cats.csv")));
     // let goals: Arc<dyn Node> = Arc::new(CSVSource::new("goals_big.csv"));
     // let teams: Arc<dyn Node> = Arc::new(CSVSource::new("teams.csv"));
     let plan: Arc<dyn Node> = Arc::new(Map::new(plan, vec![Arc::new(FieldExpression::new("id".to_string())), Arc::new(FieldExpression::new("livesleft".to_string()))]));

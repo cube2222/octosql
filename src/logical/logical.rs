@@ -56,75 +56,77 @@ struct MaterializationContext {}
 
 impl Node {
     pub fn physical(&self, mat_ctx: &MaterializationContext) -> Result<Arc<dyn execution::Node>, Error> {
-        Ok(Arc::new(match self {
+        match self {
             Node::Source { name } => {
-                CSVSource::new(
+                Ok(Arc::new(CSVSource::new(
                     name.clone(),
-                )
+                )))
             }
             Node::Filter { source, filter_column } => {
-                Filter::new(
+                Ok(Arc::new(Filter::new(
                     filter_column.clone(),
                     source.physical(mat_ctx)?,
-                )
+                )))
             }
             Node::Map { source, expressions } => {
-                let expr_vec = expressions
+                let expr_vec_res = expressions
                     .iter()
-                    .map(Expression::physical)
-                    .fold_results(vec![], |mut exprs, cur| {
-                        exprs.push(cur);
-                        exprs
-                    })?;
-                map::Map::new(
+                    .map(|expr| expr.physical(mat_ctx))
+                    .collect::<Vec<_>>();
+                let mut expr_vec = Vec::with_capacity(expr_vec_res.len());
+                for expr_res in expr_vec_res {
+                    expr_vec.push(expr_res?);
+                }
+                Ok(Arc::new(map::Map::new(
                     source.physical(mat_ctx)?,
                     expr_vec,
-                )
+                )))
             }
             Node::GroupBy { source, key_fields, aggregates, aggregated_fields, output_fields } => {
-                let aggregate_vec = aggregates
+                let aggregate_vec_res = aggregates
                     .iter()
-                    .map(Aggregate::physical)
-                    .fold_results(vec![], |mut aggrs, cur| {
-                        aggrs.push(cur);
-                        aggrs
-                    })?;
-                GroupBy::new(
+                    .map(|expr| expr.physical(mat_ctx))
+                    .collect::<Vec<_>>();
+                let mut aggregate_vec = Vec::with_capacity(aggregate_vec_res.len());
+                for expr_res in aggregate_vec_res {
+                    aggregate_vec.push(expr_res?);
+                }
+                Ok(Arc::new(GroupBy::new(
                     key_fields.clone(),
                     aggregated_fields.clone(),
                     aggregate_vec,
                     output_fields.clone(),
                     source.physical(mat_ctx)?,
-                )
+                )))
             }
             Node::Join { source, source_key, joined, joined_key } => {
-                StreamJoin::new(
+                Ok(Arc::new(StreamJoin::new(
                     source.physical(mat_ctx)?,
                     source_key.clone(),
                     joined.physical(mat_ctx)?,
                     joined_key.clone(),
-                )
+                )))
             }
-        }))
+        }
     }
 }
 
 impl Expression {
     pub fn physical(&self, mat_ctx: &MaterializationContext) -> Result<Arc<dyn map::Expression>, Error> {
-        Ok(Arc::new(match self {
+        match self {
             Expression::Variable(name) => {
-                map::FieldExpression::new(name.clone())
+                Ok(Arc::new(map::FieldExpression::new(name.clone())))
             }
             Expression::Constant(_) => { unimplemented!() }
-        }))
+        }
     }
 }
 
 impl Aggregate {
     pub fn physical(&self, mat_ctx: &MaterializationContext) -> Result<Arc<dyn group_by::Aggregate>, Error> {
-        Ok(Arc::new(match self {
-            Aggregate::Count() => { group_by::Count {} }
-            Aggregate::Sum() => { group_by::Sum {} }
-        }))
+        match self {
+            Aggregate::Count() => { Ok(Arc::new(group_by::Count {})) }
+            Aggregate::Sum() => { Ok(Arc::new(group_by::Sum {})) }
+        }
     }
 }

@@ -1,9 +1,9 @@
-use std::sync::Arc;
 use arrow::datatypes::Schema;
-use std::hash::Hash;
-use arrow::record_batch::RecordBatch;
 use arrow::error::ArrowError;
+use arrow::record_batch::RecordBatch;
+use std::hash::Hash;
 use std::io;
+use std::sync::Arc;
 
 pub const batch_size: usize = 8192;
 pub const retractions_field: &str = "retraction";
@@ -59,7 +59,7 @@ pub struct VariableContext {
 }
 
 pub struct ExecutionContext {
-    pub variable_context: Arc<VariableContext>
+    pub variable_context: Arc<VariableContext>,
 }
 
 impl Clone for ExecutionContext {
@@ -70,6 +70,7 @@ impl Clone for ExecutionContext {
     }
 }
 
+#[derive(Debug)]
 pub enum Error {
     IOError(io::Error),
     ArrowError(arrow::error::ArrowError),
@@ -95,5 +96,10 @@ pub enum MetadataMessage {
 
 pub trait Node: Send + Sync {
     fn schema(&self) -> Result<Arc<Schema>, Error>;
-    fn run(&self, ctx: &ExecutionContext, produce: ProduceFn, meta_send: MetaSendFn) -> Result<(), Error>;
+    fn run(
+        &self,
+        ctx: &ExecutionContext,
+        produce: ProduceFn,
+        meta_send: MetaSendFn,
+    ) -> Result<(), Error>;
 }

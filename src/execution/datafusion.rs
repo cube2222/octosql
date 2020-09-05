@@ -1,8 +1,10 @@
-
 // ****** Copied from datafusion
 
-use arrow::array::{ArrayRef, UInt8Array, UInt16Array, UInt32Array, UInt64Array, Int8Array, Int16Array, Int32Array, Int64Array, StringArray, BooleanArray};
 use crate::execution::execution::{Error, ScalarValue};
+use arrow::array::{
+    ArrayRef, BooleanArray, Int16Array, Int32Array, Int64Array, Int8Array, StringArray,
+    UInt16Array, UInt32Array, UInt64Array, UInt8Array,
+};
 use arrow::datatypes::DataType;
 
 /// Enumeration of types that can be used in a GROUP BY expression (all primitives except

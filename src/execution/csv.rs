@@ -1,13 +1,13 @@
 use crate::execution::execution::*;
-use arrow::datatypes::{Schema, Field, DataType};
-use std::fs::File;
+use arrow::array::{ArrayRef, BooleanBuilder};
 use arrow::csv;
-use std::sync::Arc;
-use arrow::array::{BooleanBuilder, ArrayRef};
+use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
+use std::fs::File;
+use std::sync::Arc;
 
 pub struct CSVSource {
-    path: String
+    path: String,
 }
 
 impl CSVSource {
@@ -23,20 +23,27 @@ impl Node for CSVSource {
             .has_header(true)
             .infer_schema(Some(10))
             .with_batch_size(batch_size * 2)
-            .build(file).unwrap();
+            .build(file)
+            .unwrap();
         let mut fields = r.schema().fields().clone();
         fields.push(Field::new(retractions_field, DataType::Boolean, false));
 
         Ok(Arc::new(Schema::new(fields)))
     }
 
-    fn run(&self, ctx: &ExecutionContext, produce: ProduceFn, meta_send: MetaSendFn) -> Result<(), Error> {
+    fn run(
+        &self,
+        ctx: &ExecutionContext,
+        produce: ProduceFn,
+        meta_send: MetaSendFn,
+    ) -> Result<(), Error> {
         let file = File::open(self.path.as_str()).unwrap();
         let mut r = csv::ReaderBuilder::new()
             .has_header(true)
             .infer_schema(Some(10))
             .with_batch_size(batch_size)
-            .build(file).unwrap();
+            .build(file)
+            .unwrap();
         let mut retraction_array_builder = BooleanBuilder::new(batch_size);
         for i in 0..batch_size {
             retraction_array_builder.append_value(false);
@@ -59,7 +66,10 @@ impl Node for CSVSource {
                         let retraction_array = Arc::new(retraction_array_builder.finish());
                         columns.push(retraction_array as ArrayRef)
                     }
-                    produce(&ProduceContext {}, RecordBatch::try_new(schema.clone(), columns).unwrap())
+                    produce(
+                        &ProduceContext {},
+                        RecordBatch::try_new(schema.clone(), columns).unwrap(),
+                    )
                 }
             };
         }

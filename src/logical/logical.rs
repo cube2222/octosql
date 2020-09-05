@@ -1,19 +1,20 @@
 use crate::execution::csv::CSVSource;
 use crate::execution::execution;
 use crate::execution::filter::Filter;
-use crate::execution::map;
 use crate::execution::group_by;
-use std::sync::Arc;
 use crate::execution::group_by::GroupBy;
+use crate::execution::map;
 use crate::execution::stream_join::StreamJoin;
+use std::sync::Arc;
 
-enum Error {
+#[derive(Debug)]
+pub enum Error {
     Unexpected(String),
 }
 
-enum Node {
+pub enum Node {
     Source {
-        name: String
+        name: String,
     },
     Filter {
         source: Box<Node>,
@@ -38,12 +39,12 @@ enum Node {
     },
 }
 
-enum Expression {
+pub enum Expression {
     Variable(String),
     Constant(execution::ScalarValue),
 }
 
-enum Aggregate {
+pub enum Aggregate {
     Count(),
     Sum(),
 }
@@ -52,23 +53,26 @@ enum Trigger {
     Counting(u64),
 }
 
-struct MaterializationContext {}
+pub struct MaterializationContext {}
 
 impl Node {
-    pub fn physical(&self, mat_ctx: &MaterializationContext) -> Result<Arc<dyn execution::Node>, Error> {
+    pub fn physical(
+        &self,
+        mat_ctx: &MaterializationContext,
+    ) -> Result<Arc<dyn execution::Node>, Error> {
         match self {
-            Node::Source { name } => {
-                Ok(Arc::new(CSVSource::new(
-                    name.clone(),
-                )))
-            }
-            Node::Filter { source, filter_column } => {
-                Ok(Arc::new(Filter::new(
-                    filter_column.clone(),
-                    source.physical(mat_ctx)?,
-                )))
-            }
-            Node::Map { source, expressions } => {
+            Node::Source { name } => Ok(Arc::new(CSVSource::new(name.clone()))),
+            Node::Filter {
+                source,
+                filter_column,
+            } => Ok(Arc::new(Filter::new(
+                filter_column.clone(),
+                source.physical(mat_ctx)?,
+            ))),
+            Node::Map {
+                source,
+                expressions,
+            } => {
                 let expr_vec_res = expressions
                     .iter()
                     .map(|expr| expr.physical(mat_ctx))
@@ -77,12 +81,15 @@ impl Node {
                 for expr_res in expr_vec_res {
                     expr_vec.push(expr_res?);
                 }
-                Ok(Arc::new(map::Map::new(
-                    source.physical(mat_ctx)?,
-                    expr_vec,
-                )))
+                Ok(Arc::new(map::Map::new(source.physical(mat_ctx)?, expr_vec)))
             }
-            Node::GroupBy { source, key_fields, aggregates, aggregated_fields, output_fields } => {
+            Node::GroupBy {
+                source,
+                key_fields,
+                aggregates,
+                aggregated_fields,
+                output_fields,
+            } => {
                 let aggregate_vec_res = aggregates
                     .iter()
                     .map(|expr| expr.physical(mat_ctx))
@@ -99,34 +106,41 @@ impl Node {
                     source.physical(mat_ctx)?,
                 )))
             }
-            Node::Join { source, source_key, joined, joined_key } => {
-                Ok(Arc::new(StreamJoin::new(
-                    source.physical(mat_ctx)?,
-                    source_key.clone(),
-                    joined.physical(mat_ctx)?,
-                    joined_key.clone(),
-                )))
-            }
+            Node::Join {
+                source,
+                source_key,
+                joined,
+                joined_key,
+            } => Ok(Arc::new(StreamJoin::new(
+                source.physical(mat_ctx)?,
+                source_key.clone(),
+                joined.physical(mat_ctx)?,
+                joined_key.clone(),
+            ))),
         }
     }
 }
 
 impl Expression {
-    pub fn physical(&self, mat_ctx: &MaterializationContext) -> Result<Arc<dyn map::Expression>, Error> {
+    pub fn physical(
+        &self,
+        mat_ctx: &MaterializationContext,
+    ) -> Result<Arc<dyn map::Expression>, Error> {
         match self {
-            Expression::Variable(name) => {
-                Ok(Arc::new(map::FieldExpression::new(name.clone())))
-            }
-            Expression::Constant(_) => { unimplemented!() }
+            Expression::Variable(name) => Ok(Arc::new(map::FieldExpression::new(name.clone()))),
+            Expression::Constant(_) => unimplemented!(),
         }
     }
 }
 
 impl Aggregate {
-    pub fn physical(&self, mat_ctx: &MaterializationContext) -> Result<Arc<dyn group_by::Aggregate>, Error> {
+    pub fn physical(
+        &self,
+        mat_ctx: &MaterializationContext,
+    ) -> Result<Arc<dyn group_by::Aggregate>, Error> {
         match self {
-            Aggregate::Count() => { Ok(Arc::new(group_by::Count {})) }
-            Aggregate::Sum() => { Ok(Arc::new(group_by::Sum {})) }
+            Aggregate::Count() => Ok(Arc::new(group_by::Count {})),
+            Aggregate::Sum() => Ok(Arc::new(group_by::Sum {})),
         }
     }
 }

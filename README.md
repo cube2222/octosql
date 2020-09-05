@@ -13,6 +13,7 @@ The current roadmap is to achieve feature parity with the Go version of OctoSQL.
 - [x] Retractions
   - [x] Add retractions to Projection (don't allow the user to remove the retraction column)
 - [x] Stream join
+  - [ ] Float support (currently not tested and possibly wacky)
 - [ ] Expressions
   - [x] Evaluation in record context.
   - [ ] Evaluation in execution context of variables (if we're in a subquery, we need to understand both the current record, and variables stemming from record flows above us)
@@ -32,7 +33,6 @@ The current roadmap is to achieve feature parity with the Go version of OctoSQL.
 - [x] Logical Plan
 - [ ] SQL
 - [ ] Nice output printing
-- [ ] Float support in stream join (currently not tested and possibly wacky)
 - [ ] Datasources
   - [x] CSV
   - [ ] MySQL

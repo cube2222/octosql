@@ -95,11 +95,18 @@ pub fn namespaced_identifier(input: &str) -> IResult<&str, Identifier> {
     }
 }
 
+pub fn identifier(input: &str) -> IResult<&str, Identifier> {
+    alt((
+        namespaced_identifier,
+        simple_identifier,
+    ))(input)
+}
+
 #[test]
 fn simple_test() {
     //let text = "my_happy.rainbow";
     let text = "my_happy.long.rainbow";
-    let res = namespaced_identifier(text);
+    let res = identifier(text);
     dbg!(res);
 }
 

@@ -6,10 +6,10 @@ use nom::{
 };
 use nom::character::is_alphanumeric;
 use nom::combinator::recognize;
-use nom::sequence::pair;
+use nom::sequence::{pair, terminated};
 use nom::branch::alt;
-use nom::character::complete::{alpha1, alphanumeric1, alphanumeric0};
-use nom::multi::many0;
+use nom::character::complete::{alpha1, alphanumeric1, alphanumeric0, one_of, digit1};
+use nom::multi::{many0, many1};
 
 pub mod parser;
 
@@ -42,19 +42,6 @@ pub enum Identifier {
     NamespacedIdentifier(String, String),
 }
 
-#[derive(Debug, Eq, PartialEq)]
-pub enum Value {
-    Integer(i64),
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub enum Operator {
-    Plus,
-    Minus,
-    AND,
-    OR,
-}
-
 pub fn simple_identifier(input: &str) -> IResult<&str, Identifier> {
     let (remaining, ident) = recognize(
         pair(
@@ -66,24 +53,6 @@ pub fn simple_identifier(input: &str) -> IResult<&str, Identifier> {
 }
 
 pub fn namespaced_identifier(input: &str) -> IResult<&str, Identifier> {
-    // let simple_ident = recognize(
-    //     pair(
-    //         alpha1,
-    //         many0(alt((alphanumeric1, tag("_")))),
-    //     ),
-    // );
-    // let namespaced_ident = recognize(
-    //     tuple((
-    //         &simple_ident,
-    //         tag("."),
-    //         identifier,
-    //     )),
-    // );
-    //
-    // let (remaining, ident) = alt((
-    //     namespaced_ident,
-    //     &simple_ident,
-    // ))(input)?;
     if let (remaining, (Identifier::SimpleIdentifier(namespace), _, Identifier::SimpleIdentifier(name))) = tuple((
         simple_identifier,
         tag("."),
@@ -102,11 +71,39 @@ pub fn identifier(input: &str) -> IResult<&str, Identifier> {
     ))(input)
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub enum Value {
+    Integer(i64),
+}
+
+pub fn integer(input: &str) -> IResult<&str, Value> {
+    let (remaining, digits) = recognize(
+        digit1
+    )(input)?;
+    Ok((remaining, Value::Integer(digits.parse::<i64>().unwrap())))
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum Operator {
+    Plus,
+    Minus,
+    AND,
+    OR,
+}
+
 #[test]
 fn simple_test() {
     //let text = "my_happy.rainbow";
     let text = "my_happy.long.rainbow";
     let res = identifier(text);
+    dbg!(res);
+}
+
+#[test]
+fn simple_test2() {
+    //let text = "my_happy.rainbow";
+    let text = "012345";
+    let res = integer(text);
     dbg!(res);
 }
 

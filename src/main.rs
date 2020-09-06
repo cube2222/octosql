@@ -1,5 +1,6 @@
 mod physical;
 mod logical;
+mod parser;
 
 use crate::physical::physical::{noop_meta_send, ExecutionContext, ProduceContext, VariableContext, retractions_field};
 use crate::logical::logical::Expression::Variable;

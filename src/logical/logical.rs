@@ -16,6 +16,7 @@ pub enum Error {
 pub enum Node {
     Source {
         name: Identifier,
+        alias: Option<Identifier>,
     },
     Filter {
         source: Box<Node>,
@@ -39,6 +40,10 @@ pub enum Node {
         joined: Box<Node>,
         joined_key: Vec<Identifier>,
     },
+    Requalifier {
+        source: Box<Node>,
+        alias: Identifier,
+    }
 }
 
 pub enum Expression {
@@ -63,7 +68,7 @@ impl Node {
         mat_ctx: &MaterializationContext,
     ) -> Result<Arc<dyn physical::Node>, Error> {
         match self {
-            Node::Source { name } => Ok(Arc::new(CSVSource::new(name.to_string()))),
+            Node::Source { name, alias} => Ok(Arc::new(CSVSource::new(name.to_string()))),
             Node::Filter {
                 source,
                 filter_column,
@@ -120,6 +125,7 @@ impl Node {
                 joined.physical(mat_ctx)?,
                 joined_key.clone(),
             ))),
+            Node::Requalifier { source, alias } => unimplemented!(),
         }
     }
 }

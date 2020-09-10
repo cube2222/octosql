@@ -77,6 +77,7 @@ fn main() {
     // ));
     let logical_plan = Source {
         name: Identifier::SimpleIdentifier("cats.csv".to_string()),
+        alias: None,
     };
     let logical_plan = Map {
         source: Box::new(logical_plan),

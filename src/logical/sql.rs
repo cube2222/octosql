@@ -31,10 +31,10 @@ pub fn query_to_logical_plan(query: &Box<parser::Query>) -> Box<Node> {
 
 pub fn source_to_logical_plan(expr: &Box<parser::Source>) -> Box<Node> {
     match &**expr {
-        parser::Source::Table(ident) => {
-            Box::new(Node::Source { name: identifier_to_logical_plan(&ident) })
+        parser::Source::Table(ident, alias) => {
+            Box::new(Node::Source { name: identifier_to_logical_plan(&ident), alias: alias.clone().map(|ident| identifier_to_logical_plan(&ident)) })
         }
-        parser::Source::Subquery(subquery) => {
+        parser::Source::Subquery(subquery, alias) => {
             query_to_logical_plan(&subquery)
         }
     }

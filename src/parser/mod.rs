@@ -25,8 +25,8 @@ pub enum Query {
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Source {
-    Table(Identifier),
-    Subquery(Box<Query>),
+    Table(Identifier, Option<Identifier>),
+    Subquery(Box<Query>, Option<Identifier>),
 }
 
 #[derive(Debug, Eq, PartialEq)]

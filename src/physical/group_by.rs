@@ -102,19 +102,19 @@ impl Accumulator for CountAccumulator {
 }
 
 pub struct GroupBy {
-    key: Vec<String>,
-    aggregated_fields: Vec<String>,
+    key: Vec<Identifier>,
+    aggregated_fields: Vec<Identifier>,
     aggregates: Vec<Arc<dyn Aggregate>>,
-    output_names: Vec<String>,
+    output_names: Vec<Identifier>,
     source: Arc<dyn Node>,
 }
 
 impl GroupBy {
     pub fn new(
-        key: Vec<String>,
-        aggregated_fields: Vec<String>,
+        key: Vec<Identifier>,
+        aggregated_fields: Vec<Identifier>,
         aggregates: Vec<Arc<dyn Aggregate>>,
-        output_names: Vec<String>,
+        output_names: Vec<Identifier>,
         source: Arc<dyn Node>,
     ) -> GroupBy {
         return GroupBy {
@@ -133,7 +133,7 @@ impl Node for GroupBy {
         let mut key_fields: Vec<Field> = self
             .key
             .iter()
-            .map(|key_field| source_schema.index_of(key_field).unwrap())
+            .map(|key_field| source_schema.index_of(key_field.to_string().as_str()).unwrap())
             .map(|i| source_schema.field(i))
             .cloned()
             .collect();
@@ -141,7 +141,7 @@ impl Node for GroupBy {
         let aggregated_field_types: Vec<DataType> = self
             .aggregated_fields
             .iter()
-            .map(|field| source_schema.index_of(field.as_str()).unwrap())
+            .map(|field| source_schema.index_of(field.to_string().as_str()).unwrap())
             .enumerate()
             .map(|(i, column_index)| {
                 self.aggregates[i].output_type(source_schema.field(column_index).data_type())
@@ -156,7 +156,7 @@ impl Node for GroupBy {
             .iter()
             .cloned()
             .enumerate()
-            .map(|(i, t)| Field::new(self.output_names[i].as_str(), t, false))
+            .map(|(i, t)| Field::new(self.output_names[i].to_string().as_str(), t, false))
             .collect();
 
         key_fields.append(&mut new_fields);
@@ -174,12 +174,12 @@ impl Node for GroupBy {
         let key_indices: Vec<usize> = self
             .key
             .iter()
-            .map(|key_field| source_schema.index_of(key_field).unwrap())
+            .map(|key_field| source_schema.index_of(key_field.to_string().as_str()).unwrap())
             .collect();
         let aggregated_field_indices: Vec<usize> = self
             .aggregated_fields
             .iter()
-            .map(|field| source_schema.index_of(field.as_str()).unwrap())
+            .map(|field| source_schema.index_of(field.to_string().as_str()).unwrap())
             .collect();
 
         let mut accumulators_map: BTreeMap<Vec<GroupByScalar>, Vec<Box<dyn Accumulator>>> =
@@ -191,7 +191,7 @@ impl Node for GroupBy {
             Ok(schema) => self
                 .key
                 .iter()
-                .map(|field| schema.field_with_name(field).unwrap().data_type())
+                .map(|field| schema.field_with_name(field.to_string().as_str()).unwrap().data_type())
                 .cloned()
                 .collect(),
             _ => panic!("aaa"),

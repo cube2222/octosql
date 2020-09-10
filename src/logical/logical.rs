@@ -6,6 +6,7 @@ use crate::physical::group_by::GroupBy;
 use crate::physical::map;
 use crate::physical::stream_join::StreamJoin;
 use std::sync::Arc;
+use crate::physical::physical::Identifier;
 
 #[derive(Debug)]
 pub enum Error {
@@ -14,33 +15,34 @@ pub enum Error {
 
 pub enum Node {
     Source {
-        name: String,
+        name: Identifier,
     },
     Filter {
         source: Box<Node>,
-        filter_column: String,
+        filter_column: Identifier,
     },
     Map {
         source: Box<Node>,
         expressions: Vec<Expression>,
+        keep_source_fields: bool,
     },
     GroupBy {
         source: Box<Node>,
-        key_fields: Vec<String>,
+        key_fields: Vec<Identifier>,
         aggregates: Vec<Aggregate>,
-        aggregated_fields: Vec<String>,
-        output_fields: Vec<String>,
+        aggregated_fields: Vec<Identifier>,
+        output_fields: Vec<Identifier>,
     },
     Join {
         source: Box<Node>,
-        source_key: Vec<String>,
+        source_key: Vec<Identifier>,
         joined: Box<Node>,
-        joined_key: Vec<String>,
+        joined_key: Vec<Identifier>,
     },
 }
 
 pub enum Expression {
-    Variable(String),
+    Variable(Identifier),
     Constant(physical::ScalarValue),
 }
 
@@ -49,7 +51,7 @@ pub enum Aggregate {
     Sum(),
 }
 
-enum Trigger {
+pub enum Trigger {
     Counting(u64),
 }
 
@@ -61,7 +63,7 @@ impl Node {
         mat_ctx: &MaterializationContext,
     ) -> Result<Arc<dyn physical::Node>, Error> {
         match self {
-            Node::Source { name } => Ok(Arc::new(CSVSource::new(name.clone()))),
+            Node::Source { name } => Ok(Arc::new(CSVSource::new(name.to_string()))),
             Node::Filter {
                 source,
                 filter_column,
@@ -72,6 +74,7 @@ impl Node {
             Node::Map {
                 source,
                 expressions,
+                keep_source_fields,
             } => {
                 let expr_vec_res = expressions
                     .iter()

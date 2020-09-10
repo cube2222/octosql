@@ -11,11 +11,10 @@ use nom::branch::alt;
 use nom::character::complete::{alpha1, alphanumeric1, alphanumeric0, one_of, digit1};
 use nom::multi::{many0, many1};
 
-pub mod parser;
-
 #[derive(Debug, Eq, PartialEq)]
 pub enum Query {
     Select {
+        expressions: Vec<(Box<Expression>, Option<Identifier>)>,
         filter: Option<Box<Expression>>,
         from: Box<Source>,
         order_by: Vec<Box<Expression>>,
@@ -32,11 +31,11 @@ pub enum Source {
 pub enum Expression {
     Variable(Identifier),
     Constant(Value),
-    Function(Identifier, Box<Expression>),
+    Function(Identifier, Vec<Box<Expression>>),
     Operator(Box<Expression>, Operator, Box<Expression>),
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Identifier {
     SimpleIdentifier(String),
     NamespacedIdentifier(String, String),

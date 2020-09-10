@@ -6,12 +6,12 @@ use arrow::record_batch::RecordBatch;
 use std::sync::Arc;
 
 pub struct Filter {
-    field: String,
+    field: Identifier,
     source: Arc<dyn Node>,
 }
 
 impl Filter {
-    pub fn new(field: String, source: Arc<dyn Node>) -> Filter {
+    pub fn new(field: Identifier, source: Arc<dyn Node>) -> Filter {
         Filter { field, source }
     }
 }
@@ -28,7 +28,7 @@ impl Node for Filter {
         meta_send: MetaSendFn,
     ) -> Result<(), Error> {
         let source_schema = self.source.schema()?;
-        let index_of_field = source_schema.index_of(self.field.as_str())?;
+        let index_of_field = source_schema.index_of(self.field.to_string().as_str())?;
 
         self.source.run(
             ctx,

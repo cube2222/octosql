@@ -8,6 +8,29 @@ use std::sync::Arc;
 pub const batch_size: usize = 8192;
 pub const retractions_field: &str = "retraction";
 
+#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
+pub enum Identifier {
+    SimpleIdentifier(String),
+    NamespacedIdentifier(String, String),
+}
+
+impl ToString for Identifier {
+    #[inline]
+    fn to_string(&self) -> String {
+        match self {
+            Identifier::SimpleIdentifier(id) => {
+                id.clone()
+            },
+            Identifier::NamespacedIdentifier(namespace, id) => {
+                let mut output = namespace.clone();
+                output.push_str(".");
+                output.push_str(id);
+                output
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum ScalarValue {
     Null,

@@ -2,7 +2,7 @@ mod physical;
 mod logical;
 mod parser;
 
-use crate::physical::physical::{noop_meta_send, ExecutionContext, ProduceContext, VariableContext, retractions_field};
+use crate::physical::physical::{noop_meta_send, ExecutionContext, ProduceContext, VariableContext, retractions_field, Identifier};
 use crate::logical::logical::Expression::Variable;
 use crate::logical::logical::MaterializationContext;
 use crate::logical::logical::Node::{Map, Source, GroupBy, Filter};
@@ -76,18 +76,19 @@ fn main() {
     //     plan,
     // ));
     let logical_plan = Source {
-        name: "cats.csv".to_string(),
+        name: Identifier::SimpleIdentifier("cats.csv".to_string()),
     };
     let logical_plan = Map {
         source: Box::new(logical_plan),
-        expressions: vec![Variable("name".to_string()), Variable("livesleft".to_string())],
+        expressions: vec![Variable(Identifier::SimpleIdentifier("name".to_string())), Variable(Identifier::SimpleIdentifier("livesleft".to_string()))],
+        keep_source_fields: false,
     };
     let logical_plan = GroupBy {
         source: Box::new(logical_plan),
-        key_fields: vec!["livesleft".to_string()],
+        key_fields: vec![Identifier::SimpleIdentifier("livesleft".to_string())],
         aggregates: vec![Count(), Sum()],
-        aggregated_fields: vec!["livesleft".to_string(), "livesleft".to_string()],
-        output_fields: vec!["livesleft_count".to_string(), "livesleft_sum".to_string()]
+        aggregated_fields: vec![Identifier::SimpleIdentifier("livesleft".to_string()), Identifier::SimpleIdentifier("livesleft".to_string())],
+        output_fields: vec![Identifier::SimpleIdentifier("livesleft_count".to_string()), Identifier::SimpleIdentifier("livesleft_sum".to_string())]
     };
     // let logical_plan = Filter {
     //     source: Box::new(logical_plan),

@@ -8,17 +8,17 @@ use std::sync::{mpsc, Arc};
 
 pub struct StreamJoin {
     source: Arc<dyn Node>,
-    source_key_fields: Vec<String>,
+    source_key_fields: Vec<Identifier>,
     joined: Arc<dyn Node>,
-    joined_key_fields: Vec<String>,
+    joined_key_fields: Vec<Identifier>,
 }
 
 impl StreamJoin {
     pub fn new(
         source: Arc<dyn Node>,
-        source_key_fields: Vec<String>,
+        source_key_fields: Vec<Identifier>,
         joined: Arc<dyn Node>,
-        joined_key_fields: Vec<String>,
+        joined_key_fields: Vec<Identifier>,
     ) -> StreamJoin {
         StreamJoin {
             source,
@@ -60,13 +60,13 @@ impl Node for StreamJoin {
         let source_key_indices: Vec<usize> = self
             .source_key_fields
             .iter()
-            .map(|key_field| source_schema.index_of(key_field).unwrap())
+            .map(|key_field| source_schema.index_of(key_field.to_string().as_str()).unwrap())
             .collect();
         let joined_schema = self.joined.schema()?;
         let joined_key_indices: Vec<usize> = self
             .joined_key_fields
             .iter()
-            .map(|key_field| joined_schema.index_of(key_field).unwrap())
+            .map(|key_field| joined_schema.index_of(key_field.to_string().as_str()).unwrap())
             .collect();
         let output_schema = self.schema()?;
 
@@ -83,7 +83,7 @@ impl Node for StreamJoin {
             Ok(schema) => self
                 .source_key_fields
                 .iter()
-                .map(|field| schema.field_with_name(field).unwrap().data_type())
+                .map(|field| schema.field_with_name(field.to_string().as_str()).unwrap().data_type())
                 .cloned()
                 .collect(),
             _ => panic!("aaa"),

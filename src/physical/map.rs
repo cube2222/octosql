@@ -76,11 +76,11 @@ pub trait Expression: Send + Sync {
 }
 
 pub struct FieldExpression {
-    field: String,
+    field: Identifier,
 }
 
 impl FieldExpression {
-    pub fn new(field: String) -> FieldExpression {
+    pub fn new(field: Identifier) -> FieldExpression {
         FieldExpression { field }
     }
 }
@@ -93,13 +93,13 @@ impl Expression for FieldExpression {
         record_schema: &Arc<Schema>,
     ) -> Result<Field, Error> {
         Ok(record_schema
-            .field_with_name(self.field.as_str())
+            .field_with_name(self.field.to_string().as_str())
             .unwrap()
             .clone())
     }
     fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef, Error> {
         let record_schema: Arc<Schema> = record.schema();
-        let field_index = record_schema.index_of(self.field.as_str()).unwrap();
+        let field_index = record_schema.index_of(self.field.to_string().as_str()).unwrap();
         Ok(record.column(field_index).clone())
     }
 }

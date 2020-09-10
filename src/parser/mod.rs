@@ -1,3 +1,5 @@
+pub mod parser;
+
 use nom::{
     IResult,
     bytes::complete::{tag},

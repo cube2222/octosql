@@ -375,7 +375,7 @@ dependencies = [
  "paste",
  "prettytable-rs",
  "rustyline",
- "sqlparser",
+ "sqlparser 0.2.6",
 ]
 
 [[package]]
@@ -971,6 +971,7 @@ dependencies = [
  "nom",
  "serde",
  "serde_json",
+ "sqlparser 0.6.1",
 ]
 
 [[package]]
@@ -1376,6 +1377,15 @@ dependencies = [
  "chrono",
  "log",
  "uuid",
+]
+
+[[package]]
+name = "sqlparser"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53fa7478852b3ea28f0d21a42b2d7dade24ba4aa72e22bf66982e4b587a7f608"
+dependencies = [
+ "log",
 ]
 
 [[package]]

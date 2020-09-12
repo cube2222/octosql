@@ -79,11 +79,11 @@ fn main() {
         name: Identifier::SimpleIdentifier("cats.csv".to_string()),
         alias: None,
     };
-    let logical_plan = Map {
-        source: Box::new(logical_plan),
-        expressions: vec![Variable(Identifier::SimpleIdentifier("name".to_string())), Variable(Identifier::SimpleIdentifier("livesleft".to_string()))],
-        keep_source_fields: false,
-    };
+    // let logical_plan = Map {
+    //     source: Box::new(logical_plan),
+    //     expressions: vec![Variable(Identifier::SimpleIdentifier("name".to_string())), Variable(Identifier::SimpleIdentifier("livesleft".to_string()))],
+    //     keep_source_fields: false,
+    // };
     let logical_plan = GroupBy {
         source: Box::new(logical_plan),
         key_fields: vec![Identifier::SimpleIdentifier("livesleft".to_string())],

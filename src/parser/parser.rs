@@ -4,18 +4,17 @@ use crate::parser::{Query, Source, Identifier, Expression, Value, Operator};
 use sqlparser::ast;
 use sqlparser::ast::{Statement, SetExpr, Select, TableFactor, Ident, Expr, SelectItem, BinaryOperator};
 
-pub fn parse_sql(text: &str) -> Query {
+pub fn parse_sql(text: &str) -> Box<Query> {
     let dialect = GenericDialect {}; // or AnsiDialect, or your own dialect ...
 
     let ast = Parser::parse_sql(&dialect, text).unwrap();
 
     if let Statement::Query(q) = &ast[0] {
         let parsed = parse_query(q.as_ref());
-        dbg!(parsed);
+        parsed
     } else {
         unimplemented!()
     }
-    unimplemented!()
 }
 
 pub fn parse_query(sql_query: &sqlparser::ast::Query) -> Box<Query> {

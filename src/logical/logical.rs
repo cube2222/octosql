@@ -13,6 +13,7 @@ pub enum Error {
     Unexpected(String),
 }
 
+#[derive(Debug)]
 pub enum Node {
     Source {
         name: Identifier,
@@ -24,7 +25,7 @@ pub enum Node {
     },
     Map {
         source: Box<Node>,
-        expressions: Vec<Expression>,
+        expressions: Vec<(Box<Expression>, Identifier)>,
         keep_source_fields: bool,
     },
     GroupBy {
@@ -43,20 +44,23 @@ pub enum Node {
     Requalifier {
         source: Box<Node>,
         alias: Identifier,
-    }
+    },
 }
 
+#[derive(Debug)]
 pub enum Expression {
     Variable(Identifier),
     Constant(physical::ScalarValue),
     Function(Identifier, Vec<Box<Expression>>),
 }
 
+#[derive(Debug)]
 pub enum Aggregate {
     Count(),
     Sum(),
 }
 
+#[derive(Debug)]
 pub enum Trigger {
     Counting(u64),
 }
@@ -69,7 +73,7 @@ impl Node {
         mat_ctx: &MaterializationContext,
     ) -> Result<Arc<dyn physical::Node>, Error> {
         match self {
-            Node::Source { name, alias} => Ok(Arc::new(CSVSource::new(name.to_string()))),
+            Node::Source { name, alias } => Ok(Arc::new(CSVSource::new(name.to_string()))),
             Node::Filter {
                 source,
                 filter_column,
@@ -82,15 +86,16 @@ impl Node {
                 expressions,
                 keep_source_fields,
             } => {
-                let expr_vec_res = expressions
-                    .iter()
-                    .map(|expr| expr.physical(mat_ctx))
-                    .collect::<Vec<_>>();
-                let mut expr_vec = Vec::with_capacity(expr_vec_res.len());
-                for expr_res in expr_vec_res {
-                    expr_vec.push(expr_res?);
-                }
-                Ok(Arc::new(map::Map::new(source.physical(mat_ctx)?, expr_vec)))
+                unimplemented!()
+                // let expr_vec_res = expressions
+                //     .iter()
+                //     .map(|expr| expr.physical(mat_ctx))
+                //     .collect::<Vec<_>>();
+                // let mut expr_vec = Vec::with_capacity(expr_vec_res.len());
+                // for expr_res in expr_vec_res {
+                //     expr_vec.push(expr_res?);
+                // }
+                // Ok(Arc::new(map::Map::new(source.physical(mat_ctx)?, expr_vec)))
             }
             Node::GroupBy {
                 source,
@@ -139,6 +144,7 @@ impl Expression {
         match self {
             Expression::Variable(name) => Ok(Arc::new(map::FieldExpression::new(name.clone()))),
             Expression::Constant(_) => unimplemented!(),
+            Expression::Function(_, _) => { unimplemented!() }
         }
     }
 }

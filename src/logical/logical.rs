@@ -49,6 +49,7 @@ pub enum Node {
 pub enum Expression {
     Variable(Identifier),
     Constant(physical::ScalarValue),
+    Function(Identifier, Vec<Box<Expression>>),
 }
 
 pub enum Aggregate {

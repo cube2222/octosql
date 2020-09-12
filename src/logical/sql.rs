@@ -22,8 +22,6 @@ pub fn query_to_logical_plan(query: &Box<parser::Query>) -> Box<Node> {
                 topmost_map_fields.push(ident);
             }
 
-
-
             unimplemented!()
         }
     }
@@ -51,7 +49,7 @@ pub fn expression_to_logical_plan(expr: &Box<parser::Expression>) -> Box<Express
         parser::Expression::Function(name, args) => {
             unimplemented!()
         }
-        parser::Expression::Operator(_, _, _) => {
+        parser::Expression::Operator(left, op, right) => {
             unimplemented!()
         }
     }

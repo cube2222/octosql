@@ -86,6 +86,7 @@ pub fn integer(input: &str) -> IResult<&str, Value> {
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Operator {
+    Eq,
     Plus,
     Minus,
     AND,

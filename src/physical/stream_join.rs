@@ -5,26 +5,27 @@ use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{mpsc, Arc};
+use crate::physical::map::Expression;
 
 pub struct StreamJoin {
     source: Arc<dyn Node>,
-    source_key_fields: Vec<Identifier>,
+    source_key_exprs: Vec<Arc<dyn Expression>>,
     joined: Arc<dyn Node>,
-    joined_key_fields: Vec<Identifier>,
+    joined_key_exprs: Vec<Arc<dyn Expression>>,
 }
 
 impl StreamJoin {
     pub fn new(
         source: Arc<dyn Node>,
-        source_key_fields: Vec<Identifier>,
+        source_key_exprs: Vec<Arc<dyn Expression>>,
         joined: Arc<dyn Node>,
-        joined_key_fields: Vec<Identifier>,
+        joined_key_exprs: Vec<Arc<dyn Expression>>,
     ) -> StreamJoin {
         StreamJoin {
             source,
-            source_key_fields,
+            source_key_exprs,
             joined,
-            joined_key_fields,
+            joined_key_exprs,
         }
     }
 }
@@ -57,17 +58,7 @@ impl Node for StreamJoin {
         meta_send: MetaSendFn,
     ) -> Result<(), Error> {
         let source_schema = self.source.schema()?;
-        let source_key_indices: Vec<usize> = self
-            .source_key_fields
-            .iter()
-            .map(|key_field| source_schema.index_of(key_field.to_string().as_str()).unwrap())
-            .collect();
         let joined_schema = self.joined.schema()?;
-        let joined_key_indices: Vec<usize> = self
-            .joined_key_fields
-            .iter()
-            .map(|key_field| joined_schema.index_of(key_field.to_string().as_str()).unwrap())
-            .collect();
         let output_schema = self.schema()?;
 
         // TODO: Fixme HashMap => BTreeMap
@@ -81,10 +72,9 @@ impl Node for StreamJoin {
 
         let key_types: Vec<DataType> = match self.source.schema() {
             Ok(schema) => self
-                .source_key_fields
+                .source_key_exprs
                 .iter()
-                .map(|field| schema.field_with_name(field.to_string().as_str()).unwrap().data_type())
-                .cloned()
+                .map(|field| field.field_meta(&vec![], &source_schema).unwrap().data_type().clone())
                 .collect(),
             _ => panic!("aaa"),
         };
@@ -120,21 +110,20 @@ impl Node for StreamJoin {
 
         std::mem::drop(sender);
 
-        let key_indices = vec![source_key_indices, joined_key_indices];
+        let key_exprs = vec![self.source_key_exprs.clone(), self.joined_key_exprs.clone()];
 
         for (source_index, batch) in receiver {
-            let key_columns: Vec<ArrayRef> = key_indices[source_index]
+            let key_columns: Vec<ArrayRef> = key_exprs[source_index]
                 .iter()
-                .map(|&i| batch.column(i))
-                .cloned()
-                .collect();
+                .map(|expr| expr.evaluate(ctx, &batch))
+                .collect::<Result<_, _>>()?;
 
             let mut new_rows: BTreeMap<Vec<GroupByScalar>, Vec<Vec<ScalarValue>>> = BTreeMap::new();
 
             let mut required_capacity: usize = 0;
 
             for row in 0..batch.num_rows() {
-                let mut key_vec = Vec::with_capacity(self.source_key_fields.len());
+                let mut key_vec = Vec::with_capacity(self.source_key_exprs.len());
                 for i in 0..key_columns.len() {
                     key_vec.push(GroupByScalar::Int64(0))
                 }

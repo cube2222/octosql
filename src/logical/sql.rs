@@ -28,12 +28,6 @@ pub fn query_to_logical_plan(query: &parser::Query) -> Box<Node> {
                 topmost_map_fields.push(ident);
             }
 
-            let filter_ident = filter.as_ref().map(|expr| {
-                let ident = Identifier::NamespacedIdentifier("sys".to_string(), "filter".to_string());
-                variables.insert(ident.clone(), expression_to_logical_plan(expr.as_ref()));
-                ident
-            });
-
             let bottom_map_expressions = variables.into_iter()
                 .map(|(ident, expr)| {
                     (expr, ident)
@@ -45,8 +39,8 @@ pub fn query_to_logical_plan(query: &parser::Query) -> Box<Node> {
                 keep_source_fields: true,
             });
 
-            if let Some(ident) = filter_ident {
-                plan = Box::new(Node::Filter { source: plan, filter_column: ident })
+            if let Some(expr) = filter {
+                plan = Box::new(Node::Filter { source: plan, filter_expr: expression_to_logical_plan(expr.as_ref()) });
             }
 
             let topmost_map_expressions = topmost_map_fields.into_iter()

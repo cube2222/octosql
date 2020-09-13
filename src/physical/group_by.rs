@@ -9,6 +9,7 @@ use arrow::record_batch::RecordBatch;
 use std::collections::BTreeMap;
 use std::future::Future;
 use std::sync::Arc;
+use crate::physical::map::Expression;
 
 pub trait Aggregate: Send + Sync {
     fn output_type(&self, input_schema: &DataType) -> Result<DataType, Error>;
@@ -102,8 +103,8 @@ impl Accumulator for CountAccumulator {
 }
 
 pub struct GroupBy {
-    key: Vec<Identifier>,
-    aggregated_fields: Vec<Identifier>,
+    key: Vec<Arc<dyn Expression>>,
+    aggregated_exprs: Vec<Arc<dyn Expression>>,
     aggregates: Vec<Arc<dyn Aggregate>>,
     output_names: Vec<Identifier>,
     source: Arc<dyn Node>,
@@ -111,15 +112,15 @@ pub struct GroupBy {
 
 impl GroupBy {
     pub fn new(
-        key: Vec<Identifier>,
-        aggregated_fields: Vec<Identifier>,
+        key: Vec<Arc<dyn Expression>>,
+        aggregated_exprs: Vec<Arc<dyn Expression>>,
         aggregates: Vec<Arc<dyn Aggregate>>,
         output_names: Vec<Identifier>,
         source: Arc<dyn Node>,
     ) -> GroupBy {
         return GroupBy {
             key,
-            aggregated_fields,
+            aggregated_exprs,
             aggregates,
             output_names,
             source,
@@ -133,24 +134,17 @@ impl Node for GroupBy {
         let mut key_fields: Vec<Field> = self
             .key
             .iter()
-            .map(|key_field| source_schema.index_of(key_field.to_string().as_str()).unwrap())
-            .map(|i| source_schema.field(i))
-            .cloned()
-            .collect();
+            .map(|key_field| key_field.field_meta(&vec![], &source_schema))
+            .collect::<Result<Vec<Field>, Error>>()?;
 
         let aggregated_field_types: Vec<DataType> = self
-            .aggregated_fields
+            .aggregated_exprs
             .iter()
-            .map(|field| source_schema.index_of(field.to_string().as_str()).unwrap())
             .enumerate()
-            .map(|(i, column_index)| {
-                self.aggregates[i].output_type(source_schema.field(column_index).data_type())
+            .map(|(i, column_expr)| {
+                self.aggregates[i].output_type(column_expr.field_meta(&vec![], &source_schema)?.data_type())
             })
-            .map(|t_res| match t_res {
-                Ok(t) => t,
-                Err(e) => panic!(e),
-            })
-            .collect();
+            .collect::<Result<Vec<DataType>,Error>>()?;
 
         let mut new_fields: Vec<Field> = aggregated_field_types
             .iter()
@@ -166,51 +160,36 @@ impl Node for GroupBy {
 
     fn run(
         &self,
-        ctx: &ExecutionContext,
+        exec_ctx: &ExecutionContext,
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<(), Error> {
         let source_schema = self.source.schema()?;
-        let key_indices: Vec<usize> = self
-            .key
-            .iter()
-            .map(|key_field| source_schema.index_of(key_field.to_string().as_str()).unwrap())
-            .collect();
-        let aggregated_field_indices: Vec<usize> = self
-            .aggregated_fields
-            .iter()
-            .map(|field| source_schema.index_of(field.to_string().as_str()).unwrap())
-            .collect();
 
         let mut accumulators_map: BTreeMap<Vec<GroupByScalar>, Vec<Box<dyn Accumulator>>> =
             BTreeMap::new();
         let mut last_triggered_values: BTreeMap<Vec<GroupByScalar>, Vec<ScalarValue>> =
             BTreeMap::new();
 
-        let key_types: Vec<DataType> = match self.source.schema() {
-            Ok(schema) => self
-                .key
-                .iter()
-                .map(|field| schema.field_with_name(field.to_string().as_str()).unwrap().data_type())
-                .cloned()
-                .collect(),
-            _ => panic!("aaa"),
-        };
+        let key_types: Vec<DataType> = self
+            .key
+            .iter()
+            .map(|key_expr| key_expr.field_meta(&vec![], &source_schema).unwrap().data_type().clone())
+            .collect();
+
         let mut trigger: Box<dyn Trigger> = Box::new(CountingTrigger::new(key_types, 100));
 
         self.source.run(
-            ctx,
+            exec_ctx,
             &mut |ctx, batch| {
-                let key_columns: Vec<ArrayRef> = key_indices
+                let key_columns: Vec<ArrayRef> = self.key
                     .iter()
-                    .map(|&i| batch.column(i))
-                    .cloned()
-                    .collect();
-                let aggregated_columns: Vec<ArrayRef> = aggregated_field_indices
+                    .map(|expr| expr.evaluate(exec_ctx, &batch))
+                    .collect::<Result<_, _>>()?;
+                let aggregated_columns: Vec<ArrayRef> = self.aggregated_exprs
                     .iter()
-                    .map(|&i| batch.column(i))
-                    .cloned()
-                    .collect();
+                    .map(|expr| expr.evaluate(exec_ctx, &batch))
+                    .collect::<Result<_, _>>()?;
 
                 let mut key_vec: Vec<GroupByScalar> = Vec::with_capacity(key_columns.len());
                 for i in 0..key_columns.len() {
@@ -298,7 +277,7 @@ impl Node for GroupBy {
 
                 // Push retractions
                 for aggregate_index in 0..self.aggregates.len() {
-                    match output_schema.fields()[key_indices.len() + aggregate_index].data_type() {
+                    match output_schema.fields()[self.key.len() + aggregate_index].data_type() {
                         DataType::Int64 => {
                             let mut array = Int64Builder::new(output_columns[0].len());
                             for row in 0..output_columns[0].len() {
@@ -340,7 +319,7 @@ impl Node for GroupBy {
 
                 // Push new values
                 for aggregate_index in 0..self.aggregates.len() {
-                    match output_schema.fields()[key_indices.len() + aggregate_index].data_type() {
+                    match output_schema.fields()[self.key.len() + aggregate_index].data_type() {
                         DataType::Int64 => {
                             let mut array = Int64Builder::new(output_columns[0].len());
 

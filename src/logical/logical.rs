@@ -21,7 +21,7 @@ pub enum Node {
     },
     Filter {
         source: Box<Node>,
-        filter_column: Identifier,
+        filter_expr: Box<Expression>,
     },
     Map {
         source: Box<Node>,
@@ -30,16 +30,16 @@ pub enum Node {
     },
     GroupBy {
         source: Box<Node>,
-        key_fields: Vec<Identifier>,
+        key_exprs: Vec<Box<Expression>>,
         aggregates: Vec<Aggregate>,
-        aggregated_fields: Vec<Identifier>,
+        aggregated_exprs: Vec<Box<Expression>>,
         output_fields: Vec<Identifier>,
     },
     Join {
         source: Box<Node>,
-        source_key: Vec<Identifier>,
+        source_key: Vec<Box<Expression>>,
         joined: Box<Node>,
-        joined_key: Vec<Identifier>,
+        joined_key: Vec<Box<Expression>>,
     },
     Requalifier {
         source: Box<Node>,
@@ -76,45 +76,54 @@ impl Node {
             Node::Source { name, alias } => Ok(Arc::new(CSVSource::new(name.to_string()))),
             Node::Filter {
                 source,
-                filter_column,
-            } => Ok(Arc::new(Filter::new(
-                filter_column.clone(),
-                source.physical(mat_ctx)?,
-            ))),
+                filter_expr,
+            } => {
+                Ok(Arc::new(Filter::new(
+                    filter_expr.physical(mat_ctx)?,
+                    source.physical(mat_ctx)?,
+                )))
+            }
             Node::Map {
                 source,
                 expressions,
                 keep_source_fields,
             } => {
-                unimplemented!()
-                // let expr_vec_res = expressions
-                //     .iter()
-                //     .map(|expr| expr.physical(mat_ctx))
-                //     .collect::<Vec<_>>();
-                // let mut expr_vec = Vec::with_capacity(expr_vec_res.len());
-                // for expr_res in expr_vec_res {
-                //     expr_vec.push(expr_res?);
-                // }
-                // Ok(Arc::new(map::Map::new(source.physical(mat_ctx)?, expr_vec)))
+                let expr_vec_res = expressions
+                    .iter()
+                    .map(|(expr, ident)|
+                        expr.physical(mat_ctx).map(|expr| (expr, ident.clone())))
+                    .collect::<Vec<_>>();
+                let mut expr_vec = Vec::with_capacity(expr_vec_res.len());
+                let mut name_vec = Vec::with_capacity(expr_vec_res.len());
+                for expr_res in expr_vec_res {
+                    let (expr, name) = expr_res?;
+                    expr_vec.push(expr);
+                    name_vec.push(name);
+                }
+                Ok(Arc::new(map::Map::new(source.physical(mat_ctx)?, expr_vec, name_vec)))
             }
             Node::GroupBy {
                 source,
-                key_fields,
+                key_exprs,
                 aggregates,
-                aggregated_fields,
+                aggregated_exprs,
                 output_fields,
             } => {
-                let aggregate_vec_res = aggregates
+                let key_exprs_physical = key_exprs
+                    .into_iter()
+                    .map(|expr| expr.physical(mat_ctx))
+                    .collect::<Result<_, _>>()?;
+                let aggregated_exprs_physical = aggregated_exprs
+                    .into_iter()
+                    .map(|expr| expr.physical(mat_ctx))
+                    .collect::<Result<_, _>>()?;
+                let aggregate_vec = aggregates
                     .iter()
                     .map(|expr| expr.physical(mat_ctx))
-                    .collect::<Vec<_>>();
-                let mut aggregate_vec = Vec::with_capacity(aggregate_vec_res.len());
-                for expr_res in aggregate_vec_res {
-                    aggregate_vec.push(expr_res?);
-                }
+                    .collect::<Result<_, _>>()?;
                 Ok(Arc::new(GroupBy::new(
-                    key_fields.clone(),
-                    aggregated_fields.clone(),
+                    key_exprs_physical,
+                    aggregated_exprs_physical,
                     aggregate_vec,
                     output_fields.clone(),
                     source.physical(mat_ctx)?,
@@ -125,12 +134,24 @@ impl Node {
                 source_key,
                 joined,
                 joined_key,
-            } => Ok(Arc::new(StreamJoin::new(
-                source.physical(mat_ctx)?,
-                source_key.clone(),
-                joined.physical(mat_ctx)?,
-                joined_key.clone(),
-            ))),
+            } => {
+                let source_key_exprs = source_key
+                    .into_iter()
+                    .map(|expr| expr.physical(mat_ctx))
+                    .collect::<Result<_, _>>()?;
+
+                let joined_key_exprs = joined_key
+                    .into_iter()
+                    .map(|expr| expr.physical(mat_ctx))
+                    .collect::<Result<_, _>>()?;
+
+                Ok(Arc::new(StreamJoin::new(
+                    source.physical(mat_ctx)?,
+                    source_key_exprs,
+                    joined.physical(mat_ctx)?,
+                    joined_key_exprs,
+                )))
+            }
             Node::Requalifier { source, alias } => unimplemented!(),
         }
     }

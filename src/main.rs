@@ -84,13 +84,13 @@ fn main() {
     //     expressions: vec![Variable(Identifier::SimpleIdentifier("name".to_string())), Variable(Identifier::SimpleIdentifier("livesleft".to_string()))],
     //     keep_source_fields: false,
     // };
-    let logical_plan = GroupBy {
-        source: Box::new(logical_plan),
-        key_fields: vec![Identifier::SimpleIdentifier("livesleft".to_string())],
-        aggregates: vec![Count(), Sum()],
-        aggregated_fields: vec![Identifier::SimpleIdentifier("livesleft".to_string()), Identifier::SimpleIdentifier("livesleft".to_string())],
-        output_fields: vec![Identifier::SimpleIdentifier("livesleft_count".to_string()), Identifier::SimpleIdentifier("livesleft_sum".to_string())]
-    };
+    // let logical_plan = GroupBy {
+    //     source: Box::new(logical_plan),
+    //     key_fields: vec![Identifier::SimpleIdentifier("livesleft".to_string())],
+    //     aggregates: vec![Count(), Sum()],
+    //     aggregated_fields: vec![Identifier::SimpleIdentifier("livesleft".to_string()), Identifier::SimpleIdentifier("livesleft".to_string())],
+    //     output_fields: vec![Identifier::SimpleIdentifier("livesleft_count".to_string()), Identifier::SimpleIdentifier("livesleft_sum".to_string())]
+    // };
     // let logical_plan = Filter {
     //     source: Box::new(logical_plan),
     //     filter_column: retractions_field.to_string(),

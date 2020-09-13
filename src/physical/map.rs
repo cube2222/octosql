@@ -7,13 +7,15 @@ use std::sync::Arc;
 pub struct Map {
     source: Arc<dyn Node>,
     expressions: Vec<Arc<dyn Expression>>,
+    names: Vec<Identifier>,
 }
 
 impl Map {
-    pub fn new(source: Arc<dyn Node>, expressions: Vec<Arc<dyn Expression>>) -> Map {
+    pub fn new(source: Arc<dyn Node>, expressions: Vec<Arc<dyn Expression>>, names: Vec<Identifier>) -> Map {
         Map {
             source,
             expressions,
+            names,
         }
     }
 }

@@ -4,15 +4,16 @@ use arrow::compute::kernels::filter;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use std::sync::Arc;
+use crate::physical::map::Expression;
 
 pub struct Filter {
-    field: Identifier,
+    filter_expr: Arc<dyn Expression>,
     source: Arc<dyn Node>,
 }
 
 impl Filter {
-    pub fn new(field: Identifier, source: Arc<dyn Node>) -> Filter {
-        Filter { field, source }
+    pub fn new(filter_expr: Arc<dyn Expression>, source: Arc<dyn Node>) -> Filter {
+        Filter { filter_expr, source }
     }
 }
 
@@ -23,18 +24,18 @@ impl Node for Filter {
 
     fn run(
         &self,
-        ctx: &ExecutionContext,
+        exec_ctx: &ExecutionContext,
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<(), Error> {
         let source_schema = self.source.schema()?;
-        let index_of_field = source_schema.index_of(self.field.to_string().as_str())?;
 
         self.source.run(
-            ctx,
+            exec_ctx,
             &mut |ctx, batch| {
-                let predicate_column = batch
-                    .column(index_of_field)
+                let predicate_column_untyped = self.filter_expr
+                    .evaluate(exec_ctx, &batch)?;
+                let predicate_column = predicate_column_untyped
                     .as_any()
                     .downcast_ref::<BooleanArray>()
                     .unwrap();

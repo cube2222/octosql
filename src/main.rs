@@ -4,7 +4,7 @@ mod parser;
 
 use crate::physical::physical::{noop_meta_send, ExecutionContext, ProduceContext, VariableContext, retractions_field, Identifier};
 use crate::logical::logical::Expression::Variable;
-use crate::logical::logical::MaterializationContext;
+use crate::logical::logical::{MaterializationContext, Expression};
 use crate::logical::logical::Node::{Map, Source, GroupBy, Filter};
 
 use arrow::array::*;
@@ -46,6 +46,10 @@ fn record_print(
     Ok(())
 }
 
+fn var(name: &str) -> Box<Expression> {
+    Box::new(Expression::Variable(Identifier::SimpleIdentifier(name.to_string())))
+}
+
 fn main() {
     let start_time = std::time::Instant::now();
 
@@ -84,13 +88,13 @@ fn main() {
     //     expressions: vec![Variable(Identifier::SimpleIdentifier("name".to_string())), Variable(Identifier::SimpleIdentifier("livesleft".to_string()))],
     //     keep_source_fields: false,
     // };
-    // let logical_plan = GroupBy {
-    //     source: Box::new(logical_plan),
-    //     key_fields: vec![Identifier::SimpleIdentifier("livesleft".to_string())],
-    //     aggregates: vec![Count(), Sum()],
-    //     aggregated_fields: vec![Identifier::SimpleIdentifier("livesleft".to_string()), Identifier::SimpleIdentifier("livesleft".to_string())],
-    //     output_fields: vec![Identifier::SimpleIdentifier("livesleft_count".to_string()), Identifier::SimpleIdentifier("livesleft_sum".to_string())]
-    // };
+    let logical_plan = GroupBy {
+        source: Box::new(logical_plan),
+        key_exprs: vec![var("livesleft")],
+        aggregates: vec![Count(), Sum()],
+        aggregated_exprs: vec![var("livesleft"), var("livesleft")],
+        output_fields: vec![Identifier::SimpleIdentifier("livesleft_count".to_string()), Identifier::SimpleIdentifier("livesleft_sum".to_string())]
+    };
     // let logical_plan = Filter {
     //     source: Box::new(logical_plan),
     //     filter_column: retractions_field.to_string(),

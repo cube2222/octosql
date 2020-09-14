@@ -83,45 +83,75 @@ pub fn expression_to_logical_plan(expr: &parser::Expression) -> Box<Expression> 
         parser::Expression::Operator(left, op, right) => {
             Box::new(Expression::Function(operator_to_logical_plan(op), vec![expression_to_logical_plan(left.as_ref()), expression_to_logical_plan(right.as_ref())]))
         }
-    }
-}
-
-pub fn identifier_to_logical_plan(ident: &parser::Identifier) -> Identifier {
-    match ident {
-        parser::Identifier::SimpleIdentifier(id) => {
-            Identifier::SimpleIdentifier(id.clone())
-        }
-        parser::Identifier::NamespacedIdentifier(namespace, id) => {
-            Identifier::NamespacedIdentifier(namespace.clone(), id.clone())
+        parser::Expression::Wildcard => {
+            unimplemented!()
         }
     }
 }
 
-pub fn value_to_logical_plan(val: &parser::Value) -> ScalarValue {
-    match val {
-        parser::Value::Integer(v) => {
-            ScalarValue::Int64(v.clone())
+// TODO: Maybe it should be Aggregate(Expr), this way the aggregate receives the record batch and calculates everything itself.
+// Would be easier for stars and stuff I suppose.
+// Think about it.
+// The Cons is that each aggregate will have to define evaluating the underlying expression, which might be meh.
+// Especially since star and star distinct can operate on some kind of tuple... maybe?
+pub fn aggregate_expression_to_logical_plan(expr: &parser::Expression) -> Box<Expression> {
+    match expr {
+        parser::Expression::Variable(ident) => {
+            // Aggregate Expression :: Key Part With Name
+            Box::new(Expression::Variable(identifier_to_logical_plan(&ident)))
+        }
+        parser::Expression::Function(name, args) => {
+            // Aggregate Expression :: Aggregate
+            unimplemented!()
+        }
+        parser::Expression::Wildcard => {
+            unimplemented!()
+        }
+        _ => {
+            dbg!(expr);
+            panic!("invalid aggregate expression")
         }
     }
 }
 
-pub fn operator_to_logical_plan(op: &parser::Operator) -> Identifier {
-    Identifier::SimpleIdentifier(match op {
-        Operator::Eq => "=".to_string(),
-        Operator::Plus => "+".to_string(),
-        Operator::Minus => "-".to_string(),
-        Operator::AND => "AND".to_string(),
-        Operator::OR => "OR".to_string(),
-    })
+
+pub fn identifier_to_logical_plan(ident: & parser::Identifier) -> Identifier {
+match ident {
+parser::Identifier::SimpleIdentifier(id) => {
+Identifier::SimpleIdentifier(id.clone())
+}
+parser::Identifier::NamespacedIdentifier(namespace, id) => {
+Identifier::NamespacedIdentifier(namespace.clone(), id.clone())
+}
+}
 }
 
-#[test]
+pub fn value_to_logical_plan(val: & parser::Value) -> ScalarValue {
+match val {
+parser::Value::Integer(v) => {
+ScalarValue::Int64(v.clone())
+}
+}
+}
+
+pub fn operator_to_logical_plan(op: & parser::Operator) -> Identifier {
+Identifier::SimpleIdentifier( match op {
+Operator::Eq => "=".to_string(),
+Operator::Plus => "+".to_string(),
+Operator::Minus => "-".to_string(),
+Operator::AND => "AND".to_string(),
+Operator::OR => "OR".to_string(),
+})
+}
+
+# [test]
 fn my_test() {
-    let sql = "SELECT c2.name as name, c2.livesleft, 3 as myconst \
-    FROM (SELECT c.name, c.livesleft, c.age FROM cats c) as c2 \
-    WHERE c2.age = c2.livesleft";
+let sql = "SELECT c.name, COUNT(*), SUM(c.livesleft) \
+    FROM cats c \
+    WHERE c.age = c.livesleft \
+    GROUP BY c.name";
 
-    let query = parse_sql(sql);
-    let plan = query_to_logical_plan(query.as_ref());
-    dbg!(plan);
+let query = parse_sql(sql);
+let plan = query_to_logical_plan(query.as_ref());
+dbg ! (plan);
 }

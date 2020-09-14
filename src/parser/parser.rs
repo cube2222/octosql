@@ -2,7 +2,7 @@ use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
 use crate::parser::{Query, Source, Identifier, Expression, Value, Operator};
 use sqlparser::ast;
-use sqlparser::ast::{Statement, SetExpr, Select, TableFactor, Ident, Expr, SelectItem, BinaryOperator};
+use sqlparser::ast::{Statement, SetExpr, Select, TableFactor, Ident, Expr, SelectItem, BinaryOperator, Function};
 
 pub fn parse_sql(text: &str) -> Box<Query> {
     let dialect = GenericDialect {}; // or AnsiDialect, or your own dialect ...
@@ -85,7 +85,16 @@ pub fn parse_expr(expr: &Expr) -> Box<Expression> {
                 parse_expr(right.as_ref()),
             ))
         }
-        _ => unimplemented!(),
+        Expr::Function(Function{ name, args, over, distinct }) => {
+            Box::new(Expression::Function(parse_ident(&name.0[0]), args.iter().map(parse_expr).collect()))
+        }
+        Expr::Wildcard => {
+            Box::new(Expression::Wildcard)
+        }
+        _ => {
+            dbg!(expr);
+            unimplemented!()
+        },
     }
 }
 

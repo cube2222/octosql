@@ -35,6 +35,7 @@ pub enum Expression {
     Constant(Value),
     Function(Identifier, Vec<Box<Expression>>),
     Operator(Box<Expression>, Operator, Box<Expression>),
+    Wildcard,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

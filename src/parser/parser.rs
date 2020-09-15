@@ -35,11 +35,16 @@ pub fn parse_select(select: &Select) -> Box<Query> {
 
     let filter_expression = select.selection.as_ref().map(parse_expr);
 
+    let group_by_expression = select.group_by.iter()
+        .map(parse_expr)
+        .collect();
+
     Box::new(Query::Select {
         expressions,
         filter: filter_expression,
         from,
         order_by: vec![],
+        group_by: group_by_expression,
     })
 }
 

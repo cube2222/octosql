@@ -91,7 +91,7 @@ fn main() {
     let logical_plan = GroupBy {
         source: Box::new(logical_plan),
         key_exprs: vec![var("livesleft")],
-        aggregates: vec![Count(), Sum()],
+        aggregates: vec![Count, Sum],
         aggregated_exprs: vec![var("livesleft"), var("livesleft")],
         output_fields: vec![Identifier::SimpleIdentifier("livesleft_count".to_string()), Identifier::SimpleIdentifier("livesleft_sum".to_string())]
     };

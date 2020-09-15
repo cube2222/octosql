@@ -8,52 +8,83 @@ use crate::parser::parser::parse_sql;
 
 pub fn query_to_logical_plan(query: &parser::Query) -> Box<Node> {
     match query {
-        parser::Query::Select { expressions, filter, from, order_by } => {
-            let mut plan = source_to_logical_plan(from.as_ref());
+        parser::Query::Select { expressions, filter, from, order_by, group_by } => {
+            if group_by.is_empty() {
+                let mut plan = source_to_logical_plan(from.as_ref());
 
-            let mut variables: BTreeMap<Identifier, Box<Expression>> = BTreeMap::new();
+                let mut variables: BTreeMap<Identifier, Box<Expression>> = BTreeMap::new();
 
-            let mut topmost_map_fields = Vec::with_capacity(expressions.len());
+                let mut topmost_map_fields = Vec::with_capacity(expressions.len());
 
-            for (i, (expr, alias)) in expressions.iter().enumerate() {
-                let name = alias.clone()
-                    .unwrap_or_else(|| if let parser::Expression::Variable(ident) = expr.as_ref() {
-                        ident.clone()
-                    } else {
-                        parser::Identifier::SimpleIdentifier(format!("column_{}", i))
-                    });
-                let ident = identifier_to_logical_plan(&name);
-                variables.insert(ident.clone(), expression_to_logical_plan(expr.as_ref()));
+                for (i, (expr, alias)) in expressions.iter().enumerate() {
+                    let name = alias.clone()
+                        .unwrap_or_else(|| if let parser::Expression::Variable(ident) = expr.as_ref() {
+                            ident.clone()
+                        } else {
+                            parser::Identifier::SimpleIdentifier(format!("column_{}", i))
+                        });
+                    let ident = identifier_to_logical_plan(&name);
+                    variables.insert(ident.clone(), expression_to_logical_plan(expr.as_ref()));
 
-                topmost_map_fields.push(ident);
+                    topmost_map_fields.push(ident);
+                }
+
+                let bottom_map_expressions = variables.into_iter()
+                    .map(|(ident, expr)| {
+                        (expr, ident)
+                    }).collect();
+
+                plan = Box::new(Node::Map {
+                    source: plan,
+                    expressions: bottom_map_expressions,
+                    keep_source_fields: true,
+                });
+
+                if let Some(expr) = filter {
+                    plan = Box::new(Node::Filter { source: plan, filter_expr: expression_to_logical_plan(expr.as_ref()) });
+                }
+
+                let topmost_map_expressions = topmost_map_fields.into_iter()
+                    .map(|ident| (Box::new(Expression::Variable(ident.clone())), ident))
+                    .collect();
+
+                plan = Box::new(Node::Map {
+                    source: plan,
+                    expressions: topmost_map_expressions,
+                    keep_source_fields: false,
+                });
+
+                plan
+            } else {
+                let mut plan = source_to_logical_plan(from.as_ref());
+
+                if let Some(expr) = filter {
+                    plan = Box::new(Node::Filter { source: plan, filter_expr: expression_to_logical_plan(expr.as_ref()) });
+                }
+
+                let key_exprs = group_by.iter()
+                    .map(Box::as_ref)
+                    .map(expression_to_logical_plan)
+                    .collect();
+
+                let (aggregate_exprs, output_fields): (Vec<_>, Vec<_>) = expressions.iter()
+                    .map(|(expr, ident)| (aggregate_expression_to_logical_plan(expr), ident.as_ref().map(identifier_to_logical_plan)))
+                    .enumerate()
+                    .map(|(i, (expr, ident))| (expr, ident.unwrap_or(Identifier::SimpleIdentifier(format!("column_{}", i)))))
+                    .unzip();
+
+                let (aggregates, exprs): (Vec<_>, Vec<_>) = aggregate_exprs.into_iter().unzip();
+
+                plan = Box::new(Node::GroupBy {
+                    source: plan,
+                    key_exprs,
+                    aggregates,
+                    aggregated_exprs: exprs,
+                    output_fields,
+                });
+
+                plan
             }
-
-            let bottom_map_expressions = variables.into_iter()
-                .map(|(ident, expr)| {
-                    (expr, ident)
-                }).collect();
-
-            plan = Box::new(Node::Map {
-                source: plan,
-                expressions: bottom_map_expressions,
-                keep_source_fields: true,
-            });
-
-            if let Some(expr) = filter {
-                plan = Box::new(Node::Filter { source: plan, filter_expr: expression_to_logical_plan(expr.as_ref()) });
-            }
-
-            let topmost_map_expressions = topmost_map_fields.into_iter()
-                .map(|ident| (Box::new(Expression::Variable(ident.clone())), ident))
-                .collect();
-
-            plan = Box::new(Node::Map {
-                source: plan,
-                expressions: topmost_map_expressions,
-                keep_source_fields: false,
-            });
-
-            plan
         }
     }
 }
@@ -78,13 +109,17 @@ pub fn expression_to_logical_plan(expr: &parser::Expression) -> Box<Expression> 
             Box::new(Expression::Constant(value_to_logical_plan(&value)))
         }
         parser::Expression::Function(name, args) => {
-            unimplemented!()
+            Box::new(Expression::Function(identifier_to_logical_plan(name), args.iter().map(Box::as_ref).map(expression_to_logical_plan).collect()))
         }
         parser::Expression::Operator(left, op, right) => {
             Box::new(Expression::Function(operator_to_logical_plan(op), vec![expression_to_logical_plan(left.as_ref()), expression_to_logical_plan(right.as_ref())]))
         }
         parser::Expression::Wildcard => {
-            unimplemented!()
+            Box::new(Expression::Wildcard)
+        }
+        _ => {
+            dbg!(expr);
+            panic!("invalid expression")
         }
     }
 }
@@ -94,18 +129,26 @@ pub fn expression_to_logical_plan(expr: &parser::Expression) -> Box<Expression> 
 // Think about it.
 // The Cons is that each aggregate will have to define evaluating the underlying expression, which might be meh.
 // Especially since star and star distinct can operate on some kind of tuple... maybe?
-pub fn aggregate_expression_to_logical_plan(expr: &parser::Expression) -> Box<Expression> {
+pub fn aggregate_expression_to_logical_plan(expr: &parser::Expression) -> (Aggregate, Box<Expression>) {
     match expr {
         parser::Expression::Variable(ident) => {
-            // Aggregate Expression :: Key Part With Name
-            Box::new(Expression::Variable(identifier_to_logical_plan(&ident)))
+            (Aggregate::KeyPart, Box::new(Expression::Variable(identifier_to_logical_plan(&ident))))
         }
         parser::Expression::Function(name, args) => {
-            // Aggregate Expression :: Aggregate
-            unimplemented!()
-        }
-        parser::Expression::Wildcard => {
-            unimplemented!()
+            match name {
+                parser::Identifier::SimpleIdentifier(name) => {
+                    match name.to_lowercase().as_str() {
+                        "count" => {
+                            (Aggregate::Count, expression_to_logical_plan(args[0].as_ref()))
+                        }
+                        "sum" => {
+                            (Aggregate::Sum, expression_to_logical_plan(args[0].as_ref()))
+                        }
+                        _ => unimplemented!(),
+                    }
+                }
+                _ => unimplemented!(),
+            }
         }
         _ => {
             dbg!(expr);
@@ -115,43 +158,43 @@ pub fn aggregate_expression_to_logical_plan(expr: &parser::Expression) -> Box<Ex
 }
 
 
-pub fn identifier_to_logical_plan(ident: & parser::Identifier) -> Identifier {
-match ident {
-parser::Identifier::SimpleIdentifier(id) => {
-Identifier::SimpleIdentifier(id.clone())
-}
-parser::Identifier::NamespacedIdentifier(namespace, id) => {
-Identifier::NamespacedIdentifier(namespace.clone(), id.clone())
-}
-}
-}
-
-pub fn value_to_logical_plan(val: & parser::Value) -> ScalarValue {
-match val {
-parser::Value::Integer(v) => {
-ScalarValue::Int64(v.clone())
-}
-}
+pub fn identifier_to_logical_plan(ident: &parser::Identifier) -> Identifier {
+    match ident {
+        parser::Identifier::SimpleIdentifier(id) => {
+            Identifier::SimpleIdentifier(id.clone())
+        }
+        parser::Identifier::NamespacedIdentifier(namespace, id) => {
+            Identifier::NamespacedIdentifier(namespace.clone(), id.clone())
+        }
+    }
 }
 
-pub fn operator_to_logical_plan(op: & parser::Operator) -> Identifier {
-Identifier::SimpleIdentifier( match op {
-Operator::Eq => "=".to_string(),
-Operator::Plus => "+".to_string(),
-Operator::Minus => "-".to_string(),
-Operator::AND => "AND".to_string(),
-Operator::OR => "OR".to_string(),
-})
+pub fn value_to_logical_plan(val: &parser::Value) -> ScalarValue {
+    match val {
+        parser::Value::Integer(v) => {
+            ScalarValue::Int64(v.clone())
+        }
+    }
 }
 
-# [test]
+pub fn operator_to_logical_plan(op: &parser::Operator) -> Identifier {
+    Identifier::SimpleIdentifier(match op {
+        Operator::Eq => "=".to_string(),
+        Operator::Plus => "+".to_string(),
+        Operator::Minus => "-".to_string(),
+        Operator::AND => "AND".to_string(),
+        Operator::OR => "OR".to_string(),
+    })
+}
+
+#[test]
 fn my_test() {
-let sql = "SELECT c.name, COUNT(*), SUM(c.livesleft) \
+    let sql = "SELECT c.name, COUNT(*) as my_count, SUM(c.livesleft) \
     FROM cats c \
     WHERE c.age = c.livesleft \
     GROUP BY c.name";
 
-let query = parse_sql(sql);
-let plan = query_to_logical_plan(query.as_ref());
-dbg ! (plan);
+    let query = parse_sql(sql);
+    let plan = query_to_logical_plan(query.as_ref());
+    dbg!(plan);
 }

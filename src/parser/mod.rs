@@ -19,7 +19,8 @@ pub enum Query {
         expressions: Vec<(Box<Expression>, Option<Identifier>)>,
         filter: Option<Box<Expression>>,
         from: Box<Source>,
-        order_by: Vec<Box<Expression>>,
+        order_by:Vec<Box<Expression>>,
+        group_by: Vec<Box<Expression>>,
     },
 }
 

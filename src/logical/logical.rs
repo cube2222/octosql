@@ -52,12 +52,14 @@ pub enum Expression {
     Variable(Identifier),
     Constant(physical::ScalarValue),
     Function(Identifier, Vec<Box<Expression>>),
+    Wildcard,
 }
 
 #[derive(Debug)]
 pub enum Aggregate {
-    Count(),
-    Sum(),
+    KeyPart,
+    Count,
+    Sum,
 }
 
 #[derive(Debug)]
@@ -166,6 +168,7 @@ impl Expression {
             Expression::Variable(name) => Ok(Arc::new(map::FieldExpression::new(name.clone()))),
             Expression::Constant(_) => unimplemented!(),
             Expression::Function(_, _) => { unimplemented!() }
+            Expression::Wildcard => { unimplemented!() }
         }
     }
 }
@@ -176,8 +179,9 @@ impl Aggregate {
         mat_ctx: &MaterializationContext,
     ) -> Result<Arc<dyn group_by::Aggregate>, Error> {
         match self {
-            Aggregate::Count() => Ok(Arc::new(group_by::Count {})),
-            Aggregate::Sum() => Ok(Arc::new(group_by::Sum {})),
+            Aggregate::Count => Ok(Arc::new(group_by::Count {})),
+            Aggregate::Sum => Ok(Arc::new(group_by::Sum {})),
+            _ => unimplemented!(),
         }
     }
 }

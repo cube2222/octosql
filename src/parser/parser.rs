@@ -1,8 +1,9 @@
+use sqlparser::ast;
+use sqlparser::ast::{BinaryOperator, Expr, Function, Ident, Select, SelectItem, SetExpr, Statement, TableFactor};
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
-use crate::parser::{Query, Source, Identifier, Expression, Value, Operator};
-use sqlparser::ast;
-use sqlparser::ast::{Statement, SetExpr, Select, TableFactor, Ident, Expr, SelectItem, BinaryOperator, Function};
+
+use crate::parser::{Expression, Identifier, Operator, Query, Source, Value};
 
 pub fn parse_sql(text: &str) -> Box<Query> {
     let dialect = GenericDialect {}; // or AnsiDialect, or your own dialect ...

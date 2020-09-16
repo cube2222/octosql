@@ -4,8 +4,10 @@ mod parser;
 
 use crate::physical::physical::{noop_meta_send, ExecutionContext, ProduceContext, VariableContext, retractions_field, Identifier};
 use crate::logical::logical::Expression::Variable;
-use crate::logical::logical::{MaterializationContext, Expression};
+use crate::logical::logical::{MaterializationContext, Expression, Aggregate};
 use crate::logical::logical::Node::{Map, Source, GroupBy, Filter};
+use crate::logical::sql::query_to_logical_plan;
+use crate::parser::parser::parse_sql;
 
 use arrow::array::*;
 use arrow::compute::kernels::filter;
@@ -79,26 +81,34 @@ fn main() {
     //     vec![String::from("count")],
     //     plan,
     // ));
-    let logical_plan = Source {
-        name: Identifier::SimpleIdentifier("cats.csv".to_string()),
-        alias: None,
-    };
+    // let logical_plan = Source {
+    //     name: Identifier::SimpleIdentifier("cats.csv".to_string()),
+    //     alias: None,
+    // };
     // let logical_plan = Map {
     //     source: Box::new(logical_plan),
     //     expressions: vec![Variable(Identifier::SimpleIdentifier("name".to_string())), Variable(Identifier::SimpleIdentifier("livesleft".to_string()))],
     //     keep_source_fields: false,
     // };
-    let logical_plan = GroupBy {
-        source: Box::new(logical_plan),
-        key_exprs: vec![var("livesleft")],
-        aggregates: vec![Count, Sum],
-        aggregated_exprs: vec![var("livesleft"), var("livesleft")],
-        output_fields: vec![Identifier::SimpleIdentifier("livesleft_count".to_string()), Identifier::SimpleIdentifier("livesleft_sum".to_string())]
-    };
+    // let logical_plan = GroupBy {
+    //     source: Box::new(logical_plan),
+    //     key_exprs: vec![var("livesleft")],
+    //     aggregates: vec![Aggregate::KeyPart, Aggregate::KeyPart, Count, Sum],
+    //     aggregated_exprs: vec![var("livesleft"), var("livesleft"), var("livesleft"), var("livesleft")],
+    //     output_fields: vec![Identifier::SimpleIdentifier("livesleft_count".to_string()), Identifier::SimpleIdentifier("livesleft_sum".to_string())]
+    // };
     // let logical_plan = Filter {
     //     source: Box::new(logical_plan),
     //     filter_column: retractions_field.to_string(),
     // };
+    let sql = std::env::args().nth(1).unwrap();
+    dbg!(&sql);
+
+    let query = parse_sql(sql.as_str());
+    dbg!(&query);
+    let logical_plan = query_to_logical_plan(query.as_ref());
+    dbg!(&logical_plan);
+
     let plan = logical_plan.physical(&MaterializationContext {}).unwrap();
 
     let res = plan.run(
@@ -112,5 +122,6 @@ fn main() {
         &mut record_print,
         &mut noop_meta_send,
     );
-    println!("{:?}", start_time.elapsed());
+    dbg!(start_time.elapsed());
+    // println!("{:?}", start_time.elapsed());
 }

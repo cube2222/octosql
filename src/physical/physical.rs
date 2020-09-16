@@ -1,9 +1,10 @@
-use arrow::datatypes::Schema;
-use arrow::error::ArrowError;
-use arrow::record_batch::RecordBatch;
 use std::hash::Hash;
 use std::io;
 use std::sync::Arc;
+
+use arrow::datatypes::Schema;
+use arrow::error::ArrowError;
+use arrow::record_batch::RecordBatch;
 
 pub const batch_size: usize = 8192;
 pub const retractions_field: &str = "retraction";

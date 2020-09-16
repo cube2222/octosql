@@ -1,12 +1,13 @@
+use std::sync::Arc;
+
 use crate::physical::csv::CSVSource;
-use crate::physical::physical;
 use crate::physical::filter::Filter;
 use crate::physical::group_by;
 use crate::physical::group_by::GroupBy;
 use crate::physical::map;
-use crate::physical::stream_join::StreamJoin;
-use std::sync::Arc;
+use crate::physical::physical;
 use crate::physical::physical::Identifier;
+use crate::physical::stream_join::StreamJoin;
 
 #[derive(Debug)]
 pub enum Error {
@@ -75,7 +76,11 @@ impl Node {
         mat_ctx: &MaterializationContext,
     ) -> Result<Arc<dyn physical::Node>, Error> {
         match self {
-            Node::Source { name, alias } => Ok(Arc::new(CSVSource::new(name.to_string()))),
+            Node::Source { name, alias } => {
+                let mut path = name.to_string();
+                path.push_str(".csv");
+                Ok(Arc::new(CSVSource::new(path)))
+            },
             Node::Filter {
                 source,
                 filter_expr,
@@ -115,19 +120,61 @@ impl Node {
                     .into_iter()
                     .map(|expr| expr.physical(mat_ctx))
                     .collect::<Result<_, _>>()?;
-                let aggregated_exprs_physical = aggregated_exprs
-                    .into_iter()
-                    .map(|expr| expr.physical(mat_ctx))
-                    .collect::<Result<_, _>>()?;
-                let aggregate_vec = aggregates
+
+                let (aggregates_no_key_part, aggregated_exprs_no_key_part): (Vec<_>, Vec<_>) = aggregates.iter()
+                    .zip(aggregated_exprs.iter())
+                    .filter(|(aggregate, aggregated_expr)| if let(Aggregate::KeyPart) = **aggregate {false} else {true})
+                    .unzip();
+
+                let aggregate_vec = aggregates_no_key_part
                     .iter()
                     .map(|expr| expr.physical(mat_ctx))
                     .collect::<Result<_, _>>()?;
+                let aggregated_exprs_physical = aggregated_exprs_no_key_part
+                    .into_iter()
+                    .map(|expr| expr.physical(mat_ctx))
+                    .collect::<Result<_, _>>()?;
+
+                let aggregated_exprs_key_part = aggregates.iter()
+                    .zip(aggregated_exprs.iter())
+                    .filter(|(aggregate, aggregated_expr)| if let(Aggregate::KeyPart) = **aggregate {true} else {false})
+                    .map(|(aggregate, aggregated_expr)| aggregated_expr)
+                    .collect::<Vec<_>>();
+
+                let aggregate_output_names = aggregates.iter()
+                    .enumerate()
+                    .filter(|(i, aggregate)| if let(Aggregate::KeyPart) = **aggregate {false} else {true})
+                    .map(|(i, _)| output_fields[i].clone())
+                    .collect();
+
+                let mut output_key_indices = Vec::with_capacity(aggregated_exprs_key_part.len());
+
+                for expr in aggregated_exprs_key_part {
+                    if let(Expression::Variable(var_name)) = expr.as_ref() {
+                        let mut found = false;
+                        for i in 0..key_exprs.len() {
+                            if let(Expression::Variable(key_var_name)) = key_exprs[i].as_ref() {
+                                if var_name == key_var_name {
+                                    output_key_indices.push(i);
+                                    found = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if !found {
+                            return Err(Error::Unexpected(format!("key part variable {} not found in key", var_name.to_string())))
+                        }
+                    } else {
+                        return Err(Error::Unexpected("key part can only contain variables".to_string()))
+                    }
+                }
+
                 Ok(Arc::new(GroupBy::new(
                     key_exprs_physical,
+                    output_key_indices,
                     aggregated_exprs_physical,
                     aggregate_vec,
-                    output_fields.clone(),
+                    aggregate_output_names,
                     source.physical(mat_ctx)?,
                 )))
             }

@@ -1,15 +1,17 @@
-use crate::physical::datafusion::{create_key, create_row, GroupByScalar};
-use crate::physical::physical::*;
-use crate::physical::trigger::*;
+use std::collections::BTreeMap;
+use std::future::Future;
+use std::sync::Arc;
+
 use arrow::array::{
     ArrayBuilder, ArrayRef, BooleanBuilder, Int64Array, Int64Builder, StringBuilder,
 };
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
-use std::collections::BTreeMap;
-use std::future::Future;
-use std::sync::Arc;
+
+use crate::physical::datafusion::{create_key, create_row, GroupByScalar};
 use crate::physical::map::Expression;
+use crate::physical::physical::*;
+use crate::physical::trigger::*;
 
 pub trait Aggregate: Send + Sync {
     fn output_type(&self, input_schema: &DataType) -> Result<DataType, Error>;
@@ -104,6 +106,7 @@ impl Accumulator for CountAccumulator {
 
 pub struct GroupBy {
     key: Vec<Arc<dyn Expression>>,
+    output_key_indices: Vec<usize>,
     aggregated_exprs: Vec<Arc<dyn Expression>>,
     aggregates: Vec<Arc<dyn Aggregate>>,
     output_names: Vec<Identifier>,
@@ -113,6 +116,7 @@ pub struct GroupBy {
 impl GroupBy {
     pub fn new(
         key: Vec<Arc<dyn Expression>>,
+        output_key_indices: Vec<usize>,
         aggregated_exprs: Vec<Arc<dyn Expression>>,
         aggregates: Vec<Arc<dyn Aggregate>>,
         output_names: Vec<Identifier>,
@@ -120,6 +124,7 @@ impl GroupBy {
     ) -> GroupBy {
         return GroupBy {
             key,
+            output_key_indices,
             aggregated_exprs,
             aggregates,
             output_names,
@@ -132,8 +137,9 @@ impl Node for GroupBy {
     fn schema(&self) -> Result<Arc<Schema>, Error> {
         let source_schema = self.source.schema()?;
         let mut key_fields: Vec<Field> = self
-            .key
+            .output_key_indices
             .iter()
+            .map(|i| &self.key[*i])
             .map(|key_field| key_field.field_meta(&vec![], &source_schema))
             .collect::<Result<Vec<Field>, Error>>()?;
 
@@ -144,7 +150,7 @@ impl Node for GroupBy {
             .map(|(i, column_expr)| {
                 self.aggregates[i].output_type(column_expr.field_meta(&vec![], &source_schema)?.data_type())
             })
-            .collect::<Result<Vec<DataType>,Error>>()?;
+            .collect::<Result<Vec<DataType>, Error>>()?;
 
         let mut new_fields: Vec<Field> = aggregated_field_types
             .iter()
@@ -227,17 +233,20 @@ impl Node for GroupBy {
                 if key_columns[0].len() == 0 {
                     return Ok(());
                 }
-                let mut output_columns = key_columns.clone();
+                let mut output_columns = self.output_key_indices
+                    .iter()
+                    .map(|i| key_columns[*i].clone())
+                    .collect::<Vec<_>>();
                 let output_schema = self.schema()?;
 
-                let mut retraction_columns = Vec::with_capacity(self.output_names.len());
+                let mut retraction_key_columns = Vec::with_capacity(self.output_names.len());
 
                 // Push retraction keys
                 for key_index in 0..self.key.len() {
                     match output_schema.fields()[key_index].data_type() {
                         DataType::Utf8 => {
-                            let mut array = StringBuilder::new(output_columns[0].len());
-                            for row in 0..output_columns[0].len() {
+                            let mut array = StringBuilder::new(key_columns[0].len());
+                            for row in 0..key_columns[0].len() {
                                 create_key(key_columns.as_slice(), row, &mut key_vec);
 
                                 if !last_triggered_values.contains_key(&key_vec) {
@@ -252,11 +261,11 @@ impl Node for GroupBy {
                                     // TODO: Maybe use as_any -> downcast?
                                 }
                             }
-                            retraction_columns.push(Arc::new(array.finish()) as ArrayRef);
+                            retraction_key_columns.push(Arc::new(array.finish()) as ArrayRef);
                         }
                         DataType::Int64 => {
-                            let mut array = Int64Builder::new(output_columns[0].len());
-                            for row in 0..output_columns[0].len() {
+                            let mut array = Int64Builder::new(key_columns[0].len());
+                            for row in 0..key_columns[0].len() {
                                 create_key(key_columns.as_slice(), row, &mut key_vec);
 
                                 if !last_triggered_values.contains_key(&key_vec) {
@@ -269,19 +278,24 @@ impl Node for GroupBy {
                                     // TODO: Maybe use as_any -> downcast?
                                 }
                             }
-                            retraction_columns.push(Arc::new(array.finish()) as ArrayRef);
+                            retraction_key_columns.push(Arc::new(array.finish()) as ArrayRef);
                         }
                         _ => unimplemented!(),
                     }
                 }
 
+                let mut retraction_columns = self.output_key_indices
+                    .iter()
+                    .map(|i| retraction_key_columns[*i].clone())
+                    .collect::<Vec<_>>();
+
                 // Push retractions
                 for aggregate_index in 0..self.aggregates.len() {
-                    match output_schema.fields()[self.key.len() + aggregate_index].data_type() {
+                    match output_schema.fields()[self.output_key_indices.len() + aggregate_index].data_type() {
                         DataType::Int64 => {
-                            let mut array = Int64Builder::new(output_columns[0].len());
-                            for row in 0..output_columns[0].len() {
-                                create_key(key_columns.as_slice(), row, &mut key_vec);
+                            let mut array = Int64Builder::new(retraction_key_columns[0].len());
+                            for row in 0..retraction_key_columns[0].len() {
+                                create_key(retraction_key_columns.as_slice(), row, &mut key_vec);
 
                                 let last_triggered = last_triggered_values.get(&key_vec);
                                 let last_triggered_row = match last_triggered {
@@ -297,33 +311,36 @@ impl Node for GroupBy {
                             }
                             retraction_columns.push(Arc::new(array.finish()) as ArrayRef);
                         }
-                        _ => unimplemented!(),
+                        _ => {
+                            dbg!(output_schema.fields()[self.key.len() + aggregate_index].data_type());
+                            unimplemented!()
+                        }
                     }
                 }
                 // Remove those values
-                for row in 0..output_columns[0].len() {
-                    create_key(key_columns.as_slice(), row, &mut key_vec);
+                for row in 0..retraction_key_columns[0].len() {
+                    create_key(retraction_key_columns.as_slice(), row, &mut key_vec);
                     last_triggered_values.remove(&key_vec);
                 }
                 // Build retraction array
                 // TODO: BooleanBuilder => PrimitiveBuilder<BooleanType>. Maybe this can be refactored into a function after all.
                 let mut retraction_array_builder =
-                    BooleanBuilder::new(retraction_columns[0].len() + output_columns[0].len());
-                for i in 0..retraction_columns[0].len() {
+                    BooleanBuilder::new(retraction_key_columns[0].len() + key_columns[0].len());
+                for i in 0..retraction_key_columns[0].len() {
                     retraction_array_builder.append_value(true);
                 }
-                for i in 0..output_columns[0].len() {
+                for i in 0..key_columns[0].len() {
                     retraction_array_builder.append_value(false);
                 }
                 let retraction_array = Arc::new(retraction_array_builder.finish());
 
                 // Push new values
                 for aggregate_index in 0..self.aggregates.len() {
-                    match output_schema.fields()[self.key.len() + aggregate_index].data_type() {
+                    match output_schema.fields()[self.output_key_indices.len() + aggregate_index].data_type() {
                         DataType::Int64 => {
-                            let mut array = Int64Builder::new(output_columns[0].len());
+                            let mut array = Int64Builder::new(key_columns[0].len());
 
-                            for row in 0..output_columns[0].len() {
+                            for row in 0..key_columns[0].len() {
                                 create_key(key_columns.as_slice(), row, &mut key_vec);
                                 // TODO: this key may not exist because of retractions.
                                 let row_accumulators = accumulators_map.get(&key_vec).unwrap();

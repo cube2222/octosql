@@ -1,10 +1,12 @@
-use crate::physical::physical::*;
+use std::fs::File;
+use std::sync::Arc;
+
 use arrow::array::{ArrayRef, BooleanBuilder};
 use arrow::csv;
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
-use std::fs::File;
-use std::sync::Arc;
+
+use crate::physical::physical::*;
 
 pub struct CSVSource {
     path: String,

@@ -1,11 +1,12 @@
 // ****** Copied from datafusion
 
-use crate::physical::physical::{Error, ScalarValue};
 use arrow::array::{
     ArrayRef, BooleanArray, Int16Array, Int32Array, Int64Array, Int8Array, StringArray,
     UInt16Array, UInt32Array, UInt64Array, UInt8Array,
 };
 use arrow::datatypes::DataType;
+
+use crate::physical::physical::{Error, ScalarValue};
 
 /// Enumeration of types that can be used in a GROUP BY expression (all primitives except
 /// for floating point numerics)

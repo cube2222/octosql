@@ -1,10 +1,12 @@
-use crate::physical::physical::*;
+use std::sync::Arc;
+
 use arrow::array::BooleanArray;
 use arrow::compute::kernels::filter;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
-use std::sync::Arc;
+
 use crate::physical::map::Expression;
+use crate::physical::physical::*;
 
 pub struct Filter {
     filter_expr: Arc<dyn Expression>,

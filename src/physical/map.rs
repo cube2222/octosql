@@ -1,8 +1,10 @@
-use crate::physical::physical::*;
+use std::sync::Arc;
+
 use arrow::array::ArrayRef;
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
-use std::sync::Arc;
+
+use crate::physical::physical::*;
 
 pub struct Map {
     source: Arc<dyn Node>,

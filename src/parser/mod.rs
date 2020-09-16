@@ -1,17 +1,16 @@
 pub mod parser;
 
 use nom::{
-    IResult,
     bytes::complete::{tag},
-    combinator::map_res,
+    IResult,
     sequence::tuple,
 };
+use nom::branch::alt;
+use nom::character::complete::{alpha1, alphanumeric0, alphanumeric1, digit1, one_of};
 use nom::character::is_alphanumeric;
 use nom::combinator::recognize;
-use nom::sequence::{pair, terminated};
-use nom::branch::alt;
-use nom::character::complete::{alpha1, alphanumeric1, alphanumeric0, one_of, digit1};
 use nom::multi::{many0, many1};
+use nom::sequence::{pair, terminated};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Query {

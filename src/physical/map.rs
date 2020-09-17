@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
-use arrow::array::ArrayRef;
+use arrow::array::{ArrayRef, Int64Builder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 
 use crate::physical::physical::*;
+use crate::physical::physical::ScalarValue::Null;
 
 pub struct Map {
     source: Arc<dyn Node>,
@@ -33,6 +34,8 @@ impl Node for Map {
                 expr.field_meta(&vec![], &source_schema)
                     .unwrap_or_else(|err| unimplemented!())
             })
+            .enumerate()
+            .map(|(i, field)| Field::new(self.names[i].to_string().as_str(), field.data_type().clone(), field.is_nullable()))
             .collect();
         new_schema_fields.push(Field::new(retractions_field, DataType::Boolean, false));
         Ok(Arc::new(Schema::new(new_schema_fields)))
@@ -105,5 +108,40 @@ impl Expression for FieldExpression {
         let record_schema: Arc<Schema> = record.schema();
         let field_index = record_schema.index_of(self.field.to_string().as_str()).unwrap();
         Ok(record.column(field_index).clone())
+    }
+}
+
+pub struct Constant {
+    value: ScalarValue,
+}
+
+impl Constant {
+    pub fn new(value: ScalarValue) -> Constant {
+        Constant { value }
+    }
+}
+
+impl Expression for Constant {
+    fn field_meta(
+        &self,
+        context_schema: &Vec<Arc<Schema>>,
+        record_schema: &Arc<Schema>,
+    ) -> Result<Field, Error> {
+        Ok(Field::new("", self.value.data_type(), self.value == ScalarValue::Null))
+    }
+    fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef, Error> {
+        match self.value {
+            ScalarValue::Int64(n) => {
+                let mut array = Int64Builder::new(record.num_rows());
+                for i in 0..record.num_rows() {
+                    array.append_value(n).unwrap();
+                }
+                Ok(Arc::new(array.finish()) as ArrayRef)
+            },
+            _ => {
+                dbg!(self.value.data_type());
+                unimplemented!()
+            },
+        }
     }
 }

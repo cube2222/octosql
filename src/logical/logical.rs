@@ -213,7 +213,7 @@ impl Expression {
     ) -> Result<Arc<dyn map::Expression>, Error> {
         match self {
             Expression::Variable(name) => Ok(Arc::new(map::FieldExpression::new(name.clone()))),
-            Expression::Constant(_) => unimplemented!(),
+            Expression::Constant(value) => Ok(Arc::new(map::Constant::new(value.clone()))),
             Expression::Function(_, _) => { unimplemented!() }
             Expression::Wildcard => { unimplemented!() }
         }

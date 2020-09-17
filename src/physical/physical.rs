@@ -2,7 +2,7 @@ use std::hash::Hash;
 use std::io;
 use std::sync::Arc;
 
-use arrow::datatypes::Schema;
+use arrow::datatypes::{Schema, DataType};
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 
@@ -21,13 +21,13 @@ impl ToString for Identifier {
         match self {
             Identifier::SimpleIdentifier(id) => {
                 id.clone()
-            },
+            }
             Identifier::NamespacedIdentifier(namespace, id) => {
                 let mut output = namespace.clone();
                 output.push_str(".");
                 output.push_str(id);
                 output
-            },
+            }
         }
     }
 }
@@ -48,6 +48,27 @@ pub enum ScalarValue {
     UInt64(u64),
     Utf8(String),
     Struct(Vec<ScalarValue>),
+}
+
+impl ScalarValue {
+    pub fn data_type(&self) -> DataType {
+        match self {
+            ScalarValue::Null => DataType::Null,
+            ScalarValue::Boolean(_) => DataType::Boolean,
+            ScalarValue::Float32(_) => DataType::Float32,
+            ScalarValue::Float64(_) => DataType::Float64,
+            ScalarValue::Int8(_) => DataType::Int8,
+            ScalarValue::Int16(_) => DataType::Int16,
+            ScalarValue::Int32(_) => DataType::Int32,
+            ScalarValue::Int64(_) => DataType::Int64,
+            ScalarValue::UInt8(_) => DataType::UInt8,
+            ScalarValue::UInt16(_) => DataType::UInt16,
+            ScalarValue::UInt32(_) => DataType::UInt32,
+            ScalarValue::UInt64(_) => DataType::UInt64,
+            ScalarValue::Utf8(_) => DataType::Utf8,
+            ScalarValue::Struct(_) => /*DataType::Struct*/ unimplemented!(),
+        }
+    }
 }
 
 impl Hash for ScalarValue {

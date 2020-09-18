@@ -9,6 +9,7 @@ use crate::physical::physical;
 use crate::physical::physical::Identifier;
 use crate::physical::stream_join::StreamJoin;
 use crate::physical::functions::Equal;
+use crate::physical::requalifier::Requalifier;
 
 #[derive(Debug)]
 pub enum Error {
@@ -45,7 +46,7 @@ pub enum Node {
     },
     Requalifier {
         source: Box<Node>,
-        alias: Identifier,
+        alias: String,
     },
 }
 
@@ -203,7 +204,9 @@ impl Node {
                     joined_key_exprs,
                 )))
             }
-            Node::Requalifier { source, alias } => unimplemented!(),
+            Node::Requalifier { source, alias } => {
+                Ok(Arc::new(Requalifier::new(alias.clone(), source.physical(mat_ctx)?)))
+            },
         }
     }
 }

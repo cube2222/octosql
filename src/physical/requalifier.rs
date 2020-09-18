@@ -48,13 +48,13 @@ impl Node for Requalifier {
                 let new_batch = RecordBatch::try_new(
                     schema.clone(),
                     batch.columns().iter().cloned().collect(),
-                );
-                produce(ctx, batch);
+                )?;
+                produce(ctx, new_batch)?;
 
                 Ok(())
             },
             &mut noop_meta_send,
-        );
+        )?;
         Ok(())
     }
 }

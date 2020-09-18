@@ -91,10 +91,18 @@ pub fn query_to_logical_plan(query: &parser::Query) -> Box<Node> {
 pub fn source_to_logical_plan(expr: &parser::Source) -> Box<Node> {
     match expr {
         parser::Source::Table(ident, alias) => {
-            Box::new(Node::Source { name: identifier_to_logical_plan(&ident), alias: alias.clone().map(|ident| identifier_to_logical_plan(&ident)) })
+            let mut plan = Box::new(Node::Source { name: identifier_to_logical_plan(&ident), alias: alias.clone().map(|ident| identifier_to_logical_plan(&ident)) });
+            if let Some(parser::Identifier::SimpleIdentifier(ident)) = alias {
+                plan = Box::new(Node::Requalifier { source: plan, alias: ident.clone() })
+            }
+            plan
         }
         parser::Source::Subquery(subquery, alias) => {
-            query_to_logical_plan(&subquery)
+            let mut plan = query_to_logical_plan(&subquery);
+            if let Some(parser::Identifier::SimpleIdentifier(ident)) = alias {
+                plan = Box::new(Node::Requalifier { source: plan, alias: ident.clone() })
+            }
+            plan
         }
     }
 }

@@ -94,7 +94,7 @@ impl Node for StreamJoin {
                     Ok(())
                 },
                 &mut noop_meta_send,
-            );
+            ).unwrap();
         });
         let sender2 = sender.clone();
         let joined = self.joined.clone();
@@ -107,7 +107,7 @@ impl Node for StreamJoin {
                     Ok(())
                 },
                 &mut noop_meta_send,
-            );
+            ).unwrap();
         });
 
         std::mem::drop(sender);
@@ -407,7 +407,7 @@ impl Node for StreamJoin {
 
             let output_batch = RecordBatch::try_new(output_schema.clone(), output_columns)?;
             if output_batch.num_rows() > 0 {
-                produce(&ProduceContext {}, output_batch);
+                produce(&ProduceContext {}, output_batch)?;
             }
         }
 

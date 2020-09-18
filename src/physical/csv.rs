@@ -71,7 +71,7 @@ impl Node for CSVSource {
                     produce(
                         &ProduceContext {},
                         RecordBatch::try_new(schema.clone(), columns).unwrap(),
-                    )
+                    )?
                 }
             };
         }

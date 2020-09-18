@@ -393,7 +393,7 @@ impl Node for GroupBy {
 
                 let new_batch = RecordBatch::try_new(output_schema, output_columns).unwrap();
 
-                produce(&ProduceContext {}, new_batch);
+                produce(&ProduceContext {}, new_batch)?;
 
                 Ok(())
             },

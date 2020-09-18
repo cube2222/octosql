@@ -46,7 +46,7 @@ impl Node for Map {
         if self.keep_source_fields {
             let mut to_append = new_schema_fields;
             new_schema_fields = source_schema.fields().clone();
-            new_schema_fields.truncate(new_schema_fields.len()-1); // Remove retraction field.
+            new_schema_fields.truncate(new_schema_fields.len() - 1); // Remove retraction field.
             new_schema_fields.append(&mut to_append);
         }
         new_schema_fields.push(Field::new(retractions_field, DataType::Boolean, false));
@@ -67,17 +67,14 @@ impl Node for Map {
                 let mut new_columns: Vec<ArrayRef> = self
                     .expressions
                     .iter()
-                    .map(|expr| {
-                        expr.evaluate(ctx, &batch)
-                            .unwrap_or_else(|err| unimplemented!())
-                    })
-                    .collect();
+                    .map(|expr| expr.evaluate(ctx, &batch))
+                    .collect::<Result<_, _>>()?;
                 new_columns.push(batch.column(batch.num_columns() - 1).clone());
 
                 if self.keep_source_fields {
                     let mut to_append = new_columns;
                     new_columns = batch.columns().iter().cloned().collect();
-                    new_columns.truncate(new_columns.len()-1); // Remove retraction field.
+                    new_columns.truncate(new_columns.len() - 1); // Remove retraction field.
                     new_columns.append(&mut to_append);
                 }
 
@@ -87,7 +84,7 @@ impl Node for Map {
                 Ok(())
             },
             &mut noop_meta_send,
-        );
+        )?;
         Ok(())
     }
 }
@@ -125,8 +122,27 @@ impl Expression for FieldExpression {
     }
     fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef, Error> {
         let record_schema: Arc<Schema> = record.schema();
-        let field_index = record_schema.index_of(self.field.to_string().as_str()).unwrap();
-        Ok(record.column(field_index).clone())
+        let field_name_string = self.field.to_string();
+        let field_name = field_name_string.as_str();
+        let field_index = record_schema.index_of(field_name);
+        if let Err(err) = field_index {
+            let mut variable_context = Some(ctx.variable_context.clone());
+            loop {
+                if let Some(var_ctx) = variable_context {
+                    if let Ok(index) = var_ctx.schema.index_of(field_name) {
+                        let val = var_ctx.variables[index].clone();
+                        return Constant::new(val).evaluate(ctx, record);
+                    }
+
+                    variable_context = var_ctx.previous.clone();
+                } else {
+                    return Err(Error::from(err));
+                }
+            }
+        } else {
+            let index = field_index?;
+            Ok(record.column(index).clone())
+        }
     }
 }
 

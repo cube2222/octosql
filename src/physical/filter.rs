@@ -48,12 +48,12 @@ impl Node for Filter {
                     .collect();
                 let new_batch = RecordBatch::try_new(source_schema.clone(), new_columns).unwrap();
                 if new_batch.num_rows() > 0 {
-                    produce(ctx, new_batch);
+                    produce(ctx, new_batch)?;
                 }
                 Ok(())
             },
             &mut noop_meta_send,
-        );
+        )?;
         Ok(())
     }
 }

@@ -47,7 +47,9 @@ impl Node for Filter {
                     .map(|array_ref| filter::filter(array_ref.as_ref(), predicate_column).unwrap())
                     .collect();
                 let new_batch = RecordBatch::try_new(source_schema.clone(), new_columns).unwrap();
-                produce(ctx, new_batch);
+                if new_batch.num_rows() > 0 {
+                    produce(ctx, new_batch);
+                }
                 Ok(())
             },
             &mut noop_meta_send,

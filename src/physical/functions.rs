@@ -144,7 +144,7 @@ impl Expression for Equal {
     }
     fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef, Error> {
         let left = self.left.evaluate(ctx, record)?;
-        let right = self.left.evaluate(ctx, record)?;
+        let right = self.right.evaluate(ctx, record)?;
 
         let output: Result<_, ArrowError> = binary_array_op!(left, right, eq);
         Ok(output?)

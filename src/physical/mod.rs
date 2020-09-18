@@ -7,3 +7,4 @@ pub mod map;
 pub mod stream_join;
 pub mod trigger;
 pub mod functions;
+pub mod requalifier;

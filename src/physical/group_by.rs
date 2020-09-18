@@ -8,7 +8,7 @@ use arrow::array::{
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 
-use crate::physical::datafusion::{create_key, create_row, GroupByScalar};
+use crate::physical::datafusion::{create_key, GroupByScalar};
 use crate::physical::map::Expression;
 use crate::physical::physical::*;
 use crate::physical::trigger::*;

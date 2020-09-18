@@ -5,7 +5,6 @@ use arrow::array::{ArrayRef, Int64Builder, StringBuilder};
 use arrow::datatypes::DataType;
 
 use crate::physical::datafusion::{create_key, GroupByScalar};
-use crate::physical::physical::*;
 
 pub trait Trigger: std::fmt::Debug {
     fn keys_received(&mut self, keys: Vec<ArrayRef>);

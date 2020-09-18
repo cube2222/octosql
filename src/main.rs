@@ -48,9 +48,9 @@ fn record_print(
     Ok(())
 }
 
-fn var(name: &str) -> Box<Expression> {
-    Box::new(Expression::Variable(Identifier::SimpleIdentifier(name.to_string())))
-}
+// fn var(name: &str) -> Box<Expression> {
+//     Box::new(Expression::Variable(Identifier::SimpleIdentifier(name.to_string())))
+// }
 
 fn main() {
     let start_time = std::time::Instant::now();

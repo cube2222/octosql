@@ -5,7 +5,6 @@ use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 
 use crate::physical::physical::*;
-use crate::physical::physical::ScalarValue::Null;
 
 pub struct Map {
     source: Arc<dyn Node>,

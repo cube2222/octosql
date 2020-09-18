@@ -1,11 +1,8 @@
 use std::collections::BTreeMap;
 
-use datafusion::logicalplan::FunctionType::Scalar;
-
 use crate::logical::logical::{Aggregate, Expression, Node};
 use crate::parser;
-use crate::parser::{identifier, Operator, Source, Value};
-use crate::parser::parser::parse_sql;
+use crate::parser::Operator;
 use crate::physical::physical::{Identifier, ScalarValue};
 
 pub fn query_to_logical_plan(query: &parser::Query) -> Box<Node> {

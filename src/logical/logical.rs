@@ -123,7 +123,7 @@ impl Node {
 
                 let (aggregates_no_key_part, aggregated_exprs_no_key_part): (Vec<_>, Vec<_>) = aggregates.iter()
                     .zip(aggregated_exprs.iter())
-                    .filter(|(aggregate, aggregated_expr)| if let(Aggregate::KeyPart) = **aggregate {false} else {true})
+                    .filter(|(aggregate, aggregated_expr)| if let Aggregate::KeyPart = **aggregate {false} else {true})
                     .unzip();
 
                 let aggregate_vec = aggregates_no_key_part
@@ -137,23 +137,23 @@ impl Node {
 
                 let aggregated_exprs_key_part = aggregates.iter()
                     .zip(aggregated_exprs.iter())
-                    .filter(|(aggregate, aggregated_expr)| if let(Aggregate::KeyPart) = **aggregate {true} else {false})
+                    .filter(|(aggregate, aggregated_expr)| if let Aggregate::KeyPart = **aggregate {true} else {false})
                     .map(|(aggregate, aggregated_expr)| aggregated_expr)
                     .collect::<Vec<_>>();
 
                 let aggregate_output_names = aggregates.iter()
                     .enumerate()
-                    .filter(|(i, aggregate)| if let(Aggregate::KeyPart) = **aggregate {false} else {true})
+                    .filter(|(i, aggregate)| if let Aggregate::KeyPart = **aggregate {false} else {true})
                     .map(|(i, _)| output_fields[i].clone())
                     .collect();
 
                 let mut output_key_indices = Vec::with_capacity(aggregated_exprs_key_part.len());
 
                 for expr in aggregated_exprs_key_part {
-                    if let(Expression::Variable(var_name)) = expr.as_ref() {
+                    if let Expression::Variable(var_name) = expr.as_ref() {
                         let mut found = false;
                         for i in 0..key_exprs.len() {
-                            if let(Expression::Variable(key_var_name)) = key_exprs[i].as_ref() {
+                            if let Expression::Variable(key_var_name) = key_exprs[i].as_ref() {
                                 if var_name == key_var_name {
                                     output_key_indices.push(i);
                                     found = true;

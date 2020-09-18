@@ -110,7 +110,10 @@ pub fn parse_value(value: &ast::Value) -> Value {
             let val_str: &str = val.as_str();
             Value::Integer(val_str.parse::<i64>().unwrap())
         }
-        _ => unimplemented!(),
+        _ => {
+            dbg!(value);
+            unimplemented!()
+        },
     }
 }
 

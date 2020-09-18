@@ -24,6 +24,7 @@ pub enum Expression {
     Function(Identifier, Vec<Box<Expression>>),
     Operator(Box<Expression>, Operator, Box<Expression>),
     Wildcard,
+    Subquery(Box<Query>),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

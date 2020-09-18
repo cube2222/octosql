@@ -97,6 +97,9 @@ pub fn parse_expr(expr: &Expr) -> Box<Expression> {
         Expr::Wildcard => {
             Box::new(Expression::Wildcard)
         }
+        Expr::Subquery(subquery) => {
+            Box::new(Expression::Subquery(parse_query(subquery)))
+        }
         _ => {
             dbg!(expr);
             unimplemented!()

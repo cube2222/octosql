@@ -8,6 +8,7 @@ use crate::physical::map;
 use crate::physical::physical;
 use crate::physical::physical::Identifier;
 use crate::physical::stream_join::StreamJoin;
+use crate::physical::functions::Equal;
 
 #[derive(Debug)]
 pub enum Error {
@@ -54,6 +55,7 @@ pub enum Expression {
     Constant(physical::ScalarValue),
     Function(Identifier, Vec<Box<Expression>>),
     Wildcard,
+    Subquery(Box<Node>),
 }
 
 #[derive(Debug)]
@@ -107,7 +109,7 @@ impl Node {
                     expr_vec.push(expr);
                     name_vec.push(name);
                 }
-                Ok(Arc::new(map::Map::new(source.physical(mat_ctx)?, expr_vec, name_vec)))
+                Ok(Arc::new(map::Map::new(source.physical(mat_ctx)?, expr_vec, name_vec, *keep_source_fields)))
             }
             Node::GroupBy {
                 source,
@@ -214,8 +216,19 @@ impl Expression {
         match self {
             Expression::Variable(name) => Ok(Arc::new(map::FieldExpression::new(name.clone()))),
             Expression::Constant(value) => Ok(Arc::new(map::Constant::new(value.clone()))),
-            Expression::Function(_, _) => { unimplemented!() }
+            Expression::Function(name, args) => {
+                match name {
+                    Identifier::SimpleIdentifier(ident) => {
+                        match ident.as_str() {
+                            "=" => Ok(Arc::new(Equal::new(args[0].physical(mat_ctx)?, args[1].physical(mat_ctx)?))),
+                            _ => unimplemented!(),
+                        }
+                    }
+                    _ => unimplemented!(),
+                }
+            }
             Expression::Wildcard => { unimplemented!() }
+            Expression::Subquery(query) => { Ok(Arc::new(map::Subquery::new(query.physical(mat_ctx)?))) }
         }
     }
 }

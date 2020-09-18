@@ -116,6 +116,9 @@ pub fn expression_to_logical_plan(expr: &parser::Expression) -> Box<Expression> 
         parser::Expression::Wildcard => {
             Box::new(Expression::Wildcard)
         }
+        parser::Expression::Subquery(query) => {
+            Box::new(Expression::Subquery(query_to_logical_plan(query.as_ref())))
+        }
         _ => {
             dbg!(expr);
             panic!("invalid expression")

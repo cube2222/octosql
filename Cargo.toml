@@ -1,5 +1,10 @@
 [package]
 name = "octosql"
+description = "WIP PoC rewrite of OctoSQL in Rust"
+license-file = "LICENSE.txt"
+readme = "README.md"
+homepage = "https://octosql.dev"
+repository = "https://github.com/cube2222/octosql-rs"
 version = "0.0.1"
 authors = ["jakub"]
 edition = "2018"

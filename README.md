@@ -24,7 +24,9 @@ The current roadmap is to achieve feature parity with the Go version of OctoSQL.
   - [ ] Watermark generators
 	- [ ] Start with Max difference
 - [ ] Shuffle
-- [ ] Subqueries
+- [x] Subqueries
+  - [ ] Handle all primitive types
+  - [ ] Handle multiple columns/rows (Tuple values)
 - [ ] Lookup join
 - [x] Physical Plan (fit for pattern matching)
   - [ ] Basic optimiser

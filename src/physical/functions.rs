@@ -28,47 +28,6 @@ use crate::physical::arrow::*;
 
 // TODO: Add "custom function" expression.
 
-// pub struct Equal {
-//     left: Arc<dyn Expression>,
-//     right: Arc<dyn Expression>,
-// }
-//
-// impl Equal {
-//     pub fn new(left: Arc<dyn Expression>, right: Arc<dyn Expression>) -> Equal {
-//         Equal { left, right }
-//     }
-// }
-//
-// impl Expression for Equal {
-//     fn field_meta(
-//         &self,
-//         schema_context: Arc<dyn SchemaContext>,
-//         record_schema: &Arc<Schema>,
-//     ) -> Result<Field, Error> {
-//         // TODO: Nullable if either subexpression nullable?
-//         Ok(Field::new("", DataType::Boolean, false))
-//     }
-//     fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef, Error> {
-//         let left = self.left.evaluate(ctx, record)?;
-//         let right = self.right.evaluate(ctx, record)?;
-//
-//         let output: Result<_, ArrowError> = binary_array_op!(left, right, eq);
-//         Ok(output?)
-//     }
-// }
-
-// macro_rules! make_binary_primitive_array_op_function {
-//     ($name: ident, $function: ident) => {
-//         pub fn $name(args: Vec<ArrayRef>) -> Result<ArrayRef, Error> {
-//             let output: Result<_, ArrowError> = binary_primitive_array_op!(args[0], args[1], $function);
-//             Ok(output?)
-//         }
-//     }
-// }
-//
-// make_binary_primitive_array_op_function!(function_equal, eq);
-//
-
 type EvaluateFunction = Arc<dyn Fn(Vec<ArrayRef>) -> Result<ArrayRef, Error> + Send + Sync>;
 type MetaFunction = Arc<dyn Fn(&Arc<dyn SchemaContext>, &Arc<Schema>) -> Result<Field, Error> + Send + Sync>;
 
@@ -138,50 +97,3 @@ lazy_static! {
         m
     };
 }
-
-// macro_rules! make_const_meta_body {
-//     ($data_type: expr) => {
-//         Ok(Field::new("", $data_type, false))
-//     }
-// }
-//
-// macro_rules! make_binary_primitive_array_op_function_body {
-//     ($function: ident) => {
-//         |args: Vec<ArrayRef>| {
-//             let output: Result<_, ArrowError> = binary_primitive_array_op!(args[0], args[1], $function);
-//             Ok(output? as ArrayRef)
-//         }
-//     }
-// }
-//
-// macro_rules! make_function {
-//     ($name: ident, $meta_body: expr, $body: expr) => {
-//         pub struct $name {
-//             args: Vec<Arc<dyn Expression>>,
-//         }
-//
-//         impl $name
-//         {
-//             pub fn new(args: Vec<Arc<dyn Expression>>) -> $name {
-//                 $name { args }
-//             }
-//         }
-//
-//         impl Expression for $name
-//         {
-//             fn field_meta(&self, schema_context: Arc<dyn SchemaContext>, record_schema: &Arc<Schema>) -> Result<Field, Error> {
-//                 $meta_body
-//             }
-//
-//             fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef, Error> {
-//                 let args = self.args.iter()
-//                     .map(|expr| expr.evaluate(ctx, record))
-//                     .collect::<Result<Vec<ArrayRef>, Error>>()?;
-//
-//                 ($body)(args)
-//             }
-//         }
-//     }
-// }
-//
-// make_function!(FunctionEqual, make_const_meta_body!(DataType::Boolean), make_binary_primitive_array_op_function_body!(eq));

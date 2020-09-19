@@ -2,7 +2,7 @@ use std::hash::Hash;
 use std::io;
 use std::sync::Arc;
 
-use arrow::datatypes::{Schema, DataType};
+use arrow::datatypes::{Schema, DataType, Field};
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 
@@ -96,11 +96,60 @@ impl Eq for ScalarValue {}
 
 pub struct ProduceContext {}
 
+pub trait SchemaContext {
+    fn field_with_name(&self, name: &str) -> Result<&Field, Error>;
+}
+
+pub struct EmptySchemaContext {
+}
+
+impl SchemaContext for EmptySchemaContext {
+    fn field_with_name(&self, name: &str) -> Result<&Field, Error> {
+        Err(Error::Unexpected)
+    }
+}
+
+pub struct SchemaContextWithSchema {
+    pub previous: Arc<dyn SchemaContext>,
+    pub schema: Arc<Schema>,
+}
+
+impl SchemaContext for SchemaContextWithSchema {
+    fn field_with_name(&self, name: &str) -> Result<&Field, Error> {
+        match self.schema.field_with_name(name) {
+            Ok(field) => Ok(field),
+            Err(arrow_err) => {
+                match self.previous.field_with_name(name) {
+                    Ok(field) => Ok(field),
+                    Err(err) => Err(Error::Wrapped(format!("{}", arrow_err), Box::new(err.into()))),
+                }
+            },
+        }
+    }
+}
+
 // TODO: Fixme struct field visibility.
 pub struct VariableContext {
     pub previous: Option<Arc<VariableContext>>,
     pub schema: Arc<Schema>,
     pub variables: Vec<ScalarValue>,
+}
+
+impl SchemaContext for VariableContext {
+    fn field_with_name(&self, name: &str) -> Result<&Field, Error> {
+        match self.schema.field_with_name(name) {
+            Ok(field) => Ok(field),
+            Err(arrow_err) => {
+                match &self.previous {
+                    None => Err(Error::Unexpected),
+                    Some(previous) => match previous.field_with_name(name) {
+                        Ok(field) => Ok(field),
+                        Err(err) => Err(Error::Wrapped(format!("{}", arrow_err), Box::new(err.into()))),
+                    },
+                }
+            },
+        }
+    }
 }
 
 pub struct ExecutionContext {
@@ -120,6 +169,7 @@ pub enum Error {
     IOError(io::Error),
     ArrowError(arrow::error::ArrowError),
     Unexpected,
+    Wrapped(String, Box<Error>),
 }
 
 impl From<arrow::error::ArrowError> for Error {
@@ -140,7 +190,7 @@ pub enum MetadataMessage {
 }
 
 pub trait Node: Send + Sync {
-    fn schema(&self) -> Result<Arc<Schema>, Error>;
+    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>, Error>;
     fn run(
         &self,
         ctx: &ExecutionContext,

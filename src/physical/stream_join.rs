@@ -33,11 +33,11 @@ impl StreamJoin {
 }
 
 impl Node for StreamJoin {
-    fn schema(&self) -> Result<Arc<Schema>, Error> {
+    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>, Error> {
         // Both without last row, and retraction added at end.
-        let mut source_schema_fields = self.source.schema()?.fields().clone();
+        let mut source_schema_fields = self.source.schema(schema_context.clone())?.fields().clone();
         source_schema_fields.truncate(source_schema_fields.len() - 1);
-        let joined_schema_fields = self.joined.schema()?.fields().clone();
+        let joined_schema_fields = self.joined.schema(schema_context.clone())?.fields().clone();
         let new_fields: Vec<Field> = source_schema_fields
             .iter()
             .map(|f| Field::new(f.name(), f.data_type().clone(), true))
@@ -59,9 +59,9 @@ impl Node for StreamJoin {
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<(), Error> {
-        let source_schema = self.source.schema()?;
-        let joined_schema = self.joined.schema()?;
-        let output_schema = self.schema()?;
+        let source_schema = self.source.schema(ctx.variable_context.clone())?;
+        let joined_schema = self.joined.schema(ctx.variable_context.clone())?;
+        let output_schema = self.schema(ctx.variable_context.clone())?;
 
         // TODO: Fixme HashMap => BTreeMap
         let mut state_map: BTreeMap<
@@ -72,11 +72,11 @@ impl Node for StreamJoin {
             ),
         > = BTreeMap::new();
 
-        let key_types: Vec<DataType> = match self.source.schema() {
+        let key_types: Vec<DataType> = match self.source.schema(ctx.variable_context.clone()) {
             Ok(schema) => self
                 .source_key_exprs
                 .iter()
-                .map(|field| field.field_meta(&vec![], &source_schema).unwrap().data_type().clone())
+                .map(|field| field.field_meta(ctx.variable_context.clone(), &source_schema).unwrap().data_type().clone())
                 .collect(),
             _ => panic!("aaa"),
         };

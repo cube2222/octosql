@@ -20,8 +20,8 @@ impl Filter {
 }
 
 impl Node for Filter {
-    fn schema(&self) -> Result<Arc<Schema>, Error> {
-        self.source.schema()
+    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>, Error> {
+        self.source.schema(schema_context.clone())
     }
 
     fn run(
@@ -30,7 +30,7 @@ impl Node for Filter {
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<(), Error> {
-        let source_schema = self.source.schema()?;
+        let source_schema = self.source.schema(exec_ctx.variable_context.clone())?;
 
         self.source.run(
             exec_ctx,

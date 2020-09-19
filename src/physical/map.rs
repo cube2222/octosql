@@ -10,6 +10,7 @@ use crate::physical::physical::*;
 use arrow::buffer::MutableBuffer;
 use std::mem;
 use std::io::Write;
+use crate::physical::datafusion::create_row;
 
 pub struct Map {
     source: Arc<dyn Node>,
@@ -31,14 +32,14 @@ impl Map {
 
 impl Node for Map {
     // TODO: Just don't allow to use retractions field as field name.
-    fn schema(&self) -> Result<Arc<Schema>, Error> {
-        let source_schema = self.source.schema()?;
+    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>, Error> {
+        let source_schema = self.source.schema(schema_context.clone())?;
         let mut new_schema_fields: Vec<Field> = self
             .expressions
             .iter()
             .map(|expr| {
-                expr.field_meta(&vec![], &source_schema)
-                    .unwrap_or_else(|err| unimplemented!())
+                expr.field_meta(schema_context.clone(), &source_schema)
+                    .unwrap_or_else(|err| {dbg!(err); unimplemented!()})
             })
             .enumerate()
             .map(|(i, field)| Field::new(self.names[i].to_string().as_str(), field.data_type().clone(), field.is_nullable()))
@@ -59,7 +60,7 @@ impl Node for Map {
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<(), Error> {
-        let output_schema = self.schema()?;
+        let output_schema = self.schema(ctx.variable_context.clone())?;
 
         self.source.run(
             ctx,
@@ -92,7 +93,7 @@ impl Node for Map {
 pub trait Expression: Send + Sync {
     fn field_meta(
         &self,
-        context_schema: &Vec<Arc<Schema>>,
+        schema_context: Arc<dyn SchemaContext>,
         record_schema: &Arc<Schema>,
     ) -> Result<Field, Error>;
     fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef, Error>;
@@ -112,13 +113,20 @@ impl FieldExpression {
 impl Expression for FieldExpression {
     fn field_meta(
         &self,
-        context_schema: &Vec<Arc<Schema>>,
+        schema_context: Arc<dyn SchemaContext>,
         record_schema: &Arc<Schema>,
     ) -> Result<Field, Error> {
-        Ok(record_schema
-            .field_with_name(self.field.to_string().as_str())
-            .unwrap()
-            .clone())
+        let field_name_string = self.field.to_string();
+        let field_name = field_name_string.as_str();
+        match record_schema.field_with_name(field_name) {
+            Ok(field) => Ok(field.clone()),
+            Err(arrow_err) => {
+                match schema_context.field_with_name(field_name).map(|field| field.clone()) {
+                    Ok(field) => Ok(field),
+                    Err(err) => Err(Error::Wrapped(format!("{}", arrow_err), Box::new(err.into()))),
+                }
+            },
+        }
     }
     fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef, Error> {
         let record_schema: Arc<Schema> = record.schema();
@@ -159,7 +167,7 @@ impl Constant {
 impl Expression for Constant {
     fn field_meta(
         &self,
-        context_schema: &Vec<Arc<Schema>>,
+        schema_context: Arc<dyn SchemaContext>,
         record_schema: &Arc<Schema>,
     ) -> Result<Field, Error> {
         Ok(Field::new("", self.value.data_type(), self.value == ScalarValue::Null))
@@ -194,26 +202,49 @@ impl Subquery {
 impl Expression for Subquery {
     fn field_meta(
         &self,
-        context_schema: &Vec<Arc<Schema>>,
+        schema_context: Arc<dyn SchemaContext>,
         record_schema: &Arc<Schema>,
     ) -> Result<Field, Error> {
-        let source_schema = self.query.schema()?;
+        let source_schema = self.query.schema(
+            Arc::new(SchemaContextWithSchema {
+                previous: schema_context.clone(),
+                schema: record_schema.clone(),
+            }),
+        )?;
         // TODO: Implement for tuples.
         Ok(source_schema.field(0).clone())
     }
 
     // TODO: Would probably be more elegant to gather vectors of record batches, and then do a type switch later, creating the final array in a typesafe way.
     fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef, Error> {
-        let source_schema = self.query.schema()?;
+        let source_schema = self.query.schema(Arc::new(SchemaContextWithSchema {
+            previous: ctx.variable_context.clone(),
+            schema: record.schema(),
+        }))?;
         let output_type = source_schema.field(0).data_type().clone();
         let builder = ArrayDataBuilder::new(output_type);
         let mut buffer = MutableBuffer::new(0);
 
         for i in 0..record.num_rows() {
+            let mut row = Vec::with_capacity(record.num_columns());
+            for i in 0..record.num_columns() {
+                row.push(ScalarValue::Null);
+            }
+
+            create_row(record.columns(), i, &mut row)?;
+
+            let ctx = ExecutionContext {
+                variable_context: Arc::new(VariableContext {
+                    previous: Some(ctx.variable_context.clone()),
+                    schema: record.schema().clone(),
+                    variables: row,
+                })
+            };
+
             let mut batches = vec![];
 
             self.query.run(
-                ctx,
+                &ctx,
                 &mut |produce_ctx, batch| {
                     batches.push(batch);
                     Ok(())

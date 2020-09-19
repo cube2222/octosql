@@ -134,13 +134,13 @@ impl GroupBy {
 }
 
 impl Node for GroupBy {
-    fn schema(&self) -> Result<Arc<Schema>, Error> {
-        let source_schema = self.source.schema()?;
+    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>, Error> {
+        let source_schema = self.source.schema(schema_context.clone())?;
         let mut key_fields: Vec<Field> = self
             .output_key_indices
             .iter()
             .map(|i| &self.key[*i])
-            .map(|key_field| key_field.field_meta(&vec![], &source_schema))
+            .map(|key_field| key_field.field_meta(schema_context.clone(), &source_schema))
             .collect::<Result<Vec<Field>, Error>>()?;
 
         let aggregated_field_types: Vec<DataType> = self
@@ -148,7 +148,7 @@ impl Node for GroupBy {
             .iter()
             .enumerate()
             .map(|(i, column_expr)| {
-                self.aggregates[i].output_type(column_expr.field_meta(&vec![], &source_schema)?.data_type())
+                self.aggregates[i].output_type(column_expr.field_meta(schema_context.clone(), &source_schema)?.data_type())
             })
             .collect::<Result<Vec<DataType>, Error>>()?;
 
@@ -170,7 +170,7 @@ impl Node for GroupBy {
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<(), Error> {
-        let source_schema = self.source.schema()?;
+        let source_schema = self.source.schema(exec_ctx.variable_context.clone())?;
 
         let mut accumulators_map: BTreeMap<Vec<GroupByScalar>, Vec<Box<dyn Accumulator>>> =
             BTreeMap::new();
@@ -180,7 +180,7 @@ impl Node for GroupBy {
         let key_types: Vec<DataType> = self
             .key
             .iter()
-            .map(|key_expr| key_expr.field_meta(&vec![], &source_schema).unwrap().data_type().clone())
+            .map(|key_expr| key_expr.field_meta(exec_ctx.variable_context.clone(), &source_schema).unwrap().data_type().clone())
             .collect();
 
         let mut trigger: Box<dyn Trigger> = Box::new(CountingTrigger::new(key_types, 100));
@@ -237,7 +237,7 @@ impl Node for GroupBy {
                     .iter()
                     .map(|i| key_columns[*i].clone())
                     .collect::<Vec<_>>();
-                let output_schema = self.schema()?;
+                let output_schema = self.schema(exec_ctx.variable_context.clone())?;
 
                 let mut retraction_key_columns = Vec::with_capacity(self.output_names.len());
 

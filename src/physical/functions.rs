@@ -2,7 +2,7 @@ use crate::physical::map::Expression;
 use std::sync::Arc;
 use arrow::datatypes::{Schema, Field, DataType, TimeUnit};
 use arrow::array::{BooleanArray, Int8Array, Int16Array, Int32Array, Int64Array, UInt8Array, UInt16Array, UInt32Array, UInt64Array, Float32Array, Float64Array, Date32Array, Date64Array, Time32SecondArray, Time32MillisecondArray, Time64MicrosecondArray, Time64NanosecondArray, TimestampSecondArray, TimestampMillisecondArray, TimestampMicrosecondArray, TimestampNanosecondArray, IntervalYearMonthArray, IntervalDayTimeArray, DurationSecondArray, DurationMillisecondArray, DurationMicrosecondArray, DurationNanosecondArray, BinaryArray, LargeBinaryArray, FixedSizeBinaryArray, StringArray, LargeStringArray, ListArray, LargeListArray, StructArray, UnionArray, FixedSizeListArray, NullArray, DictionaryArray};
-use crate::physical::physical::{Error, ExecutionContext};
+use crate::physical::physical::{Error, ExecutionContext, SchemaContext};
 use arrow::compute::kernels::comparison::{eq};
 use arrow::record_batch::RecordBatch;
 use arrow::array::ArrayRef;
@@ -136,7 +136,7 @@ impl Equal {
 impl Expression for Equal {
     fn field_meta(
         &self,
-        context_schema: &Vec<Arc<Schema>>,
+        schema_context: Arc<dyn SchemaContext>,
         record_schema: &Arc<Schema>,
     ) -> Result<Field, Error> {
         // TODO: Nullable if either subexpression nullable?

@@ -19,7 +19,7 @@ impl CSVSource {
 }
 
 impl Node for CSVSource {
-    fn schema(&self) -> Result<Arc<Schema>, Error> {
+    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>, Error> {
         let file = File::open(self.path.as_str()).unwrap();
         let r = csv::ReaderBuilder::new()
             .has_header(true)
@@ -51,7 +51,7 @@ impl Node for CSVSource {
             retraction_array_builder.append_value(false);
         }
         let retraction_array = Arc::new(retraction_array_builder.finish());
-        let schema = self.schema()?;
+        let schema = self.schema(ctx.variable_context.clone())?;
         loop {
             let maybe_rec = r.next().unwrap();
             match maybe_rec {

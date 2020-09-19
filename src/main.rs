@@ -2,7 +2,7 @@ mod physical;
 mod logical;
 mod parser;
 
-use crate::physical::physical::{noop_meta_send, ExecutionContext, ProduceContext, VariableContext, retractions_field, Identifier};
+use crate::physical::physical::{noop_meta_send, ExecutionContext, ProduceContext, VariableContext, retractions_field, Identifier, EmptySchemaContext};
 use crate::logical::logical::Expression::Variable;
 use crate::logical::logical::{MaterializationContext, Expression, Aggregate};
 use crate::logical::logical::Node::{Map, Source, GroupBy, Filter};
@@ -110,6 +110,9 @@ fn main() {
     dbg!(&logical_plan);
 
     let plan = logical_plan.physical(&MaterializationContext {}).unwrap();
+
+    let schema = plan.schema(Arc::new(EmptySchemaContext{})).unwrap();
+    dbg!(schema);
 
     let res = plan.run(
         &ExecutionContext {

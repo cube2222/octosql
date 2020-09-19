@@ -963,8 +963,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "octosql-rs"
-version = "0.1.0"
+name = "octosql"
+version = "0.0.1"
 dependencies = [
  "arrow",
  "datafusion",

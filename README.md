@@ -40,7 +40,7 @@ The current roadmap is to achieve feature parity with the Go version of OctoSQL.
 - [x] SQL
   - [ ] Temporal Extensions
 - [ ] Nice output printing
-- [ ] Datasources
+- [ ] Data Sources
   - [x] CSV
   - [ ] MySQL
   - [ ] PostgreSQL

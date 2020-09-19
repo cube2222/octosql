@@ -40,7 +40,6 @@ use std::path;
 use std::result::*;
 use std::thread;
 use std::time;
-// use datafusion::logicalplan::ScalarValue;
 use arrow::error::ArrowError;
 use arrow::ipc::{BoolBuilder, Utf8Builder};
 use datafusion::execution::physical_plan::common::get_scalar_value;
@@ -57,11 +56,6 @@ fn record_print(
     ctx: &ProduceContext,
     batch: RecordBatch,
 ) -> Result<(), physical::physical::Error> {
-    for i in 0..batch.num_columns() {
-        for j in 0..batch.num_rows() {
-            dbg!((i, j, batch.column(i).is_null(j)));
-        }
-    }
     println!("{}", batch.num_rows());
     println!("{}", pretty_format_batches(&[batch]).unwrap());
     Ok(())

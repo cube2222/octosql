@@ -28,6 +28,8 @@
 
 //! Utilities for printing record batches
 
+use std::time::{SystemTime, UNIX_EPOCH, Duration};
+
 use arrow::array;
 use arrow::datatypes::{DataType, TimeUnit, ArrowPrimitiveType, Int64Type};
 use arrow::record_batch::RecordBatch;
@@ -36,6 +38,8 @@ use arrow::error::{Result, ArrowError};
 use prettytable::format;
 use prettytable::{Cell, Row, Table};
 use arrow::array::{Int64Array, PrimitiveArrayOps, PrimitiveArray};
+use chrono::{Utc, DateTime, NaiveDateTime, Local};
+use chrono::format::Fixed::RFC3339;
 
 ///! Create a visual representation of record batches
 pub fn pretty_format_batches(results: &[RecordBatch]) -> Result<String> {
@@ -124,7 +128,17 @@ fn array_value_to_string(column: array::ArrayRef, row: usize) -> Result<String> 
             make_string!(array::TimestampMicrosecondArray, column, row)
         }
         DataType::Timestamp(unit, _) if *unit == TimeUnit::Nanosecond => {
-            make_string!(array::TimestampNanosecondArray, column, row)
+            if column.is_null(row) {
+                Ok("<null>".to_string())
+            } else {
+                let nano_duration = UNIX_EPOCH + Duration::from_nanos(column
+                    .as_any()
+                    .downcast_ref::<array::TimestampNanosecondArray>()
+                    .unwrap()
+                    .value(row) as u64);
+                let datetime = DateTime::<Utc>::from(nano_duration);
+                Ok(datetime.to_rfc3339())
+            }
         }
         DataType::Date32(_) => make_string!(array::Date32Array, column, row),
         DataType::Date64(_) => make_string!(array::Date64Array, column, row),

@@ -16,6 +16,9 @@
 extern crate lazy_static;
 
 #[macro_use]
+extern crate paste;
+
+#[macro_use]
 mod physical;
 mod logical;
 mod parser;

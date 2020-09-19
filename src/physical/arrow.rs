@@ -158,21 +158,6 @@ pub fn create_row(
     Ok(())
 }
 
-/// Invoke a compute kernel on a pair of binary data arrays
-// macro_rules! compute_utf8_op {
-//     ($LEFT:expr, $RIGHT:expr, $OP:ident, $DT:ident) => {{
-//         let ll = $LEFT
-//             .as_any()
-//             .downcast_ref::<$DT>()
-//             .expect("compute_op failed to downcast array");
-//         let rr = $RIGHT
-//             .as_any()
-//             .downcast_ref::<$DT>()
-//             .expect("compute_op failed to downcast array");
-//         Ok(Arc::new(paste::expr! {[<$OP _utf8>]}(&ll, &rr)?))
-//     }};
-// }
-
 macro_rules! compute_single_arg {
     ($arg:expr, $input_type:ident, $output_builder:ident, $op:expr) => {{
         let arg = $arg
@@ -182,7 +167,44 @@ macro_rules! compute_single_arg {
 
         let mut result = $output_builder::new($arg.len());
         for i in 0..$arg.len() {
+            result.append_value($op(arg.value(i))?)?;
+        }
+
+        Ok(Arc::new(result.finish()) as ArrayRef)
+    }};
+}
+
+macro_rules! compute_single_arg_str {
+    ($arg:expr, $input_type:ident, $output_builder:ident, $op:expr) => {{
+        let arg = $arg
+            .as_any()
+            .downcast_ref::<$input_type>()
+            .expect("compute_single_arg failed to downcast array");
+
+        let mut result = $output_builder::new($arg.len());
+        for i in 0..$arg.len() {
             result.append_value($op(arg.value(i)).as_str())?;
+        }
+
+        Ok(Arc::new(result.finish()) as ArrayRef)
+    }};
+}
+
+macro_rules! compute_two_arg {
+    ($arg1:expr, $arg2:expr, $input_type1:ident, $input_type2:ident, $output_builder:ident, $op:expr) => {{
+        let arg1 = $arg1
+            .as_any()
+            .downcast_ref::<$input_type1>()
+            .expect("compute_single_arg failed to downcast array");
+
+        let arg2 = $arg2
+            .as_any()
+            .downcast_ref::<$input_type2>()
+            .expect("compute_single_arg failed to downcast array");
+
+        let mut result = $output_builder::new($arg1.len());
+        for i in 0..$arg1.len() {
+            result.append_value($op(arg1.value(i), arg2.value(i))?)?;
         }
 
         Ok(Arc::new(result.finish()) as ArrayRef)
@@ -201,6 +223,21 @@ macro_rules! compute_op {
             .downcast_ref::<$DT>()
             .expect("compute_op failed to downcast array");
         Ok(Arc::new($OP(&ll, &rr)?))
+    }};
+}
+
+/// Invoke a compute kernel on a pair of binary data arrays
+macro_rules! compute_utf8_op {
+    ($LEFT:expr, $RIGHT:expr, $OP:ident, $DT:ident) => {{
+        let ll = $LEFT
+            .as_any()
+            .downcast_ref::<$DT>()
+            .expect("compute_op failed to downcast array");
+        let rr = $RIGHT
+            .as_any()
+            .downcast_ref::<$DT>()
+            .expect("compute_op failed to downcast array");
+        Ok(Arc::new(paste::expr! {[<$OP _utf8>]}(&ll, &rr)?))
     }};
 }
 
@@ -255,7 +292,7 @@ macro_rules! binary_array_op {
             DataType::UInt64 => compute_op!($LEFT, $RIGHT, $OP, UInt64Array),
             DataType::Float32 => compute_op!($LEFT, $RIGHT, $OP, Float32Array),
             DataType::Float64 => compute_op!($LEFT, $RIGHT, $OP, Float64Array),
-            // DataType::Utf8 => compute_utf8_op!($LEFT, $RIGHT, $OP, StringArray),
+            DataType::Utf8 => compute_utf8_op!($LEFT, $RIGHT, $OP, StringArray),
             DataType::Timestamp(TimeUnit::Nanosecond, None) => {
                 compute_op!($LEFT, $RIGHT, $OP, TimestampNanosecondArray)
             }

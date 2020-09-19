@@ -967,9 +967,11 @@ name = "octosql"
 version = "0.0.1"
 dependencies = [
  "arrow",
+ "chrono",
  "datafusion",
  "lazy_static",
  "nom",
+ "paste",
  "prettytable-rs",
  "serde",
  "serde_json",

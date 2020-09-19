@@ -173,6 +173,22 @@ pub fn create_row(
 //     }};
 // }
 
+macro_rules! compute_single_arg {
+    ($arg:expr, $input_type:ident, $output_builder:ident, $op:expr) => {{
+        let arg = $arg
+            .as_any()
+            .downcast_ref::<$input_type>()
+            .expect("compute_single_arg failed to downcast array");
+
+        let mut result = $output_builder::new($arg.len());
+        for i in 0..$arg.len() {
+            result.append_value($op(arg.value(i)).as_str())?;
+        }
+
+        Ok(Arc::new(result.finish()) as ArrayRef)
+    }};
+}
+
 /// Invoke a compute kernel on a pair of arrays
 macro_rules! compute_op {
     ($LEFT:expr, $RIGHT:expr, $OP:ident, $DT:ident) => {{

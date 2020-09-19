@@ -50,11 +50,15 @@ pub enum Identifier {
 #[derive(Debug, Eq, PartialEq)]
 pub enum Value {
     Integer(i64),
+    String(String),
 }
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Operator {
+    Lt,
+    LtEq,
     Eq,
+    GtEq,
     Gt,
     Plus,
     Minus,

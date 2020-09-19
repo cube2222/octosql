@@ -14,7 +14,7 @@
 
 use std::sync::Arc;
 
-use arrow::array::{ArrayRef, Int64Builder, Int32Builder, ArrayDataBuilder, ArrayDataRef, BooleanBufferBuilder, BufferBuilderTrait};
+use arrow::array::{ArrayRef, Int64Builder, Int32Builder, ArrayDataBuilder, ArrayDataRef, BooleanBufferBuilder, BufferBuilderTrait, StringBuilder};
 use arrow::array::{BooleanArray, Int8Array, Int16Array, Int32Array, Int64Array, UInt8Array, UInt16Array, UInt32Array, UInt64Array, Float32Array, Float64Array, Date32Array, Date64Array, Time32SecondArray, Time32MillisecondArray, Time64MicrosecondArray, Time64NanosecondArray, TimestampSecondArray, TimestampMillisecondArray, TimestampMicrosecondArray, TimestampNanosecondArray, IntervalYearMonthArray, IntervalDayTimeArray, DurationSecondArray, DurationMillisecondArray, DurationMicrosecondArray, DurationNanosecondArray, BinaryArray, LargeBinaryArray, FixedSizeBinaryArray, StringArray, LargeStringArray, ListArray, LargeListArray, StructArray, UnionArray, FixedSizeListArray, NullArray, DictionaryArray};
 use arrow::datatypes::{DataType, Field, Schema, DateUnit, TimeUnit, IntervalUnit, Int8Type, Int16Type, Int32Type, Int64Type, UInt8Type, UInt16Type, UInt32Type, UInt64Type};
 use arrow::compute::kernels::comparison::eq;
@@ -190,11 +190,18 @@ impl Expression for Constant {
         Ok(Field::new("", self.value.data_type(), self.value == ScalarValue::Null))
     }
     fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef, Error> {
-        match self.value {
+        match &self.value {
             ScalarValue::Int64(n) => {
                 let mut array = Int64Builder::new(record.num_rows());
                 for i in 0..record.num_rows() {
-                    array.append_value(n).unwrap();
+                    array.append_value(*n).unwrap();
+                }
+                Ok(Arc::new(array.finish()) as ArrayRef)
+            }
+            ScalarValue::Utf8(v) => {
+                let mut array = StringBuilder::new(record.num_rows());
+                for i in 0..record.num_rows() {
+                    array.append_value(v.as_str()).unwrap();
                 }
                 Ok(Arc::new(array.finish()) as ArrayRef)
             }

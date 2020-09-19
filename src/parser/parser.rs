@@ -105,7 +105,7 @@ pub fn parse_expr(expr: &Expr) -> Box<Expression> {
                 parse_expr(right.as_ref()),
             ))
         }
-        Expr::Function(Function{ name, args, over, distinct }) => {
+        Expr::Function(Function { name, args, over, distinct }) => {
             Box::new(Expression::Function(parse_ident(&name.0[0]), args.iter().map(parse_expr).collect()))
         }
         Expr::Wildcard => {
@@ -117,7 +117,7 @@ pub fn parse_expr(expr: &Expr) -> Box<Expression> {
         _ => {
             dbg!(expr);
             unimplemented!()
-        },
+        }
     }
 }
 
@@ -126,22 +126,24 @@ pub fn parse_value(value: &ast::Value) -> Value {
         ast::Value::Number(val) => {
             let val_str: &str = val.as_str();
             Value::Integer(val_str.parse::<i64>().unwrap())
-        }
+        },
+        ast::Value::SingleQuotedString(val) => {
+            Value::String(val.clone())
+        },
         _ => {
             dbg!(value);
             unimplemented!()
-        },
+        }
     }
 }
 
 pub fn parse_binary_operator(op: &BinaryOperator) -> Operator {
     match op {
-        BinaryOperator::Eq => {
-            Operator::Eq
-        },
-        BinaryOperator::Gt => {
-            Operator::Gt
-        },
+        BinaryOperator::Lt => Operator::Lt,
+        BinaryOperator::LtEq => Operator::LtEq,
+        BinaryOperator::Eq => Operator::Eq,
+        BinaryOperator::GtEq => Operator::GtEq,
+        BinaryOperator::Gt => Operator::Gt,
         _ => unimplemented!(),
     }
 }

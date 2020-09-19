@@ -99,8 +99,8 @@ impl Node {
         match self {
             Node::Source { name, alias } => {
                 let mut path = name.to_string();
-                path.push_str(".csv");
-                Ok(Arc::new(CSVSource::new(path)))
+                path.push_str(".json");
+                Ok(Arc::new(JSONSource::new(path)))
             },
             Node::Filter {
                 source,
@@ -245,7 +245,7 @@ impl Expression {
 
                 match name {
                     Identifier::SimpleIdentifier(ident) => {
-                        match BUILTIN_FUNCTIONS.get(ident.as_str()) {
+                        match BUILTIN_FUNCTIONS.get(ident.to_lowercase().as_str()) {
                             None => {Err(Error::Unexpected(format!("unknown function: {}", ident.as_str())))},
                             Some(fn_constructor) => Ok(fn_constructor(args_physical)),
                         }

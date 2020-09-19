@@ -16,8 +16,9 @@ use std::collections::BTreeMap;
 
 use crate::logical::logical::{Aggregate, Expression, Node};
 use crate::parser;
-use crate::parser::Operator;
+use crate::parser::{Operator, Value};
 use crate::physical::physical::{Identifier, ScalarValue};
+use datafusion::logicalplan::FunctionType::Scalar;
 
 pub fn query_to_logical_plan(query: &parser::Query) -> Box<Node> {
     match query {
@@ -198,12 +199,16 @@ pub fn value_to_logical_plan(val: &parser::Value) -> ScalarValue {
         parser::Value::Integer(v) => {
             ScalarValue::Int64(v.clone())
         }
+        Value::String(v) => {ScalarValue::Utf8(v.clone())}
     }
 }
 
 pub fn operator_to_logical_plan(op: &parser::Operator) -> Identifier {
     Identifier::SimpleIdentifier(match op {
+        Operator::Lt => "<".to_string(),
+        Operator::LtEq => "<=".to_string(),
         Operator::Eq => "=".to_string(),
+        Operator::GtEq => ">=".to_string(),
         Operator::Gt => ">".to_string(),
         Operator::Plus => "+".to_string(),
         Operator::Minus => "-".to_string(),

@@ -18,7 +18,8 @@ The current roadmap is to achieve feature parity with the Go version of OctoSQL.
   - [ ] Float support (currently not tested and possibly wacky)
 - [ ] Expressions
   - [x] Evaluation in record context.
-  - [ ] Evaluation in execution context of variables (if we're in a subquery, we need to understand both the current record, and variables stemming from record flows above us)
+  - [x] Evaluation in execution context of variables (if we're in a subquery, we need to understand both the current record, and variables stemming from record flows above us)
+  - [ ] Common functions / operators. (Currently only Equals)
 - [x] Map (evaluate expressions, this is the only place where expressions are evaluated in OctoSQL, everything else gets evaluated expressions passed from here by name)
   - [ ] StarExpression
 - [ ] Watermarks

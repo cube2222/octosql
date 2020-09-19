@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use arrow::array::{ArrayRef, Int64Builder, Int32Builder, ArrayDataBuilder, ArrayDataRef};
+use arrow::array::{ArrayRef, Int64Builder, Int32Builder, ArrayDataBuilder, ArrayDataRef, BooleanBufferBuilder, BufferBuilderTrait};
 use arrow::array::{BooleanArray, Int8Array, Int16Array, Int32Array, Int64Array, UInt8Array, UInt16Array, UInt32Array, UInt64Array, Float32Array, Float64Array, Date32Array, Date64Array, Time32SecondArray, Time32MillisecondArray, Time64MicrosecondArray, Time64NanosecondArray, TimestampSecondArray, TimestampMillisecondArray, TimestampMicrosecondArray, TimestampNanosecondArray, IntervalYearMonthArray, IntervalDayTimeArray, DurationSecondArray, DurationMillisecondArray, DurationMicrosecondArray, DurationNanosecondArray, BinaryArray, LargeBinaryArray, FixedSizeBinaryArray, StringArray, LargeStringArray, ListArray, LargeListArray, StructArray, UnionArray, FixedSizeListArray, NullArray, DictionaryArray};
 use arrow::datatypes::{DataType, Field, Schema, DateUnit, TimeUnit, IntervalUnit, Int8Type, Int16Type, Int32Type, Int64Type, UInt8Type, UInt16Type, UInt32Type, UInt64Type};
 use arrow::compute::kernels::comparison::eq;
@@ -10,7 +10,7 @@ use crate::physical::physical::*;
 use arrow::buffer::MutableBuffer;
 use std::mem;
 use std::io::Write;
-use crate::physical::datafusion::create_row;
+use crate::physical::arrow::create_row;
 
 pub struct Map {
     source: Arc<dyn Node>,
@@ -39,7 +39,10 @@ impl Node for Map {
             .iter()
             .map(|expr| {
                 expr.field_meta(schema_context.clone(), &source_schema)
-                    .unwrap_or_else(|err| {dbg!(err); unimplemented!()})
+                    .unwrap_or_else(|err| {
+                        dbg!(err);
+                        unimplemented!()
+                    })
             })
             .enumerate()
             .map(|(i, field)| Field::new(self.names[i].to_string().as_str(), field.data_type().clone(), field.is_nullable()))
@@ -125,7 +128,7 @@ impl Expression for FieldExpression {
                     Ok(field) => Ok(field),
                     Err(err) => Err(Error::Wrapped(format!("{}", arrow_err), Box::new(err.into()))),
                 }
-            },
+            }
         }
     }
     fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef, Error> {
@@ -212,7 +215,8 @@ impl Expression for Subquery {
             }),
         )?;
         // TODO: Implement for tuples.
-        Ok(source_schema.field(0).clone())
+        let field_base = source_schema.field(0);
+        Ok(Field::new(field_base.name().as_str(), field_base.data_type().clone(), true))
     }
 
     // TODO: Would probably be more elegant to gather vectors of record batches, and then do a type switch later, creating the final array in a typesafe way.
@@ -222,8 +226,15 @@ impl Expression for Subquery {
             schema: record.schema(),
         }))?;
         let output_type = source_schema.field(0).data_type().clone();
+
+        let single_value_byte_size: usize = match output_type {
+            DataType::Int64 => 8,
+            _ => unimplemented!(),
+        };
+
         let builder = ArrayDataBuilder::new(output_type);
-        let mut buffer = MutableBuffer::new(0);
+        let mut null_bitmap_builder = BooleanBufferBuilder::new(record.num_rows() * single_value_byte_size);
+        let mut buffer = MutableBuffer::new(record.num_rows() * single_value_byte_size);
 
         for i in 0..record.num_rows() {
             let mut row = Vec::with_capacity(record.num_columns());
@@ -252,6 +263,14 @@ impl Expression for Subquery {
                 &mut noop_meta_send,
             )?;
 
+            if batches.len() == 0 || batches[0].num_rows() == 0 {
+                null_bitmap_builder.append(false);
+                buffer.resize(buffer.len() + single_value_byte_size);
+                continue;
+            }
+
+            null_bitmap_builder.append(true);
+
             if batches.len() != 1 {
                 unimplemented!()
             }
@@ -261,13 +280,18 @@ impl Expression for Subquery {
             }
 
             let cur_data = batches[0].column(0).data();
-
             let cur_buffer = &cur_data.buffers()[0];
-            buffer.reserve(buffer.len() + cur_buffer.len()).unwrap();
+
+            if cur_buffer.len() != single_value_byte_size {
+                unimplemented!();
+            }
+
+            buffer.reserve(buffer.len() + single_value_byte_size).unwrap();
             buffer.write_bytes(cur_buffer.data(), 0).unwrap();
         }
 
         let builder = builder.add_buffer(buffer.freeze());
+        let builder = builder.null_bit_buffer(null_bitmap_builder.finish());
         let builder = builder.len(record.num_rows());
 
         let output_array = make_array(builder.build());

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 pub mod csv;
+#[macro_use]
 pub mod arrow;
 pub mod physical;
 pub mod filter;

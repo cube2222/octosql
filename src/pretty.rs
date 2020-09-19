@@ -28,14 +28,14 @@
 
 //! Utilities for printing record batches
 
-use crate::array;
-use crate::datatypes::{DataType, TimeUnit};
-use crate::record_batch::RecordBatch;
+use arrow::array;
+use arrow::datatypes::{DataType, TimeUnit, ArrowPrimitiveType, Int64Type};
+use arrow::record_batch::RecordBatch;
+use arrow::error::{Result, ArrowError};
 
 use prettytable::format;
 use prettytable::{Cell, Row, Table};
-
-use crate::error::{ArrowError, Result};
+use arrow::array::{Int64Array, PrimitiveArrayOps, PrimitiveArray};
 
 ///! Create a visual representation of record batches
 pub fn pretty_format_batches(results: &[RecordBatch]) -> Result<String> {
@@ -81,12 +81,16 @@ fn create_table(results: &[RecordBatch]) -> Result<Table> {
 
 macro_rules! make_string {
     ($array_type:ty, $column: ident, $row: ident) => {{
-        Ok($column
-            .as_any()
-            .downcast_ref::<$array_type>()
-            .unwrap()
-            .value($row)
-            .to_string())
+        if $column.is_null($row) {
+            Ok("<null>".to_string())
+        } else {
+            Ok($column
+                .as_any()
+                .downcast_ref::<$array_type>()
+                .unwrap()
+                .value($row)
+                .to_string())
+        }
     }};
 }
 

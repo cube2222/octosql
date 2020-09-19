@@ -969,6 +969,7 @@ dependencies = [
  "arrow",
  "datafusion",
  "nom",
+ "prettytable-rs",
  "serde",
  "serde_json",
  "sqlparser 0.6.1",

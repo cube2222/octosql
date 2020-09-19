@@ -16,27 +16,26 @@ use std::fs::File;
 use std::sync::Arc;
 
 use arrow::array::{ArrayRef, BooleanBuilder};
-use arrow::csv;
+use arrow::json;
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 
 use crate::physical::physical::*;
 
-pub struct CSVSource {
+pub struct JSONSource {
     path: String,
 }
 
-impl CSVSource {
-    pub fn new(path: String) -> CSVSource {
-        CSVSource { path }
+impl JSONSource {
+    pub fn new(path: String) -> JSONSource {
+        JSONSource { path }
     }
 }
 
-impl Node for CSVSource {
+impl Node for JSONSource {
     fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>, Error> {
         let file = File::open(self.path.as_str()).unwrap();
-        let r = csv::ReaderBuilder::new()
-            .has_header(true)
+        let r = json::ReaderBuilder::new()
             .infer_schema(Some(10))
             .with_batch_size(batch_size)
             .build(file)
@@ -54,8 +53,7 @@ impl Node for CSVSource {
         meta_send: MetaSendFn,
     ) -> Result<(), Error> {
         let file = File::open(self.path.as_str()).unwrap();
-        let mut r = csv::ReaderBuilder::new()
-            .has_header(true)
+        let mut r = json::ReaderBuilder::new()
             .infer_schema(Some(10))
             .with_batch_size(batch_size)
             .build(file)

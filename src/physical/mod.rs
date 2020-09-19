@@ -23,3 +23,4 @@ pub mod stream_join;
 pub mod trigger;
 pub mod functions;
 pub mod requalifier;
+pub mod json;

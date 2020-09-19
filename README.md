@@ -44,7 +44,7 @@ The current roadmap is to achieve feature parity with the Go version of OctoSQL.
   - [x] CSV
   - [ ] MySQL
   - [ ] PostgreSQL
-  - [ ] JSON
+  - [x] JSON
   - [ ] Parquet
   - [ ] Excel
   - [ ] Kafka

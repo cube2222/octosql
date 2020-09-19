@@ -24,6 +24,7 @@ use crate::physical::physical::Identifier;
 use crate::physical::stream_join::StreamJoin;
 use crate::physical::functions::Equal;
 use crate::physical::requalifier::Requalifier;
+use crate::physical::json::JSONSource;
 
 #[derive(Debug)]
 pub enum Error {
@@ -95,8 +96,8 @@ impl Node {
         match self {
             Node::Source { name, alias } => {
                 let mut path = name.to_string();
-                path.push_str(".csv");
-                Ok(Arc::new(CSVSource::new(path)))
+                path.push_str(".json");
+                Ok(Arc::new(JSONSource::new(path)))
             },
             Node::Filter {
                 source,

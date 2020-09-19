@@ -55,6 +55,7 @@ pub enum Value {
 #[derive(Debug, Eq, PartialEq)]
 pub enum Operator {
     Eq,
+    Gt,
     Plus,
     Minus,
     AND,

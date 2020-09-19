@@ -204,6 +204,7 @@ pub fn value_to_logical_plan(val: &parser::Value) -> ScalarValue {
 pub fn operator_to_logical_plan(op: &parser::Operator) -> Identifier {
     Identifier::SimpleIdentifier(match op {
         Operator::Eq => "=".to_string(),
+        Operator::Gt => ">".to_string(),
         Operator::Plus => "+".to_string(),
         Operator::Minus => "-".to_string(),
         Operator::AND => "AND".to_string(),

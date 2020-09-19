@@ -139,6 +139,9 @@ pub fn parse_binary_operator(op: &BinaryOperator) -> Operator {
         BinaryOperator::Eq => {
             Operator::Eq
         },
+        BinaryOperator::Gt => {
+            Operator::Gt
+        },
         _ => unimplemented!(),
     }
 }

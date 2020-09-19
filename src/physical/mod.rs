@@ -21,6 +21,7 @@ pub mod group_by;
 pub mod map;
 pub mod stream_join;
 pub mod trigger;
+#[macro_use]
 pub mod functions;
 pub mod requalifier;
 pub mod json;

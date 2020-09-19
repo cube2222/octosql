@@ -968,6 +968,7 @@ version = "0.0.1"
 dependencies = [
  "arrow",
  "datafusion",
+ "lazy_static",
  "nom",
  "prettytable-rs",
  "serde",

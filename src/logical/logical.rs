@@ -22,9 +22,12 @@ use crate::physical::map;
 use crate::physical::physical;
 use crate::physical::physical::Identifier;
 use crate::physical::stream_join::StreamJoin;
-use crate::physical::functions::Equal;
+// use crate::physical::functions::Equal;
 use crate::physical::requalifier::Requalifier;
 use crate::physical::json::JSONSource;
+use crate::physical::functions;
+use crate::physical::functions::FunctionExpression;
+use crate::physical::functions::BUILTIN_FUNCTIONS;
 
 #[derive(Debug)]
 pub enum Error {
@@ -235,12 +238,14 @@ impl Expression {
             Expression::Variable(name) => Ok(Arc::new(map::FieldExpression::new(name.clone()))),
             Expression::Constant(value) => Ok(Arc::new(map::Constant::new(value.clone()))),
             Expression::Function(name, args) => {
+                let args_physical = args
+                    .into_iter()
+                    .map(|expr| expr.physical(mat_ctx))
+                    .collect::<Result<_, _>>()?;
+
                 match name {
                     Identifier::SimpleIdentifier(ident) => {
-                        match ident.as_str() {
-                            "=" => Ok(Arc::new(Equal::new(args[0].physical(mat_ctx)?, args[1].physical(mat_ctx)?))),
-                            _ => unimplemented!(),
-                        }
+                        Ok(BUILTIN_FUNCTIONS[ident.as_str()].clone()(args_physical))
                     }
                     _ => unimplemented!(),
                 }

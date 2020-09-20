@@ -78,7 +78,7 @@ pub fn parse_select_item(item: &SelectItem) -> (Box<Expression>, Option<Identifi
 pub fn parse_table(table: &TableFactor) -> Box<Source> {
     match table {
         TableFactor::Table { name, alias, args, with_hints } => {
-            return Box::new(Source::Table(parse_ident(&name.0[0]), alias.clone().map(|alias| parse_ident(&alias.name))));
+            return Box::new(Source::Table(parse_compound_ident(&name.0), alias.clone().map(|alias| parse_ident(&alias.name))));
         }
         TableFactor::Derived { lateral, subquery, alias } => {
             return Box::new(Source::Subquery(parse_query(subquery), alias.clone().map(|alias| parse_ident(&alias.name))));
@@ -149,10 +149,13 @@ pub fn parse_binary_operator(op: &BinaryOperator) -> Operator {
 }
 
 pub fn parse_compound_ident(parts: &Vec<Ident>) -> Identifier {
-    if parts.len() != 2 {
+    if parts.len() == 1 {
+        Identifier::SimpleIdentifier(parts[0].value.clone())
+    } else if parts.len() == 2 {
+        Identifier::NamespacedIdentifier(parts[0].value.clone(), parts[1].value.clone())
+    } else {
         unimplemented!()
     }
-    Identifier::NamespacedIdentifier(parts[0].value.clone(), parts[1].value.clone())
 }
 
 pub fn parse_ident(ident: &Ident) -> Identifier {

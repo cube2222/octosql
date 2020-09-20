@@ -14,7 +14,7 @@
 
 use arrow::datatypes::{DataType, ArrowNumericType};
 use crate::physical::physical::{Error, ScalarValue};
-use nom::lib::std::ops::{Add, AddAssign};
+use nom::lib::std::ops::{Add, AddAssign, SubAssign};
 
 pub trait Aggregate: Send + Sync {
     fn output_type(&self, input_schema: &DataType) -> Result<DataType, Error>;
@@ -31,7 +31,15 @@ pub struct Sum {}
 impl Aggregate for Sum {
     fn output_type(&self, input_type: &DataType) -> Result<DataType, Error> {
         match input_type {
+            DataType::Int8 => Ok(DataType::Int8),
+            DataType::Int16 => Ok(DataType::Int16),
+            DataType::Int32 => Ok(DataType::Int32),
             DataType::Int64 => Ok(DataType::Int64),
+            DataType::UInt8 => Ok(DataType::UInt8),
+            DataType::UInt16 => Ok(DataType::UInt16),
+            DataType::UInt32 => Ok(DataType::UInt32),
+            DataType::UInt64 => Ok(DataType::UInt64),
+            DataType::Float32 => Ok(DataType::Float32),
             DataType::Float64 => Ok(DataType::Float64),
             _ => {
                 dbg!(input_type);
@@ -42,7 +50,15 @@ impl Aggregate for Sum {
 
     fn create_accumulator(&self, input_type: &DataType) -> Box<dyn Accumulator> {
         match input_type {
+            DataType::Int8 => Box::new(SumAccumulator::<i8> { sum: 0, count: 0 }),
+            DataType::Int16 => Box::new(SumAccumulator::<i16> { sum: 0, count: 0 }),
+            DataType::Int32 => Box::new(SumAccumulator::<i32> { sum: 0, count: 0 }),
             DataType::Int64 => Box::new(SumAccumulator::<i64> { sum: 0, count: 0 }),
+            DataType::UInt8 => Box::new(SumAccumulator::<u8> { sum: 0, count: 0 }),
+            DataType::UInt16 => Box::new(SumAccumulator::<u16> { sum: 0, count: 0 }),
+            DataType::UInt32 => Box::new(SumAccumulator::<u32> { sum: 0, count: 0 }),
+            DataType::UInt64 => Box::new(SumAccumulator::<u64> { sum: 0, count: 0 }),
+            DataType::Float32 => Box::new(SumAccumulator::<f32> { sum: 0.0, count: 0 }),
             DataType::Float64 => Box::new(SumAccumulator::<f64> { sum: 0.0, count: 0 }),
             _ => {
                 dbg!(input_type);
@@ -53,7 +69,7 @@ impl Aggregate for Sum {
 }
 
 #[derive(Debug)]
-struct SumAccumulator<T: AddAssign<T>> {
+struct SumAccumulator<T: AddAssign<T> + SubAssign<T>> {
     sum: T,
     count: i64,
 }
@@ -66,14 +82,17 @@ macro_rules! impl_sum_accumulator {
                     ScalarValue::Boolean(x) => x,
                     _ => panic!("retraction shall be boolean"),
                 };
-                let multiplier = if !is_retraction { 1 as $primitive_type } else { -1 as $primitive_type };
-                if is_retraction {
-                    self.count -= 1;
-                } else {
+                if !is_retraction {
                     self.count += 1;
+                } else {
+                    self.count -= 1;
                 }
                 if let ScalarValue::$scalar_value_type(x) = value {
-                    self.sum += x * multiplier;
+                    if !is_retraction {
+                        self.sum += x;
+                    } else {
+                        self.sum -= x;
+                    }
                 } else {
                     panic!("bad aggregate argument");
                 }
@@ -87,7 +106,15 @@ macro_rules! impl_sum_accumulator {
     }
 }
 
+impl_sum_accumulator!(i8, Int8);
+impl_sum_accumulator!(i16, Int16);
+impl_sum_accumulator!(i32, Int32);
 impl_sum_accumulator!(i64, Int64);
+impl_sum_accumulator!(u8, UInt8);
+impl_sum_accumulator!(u16, UInt16);
+impl_sum_accumulator!(u32, UInt32);
+impl_sum_accumulator!(u64, UInt64);
+impl_sum_accumulator!(f32, Float32);
 impl_sum_accumulator!(f64, Float64);
 
 pub struct Count {}

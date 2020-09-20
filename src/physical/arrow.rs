@@ -39,6 +39,7 @@ use crate::physical::physical::{Error, ScalarValue};
 /// for floating point numerics)
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Ord, PartialOrd)]
 pub enum GroupByScalar {
+    Boolean(bool),
     UInt8(u8),
     UInt16(u16),
     UInt32(u32),
@@ -59,6 +60,10 @@ pub fn create_key(
     for i in 0..group_by_keys.len() {
         let col = &group_by_keys[i];
         match col.data_type() {
+            DataType::Boolean => {
+                let array = col.as_any().downcast_ref::<BooleanArray>().unwrap();
+                vec[i] = GroupByScalar::Boolean(array.value(row))
+            }
             DataType::UInt8 => {
                 let array = col.as_any().downcast_ref::<UInt8Array>().unwrap();
                 vec[i] = GroupByScalar::UInt8(array.value(row))

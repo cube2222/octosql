@@ -16,7 +16,8 @@ use std::collections::BTreeMap;
 use std::future::Future;
 use std::sync::Arc;
 
-use arrow::array::{ArrayBuilder, ArrayRef, BooleanBuilder, Int64Array, Int64Builder, StringBuilder, BooleanArray, Float64Builder};
+use arrow::array::{ArrayBuilder, ArrayRef, Int64Array, BooleanArray};
+use arrow::array::{BooleanBuilder, Int8Builder, Int16Builder, Int32Builder, Int64Builder, UInt8Builder, UInt16Builder, UInt32Builder, UInt64Builder, Float32Builder, Float64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 
@@ -279,7 +280,15 @@ impl Node for GroupBy {
                 for key_index in 0..self.key.len() {
                     match output_schema.fields()[key_index].data_type() {
                         DataType::Utf8 => push_retraction_keys_utf8!(Utf8, StringBuilder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
+                        DataType::Boolean => push_retraction_keys!(Boolean, BooleanBuilder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
+                        DataType::Int8 => push_retraction_keys!(Int8, Int8Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
+                        DataType::Int16 => push_retraction_keys!(Int16, Int16Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
+                        DataType::Int32 => push_retraction_keys!(Int32, Int32Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
                         DataType::Int64 => push_retraction_keys!(Int64, Int64Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
+                        DataType::UInt8 => push_retraction_keys!(UInt8, UInt8Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
+                        DataType::UInt16 => push_retraction_keys!(UInt16, UInt16Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
+                        DataType::UInt32 => push_retraction_keys!(UInt32, UInt32Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
+                        DataType::UInt64 => push_retraction_keys!(UInt64, UInt64Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
                         _ => unimplemented!(),
                     }
                 }
@@ -292,7 +301,16 @@ impl Node for GroupBy {
                 // Push retractions
                 for aggregate_index in 0..self.aggregates.len() {
                     match output_schema.fields()[self.output_key_indices.len() + aggregate_index].data_type() {
+                        DataType::Boolean => push_retraction_values!(Boolean, BooleanBuilder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
+                        DataType::Int8 => push_retraction_values!(Int8, Int8Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
+                        DataType::Int16 => push_retraction_values!(Int16, Int16Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
+                        DataType::Int32 => push_retraction_values!(Int32, Int32Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
                         DataType::Int64 => push_retraction_values!(Int64, Int64Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
+                        DataType::UInt8 => push_retraction_values!(UInt8, UInt8Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
+                        DataType::UInt16 => push_retraction_values!(UInt16, UInt16Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
+                        DataType::UInt32 => push_retraction_values!(UInt32, UInt32Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
+                        DataType::UInt64 => push_retraction_values!(UInt64, UInt64Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
+                        DataType::Float32 => push_retraction_values!(Float32, Float32Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
                         DataType::Float64 => push_retraction_values!(Float64, Float64Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
                         _ => {
                             dbg!(output_schema.fields()[self.key.len() + aggregate_index].data_type());
@@ -320,7 +338,16 @@ impl Node for GroupBy {
                 // Push new values
                 for aggregate_index in 0..self.aggregates.len() {
                     match output_schema.fields()[self.output_key_indices.len() + aggregate_index].data_type() {
+                        DataType::Boolean => push_values!(Boolean, BooleanBuilder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
+                        DataType::Int8 => push_values!(Int8, Int8Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
+                        DataType::Int16 => push_values!(Int16, Int16Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
+                        DataType::Int32 => push_values!(Int32, Int32Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
                         DataType::Int64 => push_values!(Int64, Int64Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
+                        DataType::UInt8 => push_values!(UInt8, UInt8Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
+                        DataType::UInt16 => push_values!(UInt16, UInt16Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
+                        DataType::UInt32 => push_values!(UInt32, UInt32Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
+                        DataType::UInt64 => push_values!(UInt64, UInt64Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
+                        DataType::Float32 => push_values!(Float32, Float32Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
                         DataType::Float64 => push_values!(Float64, Float64Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
                         _ => unimplemented!(),
                     }
@@ -329,7 +356,16 @@ impl Node for GroupBy {
                 // Combine retraction and non-retraction columns
                 for column_index in 0..output_columns.len() {
                     match output_schema.fields()[column_index].data_type() {
+                        DataType::Boolean => combine_columns!(BooleanBuilder, retraction_columns, output_columns, column_index),
+                        DataType::Int8 => combine_columns!(Int8Builder, retraction_columns, output_columns, column_index),
+                        DataType::Int16 => combine_columns!(Int16Builder, retraction_columns, output_columns, column_index),
+                        DataType::Int32 => combine_columns!(Int32Builder, retraction_columns, output_columns, column_index),
                         DataType::Int64 => combine_columns!(Int64Builder, retraction_columns, output_columns, column_index),
+                        DataType::UInt8 => combine_columns!(UInt8Builder, retraction_columns, output_columns, column_index),
+                        DataType::UInt16 => combine_columns!(UInt16Builder, retraction_columns, output_columns, column_index),
+                        DataType::UInt32 => combine_columns!(UInt32Builder, retraction_columns, output_columns, column_index),
+                        DataType::UInt64 => combine_columns!(UInt64Builder, retraction_columns, output_columns, column_index),
+                        DataType::Float32 => combine_columns!(Float32Builder, retraction_columns, output_columns, column_index),
                         DataType::Float64 => combine_columns!(Float64Builder, retraction_columns, output_columns, column_index),
                         DataType::Utf8 => combine_columns!(StringBuilder, retraction_columns, output_columns, column_index),
                         _ => unimplemented!(),

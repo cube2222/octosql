@@ -99,8 +99,13 @@ impl Node {
         match self {
             Node::Source { name, alias } => {
                 let mut path = name.to_string();
-                path.push_str(".csv");
-                Ok(Arc::new(CSVSource::new(path)))
+                if path.contains(".json") {
+                    Ok(Arc::new(JSONSource::new(path)))
+                } else if path.contains(".csv") {
+                    Ok(Arc::new(CSVSource::new(path)))
+                } else {
+                    unimplemented!()
+                }
             },
             Node::Filter {
                 source,

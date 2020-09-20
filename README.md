@@ -6,9 +6,9 @@ The current roadmap is to achieve feature parity with the Go version of OctoSQL.
 - [x] Projection
 - [x] Filter
 - [x] GroupBy
-  - [ ] Support all types
+  - [x] Support all types
   - [ ] More aggregates
-  - [ ] StarExpression
+  - [x] Wildcard
 - [x] Triggers
   - [x] Counting
   - [ ] Delay
@@ -19,9 +19,9 @@ The current roadmap is to achieve feature parity with the Go version of OctoSQL.
 - [ ] Expressions
   - [x] Evaluation in record context.
   - [x] Evaluation in execution context of variables (if we're in a subquery, we need to understand both the current record, and variables stemming from record flows above us)
-  - [ ] Common functions / operators. (Currently only Equals)
+  - [ ] Common functions / arithmetics. (Currently only comparison operators)
 - [x] Map (evaluate expressions, this is the only place where expressions are evaluated in OctoSQL, everything else gets evaluated expressions passed from here by name)
-  - [ ] StarExpression
+  - [x] Wildcard
 - [ ] Watermarks
   - [ ] Metadata Message and Handling
   - [ ] Watermark trigger
@@ -39,6 +39,7 @@ The current roadmap is to achieve feature parity with the Go version of OctoSQL.
 - [x] Logical Plan
 - [x] SQL
   - [ ] Temporal Extensions
+  - [ ] Join
 - [ ] Nice output printing
 - [ ] Data Sources
   - [x] CSV
@@ -49,6 +50,7 @@ The current roadmap is to achieve feature parity with the Go version of OctoSQL.
   - [ ] Excel
   - [ ] Kafka
 - [ ] Durations and Dates support
+  - [ ] SQL interval
 
 # Contributing
 Contributions are welcome!

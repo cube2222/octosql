@@ -18,6 +18,7 @@ use crate::physical::csv::CSVSource;
 use crate::physical::filter::Filter;
 use crate::physical::{group_by, aggregate};
 use crate::physical::group_by::GroupBy;
+use crate::physical::expression;
 use crate::physical::map;
 use crate::physical::physical;
 use crate::physical::physical::Identifier;
@@ -238,10 +239,10 @@ impl Expression {
     pub fn physical(
         &self,
         mat_ctx: &MaterializationContext,
-    ) -> Result<Arc<dyn map::Expression>, Error> {
+    ) -> Result<Arc<dyn expression::Expression>, Error> {
         match self {
-            Expression::Variable(name) => Ok(Arc::new(map::FieldExpression::new(name.clone()))),
-            Expression::Constant(value) => Ok(Arc::new(map::Constant::new(value.clone()))),
+            Expression::Variable(name) => Ok(Arc::new(expression::FieldExpression::new(name.clone()))),
+            Expression::Constant(value) => Ok(Arc::new(expression::Constant::new(value.clone()))),
             Expression::Function(name, args) => {
                 let args_physical = args
                     .into_iter()
@@ -259,7 +260,7 @@ impl Expression {
                 }
             }
             Expression::Wildcard => { unimplemented!() }
-            Expression::Subquery(query) => { Ok(Arc::new(map::Subquery::new(query.physical(mat_ctx)?))) }
+            Expression::Subquery(query) => { Ok(Arc::new(expression::Subquery::new(query.physical(mat_ctx)?))) }
         }
     }
 }

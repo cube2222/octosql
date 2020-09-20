@@ -19,7 +19,7 @@ use arrow::compute::kernels::filter;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 
-use crate::physical::map::Expression;
+use crate::physical::expression::Expression;
 use crate::physical::physical::*;
 
 pub struct Filter {

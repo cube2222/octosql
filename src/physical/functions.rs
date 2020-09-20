@@ -22,7 +22,7 @@ use arrow::datatypes::{DataType, Field, Schema, TimeUnit, ArrowPrimitiveType};
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 
-use crate::physical::map::Expression;
+use crate::physical::expression::Expression;
 use crate::physical::physical::{Error, ExecutionContext, SchemaContext};
 use crate::physical::arrow::*;
 use chrono::{DateTime, Timelike};

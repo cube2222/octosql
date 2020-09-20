@@ -20,7 +20,7 @@ use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 
 use crate::physical::arrow::{create_key, create_row, GroupByScalar};
-use crate::physical::map::Expression;
+use crate::physical::expression::Expression;
 use crate::physical::physical::*;
 
 pub struct StreamJoin {

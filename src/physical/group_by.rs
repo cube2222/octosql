@@ -22,7 +22,7 @@ use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 
 use crate::physical::arrow::{create_key, GroupByScalar, get_scalar_value};
-use crate::physical::map::Expression;
+use crate::physical::expression::Expression;
 use crate::physical::physical::*;
 use crate::physical::trigger::*;
 use crate::physical::aggregate::{Aggregate, Accumulator};

@@ -25,3 +25,4 @@ pub mod trigger;
 pub mod functions;
 pub mod requalifier;
 pub mod json;
+pub mod aggregate;

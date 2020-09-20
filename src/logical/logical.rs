@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use crate::physical::csv::CSVSource;
 use crate::physical::filter::Filter;
-use crate::physical::group_by;
+use crate::physical::{group_by, aggregate};
 use crate::physical::group_by::GroupBy;
 use crate::physical::map;
 use crate::physical::physical;
@@ -99,8 +99,8 @@ impl Node {
         match self {
             Node::Source { name, alias } => {
                 let mut path = name.to_string();
-                path.push_str(".json");
-                Ok(Arc::new(JSONSource::new(path)))
+                path.push_str(".csv");
+                Ok(Arc::new(CSVSource::new(path)))
             },
             Node::Filter {
                 source,
@@ -263,10 +263,10 @@ impl Aggregate {
     pub fn physical(
         &self,
         mat_ctx: &MaterializationContext,
-    ) -> Result<Arc<dyn group_by::Aggregate>, Error> {
+    ) -> Result<Arc<dyn aggregate::Aggregate>, Error> {
         match self {
-            Aggregate::Count => Ok(Arc::new(group_by::Count {})),
-            Aggregate::Sum => Ok(Arc::new(group_by::Sum {})),
+            Aggregate::Count => Ok(Arc::new(aggregate::Count {})),
+            Aggregate::Sum => Ok(Arc::new(aggregate::Sum {})),
             _ => unimplemented!(),
         }
     }

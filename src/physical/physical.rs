@@ -184,6 +184,7 @@ pub enum Error {
     ArrowError(arrow::error::ArrowError),
     Unexpected,
     Wrapped(String, Box<Error>),
+    BadInput(String),
 }
 
 impl From<arrow::error::ArrowError> for Error {

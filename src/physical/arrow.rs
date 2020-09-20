@@ -26,6 +26,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use arrow::array;
 use arrow::array::{
     ArrayRef, BooleanArray, Int16Array, Int32Array, Int64Array, Int8Array, StringArray,
     UInt16Array, UInt32Array, UInt64Array, UInt8Array,
@@ -156,6 +157,99 @@ pub fn create_row(
         }
     }
     Ok(())
+}
+
+/// Get a value from an array as a ScalarValue
+pub fn get_scalar_value(array: &ArrayRef, row: usize) -> Result<ScalarValue, Error> {
+    if array.is_null(row) {
+        return Ok(ScalarValue::Null);
+    }
+    let value: ScalarValue = match array.data_type() {
+        DataType::UInt8 => {
+            let array = array
+                .as_any()
+                .downcast_ref::<array::UInt8Array>()
+                .expect("Failed to cast array");
+            ScalarValue::UInt8(array.value(row))
+        }
+        DataType::UInt16 => {
+            let array = array
+                .as_any()
+                .downcast_ref::<array::UInt16Array>()
+                .expect("Failed to cast array");
+            ScalarValue::UInt16(array.value(row))
+        }
+        DataType::UInt32 => {
+            let array = array
+                .as_any()
+                .downcast_ref::<array::UInt32Array>()
+                .expect("Failed to cast array");
+            ScalarValue::UInt32(array.value(row))
+        }
+        DataType::UInt64 => {
+            let array = array
+                .as_any()
+                .downcast_ref::<array::UInt64Array>()
+                .expect("Failed to cast array");
+            ScalarValue::UInt64(array.value(row))
+        }
+        DataType::Int8 => {
+            let array = array
+                .as_any()
+                .downcast_ref::<array::Int8Array>()
+                .expect("Failed to cast array");
+            ScalarValue::Int8(array.value(row))
+        }
+        DataType::Int16 => {
+            let array = array
+                .as_any()
+                .downcast_ref::<array::Int16Array>()
+                .expect("Failed to cast array");
+            ScalarValue::Int16(array.value(row))
+        }
+        DataType::Int32 => {
+            let array = array
+                .as_any()
+                .downcast_ref::<array::Int32Array>()
+                .expect("Failed to cast array");
+            ScalarValue::Int32(array.value(row))
+        }
+        DataType::Int64 => {
+            let array = array
+                .as_any()
+                .downcast_ref::<array::Int64Array>()
+                .expect("Failed to cast array");
+            ScalarValue::Int64(array.value(row))
+        }
+        DataType::Float32 => {
+            let array = array
+                .as_any()
+                .downcast_ref::<array::Float32Array>()
+                .unwrap();
+            ScalarValue::Float32(array.value(row))
+        }
+        DataType::Float64 => {
+            let array = array
+                .as_any()
+                .downcast_ref::<array::Float64Array>()
+                .unwrap();
+            ScalarValue::Float64(array.value(row))
+        }
+        DataType::Utf8 => {
+            let array = array
+                .as_any()
+                .downcast_ref::<array::StringArray>()
+                .unwrap();
+            ScalarValue::Utf8(array.value(row).to_string())
+        }
+        other => {
+            return Err(Error::BadInput(format!(
+                "Unsupported data type {:?} for result of aggregate expression",
+                other
+            )));
+        }
+    };
+    Ok(value)
 }
 
 macro_rules! compute_single_arg {

@@ -17,12 +17,18 @@ pub mod parser;
 #[derive(Debug, Eq, PartialEq)]
 pub enum Query {
     Select {
-        expressions: Vec<(Box<Expression>, Option<Identifier>)>,
+        expressions: Vec<SelectExpression>,
         filter: Option<Box<Expression>>,
         from: Box<Source>,
         order_by:Vec<Box<Expression>>,
         group_by: Vec<Box<Expression>>,
     },
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum SelectExpression {
+    Expression(Box<Expression>, Option<Identifier>),
+    Wildcard(Option<String>),
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -37,7 +43,7 @@ pub enum Expression {
     Constant(Value),
     Function(Identifier, Vec<Box<Expression>>),
     Operator(Box<Expression>, Operator, Box<Expression>),
-    Wildcard,
+    Wildcard(Option<String>),
     Subquery(Box<Query>),
 }
 

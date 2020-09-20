@@ -16,7 +16,7 @@ use std::collections::BTreeMap;
 
 use crate::logical::logical::{Aggregate, Expression, Node};
 use crate::parser;
-use crate::parser::{Operator, Value};
+use crate::parser::{Operator, Value, SelectExpression};
 use crate::physical::physical::{Identifier, ScalarValue};
 use datafusion::logicalplan::FunctionType::Scalar;
 
@@ -29,18 +29,26 @@ pub fn query_to_logical_plan(query: &parser::Query) -> Box<Node> {
                 let mut variables: BTreeMap<Identifier, Box<Expression>> = BTreeMap::new();
 
                 let mut topmost_map_fields = Vec::with_capacity(expressions.len());
+                let mut topmost_map_wildcards = vec![];
 
-                for (i, (expr, alias)) in expressions.iter().enumerate() {
-                    let name = alias.clone()
-                        .unwrap_or_else(|| if let parser::Expression::Variable(ident) = expr.as_ref() {
-                            ident.clone()
-                        } else {
-                            parser::Identifier::SimpleIdentifier(format!("column_{}", i))
-                        });
-                    let ident = identifier_to_logical_plan(&name);
-                    variables.insert(ident.clone(), expression_to_logical_plan(expr.as_ref()));
+                for (i, select_expr) in expressions.iter().enumerate() {
+                    match select_expr {
+                        SelectExpression::Expression(expr, alias) => {
+                            let name = alias.clone()
+                                .unwrap_or_else(|| if let parser::Expression::Variable(ident) = expr.as_ref() {
+                                    ident.clone()
+                                } else {
+                                    parser::Identifier::SimpleIdentifier(format!("column_{}", i))
+                                });
+                            let ident = identifier_to_logical_plan(&name);
+                            variables.insert(ident.clone(), expression_to_logical_plan(expr.as_ref()));
 
-                    topmost_map_fields.push(ident);
+                            topmost_map_fields.push(ident);
+                        }
+                        SelectExpression::Wildcard(qualifier) => {
+                            topmost_map_wildcards.push(qualifier.clone());
+                        }
+                    }
                 }
 
                 let bottom_map_expressions = variables.into_iter()
@@ -51,6 +59,7 @@ pub fn query_to_logical_plan(query: &parser::Query) -> Box<Node> {
                 plan = Box::new(Node::Map {
                     source: plan,
                     expressions: bottom_map_expressions,
+                    wildcards: vec![],
                     keep_source_fields: true,
                 });
 
@@ -65,6 +74,7 @@ pub fn query_to_logical_plan(query: &parser::Query) -> Box<Node> {
                 plan = Box::new(Node::Map {
                     source: plan,
                     expressions: topmost_map_expressions,
+                    wildcards: topmost_map_wildcards,
                     keep_source_fields: false,
                 });
 
@@ -82,6 +92,14 @@ pub fn query_to_logical_plan(query: &parser::Query) -> Box<Node> {
                     .collect();
 
                 let (aggregate_exprs, output_fields): (Vec<_>, Vec<_>) = expressions.iter()
+                    .map(|select_expr| {
+                        if let SelectExpression::Expression(expr, ident) = select_expr {
+                            (expr, ident)
+                        } else {
+                            dbg!(select_expr);
+                            unimplemented!()
+                        }
+                    })
                     .map(|(expr, ident)| (aggregate_expression_to_logical_plan(expr), ident.as_ref().map(identifier_to_logical_plan)))
                     .enumerate()
                     .map(|(i, (expr, ident))| (expr, ident.unwrap_or(Identifier::SimpleIdentifier(format!("column_{}", i)))))
@@ -136,8 +154,8 @@ pub fn expression_to_logical_plan(expr: &parser::Expression) -> Box<Expression> 
         parser::Expression::Operator(left, op, right) => {
             Box::new(Expression::Function(operator_to_logical_plan(op), vec![expression_to_logical_plan(left.as_ref()), expression_to_logical_plan(right.as_ref())]))
         }
-        parser::Expression::Wildcard => {
-            Box::new(Expression::Wildcard)
+        parser::Expression::Wildcard(qualifier) => {
+            Box::new(Expression::Wildcard(qualifier.clone()))
         }
         parser::Expression::Subquery(query) => {
             Box::new(Expression::Subquery(query_to_logical_plan(query.as_ref())))

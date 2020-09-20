@@ -17,7 +17,7 @@ use sqlparser::ast::{BinaryOperator, Expr, Function, Ident, Select, SelectItem, 
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
 
-use crate::parser::{Expression, Identifier, Operator, Query, Source, Value};
+use crate::parser::{Expression, Identifier, Operator, Query, Source, Value, SelectExpression};
 
 pub fn parse_sql(text: &str) -> Box<Query> {
     let dialect = GenericDialect {}; // or AnsiDialect, or your own dialect ...
@@ -63,13 +63,19 @@ pub fn parse_select(select: &Select) -> Box<Query> {
     })
 }
 
-pub fn parse_select_item(item: &SelectItem) -> (Box<Expression>, Option<Identifier>) {
+pub fn parse_select_item(item: &SelectItem) -> SelectExpression {
     match item {
         SelectItem::UnnamedExpr(expr) => {
-            (parse_expr(expr), None)
+            SelectExpression::Expression(parse_expr(expr), None)
         }
         SelectItem::ExprWithAlias { expr, alias } => {
-            (parse_expr(expr), Some(parse_ident(alias)))
+            SelectExpression::Expression(parse_expr(expr), Some(parse_ident(alias)))
+        }
+        SelectItem::Wildcard => {
+            SelectExpression::Wildcard(None)
+        }
+        SelectItem::QualifiedWildcard(name) => {
+            SelectExpression::Wildcard(Some(name.0[0].value.clone()))
         }
         _ => unimplemented!(),
     }
@@ -109,7 +115,10 @@ pub fn parse_expr(expr: &Expr) -> Box<Expression> {
             Box::new(Expression::Function(parse_ident(&name.0[0]), args.iter().map(parse_expr).collect()))
         }
         Expr::Wildcard => {
-            Box::new(Expression::Wildcard)
+            Box::new(Expression::Wildcard(None))
+        }
+        Expr::QualifiedWildcard(idents) => {
+            Box::new(Expression::Wildcard(Some(idents[0].value.clone())))
         }
         Expr::Subquery(subquery) => {
             Box::new(Expression::Subquery(parse_query(subquery)))

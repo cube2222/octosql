@@ -247,6 +247,13 @@ impl Expression for WildcardExpression {
         let fields = record_schema.fields().iter()
             .enumerate()
             .map(|(i, f)| Field::new(format!("{}", i).as_str(), f.data_type().clone(), f.is_nullable()))
+            .filter(|f| {
+                if let Some(qualifier) = &self.qualifier {
+                    f.name().starts_with(qualifier)
+                } else {
+                    true
+                }
+            })
             .collect();
         Ok(Field::new("", DataType::Struct(fields), false))
     }
@@ -255,6 +262,13 @@ impl Expression for WildcardExpression {
 
         let tuple_elements = record.columns().iter()
             .enumerate()
+            .filter(|(i, _)| {
+                if let Some(qualifier) = &self.qualifier {
+                    source_schema.field(i.clone()).name().starts_with(qualifier)
+                } else {
+                    true
+                }
+            })
             .map(|(i, col)| {
                 let source_field = source_schema.field(i);
                 (

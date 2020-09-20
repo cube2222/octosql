@@ -1,4 +1,4 @@
-id,size,name,ownerid,age,livesleft,description
+id,size,name,c.ownerid,c.age,livesleft,description
 1,1.5,Buster,595661,4,6,fluffy
 2,2.5,Tiger,561315,1,4,work of art
 3,3.5,Lucy,475093,7,1,fat

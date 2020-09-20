@@ -31,15 +31,26 @@ pub struct Map {
     source: Arc<dyn Node>,
     expressions: Vec<Arc<dyn Expression>>,
     names: Vec<Identifier>,
+    wildcards: Vec<Option<String>>,
     keep_source_fields: bool,
 }
 
 impl Map {
-    pub fn new(source: Arc<dyn Node>, expressions: Vec<Arc<dyn Expression>>, names: Vec<Identifier>, keep_source_fields: bool) -> Map {
+    pub fn new(source: Arc<dyn Node>, expressions: Vec<Arc<dyn Expression>>, names: Vec<Identifier>, wildcards: Vec<Option<String>>, keep_source_fields: bool) -> Map {
+        let wildcards = wildcards.into_iter()
+            .map(|wildcard| {
+                wildcard.map(|mut qualifier| {
+                    qualifier.push_str(".");
+                    qualifier
+                })
+            })
+            .collect();
+
         Map {
             source,
             expressions,
             names,
+            wildcards,
             keep_source_fields,
         }
     }
@@ -49,7 +60,25 @@ impl Node for Map {
     // TODO: Just don't allow to use retractions field as field name.
     fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>, Error> {
         let source_schema = self.source.schema(schema_context.clone())?;
-        let mut new_schema_fields: Vec<Field> = self
+        let mut new_schema_fields: Vec<Field> = self.wildcards.iter()
+            .flat_map(|qualifier| {
+                match qualifier {
+                    Some(qualifier) => {
+                        source_schema.fields().clone().into_iter()
+                            .filter(|f| {
+                                f.name().starts_with(qualifier)
+                            })
+                            .collect::<Vec<_>>()
+                    }
+                    None => {
+                        source_schema.fields().clone().into_iter().collect::<Vec<_>>()
+                    }
+                }
+            })
+            .filter(|f| f.name() != retractions_field)
+            .collect();
+
+        new_schema_fields.extend(self
             .expressions
             .iter()
             .map(|expr| {
@@ -60,8 +89,7 @@ impl Node for Map {
                     })
             })
             .enumerate()
-            .map(|(i, field)| Field::new(self.names[i].to_string().as_str(), field.data_type().clone(), field.is_nullable()))
-            .collect();
+            .map(|(i, field)| Field::new(self.names[i].to_string().as_str(), field.data_type().clone(), field.is_nullable())));
         if self.keep_source_fields {
             let mut to_append = new_schema_fields;
             new_schema_fields = source_schema.fields().clone();
@@ -78,16 +106,41 @@ impl Node for Map {
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<(), Error> {
+        let source_schema = self.source.schema(ctx.variable_context.clone())?;
         let output_schema = self.schema(ctx.variable_context.clone())?;
+        let wildcard_column_indices: Vec<usize> = self.wildcards.iter()
+            .flat_map(|qualifier| {
+                match qualifier {
+                    Some(qualifier) => {
+                        source_schema.fields().clone().into_iter()
+                            .enumerate()
+                            .filter(|(column_index, f)| {
+                                f.name().starts_with(qualifier)
+                            })
+                            .collect::<Vec<_>>()
+                    }
+                    None => {
+                        source_schema.fields().clone().into_iter().enumerate().collect::<Vec<_>>()
+                    }
+                }
+            })
+            .filter(|(column_index, f)| f.name() != retractions_field)
+            .map(|(column_index, f)| column_index)
+            .collect();
 
         self.source.run(
             ctx,
             &mut |produce_ctx, batch| {
-                let mut new_columns: Vec<ArrayRef> = self
+                let mut new_columns: Vec<ArrayRef> = wildcard_column_indices.iter()
+                    .map(|column_index| batch.column(column_index.clone()).clone())
+                    .collect();
+
+                let mut new_evaluated_columns: Vec<ArrayRef> = self
                     .expressions
                     .iter()
                     .map(|expr| expr.evaluate(ctx, &batch))
                     .collect::<Result<_, _>>()?;
+                new_columns.append(&mut new_evaluated_columns);
                 new_columns.push(batch.column(batch.num_columns() - 1).clone());
 
                 if self.keep_source_fields {

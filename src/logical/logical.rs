@@ -49,6 +49,7 @@ pub enum Node {
     Map {
         source: Box<Node>,
         expressions: Vec<(Box<Expression>, Identifier)>,
+        wildcards: Vec<Option<String>>,
         keep_source_fields: bool,
     },
     GroupBy {
@@ -75,7 +76,7 @@ pub enum Expression {
     Variable(Identifier),
     Constant(physical::ScalarValue),
     Function(Identifier, Vec<Box<Expression>>),
-    Wildcard,
+    Wildcard(Option<String>),
     Subquery(Box<Node>),
 }
 
@@ -121,6 +122,7 @@ impl Node {
             Node::Map {
                 source,
                 expressions,
+                wildcards,
                 keep_source_fields,
             } => {
                 let expr_vec_res = expressions
@@ -135,7 +137,7 @@ impl Node {
                     expr_vec.push(expr);
                     name_vec.push(name);
                 }
-                Ok(Arc::new(map::Map::new(source.physical(mat_ctx)?, expr_vec, name_vec, *keep_source_fields)))
+                Ok(Arc::new(map::Map::new(source.physical(mat_ctx)?, expr_vec, name_vec, wildcards.clone(), *keep_source_fields)))
             }
             Node::GroupBy {
                 source,
@@ -260,7 +262,7 @@ impl Expression {
                     _ => unimplemented!(),
                 }
             }
-            Expression::Wildcard => Ok(Arc::new(WildcardExpression::new(None))),
+            Expression::Wildcard(qualifier) => Ok(Arc::new(WildcardExpression::new(qualifier.as_ref().map(|s| s.as_str())))),
             Expression::Subquery(query) => Ok(Arc::new(expression::Subquery::new(query.physical(mat_ctx)?))),
         }
     }

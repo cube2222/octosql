@@ -112,7 +112,7 @@ macro_rules! push_retraction_values {
             for row in 0..$retraction_key_columns[0].len() {
                 create_key($retraction_key_columns.as_slice(), row, &mut $key_vec);
 
-                let last_triggered = $last_triggered_values.get(&key_vec);
+                let last_triggered = $last_triggered_values.get(&$key_vec);
                 let last_triggered_row = match last_triggered {
                     None => continue,
                     Some(v) => v,

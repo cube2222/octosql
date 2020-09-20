@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use arrow::array::{ArrayDataBuilder, ArrayRef, BooleanBufferBuilder, BufferBuilderTrait, Int64Builder, StringBuilder};
+use arrow::array::{ArrayDataBuilder, ArrayRef, BooleanBufferBuilder, BufferBuilderTrait, Int64Builder, StringBuilder, StructBuilder, StructArray};
 use arrow::buffer::MutableBuffer;
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -219,5 +219,51 @@ impl Expression for Subquery {
         let output_array = make_array(builder.build());
 
         Ok(output_array)
+    }
+}
+
+pub struct WildcardExpression {
+    qualifier: Option<String>,
+}
+
+impl WildcardExpression {
+    pub fn new(qualifier: Option<&str>) -> WildcardExpression {
+        let qualifier_with_dot = qualifier.map(|qualifier| {
+            let mut qualifier_with_dot = qualifier.to_string();
+            qualifier_with_dot.push_str(".");
+            qualifier_with_dot
+        });
+
+        WildcardExpression { qualifier: qualifier_with_dot }
+    }
+}
+
+impl Expression for WildcardExpression {
+    fn field_meta(
+        &self,
+        schema_context: Arc<dyn SchemaContext>,
+        record_schema: &Arc<Schema>,
+    ) -> Result<Field, Error> {
+        let fields = record_schema.fields().iter()
+            .enumerate()
+            .map(|(i, f)| Field::new(format!("{}", i).as_str(), f.data_type().clone(), f.is_nullable()))
+            .collect();
+        Ok(Field::new("", DataType::Struct(fields), false))
+    }
+    fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef, Error> {
+        let source_schema = record.schema();
+
+        let tuple_elements = record.columns().iter()
+            .enumerate()
+            .map(|(i, col)| {
+                let source_field = source_schema.field(i);
+                (
+                    Field::new(format!("{}", i).as_str(), source_field.data_type().clone(), source_field.is_nullable()),
+                    col.clone(),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        Ok(Arc::new(StructArray::from(tuple_elements)))
     }
 }

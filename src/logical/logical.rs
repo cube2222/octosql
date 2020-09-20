@@ -29,6 +29,7 @@ use crate::physical::json::JSONSource;
 use crate::physical::functions;
 use crate::physical::functions::FunctionExpression;
 use crate::physical::functions::BUILTIN_FUNCTIONS;
+use crate::physical::expression::WildcardExpression;
 
 #[derive(Debug)]
 pub enum Error {
@@ -259,8 +260,8 @@ impl Expression {
                     _ => unimplemented!(),
                 }
             }
-            Expression::Wildcard => { unimplemented!() }
-            Expression::Subquery(query) => { Ok(Arc::new(expression::Subquery::new(query.physical(mat_ctx)?))) }
+            Expression::Wildcard => Ok(Arc::new(WildcardExpression::new(None))),
+            Expression::Subquery(query) => Ok(Arc::new(expression::Subquery::new(query.physical(mat_ctx)?))),
         }
     }
 }

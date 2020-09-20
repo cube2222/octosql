@@ -168,6 +168,13 @@ pub fn get_scalar_value(array: &ArrayRef, row: usize) -> Result<ScalarValue, Err
         return Ok(ScalarValue::Null);
     }
     let value: ScalarValue = match array.data_type() {
+        DataType::Boolean => {
+            let array = array
+                .as_any()
+                .downcast_ref::<array::BooleanArray>()
+                .expect("Failed to cast array");
+            ScalarValue::Boolean(array.value(row))
+        }
         DataType::UInt8 => {
             let array = array
                 .as_any()
@@ -244,6 +251,16 @@ pub fn get_scalar_value(array: &ArrayRef, row: usize) -> Result<ScalarValue, Err
                 .downcast_ref::<array::StringArray>()
                 .unwrap();
             ScalarValue::Utf8(array.value(row).to_string())
+        }
+        DataType::Struct(fields) => {
+            let array = array
+                .as_any()
+                .downcast_ref::<array::StructArray>()
+                .unwrap();
+            ScalarValue::Struct(array.columns().iter()
+                .cloned()
+                .map(|col| get_scalar_value(col, row))
+                .collect::<Result<Vec<_>, _>>()?)
         }
         other => {
             return Err(Error::BadInput(format!(

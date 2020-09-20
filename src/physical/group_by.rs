@@ -73,7 +73,10 @@ macro_rules! push_retraction_keys {
                     GroupByScalar::$data_type(v) => {
                         array.append_value(v).unwrap()
                     }
-                    _ => panic!("bug: key doesn't match schema"),
+                    _ => {
+                        dbg!(&$key_vec[$key_index]);
+                        panic!("bug: key doesn't match schema")
+                    },
                     // TODO: Maybe use as_any -> downcast?
                 }
             }
@@ -97,7 +100,10 @@ macro_rules! push_retraction_keys_utf8 {
                     GroupByScalar::$data_type(v) => {
                         array.append_value(v.as_str()).unwrap()
                     }
-                    _ => panic!("bug: key doesn't match schema"),
+                    _ => {
+                        dbg!(&$key_vec[$key_index]);
+                        panic!("bug: key doesn't match schema")
+                    },
                     // TODO: Maybe use as_any -> downcast?
                 }
             }
@@ -219,7 +225,7 @@ impl Node for GroupBy {
             .map(|key_expr| key_expr.field_meta(exec_ctx.variable_context.clone(), &source_schema).unwrap().data_type().clone())
             .collect();
 
-        let mut trigger: Box<dyn Trigger> = Box::new(CountingTrigger::new(key_types, 1));
+        let mut trigger: Box<dyn Trigger> = Box::new(CountingTrigger::new(key_types, 1000));
 
         self.source.run(
             exec_ctx,
@@ -278,7 +284,7 @@ impl Node for GroupBy {
 
                 // Push retraction keys
                 for key_index in 0..self.key.len() {
-                    match output_schema.fields()[key_index].data_type() {
+                    match key_columns[key_index].data_type() {
                         DataType::Utf8 => push_retraction_keys_utf8!(Utf8, StringBuilder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
                         DataType::Boolean => push_retraction_keys!(Boolean, BooleanBuilder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
                         DataType::Int8 => push_retraction_keys!(Int8, Int8Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),

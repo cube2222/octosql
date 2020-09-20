@@ -254,7 +254,7 @@ impl Node for GroupBy {
                 for aggregate_index in 0..self.aggregates.len() {
                     match output_schema.fields()[self.output_key_indices.len() + aggregate_index].data_type() {
                         DataType::Int64 => push_retraction_values!(Int64, Int64Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
-                        DataType::Float64 => push_retraction_values!(Float64, Int64Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
+                        DataType::Float64 => push_retraction_values!(Float64, Float64Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
                         // DataType::Int64 => {
                         //     let mut array = Int64Builder::new(retraction_key_columns[0].len());
                         //     for row in 0..retraction_key_columns[0].len() {

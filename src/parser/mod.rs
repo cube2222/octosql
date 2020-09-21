@@ -13,7 +13,7 @@
 // limitations under the License.
 
 pub mod parser;
-pub mod sqlparser;
+mod sqlparser;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Query {

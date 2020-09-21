@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use sqlparser::ast;
-use sqlparser::ast::{BinaryOperator, Expr, Function, Ident, SelectItem, SetExpr, Statement, TableFactor, Select};
-use sqlparser::dialect::GenericDialect;
+use super::sqlparser;
+use super::sqlparser::ast;
+use super::sqlparser::ast::{BinaryOperator, Expr, Function, Ident, SelectItem, SetExpr, Statement, TableFactor, Select, FunctionArg};
+use super::sqlparser::dialect::GenericDialect;
+use super::sqlparser::parser::Parser;
 
 use crate::parser::{Expression, Identifier, Operator, Query, SelectExpression, Source, Value};
-use crate::parser::sqlparser::{Parser, Query, Select, SetExpr, TableFactor, Expr};
-use sqlparser::parser::Parser;
 
 pub fn parse_sql(text: &str) -> Box<Query> {
     let dialect = GenericDialect {}; // or AnsiDialect, or your own dialect ...
@@ -112,7 +112,7 @@ pub fn parse_expr(expr: &Expr) -> Box<Expression> {
             ))
         }
         Expr::Function(Function { name, args, over: _, distinct: _ }) => {
-            Box::new(Expression::Function(parse_ident(&name.0[0]), args.iter().map(parse_expr).collect()))
+            Box::new(Expression::Function(parse_ident(&name.0[0]), args.iter().map(parse_function_arg).collect()))
         }
         Expr::Wildcard => {
             Box::new(Expression::Wildcard(None))
@@ -127,6 +127,13 @@ pub fn parse_expr(expr: &Expr) -> Box<Expression> {
             dbg!(expr);
             unimplemented!()
         }
+    }
+}
+
+pub fn parse_function_arg(arg: &FunctionArg) -> Box<Expression> {
+    match arg {
+        FunctionArg::Unnamed(expr) => parse_expr(expr),
+        _ => unimplemented!(),
     }
 }
 

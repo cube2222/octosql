@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use arrow::datatypes::{DataType, ArrowNumericType};
+use arrow::datatypes::DataType;
+use nom::lib::std::ops::{AddAssign, SubAssign};
+
 use crate::physical::physical::{Error, ScalarValue};
-use nom::lib::std::ops::{Add, AddAssign, SubAssign};
 
 pub trait Aggregate: Send + Sync {
     fn output_type(&self, input_schema: &DataType) -> Result<DataType, Error>;
@@ -120,11 +121,11 @@ impl_sum_accumulator!(f64, Float64);
 pub struct Count {}
 
 impl Aggregate for Count {
-    fn output_type(&self, input_type: &DataType) -> Result<DataType, Error> {
+    fn output_type(&self, _input_type: &DataType) -> Result<DataType, Error> {
         Ok(DataType::Int64)
     }
 
-    fn create_accumulator(&self, input_type: &DataType) -> Box<dyn Accumulator> {
+    fn create_accumulator(&self, _input_type: &DataType) -> Box<dyn Accumulator> {
         Box::new(CountAccumulator { count: 0 })
     }
 }
@@ -135,12 +136,12 @@ struct CountAccumulator {
 }
 
 impl Accumulator for CountAccumulator {
-    fn add(&mut self, value: ScalarValue, retract: ScalarValue) -> bool {
+    fn add(&mut self, _value: ScalarValue, retract: ScalarValue) -> bool {
         let is_retraction = match retract {
             ScalarValue::Boolean(x) => x,
             _ => panic!("retraction shall be boolean"),
         };
-        let multiplier = if !is_retraction { 1 } else { -1 };
+        let _multiplier = if !is_retraction { 1 } else { -1 };
         if is_retraction {
             self.count -= 1;
         } else {

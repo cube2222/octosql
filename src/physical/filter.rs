@@ -42,7 +42,7 @@ impl Node for Filter {
         &self,
         exec_ctx: &ExecutionContext,
         produce: ProduceFn,
-        meta_send: MetaSendFn,
+        _meta_send: MetaSendFn,
     ) -> Result<(), Error> {
         let source_schema = self.source.schema(exec_ctx.variable_context.clone())?;
 

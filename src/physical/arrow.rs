@@ -26,12 +26,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::sync::Arc;
+
 use arrow::array;
 use arrow::array::{BooleanArray, Int8Array, Int16Array, Int32Array, Int64Array, UInt8Array, UInt16Array, UInt32Array, UInt64Array, Float32Array, Float64Array, Date32Array, Date64Array, Time32SecondArray, Time32MillisecondArray, Time64MicrosecondArray, Time64NanosecondArray, TimestampSecondArray, TimestampMillisecondArray, TimestampMicrosecondArray, TimestampNanosecondArray, IntervalYearMonthArray, IntervalDayTimeArray, DurationSecondArray, DurationMillisecondArray, DurationMicrosecondArray, DurationNanosecondArray, BinaryArray, LargeBinaryArray, FixedSizeBinaryArray, StringArray, LargeStringArray, ListArray, LargeListArray, StructArray, UnionArray, FixedSizeListArray, NullArray, DictionaryArray, ArrayRef, ArrayDataRef};
 use arrow::datatypes::{DataType, TimeUnit, DateUnit, Int8Type, Int16Type, Int32Type, Int64Type, UInt8Type, UInt16Type, UInt32Type, UInt64Type, IntervalUnit};
 
 use crate::physical::physical::{Error, ScalarValue};
-use std::sync::Arc;
 
 /// Enumeration of types that can be used in a GROUP BY expression (all primitives except
 /// for floating point numerics)
@@ -252,7 +253,7 @@ pub fn get_scalar_value(array: &ArrayRef, row: usize) -> Result<ScalarValue, Err
                 .unwrap();
             ScalarValue::Utf8(array.value(row).to_string())
         }
-        DataType::Struct(fields) => {
+        DataType::Struct(_fields) => {
             let array = array
                 .as_any()
                 .downcast_ref::<array::StructArray>()
@@ -355,41 +356,41 @@ macro_rules! compute_utf8_op {
     }};
 }
 
-macro_rules! binary_string_array_op {
-    ($LEFT:expr, $RIGHT:expr, $OP:ident) => {{
-        match $LEFT.data_type() {
-            DataType::Utf8 => compute_utf8_op!($LEFT, $RIGHT, $OP, StringArray),
-            other => {
-                dbg!(other);
-                unimplemented!()
-            }
-        }
-    }};
-}
+// macro_rules! binary_string_array_op {
+//     ($LEFT:expr, $RIGHT:expr, $OP:ident) => {{
+//         match $LEFT.data_type() {
+//             DataType::Utf8 => compute_utf8_op!($LEFT, $RIGHT, $OP, StringArray),
+//             other => {
+//                 dbg!(other);
+//                 unimplemented!()
+//             }
+//         }
+//     }};
+// }
 
-/// Invoke a compute kernel on a pair of arrays
-/// The binary_primitive_array_op macro only evaluates for primitive types
-/// like integers and floats.
-macro_rules! binary_primitive_array_op {
-    ($LEFT:expr, $RIGHT:expr, $OP:ident) => {{
-        match $LEFT.data_type() {
-            DataType::Int8 => compute_op!($LEFT, $RIGHT, $OP, Int8Array),
-            DataType::Int16 => compute_op!($LEFT, $RIGHT, $OP, Int16Array),
-            DataType::Int32 => compute_op!($LEFT, $RIGHT, $OP, Int32Array),
-            DataType::Int64 => compute_op!($LEFT, $RIGHT, $OP, Int64Array),
-            DataType::UInt8 => compute_op!($LEFT, $RIGHT, $OP, UInt8Array),
-            DataType::UInt16 => compute_op!($LEFT, $RIGHT, $OP, UInt16Array),
-            DataType::UInt32 => compute_op!($LEFT, $RIGHT, $OP, UInt32Array),
-            DataType::UInt64 => compute_op!($LEFT, $RIGHT, $OP, UInt64Array),
-            DataType::Float32 => compute_op!($LEFT, $RIGHT, $OP, Float32Array),
-            DataType::Float64 => compute_op!($LEFT, $RIGHT, $OP, Float64Array),
-            other => {
-                dbg!(other);
-                unimplemented!()
-            }
-        }
-    }};
-}
+// /// Invoke a compute kernel on a pair of arrays
+// /// The binary_primitive_array_op macro only evaluates for primitive types
+// /// like integers and floats.
+// macro_rules! binary_primitive_array_op {
+//     ($LEFT:expr, $RIGHT:expr, $OP:ident) => {{
+//         match $LEFT.data_type() {
+//             DataType::Int8 => compute_op!($LEFT, $RIGHT, $OP, Int8Array),
+//             DataType::Int16 => compute_op!($LEFT, $RIGHT, $OP, Int16Array),
+//             DataType::Int32 => compute_op!($LEFT, $RIGHT, $OP, Int32Array),
+//             DataType::Int64 => compute_op!($LEFT, $RIGHT, $OP, Int64Array),
+//             DataType::UInt8 => compute_op!($LEFT, $RIGHT, $OP, UInt8Array),
+//             DataType::UInt16 => compute_op!($LEFT, $RIGHT, $OP, UInt16Array),
+//             DataType::UInt32 => compute_op!($LEFT, $RIGHT, $OP, UInt32Array),
+//             DataType::UInt64 => compute_op!($LEFT, $RIGHT, $OP, UInt64Array),
+//             DataType::Float32 => compute_op!($LEFT, $RIGHT, $OP, Float32Array),
+//             DataType::Float64 => compute_op!($LEFT, $RIGHT, $OP, Float64Array),
+//             other => {
+//                 dbg!(other);
+//                 unimplemented!()
+//             }
+//         }
+//     }};
+// }
 
 /// The binary_array_op macro includes types that extend beyond the primitive,
 /// such as Utf8 strings.
@@ -418,20 +419,20 @@ macro_rules! binary_array_op {
     }};
 }
 
-/// Invoke a boolean kernel on a pair of arrays
-macro_rules! boolean_op {
-    ($LEFT:expr, $RIGHT:expr, $OP:ident) => {{
-        let ll = $LEFT
-            .as_any()
-            .downcast_ref::<BooleanArray>()
-            .expect("boolean_op failed to downcast array");
-        let rr = $RIGHT
-            .as_any()
-            .downcast_ref::<BooleanArray>()
-            .expect("boolean_op failed to downcast array");
-        Ok(Arc::new($OP(&ll, &rr)?))
-    }};
-}
+// /// Invoke a boolean kernel on a pair of arrays
+// macro_rules! boolean_op {
+//     ($LEFT:expr, $RIGHT:expr, $OP:ident) => {{
+//         let ll = $LEFT
+//             .as_any()
+//             .downcast_ref::<BooleanArray>()
+//             .expect("boolean_op failed to downcast array");
+//         let rr = $RIGHT
+//             .as_any()
+//             .downcast_ref::<BooleanArray>()
+//             .expect("boolean_op failed to downcast array");
+//         Ok(Arc::new($OP(&ll, &rr)?))
+//     }};
+// }
 
 pub fn make_array(data: ArrayDataRef) -> ArrayRef {
     match data.data_type() {

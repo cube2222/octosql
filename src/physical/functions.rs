@@ -15,17 +15,17 @@
 use std::sync::Arc;
 use std::collections::HashMap;
 
-use arrow::array::{BinaryArray, BooleanArray, Date32Array, Date64Array, DictionaryArray, DurationMicrosecondArray, DurationMillisecondArray, DurationNanosecondArray, DurationSecondArray, FixedSizeBinaryArray, FixedSizeListArray, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, IntervalDayTimeArray, IntervalYearMonthArray, LargeBinaryArray, LargeListArray, LargeStringArray, ListArray, NullArray, StringArray, StructArray, Time32MillisecondArray, Time32SecondArray, Time64MicrosecondArray, Time64NanosecondArray, TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array, UnionArray, PrimitiveArray, StringBuilder, Date64Builder, TimestampNanosecondBuilder, ArrayBuilder};
+use arrow::array::{Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, StringArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array, StringBuilder, TimestampNanosecondBuilder};
 use arrow::array::ArrayRef;
 use arrow::compute::kernels::comparison::{lt, lt_eq, eq, gt_eq, gt, lt_utf8, lt_eq_utf8, eq_utf8, gt_eq_utf8, gt_utf8};
-use arrow::datatypes::{DataType, Field, Schema, TimeUnit, ArrowPrimitiveType};
+use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 
 use crate::physical::expression::Expression;
 use crate::physical::physical::{Error, ExecutionContext, SchemaContext};
-use crate::physical::arrow::*;
-use chrono::{DateTime, Timelike};
+
+use chrono::{DateTime};
 use arrow::datatypes::TimeUnit::Nanosecond;
 
 // TODO: Add "custom function" expression.
@@ -71,20 +71,20 @@ impl Expression for FunctionExpression
 
 macro_rules! make_const_meta_body {
     ($data_type: expr) => {
-        Arc::new(|schema_context, record_schema| {
+        Arc::new(|_schema_context, _record_schema| {
             Ok(Field::new("", $data_type, false))
         })
     }
 }
 
-macro_rules! make_binary_primitive_array_evaluate_function {
-    ($function: ident) => {
-        Arc::new(|args: Vec<ArrayRef>| {
-            let output: Result<_, ArrowError> = binary_primitive_array_op!(args[0], args[1], $function);
-            Ok(output? as ArrayRef)
-        })
-    }
-}
+// macro_rules! make_binary_primitive_array_evaluate_function {
+//     ($function: ident) => {
+//         Arc::new(|args: Vec<ArrayRef>| {
+//             let output: Result<_, ArrowError> = binary_primitive_array_op!(args[0], args[1], $function);
+//             Ok(output? as ArrayRef)
+//         })
+//     }
+// }
 
 macro_rules! make_binary_array_evaluate_function {
     ($function: ident) => {

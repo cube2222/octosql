@@ -28,18 +28,15 @@
 
 //! Utilities for printing record batches
 
-use std::time::{SystemTime, UNIX_EPOCH, Duration};
+use std::time::{Duration, UNIX_EPOCH};
 
 use arrow::array;
-use arrow::datatypes::{DataType, TimeUnit, ArrowPrimitiveType, Int64Type};
+use arrow::datatypes::{DataType, TimeUnit};
+use arrow::error::{ArrowError, Result};
 use arrow::record_batch::RecordBatch;
-use arrow::error::{Result, ArrowError};
-
-use prettytable::format;
+use chrono::{DateTime, Utc};
 use prettytable::{Cell, Row, Table};
-use arrow::array::{Int64Array, PrimitiveArrayOps, PrimitiveArray};
-use chrono::{Utc, DateTime, NaiveDateTime, Local};
-use chrono::format::Fixed::RFC3339;
+use prettytable::format;
 
 ///! Create a visual representation of record batches
 pub fn pretty_format_batches(results: &[RecordBatch]) -> Result<String> {

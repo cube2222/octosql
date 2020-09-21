@@ -13,9 +13,11 @@
 // limitations under the License.
 
 use std::sync::Arc;
-use crate::physical::physical::{Node, Error, ExecutionContext, ProduceFn, MetaSendFn, noop_meta_send, SchemaContext};
-use arrow::datatypes::{Schema, Field};
+
+use arrow::datatypes::{Field, Schema};
 use arrow::record_batch::RecordBatch;
+
+use crate::physical::physical::{Error, ExecutionContext, MetaSendFn, Node, noop_meta_send, ProduceFn, SchemaContext};
 
 pub struct Requalifier {
     qualifier: String,
@@ -52,7 +54,7 @@ impl Node for Requalifier {
         &self,
         exec_ctx: &ExecutionContext,
         produce: ProduceFn,
-        meta_send: MetaSendFn,
+        _meta_send: MetaSendFn,
     ) -> Result<(), Error> {
         let schema = self.schema(exec_ctx.variable_context.clone())?;
 

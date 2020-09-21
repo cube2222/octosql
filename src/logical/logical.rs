@@ -14,22 +14,20 @@
 
 use std::sync::Arc;
 
+use crate::physical::aggregate;
 use crate::physical::csv::CSVSource;
-use crate::physical::filter::Filter;
-use crate::physical::{group_by, aggregate};
-use crate::physical::group_by::GroupBy;
 use crate::physical::expression;
+use crate::physical::expression::WildcardExpression;
+use crate::physical::filter::Filter;
+use crate::physical::functions::BUILTIN_FUNCTIONS;
+use crate::physical::group_by::GroupBy;
+use crate::physical::json::JSONSource;
 use crate::physical::map;
 use crate::physical::physical;
 use crate::physical::physical::Identifier;
-use crate::physical::stream_join::StreamJoin;
 // use crate::physical::functions::Equal;
 use crate::physical::requalifier::Requalifier;
-use crate::physical::json::JSONSource;
-use crate::physical::functions;
-use crate::physical::functions::FunctionExpression;
-use crate::physical::functions::BUILTIN_FUNCTIONS;
-use crate::physical::expression::WildcardExpression;
+use crate::physical::stream_join::StreamJoin;
 
 #[derive(Debug)]
 pub enum Error {
@@ -100,8 +98,8 @@ impl Node {
         mat_ctx: &MaterializationContext,
     ) -> Result<Arc<dyn physical::Node>, Error> {
         match self {
-            Node::Source { name, alias } => {
-                let mut path = name.to_string();
+            Node::Source { name, alias: _ } => {
+                let path = name.to_string();
                 if path.contains(".json") {
                     Ok(Arc::new(JSONSource::new(path)))
                 } else if path.contains(".csv") {
@@ -153,7 +151,7 @@ impl Node {
 
                 let (aggregates_no_key_part, aggregated_exprs_no_key_part): (Vec<_>, Vec<_>) = aggregates.iter()
                     .zip(aggregated_exprs.iter())
-                    .filter(|(aggregate, aggregated_expr)| if let Aggregate::KeyPart = **aggregate {false} else {true})
+                    .filter(|(aggregate, _aggregated_expr)| if let Aggregate::KeyPart = **aggregate {false} else {true})
                     .unzip();
 
                 let aggregate_vec = aggregates_no_key_part
@@ -167,13 +165,13 @@ impl Node {
 
                 let aggregated_exprs_key_part = aggregates.iter()
                     .zip(aggregated_exprs.iter())
-                    .filter(|(aggregate, aggregated_expr)| if let Aggregate::KeyPart = **aggregate {true} else {false})
-                    .map(|(aggregate, aggregated_expr)| aggregated_expr)
+                    .filter(|(aggregate, _aggregated_expr)| if let Aggregate::KeyPart = **aggregate {true} else {false})
+                    .map(|(_aggregate, aggregated_expr)| aggregated_expr)
                     .collect::<Vec<_>>();
 
                 let aggregate_output_names = aggregates.iter()
                     .enumerate()
-                    .filter(|(i, aggregate)| if let Aggregate::KeyPart = **aggregate {false} else {true})
+                    .filter(|(_i, aggregate)| if let Aggregate::KeyPart = **aggregate {false} else {true})
                     .map(|(i, _)| output_fields[i].clone())
                     .collect();
 
@@ -271,7 +269,7 @@ impl Expression {
 impl Aggregate {
     pub fn physical(
         &self,
-        mat_ctx: &MaterializationContext,
+        _mat_ctx: &MaterializationContext,
     ) -> Result<Arc<dyn aggregate::Aggregate>, Error> {
         match self {
             Aggregate::Count => Ok(Arc::new(aggregate::Count {})),

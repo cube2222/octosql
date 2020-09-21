@@ -47,12 +47,12 @@ impl CountingTrigger {
 impl Trigger for CountingTrigger {
     fn keys_received(&mut self, keys: Vec<ArrayRef>) {
         let mut key_vec: Vec<GroupByScalar> = Vec::with_capacity(keys.len());
-        for i in 0..self.key_data_types.len() {
+        for _i in 0..self.key_data_types.len() {
             key_vec.push(GroupByScalar::Int64(0))
         }
 
         for row in 0..keys[0].len() {
-            create_key(keys.as_slice(), row, &mut key_vec);
+            create_key(keys.as_slice(), row, &mut key_vec).unwrap();
 
             let count = self.counts.entry(key_vec.clone()).or_insert(0);
             *count += 1;

@@ -13,19 +13,18 @@
 // limitations under the License.
 
 use std::collections::BTreeMap;
-use std::future::Future;
 use std::sync::Arc;
 
-use arrow::array::{ArrayBuilder, ArrayRef, Int64Array, BooleanArray};
-use arrow::array::{BooleanBuilder, Int8Builder, Int16Builder, Int32Builder, Int64Builder, UInt8Builder, UInt16Builder, UInt32Builder, UInt64Builder, Float32Builder, Float64Builder, StringBuilder};
+use arrow::array::{ArrayBuilder, ArrayRef, BooleanArray};
+use arrow::array::{BooleanBuilder, Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder, Int8Builder, StringBuilder, UInt16Builder, UInt32Builder, UInt64Builder, UInt8Builder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 
-use crate::physical::arrow::{create_key, GroupByScalar, get_scalar_value};
+use crate::physical::aggregate::{Accumulator, Aggregate};
+use crate::physical::arrow::{create_key, get_scalar_value, GroupByScalar};
 use crate::physical::expression::Expression;
 use crate::physical::physical::*;
 use crate::physical::trigger::*;
-use crate::physical::aggregate::{Aggregate, Accumulator};
 
 pub struct GroupBy {
     key: Vec<Arc<dyn Expression>>,
@@ -63,7 +62,7 @@ macro_rules! push_retraction_keys {
         {
             let mut array = $builder::new($key_columns[0].len());
             for row in 0..$key_columns[0].len() {
-                create_key($key_columns.as_slice(), row, &mut $key_vec);
+                create_key($key_columns.as_slice(), row, &mut $key_vec).unwrap();
 
                 if !$last_triggered_values.contains_key(&$key_vec) {
                     continue;
@@ -90,7 +89,7 @@ macro_rules! push_retraction_keys_utf8 {
         {
             let mut array = $builder::new($key_columns[0].len());
             for row in 0..$key_columns[0].len() {
-                create_key($key_columns.as_slice(), row, &mut $key_vec);
+                create_key($key_columns.as_slice(), row, &mut $key_vec).unwrap();
 
                 if !$last_triggered_values.contains_key(&$key_vec) {
                     continue;
@@ -117,7 +116,7 @@ macro_rules! push_retraction_values {
         {
             let mut array = $builder::new($retraction_key_columns[0].len());
             for row in 0..$retraction_key_columns[0].len() {
-                create_key($retraction_key_columns.as_slice(), row, &mut $key_vec);
+                create_key($retraction_key_columns.as_slice(), row, &mut $key_vec).unwrap();
 
                 let last_triggered = $last_triggered_values.get(&$key_vec);
                 let last_triggered_row = match last_triggered {
@@ -142,7 +141,7 @@ macro_rules! push_values {
             let mut array = $builder::new($key_columns[0].len());
 
             for row in 0..$key_columns[0].len() {
-                create_key($key_columns.as_slice(), row, &mut $key_vec);
+                create_key($key_columns.as_slice(), row, &mut $key_vec).unwrap();
                 // TODO: this key may not exist because of retractions.
                 let row_accumulators = $accumulators_map.get(&$key_vec).unwrap();
 
@@ -152,7 +151,7 @@ macro_rules! push_values {
                     // TODO: Maybe use as_any -> downcast?
                 }
 
-                let mut last_values_vec = $last_triggered_values.entry($key_vec.clone()).or_default();
+                let last_values_vec = $last_triggered_values.entry($key_vec.clone()).or_default();
                 last_values_vec.push(row_accumulators[$aggregate_index].trigger());
             }
             $output_columns.push(Arc::new(array.finish()) as ArrayRef);
@@ -169,7 +168,7 @@ macro_rules! combine_columns {
             array.append_data(&[
                 $retraction_columns[$column_index].data(),
                 $output_columns[$column_index].data(),
-            ]);
+            ])?;
             $output_columns[$column_index] = Arc::new(array.finish()) as ArrayRef;
         }
     }
@@ -202,7 +201,7 @@ impl Node for GroupBy {
             .collect();
 
         key_fields.append(&mut new_fields);
-        key_fields.push(Field::new(retractions_field, DataType::Boolean, false));
+        key_fields.push(Field::new(RETRACTIONS_FIELD, DataType::Boolean, false));
         Ok(Arc::new(Schema::new(key_fields)))
     }
 
@@ -210,7 +209,7 @@ impl Node for GroupBy {
         &self,
         exec_ctx: &ExecutionContext,
         produce: ProduceFn,
-        meta_send: MetaSendFn,
+        _meta_send: MetaSendFn,
     ) -> Result<(), Error> {
         let source_schema = self.source.schema(exec_ctx.variable_context.clone())?;
 
@@ -229,7 +228,7 @@ impl Node for GroupBy {
 
         self.source.run(
             exec_ctx,
-            &mut |ctx, batch| {
+            &mut |_ctx, batch| {
                 let key_columns: Vec<ArrayRef> = self.key
                     .iter()
                     .map(|expr| expr.evaluate(exec_ctx, &batch))
@@ -244,12 +243,12 @@ impl Node for GroupBy {
                     .unwrap();
 
                 let mut key_vec: Vec<GroupByScalar> = Vec::with_capacity(key_columns.len());
-                for i in 0..key_columns.len() {
+                for _i in 0..key_columns.len() {
                     key_vec.push(GroupByScalar::Int64(0))
                 }
 
                 for row in 0..aggregated_columns[0].len() {
-                    create_key(key_columns.as_slice(), row, &mut key_vec);
+                    create_key(key_columns.as_slice(), row, &mut key_vec).unwrap();
 
                     let accumulators = accumulators_map.entry(key_vec.clone()).or_insert(
                         self.aggregates
@@ -270,7 +269,7 @@ impl Node for GroupBy {
                 trigger.keys_received(key_columns);
 
                 // Check if we can trigger something
-                let mut key_columns = trigger.poll();
+                let key_columns = trigger.poll();
                 if key_columns[0].len() == 0 {
                     return Ok(());
                 }
@@ -326,18 +325,18 @@ impl Node for GroupBy {
                 }
                 // Remove those values
                 for row in 0..retraction_key_columns[0].len() {
-                    create_key(retraction_key_columns.as_slice(), row, &mut key_vec);
+                    create_key(retraction_key_columns.as_slice(), row, &mut key_vec).unwrap();
                     last_triggered_values.remove(&key_vec);
                 }
                 // Build retraction array
                 // TODO: BooleanBuilder => PrimitiveBuilder<BooleanType>. Maybe this can be refactored into a function after all.
                 let mut retraction_array_builder =
                     BooleanBuilder::new(retraction_key_columns[0].len() + key_columns[0].len());
-                for i in 0..retraction_key_columns[0].len() {
-                    retraction_array_builder.append_value(true);
+                for _i in 0..retraction_key_columns[0].len() {
+                    retraction_array_builder.append_value(true)?;
                 }
-                for i in 0..key_columns[0].len() {
-                    retraction_array_builder.append_value(false);
+                for _i in 0..key_columns[0].len() {
+                    retraction_array_builder.append_value(false)?;
                 }
                 let retraction_array = Arc::new(retraction_array_builder.finish());
 

@@ -16,13 +16,12 @@ use std::collections::BTreeMap;
 
 use crate::logical::logical::{Aggregate, Expression, Node};
 use crate::parser;
-use crate::parser::{Operator, Value, SelectExpression};
+use crate::parser::{Operator, SelectExpression, Value};
 use crate::physical::physical::{Identifier, ScalarValue};
-use datafusion::logicalplan::FunctionType::Scalar;
 
 pub fn query_to_logical_plan(query: &parser::Query) -> Box<Node> {
     match query {
-        parser::Query::Select { expressions, filter, from, order_by, group_by } => {
+        parser::Query::Select { expressions, filter, from, order_by: _, group_by } => {
             if group_by.is_empty() {
                 let mut plan = source_to_logical_plan(from.as_ref());
 
@@ -160,10 +159,6 @@ pub fn expression_to_logical_plan(expr: &parser::Expression) -> Box<Expression> 
         parser::Expression::Subquery(query) => {
             Box::new(Expression::Subquery(query_to_logical_plan(query.as_ref())))
         }
-        _ => {
-            dbg!(expr);
-            panic!("invalid expression")
-        }
     }
 }
 
@@ -233,16 +228,4 @@ pub fn operator_to_logical_plan(op: &parser::Operator) -> Identifier {
         Operator::AND => "AND".to_string(),
         Operator::OR => "OR".to_string(),
     })
-}
-
-#[test]
-fn my_test() {
-    let sql = "SELECT c.name, COUNT(*) as my_count, SUM(c.livesleft) \
-    FROM cats c \
-    WHERE c.age = c.livesleft \
-    GROUP BY c.name";
-
-    let query = parse_sql(sql);
-    let plan = query_to_logical_plan(query.as_ref());
-    dbg!(plan);
 }

@@ -13,18 +13,18 @@
 // limitations under the License.
 
 use sqlparser::ast;
-use sqlparser::ast::{BinaryOperator, Expr, Function, Ident, Select, SelectItem, SetExpr, Statement, TableFactor};
+use sqlparser::ast::{BinaryOperator, Expr, Function, Ident, SelectItem, SetExpr, Statement, TableFactor};
 use sqlparser::dialect::GenericDialect;
-use sqlparser::parser::Parser;
 
-use crate::parser::{Expression, Identifier, Operator, Query, Source, Value, SelectExpression};
+use crate::parser::{Expression, Identifier, Operator, Query, SelectExpression, Source, Value};
+use crate::parser::sqlparser::{OctoSQLParser, OctoSQLQuery, OctoSQLSelect, OctoSQLSetExpr, OctoSQLTableFactor, OctoSQLExpr};
 
 pub fn parse_sql(text: &str) -> Box<Query> {
     let dialect = GenericDialect {}; // or AnsiDialect, or your own dialect ...
 
-    let ast = Parser::parse_sql(&dialect, text).unwrap();
+    let ast = OctoSQLParser::parse_sql(&dialect, text).unwrap();
 
-    if let Statement::Query(q) = &ast[0] {
+    if let OctoSQLStatement::OctoSQLQuery(q) = &ast[0] {
         let parsed = parse_query(q.as_ref());
         parsed
     } else {
@@ -32,8 +32,8 @@ pub fn parse_sql(text: &str) -> Box<Query> {
     }
 }
 
-pub fn parse_query(sql_query: &sqlparser::ast::Query) -> Box<Query> {
-    if let SetExpr::Select(select) = &sql_query.body {
+pub fn parse_query(sql_query: &OctoSQLQuery) -> Box<Query> {
+    if let OctoSQLSetExpr::Select(select) = &sql_query.body {
         let query = parse_select(select.as_ref());
         query
     } else {
@@ -41,7 +41,7 @@ pub fn parse_query(sql_query: &sqlparser::ast::Query) -> Box<Query> {
     }
 }
 
-pub fn parse_select(select: &Select) -> Box<Query> {
+pub fn parse_select(select: &OctoSQLSelect) -> Box<Query> {
     let from = parse_table(&select.from[0].relation);
 
     let expressions = select.projection.iter()
@@ -77,50 +77,49 @@ pub fn parse_select_item(item: &SelectItem) -> SelectExpression {
         SelectItem::QualifiedWildcard(name) => {
             SelectExpression::Wildcard(Some(name.0[0].value.clone()))
         }
-        _ => unimplemented!(),
     }
 }
 
-pub fn parse_table(table: &TableFactor) -> Box<Source> {
+pub fn parse_table(table: &OctoSQLTableFactor) -> Box<Source> {
     match table {
-        TableFactor::Table { name, alias, args, with_hints } => {
+        OctoSQLTableFactor::Table { name, alias, args: _, with_hints: _ } => {
             return Box::new(Source::Table(parse_compound_ident(&name.0), alias.clone().map(|alias| parse_ident(&alias.name))));
         }
-        TableFactor::Derived { lateral, subquery, alias } => {
+        OctoSQLTableFactor::Derived { lateral: _, subquery, alias } => {
             return Box::new(Source::Subquery(parse_query(subquery), alias.clone().map(|alias| parse_ident(&alias.name))));
         }
         _ => unimplemented!(),
     }
 }
 
-pub fn parse_expr(expr: &Expr) -> Box<Expression> {
+pub fn parse_expr(expr: &OctoSQLExpr) -> Box<Expression> {
     match expr {
-        Expr::Identifier(ident) => {
+        OctoSQLExpr::Identifier(ident) => {
             Box::new(Expression::Variable(parse_ident(&ident)))
         }
-        Expr::CompoundIdentifier(parts) => {
+        OctoSQLExpr::CompoundIdentifier(parts) => {
             Box::new(Expression::Variable(parse_compound_ident(parts)))
         }
-        Expr::Value(value) => {
+        OctoSQLExpr::Value(value) => {
             Box::new(Expression::Constant(parse_value(value)))
         }
-        Expr::BinaryOp { left, op, right } => {
+        OctoSQLExpr::BinaryOp { left, op, right } => {
             Box::new(Expression::Operator(
                 parse_expr(left.as_ref()),
                 parse_binary_operator(op),
                 parse_expr(right.as_ref()),
             ))
         }
-        Expr::Function(Function { name, args, over, distinct }) => {
+        OctoSQLExpr::Function(Function { name, args, over: _, distinct: _ }) => {
             Box::new(Expression::Function(parse_ident(&name.0[0]), args.iter().map(parse_expr).collect()))
         }
-        Expr::Wildcard => {
+        OctoSQLExpr::Wildcard => {
             Box::new(Expression::Wildcard(None))
         }
-        Expr::QualifiedWildcard(idents) => {
+        OctoSQLExpr::QualifiedWildcard(idents) => {
             Box::new(Expression::Wildcard(Some(idents[0].value.clone())))
         }
-        Expr::Subquery(subquery) => {
+        OctoSQLExpr::Subquery(subquery) => {
             Box::new(Expression::Subquery(parse_query(subquery)))
         }
         _ => {

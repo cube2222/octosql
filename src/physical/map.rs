@@ -12,18 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::io::Write;
-use std::mem;
 use std::sync::Arc;
 
-use arrow::array::{ArrayDataBuilder, ArrayDataRef, ArrayRef, BooleanBufferBuilder, BufferBuilderTrait, Int32Builder, Int64Builder, StringBuilder};
-use arrow::array::{BinaryArray, BooleanArray, Date32Array, Date64Array, DictionaryArray, DurationMicrosecondArray, DurationMillisecondArray, DurationNanosecondArray, DurationSecondArray, FixedSizeBinaryArray, FixedSizeListArray, Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, IntervalDayTimeArray, IntervalYearMonthArray, LargeBinaryArray, LargeListArray, LargeStringArray, ListArray, NullArray, StringArray, StructArray, Time32MillisecondArray, Time32SecondArray, Time64MicrosecondArray, Time64NanosecondArray, TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array, UnionArray};
-use arrow::buffer::MutableBuffer;
-use arrow::compute::kernels::comparison::eq;
-use arrow::datatypes::{DataType, DateUnit, Field, Int16Type, Int32Type, Int64Type, Int8Type, IntervalUnit, Schema, TimeUnit, UInt16Type, UInt32Type, UInt64Type, UInt8Type};
+use arrow::array::ArrayRef;
+use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 
-use crate::physical::arrow::create_row;
 use crate::physical::expression::Expression;
 use crate::physical::physical::*;
 
@@ -75,7 +69,7 @@ impl Node for Map {
                     }
                 }
             })
-            .filter(|f| f.name() != retractions_field)
+            .filter(|f| f.name() != RETRACTIONS_FIELD)
             .collect();
 
         new_schema_fields.extend(self
@@ -96,7 +90,7 @@ impl Node for Map {
             new_schema_fields.truncate(new_schema_fields.len() - 1); // Remove retraction field.
             new_schema_fields.append(&mut to_append);
         }
-        new_schema_fields.push(Field::new(retractions_field, DataType::Boolean, false));
+        new_schema_fields.push(Field::new(RETRACTIONS_FIELD, DataType::Boolean, false));
         Ok(Arc::new(Schema::new(new_schema_fields)))
     }
 
@@ -104,7 +98,7 @@ impl Node for Map {
         &self,
         ctx: &ExecutionContext,
         produce: ProduceFn,
-        meta_send: MetaSendFn,
+        _meta_send: MetaSendFn,
     ) -> Result<(), Error> {
         let source_schema = self.source.schema(ctx.variable_context.clone())?;
         let output_schema = self.schema(ctx.variable_context.clone())?;
@@ -114,7 +108,7 @@ impl Node for Map {
                     Some(qualifier) => {
                         source_schema.fields().clone().into_iter()
                             .enumerate()
-                            .filter(|(column_index, f)| {
+                            .filter(|(_column_index, f)| {
                                 f.name().starts_with(qualifier)
                             })
                             .collect::<Vec<_>>()
@@ -124,8 +118,8 @@ impl Node for Map {
                     }
                 }
             })
-            .filter(|(column_index, f)| f.name() != retractions_field)
-            .map(|(column_index, f)| column_index)
+            .filter(|(_column_index, f)| f.name() != RETRACTIONS_FIELD)
+            .map(|(column_index, _f)| column_index)
             .collect();
 
         self.source.run(

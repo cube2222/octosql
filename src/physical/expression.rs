@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use arrow::array::{ArrayDataBuilder, ArrayRef, BooleanBufferBuilder, BufferBuilderTrait, Int64Builder, StringBuilder, StructBuilder, StructArray};
+use arrow::array::{ArrayDataBuilder, ArrayRef, BooleanBufferBuilder, BufferBuilderTrait, Int64Builder, StringBuilder, StructArray};
 use arrow::buffer::MutableBuffer;
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -85,23 +85,23 @@ impl Constant {
 impl Expression for Constant {
     fn field_meta(
         &self,
-        schema_context: Arc<dyn SchemaContext>,
-        record_schema: &Arc<Schema>,
+        _schema_context: Arc<dyn SchemaContext>,
+        _record_schema: &Arc<Schema>,
     ) -> Result<Field, Error> {
         Ok(Field::new("", self.value.data_type(), self.value == ScalarValue::Null))
     }
-    fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef, Error> {
+    fn evaluate(&self, _ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef, Error> {
         match &self.value {
             ScalarValue::Int64(n) => {
                 let mut array = Int64Builder::new(record.num_rows());
-                for i in 0..record.num_rows() {
+                for _i in 0..record.num_rows() {
                     array.append_value(*n).unwrap();
                 }
                 Ok(Arc::new(array.finish()) as ArrayRef)
             }
             ScalarValue::Utf8(v) => {
                 let mut array = StringBuilder::new(record.num_rows());
-                for i in 0..record.num_rows() {
+                for _i in 0..record.num_rows() {
                     array.append_value(v.as_str()).unwrap();
                 }
                 Ok(Arc::new(array.finish()) as ArrayRef)
@@ -160,7 +160,7 @@ impl Expression for Subquery {
 
         for i in 0..record.num_rows() {
             let mut row = Vec::with_capacity(record.num_columns());
-            for i in 0..record.num_columns() {
+            for _i in 0..record.num_columns() {
                 row.push(ScalarValue::Null);
             }
 
@@ -178,7 +178,7 @@ impl Expression for Subquery {
 
             self.query.run(
                 &ctx,
-                &mut |produce_ctx, batch| {
+                &mut |_produce_ctx, batch| {
                     batches.push(batch);
                     Ok(())
                 },
@@ -186,12 +186,12 @@ impl Expression for Subquery {
             )?;
 
             if batches.len() == 0 || batches[0].num_rows() == 0 {
-                null_bitmap_builder.append(false);
-                buffer.resize(buffer.len() + single_value_byte_size);
+                null_bitmap_builder.append(false)?;
+                buffer.resize(buffer.len() + single_value_byte_size)?;
                 continue;
             }
 
-            null_bitmap_builder.append(true);
+            null_bitmap_builder.append(true)?;
 
             if batches.len() != 1 {
                 unimplemented!()
@@ -241,7 +241,7 @@ impl WildcardExpression {
 impl Expression for WildcardExpression {
     fn field_meta(
         &self,
-        schema_context: Arc<dyn SchemaContext>,
+        _schema_context: Arc<dyn SchemaContext>,
         record_schema: &Arc<Schema>,
     ) -> Result<Field, Error> {
         let fields = record_schema.fields().iter()
@@ -257,7 +257,7 @@ impl Expression for WildcardExpression {
             .collect();
         Ok(Field::new("", DataType::Struct(fields), false))
     }
-    fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef, Error> {
+    fn evaluate(&self, _ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef, Error> {
         let source_schema = record.schema();
 
         let tuple_elements = record.columns().iter()

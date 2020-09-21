@@ -15,8 +15,17 @@
 #[macro_use]
 extern crate lazy_static;
 
-#[macro_use]
-extern crate paste;
+use std::result::*;
+use std::sync::Arc;
+
+use arrow::datatypes::Schema;
+use arrow::record_batch::RecordBatch;
+
+use crate::logical::logical::MaterializationContext;
+use crate::logical::sql::query_to_logical_plan;
+use crate::parser::parser::parse_sql;
+use crate::physical::physical::{EmptySchemaContext, ExecutionContext, noop_meta_send, ProduceContext, VariableContext};
+use crate::pretty::pretty_format_batches;
 
 #[macro_use]
 mod physical;
@@ -24,43 +33,8 @@ mod logical;
 mod parser;
 mod pretty;
 
-use crate::physical::physical::{noop_meta_send, ExecutionContext, ProduceContext, VariableContext, retractions_field, Identifier, EmptySchemaContext};
-use crate::logical::logical::Expression::Variable;
-use crate::logical::logical::{MaterializationContext, Expression, Aggregate};
-use crate::logical::logical::Node::{Map, Source, GroupBy, Filter};
-use crate::logical::sql::query_to_logical_plan;
-use crate::parser::parser::parse_sql;
-
-use arrow::array::*;
-use arrow::compute::kernels::filter;
-use arrow::csv;
-use arrow::csv::reader;
-use arrow::datatypes::{DataType, Field, Schema};
-use arrow::ipc::writer::FileWriter;
-use arrow::ipc::writer::*;
-use arrow::record_batch::RecordBatch;
-use crate::pretty::pretty_format_batches;
-use std::fs::{read, File};
-use std::io;
-use std::io::Cursor;
-use std::path;
-use std::result::*;
-use std::thread;
-use std::time;
-use arrow::error::ArrowError;
-use arrow::ipc::{BoolBuilder, Utf8Builder};
-use datafusion::execution::physical_plan::common::get_scalar_value;
-use datafusion::execution::physical_plan::hash_aggregate::HashAggregateExec;
-use datafusion::execution::physical_plan::PhysicalExpr;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::hash::Hash;
-use std::iter::repeat;
-use std::sync::mpsc;
-use std::sync::Arc;
-use crate::logical::logical::Aggregate::{Count, Sum};
-
 fn record_print(
-    ctx: &ProduceContext,
+    _ctx: &ProduceContext,
     batch: RecordBatch,
 ) -> Result<(), physical::physical::Error> {
     println!("{}", batch.num_rows());
@@ -119,7 +93,7 @@ fn main() {
     // };
     // let logical_plan = Filter {
     //     source: Box::new(logical_plan),
-    //     filter_column: retractions_field.to_string(),
+    //     filter_column: RETRACTIONS_FIELD.to_string(),
     // };
     let sql = std::env::args().nth(1).unwrap();
     dbg!(&sql);
@@ -134,7 +108,7 @@ fn main() {
     let schema = plan.schema(Arc::new(EmptySchemaContext{})).unwrap();
     dbg!(schema);
 
-    let res = plan.run(
+    let _res = plan.run(
         &ExecutionContext {
             variable_context: Arc::new(VariableContext {
                 previous: None,

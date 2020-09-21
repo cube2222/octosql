@@ -13,15 +13,14 @@
 // limitations under the License.
 
 use std::hash::Hash;
-use std::io;
 use std::sync::Arc;
 
-use arrow::datatypes::{Schema, DataType, Field};
+use arrow::datatypes::{DataType, Field, Schema};
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 
-pub const batch_size: usize = 8192;
-pub const retractions_field: &str = "retraction";
+pub const BATCH_SIZE: usize = 8192;
+pub const RETRACTIONS_FIELD: &str = "retraction";
 
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 pub enum Identifier {
@@ -90,8 +89,8 @@ impl Hash for ScalarValue {
         match self {
             ScalarValue::Null => (),
             ScalarValue::Boolean(x) => x.hash(state),
-            ScalarValue::Float32(x) => unimplemented!(),
-            ScalarValue::Float64(x) => unimplemented!(),
+            ScalarValue::Float32(_x) => unimplemented!(),
+            ScalarValue::Float64(_x) => unimplemented!(),
             ScalarValue::Int8(x) => x.hash(state),
             ScalarValue::Int16(x) => x.hash(state),
             ScalarValue::Int32(x) => x.hash(state),
@@ -118,7 +117,7 @@ pub struct EmptySchemaContext {
 }
 
 impl SchemaContext for EmptySchemaContext {
-    fn field_with_name(&self, name: &str) -> Result<&Field, Error> {
+    fn field_with_name(&self, _name: &str) -> Result<&Field, Error> {
         Err(Error::Unexpected)
     }
 }
@@ -180,7 +179,6 @@ impl Clone for ExecutionContext {
 
 #[derive(Debug)]
 pub enum Error {
-    IOError(io::Error),
     ArrowError(arrow::error::ArrowError),
     Unexpected,
     Wrapped(String, Box<Error>),
@@ -196,7 +194,7 @@ impl From<arrow::error::ArrowError> for Error {
 pub type ProduceFn<'a> = &'a mut dyn FnMut(&ProduceContext, RecordBatch) -> Result<(), Error>;
 pub type MetaSendFn<'a> = &'a mut dyn FnMut(&ProduceContext, MetadataMessage) -> Result<(), Error>;
 
-pub fn noop_meta_send(ctx: &ProduceContext, msg: MetadataMessage) -> Result<(), Error> {
+pub fn noop_meta_send(_ctx: &ProduceContext, _msg: MetadataMessage) -> Result<(), Error> {
     Ok(())
 }
 

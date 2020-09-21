@@ -71,7 +71,7 @@ impl Node for StreamJoin {
         &self,
         ctx: &ExecutionContext,
         produce: ProduceFn,
-        meta_send: MetaSendFn,
+        _meta_send: MetaSendFn,
     ) -> Result<(), Error> {
         let source_schema = self.source.schema(ctx.variable_context.clone())?;
         let joined_schema = self.joined.schema(ctx.variable_context.clone())?;
@@ -86,8 +86,8 @@ impl Node for StreamJoin {
             ),
         > = BTreeMap::new();
 
-        let key_types: Vec<DataType> = match self.source.schema(ctx.variable_context.clone()) {
-            Ok(schema) => self
+        let _key_types: Vec<DataType> = match self.source.schema(ctx.variable_context.clone()) {
+            Ok(_schema) => self
                 .source_key_exprs
                 .iter()
                 .map(|field| field.field_meta(ctx.variable_context.clone(), &source_schema).unwrap().data_type().clone())
@@ -101,10 +101,10 @@ impl Node for StreamJoin {
         let source = self.source.clone();
         let ctx1 = ctx.clone();
         let handle1 = std::thread::spawn(move || {
-            let res = source.run(
+            let _res = source.run(
                 &ctx1,
-                &mut |ctx, batch| {
-                    sender1.send((0, batch));
+                &mut |_ctx, batch| {
+                    sender1.send((0, batch)).unwrap();
                     Ok(())
                 },
                 &mut noop_meta_send,
@@ -114,10 +114,10 @@ impl Node for StreamJoin {
         let joined = self.joined.clone();
         let ctx2 = ctx.clone();
         let handle2 = std::thread::spawn(move || {
-            let res = joined.run(
+            let _res = joined.run(
                 &ctx2,
-                &mut |ctx, batch| {
-                    sender2.send((1, batch));
+                &mut |_ctx, batch| {
+                    sender2.send((1, batch)).unwrap();
                     Ok(())
                 },
                 &mut noop_meta_send,
@@ -140,10 +140,10 @@ impl Node for StreamJoin {
 
             for row in 0..batch.num_rows() {
                 let mut key_vec = Vec::with_capacity(self.source_key_exprs.len());
-                for i in 0..key_columns.len() {
+                for _i in 0..key_columns.len() {
                     key_vec.push(GroupByScalar::Int64(0))
                 }
-                create_key(&key_columns, row, &mut key_vec);
+                create_key(&key_columns, row, &mut key_vec)?;
 
                 if let Some((source_rows, joined_rows)) = state_map.get(&key_vec) {
                     // The row will later be joined with the other source rows.
@@ -155,12 +155,12 @@ impl Node for StreamJoin {
                 }
 
                 let mut row_vec = Vec::with_capacity(batch.num_columns());
-                for i in 0..batch.num_columns() {
+                for _i in 0..batch.num_columns() {
                     row_vec.push(ScalarValue::Int64(0))
                 }
-                create_row(batch.columns(), row, &mut row_vec);
+                create_row(batch.columns(), row, &mut row_vec)?;
 
-                let mut new_rows_for_key = new_rows.entry(key_vec).or_default();
+                let new_rows_for_key = new_rows.entry(key_vec).or_default();
                 new_rows_for_key.push(row_vec);
             }
 
@@ -175,11 +175,11 @@ impl Node for StreamJoin {
                             let mut array = Int64Builder::new(required_capacity);
                             for (key, cur_new_rows) in &new_rows {
                                 if let Some((_, state_other_rows)) = state_map.get(key) {
-                                    for (other_row, &count) in state_other_rows {
+                                    for (_other_row, &count) in state_other_rows {
                                         for new_row in cur_new_rows {
-                                            for repetition in 0..count {
+                                            for _repetition in 0..count {
                                                 if let ScalarValue::Int64(n) = &new_row[column] {
-                                                    array.append_value(*n);
+                                                    array.append_value(*n)?;
                                                 } else {
                                                     panic!("invalid type");
                                                 }
@@ -194,11 +194,11 @@ impl Node for StreamJoin {
                             let mut array = StringBuilder::new(required_capacity);
                             for (key, cur_new_rows) in &new_rows {
                                 if let Some((_, state_other_rows)) = state_map.get(key) {
-                                    for (other_row, &count) in state_other_rows {
+                                    for (_other_row, &count) in state_other_rows {
                                         for new_row in cur_new_rows {
-                                            for repetition in 0..count {
+                                            for _repetition in 0..count {
                                                 if let ScalarValue::Utf8(text) = &new_row[column] {
-                                                    array.append_value(text.as_str());
+                                                    array.append_value(text.as_str())?;
                                                 } else {
                                                     panic!("invalid type");
                                                 }
@@ -220,10 +220,10 @@ impl Node for StreamJoin {
                             for (key, cur_new_rows) in &new_rows {
                                 if let Some((_, state_other_rows)) = state_map.get(key) {
                                     for (other_row, &count) in state_other_rows {
-                                        for new_row in cur_new_rows {
-                                            for repetition in 0..count {
+                                        for _new_row in cur_new_rows {
+                                            for _repetition in 0..count {
                                                 if let ScalarValue::Int64(n) = &other_row[column] {
-                                                    array.append_value(*n);
+                                                    array.append_value(*n)?;
                                                 } else {
                                                     panic!("invalid type");
                                                 }
@@ -239,11 +239,11 @@ impl Node for StreamJoin {
                             for (key, cur_new_rows) in &new_rows {
                                 if let Some((_, state_other_rows)) = state_map.get(key) {
                                     for (other_row, &count) in state_other_rows {
-                                        for new_row in cur_new_rows {
-                                            for repetition in 0..count {
+                                        for _new_row in cur_new_rows {
+                                            for _repetition in 0..count {
                                                 if let ScalarValue::Utf8(text) = &other_row[column]
                                                 {
-                                                    array.append_value(text.as_str());
+                                                    array.append_value(text.as_str())?;
                                                 } else {
                                                     panic!("invalid type");
                                                 }
@@ -263,13 +263,13 @@ impl Node for StreamJoin {
                 let mut array = BooleanBuilder::new(required_capacity);
                 for (key, cur_new_rows) in &new_rows {
                     if let Some((_, state_other_rows)) = state_map.get(key) {
-                        for (other_row, &count) in state_other_rows {
+                        for (_other_row, &count) in state_other_rows {
                             for new_row in cur_new_rows {
-                                for repetition in 0..count {
+                                for _repetition in 0..count {
                                     if let ScalarValue::Boolean(retraction) =
                                         new_row[retraction_column]
                                     {
-                                        array.append_value(retraction);
+                                        array.append_value(retraction)?;
                                     } else {
                                         panic!("invalid type");
                                     }
@@ -287,10 +287,10 @@ impl Node for StreamJoin {
                             for (key, cur_new_rows) in &new_rows {
                                 if let Some((state_other_rows, _)) = state_map.get(key) {
                                     for (other_row, &count) in state_other_rows {
-                                        for new_row in cur_new_rows {
-                                            for repetition in 0..count {
+                                        for _new_row in cur_new_rows {
+                                            for _repetition in 0..count {
                                                 if let ScalarValue::Int64(n) = &other_row[column] {
-                                                    array.append_value(*n);
+                                                    array.append_value(*n)?;
                                                 } else {
                                                     panic!("invalid type");
                                                 }
@@ -306,11 +306,11 @@ impl Node for StreamJoin {
                             for (key, cur_new_rows) in &new_rows {
                                 if let Some((state_other_rows, _)) = state_map.get(key) {
                                     for (other_row, &count) in state_other_rows {
-                                        for new_row in cur_new_rows {
-                                            for repetition in 0..count {
+                                        for _new_row in cur_new_rows {
+                                            for _repetition in 0..count {
                                                 if let ScalarValue::Utf8(text) = &other_row[column]
                                                 {
-                                                    array.append_value(text.as_str());
+                                                    array.append_value(text.as_str())?;
                                                 } else {
                                                     panic!("invalid type");
                                                 }
@@ -332,11 +332,11 @@ impl Node for StreamJoin {
                             let mut array = Int64Builder::new(required_capacity);
                             for (key, cur_new_rows) in &new_rows {
                                 if let Some((state_other_rows, _)) = state_map.get(key) {
-                                    for (other_row, &count) in state_other_rows {
+                                    for (_other_row, &count) in state_other_rows {
                                         for new_row in cur_new_rows {
-                                            for repetition in 0..count {
+                                            for _repetition in 0..count {
                                                 if let ScalarValue::Int64(n) = &new_row[column] {
-                                                    array.append_value(*n);
+                                                    array.append_value(*n)?;
                                                 } else {
                                                     panic!("invalid type");
                                                 }
@@ -351,11 +351,11 @@ impl Node for StreamJoin {
                             let mut array = StringBuilder::new(required_capacity);
                             for (key, cur_new_rows) in &new_rows {
                                 if let Some((state_other_rows, _)) = state_map.get(key) {
-                                    for (other_row, &count) in state_other_rows {
+                                    for (_other_row, &count) in state_other_rows {
                                         for new_row in cur_new_rows {
-                                            for repetition in 0..count {
+                                            for _repetition in 0..count {
                                                 if let ScalarValue::Utf8(text) = &new_row[column] {
-                                                    array.append_value(text.as_str());
+                                                    array.append_value(text.as_str())?;
                                                 } else {
                                                     panic!("invalid type");
                                                 }
@@ -375,13 +375,13 @@ impl Node for StreamJoin {
                 let mut array = BooleanBuilder::new(required_capacity);
                 for (key, cur_new_rows) in &new_rows {
                     if let Some((state_other_rows, _)) = state_map.get(key) {
-                        for (other_row, &count) in state_other_rows {
+                        for (_other_row, &count) in state_other_rows {
                             for new_row in cur_new_rows {
-                                for repetition in 0..count {
+                                for _repetition in 0..count {
                                     if let ScalarValue::Boolean(retraction) =
                                         new_row[retraction_column]
                                     {
-                                        array.append_value(retraction);
+                                        array.append_value(retraction)?;
                                     } else {
                                         panic!("invalid type");
                                     }
@@ -425,8 +425,8 @@ impl Node for StreamJoin {
             }
         }
 
-        handle1.join();
-        handle2.join();
+        handle1.join().unwrap();
+        handle2.join().unwrap();
 
         Ok(())
     }

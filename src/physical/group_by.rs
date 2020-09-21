@@ -32,6 +32,7 @@ pub struct GroupBy {
     aggregated_exprs: Vec<Arc<dyn Expression>>,
     aggregates: Vec<Arc<dyn Aggregate>>,
     output_names: Vec<Identifier>,
+    trigger_prototypes: Vec<Arc<dyn TriggerPrototype>>,
     source: Arc<dyn Node>,
 }
 
@@ -42,6 +43,7 @@ impl GroupBy {
         aggregated_exprs: Vec<Arc<dyn Expression>>,
         aggregates: Vec<Arc<dyn Aggregate>>,
         output_names: Vec<Identifier>,
+        trigger_prototypes: Vec<Arc<dyn TriggerPrototype>>,
         source: Arc<dyn Node>,
     ) -> GroupBy {
         return GroupBy {
@@ -50,6 +52,7 @@ impl GroupBy {
             aggregated_exprs,
             aggregates,
             output_names,
+            trigger_prototypes,
             source,
         };
     }
@@ -224,7 +227,9 @@ impl Node for GroupBy {
             .map(|key_expr| key_expr.field_meta(exec_ctx.variable_context.clone(), &source_schema).unwrap().data_type().clone())
             .collect();
 
-        let mut trigger: Box<dyn Trigger> = Box::new(CountingTrigger::new(key_types, 1000));
+        let mut trigger: Box<dyn Trigger> = self.trigger_prototypes.get(0)
+            .map(|prototype| prototype.create_trigger(key_types.clone()))
+            .unwrap_or_else(|| Box::new(CountingTrigger::new(key_types.clone(), 1)));
 
         self.source.run(
             exec_ctx,

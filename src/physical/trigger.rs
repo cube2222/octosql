@@ -20,6 +20,29 @@ use arrow::datatypes::DataType;
 
 use crate::physical::arrow::{create_key, GroupByScalar};
 
+pub trait TriggerPrototype: Send + Sync {
+    fn create_trigger(&self, key_data_types: Vec<DataType>) -> Box<dyn Trigger>;
+}
+
+#[derive(Debug)]
+pub struct CountingTriggerPrototype {
+    pub trigger_count: u64
+}
+
+impl CountingTriggerPrototype {
+    pub fn new(trigger_count: u64) -> CountingTriggerPrototype {
+        CountingTriggerPrototype {
+            trigger_count,
+        }
+    }
+}
+
+impl TriggerPrototype for CountingTriggerPrototype {
+    fn create_trigger(&self, key_data_types: Vec<DataType>) -> Box<dyn Trigger> {
+        Box::new(CountingTrigger::new(key_data_types, self.trigger_count))
+    }
+}
+
 pub trait Trigger: std::fmt::Debug {
     fn keys_received(&mut self, keys: Vec<ArrayRef>);
     fn poll(&mut self) -> Vec<ArrayRef>;
@@ -28,13 +51,13 @@ pub trait Trigger: std::fmt::Debug {
 #[derive(Debug)]
 pub struct CountingTrigger {
     key_data_types: Vec<DataType>,
-    trigger_count: i64,
-    counts: BTreeMap<Vec<GroupByScalar>, i64>,
+    trigger_count: u64,
+    counts: BTreeMap<Vec<GroupByScalar>, u64>,
     to_trigger: BTreeSet<Vec<GroupByScalar>>,
 }
 
 impl CountingTrigger {
-    pub fn new(key_data_types: Vec<DataType>, trigger_count: i64) -> CountingTrigger {
+    pub fn new(key_data_types: Vec<DataType>, trigger_count: u64) -> CountingTrigger {
         CountingTrigger {
             key_data_types,
             trigger_count,

@@ -14,14 +14,14 @@
 
 use std::collections::BTreeMap;
 
-use crate::logical::logical::{Aggregate, Expression, Node};
+use crate::logical::logical::{Aggregate, Expression, Node, Trigger};
 use crate::parser;
 use crate::parser::{Operator, SelectExpression, Value};
 use crate::physical::physical::{Identifier, ScalarValue};
 
 pub fn query_to_logical_plan(query: &parser::Query) -> Box<Node> {
     match query {
-        parser::Query::Select { expressions, filter, from, order_by: _, group_by } => {
+        parser::Query::Select { expressions, filter, from, order_by: _, group_by, trigger } => {
             if group_by.is_empty() {
                 let mut plan = source_to_logical_plan(from.as_ref());
 
@@ -106,12 +106,17 @@ pub fn query_to_logical_plan(query: &parser::Query) -> Box<Node> {
 
                 let (aggregates, exprs): (Vec<_>, Vec<_>) = aggregate_exprs.into_iter().unzip();
 
+                let trigger_logical = trigger.iter()
+                    .map(trigger_to_logical_plan)
+                    .collect();
+
                 plan = Box::new(Node::GroupBy {
                     source: plan,
                     key_exprs,
                     aggregates,
                     aggregated_exprs: exprs,
                     output_fields,
+                    trigger: trigger_logical,
                 });
 
                 plan
@@ -195,6 +200,11 @@ pub fn aggregate_expression_to_logical_plan(expr: &parser::Expression) -> (Aggre
     }
 }
 
+pub fn trigger_to_logical_plan(trigger: &parser::Trigger) -> Trigger {
+    match trigger {
+        parser::Trigger::Counting(n) => Trigger::Counting(n.clone()),
+    }
+}
 
 pub fn identifier_to_logical_plan(ident: &parser::Identifier) -> Identifier {
     match ident {

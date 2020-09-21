@@ -15,6 +15,7 @@
 use std::sync::Arc;
 
 use crate::physical::aggregate;
+use crate::physical::trigger;
 use crate::physical::csv::CSVSource;
 use crate::physical::expression;
 use crate::physical::expression::WildcardExpression;
@@ -25,7 +26,6 @@ use crate::physical::json::JSONSource;
 use crate::physical::map;
 use crate::physical::physical;
 use crate::physical::physical::Identifier;
-// use crate::physical::functions::Equal;
 use crate::physical::requalifier::Requalifier;
 use crate::physical::stream_join::StreamJoin;
 
@@ -56,6 +56,7 @@ pub enum Node {
         aggregates: Vec<Aggregate>,
         aggregated_exprs: Vec<Box<Expression>>,
         output_fields: Vec<Identifier>,
+        trigger: Vec<Trigger>,
     },
     Join {
         source: Box<Node>,
@@ -107,7 +108,7 @@ impl Node {
                 } else {
                     unimplemented!()
                 }
-            },
+            }
             Node::Filter {
                 source,
                 filter_expr,
@@ -143,6 +144,7 @@ impl Node {
                 aggregates,
                 aggregated_exprs,
                 output_fields,
+                trigger,
             } => {
                 let key_exprs_physical = key_exprs
                     .into_iter()
@@ -151,7 +153,7 @@ impl Node {
 
                 let (aggregates_no_key_part, aggregated_exprs_no_key_part): (Vec<_>, Vec<_>) = aggregates.iter()
                     .zip(aggregated_exprs.iter())
-                    .filter(|(aggregate, _aggregated_expr)| if let Aggregate::KeyPart = **aggregate {false} else {true})
+                    .filter(|(aggregate, _aggregated_expr)| if let Aggregate::KeyPart = **aggregate { false } else { true })
                     .unzip();
 
                 let aggregate_vec = aggregates_no_key_part
@@ -165,13 +167,13 @@ impl Node {
 
                 let aggregated_exprs_key_part = aggregates.iter()
                     .zip(aggregated_exprs.iter())
-                    .filter(|(aggregate, _aggregated_expr)| if let Aggregate::KeyPart = **aggregate {true} else {false})
+                    .filter(|(aggregate, _aggregated_expr)| if let Aggregate::KeyPart = **aggregate { true } else { false })
                     .map(|(_aggregate, aggregated_expr)| aggregated_expr)
                     .collect::<Vec<_>>();
 
                 let aggregate_output_names = aggregates.iter()
                     .enumerate()
-                    .filter(|(_i, aggregate)| if let Aggregate::KeyPart = **aggregate {false} else {true})
+                    .filter(|(_i, aggregate)| if let Aggregate::KeyPart = **aggregate { false } else { true })
                     .map(|(i, _)| output_fields[i].clone())
                     .collect();
 
@@ -190,12 +192,16 @@ impl Node {
                             }
                         }
                         if !found {
-                            return Err(Error::Unexpected(format!("key part variable {} not found in key", var_name.to_string())))
+                            return Err(Error::Unexpected(format!("key part variable {} not found in key", var_name.to_string())));
                         }
                     } else {
-                        return Err(Error::Unexpected("key part can only contain variables".to_string()))
+                        return Err(Error::Unexpected("key part can only contain variables".to_string()));
                     }
                 }
+
+                let trigger_prototypes = trigger.iter()
+                    .map(|t| t.physical(mat_ctx))
+                    .collect::<Result<_, _>>()?;
 
                 Ok(Arc::new(GroupBy::new(
                     key_exprs_physical,
@@ -203,6 +209,7 @@ impl Node {
                     aggregated_exprs_physical,
                     aggregate_vec,
                     aggregate_output_names,
+                    trigger_prototypes,
                     source.physical(mat_ctx)?,
                 )))
             }
@@ -231,7 +238,7 @@ impl Node {
             }
             Node::Requalifier { source, alias } => {
                 Ok(Arc::new(Requalifier::new(alias.clone(), source.physical(mat_ctx)?)))
-            },
+            }
         }
     }
 }
@@ -253,7 +260,7 @@ impl Expression {
                 match name {
                     Identifier::SimpleIdentifier(ident) => {
                         match BUILTIN_FUNCTIONS.get(ident.to_lowercase().as_str()) {
-                            None => {Err(Error::Unexpected(format!("unknown function: {}", ident.as_str())))},
+                            None => { Err(Error::Unexpected(format!("unknown function: {}", ident.as_str()))) }
                             Some(fn_constructor) => Ok(fn_constructor(args_physical)),
                         }
                     }
@@ -274,6 +281,18 @@ impl Aggregate {
         match self {
             Aggregate::Count => Ok(Arc::new(aggregate::Count {})),
             Aggregate::Sum => Ok(Arc::new(aggregate::Sum {})),
+            _ => unimplemented!(),
+        }
+    }
+}
+
+impl Trigger {
+    pub fn physical(
+        &self,
+        _mat_ctx: &MaterializationContext,
+    ) -> Result<Arc<dyn trigger::TriggerPrototype>, Error> {
+        match self {
+            Trigger::Counting(n) => Ok(Arc::new(trigger::CountingTriggerPrototype::new(n.clone()))),
             _ => unimplemented!(),
         }
     }

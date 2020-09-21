@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::parser::{Expression, Identifier, Operator, Query, SelectExpression, Source, Trigger, Value};
+
 use super::sqlparser;
 use super::sqlparser::ast;
-use super::sqlparser::ast::{BinaryOperator, Expr, Function, Ident, SelectItem, SetExpr, Statement, TableFactor, Select, FunctionArg};
+use super::sqlparser::ast::{BinaryOperator, Expr, Function, FunctionArg, Ident, Select, SelectItem, SetExpr, Statement, TableFactor};
 use super::sqlparser::dialect::GenericDialect;
 use super::sqlparser::parser::Parser;
-
-use crate::parser::{Expression, Identifier, Operator, Query, SelectExpression, Source, Value};
 
 pub fn parse_sql(text: &str) -> Box<Query> {
     let dialect = GenericDialect {}; // or AnsiDialect, or your own dialect ...
@@ -55,13 +55,25 @@ pub fn parse_select(select: &Select) -> Box<Query> {
         .map(parse_expr)
         .collect();
 
+    let trigger = select.trigger.iter()
+        .map(parse_trigger)
+        .collect();
+
     Box::new(Query::Select {
         expressions,
         filter: filter_expression,
         from,
         order_by: vec![],
         group_by: group_by_expression,
+        trigger
     })
+}
+
+pub fn parse_trigger(trigger: &sqlparser::ast::Trigger) -> Trigger {
+    match trigger {
+        sqlparser::ast::Trigger::Counting(n) => Trigger::Counting(n.clone()),
+        _ => unimplemented!(),
+    }
 }
 
 pub fn parse_select_item(item: &SelectItem) -> SelectExpression {

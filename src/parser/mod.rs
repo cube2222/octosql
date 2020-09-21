@@ -23,6 +23,7 @@ pub enum Query {
         from: Box<Source>,
         order_by:Vec<Box<Expression>>,
         group_by: Vec<Box<Expression>>,
+        trigger: Vec<Trigger>
     },
 }
 
@@ -46,6 +47,11 @@ pub enum Expression {
     Operator(Box<Expression>, Operator, Box<Expression>),
     Wildcard(Option<String>),
     Subquery(Box<Query>),
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum Trigger {
+    Counting(u64),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

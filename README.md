@@ -38,7 +38,7 @@ The current roadmap is to achieve feature parity with the Go version of OctoSQL.
   - [ ] Pushing down filters
 - [x] Logical Plan
 - [x] SQL
-  - [ ] Temporal Extensions
+  - [x] Temporal Extensions
   - [ ] Join
 - [ ] Nice output printing
 - [ ] Data Sources

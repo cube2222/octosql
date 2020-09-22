@@ -14,9 +14,9 @@
 
 use std::collections::BTreeMap;
 
-use crate::logical::logical::{Aggregate, Expression, Node, Trigger};
+use crate::logical::logical::{Aggregate, Expression, Node, Trigger, TableValuedFunction};
 use crate::parser;
-use crate::parser::{Operator, SelectExpression, Value};
+use crate::parser::{Operator, SelectExpression, Value, Source};
 use crate::physical::physical::{Identifier, ScalarValue};
 
 pub fn query_to_logical_plan(query: &parser::Query) -> Box<Node> {
@@ -141,6 +141,26 @@ pub fn source_to_logical_plan(expr: &parser::Source) -> Box<Node> {
             }
             plan
         }
+        Source::TableValuedFunction(ident, args) => match ident {
+            parser::Identifier::SimpleIdentifier(name) => match name.as_str() {
+                "range" => {
+                    if args.len() != 2 {
+                        unimplemented!()
+                    }
+                    match (&args[0], &args[1]) {
+                        (parser::TableValuedFunctionArgument::Unnamed(arg0), parser::TableValuedFunctionArgument::Unnamed(arg1)) => {
+                            Box::new(Node::Function(TableValuedFunction::Range(
+                                expression_to_logical_plan(arg0),
+                                expression_to_logical_plan(arg1),
+                            )))
+                        }
+                        _ => unimplemented!()
+                    }
+                }
+                _ => unimplemented!(),
+            },
+            _ => unimplemented!(),
+        },
     }
 }
 
@@ -222,7 +242,7 @@ pub fn value_to_logical_plan(val: &parser::Value) -> ScalarValue {
         parser::Value::Integer(v) => {
             ScalarValue::Int64(v.clone())
         }
-        Value::String(v) => {ScalarValue::Utf8(v.clone())}
+        Value::String(v) => { ScalarValue::Utf8(v.clone()) }
     }
 }
 

@@ -37,6 +37,13 @@ pub enum SelectExpression {
 pub enum Source {
     Table(Identifier, Option<Identifier>),
     Subquery(Box<Query>, Option<Identifier>),
+    TableValuedFunction(Identifier, Vec<TableValuedFunctionArgument>),
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum TableValuedFunctionArgument {
+    Named(Identifier, Box<Expression>),
+    Unnamed(Box<Expression>),
 }
 
 #[derive(Debug, Eq, PartialEq)]

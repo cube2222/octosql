@@ -28,6 +28,7 @@ use crate::physical::physical;
 use crate::physical::physical::Identifier;
 use crate::physical::requalifier::Requalifier;
 use crate::physical::stream_join::StreamJoin;
+use crate::physical::tbv::range::Range;
 
 #[derive(Debug)]
 pub enum Error {
@@ -68,7 +69,14 @@ pub enum Node {
         source: Box<Node>,
         alias: String,
     },
+    Function(TableValuedFunction)
 }
+
+#[derive(Debug)]
+pub enum TableValuedFunction {
+    Range(Box<Expression>, Box<Expression>)
+}
+
 
 #[derive(Debug)]
 pub enum Expression {
@@ -106,6 +114,7 @@ impl Node {
                 } else if path.contains(".csv") {
                     Ok(Arc::new(CSVSource::new(path)))
                 } else {
+                    dbg!(name);
                     unimplemented!()
                 }
             }
@@ -238,6 +247,15 @@ impl Node {
             }
             Node::Requalifier { source, alias } => {
                 Ok(Arc::new(Requalifier::new(alias.clone(), source.physical(mat_ctx)?)))
+            }
+            Node::Function(function) => {
+                match function {
+                    TableValuedFunction::Range(start, end) => {
+                        let start_expr = start.physical(mat_ctx)?;
+                        let end_expr = end.physical(mat_ctx)?;
+                        Ok(Arc::new(Range::new(start_expr, end_expr)))
+                    },
+                }
             }
         }
     }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::parser::{Expression, Identifier, Operator, Query, SelectExpression, Source, Trigger, Value};
+use crate::parser::{Expression, Identifier, Operator, Query, SelectExpression, Source, Trigger, Value, TableValuedFunctionArgument};
 
 use super::sqlparser;
 use super::sqlparser::ast;
@@ -95,13 +95,27 @@ pub fn parse_select_item(item: &SelectItem) -> SelectExpression {
 
 pub fn parse_table(table: &TableFactor) -> Box<Source> {
     match table {
-        TableFactor::Table { name, alias, args: _, with_hints: _ } => {
-            return Box::new(Source::Table(parse_compound_ident(&name.0), alias.clone().map(|alias| parse_ident(&alias.name))));
+        TableFactor::Table { name, alias, args, with_hints: _ } => {
+            if !args.is_empty() {
+                return Box::new(Source::TableValuedFunction(
+                    parse_compound_ident(&name.0),
+                    args.iter().map(parse_table_valued_function_argument).collect(),
+                ))
+            } else {
+                return Box::new(Source::Table(parse_compound_ident(&name.0), alias.clone().map(|alias| parse_ident(&alias.name))));
+            }
         }
         TableFactor::Derived { lateral: _, subquery, alias } => {
             return Box::new(Source::Subquery(parse_query(subquery), alias.clone().map(|alias| parse_ident(&alias.name))));
         }
         _ => unimplemented!(),
+    }
+}
+
+pub fn parse_table_valued_function_argument(arg: &FunctionArg) -> TableValuedFunctionArgument {
+    match arg {
+        FunctionArg::Named { name, arg } => TableValuedFunctionArgument::Named(parse_ident(name), parse_expr(arg)),
+        FunctionArg::Unnamed(arg) => TableValuedFunctionArgument::Unnamed(parse_expr(arg)),
     }
 }
 

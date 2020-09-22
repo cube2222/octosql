@@ -1,0 +1,29 @@
+[package]
+name = "octosql"
+description = "WIP PoC rewrite of OctoSQL in Rust"
+license-file = "LICENSE.txt"
+readme = "README.md"
+homepage = "https://octosql.dev"
+repository = "https://github.com/cube2222/octosql-rs"
+version = "0.0.1"
+authors = ["jakub"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+arrow = "1.0.0"
+datafusion = "1.0.0"
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_json = "1.0.53"
+nom = "5.1.2"
+prettytable-rs = "0.8.0"
+lazy_static = "1.4.0"
+chrono = "0.4"
+paste = "0.1"
+bigdecimal = { version = "0.2", features = ["serde"], optional = true }
+log = "0.4"
+
+[dev-dependencies]
+simple_logger = "1.6"
+matches = "0.1"

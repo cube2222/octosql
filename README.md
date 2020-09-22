@@ -53,7 +53,7 @@ The current roadmap is to achieve feature parity with the Go version of OctoSQL.
   - [ ] Excel
   - [ ] Kafka
 - [ ] Table Valued Functions
-  - [ ] Range
+  - [x] Range
   - [ ] Tumble
 - [ ] Durations and Dates support
   - [ ] SQL interval

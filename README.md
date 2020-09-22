@@ -57,6 +57,7 @@ The current roadmap is to achieve feature parity with the Go version of OctoSQL.
   - [ ] Tumble
 - [ ] Durations and Dates support
   - [ ] SQL interval
+- [ ] Error handling and error messages
 
 # Contributing
 Contributions are welcome!

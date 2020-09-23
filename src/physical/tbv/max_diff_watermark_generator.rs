@@ -15,25 +15,29 @@
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use arrow::array::TimestampNanosecondArray;
+use arrow::array::{TimestampNanosecondArray, Int64Builder, Int64Array, StringArray};
 use arrow::compute::kernels::aggregate::max;
-use arrow::datatypes::Schema;
+use arrow::datatypes::{Schema, Field, DataType};
 
 use crate::physical::expression::Expression;
 use crate::physical::physical::{ExecutionContext, Identifier, MetadataMessage, MetaSendFn, Node, noop_meta_send, ProduceFn, SchemaContext};
+use arrow::record_batch::RecordBatch;
 
 pub struct MaxDiffWatermarkGenerator {
-    time_field_name: Identifier,
-    max_diff: i64,
+    time_field_name: Arc<dyn Expression>,
+    max_diff: Arc<dyn Expression>,
     source: Arc<dyn Node>,
 }
 
 impl MaxDiffWatermarkGenerator {
-    pub fn new(time_field_name: Identifier, max_diff: i64, source: Arc<dyn Node>) -> MaxDiffWatermarkGenerator {
+    // TODO: Add some kind of "Descriptor" for field names?
+    // TODO: If I'd like to use a table, and not SELECT * FROM table, then I need "Table" for such names.
+    // Or descriptor as well. Whatever.
+    pub fn new(time_field_name: Arc<dyn Expression>, max_diff: Arc<dyn Expression>, source: Arc<dyn Node>) -> MaxDiffWatermarkGenerator {
         MaxDiffWatermarkGenerator {
             time_field_name,
             max_diff,
-            source
+            source,
         }
     }
 }
@@ -49,7 +53,30 @@ impl Node for MaxDiffWatermarkGenerator {
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<()> {
-        let time_field_name = self.time_field_name.to_string();
+        // TODO: Maybe add some kind of "ScalarEvaluate"?
+        let mut scalar_builder = Int64Builder::new(1);
+        scalar_builder.append_value(1);
+        let scalar_array = scalar_builder.finish();
+
+        let scalar_batch = RecordBatch::try_new(
+            Arc::new(Schema::new(vec![Field::new("", DataType::Int64, false)])),
+            vec![Arc::new(scalar_array)],
+        ).unwrap();
+
+        let time_field_name_array = self.time_field_name.evaluate(exec_ctx, &scalar_batch)?;
+        let mut time_field_name: String = time_field_name_array
+            .as_any()
+            .downcast_ref::<StringArray>().context("time field must be string")?
+            .value(0)
+            .to_string();
+
+        let max_diff_array = self.max_diff.evaluate(exec_ctx, &scalar_batch)?;
+        let mut max_diff: i64 = max_diff_array
+            .as_any()
+            .downcast_ref::<Int64Array>().context("max difference must be integer")?
+            .value(0);
+
+
         let source_schema = self.source.schema(exec_ctx.variable_context.clone())?;
         let (time_field_index, _) = source_schema.column_with_name(time_field_name.as_str()).context("time field not found")?;
 
@@ -58,18 +85,19 @@ impl Node for MaxDiffWatermarkGenerator {
         self.source.run(
             exec_ctx,
             &mut |ctx, batch| {
-                produce(ctx, batch)?;
-
-                let time_array = batch.column(time_field_index)
+                let time_array = batch.column(time_field_index).clone();
+                let time_array_typed = time_array
                     .as_any()
                     .downcast_ref::<TimestampNanosecondArray>()
                     .context("time field must be timestamp array")?;
 
-                let max_time = max(time_array).context("no max time value found")?;
+                let max_time = max(time_array_typed).context("no max time value found")?;
+
+                produce(ctx, batch)?;
 
                 if max_time > cur_max {
                     cur_max = max_time;
-                    meta_send(ctx, MetadataMessage::Watermark(max_time - self.max_diff))?;
+                    meta_send(ctx, MetadataMessage::Watermark(max_time - max_diff))?;
                 }
 
                 Ok(())

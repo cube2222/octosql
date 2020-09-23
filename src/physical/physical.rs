@@ -15,7 +15,7 @@
 use std::hash::Hash;
 use std::sync::Arc;
 
-use arrow::datatypes::{DataType, Field, Schema};
+use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use arrow::record_batch::RecordBatch;
 use anyhow::{Context, Result};
 
@@ -60,6 +60,7 @@ pub enum ScalarValue {
     UInt32(u32),
     UInt64(u64),
     Utf8(String),
+    Timestamp(i64),
     Struct(Vec<ScalarValue>),
 }
 
@@ -79,6 +80,7 @@ impl ScalarValue {
             ScalarValue::UInt32(_) => DataType::UInt32,
             ScalarValue::UInt64(_) => DataType::UInt64,
             ScalarValue::Utf8(_) => DataType::Utf8,
+            ScalarValue::Timestamp(_) => DataType::Timestamp(TimeUnit::Nanosecond, None),
             ScalarValue::Struct(_) => /*DataType::Struct*/ unimplemented!(),
         }
     }
@@ -100,6 +102,7 @@ impl Hash for ScalarValue {
             ScalarValue::UInt32(x) => x.hash(state),
             ScalarValue::UInt64(x) => x.hash(state),
             ScalarValue::Utf8(x) => x.hash(state),
+            ScalarValue::Timestamp(x) => x.hash(state),
             ScalarValue::Struct(x) => x.hash(state),
         }
     }
@@ -184,6 +187,7 @@ pub fn noop_meta_send(_ctx: &ProduceContext, _msg: MetadataMessage) -> Result<()
     Ok(())
 }
 
+#[derive(Debug)]
 pub enum MetadataMessage {
     EndOfStream,
 

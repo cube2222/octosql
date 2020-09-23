@@ -119,7 +119,10 @@ fn main() {
             }),
         },
         &mut record_print,
-        &mut noop_meta_send,
+        &mut |ctx, msg| {
+            dbg!(msg);
+            Ok(())
+        },
     ).unwrap();
     dbg!(start_time.elapsed());
     // println!("{:?}", start_time.elapsed());

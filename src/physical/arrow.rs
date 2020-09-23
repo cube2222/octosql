@@ -254,6 +254,13 @@ pub fn get_scalar_value(array: &ArrayRef, row: usize) -> Result<ScalarValue> {
                 .unwrap();
             ScalarValue::Utf8(array.value(row).to_string())
         }
+        DataType::Timestamp(TimeUnit::Nanosecond, _) => {
+            let array = array
+                .as_any()
+                .downcast_ref::<array::TimestampNanosecondArray>()
+                .unwrap();
+            ScalarValue::Timestamp(array.value(row))
+        }
         DataType::Struct(_fields) => {
             let array = array
                 .as_any()

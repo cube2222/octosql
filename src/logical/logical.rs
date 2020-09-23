@@ -31,6 +31,7 @@ use crate::physical::physical::Identifier;
 use crate::physical::requalifier::Requalifier;
 use crate::physical::stream_join::StreamJoin;
 use crate::physical::tbv::range::Range;
+use crate::physical::tbv::max_diff_watermark_generator::MaxDiffWatermarkGenerator;
 
 #[derive(Debug)]
 pub enum Node {
@@ -71,7 +72,8 @@ pub enum Node {
 
 #[derive(Debug)]
 pub enum TableValuedFunction {
-    Range(Box<Expression>, Box<Expression>)
+    Range(Box<Expression>, Box<Expression>),
+    MaxDiffWatermarkGenerator(Box<Expression>, Box<Expression>, Box<Expression>),
 }
 
 
@@ -251,6 +253,16 @@ impl Node {
                         let start_expr = start.physical(mat_ctx)?;
                         let end_expr = end.physical(mat_ctx)?;
                         Ok(Arc::new(Range::new(start_expr, end_expr)))
+                    },
+                    TableValuedFunction::MaxDiffWatermarkGenerator(time_field_name, max_diff, source) => {
+                        let time_field_name_expr = time_field_name.physical(mat_ctx)?;
+                        let max_diff_expr = max_diff.physical(mat_ctx)?;
+                        let source_node: Arc<dyn physical::Node> = if let Expression::Subquery(query) = source.as_ref() {
+                            query.physical(mat_ctx)?
+                        } else {
+                            return Err(anyhow!("max diff watermark generator source must be query"))
+                        };
+                        Ok(Arc::new(MaxDiffWatermarkGenerator::new(time_field_name_expr, max_diff_expr, source_node)))
                     },
                 }
             }

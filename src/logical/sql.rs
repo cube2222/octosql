@@ -157,6 +157,21 @@ pub fn source_to_logical_plan(expr: &parser::Source) -> Box<Node> {
                         _ => unimplemented!()
                     }
                 }
+                "max_diff_watermark" => {
+                    if args.len() != 3 {
+                        unimplemented!()
+                    }
+                    match (&args[0], &args[1], &args[2]) {
+                        (parser::TableValuedFunctionArgument::Unnamed(arg0), parser::TableValuedFunctionArgument::Unnamed(arg1), parser::TableValuedFunctionArgument::Unnamed(arg2)) => {
+                            Box::new(Node::Function(TableValuedFunction::MaxDiffWatermarkGenerator(
+                                expression_to_logical_plan(arg0),
+                                expression_to_logical_plan(arg1),
+                                expression_to_logical_plan(arg2),
+                            )))
+                        }
+                        _ => unimplemented!()
+                    }
+                }
                 _ => unimplemented!(),
             },
             _ => unimplemented!(),

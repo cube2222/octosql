@@ -146,10 +146,3 @@ lazy_static! {
         m
     };
 }
-
-// pub fn test() {
-//     let mut builder = TimestampNanosecondBuilder::new();
-//     let dt = DateTime::parse_from_rfc3339("text").unwrap();
-//     builder.append_value(dt.timestamp_nanos());
-//
-// }

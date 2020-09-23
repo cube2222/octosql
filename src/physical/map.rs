@@ -17,6 +17,7 @@ use std::sync::Arc;
 use arrow::array::ArrayRef;
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
+use anyhow::Result;
 
 use crate::physical::expression::Expression;
 use crate::physical::physical::*;
@@ -52,7 +53,7 @@ impl Map {
 
 impl Node for Map {
     // TODO: Just don't allow to use retractions field as field name.
-    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>, Error> {
+    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>> {
         let source_schema = self.source.schema(schema_context.clone())?;
         let mut new_schema_fields: Vec<Field> = self.wildcards.iter()
             .flat_map(|qualifier| {
@@ -99,7 +100,7 @@ impl Node for Map {
         ctx: &ExecutionContext,
         produce: ProduceFn,
         _meta_send: MetaSendFn,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let source_schema = self.source.schema(ctx.variable_context.clone())?;
         let output_schema = self.schema(ctx.variable_context.clone())?;
         let wildcard_column_indices: Vec<usize> = self.wildcards.iter()

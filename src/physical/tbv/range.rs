@@ -13,11 +13,12 @@
 // limitations under the License.
 
 use crate::physical::expression::Expression;
-use crate::physical::physical::{Node, ExecutionContext, Error, SchemaContext, ProduceContext, ProduceFn, MetaSendFn, BATCH_SIZE, RETRACTIONS_FIELD};
+use crate::physical::physical::{Node, ExecutionContext, SchemaContext, ProduceContext, ProduceFn, MetaSendFn, BATCH_SIZE, RETRACTIONS_FIELD};
 use std::sync::Arc;
 use arrow::record_batch::RecordBatch;
 use arrow::datatypes::{Schema, Field, DataType};
 use arrow::array::{Int64Builder, Int64Array, BooleanBuilder};
+use anyhow::Result;
 use std::cmp::min;
 
 pub struct Range {
@@ -32,7 +33,7 @@ impl Range {
 }
 
 impl Node for Range {
-    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>, Error> {
+    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>> {
         Ok(Arc::new(Schema::new(vec![
             Field::new("i", DataType::Int64, false),
             Field::new(RETRACTIONS_FIELD, DataType::Boolean, false),
@@ -40,7 +41,7 @@ impl Node for Range {
     }
 
     // TODO: Put batchsize into execution context.
-    fn run(&self, ctx: &ExecutionContext, produce: ProduceFn, meta_send: MetaSendFn) -> Result<(), Error> {
+    fn run(&self, ctx: &ExecutionContext, produce: ProduceFn, meta_send: MetaSendFn) -> Result<()> {
         // Create retraction_array
         let mut retraction_array_builder = BooleanBuilder::new(BATCH_SIZE);
         for _i in 0..BATCH_SIZE {
@@ -61,13 +62,13 @@ impl Node for Range {
         let mut start: i64 = if let Some(array) = start_array.as_any().downcast_ref::<Int64Array>() {
             array.value(0)
         } else {
-            return Err(Error::BadInput("range start must be integer".to_string()));
+            return Err(anyhow!("range start must be integer"));
         };
         let end_array = self.end.evaluate(ctx, &scalar_batch)?;
         let end: i64 = if let Some(array) = end_array.as_any().downcast_ref::<Int64Array>() {
             array.value(0)
         } else {
-            return Err(Error::BadInput("range end must be integer".to_string()));
+            return Err(anyhow!("range end must be integer"));
         };
 
         let output_schema = self.schema(ctx.variable_context.clone())?;

@@ -16,8 +16,9 @@ use std::sync::Arc;
 
 use arrow::datatypes::{Field, Schema};
 use arrow::record_batch::RecordBatch;
+use anyhow::Result;
 
-use crate::physical::physical::{Error, ExecutionContext, MetaSendFn, Node, noop_meta_send, ProduceFn, SchemaContext};
+use crate::physical::physical::{ExecutionContext, MetaSendFn, Node, noop_meta_send, ProduceFn, SchemaContext};
 
 pub struct Requalifier {
     qualifier: String,
@@ -41,7 +42,7 @@ impl Requalifier {
 }
 
 impl Node for Requalifier {
-    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>, Error> {
+    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>> {
         let source_schema = self.source.schema(schema_context.clone())?;
         let new_fields = source_schema.fields().iter()
             .map(|f| Field::new(self.requalify(f.name()).as_str(), f.data_type().clone(), f.is_nullable()))
@@ -55,7 +56,7 @@ impl Node for Requalifier {
         exec_ctx: &ExecutionContext,
         produce: ProduceFn,
         _meta_send: MetaSendFn,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let schema = self.schema(exec_ctx.variable_context.clone())?;
 
         self.source.run(

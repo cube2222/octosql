@@ -14,12 +14,14 @@
 
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate anyhow;
 
-use std::result::*;
 use std::sync::Arc;
 
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
+use anyhow::Result;
 
 use crate::logical::logical::MaterializationContext;
 use crate::logical::sql::query_to_logical_plan;
@@ -36,7 +38,7 @@ mod pretty;
 fn record_print(
     _ctx: &ProduceContext,
     batch: RecordBatch,
-) -> Result<(), physical::physical::Error> {
+) -> Result<()> {
     println!("{}", batch.num_rows());
     println!("{}", pretty_format_batches(&[batch]).unwrap());
     Ok(())

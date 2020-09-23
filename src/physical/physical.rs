@@ -16,8 +16,8 @@ use std::hash::Hash;
 use std::sync::Arc;
 
 use arrow::datatypes::{DataType, Field, Schema};
-use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
+use anyhow::{Context, Result};
 
 pub const BATCH_SIZE: usize = 8192;
 pub const RETRACTIONS_FIELD: &str = "retraction";
@@ -110,15 +110,15 @@ impl Eq for ScalarValue {}
 pub struct ProduceContext {}
 
 pub trait SchemaContext {
-    fn field_with_name(&self, name: &str) -> Result<&Field, Error>;
+    fn field_with_name(&self, name: &str) -> Result<&Field>;
 }
 
 pub struct EmptySchemaContext {
 }
 
 impl SchemaContext for EmptySchemaContext {
-    fn field_with_name(&self, _name: &str) -> Result<&Field, Error> {
-        Err(Error::Unexpected)
+    fn field_with_name(&self, _name: &str) -> Result<&Field> {
+        Err(anyhow!("empty schema context"))
     }
 }
 
@@ -128,13 +128,13 @@ pub struct SchemaContextWithSchema {
 }
 
 impl SchemaContext for SchemaContextWithSchema {
-    fn field_with_name(&self, name: &str) -> Result<&Field, Error> {
+    fn field_with_name(&self, name: &str) -> Result<&Field> {
         match self.schema.field_with_name(name) {
             Ok(field) => Ok(field),
             Err(arrow_err) => {
                 match self.previous.field_with_name(name) {
                     Ok(field) => Ok(field),
-                    Err(err) => Err(Error::Wrapped(format!("{}", arrow_err), Box::new(err.into()))),
+                    Err(err) => Err(arrow_err).context(err)?,
                 }
             },
         }
@@ -149,15 +149,15 @@ pub struct VariableContext {
 }
 
 impl SchemaContext for VariableContext {
-    fn field_with_name(&self, name: &str) -> Result<&Field, Error> {
+    fn field_with_name(&self, name: &str) -> Result<&Field> {
         match self.schema.field_with_name(name) {
             Ok(field) => Ok(field),
             Err(arrow_err) => {
                 match &self.previous {
-                    None => Err(Error::Unexpected),
+                    None => Err(arrow_err)?,
                     Some(previous) => match previous.field_with_name(name) {
                         Ok(field) => Ok(field),
-                        Err(err) => Err(Error::Wrapped(format!("{}", arrow_err), Box::new(err.into()))),
+                        Err(err) => Err(arrow_err).context(err)?,
                     },
                 }
             },
@@ -177,24 +177,10 @@ impl Clone for ExecutionContext {
     }
 }
 
-#[derive(Debug)]
-pub enum Error {
-    ArrowError(arrow::error::ArrowError),
-    Unexpected,
-    Wrapped(String, Box<Error>),
-    BadInput(String),
-}
+pub type ProduceFn<'a> = &'a mut dyn FnMut(&ProduceContext, RecordBatch) -> Result<()>;
+pub type MetaSendFn<'a> = &'a mut dyn FnMut(&ProduceContext, MetadataMessage) -> Result<()>;
 
-impl From<arrow::error::ArrowError> for Error {
-    fn from(err: ArrowError) -> Self {
-        Error::ArrowError(err)
-    }
-}
-
-pub type ProduceFn<'a> = &'a mut dyn FnMut(&ProduceContext, RecordBatch) -> Result<(), Error>;
-pub type MetaSendFn<'a> = &'a mut dyn FnMut(&ProduceContext, MetadataMessage) -> Result<(), Error>;
-
-pub fn noop_meta_send(_ctx: &ProduceContext, _msg: MetadataMessage) -> Result<(), Error> {
+pub fn noop_meta_send(_ctx: &ProduceContext, _msg: MetadataMessage) -> Result<()> {
     Ok(())
 }
 
@@ -203,11 +189,11 @@ pub enum MetadataMessage {
 }
 
 pub trait Node: Send + Sync {
-    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>, Error>;
+    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>>;
     fn run(
         &self,
         ctx: &ExecutionContext,
         produce: ProduceFn,
         meta_send: MetaSendFn,
-    ) -> Result<(), Error>;
+    ) -> Result<()>;
 }

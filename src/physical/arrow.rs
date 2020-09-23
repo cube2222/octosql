@@ -31,8 +31,9 @@ use std::sync::Arc;
 use arrow::array;
 use arrow::array::{BooleanArray, Int8Array, Int16Array, Int32Array, Int64Array, UInt8Array, UInt16Array, UInt32Array, UInt64Array, Float32Array, Float64Array, Date32Array, Date64Array, Time32SecondArray, Time32MillisecondArray, Time64MicrosecondArray, Time64NanosecondArray, TimestampSecondArray, TimestampMillisecondArray, TimestampMicrosecondArray, TimestampNanosecondArray, IntervalYearMonthArray, IntervalDayTimeArray, DurationSecondArray, DurationMillisecondArray, DurationMicrosecondArray, DurationNanosecondArray, BinaryArray, LargeBinaryArray, FixedSizeBinaryArray, StringArray, LargeStringArray, ListArray, LargeListArray, StructArray, UnionArray, FixedSizeListArray, NullArray, DictionaryArray, ArrayRef, ArrayDataRef};
 use arrow::datatypes::{DataType, TimeUnit, DateUnit, Int8Type, Int16Type, Int32Type, Int64Type, UInt8Type, UInt16Type, UInt32Type, UInt64Type, IntervalUnit};
+use anyhow::Result;
 
-use crate::physical::physical::{Error, ScalarValue};
+use crate::physical::physical::ScalarValue;
 
 /// Enumeration of types that can be used in a GROUP BY expression (all primitives except
 /// for floating point numerics)
@@ -55,7 +56,7 @@ pub fn create_key(
     group_by_keys: &[ArrayRef],
     row: usize,
     vec: &mut Vec<GroupByScalar>,
-) -> Result<(), Error> {
+) -> Result<()> {
     for i in 0..group_by_keys.len() {
         let col = &group_by_keys[i];
         match col.data_type() {
@@ -100,7 +101,7 @@ pub fn create_key(
                 vec[i] = GroupByScalar::Utf8(String::from(array.value(row)))
             }
             _ => {
-                return Err(Error::Unexpected);
+                unimplemented!()
             }
         }
     }
@@ -111,7 +112,7 @@ pub fn create_row(
     columns: &[ArrayRef],
     row: usize,
     vec: &mut Vec<ScalarValue>,
-) -> Result<(), Error> {
+) -> Result<()> {
     for i in 0..columns.len() {
         let col = &columns[i];
         match col.data_type() {
@@ -156,7 +157,7 @@ pub fn create_row(
                 vec[i] = ScalarValue::Utf8(String::from(array.value(row)))
             }
             _ => {
-                return Err(Error::Unexpected);
+                unimplemented!()
             }
         }
     }
@@ -164,7 +165,7 @@ pub fn create_row(
 }
 
 /// Get a value from an array as a ScalarValue
-pub fn get_scalar_value(array: &ArrayRef, row: usize) -> Result<ScalarValue, Error> {
+pub fn get_scalar_value(array: &ArrayRef, row: usize) -> Result<ScalarValue> {
     if array.is_null(row) {
         return Ok(ScalarValue::Null);
     }
@@ -264,10 +265,7 @@ pub fn get_scalar_value(array: &ArrayRef, row: usize) -> Result<ScalarValue, Err
                 .collect::<Result<Vec<_>, _>>()?)
         }
         other => {
-            return Err(Error::BadInput(format!(
-                "Unsupported data type {:?} for result of aggregate expression",
-                other
-            )));
+            return Err(anyhow!("Unsupported data type {:?} for result of aggregate expression", other));
         }
     };
     Ok(value)

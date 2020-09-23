@@ -19,6 +19,7 @@ use arrow::array::{ArrayRef, BooleanBuilder};
 use arrow::csv;
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
+use anyhow::Result;
 
 use crate::physical::physical::*;
 
@@ -33,7 +34,7 @@ impl CSVSource {
 }
 
 impl Node for CSVSource {
-    fn schema(&self, _schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>, Error> {
+    fn schema(&self, _schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>> {
         let file = File::open(self.path.as_str()).unwrap();
         let r = csv::ReaderBuilder::new()
             .has_header(true)
@@ -52,7 +53,7 @@ impl Node for CSVSource {
         ctx: &ExecutionContext,
         produce: ProduceFn,
         _meta_send: MetaSendFn,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let file = File::open(self.path.as_str()).unwrap();
         let mut r = csv::ReaderBuilder::new()
             .has_header(true)

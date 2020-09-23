@@ -19,6 +19,7 @@ use arrow::array::{ArrayRef, BooleanBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::json;
 use arrow::record_batch::RecordBatch;
+use anyhow::Result;
 
 use crate::physical::physical::*;
 
@@ -33,7 +34,7 @@ impl JSONSource {
 }
 
 impl Node for JSONSource {
-    fn schema(&self, _schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>, Error> {
+    fn schema(&self, _schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>> {
         let file = File::open(self.path.as_str()).unwrap();
         let r = json::ReaderBuilder::new()
             .infer_schema(Some(10))
@@ -51,7 +52,7 @@ impl Node for JSONSource {
         ctx: &ExecutionContext,
         produce: ProduceFn,
         _meta_send: MetaSendFn,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let file = File::open(self.path.as_str()).unwrap();
         let mut r = json::ReaderBuilder::new()
             .infer_schema(Some(10))

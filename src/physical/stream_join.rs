@@ -18,6 +18,7 @@ use std::sync::{Arc, mpsc};
 use arrow::array::{ArrayRef, BooleanBuilder, Int64Builder, StringBuilder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
+use anyhow::Result;
 
 use crate::physical::arrow::{create_key, create_row, GroupByScalar};
 use crate::physical::expression::Expression;
@@ -47,7 +48,7 @@ impl StreamJoin {
 }
 
 impl Node for StreamJoin {
-    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>, Error> {
+    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>> {
         // Both without last row, and retraction added at end.
         let mut source_schema_fields = self.source.schema(schema_context.clone())?.fields().clone();
         source_schema_fields.truncate(source_schema_fields.len() - 1);
@@ -72,7 +73,7 @@ impl Node for StreamJoin {
         ctx: &ExecutionContext,
         produce: ProduceFn,
         _meta_send: MetaSendFn,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let source_schema = self.source.schema(ctx.variable_context.clone())?;
         let joined_schema = self.joined.schema(ctx.variable_context.clone())?;
         let output_schema = self.schema(ctx.variable_context.clone())?;

@@ -14,6 +14,8 @@
 
 use std::sync::Arc;
 
+use anyhow::Result;
+
 use crate::physical::aggregate;
 use crate::physical::trigger;
 use crate::physical::csv::CSVSource;
@@ -29,11 +31,6 @@ use crate::physical::physical::Identifier;
 use crate::physical::requalifier::Requalifier;
 use crate::physical::stream_join::StreamJoin;
 use crate::physical::tbv::range::Range;
-
-#[derive(Debug)]
-pub enum Error {
-    Unexpected(String),
-}
 
 #[derive(Debug)]
 pub enum Node {
@@ -105,7 +102,7 @@ impl Node {
     pub fn physical(
         &self,
         mat_ctx: &MaterializationContext,
-    ) -> Result<Arc<dyn physical::Node>, Error> {
+    ) -> Result<Arc<dyn physical::Node>> {
         match self {
             Node::Source { name, alias: _ } => {
                 let path = name.to_string();
@@ -201,10 +198,10 @@ impl Node {
                             }
                         }
                         if !found {
-                            return Err(Error::Unexpected(format!("key part variable {} not found in key", var_name.to_string())));
+                            return Err(anyhow!("key part variable {} not found in key", var_name.to_string()));
                         }
                     } else {
-                        return Err(Error::Unexpected("key part can only contain variables".to_string()));
+                        return Err(anyhow!("key part can only contain variables"));
                     }
                 }
 
@@ -265,7 +262,7 @@ impl Expression {
     pub fn physical(
         &self,
         mat_ctx: &MaterializationContext,
-    ) -> Result<Arc<dyn expression::Expression>, Error> {
+    ) -> Result<Arc<dyn expression::Expression>> {
         match self {
             Expression::Variable(name) => Ok(Arc::new(expression::FieldExpression::new(name.clone()))),
             Expression::Constant(value) => Ok(Arc::new(expression::Constant::new(value.clone()))),
@@ -278,7 +275,7 @@ impl Expression {
                 match name {
                     Identifier::SimpleIdentifier(ident) => {
                         match BUILTIN_FUNCTIONS.get(ident.to_lowercase().as_str()) {
-                            None => { Err(Error::Unexpected(format!("unknown function: {}", ident.as_str()))) }
+                            None => Err(anyhow!("unknown function: {}", ident.as_str())),
                             Some(fn_constructor) => Ok(fn_constructor(args_physical)),
                         }
                     }
@@ -295,7 +292,7 @@ impl Aggregate {
     pub fn physical(
         &self,
         _mat_ctx: &MaterializationContext,
-    ) -> Result<Arc<dyn aggregate::Aggregate>, Error> {
+    ) -> Result<Arc<dyn aggregate::Aggregate>> {
         match self {
             Aggregate::Count => Ok(Arc::new(aggregate::Count {})),
             Aggregate::Sum => Ok(Arc::new(aggregate::Sum {})),
@@ -308,10 +305,9 @@ impl Trigger {
     pub fn physical(
         &self,
         _mat_ctx: &MaterializationContext,
-    ) -> Result<Arc<dyn trigger::TriggerPrototype>, Error> {
+    ) -> Result<Arc<dyn trigger::TriggerPrototype>> {
         match self {
             Trigger::Counting(n) => Ok(Arc::new(trigger::CountingTriggerPrototype::new(n.clone()))),
-            _ => unimplemented!(),
         }
     }
 }

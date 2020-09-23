@@ -21,17 +21,18 @@ use arrow::compute::kernels::comparison::{lt, lt_eq, eq, gt_eq, gt, lt_utf8, lt_
 use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
+use anyhow::Result;
 
 use crate::physical::expression::Expression;
-use crate::physical::physical::{Error, ExecutionContext, SchemaContext};
+use crate::physical::physical::{ExecutionContext, SchemaContext};
 
 use chrono::{DateTime};
 use arrow::datatypes::TimeUnit::Nanosecond;
 
 // TODO: Add "custom function" expression.
 
-type EvaluateFunction = Arc<dyn Fn(Vec<ArrayRef>) -> Result<ArrayRef, Error> + Send + Sync>;
-type MetaFunction = Arc<dyn Fn(&Arc<dyn SchemaContext>, &Arc<Schema>) -> Result<Field, Error> + Send + Sync>;
+type EvaluateFunction = Arc<dyn Fn(Vec<ArrayRef>) -> Result<ArrayRef> + Send + Sync>;
+type MetaFunction = Arc<dyn Fn(&Arc<dyn SchemaContext>, &Arc<Schema>) -> Result<Field> + Send + Sync>;
 
 pub struct FunctionExpression {
     meta_function: MetaFunction,
@@ -56,14 +57,14 @@ impl FunctionExpression
 
 impl Expression for FunctionExpression
 {
-    fn field_meta(&self, schema_context: Arc<dyn SchemaContext>, record_schema: &Arc<Schema>) -> Result<Field, Error> {
+    fn field_meta(&self, schema_context: Arc<dyn SchemaContext>, record_schema: &Arc<Schema>) -> Result<Field> {
         (self.meta_function)(&schema_context, record_schema)
     }
 
-    fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef, Error> {
+    fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef> {
         let args = self.args.iter()
             .map(|expr| expr.evaluate(ctx, record))
-            .collect::<Result<Vec<ArrayRef>, Error>>()?;
+            .collect::<Result<Vec<ArrayRef>>>()?;
 
         (self.evaluate_function)(args)
     }
@@ -125,19 +126,19 @@ lazy_static! {
             Ok(output? as ArrayRef)
         }));
         register_function!(m, "parse_datetime_rfc3339", make_const_meta_body!(DataType::Timestamp(Nanosecond, None)), Arc::new(|args: Vec<ArrayRef>| {
-            let output: Result<_, ArrowError> = compute_single_arg!(args[0], StringArray, TimestampNanosecondBuilder, |text: &str| {
+            let output: Result<_> = compute_single_arg!(args[0], StringArray, TimestampNanosecondBuilder, |text: &str| -> Result<i64> {
                 match DateTime::parse_from_rfc3339(text) {
                     Ok(dt) => Ok(dt.timestamp_nanos()),
-                    Err(err) => Err(Error::Wrapped(format!("{}", err), Box::new(Error::Unexpected))),
+                    Err(err) => Err(err)?,
                 }
             });
             Ok(output? as ArrayRef)
         }));
         register_function!(m, "parse_datetime_tz", make_const_meta_body!(DataType::Timestamp(Nanosecond, None)), Arc::new(|args: Vec<ArrayRef>| {
-            let output: Result<_, ArrowError> = compute_two_arg!(args[0], args[1], StringArray, StringArray, TimestampNanosecondBuilder, |fmt: &str, text: &str| {
+            let output: Result<_> = compute_two_arg!(args[0], args[1], StringArray, StringArray, TimestampNanosecondBuilder, |fmt: &str, text: &str| -> Result<i64> {
                 match DateTime::parse_from_str(text, fmt) {
                     Ok(dt) => Ok(dt.timestamp_nanos()),
-                    Err(err) => Err(Error::Wrapped(format!("{}", err), Box::new(Error::Unexpected))),
+                    Err(err) => Err(err)?
                 }
             });
             Ok(output? as ArrayRef)

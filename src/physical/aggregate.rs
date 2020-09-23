@@ -13,12 +13,13 @@
 // limitations under the License.
 
 use arrow::datatypes::DataType;
-use nom::lib::std::ops::{AddAssign, SubAssign};
+use std::ops::{AddAssign, SubAssign};
+use anyhow::Result;
 
-use crate::physical::physical::{Error, ScalarValue};
+use crate::physical::physical::ScalarValue;
 
 pub trait Aggregate: Send + Sync {
-    fn output_type(&self, input_schema: &DataType) -> Result<DataType, Error>;
+    fn output_type(&self, input_schema: &DataType) -> Result<DataType>;
     fn create_accumulator(&self, input_type: &DataType) -> Box<dyn Accumulator>;
 }
 
@@ -30,7 +31,7 @@ pub trait Accumulator: std::fmt::Debug {
 pub struct Sum {}
 
 impl Aggregate for Sum {
-    fn output_type(&self, input_type: &DataType) -> Result<DataType, Error> {
+    fn output_type(&self, input_type: &DataType) -> Result<DataType> {
         match input_type {
             DataType::Int8 => Ok(DataType::Int8),
             DataType::Int16 => Ok(DataType::Int16),
@@ -121,7 +122,7 @@ impl_sum_accumulator!(f64, Float64);
 pub struct Count {}
 
 impl Aggregate for Count {
-    fn output_type(&self, _input_type: &DataType) -> Result<DataType, Error> {
+    fn output_type(&self, _input_type: &DataType) -> Result<DataType> {
         Ok(DataType::Int64)
     }
 

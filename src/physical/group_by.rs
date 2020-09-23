@@ -19,6 +19,7 @@ use arrow::array::{ArrayBuilder, ArrayRef, BooleanArray};
 use arrow::array::{BooleanBuilder, Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder, Int8Builder, StringBuilder, UInt16Builder, UInt32Builder, UInt64Builder, UInt8Builder};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
+use anyhow::Result;
 
 use crate::physical::aggregate::{Accumulator, Aggregate};
 use crate::physical::arrow::{create_key, get_scalar_value, GroupByScalar};
@@ -178,14 +179,14 @@ macro_rules! combine_columns {
 }
 
 impl Node for GroupBy {
-    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>, Error> {
+    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>> {
         let source_schema = self.source.schema(schema_context.clone())?;
         let mut key_fields: Vec<Field> = self
             .output_key_indices
             .iter()
             .map(|i| &self.key[*i])
             .map(|key_field| key_field.field_meta(schema_context.clone(), &source_schema))
-            .collect::<Result<Vec<Field>, Error>>()?;
+            .collect::<Result<Vec<Field>>>()?;
 
         let aggregated_field_types: Vec<DataType> = self
             .aggregated_exprs
@@ -194,7 +195,7 @@ impl Node for GroupBy {
             .map(|(i, column_expr)| {
                 self.aggregates[i].output_type(column_expr.field_meta(schema_context.clone(), &source_schema)?.data_type())
             })
-            .collect::<Result<Vec<DataType>, Error>>()?;
+            .collect::<Result<Vec<DataType>>>()?;
 
         let mut new_fields: Vec<Field> = aggregated_field_types
             .iter()
@@ -213,7 +214,7 @@ impl Node for GroupBy {
         exec_ctx: &ExecutionContext,
         produce: ProduceFn,
         _meta_send: MetaSendFn,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let source_schema = self.source.schema(exec_ctx.variable_context.clone())?;
 
         let mut accumulators_map: BTreeMap<Vec<GroupByScalar>, Vec<Box<dyn Accumulator>>> =

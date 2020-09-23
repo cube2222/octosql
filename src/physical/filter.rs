@@ -18,6 +18,7 @@ use arrow::array::BooleanArray;
 use arrow::compute::kernels::filter;
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
+use anyhow::Result;
 
 use crate::physical::expression::Expression;
 use crate::physical::physical::*;
@@ -34,7 +35,7 @@ impl Filter {
 }
 
 impl Node for Filter {
-    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>, Error> {
+    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>> {
         self.source.schema(schema_context.clone())
     }
 
@@ -43,7 +44,7 @@ impl Node for Filter {
         exec_ctx: &ExecutionContext,
         produce: ProduceFn,
         _meta_send: MetaSendFn,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let source_schema = self.source.schema(exec_ctx.variable_context.clone())?;
 
         self.source.run(

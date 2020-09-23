@@ -13,3 +13,4 @@
 // limitations under the License.
 
 pub mod range;
+pub mod max_diff_watermark_generator;

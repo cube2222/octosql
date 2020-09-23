@@ -186,6 +186,9 @@ pub fn noop_meta_send(_ctx: &ProduceContext, _msg: MetadataMessage) -> Result<()
 
 pub enum MetadataMessage {
     EndOfStream,
+
+    // Watermark with nanosecond timestamp.
+    Watermark(i64),
 }
 
 pub trait Node: Send + Sync {

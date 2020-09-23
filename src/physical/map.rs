@@ -99,7 +99,7 @@ impl Node for Map {
         &self,
         ctx: &ExecutionContext,
         produce: ProduceFn,
-        _meta_send: MetaSendFn,
+        meta_send: MetaSendFn,
     ) -> Result<()> {
         let source_schema = self.source.schema(ctx.variable_context.clone())?;
         let output_schema = self.schema(ctx.variable_context.clone())?;
@@ -150,7 +150,7 @@ impl Node for Map {
                 produce(produce_ctx, new_batch)?;
                 Ok(())
             },
-            &mut noop_meta_send,
+            meta_send,
         )?;
         Ok(())
     }

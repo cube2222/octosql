@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::physical::expression::Expression;
-use crate::physical::physical::{Node, ExecutionContext, SchemaContext, ProduceContext, ProduceFn, MetaSendFn, BATCH_SIZE, RETRACTIONS_FIELD};
-use std::sync::Arc;
-use arrow::record_batch::RecordBatch;
-use arrow::datatypes::{Schema, Field, DataType};
-use arrow::array::{Int64Builder, Int64Array, BooleanBuilder};
-use anyhow::Result;
 use std::cmp::min;
+use std::sync::Arc;
+
+use anyhow::Result;
+use arrow::array::{BooleanBuilder, Int64Array, Int64Builder};
+use arrow::datatypes::{DataType, Field, Schema};
+use arrow::record_batch::RecordBatch;
+
+use crate::physical::expression::Expression;
+use crate::physical::physical::{BATCH_SIZE, ExecutionContext, MetaSendFn, Node, ProduceContext, ProduceFn, RETRACTIONS_FIELD, ScalarValue, SchemaContext};
 
 pub struct Range {
     start: Arc<dyn Expression>,
@@ -42,33 +44,22 @@ impl Node for Range {
 
     // TODO: Put batchsize into execution context.
     fn run(&self, ctx: &ExecutionContext, produce: ProduceFn, meta_send: MetaSendFn) -> Result<()> {
-        // Create retraction_array
+        // Create BATCH_SIZE sized retraction_array for later reuse.
         let mut retraction_array_builder = BooleanBuilder::new(BATCH_SIZE);
         for _i in 0..BATCH_SIZE {
             retraction_array_builder.append_value(false)?;
         }
         let retraction_array = Arc::new(retraction_array_builder.finish());
 
-        // TODO: Maybe add some kind of "ScalarEvaluate"?
-        let mut scalar_builder = Int64Builder::new(1);
-        scalar_builder.append_value(1);
-        let scalar_array = scalar_builder.finish();
-
-        let scalar_batch = RecordBatch::try_new(
-            Arc::new(Schema::new(vec![Field::new("", DataType::Int64, false)])),
-            vec![Arc::new(scalar_array)],
-        ).unwrap();
-        let start_array = self.start.evaluate(ctx, &scalar_batch)?;
-        let mut start: i64 = if let Some(array) = start_array.as_any().downcast_ref::<Int64Array>() {
-            array.value(0)
+        let mut start =  if let ScalarValue::Int64(v) = self.start.evaluate_scalar(ctx)? {
+            v
         } else {
-            return Err(anyhow!("range start must be integer"));
+            Err(anyhow!("range start must be integer"))?
         };
-        let end_array = self.end.evaluate(ctx, &scalar_batch)?;
-        let end: i64 = if let Some(array) = end_array.as_any().downcast_ref::<Int64Array>() {
-            array.value(0)
+        let end =  if let ScalarValue::Int64(v) = self.end.evaluate_scalar(ctx)? {
+            v
         } else {
-            return Err(anyhow!("range end must be integer"));
+            Err(anyhow!("range end must be integer"))?
         };
 
         let output_schema = self.schema(ctx.variable_context.clone())?;

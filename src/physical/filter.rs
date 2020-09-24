@@ -43,7 +43,7 @@ impl Node for Filter {
         &self,
         exec_ctx: &ExecutionContext,
         produce: ProduceFn,
-        _meta_send: MetaSendFn,
+        meta_send: MetaSendFn,
     ) -> Result<()> {
         let source_schema = self.source.schema(exec_ctx.variable_context.clone())?;
 
@@ -67,7 +67,7 @@ impl Node for Filter {
                 }
                 Ok(())
             },
-            &mut noop_meta_send,
+            meta_send,
         )?;
         Ok(())
     }

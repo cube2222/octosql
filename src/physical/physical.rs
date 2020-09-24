@@ -189,8 +189,6 @@ pub fn noop_meta_send(_ctx: &ProduceContext, _msg: MetadataMessage) -> Result<()
 
 #[derive(Debug)]
 pub enum MetadataMessage {
-    EndOfStream,
-
     // Watermark with nanosecond timestamp.
     Watermark(i64),
 }

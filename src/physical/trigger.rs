@@ -21,7 +21,7 @@ use arrow::datatypes::DataType;
 use crate::physical::arrow::{create_key, GroupByScalar};
 
 pub trait TriggerPrototype: Send + Sync {
-    fn create_trigger(&self, key_data_types: Vec<DataType>) -> Box<dyn Trigger>;
+    fn create_trigger(&self, key_data_types: Vec<DataType>, time_col: Option<usize>) -> Box<dyn Trigger>;
 }
 
 #[derive(Debug)]
@@ -38,12 +38,14 @@ impl CountingTriggerPrototype {
 }
 
 impl TriggerPrototype for CountingTriggerPrototype {
-    fn create_trigger(&self, key_data_types: Vec<DataType>) -> Box<dyn Trigger> {
+    fn create_trigger(&self, key_data_types: Vec<DataType>, time_col: Option<usize>) -> Box<dyn Trigger> {
         Box::new(CountingTrigger::new(key_data_types, self.trigger_count))
     }
 }
 
 pub trait Trigger: std::fmt::Debug {
+    fn end_of_stream_reached(&mut self);
+    fn watermark_received(&mut self, watermark: i64);
     fn keys_received(&mut self, keys: Vec<ArrayRef>);
     fn poll(&mut self) -> Vec<ArrayRef>;
 }
@@ -68,6 +70,10 @@ impl CountingTrigger {
 }
 
 impl Trigger for CountingTrigger {
+    fn end_of_stream_reached(&mut self) {}
+
+    fn watermark_received(&mut self, watermark: i64) {}
+
     fn keys_received(&mut self, keys: Vec<ArrayRef>) {
         let mut key_vec: Vec<GroupByScalar> = Vec::with_capacity(keys.len());
         for _i in 0..self.key_data_types.len() {

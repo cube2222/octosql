@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
+use anyhow::{Context, Result};
 use arrow::array::{ArrayDataBuilder, ArrayRef, BooleanBufferBuilder, BufferBuilderTrait, Int64Builder, StringBuilder, StructArray};
 use arrow::buffer::MutableBuffer;
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
-use anyhow::{Result, Context};
 
-use crate::physical::arrow::{create_row, make_array};
+use crate::physical::arrow::{create_row, get_scalar_value, make_array};
 use crate::physical::physical::{ExecutionContext, Identifier, Node, noop_meta_send, ScalarValue, SchemaContext, SchemaContextWithSchema, VariableContext};
 
 pub trait Expression: Send + Sync {
@@ -15,7 +15,22 @@ pub trait Expression: Send + Sync {
         schema_context: Arc<dyn SchemaContext>,
         record_schema: &Arc<Schema>,
     ) -> Result<Field>;
+
     fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef>;
+
+    fn evaluate_scalar(&self, ctx: &ExecutionContext) -> Result<ScalarValue> {
+        let mut scalar_builder = Int64Builder::new(1);
+        scalar_builder.append_value(1);
+        let scalar_array = scalar_builder.finish();
+
+        let scalar_batch = RecordBatch::try_new(
+            Arc::new(Schema::new(vec![Field::new("", DataType::Int64, false)])),
+            vec![Arc::new(scalar_array)],
+        ).unwrap();
+
+        let output_array = self.evaluate(ctx, &scalar_batch)?;
+        get_scalar_value(&output_array, 0).context("couldn't get value from output array")
+    }
 }
 
 pub struct FieldExpression {

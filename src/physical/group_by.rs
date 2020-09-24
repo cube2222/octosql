@@ -26,6 +26,7 @@ use crate::physical::arrow::{create_key, get_scalar_value, GroupByScalar};
 use crate::physical::expression::Expression;
 use crate::physical::physical::*;
 use crate::physical::trigger::*;
+use std::cell::RefCell;
 
 pub struct GroupBy {
     key: Vec<Arc<dyn Expression>>,
@@ -58,7 +59,6 @@ impl GroupBy {
         };
     }
 }
-
 
 // TODO: Try to rewrite as a generic function. Parameterized by the builder and its native type. Could be passed a closure to turn the GroupByScalar into the raw value.
 macro_rules! push_retraction_keys {
@@ -213,14 +213,14 @@ impl Node for GroupBy {
         &self,
         exec_ctx: &ExecutionContext,
         produce: ProduceFn,
-        _meta_send: MetaSendFn,
+        meta_send: MetaSendFn,
     ) -> Result<()> {
         let source_schema = self.source.schema(exec_ctx.variable_context.clone())?;
 
-        let mut accumulators_map: BTreeMap<Vec<GroupByScalar>, Vec<Box<dyn Accumulator>>> =
-            BTreeMap::new();
-        let mut last_triggered_values: BTreeMap<Vec<GroupByScalar>, Vec<ScalarValue>> =
-            BTreeMap::new();
+        let mut accumulators_map_cell: RefCell<BTreeMap<Vec<GroupByScalar>, Vec<Box<dyn Accumulator>>>> =
+            RefCell::new(BTreeMap::new());
+        let mut last_triggered_values_cell: RefCell<BTreeMap<Vec<GroupByScalar>, Vec<ScalarValue>>> =
+            RefCell::new(BTreeMap::new());
 
         let key_types: Vec<DataType> = self
             .key
@@ -228,13 +228,20 @@ impl Node for GroupBy {
             .map(|key_expr| key_expr.field_meta(exec_ctx.variable_context.clone(), &source_schema).unwrap().data_type().clone())
             .collect();
 
-        let mut trigger: Box<dyn Trigger> = self.trigger_prototypes.get(0)
-            .map(|prototype| prototype.create_trigger(key_types.clone()))
-            .unwrap_or_else(|| Box::new(CountingTrigger::new(key_types.clone(), 1)));
+        let mut trigger_cell: RefCell<Box<dyn Trigger>> = RefCell::new(self.trigger_prototypes.get(0)
+            .map(|prototype| prototype.create_trigger(key_types.clone(), None))
+            .unwrap_or_else(|| Box::new(CountingTrigger::new(key_types.clone(), 1))));
+
+        let mut produce_cell = RefCell::new(produce);
+
+        // TODO: Maybe the trigger_output function should take those references and return a closure,
+        // which would be put in a refcell and contained all dependencies.
 
         self.source.run(
             exec_ctx,
-            &mut |_ctx, batch| {
+            &mut |ctx, batch| {
+                let accumulators_map = &mut *accumulators_map_cell.borrow_mut();
+
                 let key_columns: Vec<ArrayRef> = self.key
                     .iter()
                     .map(|expr| expr.evaluate(exec_ctx, &batch))
@@ -272,129 +279,160 @@ impl Node for GroupBy {
                     })
                 }
 
-                trigger.keys_received(key_columns);
+                let trigger_box = &mut *trigger_cell.borrow_mut();
 
-                // Check if we can trigger something
-                let key_columns = trigger.poll();
-                if key_columns[0].len() == 0 {
-                    return Ok(());
-                }
-                let mut output_columns = self.output_key_indices
-                    .iter()
-                    .map(|i| key_columns[*i].clone())
-                    .collect::<Vec<_>>();
-                let output_schema = self.schema(exec_ctx.variable_context.clone())?;
+                trigger_box.keys_received(key_columns);
 
-                let mut retraction_key_columns = Vec::with_capacity(self.output_names.len());
-
-                // Push retraction keys
-                for key_index in 0..self.key.len() {
-                    match key_columns[key_index].data_type() {
-                        DataType::Utf8 => push_retraction_keys_utf8!(Utf8, StringBuilder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
-                        DataType::Boolean => push_retraction_keys!(Boolean, BooleanBuilder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
-                        DataType::Int8 => push_retraction_keys!(Int8, Int8Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
-                        DataType::Int16 => push_retraction_keys!(Int16, Int16Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
-                        DataType::Int32 => push_retraction_keys!(Int32, Int32Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
-                        DataType::Int64 => push_retraction_keys!(Int64, Int64Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
-                        DataType::UInt8 => push_retraction_keys!(UInt8, UInt8Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
-                        DataType::UInt16 => push_retraction_keys!(UInt16, UInt16Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
-                        DataType::UInt32 => push_retraction_keys!(UInt32, UInt32Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
-                        DataType::UInt64 => push_retraction_keys!(UInt64, UInt64Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
-                        _ => unimplemented!(),
-                    }
-                }
-
-                let mut retraction_columns = self.output_key_indices
-                    .iter()
-                    .map(|i| retraction_key_columns[*i].clone())
-                    .collect::<Vec<_>>();
-
-                // Push retractions
-                for aggregate_index in 0..self.aggregates.len() {
-                    match output_schema.fields()[self.output_key_indices.len() + aggregate_index].data_type() {
-                        DataType::Boolean => push_retraction_values!(Boolean, BooleanBuilder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
-                        DataType::Int8 => push_retraction_values!(Int8, Int8Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
-                        DataType::Int16 => push_retraction_values!(Int16, Int16Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
-                        DataType::Int32 => push_retraction_values!(Int32, Int32Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
-                        DataType::Int64 => push_retraction_values!(Int64, Int64Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
-                        DataType::UInt8 => push_retraction_values!(UInt8, UInt8Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
-                        DataType::UInt16 => push_retraction_values!(UInt16, UInt16Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
-                        DataType::UInt32 => push_retraction_values!(UInt32, UInt32Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
-                        DataType::UInt64 => push_retraction_values!(UInt64, UInt64Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
-                        DataType::Float32 => push_retraction_values!(Float32, Float32Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
-                        DataType::Float64 => push_retraction_values!(Float64, Float64Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
-                        _ => {
-                            dbg!(output_schema.fields()[self.key.len() + aggregate_index].data_type());
-                            unimplemented!()
-                        }
-                    }
-                }
-                // Remove those values
-                for row in 0..retraction_key_columns[0].len() {
-                    create_key(retraction_key_columns.as_slice(), row, &mut key_vec).unwrap();
-                    last_triggered_values.remove(&key_vec);
-                }
-                // Build retraction array
-                // TODO: BooleanBuilder => PrimitiveBuilder<BooleanType>. Maybe this can be refactored into a function after all.
-                let mut retraction_array_builder =
-                    BooleanBuilder::new(retraction_key_columns[0].len() + key_columns[0].len());
-                for _i in 0..retraction_key_columns[0].len() {
-                    retraction_array_builder.append_value(true)?;
-                }
-                for _i in 0..key_columns[0].len() {
-                    retraction_array_builder.append_value(false)?;
-                }
-                let retraction_array = Arc::new(retraction_array_builder.finish());
-
-                // Push new values
-                for aggregate_index in 0..self.aggregates.len() {
-                    match output_schema.fields()[self.output_key_indices.len() + aggregate_index].data_type() {
-                        DataType::Boolean => push_values!(Boolean, BooleanBuilder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
-                        DataType::Int8 => push_values!(Int8, Int8Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
-                        DataType::Int16 => push_values!(Int16, Int16Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
-                        DataType::Int32 => push_values!(Int32, Int32Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
-                        DataType::Int64 => push_values!(Int64, Int64Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
-                        DataType::UInt8 => push_values!(UInt8, UInt8Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
-                        DataType::UInt16 => push_values!(UInt16, UInt16Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
-                        DataType::UInt32 => push_values!(UInt32, UInt32Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
-                        DataType::UInt64 => push_values!(UInt64, UInt64Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
-                        DataType::Float32 => push_values!(Float32, Float32Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
-                        DataType::Float64 => push_values!(Float64, Float64Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
-                        _ => unimplemented!(),
-                    }
-                }
-
-                // Combine retraction and non-retraction columns
-                for column_index in 0..output_columns.len() {
-                    match output_schema.fields()[column_index].data_type() {
-                        DataType::Boolean => combine_columns!(BooleanBuilder, retraction_columns, output_columns, column_index),
-                        DataType::Int8 => combine_columns!(Int8Builder, retraction_columns, output_columns, column_index),
-                        DataType::Int16 => combine_columns!(Int16Builder, retraction_columns, output_columns, column_index),
-                        DataType::Int32 => combine_columns!(Int32Builder, retraction_columns, output_columns, column_index),
-                        DataType::Int64 => combine_columns!(Int64Builder, retraction_columns, output_columns, column_index),
-                        DataType::UInt8 => combine_columns!(UInt8Builder, retraction_columns, output_columns, column_index),
-                        DataType::UInt16 => combine_columns!(UInt16Builder, retraction_columns, output_columns, column_index),
-                        DataType::UInt32 => combine_columns!(UInt32Builder, retraction_columns, output_columns, column_index),
-                        DataType::UInt64 => combine_columns!(UInt64Builder, retraction_columns, output_columns, column_index),
-                        DataType::Float32 => combine_columns!(Float32Builder, retraction_columns, output_columns, column_index),
-                        DataType::Float64 => combine_columns!(Float64Builder, retraction_columns, output_columns, column_index),
-                        DataType::Utf8 => combine_columns!(StringBuilder, retraction_columns, output_columns, column_index),
-                        _ => unimplemented!(),
-                    }
-                }
-
-                // Add retraction array
-                output_columns.push(retraction_array as ArrayRef);
-
-                let new_batch = RecordBatch::try_new(output_schema, output_columns).unwrap();
-
-                produce(&ProduceContext {}, new_batch)?;
-
-                Ok(())
+                self.trigger_output(exec_ctx, *produce_cell.borrow_mut(), ctx, trigger_box.as_mut(), accumulators_map, &mut *last_triggered_values_cell.borrow_mut())
             },
-            &mut noop_meta_send,
+            &mut |ctx, msg| {
+                match msg {
+                    MetadataMessage::Watermark(watermark) => {
+                        dbg!("watermark received");
+                        let trigger_box = &mut *trigger_cell.borrow_mut();
+
+                        trigger_box.watermark_received(watermark);
+
+                        self.trigger_output(exec_ctx, *produce_cell.borrow_mut(), ctx, trigger_box.as_mut(), &mut *accumulators_map_cell.borrow_mut(), &mut *last_triggered_values_cell.borrow_mut())?;
+
+                        meta_send(ctx, MetadataMessage::Watermark(watermark))?;
+
+                        Ok(())
+                    }
+                }
+            },
         )?;
 
+        let trigger_box = &mut *trigger_cell.borrow_mut();
+        trigger_box.watermark_received(i64::max_value());
+        self.trigger_output(exec_ctx, *produce_cell.borrow_mut(), &ProduceContext{}, trigger_box.as_mut(), &mut *accumulators_map_cell.borrow_mut(), &mut *last_triggered_values_cell.borrow_mut())?;
+
+        Ok(())
+    }
+}
+
+impl GroupBy {
+    fn trigger_output(&self, exec_ctx: &ExecutionContext, produce: ProduceFn, ctx: &ProduceContext, trigger: &mut dyn Trigger, accumulators_map: &mut BTreeMap<Vec<GroupByScalar>, Vec<Box<dyn Accumulator>>>, last_triggered_values: &mut BTreeMap<Vec<GroupByScalar>, Vec<ScalarValue>>) -> Result<()> {
+        // Check if we can trigger something
+        let key_columns = trigger.poll();
+        if key_columns[0].len() == 0 {
+            return Ok(());
+        }
+        let mut output_columns = self.output_key_indices
+            .iter()
+            .map(|i| key_columns[*i].clone())
+            .collect::<Vec<_>>();
+        let output_schema = self.schema(exec_ctx.variable_context.clone())?;
+
+        let mut retraction_key_columns = Vec::with_capacity(self.output_names.len());
+
+        let mut key_vec: Vec<GroupByScalar> = Vec::with_capacity(key_columns.len());
+        for _i in 0..key_columns.len() {
+            key_vec.push(GroupByScalar::Int64(0))
+        }
+
+        // Push retraction keys
+        for key_index in 0..self.key.len() {
+            match key_columns[key_index].data_type() {
+                DataType::Utf8 => push_retraction_keys_utf8!(Utf8, StringBuilder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
+                DataType::Boolean => push_retraction_keys!(Boolean, BooleanBuilder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
+                DataType::Int8 => push_retraction_keys!(Int8, Int8Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
+                DataType::Int16 => push_retraction_keys!(Int16, Int16Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
+                DataType::Int32 => push_retraction_keys!(Int32, Int32Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
+                DataType::Int64 => push_retraction_keys!(Int64, Int64Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
+                DataType::UInt8 => push_retraction_keys!(UInt8, UInt8Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
+                DataType::UInt16 => push_retraction_keys!(UInt16, UInt16Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
+                DataType::UInt32 => push_retraction_keys!(UInt32, UInt32Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
+                DataType::UInt64 => push_retraction_keys!(UInt64, UInt64Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
+                _ => unimplemented!(),
+            }
+        }
+
+        let mut retraction_columns = self.output_key_indices
+            .iter()
+            .map(|i| retraction_key_columns[*i].clone())
+            .collect::<Vec<_>>();
+
+        // Push retractions
+        for aggregate_index in 0..self.aggregates.len() {
+            match output_schema.fields()[self.output_key_indices.len() + aggregate_index].data_type() {
+                DataType::Boolean => push_retraction_values!(Boolean, BooleanBuilder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
+                DataType::Int8 => push_retraction_values!(Int8, Int8Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
+                DataType::Int16 => push_retraction_values!(Int16, Int16Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
+                DataType::Int32 => push_retraction_values!(Int32, Int32Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
+                DataType::Int64 => push_retraction_values!(Int64, Int64Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
+                DataType::UInt8 => push_retraction_values!(UInt8, UInt8Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
+                DataType::UInt16 => push_retraction_values!(UInt16, UInt16Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
+                DataType::UInt32 => push_retraction_values!(UInt32, UInt32Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
+                DataType::UInt64 => push_retraction_values!(UInt64, UInt64Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
+                DataType::Float32 => push_retraction_values!(Float32, Float32Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
+                DataType::Float64 => push_retraction_values!(Float64, Float64Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
+                _ => {
+                    dbg!(output_schema.fields()[self.key.len() + aggregate_index].data_type());
+                    unimplemented!()
+                }
+            }
+        }
+        // Remove those values
+        for row in 0..retraction_key_columns[0].len() {
+            create_key(retraction_key_columns.as_slice(), row, &mut key_vec).unwrap();
+            last_triggered_values.remove(&key_vec);
+        }
+        // Build retraction array
+        // TODO: BooleanBuilder => PrimitiveBuilder<BooleanType>. Maybe this can be refactored into a function after all.
+        let mut retraction_array_builder =
+            BooleanBuilder::new(retraction_key_columns[0].len() + key_columns[0].len());
+        for _i in 0..retraction_key_columns[0].len() {
+            retraction_array_builder.append_value(true)?;
+        }
+        for _i in 0..key_columns[0].len() {
+            retraction_array_builder.append_value(false)?;
+        }
+        let retraction_array = Arc::new(retraction_array_builder.finish());
+
+        // Push new values
+        for aggregate_index in 0..self.aggregates.len() {
+            match output_schema.fields()[self.output_key_indices.len() + aggregate_index].data_type() {
+                DataType::Boolean => push_values!(Boolean, BooleanBuilder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
+                DataType::Int8 => push_values!(Int8, Int8Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
+                DataType::Int16 => push_values!(Int16, Int16Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
+                DataType::Int32 => push_values!(Int32, Int32Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
+                DataType::Int64 => push_values!(Int64, Int64Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
+                DataType::UInt8 => push_values!(UInt8, UInt8Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
+                DataType::UInt16 => push_values!(UInt16, UInt16Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
+                DataType::UInt32 => push_values!(UInt32, UInt32Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
+                DataType::UInt64 => push_values!(UInt64, UInt64Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
+                DataType::Float32 => push_values!(Float32, Float32Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
+                DataType::Float64 => push_values!(Float64, Float64Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
+                _ => unimplemented!(),
+            }
+        }
+
+        // Combine retraction and non-retraction columns
+        for column_index in 0..output_columns.len() {
+            match output_schema.fields()[column_index].data_type() {
+                DataType::Boolean => combine_columns!(BooleanBuilder, retraction_columns, output_columns, column_index),
+                DataType::Int8 => combine_columns!(Int8Builder, retraction_columns, output_columns, column_index),
+                DataType::Int16 => combine_columns!(Int16Builder, retraction_columns, output_columns, column_index),
+                DataType::Int32 => combine_columns!(Int32Builder, retraction_columns, output_columns, column_index),
+                DataType::Int64 => combine_columns!(Int64Builder, retraction_columns, output_columns, column_index),
+                DataType::UInt8 => combine_columns!(UInt8Builder, retraction_columns, output_columns, column_index),
+                DataType::UInt16 => combine_columns!(UInt16Builder, retraction_columns, output_columns, column_index),
+                DataType::UInt32 => combine_columns!(UInt32Builder, retraction_columns, output_columns, column_index),
+                DataType::UInt64 => combine_columns!(UInt64Builder, retraction_columns, output_columns, column_index),
+                DataType::Float32 => combine_columns!(Float32Builder, retraction_columns, output_columns, column_index),
+                DataType::Float64 => combine_columns!(Float64Builder, retraction_columns, output_columns, column_index),
+                DataType::Utf8 => combine_columns!(StringBuilder, retraction_columns, output_columns, column_index),
+                _ => unimplemented!(),
+            }
+        }
+
+        // Add retraction array
+        output_columns.push(retraction_array as ArrayRef);
+
+        let new_batch = RecordBatch::try_new(output_schema, output_columns).unwrap();
+
+        produce(ctx, new_batch)?;
         Ok(())
     }
 }

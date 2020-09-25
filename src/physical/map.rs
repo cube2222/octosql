@@ -53,8 +53,9 @@ impl Map {
 
 impl Node for Map {
     // TODO: Just don't allow to use retractions field as field name.
-    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>> {
-        let source_schema = self.source.schema(schema_context.clone())?;
+    fn metadata(&self, schema_context: Arc<dyn SchemaContext>) -> Result<NodeMetadata> {
+        let source_metadata = self.source.metadata(schema_context.clone())?;
+        let source_schema = &source_metadata.schema;
         let mut new_schema_fields: Vec<Field> = self.wildcards.iter()
             .flat_map(|qualifier| {
                 match qualifier {
@@ -92,7 +93,11 @@ impl Node for Map {
             new_schema_fields.append(&mut to_append);
         }
         new_schema_fields.push(Field::new(RETRACTIONS_FIELD, DataType::Boolean, false));
-        Ok(Arc::new(Schema::new(new_schema_fields)))
+
+        Ok(NodeMetadata {
+            schema: Arc::new(Schema::new(new_schema_fields)),
+            time_field: if self.keep_source_fields { source_metadata.time_field.clone() } else { None },
+        })
     }
 
     fn run(
@@ -101,8 +106,8 @@ impl Node for Map {
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<()> {
-        let source_schema = self.source.schema(ctx.variable_context.clone())?;
-        let output_schema = self.schema(ctx.variable_context.clone())?;
+        let source_schema = self.source.metadata(ctx.variable_context.clone())?.schema;
+        let output_schema = self.metadata(ctx.variable_context.clone())?.schema;
         let wildcard_column_indices: Vec<usize> = self.wildcards.iter()
             .flat_map(|qualifier| {
                 match qualifier {

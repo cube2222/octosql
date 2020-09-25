@@ -48,11 +48,11 @@ impl StreamJoin {
 }
 
 impl Node for StreamJoin {
-    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>> {
+    fn metadata(&self, schema_context: Arc<dyn SchemaContext>) -> Result<NodeMetadata> {
         // Both without last row, and retraction added at end.
-        let mut source_schema_fields = self.source.schema(schema_context.clone())?.fields().clone();
+        let mut source_schema_fields = self.source.metadata(schema_context.clone())?.schema.fields().clone();
         source_schema_fields.truncate(source_schema_fields.len() - 1);
-        let joined_schema_fields = self.joined.schema(schema_context.clone())?.fields().clone();
+        let joined_schema_fields = self.joined.metadata(schema_context.clone())?.schema.fields().clone();
         let new_fields: Vec<Field> = source_schema_fields
             .iter()
             .map(|f| Field::new(f.name(), f.data_type().clone(), true))
@@ -64,8 +64,9 @@ impl Node for StreamJoin {
             .collect();
 
         // TODO: Check if source and joined key types match.
+        // TODo: set time_field
 
-        Ok(Arc::new(Schema::new(new_fields)))
+        Ok(NodeMetadata{schema: Arc::new(Schema::new(new_fields)), time_field: None })
     }
 
     fn run(
@@ -74,9 +75,9 @@ impl Node for StreamJoin {
         produce: ProduceFn,
         _meta_send: MetaSendFn,
     ) -> Result<()> {
-        let source_schema = self.source.schema(ctx.variable_context.clone())?;
-        let joined_schema = self.joined.schema(ctx.variable_context.clone())?;
-        let output_schema = self.schema(ctx.variable_context.clone())?;
+        let source_schema = self.source.metadata(ctx.variable_context.clone())?.schema;
+        let joined_schema = self.joined.metadata(ctx.variable_context.clone())?.schema;
+        let output_schema = self.metadata(ctx.variable_context.clone())?.schema;
 
         // TODO: Fixme HashMap => BTreeMap
         let mut state_map: BTreeMap<
@@ -87,7 +88,7 @@ impl Node for StreamJoin {
             ),
         > = BTreeMap::new();
 
-        let _key_types: Vec<DataType> = match self.source.schema(ctx.variable_context.clone()) {
+        let _key_types: Vec<DataType> = match self.source.metadata(ctx.variable_context.clone()) {
             Ok(_schema) => self
                 .source_key_exprs
                 .iter()

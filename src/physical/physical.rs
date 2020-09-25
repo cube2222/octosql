@@ -194,11 +194,17 @@ pub enum MetadataMessage {
 }
 
 pub trait Node: Send + Sync {
-    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>>;
+    fn metadata(&self, schema_context: Arc<dyn SchemaContext>) -> Result<NodeMetadata>;
     fn run(
         &self,
         ctx: &ExecutionContext,
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<()>;
+}
+
+#[derive(Debug, Clone)]
+pub struct NodeMetadata {
+    pub schema: Arc<Schema>,
+    pub time_field: Option<usize>,
 }

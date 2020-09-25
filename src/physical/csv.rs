@@ -34,7 +34,7 @@ impl CSVSource {
 }
 
 impl Node for CSVSource {
-    fn schema(&self, _schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>> {
+    fn metadata(&self, _schema_context: Arc<dyn SchemaContext>) -> Result<NodeMetadata> {
         let file = File::open(self.path.as_str()).unwrap();
         let r = csv::ReaderBuilder::new()
             .has_header(true)
@@ -45,7 +45,7 @@ impl Node for CSVSource {
         let mut fields = r.schema().fields().clone();
         fields.push(Field::new(RETRACTIONS_FIELD, DataType::Boolean, false));
 
-        Ok(Arc::new(Schema::new(fields)))
+        Ok(NodeMetadata{schema: Arc::new(Schema::new(fields)), time_field: None })
     }
 
     fn run(
@@ -66,7 +66,7 @@ impl Node for CSVSource {
             retraction_array_builder.append_value(false)?;
         }
         let retraction_array = Arc::new(retraction_array_builder.finish());
-        let schema = self.schema(ctx.variable_context.clone())?;
+        let schema = self.metadata(ctx.variable_context.clone())?.schema;
         loop {
             let maybe_rec = r.next().unwrap();
             match maybe_rec {

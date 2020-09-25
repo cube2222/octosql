@@ -107,7 +107,7 @@ fn main() {
 
     let plan = logical_plan.physical(&MaterializationContext {}).unwrap();
 
-    let schema = plan.schema(Arc::new(EmptySchemaContext{})).unwrap();
+    let schema = plan.metadata(Arc::new(EmptySchemaContext{})).unwrap();
     dbg!(schema);
 
     let _res = plan.run(

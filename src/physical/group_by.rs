@@ -179,13 +179,14 @@ macro_rules! combine_columns {
 }
 
 impl Node for GroupBy {
-    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>> {
-        let source_schema = self.source.schema(schema_context.clone())?;
+    fn metadata(&self, schema_context: Arc<dyn SchemaContext>) -> Result<NodeMetadata> {
+        let source_metadata = self.source.metadata(schema_context.clone())?;
+        let source_schema = &source_metadata.schema;
         let mut key_fields: Vec<Field> = self
             .output_key_indices
             .iter()
             .map(|i| &self.key[*i])
-            .map(|key_field| key_field.field_meta(schema_context.clone(), &source_schema))
+            .map(|key_field| key_field.field_meta(schema_context.clone(), source_schema))
             .collect::<Result<Vec<Field>>>()?;
 
         let aggregated_field_types: Vec<DataType> = self
@@ -193,7 +194,7 @@ impl Node for GroupBy {
             .iter()
             .enumerate()
             .map(|(i, column_expr)| {
-                self.aggregates[i].output_type(column_expr.field_meta(schema_context.clone(), &source_schema)?.data_type())
+                self.aggregates[i].output_type(column_expr.field_meta(schema_context.clone(), source_schema)?.data_type())
             })
             .collect::<Result<Vec<DataType>>>()?;
 
@@ -206,7 +207,7 @@ impl Node for GroupBy {
 
         key_fields.append(&mut new_fields);
         key_fields.push(Field::new(RETRACTIONS_FIELD, DataType::Boolean, false));
-        Ok(Arc::new(Schema::new(key_fields)))
+        Ok(NodeMetadata{schema: Arc::new(Schema::new(key_fields)), time_field: None })
     }
 
     fn run(
@@ -215,7 +216,7 @@ impl Node for GroupBy {
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<()> {
-        let source_schema = self.source.schema(exec_ctx.variable_context.clone())?;
+        let source_schema = self.source.metadata(exec_ctx.variable_context.clone())?.schema;
 
         let mut accumulators_map_cell: RefCell<BTreeMap<Vec<GroupByScalar>, Vec<Box<dyn Accumulator>>>> =
             RefCell::new(BTreeMap::new());
@@ -322,7 +323,7 @@ impl GroupBy {
             .iter()
             .map(|i| key_columns[*i].clone())
             .collect::<Vec<_>>();
-        let output_schema = self.schema(exec_ctx.variable_context.clone())?;
+        let output_schema = self.metadata(exec_ctx.variable_context.clone())?.schema;
 
         let mut retraction_key_columns = Vec::with_capacity(self.output_names.len());
 

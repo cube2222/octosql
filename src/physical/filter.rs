@@ -35,8 +35,8 @@ impl Filter {
 }
 
 impl Node for Filter {
-    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>> {
-        self.source.schema(schema_context.clone())
+    fn metadata(&self, schema_context: Arc<dyn SchemaContext>) -> Result<NodeMetadata> {
+        self.source.metadata(schema_context.clone())
     }
 
     fn run(
@@ -45,7 +45,7 @@ impl Node for Filter {
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<()> {
-        let source_schema = self.source.schema(exec_ctx.variable_context.clone())?;
+        let source_schema = self.source.metadata(exec_ctx.variable_context.clone())?.schema;
 
         self.source.run(
             exec_ctx,

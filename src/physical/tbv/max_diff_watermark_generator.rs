@@ -21,7 +21,7 @@ use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 
 use crate::physical::expression::Expression;
-use crate::physical::physical::{ExecutionContext, Identifier, MetadataMessage, MetaSendFn, Node, noop_meta_send, ProduceFn, ScalarValue, SchemaContext};
+use crate::physical::physical::{ExecutionContext, Identifier, MetadataMessage, MetaSendFn, Node, noop_meta_send, ProduceFn, ScalarValue, SchemaContext, NodeMetadata};
 
 pub struct MaxDiffWatermarkGenerator {
     time_field_name: Arc<dyn Expression>,
@@ -43,8 +43,8 @@ impl MaxDiffWatermarkGenerator {
 }
 
 impl Node for MaxDiffWatermarkGenerator {
-    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>> {
-        self.source.schema(schema_context.clone())
+    fn metadata(&self, schema_context: Arc<dyn SchemaContext>) -> Result<NodeMetadata> {
+        self.source.metadata(schema_context.clone())
     }
 
     fn run(
@@ -65,7 +65,7 @@ impl Node for MaxDiffWatermarkGenerator {
             Err(anyhow!("max difference must be integer"))?
         };
 
-        let source_schema = self.source.schema(exec_ctx.variable_context.clone())?;
+        let source_schema = self.source.metadata(exec_ctx.variable_context.clone())?.schema;
         let (time_field_index, _) = source_schema.column_with_name(time_field_name.as_str()).context("time field not found")?;
 
         let mut cur_max: i64 = 0;

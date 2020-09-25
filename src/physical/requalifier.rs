@@ -18,7 +18,7 @@ use arrow::datatypes::{Field, Schema};
 use arrow::record_batch::RecordBatch;
 use anyhow::Result;
 
-use crate::physical::physical::{ExecutionContext, MetaSendFn, Node, noop_meta_send, ProduceFn, SchemaContext};
+use crate::physical::physical::{ExecutionContext, MetaSendFn, Node, noop_meta_send, ProduceFn, SchemaContext, NodeMetadata};
 
 pub struct Requalifier {
     qualifier: String,
@@ -42,13 +42,14 @@ impl Requalifier {
 }
 
 impl Node for Requalifier {
-    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>> {
-        let source_schema = self.source.schema(schema_context.clone())?;
+    fn metadata(&self, schema_context: Arc<dyn SchemaContext>) -> Result<NodeMetadata> {
+        let source_metadata = self.source.metadata(schema_context.clone())?;
+        let source_schema = source_metadata.schema.as_ref();
         let new_fields = source_schema.fields().iter()
             .map(|f| Field::new(self.requalify(f.name()).as_str(), f.data_type().clone(), f.is_nullable()))
             .collect();
 
-        Ok(Arc::new(Schema::new(new_fields)))
+        Ok(NodeMetadata{schema: Arc::new(Schema::new(new_fields)), time_field: source_metadata.time_field.clone() })
     }
 
     fn run(
@@ -57,7 +58,7 @@ impl Node for Requalifier {
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<()> {
-        let schema = self.schema(exec_ctx.variable_context.clone())?;
+        let schema = self.metadata(exec_ctx.variable_context.clone())?.schema.clone();
 
         self.source.run(
             exec_ctx,

@@ -21,7 +21,7 @@ use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 
 use crate::physical::expression::Expression;
-use crate::physical::physical::{BATCH_SIZE, ExecutionContext, MetaSendFn, Node, ProduceContext, ProduceFn, RETRACTIONS_FIELD, ScalarValue, SchemaContext};
+use crate::physical::physical::{BATCH_SIZE, ExecutionContext, MetaSendFn, Node, ProduceContext, ProduceFn, RETRACTIONS_FIELD, ScalarValue, SchemaContext, NodeMetadata};
 
 pub struct Range {
     start: Arc<dyn Expression>,
@@ -35,11 +35,11 @@ impl Range {
 }
 
 impl Node for Range {
-    fn schema(&self, schema_context: Arc<dyn SchemaContext>) -> Result<Arc<Schema>> {
-        Ok(Arc::new(Schema::new(vec![
+    fn metadata(&self, schema_context: Arc<dyn SchemaContext>) -> Result<NodeMetadata> {
+        Ok(NodeMetadata{schema: Arc::new(Schema::new(vec![
             Field::new("i", DataType::Int64, false),
             Field::new(RETRACTIONS_FIELD, DataType::Boolean, false),
-        ])))
+        ])), time_field: None })
     }
 
     // TODO: Put batchsize into execution context.
@@ -62,7 +62,7 @@ impl Node for Range {
             Err(anyhow!("range end must be integer"))?
         };
 
-        let output_schema = self.schema(ctx.variable_context.clone())?;
+        let output_schema = self.metadata(ctx.variable_context.clone())?.schema;
 
         while start < end {
             let batch_end = min(start + (BATCH_SIZE as i64), end);

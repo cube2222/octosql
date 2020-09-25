@@ -70,7 +70,14 @@ impl CountingTrigger {
 }
 
 impl Trigger for CountingTrigger {
-    fn end_of_stream_reached(&mut self) {}
+    fn end_of_stream_reached(&mut self) {
+        let mut counts = BTreeMap::new();
+        std::mem::swap(&mut counts, &mut self.counts);
+
+        for (key, value) in counts {
+            self.to_trigger.insert(key);
+        }
+    }
 
     fn watermark_received(&mut self, watermark: i64) {}
 

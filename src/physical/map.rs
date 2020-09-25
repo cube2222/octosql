@@ -96,7 +96,7 @@ impl Node for Map {
 
         Ok(NodeMetadata {
             schema: Arc::new(Schema::new(new_schema_fields)),
-            time_field: if self.keep_source_fields { source_metadata.time_field.clone() } else { None },
+            time_column: if self.keep_source_fields { source_metadata.time_column.clone() } else { None },
         })
     }
 

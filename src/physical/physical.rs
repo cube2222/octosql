@@ -206,5 +206,5 @@ pub trait Node: Send + Sync {
 #[derive(Debug, Clone)]
 pub struct NodeMetadata {
     pub schema: Arc<Schema>,
-    pub time_field: Option<usize>,
+    pub time_column: Option<usize>,
 }

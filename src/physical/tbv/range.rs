@@ -39,7 +39,7 @@ impl Node for Range {
         Ok(NodeMetadata{schema: Arc::new(Schema::new(vec![
             Field::new("i", DataType::Int64, false),
             Field::new(RETRACTIONS_FIELD, DataType::Boolean, false),
-        ])), time_field: None })
+        ])), time_column: None })
     }
 
     // TODO: Put batchsize into execution context.

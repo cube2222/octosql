@@ -207,7 +207,7 @@ impl Node for GroupBy {
 
         key_fields.append(&mut new_fields);
         key_fields.push(Field::new(RETRACTIONS_FIELD, DataType::Boolean, false));
-        Ok(NodeMetadata{schema: Arc::new(Schema::new(key_fields)), time_field: None })
+        Ok(NodeMetadata{schema: Arc::new(Schema::new(key_fields)), time_column: None })
     }
 
     fn run(

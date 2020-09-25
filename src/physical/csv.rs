@@ -45,7 +45,7 @@ impl Node for CSVSource {
         let mut fields = r.schema().fields().clone();
         fields.push(Field::new(RETRACTIONS_FIELD, DataType::Boolean, false));
 
-        Ok(NodeMetadata{schema: Arc::new(Schema::new(fields)), time_field: None })
+        Ok(NodeMetadata{schema: Arc::new(Schema::new(fields)), time_column: None })
     }
 
     fn run(

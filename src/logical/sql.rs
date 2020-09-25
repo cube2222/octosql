@@ -14,10 +14,11 @@
 
 use std::collections::BTreeMap;
 
-use crate::logical::logical::{Aggregate, Expression, Node, Trigger, TableValuedFunction};
+use crate::logical::logical::{Aggregate, Expression, Node, Trigger, TableValuedFunction, TableValuedFunctionArgument};
 use crate::parser;
 use crate::parser::{Operator, SelectExpression, Value, Source};
 use crate::physical::physical::{Identifier, ScalarValue};
+use crate::logical::logical::TableValuedFunctionArgument::Table;
 
 pub fn query_to_logical_plan(query: &parser::Query) -> Box<Node> {
     match query {
@@ -147,35 +148,50 @@ pub fn source_to_logical_plan(expr: &parser::Source) -> Box<Node> {
                     if args.len() != 2 {
                         unimplemented!()
                     }
-                    match (&args[0], &args[1]) {
-                        (parser::TableValuedFunctionArgument::Unnamed(arg0), parser::TableValuedFunctionArgument::Unnamed(arg1)) => {
-                            Box::new(Node::Function(TableValuedFunction::Range(
-                                expression_to_logical_plan(arg0),
-                                expression_to_logical_plan(arg1),
-                            )))
-                        }
-                        _ => unimplemented!()
-                    }
+                    Box::new(Node::Function(TableValuedFunction::Range(
+                        table_valued_function_argument_to_logical_plan(&args[0]),
+                        table_valued_function_argument_to_logical_plan(&args[1]),
+                    )))
                 }
                 "max_diff_watermark" => {
                     if args.len() != 3 {
                         unimplemented!()
                     }
-                    match (&args[0], &args[1], &args[2]) {
-                        (parser::TableValuedFunctionArgument::Unnamed(arg0), parser::TableValuedFunctionArgument::Unnamed(arg1), parser::TableValuedFunctionArgument::Unnamed(arg2)) => {
-                            Box::new(Node::Function(TableValuedFunction::MaxDiffWatermarkGenerator(
-                                expression_to_logical_plan(arg0),
-                                expression_to_logical_plan(arg1),
-                                expression_to_logical_plan(arg2),
-                            )))
-                        }
-                        _ => unimplemented!()
-                    }
+                    Box::new(Node::Function(TableValuedFunction::MaxDiffWatermarkGenerator(
+                        table_valued_function_argument_to_logical_plan(&args[0]),
+                        table_valued_function_argument_to_logical_plan(&args[1]),
+                        table_valued_function_argument_to_logical_plan(&args[2]),
+                    )))
                 }
                 _ => unimplemented!(),
-            },
+            }
             _ => unimplemented!(),
         },
+    }
+}
+
+pub fn table_valued_function_argument_to_logical_plan(arg: &parser::TableValuedFunctionArgument) -> TableValuedFunctionArgument {
+    if let parser::TableValuedFunctionArgument::Unnamed(expr) = arg {
+        match expr.as_ref() {
+            parser::Expression::Function(name, args) => {
+                if args.len() == 1 {
+                    if name == &parser::Identifier::SimpleIdentifier("TABLE".to_string()) {
+                        if let parser::Expression::Subquery(query) = args[0].as_ref() {
+                            return TableValuedFunctionArgument::Table(query_to_logical_plan(query))
+                        }
+                        // TODO: When we have CTE's, also accept a variable here.
+                    } else if name == &parser::Identifier::SimpleIdentifier("DESCRIPTOR".to_string()) {
+                        if let parser::Expression::Variable(ident) = args[0].as_ref() {
+                            return TableValuedFunctionArgument::Descriptior(identifier_to_logical_plan(ident))
+                        }
+                    }
+                }
+            }
+            _ => {}
+        };
+        return TableValuedFunctionArgument::Expresion(expression_to_logical_plan(expr.as_ref()))
+    } else {
+        unimplemented!()
     }
 }
 

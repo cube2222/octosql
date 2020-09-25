@@ -66,7 +66,7 @@ impl Node for StreamJoin {
         // TODO: Check if source and joined key types match.
         // TODo: set time_field
 
-        Ok(NodeMetadata{schema: Arc::new(Schema::new(new_fields)), time_field: None })
+        Ok(NodeMetadata{schema: Arc::new(Schema::new(new_fields)), time_column: None })
     }
 
     fn run(

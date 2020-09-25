@@ -72,10 +72,16 @@ pub enum Node {
 
 #[derive(Debug)]
 pub enum TableValuedFunction {
-    Range(Box<Expression>, Box<Expression>),
-    MaxDiffWatermarkGenerator(Box<Expression>, Box<Expression>, Box<Expression>),
+    Range(TableValuedFunctionArgument, TableValuedFunctionArgument),
+    MaxDiffWatermarkGenerator(TableValuedFunctionArgument, TableValuedFunctionArgument, TableValuedFunctionArgument),
 }
 
+#[derive(Debug)]
+pub enum TableValuedFunctionArgument {
+    Expresion(Box<Expression>),
+    Table(Box<Node>),
+    Descriptior(Identifier),
+}
 
 #[derive(Debug)]
 pub enum Expression {
@@ -250,19 +256,35 @@ impl Node {
             Node::Function(function) => {
                 match function {
                     TableValuedFunction::Range(start, end) => {
-                        let start_expr = start.physical(mat_ctx)?;
-                        let end_expr = end.physical(mat_ctx)?;
+                        let start_expr = if let TableValuedFunctionArgument::Expresion(expr) = start {
+                            expr.physical(mat_ctx)?
+                        } else {
+                            return Err(anyhow!("range start must be expression"))
+                        };
+                        let end_expr = if let TableValuedFunctionArgument::Expresion(expr) = end {
+                            expr.physical(mat_ctx)?
+                        } else {
+                            return Err(anyhow!("range end must be expression"))
+                        };
                         Ok(Arc::new(Range::new(start_expr, end_expr)))
                     },
                     TableValuedFunction::MaxDiffWatermarkGenerator(time_field_name, max_diff, source) => {
-                        let time_field_name_expr = time_field_name.physical(mat_ctx)?;
-                        let max_diff_expr = max_diff.physical(mat_ctx)?;
-                        let source_node: Arc<dyn physical::Node> = if let Expression::Subquery(query) = source.as_ref() {
+                        let time_field_name = if let TableValuedFunctionArgument::Descriptior(ident) = time_field_name {
+                            ident.clone()
+                        } else {
+                            return Err(anyhow!("max diff watermark generator time_field_name must be identifier"))
+                        };
+                        let max_diff_expr = if let TableValuedFunctionArgument::Expresion(expr) = max_diff {
+                            expr.physical(mat_ctx)?
+                        } else {
+                            return Err(anyhow!("max diff watermark generator max_diff must be expression"))
+                        };
+                        let source_node = if let TableValuedFunctionArgument::Table(query) = source {
                             query.physical(mat_ctx)?
                         } else {
                             return Err(anyhow!("max diff watermark generator source must be query"))
                         };
-                        Ok(Arc::new(MaxDiffWatermarkGenerator::new(time_field_name_expr, max_diff_expr, source_node)))
+                        Ok(Arc::new(MaxDiffWatermarkGenerator::new(time_field_name, max_diff_expr, source_node)))
                     },
                 }
             }

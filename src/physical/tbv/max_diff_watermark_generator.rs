@@ -24,16 +24,13 @@ use crate::physical::expression::Expression;
 use crate::physical::physical::{ExecutionContext, Identifier, MetadataMessage, MetaSendFn, Node, noop_meta_send, ProduceFn, ScalarValue, SchemaContext, NodeMetadata};
 
 pub struct MaxDiffWatermarkGenerator {
-    time_field_name: Arc<dyn Expression>,
+    time_field_name: Identifier,
     max_diff: Arc<dyn Expression>,
     source: Arc<dyn Node>,
 }
 
 impl MaxDiffWatermarkGenerator {
-    // TODO: Add some kind of "Descriptor" for field names?
-    // TODO: If I'd like to use a table, and not SELECT * FROM table, then I need "Table" for such names.
-    // Or descriptor as well. Whatever.
-    pub fn new(time_field_name: Arc<dyn Expression>, max_diff: Arc<dyn Expression>, source: Arc<dyn Node>) -> MaxDiffWatermarkGenerator {
+    pub fn new(time_field_name: Identifier, max_diff: Arc<dyn Expression>, source: Arc<dyn Node>) -> MaxDiffWatermarkGenerator {
         MaxDiffWatermarkGenerator {
             time_field_name,
             max_diff,
@@ -44,7 +41,18 @@ impl MaxDiffWatermarkGenerator {
 
 impl Node for MaxDiffWatermarkGenerator {
     fn metadata(&self, schema_context: Arc<dyn SchemaContext>) -> Result<NodeMetadata> {
-        self.source.metadata(schema_context.clone())
+        let source_metadata = self.source.metadata(schema_context.clone())?;
+        let mut time_col = None;
+        for (i, field) in source_metadata.schema.fields().iter().enumerate() {
+            if field.name() == &self.time_field_name.to_string() {
+                time_col = Some(i);
+            }
+        }
+
+        Ok(NodeMetadata {
+            schema: source_metadata.schema.clone(),
+            time_column: time_col,
+        })
     }
 
     fn run(
@@ -53,20 +61,14 @@ impl Node for MaxDiffWatermarkGenerator {
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<()> {
-        let time_field_name = if let ScalarValue::Utf8(v) = self.time_field_name.evaluate_scalar(exec_ctx)? {
-            v
-        } else {
-            Err(anyhow!("time field name must be string"))?
-        };
-
-        let max_diff =  if let ScalarValue::Int64(v) = self.time_field_name.evaluate_scalar(exec_ctx)? {
+        let max_diff =  if let ScalarValue::Int64(v) = self.max_diff.evaluate_scalar(exec_ctx)? {
             v
         } else {
             Err(anyhow!("max difference must be integer"))?
         };
 
         let source_schema = self.source.metadata(exec_ctx.variable_context.clone())?.schema;
-        let (time_field_index, _) = source_schema.column_with_name(time_field_name.as_str()).context("time field not found")?;
+        let (time_field_index, _) = source_schema.column_with_name(self.time_field_name.to_string().as_str()).context("time field not found")?;
 
         let mut cur_max: i64 = 0;
 

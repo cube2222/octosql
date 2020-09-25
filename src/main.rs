@@ -112,6 +112,7 @@ fn main() {
 
     let _res = plan.run(
         &ExecutionContext {
+            partition: 0,
             variable_context: Arc::new(VariableContext {
                 previous: None,
                 schema: Arc::new(Schema::new(vec![])), // Potential runtime variables.

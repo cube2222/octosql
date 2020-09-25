@@ -183,6 +183,7 @@ impl Expression for Subquery {
             create_row(record.columns(), i, &mut row)?;
 
             let ctx = ExecutionContext {
+                partition: 0,
                 variable_context: Arc::new(VariableContext {
                     previous: Some(ctx.variable_context.clone()),
                     schema: record.schema().clone(),

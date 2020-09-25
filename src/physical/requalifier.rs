@@ -49,7 +49,11 @@ impl Node for Requalifier {
             .map(|f| Field::new(self.requalify(f.name()).as_str(), f.data_type().clone(), f.is_nullable()))
             .collect();
 
-        Ok(NodeMetadata{schema: Arc::new(Schema::new(new_fields)), time_column: source_metadata.time_column.clone() })
+        Ok(NodeMetadata{
+            partition_count: source_metadata.partition_count,
+            schema: Arc::new(Schema::new(new_fields)),
+            time_column: source_metadata.time_column.clone(),
+        })
     }
 
     fn run(

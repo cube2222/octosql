@@ -50,6 +50,7 @@ impl Node for MaxDiffWatermarkGenerator {
         }
 
         Ok(NodeMetadata {
+            partition_count: source_metadata.partition_count,
             schema: source_metadata.schema.clone(),
             time_column: time_col,
         })

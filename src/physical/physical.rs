@@ -116,8 +116,7 @@ pub trait SchemaContext {
     fn field_with_name(&self, name: &str) -> Result<&Field>;
 }
 
-pub struct EmptySchemaContext {
-}
+pub struct EmptySchemaContext {}
 
 impl SchemaContext for EmptySchemaContext {
     fn field_with_name(&self, _name: &str) -> Result<&Field> {
@@ -139,7 +138,7 @@ impl SchemaContext for SchemaContextWithSchema {
                     Ok(field) => Ok(field),
                     Err(err) => Err(arrow_err).context(err)?,
                 }
-            },
+            }
         }
     }
 }
@@ -163,21 +162,15 @@ impl SchemaContext for VariableContext {
                         Err(err) => Err(arrow_err).context(err)?,
                     },
                 }
-            },
+            }
         }
     }
 }
 
+#[derive(Clone)]
 pub struct ExecutionContext {
+    pub partition: usize,
     pub variable_context: Arc<VariableContext>,
-}
-
-impl Clone for ExecutionContext {
-    fn clone(&self) -> Self {
-        ExecutionContext {
-            variable_context: self.variable_context.clone(),
-        }
-    }
 }
 
 pub type ProduceFn<'a> = &'a mut dyn FnMut(&ProduceContext, RecordBatch) -> Result<()>;
@@ -205,6 +198,7 @@ pub trait Node: Send + Sync {
 
 #[derive(Debug, Clone)]
 pub struct NodeMetadata {
+    pub partition_count: usize,
     pub schema: Arc<Schema>,
     pub time_column: Option<usize>,
 }

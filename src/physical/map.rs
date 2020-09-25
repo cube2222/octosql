@@ -95,6 +95,7 @@ impl Node for Map {
         new_schema_fields.push(Field::new(RETRACTIONS_FIELD, DataType::Boolean, false));
 
         Ok(NodeMetadata {
+            partition_count: source_metadata.partition_count,
             schema: Arc::new(Schema::new(new_schema_fields)),
             time_column: if self.keep_source_fields { source_metadata.time_column.clone() } else { None },
         })

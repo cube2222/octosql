@@ -36,10 +36,14 @@ impl Range {
 
 impl Node for Range {
     fn metadata(&self, schema_context: Arc<dyn SchemaContext>) -> Result<NodeMetadata> {
-        Ok(NodeMetadata{schema: Arc::new(Schema::new(vec![
-            Field::new("i", DataType::Int64, false),
-            Field::new(RETRACTIONS_FIELD, DataType::Boolean, false),
-        ])), time_column: None })
+        Ok(NodeMetadata {
+            partition_count: 1,
+            schema: Arc::new(Schema::new(vec![
+                Field::new("i", DataType::Int64, false),
+                Field::new(RETRACTIONS_FIELD, DataType::Boolean, false),
+            ])),
+            time_column: None,
+        })
     }
 
     // TODO: Put batchsize into execution context.
@@ -51,12 +55,12 @@ impl Node for Range {
         }
         let retraction_array = Arc::new(retraction_array_builder.finish());
 
-        let mut start =  if let ScalarValue::Int64(v) = self.start.evaluate_scalar(ctx)? {
+        let mut start = if let ScalarValue::Int64(v) = self.start.evaluate_scalar(ctx)? {
             v
         } else {
             Err(anyhow!("range start must be integer"))?
         };
-        let end =  if let ScalarValue::Int64(v) = self.end.evaluate_scalar(ctx)? {
+        let end = if let ScalarValue::Int64(v) = self.end.evaluate_scalar(ctx)? {
             v
         } else {
             Err(anyhow!("range end must be integer"))?

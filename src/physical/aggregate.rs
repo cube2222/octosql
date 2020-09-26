@@ -131,3 +131,60 @@ impl Accumulator for CountAccumulator {
         return ScalarValue::Int64(self.count);
     }
 }
+
+pub struct Avg {}
+
+impl Aggregate for Avg {
+    fn create_accumulator(&self, input_type: &DataType) -> Box<dyn Accumulator> {
+        match input_type {
+            DataType::Int8 => Box::new(AvgAccumulator::<i8> { underlying_sum: Box::new(SumAccumulator::<i8> { sum: 0, count: 0 }) }),
+            DataType::Int16 => Box::new(AvgAccumulator::<i16> { underlying_sum: Box::new(SumAccumulator::<i16> { sum: 0, count: 0 }) }),
+            DataType::Int32 => Box::new(AvgAccumulator::<i32> { underlying_sum: Box::new(SumAccumulator::<i32> { sum: 0, count: 0 }) }),
+            DataType::Int64 => Box::new(AvgAccumulator::<i64> { underlying_sum: Box::new(SumAccumulator::<i64> { sum: 0, count: 0 }) }),
+            DataType::UInt8 => Box::new(AvgAccumulator::<u8> { underlying_sum: Box::new(SumAccumulator::<u8> { sum: 0, count: 0 }) }),
+            DataType::UInt16 => Box::new(AvgAccumulator::<u16> { underlying_sum: Box::new(SumAccumulator::<u16> { sum: 0, count: 0 }) }),
+            DataType::UInt32 => Box::new(AvgAccumulator::<u32> { underlying_sum: Box::new(SumAccumulator::<u32> { sum: 0, count: 0 }) }),
+            DataType::UInt64 => Box::new(AvgAccumulator::<u64> { underlying_sum: Box::new(SumAccumulator::<u64> { sum: 0, count: 0 }) }),
+            DataType::Float32 => Box::new(AvgAccumulator::<f32> { underlying_sum: Box::new(SumAccumulator::<f32> { sum: 0.0, count: 0 }) }),
+            DataType::Float64 => Box::new(AvgAccumulator::<f64> { underlying_sum: Box::new(SumAccumulator::<f64> { sum: 0.0, count: 0 }) }),
+            _ => {
+                dbg!(input_type);
+                unimplemented!()
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+struct AvgAccumulator<T: AddAssign<T> + SubAssign<T>> {
+    underlying_sum: Box<SumAccumulator<T>>,
+}
+
+macro_rules! impl_avg_accumulator {
+    ($primitive_type: ident, $scalar_value_type: ident) => {
+        impl Accumulator for AvgAccumulator<$primitive_type> {
+            fn add(&mut self, value: ScalarValue, retract: ScalarValue) -> bool {
+                self.underlying_sum.add(value, retract)
+            }
+
+            fn trigger(&self) -> ScalarValue {
+                if self.underlying_sum.count == 0 {
+                    return ScalarValue::Float64(0 as f64);
+                } else {
+                    return ScalarValue::Float64(self.underlying_sum.sum as f64 / self.underlying_sum.count as f64);
+                }
+            }
+        }
+    }
+}
+
+impl_avg_accumulator!(i8, Int8);
+impl_avg_accumulator!(i16, Int16);
+impl_avg_accumulator!(i32, Int32);
+impl_avg_accumulator!(i64, Int64);
+impl_avg_accumulator!(u8, UInt8);
+impl_avg_accumulator!(u16, UInt16);
+impl_avg_accumulator!(u32, UInt32);
+impl_avg_accumulator!(u64, UInt64);
+impl_avg_accumulator!(f32, Float32);
+impl_avg_accumulator!(f64, Float64);

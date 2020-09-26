@@ -14,7 +14,7 @@
 
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{Result, Context};
 
 use crate::physical::aggregate;
 use crate::physical::trigger;
@@ -27,11 +27,14 @@ use crate::physical::group_by::GroupBy;
 use crate::physical::json::JSONSource;
 use crate::physical::map;
 use crate::physical::physical;
-use crate::physical::physical::Identifier;
+use crate::physical::physical::{Identifier, SchemaContext, ScalarValue, SchemaContextWithSchema, BATCH_SIZE, RETRACTIONS_FIELD};
 use crate::physical::requalifier::Requalifier;
 use crate::physical::stream_join::StreamJoin;
 use crate::physical::tbv::range::Range;
 use crate::physical::tbv::max_diff_watermark_generator::MaxDiffWatermarkGenerator;
+use arrow::datatypes::{Schema, Field, DataType};
+use std::fs::File;
+use arrow::{csv, json};
 
 #[derive(Debug)]
 pub enum Node {
@@ -65,9 +68,16 @@ pub enum Node {
     },
     Requalifier {
         source: Box<Node>,
-        alias: String,
+        qualifier: String,
     },
-    Function(TableValuedFunction)
+    Function(TableValuedFunction),
+}
+
+#[derive(Debug, Clone)]
+pub struct NodeMetadata {
+    pub partition_count: usize,
+    pub schema: Arc<Schema>,
+    pub time_column: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -107,6 +117,211 @@ pub enum Trigger {
 pub struct MaterializationContext {}
 
 impl Node {
+    pub fn metadata(&self, schema_context: Arc<dyn SchemaContext>) -> Result<NodeMetadata> {
+        match self {
+            Node::Source { name, alias } => {
+                let path = name.to_string();
+                if path.contains(".json") {
+                    let file = File::open(path.as_str()).unwrap();
+                    let r = json::ReaderBuilder::new()
+                        .infer_schema(Some(10))
+                        .with_batch_size(BATCH_SIZE)
+                        .build(file)
+                        .unwrap();
+                    let mut fields = r.schema().fields().clone();
+                    fields.push(Field::new(RETRACTIONS_FIELD, DataType::Boolean, false));
+
+                    Ok(NodeMetadata { partition_count: 1, schema: Arc::new(Schema::new(fields)), time_column: None })
+                } else if path.contains(".csv") {
+                    let file = File::open(path.as_str()).unwrap();
+                    let r = csv::ReaderBuilder::new()
+                        .has_header(true)
+                        .infer_schema(Some(10))
+                        .with_batch_size(BATCH_SIZE)
+                        .build(file)
+                        .unwrap();
+                    let mut fields = r.schema().fields().clone();
+                    fields.push(Field::new(RETRACTIONS_FIELD, DataType::Boolean, false));
+
+                    Ok(NodeMetadata { partition_count: 1, schema: Arc::new(Schema::new(fields)), time_column: None })
+                } else {
+                    dbg!(name);
+                    unimplemented!()
+                }
+            }
+            Node::Filter { source, filter_expr } => {
+                source.metadata(schema_context.clone())
+            }
+            Node::Map { source, expressions: expressions_with_names, wildcards, keep_source_fields } => {
+                let source_metadata = source.metadata(schema_context.clone())?;
+                let source_schema = &source_metadata.schema;
+
+                let (expressions, names): (Vec<_>, Vec<_>) = expressions_with_names.iter()
+                    // For some reason .cloned() doesn't work here.
+                    .map(|(expr, ident)| (expr.clone(), ident.clone()))
+                    .unzip();
+
+                let mut new_schema_fields: Vec<Field> = wildcards.iter()
+                    .flat_map(|qualifier| {
+                        match qualifier {
+                            Some(qualifier) => {
+                                source_schema.fields().clone().into_iter()
+                                    .filter(|f| {
+                                        f.name().starts_with(qualifier)
+                                    })
+                                    .collect::<Vec<_>>()
+                            }
+                            None => {
+                                source_schema.fields().clone().into_iter().collect::<Vec<_>>()
+                            }
+                        }
+                    })
+                    .filter(|f| f.name() != RETRACTIONS_FIELD)
+                    .collect();
+
+                new_schema_fields.extend(expressions
+                    .iter()
+                    .map(|expr| {
+                        expr.metadata(schema_context.clone(), &source_schema)
+                            .unwrap_or_else(|err| {
+                                dbg!(err);
+                                unimplemented!()
+                            })
+                    })
+                    .enumerate()
+                    .map(|(i, field)| Field::new(names[i].to_string().as_str(), field.data_type().clone(), field.is_nullable())));
+                if keep_source_fields.clone() {
+                    let mut to_append = new_schema_fields;
+                    new_schema_fields = source_schema.fields().clone();
+                    new_schema_fields.truncate(new_schema_fields.len() - 1); // Remove retraction field.
+                    new_schema_fields.append(&mut to_append);
+                }
+                new_schema_fields.push(Field::new(RETRACTIONS_FIELD, DataType::Boolean, false));
+
+                Ok(NodeMetadata {
+                    partition_count: source_metadata.partition_count,
+                    schema: Arc::new(Schema::new(new_schema_fields)),
+                    time_column: if keep_source_fields.clone() { source_metadata.time_column.clone() } else { None },
+                })
+            }
+            Node::GroupBy { source, key_exprs, aggregates, aggregated_exprs, output_fields, trigger } => {
+                let source_metadata = source.metadata(schema_context.clone())?;
+                let source_schema = &source_metadata.schema;
+                let mut key_fields: Vec<Field> = aggregates
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, aggregate)| if let Aggregate::KeyPart = **aggregate { true } else { false })
+                    .map(|(i, aggregate)| aggregated_exprs[i].metadata(schema_context.clone(), &source_schema))
+                    .collect::<Result<Vec<Field>>>()?;
+
+                let aggregated_field_types: Vec<DataType> = aggregated_exprs
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, column_expr)| if let Aggregate::KeyPart = &aggregates[i.clone()] { false } else { true })
+                    .map(|(i, column_expr)| {
+                        aggregates[i].metadata(column_expr.metadata(schema_context.clone(), source_schema)?.data_type())
+                    })
+                    .collect::<Result<Vec<DataType>>>()?;
+
+                let aggregated_field_output_names: Vec<Identifier> = aggregated_exprs
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, column_expr)| if let Aggregate::KeyPart = &aggregates[i.clone()] { false } else { true })
+                    .map(|(i, column_expr)| {
+                        output_fields[i].clone()
+                    })
+                    .collect();
+
+                let mut new_fields: Vec<Field> = aggregated_field_types
+                    .iter()
+                    .cloned()
+                    .enumerate()
+                    .map(|(i, t)| Field::new(aggregated_field_output_names[i].to_string().as_str(), t, false))
+                    .collect();
+
+                key_fields.append(&mut new_fields);
+                key_fields.push(Field::new(RETRACTIONS_FIELD, DataType::Boolean, false));
+                Ok(NodeMetadata {
+                    partition_count: 1,
+                    schema: Arc::new(Schema::new(key_fields)),
+                    time_column: None,
+                })
+            }
+            Node::Join { source, source_key, joined, joined_key } => {
+                let mut source_schema_fields = source.metadata(schema_context.clone())?.schema.fields().clone();
+                source_schema_fields.truncate(source_schema_fields.len() - 1);
+                let joined_schema_fields = joined.metadata(schema_context.clone())?.schema.fields().clone();
+                let new_fields: Vec<Field> = source_schema_fields
+                    .iter()
+                    .map(|f| Field::new(f.name(), f.data_type().clone(), true))
+                    .chain(
+                        joined_schema_fields
+                            .iter()
+                            .map(|f| Field::new(f.name(), f.data_type().clone(), true)),
+                    )
+                    .collect();
+
+                // TODO: Check if source and joined key types match.
+                // TODo: set time_field
+
+                Ok(NodeMetadata { partition_count: 1, schema: Arc::new(Schema::new(new_fields)), time_column: None })
+            }
+            Node::Requalifier { source, qualifier } => {
+                let source_metadata = source.metadata(schema_context.clone())?;
+                let source_schema = source_metadata.schema.as_ref();
+                let new_fields = source_schema.fields().iter()
+                    .map(|f| Field::new(requalify(qualifier.as_str(), f.name()).as_str(), f.data_type().clone(), f.is_nullable()))
+                    .collect();
+
+                Ok(NodeMetadata {
+                    partition_count: source_metadata.partition_count,
+                    schema: Arc::new(Schema::new(new_fields)),
+                    time_column: source_metadata.time_column.clone(),
+                })
+            }
+            Node::Function(tbv) => {
+                match tbv {
+                    TableValuedFunction::Range(_, _) => {
+                        Ok(NodeMetadata {
+                            partition_count: 1,
+                            schema: Arc::new(Schema::new(vec![
+                                Field::new("i", DataType::Int64, false),
+                                Field::new(RETRACTIONS_FIELD, DataType::Boolean, false),
+                            ])),
+                            time_column: None,
+                        })
+                    }
+                    TableValuedFunction::MaxDiffWatermarkGenerator(time_field_name, max_diff, source) => {
+                        let time_field_name = if let TableValuedFunctionArgument::Descriptior(ident) = time_field_name {
+                            ident
+                        } else {
+                            return Err(anyhow!("max diff watermark generator time_field_name must be identifier"));
+                        };
+                        let source_node = if let TableValuedFunctionArgument::Table(query) = source {
+                            query
+                        } else {
+                            return Err(anyhow!("max diff watermark generator source must be query"));
+                        };
+
+                        let source_metadata = source_node.metadata(schema_context.clone())?;
+                        let mut time_col = None;
+                        for (i, field) in source_metadata.schema.fields().iter().enumerate() {
+                            if field.name() == &time_field_name.to_string() {
+                                time_col = Some(i);
+                            }
+                        }
+
+                        Ok(NodeMetadata {
+                            partition_count: source_metadata.partition_count,
+                            schema: source_metadata.schema.clone(),
+                            time_column: time_col,
+                        })
+                    }
+                }
+            }
+        }
+    }
+
     pub fn physical(
         &self,
         mat_ctx: &MaterializationContext,
@@ -250,7 +465,7 @@ impl Node {
                     joined_key_exprs,
                 )))
             }
-            Node::Requalifier { source, alias } => {
+            Node::Requalifier { source, qualifier: alias } => {
                 Ok(Arc::new(Requalifier::new(alias.clone(), source.physical(mat_ctx)?)))
             }
             Node::Function(function) => {
@@ -259,40 +474,111 @@ impl Node {
                         let start_expr = if let TableValuedFunctionArgument::Expresion(expr) = start {
                             expr.physical(mat_ctx)?
                         } else {
-                            return Err(anyhow!("range start must be expression"))
+                            return Err(anyhow!("range start must be expression"));
                         };
                         let end_expr = if let TableValuedFunctionArgument::Expresion(expr) = end {
                             expr.physical(mat_ctx)?
                         } else {
-                            return Err(anyhow!("range end must be expression"))
+                            return Err(anyhow!("range end must be expression"));
                         };
                         Ok(Arc::new(Range::new(start_expr, end_expr)))
-                    },
+                    }
                     TableValuedFunction::MaxDiffWatermarkGenerator(time_field_name, max_diff, source) => {
                         let time_field_name = if let TableValuedFunctionArgument::Descriptior(ident) = time_field_name {
                             ident.clone()
                         } else {
-                            return Err(anyhow!("max diff watermark generator time_field_name must be identifier"))
+                            return Err(anyhow!("max diff watermark generator time_field_name must be identifier"));
                         };
                         let max_diff_expr = if let TableValuedFunctionArgument::Expresion(expr) = max_diff {
                             expr.physical(mat_ctx)?
                         } else {
-                            return Err(anyhow!("max diff watermark generator max_diff must be expression"))
+                            return Err(anyhow!("max diff watermark generator max_diff must be expression"));
                         };
                         let source_node = if let TableValuedFunctionArgument::Table(query) = source {
                             query.physical(mat_ctx)?
                         } else {
-                            return Err(anyhow!("max diff watermark generator source must be query"))
+                            return Err(anyhow!("max diff watermark generator source must be query"));
                         };
                         Ok(Arc::new(MaxDiffWatermarkGenerator::new(time_field_name, max_diff_expr, source_node)))
-                    },
+                    }
                 }
             }
         }
     }
 }
 
+fn requalify(qualifier: &str, str: &String) -> String {
+    if let Some(i) = str.find(".") {
+        format!("{}.{}", qualifier, &str[i + 1..]).to_string()
+    } else {
+        format!("{}.{}", qualifier, str.as_str()).to_string()
+    }
+}
+
 impl Expression {
+    pub fn metadata(
+        &self,
+        schema_context: Arc<dyn SchemaContext>,
+        record_schema: &Arc<Schema>,
+    ) -> Result<Field> {
+        match self {
+            Expression::Variable(field) => {
+                let field_name_string = field.to_string();
+                let field_name = field_name_string.as_str();
+                match record_schema.field_with_name(field_name) {
+                    Ok(field) => Ok(field.clone()),
+                    Err(arrow_err) => {
+                        match schema_context.field_with_name(field_name).map(|field| field.clone()) {
+                            Ok(field) => Ok(field),
+                            Err(err) => Err(arrow_err).context(err),
+                        }
+                    }
+                }
+            }
+            Expression::Constant(value) => {
+                Ok(Field::new("", value.data_type(), value == &ScalarValue::Null))
+            }
+            Expression::Function(name, args) => {
+                let meta_fn = match name {
+                    Identifier::SimpleIdentifier(ident) => {
+                        match BUILTIN_FUNCTIONS.get(ident.to_lowercase().as_str()) {
+                            None => Err(anyhow!("unknown function: {}", ident.as_str()))?,
+                            Some((meta_fn, _)) => meta_fn.clone(),
+                        }
+                    }
+                    _ => unimplemented!(),
+                };
+
+                meta_fn(&schema_context, record_schema)
+            }
+            Expression::Wildcard(qualifier_opt) => {
+                let fields = record_schema.fields().iter()
+                    .enumerate()
+                    .map(|(i, f)| Field::new(format!("{}", i).as_str(), f.data_type().clone(), f.is_nullable()))
+                    .filter(|f| {
+                        if let Some(qualifier) = qualifier_opt {
+                            f.name().starts_with(qualifier)
+                        } else {
+                            true
+                        }
+                    })
+                    .collect();
+                Ok(Field::new("", DataType::Struct(fields), false))
+            }
+            Expression::Subquery(query) => {
+                let source_schema = query.metadata(
+                    Arc::new(SchemaContextWithSchema {
+                        previous: schema_context.clone(),
+                        schema: record_schema.clone(),
+                    }),
+                )?.schema;
+                // TODO: Implement for tuples.
+                let field_base = source_schema.field(0);
+                Ok(Field::new(field_base.name().as_str(), field_base.data_type().clone(), true))
+            }
+        }
+    }
+
     pub fn physical(
         &self,
         mat_ctx: &MaterializationContext,
@@ -310,7 +596,7 @@ impl Expression {
                     Identifier::SimpleIdentifier(ident) => {
                         match BUILTIN_FUNCTIONS.get(ident.to_lowercase().as_str()) {
                             None => Err(anyhow!("unknown function: {}", ident.as_str())),
-                            Some(fn_constructor) => Ok(fn_constructor(args_physical)),
+                            Some((_, fn_constructor)) => Ok(fn_constructor(args_physical)),
                         }
                     }
                     _ => unimplemented!(),
@@ -323,6 +609,31 @@ impl Expression {
 }
 
 impl Aggregate {
+    pub fn metadata(&self, input_type: &DataType) -> Result<DataType> {
+        match self {
+            Aggregate::KeyPart => Ok(input_type.clone()),
+            Aggregate::Count => Ok(DataType::Int64),
+            Aggregate::Sum => {
+                match input_type {
+                    DataType::Int8 => Ok(DataType::Int8),
+                    DataType::Int16 => Ok(DataType::Int16),
+                    DataType::Int32 => Ok(DataType::Int32),
+                    DataType::Int64 => Ok(DataType::Int64),
+                    DataType::UInt8 => Ok(DataType::UInt8),
+                    DataType::UInt16 => Ok(DataType::UInt16),
+                    DataType::UInt32 => Ok(DataType::UInt32),
+                    DataType::UInt64 => Ok(DataType::UInt64),
+                    DataType::Float32 => Ok(DataType::Float32),
+                    DataType::Float64 => Ok(DataType::Float64),
+                    _ => {
+                        dbg!(input_type);
+                        unimplemented!()
+                    }
+                }
+            }
+        }
+    }
+
     pub fn physical(
         &self,
         _mat_ctx: &MaterializationContext,

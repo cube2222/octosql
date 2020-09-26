@@ -105,6 +105,8 @@ fn main() {
     let logical_plan = query_to_logical_plan(query.as_ref());
     dbg!(&logical_plan);
 
+    dbg!(logical_plan.metadata(Arc::new(EmptySchemaContext{})).unwrap());
+
     let plan = logical_plan.physical(&MaterializationContext {}).unwrap();
 
     let schema = plan.metadata(Arc::new(EmptySchemaContext{})).unwrap();

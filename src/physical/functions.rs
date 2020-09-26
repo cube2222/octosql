@@ -107,13 +107,13 @@ macro_rules! make_binary_array_evaluate_function {
 
 macro_rules! register_function {
     ($map: expr, $name: expr, $meta_fn: expr, $eval_fn: expr) => {
-        $map.insert($name, Arc::new(|args: Vec<Arc<dyn Expression>>| Arc::new(FunctionExpression::new($meta_fn, $eval_fn, args))));
+        $map.insert($name, ($meta_fn, Arc::new(|args: Vec<Arc<dyn Expression>>| Arc::new(FunctionExpression::new($meta_fn, $eval_fn, args)))));
     }
 }
 
 lazy_static! {
-    pub static ref BUILTIN_FUNCTIONS: HashMap<&'static str, Arc<dyn Fn(Vec<Arc<dyn Expression>>)-> Arc<FunctionExpression> + Send + Sync>> = {
-        let mut m: HashMap<&'static str, Arc<dyn Fn(Vec<Arc<dyn Expression>>)-> Arc<FunctionExpression> + Send + Sync>> = HashMap::new();
+    pub static ref BUILTIN_FUNCTIONS: HashMap<&'static str, (MetaFunction, Arc<dyn Fn(Vec<Arc<dyn Expression>>)-> Arc<FunctionExpression> + Send + Sync>)> = {
+        let mut m: HashMap<&'static str, (MetaFunction, Arc<dyn Fn(Vec<Arc<dyn Expression>>)-> Arc<FunctionExpression> + Send + Sync>)> = HashMap::new();
         register_function!(m, "<", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(lt));
         register_function!(m, "<=", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(lt_eq));
         register_function!(m, "=", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(eq));

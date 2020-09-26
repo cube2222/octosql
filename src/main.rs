@@ -105,12 +105,9 @@ fn main() {
     let logical_plan = query_to_logical_plan(query.as_ref());
     dbg!(&logical_plan);
 
-    dbg!(logical_plan.metadata(Arc::new(EmptySchemaContext{})).unwrap());
+    dbg!(logical_plan.metadata(Arc::new(EmptySchemaContext {})).unwrap());
 
-    let plan = logical_plan.physical(&MaterializationContext {}).unwrap();
-
-    let schema = plan.metadata(Arc::new(EmptySchemaContext{})).unwrap();
-    dbg!(schema);
+    let plan = logical_plan.physical(&MaterializationContext { schema_context: Arc::new(EmptySchemaContext {}) }).unwrap();
 
     let _res = plan.run(
         &ExecutionContext {

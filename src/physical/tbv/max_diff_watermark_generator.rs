@@ -21,17 +21,20 @@ use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 
 use crate::physical::expression::Expression;
-use crate::physical::physical::{ExecutionContext, Identifier, MetadataMessage, MetaSendFn, Node, noop_meta_send, ProduceFn, ScalarValue, SchemaContext, NodeMetadata};
+use crate::physical::physical::{ExecutionContext, Identifier, MetadataMessage, MetaSendFn, Node, noop_meta_send, ProduceFn, ScalarValue, SchemaContext};
+use crate::logical::logical::NodeMetadata;
 
 pub struct MaxDiffWatermarkGenerator {
+    logical_metadata: NodeMetadata,
     time_field_name: Identifier,
     max_diff: Arc<dyn Expression>,
     source: Arc<dyn Node>,
 }
 
 impl MaxDiffWatermarkGenerator {
-    pub fn new(time_field_name: Identifier, max_diff: Arc<dyn Expression>, source: Arc<dyn Node>) -> MaxDiffWatermarkGenerator {
+    pub fn new(logical_metadata: NodeMetadata, time_field_name: Identifier, max_diff: Arc<dyn Expression>, source: Arc<dyn Node>) -> MaxDiffWatermarkGenerator {
         MaxDiffWatermarkGenerator {
+            logical_metadata,
             time_field_name,
             max_diff,
             source,
@@ -40,20 +43,8 @@ impl MaxDiffWatermarkGenerator {
 }
 
 impl Node for MaxDiffWatermarkGenerator {
-    fn metadata(&self, schema_context: Arc<dyn SchemaContext>) -> Result<NodeMetadata> {
-        let source_metadata = self.source.metadata(schema_context.clone())?;
-        let mut time_col = None;
-        for (i, field) in source_metadata.schema.fields().iter().enumerate() {
-            if field.name() == &self.time_field_name.to_string() {
-                time_col = Some(i);
-            }
-        }
-
-        Ok(NodeMetadata {
-            partition_count: source_metadata.partition_count,
-            schema: source_metadata.schema.clone(),
-            time_column: time_col,
-        })
+    fn logical_metadata(&self) -> NodeMetadata {
+        self.logical_metadata.clone()
     }
 
     fn run(
@@ -68,7 +59,7 @@ impl Node for MaxDiffWatermarkGenerator {
             Err(anyhow!("max difference must be integer"))?
         };
 
-        let source_schema = self.source.metadata(exec_ctx.variable_context.clone())?.schema;
+        let source_schema = self.source.logical_metadata().schema;
         let (time_field_index, _) = source_schema.column_with_name(self.time_field_name.to_string().as_str()).context("time field not found")?;
 
         let mut cur_max: i64 = 0;

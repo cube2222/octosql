@@ -23,8 +23,10 @@ use anyhow::Result;
 use crate::physical::arrow::{create_key, create_row, GroupByScalar};
 use crate::physical::expression::Expression;
 use crate::physical::physical::*;
+use crate::logical::logical::NodeMetadata;
 
 pub struct StreamJoin {
+    logical_metadata: NodeMetadata,
     source: Arc<dyn Node>,
     source_key_exprs: Vec<Arc<dyn Expression>>,
     joined: Arc<dyn Node>,
@@ -33,12 +35,14 @@ pub struct StreamJoin {
 
 impl StreamJoin {
     pub fn new(
+        logical_metadata: NodeMetadata,
         source: Arc<dyn Node>,
         source_key_exprs: Vec<Arc<dyn Expression>>,
         joined: Arc<dyn Node>,
         joined_key_exprs: Vec<Arc<dyn Expression>>,
     ) -> StreamJoin {
         StreamJoin {
+            logical_metadata,
             source,
             source_key_exprs,
             joined,
@@ -48,25 +52,8 @@ impl StreamJoin {
 }
 
 impl Node for StreamJoin {
-    fn metadata(&self, schema_context: Arc<dyn SchemaContext>) -> Result<NodeMetadata> {
-        // Both without last row, and retraction added at end.
-        let mut source_schema_fields = self.source.metadata(schema_context.clone())?.schema.fields().clone();
-        source_schema_fields.truncate(source_schema_fields.len() - 1);
-        let joined_schema_fields = self.joined.metadata(schema_context.clone())?.schema.fields().clone();
-        let new_fields: Vec<Field> = source_schema_fields
-            .iter()
-            .map(|f| Field::new(f.name(), f.data_type().clone(), true))
-            .chain(
-                joined_schema_fields
-                    .iter()
-                    .map(|f| Field::new(f.name(), f.data_type().clone(), true)),
-            )
-            .collect();
-
-        // TODO: Check if source and joined key types match.
-        // TODo: set time_field
-
-        Ok(NodeMetadata{partition_count: 1, schema: Arc::new(Schema::new(new_fields)), time_column: None })
+    fn logical_metadata(&self) -> NodeMetadata {
+        self.logical_metadata.clone()
     }
 
     fn run(
@@ -75,9 +62,9 @@ impl Node for StreamJoin {
         produce: ProduceFn,
         _meta_send: MetaSendFn,
     ) -> Result<()> {
-        let source_schema = self.source.metadata(ctx.variable_context.clone())?.schema;
-        let joined_schema = self.joined.metadata(ctx.variable_context.clone())?.schema;
-        let output_schema = self.metadata(ctx.variable_context.clone())?.schema;
+        let source_schema = self.source.logical_metadata().schema;
+        let joined_schema = self.joined.logical_metadata().schema;
+        let output_schema = self.logical_metadata.schema.clone();
 
         // TODO: Fixme HashMap => BTreeMap
         let mut state_map: BTreeMap<
@@ -87,15 +74,6 @@ impl Node for StreamJoin {
                 HashMap<Vec<ScalarValue>, i64>,
             ),
         > = BTreeMap::new();
-
-        let _key_types: Vec<DataType> = match self.source.metadata(ctx.variable_context.clone()) {
-            Ok(_schema) => self
-                .source_key_exprs
-                .iter()
-                .map(|field| field.field_meta(ctx.variable_context.clone(), &source_schema).unwrap().data_type().clone())
-                .collect(),
-            _ => panic!("aaa"),
-        };
 
         let (sender, receiver) = mpsc::sync_channel::<(usize, RecordBatch)>(32);
 

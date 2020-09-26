@@ -22,29 +22,22 @@ use arrow::record_batch::RecordBatch;
 use anyhow::Result;
 
 use crate::physical::physical::*;
+use crate::logical::logical::NodeMetadata;
 
 pub struct JSONSource {
+    logical_metadata: NodeMetadata,
     path: String,
 }
 
 impl JSONSource {
-    pub fn new(path: String) -> JSONSource {
-        JSONSource { path }
+    pub fn new(logical_metadata: NodeMetadata, path: String) -> JSONSource {
+        JSONSource { logical_metadata, path }
     }
 }
 
 impl Node for JSONSource {
-    fn metadata(&self, _schema_context: Arc<dyn SchemaContext>) -> Result<NodeMetadata> {
-        let file = File::open(self.path.as_str()).unwrap();
-        let r = json::ReaderBuilder::new()
-            .infer_schema(Some(10))
-            .with_batch_size(BATCH_SIZE)
-            .build(file)
-            .unwrap();
-        let mut fields = r.schema().fields().clone();
-        fields.push(Field::new(RETRACTIONS_FIELD, DataType::Boolean, false));
-
-        Ok(NodeMetadata{partition_count: 1, schema: Arc::new(Schema::new(fields)), time_column: None })
+    fn logical_metadata(&self) -> NodeMetadata {
+        self.logical_metadata.clone()
     }
 
     fn run(
@@ -64,7 +57,7 @@ impl Node for JSONSource {
             retraction_array_builder.append_value(false)?;
         }
         let retraction_array = Arc::new(retraction_array_builder.finish());
-        let schema = self.metadata(ctx.variable_context.clone())?.schema;
+        let schema = self.logical_metadata.schema.clone();
         loop {
             let maybe_rec = r.next().unwrap();
             match maybe_rec {

@@ -27,8 +27,10 @@ use crate::physical::expression::Expression;
 use crate::physical::physical::*;
 use crate::physical::trigger::*;
 use std::cell::RefCell;
+use crate::logical::logical::NodeMetadata;
 
 pub struct GroupBy {
+    logical_metadata: NodeMetadata,
     key: Vec<Arc<dyn Expression>>,
     output_key_indices: Vec<usize>,
     aggregated_exprs: Vec<Arc<dyn Expression>>,
@@ -40,6 +42,7 @@ pub struct GroupBy {
 
 impl GroupBy {
     pub fn new(
+        logical_metadata: NodeMetadata,
         key: Vec<Arc<dyn Expression>>,
         output_key_indices: Vec<usize>,
         aggregated_exprs: Vec<Arc<dyn Expression>>,
@@ -49,6 +52,7 @@ impl GroupBy {
         source: Arc<dyn Node>,
     ) -> GroupBy {
         return GroupBy {
+            logical_metadata,
             key,
             output_key_indices,
             aggregated_exprs,
@@ -179,39 +183,8 @@ macro_rules! combine_columns {
 }
 
 impl Node for GroupBy {
-    fn metadata(&self, schema_context: Arc<dyn SchemaContext>) -> Result<NodeMetadata> {
-        let source_metadata = self.source.metadata(schema_context.clone())?;
-        let source_schema = &source_metadata.schema;
-        let mut key_fields: Vec<Field> = self
-            .output_key_indices
-            .iter()
-            .map(|i| &self.key[*i])
-            .map(|key_field| key_field.field_meta(schema_context.clone(), source_schema))
-            .collect::<Result<Vec<Field>>>()?;
-
-        let aggregated_field_types: Vec<DataType> = self
-            .aggregated_exprs
-            .iter()
-            .enumerate()
-            .map(|(i, column_expr)| {
-                self.aggregates[i].output_type(column_expr.field_meta(schema_context.clone(), source_schema)?.data_type())
-            })
-            .collect::<Result<Vec<DataType>>>()?;
-
-        let mut new_fields: Vec<Field> = aggregated_field_types
-            .iter()
-            .cloned()
-            .enumerate()
-            .map(|(i, t)| Field::new(self.output_names[i].to_string().as_str(), t, false))
-            .collect();
-
-        key_fields.append(&mut new_fields);
-        key_fields.push(Field::new(RETRACTIONS_FIELD, DataType::Boolean, false));
-        Ok(NodeMetadata{
-            partition_count: 1,
-            schema: Arc::new(Schema::new(key_fields)),
-            time_column: None,
-        })
+    fn logical_metadata(&self) -> NodeMetadata {
+        self.logical_metadata.clone()
     }
 
     fn run(
@@ -220,7 +193,7 @@ impl Node for GroupBy {
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<()> {
-        let source_schema = self.source.metadata(exec_ctx.variable_context.clone())?.schema;
+        let source_schema = self.source.logical_metadata().schema;
 
         let mut accumulators_map_cell: RefCell<BTreeMap<Vec<GroupByScalar>, Vec<Box<dyn Accumulator>>>> =
             RefCell::new(BTreeMap::new());
@@ -327,7 +300,7 @@ impl GroupBy {
             .iter()
             .map(|i| key_columns[*i].clone())
             .collect::<Vec<_>>();
-        let output_schema = self.metadata(exec_ctx.variable_context.clone())?.schema;
+        let output_schema = self.logical_metadata.schema.clone();
 
         let mut retraction_key_columns = Vec::with_capacity(self.output_names.len());
 

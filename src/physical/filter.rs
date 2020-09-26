@@ -22,21 +22,23 @@ use anyhow::Result;
 
 use crate::physical::expression::Expression;
 use crate::physical::physical::*;
+use crate::logical::logical::NodeMetadata;
 
 pub struct Filter {
+    logical_metadata: NodeMetadata,
     filter_expr: Arc<dyn Expression>,
     source: Arc<dyn Node>,
 }
 
 impl Filter {
-    pub fn new(filter_expr: Arc<dyn Expression>, source: Arc<dyn Node>) -> Filter {
-        Filter { filter_expr, source }
+    pub fn new(logical_metadata: NodeMetadata, filter_expr: Arc<dyn Expression>, source: Arc<dyn Node>) -> Filter {
+        Filter { logical_metadata, filter_expr, source }
     }
 }
 
 impl Node for Filter {
-    fn metadata(&self, schema_context: Arc<dyn SchemaContext>) -> Result<NodeMetadata> {
-        self.source.metadata(schema_context.clone())
+    fn logical_metadata(&self) -> NodeMetadata {
+        self.logical_metadata.clone()
     }
 
     fn run(
@@ -45,7 +47,7 @@ impl Node for Filter {
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<()> {
-        let source_schema = self.source.metadata(exec_ctx.variable_context.clone())?.schema;
+        let source_schema = self.source.logical_metadata().schema;
 
         self.source.run(
             exec_ctx,

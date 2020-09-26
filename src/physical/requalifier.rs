@@ -18,16 +18,18 @@ use arrow::datatypes::{Field, Schema};
 use arrow::record_batch::RecordBatch;
 use anyhow::Result;
 
-use crate::physical::physical::{ExecutionContext, MetaSendFn, Node, noop_meta_send, ProduceFn, SchemaContext, NodeMetadata};
+use crate::physical::physical::{ExecutionContext, MetaSendFn, Node, noop_meta_send, ProduceFn, SchemaContext};
+use crate::logical::logical::NodeMetadata;
 
 pub struct Requalifier {
+    logical_metadata: NodeMetadata,
     qualifier: String,
     source: Arc<dyn Node>,
 }
 
 impl Requalifier {
-    pub fn new(qualifier: String, source: Arc<dyn Node>) -> Requalifier {
-        Requalifier { qualifier, source }
+    pub fn new(logical_metadata: NodeMetadata, qualifier: String, source: Arc<dyn Node>) -> Requalifier {
+        Requalifier { logical_metadata, qualifier, source }
     }
 }
 
@@ -42,18 +44,8 @@ impl Requalifier {
 }
 
 impl Node for Requalifier {
-    fn metadata(&self, schema_context: Arc<dyn SchemaContext>) -> Result<NodeMetadata> {
-        let source_metadata = self.source.metadata(schema_context.clone())?;
-        let source_schema = source_metadata.schema.as_ref();
-        let new_fields = source_schema.fields().iter()
-            .map(|f| Field::new(self.requalify(f.name()).as_str(), f.data_type().clone(), f.is_nullable()))
-            .collect();
-
-        Ok(NodeMetadata{
-            partition_count: source_metadata.partition_count,
-            schema: Arc::new(Schema::new(new_fields)),
-            time_column: source_metadata.time_column.clone(),
-        })
+    fn logical_metadata(&self) -> NodeMetadata {
+        self.logical_metadata.clone()
     }
 
     fn run(
@@ -62,7 +54,7 @@ impl Node for Requalifier {
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<()> {
-        let schema = self.metadata(exec_ctx.variable_context.clone())?.schema.clone();
+        let schema = self.logical_metadata.schema.clone();
 
         self.source.run(
             exec_ctx,

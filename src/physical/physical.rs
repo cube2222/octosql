@@ -18,6 +18,7 @@ use std::sync::Arc;
 use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use arrow::record_batch::RecordBatch;
 use anyhow::{Context, Result};
+use crate::logical::logical::NodeMetadata;
 
 pub const BATCH_SIZE: usize = 8192;
 pub const RETRACTIONS_FIELD: &str = "retraction";
@@ -187,18 +188,11 @@ pub enum MetadataMessage {
 }
 
 pub trait Node: Send + Sync {
-    fn metadata(&self, schema_context: Arc<dyn SchemaContext>) -> Result<NodeMetadata>;
+    fn logical_metadata(&self) -> NodeMetadata;
     fn run(
         &self,
         ctx: &ExecutionContext,
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<()>;
-}
-
-#[derive(Debug, Clone)]
-pub struct NodeMetadata {
-    pub partition_count: usize,
-    pub schema: Arc<Schema>,
-    pub time_column: Option<usize>,
 }

@@ -21,8 +21,10 @@ use anyhow::Result;
 
 use crate::physical::expression::Expression;
 use crate::physical::physical::*;
+use crate::logical::logical::NodeMetadata;
 
 pub struct Map {
+    logical_metadata: NodeMetadata,
     source: Arc<dyn Node>,
     expressions: Vec<Arc<dyn Expression>>,
     names: Vec<Identifier>,
@@ -31,7 +33,7 @@ pub struct Map {
 }
 
 impl Map {
-    pub fn new(source: Arc<dyn Node>, expressions: Vec<Arc<dyn Expression>>, names: Vec<Identifier>, wildcards: Vec<Option<String>>, keep_source_fields: bool) -> Map {
+    pub fn new(logical_metadata: NodeMetadata, source: Arc<dyn Node>, expressions: Vec<Arc<dyn Expression>>, names: Vec<Identifier>, wildcards: Vec<Option<String>>, keep_source_fields: bool) -> Map {
         let wildcards = wildcards.into_iter()
             .map(|wildcard| {
                 wildcard.map(|mut qualifier| {
@@ -42,6 +44,7 @@ impl Map {
             .collect();
 
         Map {
+            logical_metadata,
             source,
             expressions,
             names,
@@ -52,53 +55,8 @@ impl Map {
 }
 
 impl Node for Map {
-    // TODO: Just don't allow to use retractions field as field name.
-    fn metadata(&self, schema_context: Arc<dyn SchemaContext>) -> Result<NodeMetadata> {
-        let source_metadata = self.source.metadata(schema_context.clone())?;
-        let source_schema = &source_metadata.schema;
-        let mut new_schema_fields: Vec<Field> = self.wildcards.iter()
-            .flat_map(|qualifier| {
-                match qualifier {
-                    Some(qualifier) => {
-                        source_schema.fields().clone().into_iter()
-                            .filter(|f| {
-                                f.name().starts_with(qualifier)
-                            })
-                            .collect::<Vec<_>>()
-                    }
-                    None => {
-                        source_schema.fields().clone().into_iter().collect::<Vec<_>>()
-                    }
-                }
-            })
-            .filter(|f| f.name() != RETRACTIONS_FIELD)
-            .collect();
-
-        new_schema_fields.extend(self
-            .expressions
-            .iter()
-            .map(|expr| {
-                expr.field_meta(schema_context.clone(), &source_schema)
-                    .unwrap_or_else(|err| {
-                        dbg!(err);
-                        unimplemented!()
-                    })
-            })
-            .enumerate()
-            .map(|(i, field)| Field::new(self.names[i].to_string().as_str(), field.data_type().clone(), field.is_nullable())));
-        if self.keep_source_fields {
-            let mut to_append = new_schema_fields;
-            new_schema_fields = source_schema.fields().clone();
-            new_schema_fields.truncate(new_schema_fields.len() - 1); // Remove retraction field.
-            new_schema_fields.append(&mut to_append);
-        }
-        new_schema_fields.push(Field::new(RETRACTIONS_FIELD, DataType::Boolean, false));
-
-        Ok(NodeMetadata {
-            partition_count: source_metadata.partition_count,
-            schema: Arc::new(Schema::new(new_schema_fields)),
-            time_column: if self.keep_source_fields { source_metadata.time_column.clone() } else { None },
-        })
+    fn logical_metadata(&self) -> NodeMetadata {
+        self.logical_metadata.clone()
     }
 
     fn run(
@@ -107,8 +65,8 @@ impl Node for Map {
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<()> {
-        let source_schema = self.source.metadata(ctx.variable_context.clone())?.schema;
-        let output_schema = self.metadata(ctx.variable_context.clone())?.schema;
+        let source_schema = self.source.logical_metadata().schema;
+        let output_schema = self.logical_metadata.schema.clone();
         let wildcard_column_indices: Vec<usize> = self.wildcards.iter()
             .flat_map(|qualifier| {
                 match qualifier {

@@ -146,12 +146,7 @@ impl Expression for Subquery {
         schema_context: Arc<dyn SchemaContext>,
         record_schema: &Arc<Schema>,
     ) -> Result<Field> {
-        let source_schema = self.query.metadata(
-            Arc::new(SchemaContextWithSchema {
-                previous: schema_context.clone(),
-                schema: record_schema.clone(),
-            }),
-        )?.schema;
+        let source_schema = self.query.logical_metadata().schema;
         // TODO: Implement for tuples.
         let field_base = source_schema.field(0);
         Ok(Field::new(field_base.name().as_str(), field_base.data_type().clone(), true))
@@ -159,10 +154,7 @@ impl Expression for Subquery {
 
     // TODO: Would probably be more elegant to gather vectors of record batches, and then do a type switch later, creating the final array in a typesafe way.
     fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef> {
-        let source_schema = self.query.metadata(Arc::new(SchemaContextWithSchema {
-            previous: ctx.variable_context.clone(),
-            schema: record.schema(),
-        }))?.schema;
+        let source_schema = self.query.logical_metadata().schema;
         let output_type = source_schema.field(0).data_type().clone();
 
         let single_value_byte_size: usize = match output_type {

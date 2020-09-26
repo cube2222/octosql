@@ -114,7 +114,9 @@ pub enum Trigger {
     Counting(u64),
 }
 
-pub struct MaterializationContext {}
+pub struct MaterializationContext {
+    pub schema_context: Arc<dyn SchemaContext>,
+}
 
 impl Node {
     pub fn metadata(&self, schema_context: Arc<dyn SchemaContext>) -> Result<NodeMetadata> {
@@ -152,6 +154,7 @@ impl Node {
             Node::Filter { source, filter_expr } => {
                 source.metadata(schema_context.clone())
             }
+            // TODO: Just don't allow to use retractions field as field name.
             Node::Map { source, expressions: expressions_with_names, wildcards, keep_source_fields } => {
                 let source_metadata = source.metadata(schema_context.clone())?;
                 let source_schema = &source_metadata.schema;
@@ -326,13 +329,16 @@ impl Node {
         &self,
         mat_ctx: &MaterializationContext,
     ) -> Result<Arc<dyn physical::Node>> {
+        // TODO: Fixme mat_ctx propagation.
+        let logical_metadata = self.metadata(mat_ctx.schema_context.clone())?;
+
         match self {
             Node::Source { name, alias: _ } => {
                 let path = name.to_string();
                 if path.contains(".json") {
-                    Ok(Arc::new(JSONSource::new(path)))
+                    Ok(Arc::new(JSONSource::new(logical_metadata, path)))
                 } else if path.contains(".csv") {
-                    Ok(Arc::new(CSVSource::new(path)))
+                    Ok(Arc::new(CSVSource::new(logical_metadata, path)))
                 } else {
                     dbg!(name);
                     unimplemented!()
@@ -343,6 +349,7 @@ impl Node {
                 filter_expr,
             } => {
                 Ok(Arc::new(Filter::new(
+                    logical_metadata,
                     filter_expr.physical(mat_ctx)?,
                     source.physical(mat_ctx)?,
                 )))
@@ -365,7 +372,7 @@ impl Node {
                     expr_vec.push(expr);
                     name_vec.push(name);
                 }
-                Ok(Arc::new(map::Map::new(source.physical(mat_ctx)?, expr_vec, name_vec, wildcards.clone(), *keep_source_fields)))
+                Ok(Arc::new(map::Map::new(logical_metadata, source.physical(mat_ctx)?, expr_vec, name_vec, wildcards.clone(), *keep_source_fields)))
             }
             Node::GroupBy {
                 source,
@@ -433,6 +440,7 @@ impl Node {
                     .collect::<Result<_, _>>()?;
 
                 Ok(Arc::new(GroupBy::new(
+                    logical_metadata,
                     key_exprs_physical,
                     output_key_indices,
                     aggregated_exprs_physical,
@@ -459,6 +467,7 @@ impl Node {
                     .collect::<Result<_, _>>()?;
 
                 Ok(Arc::new(StreamJoin::new(
+                    logical_metadata,
                     source.physical(mat_ctx)?,
                     source_key_exprs,
                     joined.physical(mat_ctx)?,
@@ -466,7 +475,7 @@ impl Node {
                 )))
             }
             Node::Requalifier { source, qualifier: alias } => {
-                Ok(Arc::new(Requalifier::new(alias.clone(), source.physical(mat_ctx)?)))
+                Ok(Arc::new(Requalifier::new(logical_metadata, alias.clone(), source.physical(mat_ctx)?)))
             }
             Node::Function(function) => {
                 match function {
@@ -481,7 +490,7 @@ impl Node {
                         } else {
                             return Err(anyhow!("range end must be expression"));
                         };
-                        Ok(Arc::new(Range::new(start_expr, end_expr)))
+                        Ok(Arc::new(Range::new(logical_metadata, start_expr, end_expr)))
                     }
                     TableValuedFunction::MaxDiffWatermarkGenerator(time_field_name, max_diff, source) => {
                         let time_field_name = if let TableValuedFunctionArgument::Descriptior(ident) = time_field_name {
@@ -499,7 +508,7 @@ impl Node {
                         } else {
                             return Err(anyhow!("max diff watermark generator source must be query"));
                         };
-                        Ok(Arc::new(MaxDiffWatermarkGenerator::new(time_field_name, max_diff_expr, source_node)))
+                        Ok(Arc::new(MaxDiffWatermarkGenerator::new(logical_metadata, time_field_name, max_diff_expr, source_node)))
                     }
                 }
             }

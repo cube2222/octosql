@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::error::Error;
+use std::fs::File;
 use std::sync::Arc;
 
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
+use arrow::{csv, json};
+use arrow::datatypes::{DataType, Field, Schema};
 
 use crate::physical::aggregate;
-use crate::physical::trigger;
 use crate::physical::csv::CSVSource;
 use crate::physical::expression;
 use crate::physical::expression::WildcardExpression;
@@ -27,16 +30,19 @@ use crate::physical::group_by::GroupBy;
 use crate::physical::json::JSONSource;
 use crate::physical::map;
 use crate::physical::physical;
-use crate::physical::physical::{Identifier, SchemaContext, ScalarValue, SchemaContextWithSchema, BATCH_SIZE, RETRACTIONS_FIELD};
+use crate::physical::physical::{BATCH_SIZE, Identifier, RETRACTIONS_FIELD, ScalarValue, SchemaContext, SchemaContextWithSchema};
 use crate::physical::requalifier::Requalifier;
 use crate::physical::stream_join::StreamJoin;
-use crate::physical::tbv::range::Range;
 use crate::physical::tbv::max_diff_watermark_generator::MaxDiffWatermarkGenerator;
-use arrow::datatypes::{Schema, Field, DataType};
-use std::fs::File;
-use arrow::{csv, json};
+use crate::physical::tbv::range::Range;
+use crate::physical::trigger;
 
-#[derive(Debug)]
+pub struct Transformers<E: Error> {
+    node_fn: Option<Box<dyn Fn(&Node) -> std::result::Result<Box<Node>, E>>>,
+    expr_fn: Option<Box<dyn Fn(&Expression) -> std::result::Result<Box<Expression>, E>>>,
+}
+
+#[derive(Clone, Debug)]
 pub enum Node {
     Source {
         name: Identifier,
@@ -73,27 +79,27 @@ pub enum Node {
     Function(TableValuedFunction),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct NodeMetadata {
     pub partition_count: usize,
     pub schema: Arc<Schema>,
     pub time_column: Option<usize>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum TableValuedFunction {
     Range(TableValuedFunctionArgument, TableValuedFunctionArgument),
     MaxDiffWatermarkGenerator(TableValuedFunctionArgument, TableValuedFunctionArgument, TableValuedFunctionArgument),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum TableValuedFunctionArgument {
     Expresion(Box<Expression>),
     Table(Box<Node>),
     Descriptior(Identifier),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Expression {
     Variable(Identifier),
     Constant(physical::ScalarValue),
@@ -102,14 +108,14 @@ pub enum Expression {
     Subquery(Box<Node>),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Aggregate {
     KeyPart,
     Count,
     Sum,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Trigger {
     Counting(u64),
 }
@@ -531,6 +537,80 @@ impl Node {
             }
         }
     }
+
+    // TODO: Switch to Arc's, less expensive when cloning.
+    pub fn transform<E: Error>(&self, transformers: &Transformers<E>) -> std::result::Result<Box<Self>, E> {
+        let tf = if let Some(tf) = &transformers.node_fn {
+            tf
+        } else {
+            return Ok(Box::new((*self).clone()));
+        };
+        match self {
+            Node::Source { name, alias } => tf(self),
+            Node::Filter { source, filter_expr } => {
+                let source_tf = source.transform(transformers)?;
+                let filter_expr_tf = filter_expr.transform(transformers)?;
+                tf(&Node::Filter { source: source_tf, filter_expr: filter_expr_tf })
+            }
+            Node::Map { source, expressions, wildcards, keep_source_fields } => {
+                let source_tf = source.transform(transformers)?;
+                let expressions_tf = expressions.iter()
+                    .map(|(expr, ident)| Ok((expr.transform(transformers)?, ident.clone())))
+                    .collect::<Result<Vec<_>, _>>()?;
+                tf(&Node::Map {
+                    source: source_tf,
+                    expressions: expressions_tf,
+                    wildcards: wildcards.clone(),
+                    keep_source_fields: keep_source_fields.clone(),
+                })
+            }
+            Node::GroupBy { source, key_exprs, aggregates, aggregated_exprs, output_fields, trigger } => {
+                let source_tf = source.transform(transformers)?;
+                let key_exprs_tf = key_exprs.iter()
+                    .map(|expr| expr.transform(transformers))
+                    .collect::<Result<Vec<_>, _>>()?;
+                let aggregated_exprs_tf = aggregated_exprs.iter()
+                    .map(|expr| expr.transform(transformers))
+                    .collect::<Result<Vec<_>, _>>()?;
+                tf(&Node::GroupBy {
+                    source: source_tf,
+                    key_exprs: key_exprs_tf,
+                    aggregates: aggregates.clone(),
+                    aggregated_exprs: aggregated_exprs_tf,
+                    output_fields: output_fields.clone(),
+                    trigger: trigger.clone(),
+                })
+            }
+            Node::Join { source, source_key, joined, joined_key } => {
+                let source_tf = source.transform(transformers)?;
+                let source_key_tf = source_key.iter()
+                    .map(|expr| expr.transform(transformers))
+                    .collect::<Result<Vec<_>, _>>()?;
+                let joined_tf = joined.transform(transformers)?;
+                let joined_key_tf = joined_key.iter()
+                    .map(|expr| expr.transform(transformers))
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                tf(&Node::Join {
+                    source: source_tf,
+                    source_key: source_key_tf,
+                    joined: joined_tf,
+                    joined_key: joined_key_tf,
+                })
+            }
+            Node::Requalifier { source, qualifier } => {
+                let source_tf = source.transform(transformers)?;
+
+                tf(&Node::Requalifier {
+                    source: source_tf,
+                    qualifier: qualifier.clone(),
+                })
+            }
+            Node::Function(tbv) => {
+                tf(&Node::Function(tbv.transform(transformers)?))
+            }
+        }
+    }
 }
 
 fn requalify(qualifier: &str, str: &String) -> String {
@@ -631,13 +711,40 @@ impl Expression {
             }
             Expression::Wildcard(qualifier) => Ok(Arc::new(WildcardExpression::new(qualifier.as_ref().map(|s| s.as_str())))),
             Expression::Subquery(query) => {
-                Ok(Arc::new(expression::Subquery::new(query.physical(&MaterializationContext{
+                Ok(Arc::new(expression::Subquery::new(query.physical(&MaterializationContext {
                     schema_context: Arc::new(SchemaContextWithSchema {
                         previous: mat_ctx.schema_context.clone(),
                         schema: record_schema.clone(),
                     })
                 })?)))
-            },
+            }
+        }
+    }
+
+    pub fn transform<E: Error>(&self, transformers: &Transformers<E>) -> std::result::Result<Box<Self>, E> {
+        let tf = if let Some(tf) = &transformers.expr_fn {
+            tf
+        } else {
+            return Ok(Box::new((*self).clone()));
+        };
+        match self {
+            Expression::Variable(ident) => tf(&Expression::Variable(ident.clone())),
+            Expression::Constant(value) => tf(&Expression::Constant(value.clone())),
+            Expression::Function(name, args) => {
+                let args_tf = args.iter()
+                    .map(|expr| expr.transform(transformers))
+                    .collect::<Result<Vec<_>, _>>()?;
+                tf(&Expression::Function(
+                    name.clone(),
+                    args_tf,
+                ))
+            }
+            Expression::Wildcard(qualifier) => tf(&Expression::Wildcard(qualifier.clone())),
+            Expression::Subquery(node) => {
+                tf(&Expression::Subquery(
+                    node.transform(transformers)?,
+                ))
+            }
         }
     }
 }
@@ -688,5 +795,41 @@ impl Trigger {
         match self {
             Trigger::Counting(n) => Ok(Arc::new(trigger::CountingTriggerPrototype::new(n.clone()))),
         }
+    }
+}
+
+impl TableValuedFunction {
+    pub fn transform<E: Error>(&self, transformers: &Transformers<E>) -> std::result::Result<Self, E> {
+        Ok(match self {
+            TableValuedFunction::Range(arg0, arg1) => {
+                TableValuedFunction::Range(
+                    arg0.transform(transformers)?,
+                    arg1.transform(transformers)?,
+                )
+            }
+            TableValuedFunction::MaxDiffWatermarkGenerator(arg0, arg1, arg2) => {
+                TableValuedFunction::MaxDiffWatermarkGenerator(
+                    arg0.transform(transformers)?,
+                    arg1.transform(transformers)?,
+                    arg2.transform(transformers)?,
+                )
+            }
+        })
+    }
+}
+
+impl TableValuedFunctionArgument {
+    pub fn transform<E: Error>(&self, transformers: &Transformers<E>) -> std::result::Result<Self, E> {
+        Ok(match self {
+            TableValuedFunctionArgument::Expresion(expr) => {
+                TableValuedFunctionArgument::Expresion(expr.transform(transformers)?)
+            }
+            TableValuedFunctionArgument::Table(node) => {
+                TableValuedFunctionArgument::Table(node.transform(transformers)?)
+            }
+            TableValuedFunctionArgument::Descriptior(ident) => {
+                self.clone()
+            }
+        })
     }
 }

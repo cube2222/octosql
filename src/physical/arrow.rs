@@ -152,11 +152,20 @@ pub fn create_row(
                 let array = col.as_any().downcast_ref::<Int64Array>().unwrap();
                 vec[i] = ScalarValue::Int64(array.value(row))
             }
+            DataType::Float32 => {
+                let array = col.as_any().downcast_ref::<Float32Array>().unwrap();
+                vec[i] = ScalarValue::Float32(array.value(row))
+            }
+            DataType::Float64 => {
+                let array = col.as_any().downcast_ref::<Float64Array>().unwrap();
+                vec[i] = ScalarValue::Float64(array.value(row))
+            }
             DataType::Utf8 => {
                 let array = col.as_any().downcast_ref::<StringArray>().unwrap();
                 vec[i] = ScalarValue::Utf8(String::from(array.value(row)))
             }
             _ => {
+                dbg!(col.data_type());
                 unimplemented!()
             }
         }

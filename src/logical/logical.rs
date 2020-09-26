@@ -348,9 +348,11 @@ impl Node {
                 source,
                 filter_expr,
             } => {
+                let source_metadata = source.metadata(mat_ctx.schema_context.clone())?;
+
                 Ok(Arc::new(Filter::new(
                     logical_metadata,
-                    filter_expr.physical(mat_ctx)?,
+                    filter_expr.physical(mat_ctx, &source_metadata.schema)?,
                     source.physical(mat_ctx)?,
                 )))
             }
@@ -360,10 +362,12 @@ impl Node {
                 wildcards,
                 keep_source_fields,
             } => {
+                let source_metadata = source.metadata(mat_ctx.schema_context.clone())?;
+
                 let expr_vec_res = expressions
                     .iter()
                     .map(|(expr, ident)|
-                        expr.physical(mat_ctx).map(|expr| (expr, ident.clone())))
+                        expr.physical(mat_ctx, &source_metadata.schema).map(|expr| (expr, ident.clone())))
                     .collect::<Vec<_>>();
                 let mut expr_vec = Vec::with_capacity(expr_vec_res.len());
                 let mut name_vec = Vec::with_capacity(expr_vec_res.len());
@@ -382,9 +386,11 @@ impl Node {
                 output_fields,
                 trigger,
             } => {
+                let source_metadata = source.metadata(mat_ctx.schema_context.clone())?;
+
                 let key_exprs_physical = key_exprs
                     .into_iter()
-                    .map(|expr| expr.physical(mat_ctx))
+                    .map(|expr| expr.physical(mat_ctx, &source_metadata.schema))
                     .collect::<Result<_, _>>()?;
 
                 let (aggregates_no_key_part, aggregated_exprs_no_key_part): (Vec<_>, Vec<_>) = aggregates.iter()
@@ -398,7 +404,7 @@ impl Node {
                     .collect::<Result<_, _>>()?;
                 let aggregated_exprs_physical = aggregated_exprs_no_key_part
                     .into_iter()
-                    .map(|expr| expr.physical(mat_ctx))
+                    .map(|expr| expr.physical(mat_ctx, &source_metadata.schema))
                     .collect::<Result<_, _>>()?;
 
                 let aggregated_exprs_key_part = aggregates.iter()
@@ -456,14 +462,18 @@ impl Node {
                 joined,
                 joined_key,
             } => {
+                let source_metadata = source.metadata(mat_ctx.schema_context.clone())?;
+
                 let source_key_exprs = source_key
                     .into_iter()
-                    .map(|expr| expr.physical(mat_ctx))
+                    .map(|expr| expr.physical(mat_ctx, &source_metadata.schema))
                     .collect::<Result<_, _>>()?;
+
+                let joined_metadata = joined.metadata(mat_ctx.schema_context.clone())?;
 
                 let joined_key_exprs = joined_key
                     .into_iter()
-                    .map(|expr| expr.physical(mat_ctx))
+                    .map(|expr| expr.physical(mat_ctx, &joined_metadata.schema))
                     .collect::<Result<_, _>>()?;
 
                 Ok(Arc::new(StreamJoin::new(
@@ -481,12 +491,12 @@ impl Node {
                 match function {
                     TableValuedFunction::Range(start, end) => {
                         let start_expr = if let TableValuedFunctionArgument::Expresion(expr) = start {
-                            expr.physical(mat_ctx)?
+                            expr.physical(mat_ctx, &Arc::new(Schema::new(vec![])))?
                         } else {
                             return Err(anyhow!("range start must be expression"));
                         };
                         let end_expr = if let TableValuedFunctionArgument::Expresion(expr) = end {
-                            expr.physical(mat_ctx)?
+                            expr.physical(mat_ctx, &Arc::new(Schema::new(vec![])))?
                         } else {
                             return Err(anyhow!("range end must be expression"));
                         };
@@ -498,15 +508,16 @@ impl Node {
                         } else {
                             return Err(anyhow!("max diff watermark generator time_field_name must be identifier"));
                         };
-                        let max_diff_expr = if let TableValuedFunctionArgument::Expresion(expr) = max_diff {
-                            expr.physical(mat_ctx)?
-                        } else {
-                            return Err(anyhow!("max diff watermark generator max_diff must be expression"));
-                        };
                         let source_node = if let TableValuedFunctionArgument::Table(query) = source {
                             query.physical(mat_ctx)?
                         } else {
                             return Err(anyhow!("max diff watermark generator source must be query"));
+                        };
+                        let source_schema = source_node.logical_metadata();
+                        let max_diff_expr = if let TableValuedFunctionArgument::Expresion(expr) = max_diff {
+                            expr.physical(mat_ctx, &source_schema.schema)?
+                        } else {
+                            return Err(anyhow!("max diff watermark generator max_diff must be expression"));
                         };
                         Ok(Arc::new(MaxDiffWatermarkGenerator::new(logical_metadata, time_field_name, max_diff_expr, source_node)))
                     }
@@ -591,6 +602,7 @@ impl Expression {
     pub fn physical(
         &self,
         mat_ctx: &MaterializationContext,
+        record_schema: &Arc<Schema>,
     ) -> Result<Arc<dyn expression::Expression>> {
         match self {
             Expression::Variable(name) => Ok(Arc::new(expression::FieldExpression::new(name.clone()))),
@@ -598,7 +610,7 @@ impl Expression {
             Expression::Function(name, args) => {
                 let args_physical = args
                     .into_iter()
-                    .map(|expr| expr.physical(mat_ctx))
+                    .map(|expr| expr.physical(mat_ctx, record_schema))
                     .collect::<Result<_, _>>()?;
 
                 match name {
@@ -612,7 +624,14 @@ impl Expression {
                 }
             }
             Expression::Wildcard(qualifier) => Ok(Arc::new(WildcardExpression::new(qualifier.as_ref().map(|s| s.as_str())))),
-            Expression::Subquery(query) => Ok(Arc::new(expression::Subquery::new(query.physical(mat_ctx)?))),
+            Expression::Subquery(query) => {
+                Ok(Arc::new(expression::Subquery::new(query.physical(&MaterializationContext{
+                    schema_context: Arc::new(SchemaContextWithSchema {
+                        previous: mat_ctx.schema_context.clone(),
+                        schema: record_schema.clone(),
+                    })
+                })?)))
+            },
         }
     }
 }

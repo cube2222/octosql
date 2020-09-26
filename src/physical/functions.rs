@@ -57,10 +57,6 @@ impl FunctionExpression
 
 impl Expression for FunctionExpression
 {
-    fn field_meta(&self, schema_context: Arc<dyn SchemaContext>, record_schema: &Arc<Schema>) -> Result<Field> {
-        (self.meta_function)(&schema_context, record_schema)
-    }
-
     fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef> {
         let args = self.args.iter()
             .map(|expr| expr.evaluate(ctx, record))

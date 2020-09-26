@@ -10,12 +10,6 @@ use crate::physical::arrow::{create_row, get_scalar_value, make_array};
 use crate::physical::physical::{ExecutionContext, Identifier, Node, noop_meta_send, ScalarValue, SchemaContext, SchemaContextWithSchema, VariableContext};
 
 pub trait Expression: Send + Sync {
-    fn field_meta(
-        &self,
-        schema_context: Arc<dyn SchemaContext>,
-        record_schema: &Arc<Schema>,
-    ) -> Result<Field>;
-
     fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef>;
 
     fn evaluate_scalar(&self, ctx: &ExecutionContext) -> Result<ScalarValue> {
@@ -45,23 +39,6 @@ impl FieldExpression {
 
 // TODO: Two phases, FieldExpression and RunningFieldExpression. First gets the schema and produces the second.
 impl Expression for FieldExpression {
-    fn field_meta(
-        &self,
-        schema_context: Arc<dyn SchemaContext>,
-        record_schema: &Arc<Schema>,
-    ) -> Result<Field> {
-        let field_name_string = self.field.to_string();
-        let field_name = field_name_string.as_str();
-        match record_schema.field_with_name(field_name) {
-            Ok(field) => Ok(field.clone()),
-            Err(arrow_err) => {
-                match schema_context.field_with_name(field_name).map(|field| field.clone()) {
-                    Ok(field) => Ok(field),
-                    Err(err) => Err(arrow_err).context(err),
-                }
-            }
-        }
-    }
     fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef> {
         let record_schema: Arc<Schema> = record.schema();
         let field_name_string = self.field.to_string();
@@ -99,13 +76,6 @@ impl Constant {
 }
 
 impl Expression for Constant {
-    fn field_meta(
-        &self,
-        _schema_context: Arc<dyn SchemaContext>,
-        _record_schema: &Arc<Schema>,
-    ) -> Result<Field> {
-        Ok(Field::new("", self.value.data_type(), self.value == ScalarValue::Null))
-    }
     fn evaluate(&self, _ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef> {
         match &self.value {
             ScalarValue::Int64(n) => {
@@ -141,17 +111,6 @@ impl Subquery {
 }
 
 impl Expression for Subquery {
-    fn field_meta(
-        &self,
-        schema_context: Arc<dyn SchemaContext>,
-        record_schema: &Arc<Schema>,
-    ) -> Result<Field> {
-        let source_schema = self.query.logical_metadata().schema;
-        // TODO: Implement for tuples.
-        let field_base = source_schema.field(0);
-        Ok(Field::new(field_base.name().as_str(), field_base.data_type().clone(), true))
-    }
-
     // TODO: Would probably be more elegant to gather vectors of record batches, and then do a type switch later, creating the final array in a typesafe way.
     fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef> {
         let source_schema = self.query.logical_metadata().schema;
@@ -248,24 +207,6 @@ impl WildcardExpression {
 }
 
 impl Expression for WildcardExpression {
-    fn field_meta(
-        &self,
-        _schema_context: Arc<dyn SchemaContext>,
-        record_schema: &Arc<Schema>,
-    ) -> Result<Field> {
-        let fields = record_schema.fields().iter()
-            .enumerate()
-            .map(|(i, f)| Field::new(format!("{}", i).as_str(), f.data_type().clone(), f.is_nullable()))
-            .filter(|f| {
-                if let Some(qualifier) = &self.qualifier {
-                    f.name().starts_with(qualifier)
-                } else {
-                    true
-                }
-            })
-            .collect();
-        Ok(Field::new("", DataType::Struct(fields), false))
-    }
     fn evaluate(&self, _ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef> {
         let source_schema = record.schema();
 

@@ -388,6 +388,11 @@ impl Node {
             } => {
                 let source_metadata = source.metadata(mat_ctx.schema_context.clone())?;
 
+                let key_types: Vec<DataType> = key_exprs
+                    .iter()
+                    .map(|key_expr| key_expr.metadata(mat_ctx.schema_context.clone(), &source_metadata.schema).unwrap().data_type().clone())
+                    .collect();
+
                 let key_exprs_physical = key_exprs
                     .into_iter()
                     .map(|expr| expr.physical(mat_ctx, &source_metadata.schema))
@@ -447,6 +452,7 @@ impl Node {
 
                 Ok(Arc::new(GroupBy::new(
                     logical_metadata,
+                    key_types,
                     key_exprs_physical,
                     output_key_indices,
                     aggregated_exprs_physical,

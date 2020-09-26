@@ -31,6 +31,8 @@ use crate::logical::logical::NodeMetadata;
 
 pub struct GroupBy {
     logical_metadata: NodeMetadata,
+    key_types: Vec<DataType>,
+
     key: Vec<Arc<dyn Expression>>,
     output_key_indices: Vec<usize>,
     aggregated_exprs: Vec<Arc<dyn Expression>>,
@@ -43,6 +45,7 @@ pub struct GroupBy {
 impl GroupBy {
     pub fn new(
         logical_metadata: NodeMetadata,
+        key_types: Vec<DataType>,
         key: Vec<Arc<dyn Expression>>,
         output_key_indices: Vec<usize>,
         aggregated_exprs: Vec<Arc<dyn Expression>>,
@@ -53,6 +56,7 @@ impl GroupBy {
     ) -> GroupBy {
         return GroupBy {
             logical_metadata,
+            key_types,
             key,
             output_key_indices,
             aggregated_exprs,
@@ -200,15 +204,9 @@ impl Node for GroupBy {
         let mut last_triggered_values_cell: RefCell<BTreeMap<Vec<GroupByScalar>, Vec<ScalarValue>>> =
             RefCell::new(BTreeMap::new());
 
-        let key_types: Vec<DataType> = self
-            .key
-            .iter()
-            .map(|key_expr| key_expr.field_meta(exec_ctx.variable_context.clone(), &source_schema).unwrap().data_type().clone())
-            .collect();
-
         let mut trigger_cell: RefCell<Box<dyn Trigger>> = RefCell::new(self.trigger_prototypes.get(0)
-            .map(|prototype| prototype.create_trigger(key_types.clone(), None))
-            .unwrap_or_else(|| Box::new(CountingTrigger::new(key_types.clone(), 1))));
+            .map(|prototype| prototype.create_trigger(self.key_types.clone(), None))
+            .unwrap_or_else(|| Box::new(CountingTrigger::new(self.key_types.clone(), 1))));
 
         let mut produce_cell = RefCell::new(produce);
 

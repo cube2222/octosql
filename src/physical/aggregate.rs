@@ -19,7 +19,6 @@ use anyhow::Result;
 use crate::physical::physical::ScalarValue;
 
 pub trait Aggregate: Send + Sync {
-    fn output_type(&self, input_schema: &DataType) -> Result<DataType>;
     fn create_accumulator(&self, input_type: &DataType) -> Box<dyn Accumulator>;
 }
 
@@ -31,25 +30,6 @@ pub trait Accumulator: std::fmt::Debug {
 pub struct Sum {}
 
 impl Aggregate for Sum {
-    fn output_type(&self, input_type: &DataType) -> Result<DataType> {
-        match input_type {
-            DataType::Int8 => Ok(DataType::Int8),
-            DataType::Int16 => Ok(DataType::Int16),
-            DataType::Int32 => Ok(DataType::Int32),
-            DataType::Int64 => Ok(DataType::Int64),
-            DataType::UInt8 => Ok(DataType::UInt8),
-            DataType::UInt16 => Ok(DataType::UInt16),
-            DataType::UInt32 => Ok(DataType::UInt32),
-            DataType::UInt64 => Ok(DataType::UInt64),
-            DataType::Float32 => Ok(DataType::Float32),
-            DataType::Float64 => Ok(DataType::Float64),
-            _ => {
-                dbg!(input_type);
-                unimplemented!()
-            }
-        }
-    }
-
     fn create_accumulator(&self, input_type: &DataType) -> Box<dyn Accumulator> {
         match input_type {
             DataType::Int8 => Box::new(SumAccumulator::<i8> { sum: 0, count: 0 }),
@@ -122,10 +102,6 @@ impl_sum_accumulator!(f64, Float64);
 pub struct Count {}
 
 impl Aggregate for Count {
-    fn output_type(&self, _input_type: &DataType) -> Result<DataType> {
-        Ok(DataType::Int64)
-    }
-
     fn create_accumulator(&self, _input_type: &DataType) -> Box<dyn Accumulator> {
         Box::new(CountAccumulator { count: 0 })
     }

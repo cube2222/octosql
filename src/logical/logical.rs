@@ -335,7 +335,6 @@ impl Node {
         &self,
         mat_ctx: &MaterializationContext,
     ) -> Result<Arc<dyn physical::Node>> {
-        // TODO: Fixme mat_ctx propagation.
         let logical_metadata = self.metadata(mat_ctx.schema_context.clone())?;
 
         match self {

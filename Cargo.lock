@@ -1000,6 +1000,7 @@ dependencies = [
  "bigdecimal",
  "chrono",
  "datafusion",
+ "itertools 0.8.2",
  "lazy_static",
  "log",
  "matches",

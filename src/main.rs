@@ -21,9 +21,9 @@ use std::sync::Arc;
 
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
-use anyhow::Result;
+use anyhow::{Result, Error};
 
-use crate::logical::logical::MaterializationContext;
+use crate::logical::logical::{MaterializationContext, Transformers};
 use crate::logical::sql::query_to_logical_plan;
 use crate::parser::parser::parse_sql;
 use crate::physical::physical::{EmptySchemaContext, ExecutionContext, noop_meta_send, ProduceContext, VariableContext};
@@ -106,6 +106,15 @@ fn main() {
     dbg!(&logical_plan);
 
     dbg!(logical_plan.metadata(Arc::new(EmptySchemaContext {})).unwrap());
+
+    let (transformed, state) = logical_plan.transform(&Transformers::<_, Error>{
+        node_fn: None,
+        expr_fn: Some(Box::new(|state, expr| Ok((Box::new(expr.clone()), state+1)))),
+        base_state: 0 as usize,
+        state_reduce: Box::new(|x, y| {dbg!(&x); dbg!(&y); x+y})
+    }).unwrap();
+    dbg!(transformed);
+    dbg!(state);
 
     let plan = logical_plan.physical(&MaterializationContext { schema_context: Arc::new(EmptySchemaContext {}) }).unwrap();
 

@@ -24,6 +24,7 @@ paste = "0.1"
 bigdecimal = { version = "0.2", features = ["serde"], optional = true }
 log = "0.4"
 anyhow = "1.0"
+itertools = "0.8"
 
 [dev-dependencies]
 simple_logger = "1.6"

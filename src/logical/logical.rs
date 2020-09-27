@@ -19,6 +19,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use arrow::{csv, json};
 use arrow::datatypes::{DataType, Field, Schema};
+use itertools::Itertools;
 
 use crate::physical::aggregate;
 use crate::physical::csv::CSVSource;
@@ -37,9 +38,15 @@ use crate::physical::tbv::max_diff_watermark_generator::MaxDiffWatermarkGenerato
 use crate::physical::tbv::range::Range;
 use crate::physical::trigger;
 
-pub struct Transformers<E: Error> {
-    node_fn: Option<Box<dyn Fn(&Node) -> std::result::Result<Box<Node>, E>>>,
-    expr_fn: Option<Box<dyn Fn(&Expression) -> std::result::Result<Box<Expression>, E>>>,
+type TransformNodeFn<T, E> = Box<dyn Fn(T, &Node) -> std::result::Result<(Box<Node>, T), E>>;
+type TransformExpressionFn<T, E> = Box<dyn Fn(T, &Expression) -> std::result::Result<(Box<Expression>, T), E>>;
+
+// TODO: Add schema_context.
+pub struct Transformers<T: Clone, E> {
+    pub node_fn: Option<TransformNodeFn<T, E>>,
+    pub expr_fn: Option<TransformExpressionFn<T, E>>,
+    pub base_state: T,
+    pub state_reduce: Box<dyn Fn(T, T) -> T>,
 }
 
 #[derive(Clone, Debug)]
@@ -271,7 +278,7 @@ impl Node {
                     .collect();
 
                 // TODO: Check if source and joined key types match.
-                // TODo: set time_field
+                // TODO: set time_field
 
                 Ok(NodeMetadata { partition_count: 1, schema: Arc::new(Schema::new(new_fields)), time_column: None })
             }
@@ -538,76 +545,115 @@ impl Node {
     }
 
     // TODO: Switch to Arc's, less expensive when cloning.
-    pub fn transform<E: Error>(&self, transformers: &Transformers<E>) -> std::result::Result<Box<Self>, E> {
+    pub fn transform<T: Clone, E>(&self, transformers: &Transformers<T, E>) -> std::result::Result<(Box<Self>, T), E> {
+        let default_tf: TransformNodeFn<T, E> = Box::new(|state: T, node: &Node| Ok((Box::new(node.clone()), state)));
         let tf = if let Some(tf) = &transformers.node_fn {
             tf
         } else {
-            return Ok(Box::new((*self).clone()));
+            &default_tf
         };
         match self {
-            Node::Source { name, alias } => tf(self),
+            Node::Source { name, alias } => tf(transformers.base_state.clone(), self),
             Node::Filter { source, filter_expr } => {
-                let source_tf = source.transform(transformers)?;
-                let filter_expr_tf = filter_expr.transform(transformers)?;
-                tf(&Node::Filter { source: source_tf, filter_expr: filter_expr_tf })
+                let (source_tf, source_state) = source.transform(transformers)?;
+                let (filter_expr_tf, filter_state) = filter_expr.transform(transformers)?;
+                tf(
+                    (transformers.state_reduce)(source_state, filter_state),
+                    &Node::Filter { source: source_tf, filter_expr: filter_expr_tf },
+                )
             }
             Node::Map { source, expressions, wildcards, keep_source_fields } => {
-                let source_tf = source.transform(transformers)?;
-                let expressions_tf = expressions.iter()
-                    .map(|(expr, ident)| Ok((expr.transform(transformers)?, ident.clone())))
-                    .collect::<Result<Vec<_>, _>>()?;
-                tf(&Node::Map {
-                    source: source_tf,
-                    expressions: expressions_tf,
-                    wildcards: wildcards.clone(),
-                    keep_source_fields: keep_source_fields.clone(),
-                })
+                let (source_tf, source_state) = source.transform(transformers)?;
+                let (expressions_tf, expressions_state): (_, Vec<T>) = expressions.iter()
+                    .map(|(expr, ident)| {
+                        let (expr_phys, state) = expr.transform(transformers)?;
+                        Ok(((expr_phys, ident.clone()), state))
+                    })
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter()
+                    .unzip();
+                tf(
+                    vec![source_state].into_iter().chain(expressions_state)
+                        .fold1(&transformers.state_reduce).unwrap(),
+                    &Node::Map {
+                        source: source_tf,
+                        expressions: expressions_tf,
+                        wildcards: wildcards.clone(),
+                        keep_source_fields: keep_source_fields.clone(),
+                    },
+                )
             }
             Node::GroupBy { source, key_exprs, aggregates, aggregated_exprs, output_fields, trigger } => {
-                let source_tf = source.transform(transformers)?;
-                let key_exprs_tf = key_exprs.iter()
+                let (source_tf, source_state) = source.transform(transformers)?;
+                let (key_exprs_tf, key_exprs_state): (_, Vec<T>) = key_exprs.iter()
                     .map(|expr| expr.transform(transformers))
-                    .collect::<Result<Vec<_>, _>>()?;
-                let aggregated_exprs_tf = aggregated_exprs.iter()
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter()
+                    .unzip();
+                let (aggregated_exprs_tf, aggregated_exprs_state): (_, Vec<T>) = aggregated_exprs.iter()
                     .map(|expr| expr.transform(transformers))
-                    .collect::<Result<Vec<_>, _>>()?;
-                tf(&Node::GroupBy {
-                    source: source_tf,
-                    key_exprs: key_exprs_tf,
-                    aggregates: aggregates.clone(),
-                    aggregated_exprs: aggregated_exprs_tf,
-                    output_fields: output_fields.clone(),
-                    trigger: trigger.clone(),
-                })
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter()
+                    .unzip();
+                tf(
+                    vec![source_state].into_iter().chain(key_exprs_state).chain(aggregated_exprs_state)
+                        .fold1(&transformers.state_reduce).unwrap(),
+                    &Node::GroupBy {
+                        source: source_tf,
+                        key_exprs: key_exprs_tf,
+                        aggregates: aggregates.clone(),
+                        aggregated_exprs: aggregated_exprs_tf,
+                        output_fields: output_fields.clone(),
+                        trigger: trigger.clone(),
+                    },
+                )
             }
             Node::Join { source, source_key, joined, joined_key } => {
-                let source_tf = source.transform(transformers)?;
-                let source_key_tf = source_key.iter()
+                let (source_tf, source_state) = source.transform(transformers)?;
+                let (source_key_tf, source_key_state): (_, Vec<T>) = source_key.iter()
                     .map(|expr| expr.transform(transformers))
-                    .collect::<Result<Vec<_>, _>>()?;
-                let joined_tf = joined.transform(transformers)?;
-                let joined_key_tf = joined_key.iter()
-                    .map(|expr| expr.transform(transformers))
-                    .collect::<Result<Vec<_>, _>>()?;
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter()
+                    .unzip();
 
-                tf(&Node::Join {
-                    source: source_tf,
-                    source_key: source_key_tf,
-                    joined: joined_tf,
-                    joined_key: joined_key_tf,
-                })
+                let (joined_tf, joined_state) = joined.transform(transformers)?;
+                let (joined_key_tf, joined_key_state): (_, Vec<T>) = joined_key.iter()
+                    .map(|expr| expr.transform(transformers))
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter()
+                    .unzip();
+
+                tf(
+                    vec![source_state].into_iter().chain(source_key_state)
+                        .chain(vec![joined_state]).chain(joined_key_state)
+                        .fold1(&transformers.state_reduce).unwrap(),
+                    &Node::Join {
+                        source: source_tf,
+                        source_key: source_key_tf,
+                        joined: joined_tf,
+                        joined_key: joined_key_tf,
+                    },
+                )
             }
             Node::Requalifier { source, qualifier } => {
-                let source_tf = source.transform(transformers)?;
+                let (source_tf, source_state) = source.transform(transformers)?;
 
-                tf(&Node::Requalifier {
-                    source: source_tf,
-                    qualifier: qualifier.clone(),
-                })
+                tf(
+                    source_state,
+                    &Node::Requalifier {
+                        source: source_tf,
+                        qualifier: qualifier.clone(),
+                    },
+                )
             }
             Node::Function(tbv) => {
-                tf(&Node::Function(tbv.transform(transformers)?))
+                let (tbv_tf, tbv_state) = tbv.transform(transformers)?;
+                tf(
+                    tbv_state,
+                    &Node::Function(tbv_tf),
+                )
             }
+            _ => unimplemented!(),
         }
     }
 }
@@ -720,29 +766,39 @@ impl Expression {
         }
     }
 
-    pub fn transform<E: Error>(&self, transformers: &Transformers<E>) -> std::result::Result<Box<Self>, E> {
+    pub fn transform<T: Clone, E>(&self, transformers: &Transformers<T, E>) -> std::result::Result<(Box<Self>, T), E> {
+        let default_tf: TransformExpressionFn<T, E> = Box::new(|state: T, expr: &Expression| Ok((Box::new(expr.clone()), state)));
         let tf = if let Some(tf) = &transformers.expr_fn {
             tf
         } else {
-            return Ok(Box::new((*self).clone()));
+            &default_tf
         };
         match self {
-            Expression::Variable(ident) => tf(&Expression::Variable(ident.clone())),
-            Expression::Constant(value) => tf(&Expression::Constant(value.clone())),
+            Expression::Variable(ident) => tf(transformers.base_state.clone(), &Expression::Variable(ident.clone())),
+            Expression::Constant(value) => tf(transformers.base_state.clone(), &Expression::Constant(value.clone())),
             Expression::Function(name, args) => {
-                let args_tf = args.iter()
+                let (args_tf, args_state): (_, Vec<T>) = args.iter()
                     .map(|expr| expr.transform(transformers))
-                    .collect::<Result<Vec<_>, _>>()?;
-                tf(&Expression::Function(
-                    name.clone(),
-                    args_tf,
-                ))
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter()
+                    .unzip();
+                tf(
+                    args_state.into_iter().fold1(&transformers.state_reduce).unwrap(),
+                    &Expression::Function(
+                        name.clone(),
+                        args_tf,
+                    ),
+                )
             }
-            Expression::Wildcard(qualifier) => tf(&Expression::Wildcard(qualifier.clone())),
+            Expression::Wildcard(qualifier) => tf(transformers.base_state.clone(), &Expression::Wildcard(qualifier.clone())),
             Expression::Subquery(node) => {
-                tf(&Expression::Subquery(
-                    node.transform(transformers)?,
-                ))
+                let (node_tf, node_state) = node.transform(transformers)?;
+                tf(
+                    node_state,
+                    &Expression::Subquery(
+                        node_tf
+                    ),
+                )
             }
         }
     }
@@ -798,19 +854,32 @@ impl Trigger {
 }
 
 impl TableValuedFunction {
-    pub fn transform<E: Error>(&self, transformers: &Transformers<E>) -> std::result::Result<Self, E> {
+    pub fn transform<T: Clone, E>(&self, transformers: &Transformers<T, E>) -> std::result::Result<(Self, T), E> {
         Ok(match self {
             TableValuedFunction::Range(arg0, arg1) => {
-                TableValuedFunction::Range(
-                    arg0.transform(transformers)?,
-                    arg1.transform(transformers)?,
+                let (arg0_tf, arg0_state) = arg0.transform(transformers)?;
+                let (arg1_tf, arg1_state) = arg1.transform(transformers)?;
+
+                (
+                    TableValuedFunction::Range(
+                        arg0_tf,
+                        arg1_tf,
+                    ),
+                    vec![arg0_state, arg1_state].into_iter().fold1(&transformers.state_reduce).unwrap(),
                 )
             }
             TableValuedFunction::MaxDiffWatermarkGenerator(arg0, arg1, arg2) => {
-                TableValuedFunction::MaxDiffWatermarkGenerator(
-                    arg0.transform(transformers)?,
-                    arg1.transform(transformers)?,
-                    arg2.transform(transformers)?,
+                let (arg0_tf, arg0_state) = arg0.transform(transformers)?;
+                let (arg1_tf, arg1_state) = arg1.transform(transformers)?;
+                let (arg2_tf, arg2_state) = arg2.transform(transformers)?;
+
+                (
+                    TableValuedFunction::MaxDiffWatermarkGenerator(
+                        arg0_tf,
+                        arg1_tf,
+                        arg2_tf,
+                    ),
+                    vec![arg0_state, arg1_state, arg2_state].into_iter().fold1(&transformers.state_reduce).unwrap(),
                 )
             }
         })
@@ -818,16 +887,18 @@ impl TableValuedFunction {
 }
 
 impl TableValuedFunctionArgument {
-    pub fn transform<E: Error>(&self, transformers: &Transformers<E>) -> std::result::Result<Self, E> {
+    pub fn transform<T: Clone, E>(&self, transformers: &Transformers<T, E>) -> std::result::Result<(Self, T), E> {
         Ok(match self {
             TableValuedFunctionArgument::Expresion(expr) => {
-                TableValuedFunctionArgument::Expresion(expr.transform(transformers)?)
+                let (expr_tf, expr_state) = expr.transform(transformers)?;
+                (TableValuedFunctionArgument::Expresion(expr_tf), expr_state)
             }
             TableValuedFunctionArgument::Table(node) => {
-                TableValuedFunctionArgument::Table(node.transform(transformers)?)
+                let (node_tf, node_state) = node.transform(transformers)?;
+                (TableValuedFunctionArgument::Table(node_tf), node_state)
             }
             TableValuedFunctionArgument::Descriptior(ident) => {
-                self.clone()
+                (self.clone(), transformers.base_state.clone())
             }
         })
     }

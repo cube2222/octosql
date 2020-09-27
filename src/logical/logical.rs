@@ -124,6 +124,7 @@ pub enum Aggregate {
     KeyPart,
     Count,
     Sum,
+    Avg,
 }
 
 #[derive(Clone, Debug)]
@@ -896,6 +897,7 @@ impl Aggregate {
                     }
                 }
             }
+            Aggregate::Avg => Ok(DataType::Float64)
         }
     }
 
@@ -906,6 +908,7 @@ impl Aggregate {
         match self {
             Aggregate::Count => Ok(Arc::new(aggregate::Count {})),
             Aggregate::Sum => Ok(Arc::new(aggregate::Sum {})),
+            Aggregate::Avg => Ok(Arc::new(aggregate::Avg {})),
             _ => unimplemented!(),
         }
     }

@@ -23,11 +23,12 @@ use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
 use anyhow::{Result, Error};
 
-use crate::logical::logical::{MaterializationContext, Transformers};
+use crate::logical::logical::{MaterializationContext, Transformers, TransformationContext};
 use crate::logical::sql::query_to_logical_plan;
 use crate::parser::parser::parse_sql;
 use crate::physical::physical::{EmptySchemaContext, ExecutionContext, noop_meta_send, ProduceContext, VariableContext};
 use crate::pretty::pretty_format_batches;
+use serde_json::ser::State::Empty;
 
 #[macro_use]
 mod physical;
@@ -107,12 +108,16 @@ fn main() {
 
     dbg!(logical_plan.metadata(Arc::new(EmptySchemaContext {})).unwrap());
 
-    let (transformed, state) = logical_plan.transform(&Transformers::<_, Error>{
-        node_fn: None,
-        expr_fn: Some(Box::new(|state, expr| Ok((Box::new(expr.clone()), state+1)))),
-        base_state: 0 as usize,
-        state_reduce: Box::new(|x, y| {dbg!(&x); dbg!(&y); x+y})
-    }).unwrap();
+    let (transformed, state) = logical_plan.transform(
+        &TransformationContext {
+            schema_context: Arc::new(EmptySchemaContext{}),
+        },
+        &Transformers::<_> {
+            node_fn: None,
+            expr_fn: Some(Box::new(|tf_ctx, record_schema, state, expr| Ok((Box::new(expr.clone()), state + 1)))),
+            base_state: 0 as usize,
+            state_reduce: Box::new(|x, y| x + y),
+        }).unwrap();
     dbg!(transformed);
     dbg!(state);
 

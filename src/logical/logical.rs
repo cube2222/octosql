@@ -38,13 +38,17 @@ use crate::physical::tbv::max_diff_watermark_generator::MaxDiffWatermarkGenerato
 use crate::physical::tbv::range::Range;
 use crate::physical::trigger;
 
-type TransformNodeFn<T, E> = Box<dyn Fn(T, &Node) -> std::result::Result<(Box<Node>, T), E>>;
-type TransformExpressionFn<T, E> = Box<dyn Fn(T, &Expression) -> std::result::Result<(Box<Expression>, T), E>>;
+pub struct TransformationContext {
+    pub schema_context: Arc<dyn SchemaContext>,
+}
 
-// TODO: Add schema_context.
-pub struct Transformers<T: Clone, E> {
-    pub node_fn: Option<TransformNodeFn<T, E>>,
-    pub expr_fn: Option<TransformExpressionFn<T, E>>,
+type TransformNodeFn<T> = Box<dyn Fn(&TransformationContext, T, &Node) -> Result<(Box<Node>, T)>>;
+type TransformExpressionFn<T> = Box<dyn Fn(&TransformationContext, &Arc<Schema>, T, &Expression) -> Result<(Box<Expression>, T)>>;
+
+// TODO: Add schema_context and cur_record_schema for expression transformer.
+pub struct Transformers<T: Clone> {
+    pub node_fn: Option<TransformNodeFn<T>>,
+    pub expr_fn: Option<TransformExpressionFn<T>>,
     pub base_state: T,
     pub state_reduce: Box<dyn Fn(T, T) -> T>,
 }
@@ -545,34 +549,38 @@ impl Node {
     }
 
     // TODO: Switch to Arc's, less expensive when cloning.
-    pub fn transform<T: Clone, E>(&self, transformers: &Transformers<T, E>) -> std::result::Result<(Box<Self>, T), E> {
-        let default_tf: TransformNodeFn<T, E> = Box::new(|state: T, node: &Node| Ok((Box::new(node.clone()), state)));
+    pub fn transform<T: Clone>(&self, tf_ctx: &TransformationContext, transformers: &Transformers<T>) -> Result<(Box<Self>, T)> {
+        let default_tf: TransformNodeFn<T> = Box::new(|tf_ctx: &TransformationContext, state: T, node: &Node| Ok((Box::new(node.clone()), state)));
         let tf = if let Some(tf) = &transformers.node_fn {
             tf
         } else {
             &default_tf
         };
         match self {
-            Node::Source { name, alias } => tf(transformers.base_state.clone(), self),
+            Node::Source { name, alias } => tf(tf_ctx, transformers.base_state.clone(), self),
             Node::Filter { source, filter_expr } => {
-                let (source_tf, source_state) = source.transform(transformers)?;
-                let (filter_expr_tf, filter_state) = filter_expr.transform(transformers)?;
+                let source_schema = source.metadata(tf_ctx.schema_context.clone())?.schema;
+                let (source_tf, source_state) = source.transform(tf_ctx, transformers)?;
+                let (filter_expr_tf, filter_state) = filter_expr.transform(tf_ctx, &source_schema, transformers)?;
                 tf(
+                    tf_ctx,
                     (transformers.state_reduce)(source_state, filter_state),
                     &Node::Filter { source: source_tf, filter_expr: filter_expr_tf },
                 )
             }
             Node::Map { source, expressions, wildcards, keep_source_fields } => {
-                let (source_tf, source_state) = source.transform(transformers)?;
+                let source_schema = source.metadata(tf_ctx.schema_context.clone())?.schema;
+                let (source_tf, source_state) = source.transform(tf_ctx, transformers)?;
                 let (expressions_tf, expressions_state): (_, Vec<T>) = expressions.iter()
                     .map(|(expr, ident)| {
-                        let (expr_phys, state) = expr.transform(transformers)?;
+                        let (expr_phys, state) = expr.transform(tf_ctx, &source_schema, transformers)?;
                         Ok(((expr_phys, ident.clone()), state))
                     })
-                    .collect::<Result<Vec<_>, _>>()?
+                    .collect::<Result<Vec<_>>>()?
                     .into_iter()
                     .unzip();
                 tf(
+                    tf_ctx,
                     vec![source_state].into_iter().chain(expressions_state)
                         .fold1(&transformers.state_reduce).unwrap(),
                     &Node::Map {
@@ -584,18 +592,20 @@ impl Node {
                 )
             }
             Node::GroupBy { source, key_exprs, aggregates, aggregated_exprs, output_fields, trigger } => {
-                let (source_tf, source_state) = source.transform(transformers)?;
+                let source_schema = source.metadata(tf_ctx.schema_context.clone())?.schema;
+                let (source_tf, source_state) = source.transform(tf_ctx, transformers)?;
                 let (key_exprs_tf, key_exprs_state): (_, Vec<T>) = key_exprs.iter()
-                    .map(|expr| expr.transform(transformers))
+                    .map(|expr| expr.transform(tf_ctx, &source_schema, transformers))
                     .collect::<Result<Vec<_>, _>>()?
                     .into_iter()
                     .unzip();
                 let (aggregated_exprs_tf, aggregated_exprs_state): (_, Vec<T>) = aggregated_exprs.iter()
-                    .map(|expr| expr.transform(transformers))
+                    .map(|expr| expr.transform(tf_ctx, &source_schema, transformers))
                     .collect::<Result<Vec<_>, _>>()?
                     .into_iter()
                     .unzip();
                 tf(
+                    tf_ctx,
                     vec![source_state].into_iter().chain(key_exprs_state).chain(aggregated_exprs_state)
                         .fold1(&transformers.state_reduce).unwrap(),
                     &Node::GroupBy {
@@ -609,21 +619,24 @@ impl Node {
                 )
             }
             Node::Join { source, source_key, joined, joined_key } => {
-                let (source_tf, source_state) = source.transform(transformers)?;
+                let source_schema = source.metadata(tf_ctx.schema_context.clone())?.schema;
+                let (source_tf, source_state) = source.transform(tf_ctx, transformers)?;
                 let (source_key_tf, source_key_state): (_, Vec<T>) = source_key.iter()
-                    .map(|expr| expr.transform(transformers))
+                    .map(|expr| expr.transform(tf_ctx, &source_schema, transformers))
                     .collect::<Result<Vec<_>, _>>()?
                     .into_iter()
                     .unzip();
 
-                let (joined_tf, joined_state) = joined.transform(transformers)?;
+                let joined_schema = joined.metadata(tf_ctx.schema_context.clone())?.schema;
+                let (joined_tf, joined_state) = joined.transform(tf_ctx, transformers)?;
                 let (joined_key_tf, joined_key_state): (_, Vec<T>) = joined_key.iter()
-                    .map(|expr| expr.transform(transformers))
+                    .map(|expr| expr.transform(tf_ctx, &joined_schema, transformers))
                     .collect::<Result<Vec<_>, _>>()?
                     .into_iter()
                     .unzip();
 
                 tf(
+                    tf_ctx,
                     vec![source_state].into_iter().chain(source_key_state)
                         .chain(vec![joined_state]).chain(joined_key_state)
                         .fold1(&transformers.state_reduce).unwrap(),
@@ -636,9 +649,10 @@ impl Node {
                 )
             }
             Node::Requalifier { source, qualifier } => {
-                let (source_tf, source_state) = source.transform(transformers)?;
+                let (source_tf, source_state) = source.transform(tf_ctx, transformers)?;
 
                 tf(
+                    tf_ctx,
                     source_state,
                     &Node::Requalifier {
                         source: source_tf,
@@ -647,9 +661,52 @@ impl Node {
                 )
             }
             Node::Function(tbv) => {
-                let (tbv_tf, tbv_state) = tbv.transform(transformers)?;
+                let (tbv_tf, states) = match tbv {
+                    TableValuedFunction::Range(start, end) => {
+                        let (start_expr_tf, start_expr_state) = if let TableValuedFunctionArgument::Expresion(expr) = start {
+                            expr.transform(tf_ctx, &Arc::new(Schema::new(vec![])), transformers)?
+                        } else {
+                            return Err(anyhow!("range start must be expression"));
+                        };
+                        let (end_expr_tf, end_expr_state) = if let TableValuedFunctionArgument::Expresion(expr) = end {
+                            expr.transform(tf_ctx, &Arc::new(Schema::new(vec![])), transformers)?
+                        } else {
+                            return Err(anyhow!("range end must be expression"));
+                        };
+                        (TableValuedFunction::Range(
+                            TableValuedFunctionArgument::Expresion(start_expr_tf),
+                            TableValuedFunctionArgument::Expresion(end_expr_tf),
+                        ), vec![start_expr_state, end_expr_state])
+                    }
+                    TableValuedFunction::MaxDiffWatermarkGenerator(time_field_name, max_diff, source) => {
+                        let (record_schema, (query_tf, query_state)) = if let TableValuedFunctionArgument::Table(query) = source {
+                            (
+                                query.metadata(tf_ctx.schema_context.clone())?.schema,
+                                query.transform(tf_ctx, transformers)?,
+                            )
+                        } else {
+                            return Err(anyhow!("max diff watermark generator source must be query"));
+                        };
+                        let time_field_name = if let TableValuedFunctionArgument::Descriptior(ident) = time_field_name {
+                            ident.clone()
+                        } else {
+                            return Err(anyhow!("max diff watermark generator time_field_name must be identifier"));
+                        };
+                        let (max_diff_tf, max_diff_state) = if let TableValuedFunctionArgument::Expresion(expr) = max_diff {
+                            expr.transform(tf_ctx, &record_schema, transformers)?
+                        } else {
+                            return Err(anyhow!("max diff watermark generator max_diff must be expression"));
+                        };
+                        (TableValuedFunction::MaxDiffWatermarkGenerator(
+                            TableValuedFunctionArgument::Descriptior(time_field_name),
+                            TableValuedFunctionArgument::Expresion(max_diff_tf),
+                            TableValuedFunctionArgument::Table(query_tf),
+                        ), vec![query_state, max_diff_state])
+                    }
+                };
                 tf(
-                    tbv_state,
+                    tf_ctx,
+                    states.into_iter().fold1(&transformers.state_reduce).unwrap(),
                     &Node::Function(tbv_tf),
                 )
             }
@@ -766,23 +823,25 @@ impl Expression {
         }
     }
 
-    pub fn transform<T: Clone, E>(&self, transformers: &Transformers<T, E>) -> std::result::Result<(Box<Self>, T), E> {
-        let default_tf: TransformExpressionFn<T, E> = Box::new(|state: T, expr: &Expression| Ok((Box::new(expr.clone()), state)));
+    pub fn transform<T: Clone>(&self, tf_ctx: &TransformationContext, record_schema: &Arc<Schema>, transformers: &Transformers<T>) -> Result<(Box<Self>, T)> {
+        let default_tf: TransformExpressionFn<T> = Box::new(|tf_ctx: &TransformationContext, record_schema: &Arc<Schema>, state: T, expr: &Expression| Ok((Box::new(expr.clone()), state)));
         let tf = if let Some(tf) = &transformers.expr_fn {
             tf
         } else {
             &default_tf
         };
         match self {
-            Expression::Variable(ident) => tf(transformers.base_state.clone(), &Expression::Variable(ident.clone())),
-            Expression::Constant(value) => tf(transformers.base_state.clone(), &Expression::Constant(value.clone())),
+            Expression::Variable(ident) => tf(tf_ctx, record_schema, transformers.base_state.clone(), &Expression::Variable(ident.clone())),
+            Expression::Constant(value) => tf(tf_ctx, record_schema, transformers.base_state.clone(), &Expression::Constant(value.clone())),
             Expression::Function(name, args) => {
                 let (args_tf, args_state): (_, Vec<T>) = args.iter()
-                    .map(|expr| expr.transform(transformers))
+                    .map(|expr| expr.transform(tf_ctx, record_schema, transformers))
                     .collect::<Result<Vec<_>, _>>()?
                     .into_iter()
                     .unzip();
                 tf(
+                    tf_ctx,
+                    record_schema,
                     args_state.into_iter().fold1(&transformers.state_reduce).unwrap(),
                     &Expression::Function(
                         name.clone(),
@@ -790,10 +849,20 @@ impl Expression {
                     ),
                 )
             }
-            Expression::Wildcard(qualifier) => tf(transformers.base_state.clone(), &Expression::Wildcard(qualifier.clone())),
+            Expression::Wildcard(qualifier) => tf(tf_ctx, record_schema, transformers.base_state.clone(), &Expression::Wildcard(qualifier.clone())),
             Expression::Subquery(node) => {
-                let (node_tf, node_state) = node.transform(transformers)?;
+                let (node_tf, node_state) = node.transform(
+                    &TransformationContext {
+                        schema_context: Arc::new(SchemaContextWithSchema {
+                            previous: tf_ctx.schema_context.clone(),
+                            schema: record_schema.clone(),
+                        })
+                    },
+                    transformers,
+                )?;
                 tf(
+                    tf_ctx,
+                    record_schema,
                     node_state,
                     &Expression::Subquery(
                         node_tf
@@ -850,56 +919,5 @@ impl Trigger {
         match self {
             Trigger::Counting(n) => Ok(Arc::new(trigger::CountingTriggerPrototype::new(n.clone()))),
         }
-    }
-}
-
-impl TableValuedFunction {
-    pub fn transform<T: Clone, E>(&self, transformers: &Transformers<T, E>) -> std::result::Result<(Self, T), E> {
-        Ok(match self {
-            TableValuedFunction::Range(arg0, arg1) => {
-                let (arg0_tf, arg0_state) = arg0.transform(transformers)?;
-                let (arg1_tf, arg1_state) = arg1.transform(transformers)?;
-
-                (
-                    TableValuedFunction::Range(
-                        arg0_tf,
-                        arg1_tf,
-                    ),
-                    vec![arg0_state, arg1_state].into_iter().fold1(&transformers.state_reduce).unwrap(),
-                )
-            }
-            TableValuedFunction::MaxDiffWatermarkGenerator(arg0, arg1, arg2) => {
-                let (arg0_tf, arg0_state) = arg0.transform(transformers)?;
-                let (arg1_tf, arg1_state) = arg1.transform(transformers)?;
-                let (arg2_tf, arg2_state) = arg2.transform(transformers)?;
-
-                (
-                    TableValuedFunction::MaxDiffWatermarkGenerator(
-                        arg0_tf,
-                        arg1_tf,
-                        arg2_tf,
-                    ),
-                    vec![arg0_state, arg1_state, arg2_state].into_iter().fold1(&transformers.state_reduce).unwrap(),
-                )
-            }
-        })
-    }
-}
-
-impl TableValuedFunctionArgument {
-    pub fn transform<T: Clone, E>(&self, transformers: &Transformers<T, E>) -> std::result::Result<(Self, T), E> {
-        Ok(match self {
-            TableValuedFunctionArgument::Expresion(expr) => {
-                let (expr_tf, expr_state) = expr.transform(transformers)?;
-                (TableValuedFunctionArgument::Expresion(expr_tf), expr_state)
-            }
-            TableValuedFunctionArgument::Table(node) => {
-                let (node_tf, node_state) = node.transform(transformers)?;
-                (TableValuedFunctionArgument::Table(node_tf), node_state)
-            }
-            TableValuedFunctionArgument::Descriptior(ident) => {
-                (self.clone(), transformers.base_state.clone())
-            }
-        })
     }
 }

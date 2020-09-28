@@ -298,11 +298,38 @@ macro_rules! impl_max_accumulator {
     ($primitive_type: ident, $scalar_value_type: ident) => {
         impl Accumulator for MaxAccumulator<$primitive_type> {
             fn add(&mut self, value: ScalarValue, retract: ScalarValue) -> bool {
-                panic!("implement me");
+                if let ScalarValue::$scalar_value_type(raw_value) = value {
+                    let value_count = self.values_counts.entry(raw_value).or_insert(0);
+
+                    let is_retraction = match retract {
+                        ScalarValue::Boolean(x) => x,
+                        _ => panic!("retraction shall be boolean"),
+                    };
+                    if !is_retraction {
+                        *value_count += 1;
+                    } else {
+                        *value_count -= 1;
+                    }
+
+                    let should_remove = *value_count == 0; // we can clear the value if it was retracted
+
+                    drop(value_count);
+
+                    if should_remove {
+                        self.values_counts.remove(&raw_value);
+                    }
+
+                    !should_remove
+                } else {
+                    panic!("bad aggregate argument");
+                }
             }
 
             fn trigger(&self) -> ScalarValue {
-                panic!("implement me");
+                match self.values_counts.keys().next_back() { // only difference to Min is here
+                    Some(val) => return ScalarValue::$scalar_value_type(val.clone()),
+                    None => return ScalarValue::Null,
+                }
             }
         }
     }

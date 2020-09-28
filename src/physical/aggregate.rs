@@ -16,7 +16,8 @@ use std::ops::{AddAssign, SubAssign};
 
 use anyhow::Result;
 use arrow::datatypes::DataType;
-use nom::lib::std::collections::BTreeMap;
+use std::collections::BTreeMap;
+use std::mem::drop;
 
 use crate::physical::physical::ScalarValue;
 
@@ -234,11 +235,15 @@ macro_rules! impl_min_accumulator {
                         *value_count -= 1;
                     }
 
-                    if *value_count == 0 { // we can clear the value as it was retracted
+                    let should_remove = *value_count == 0; // we can clear the value if it was retracted
+
+                    drop(value_count);
+
+                    if should_remove {
                         self.values_counts.remove(&raw_value);
                     }
 
-                    *value_count != 0
+                    !should_remove
                 } else {
                     panic!("bad aggregate argument");
                 }
@@ -246,7 +251,7 @@ macro_rules! impl_min_accumulator {
 
             fn trigger(&self) -> ScalarValue {
                 match self.values_counts.keys().next() {
-                    Some(val) => return ScalarValue::$scalar_value_type(val), // TODO - <should be i64, found &i64 ?>
+                    Some(val) => return ScalarValue::$scalar_value_type(val.clone()),
                     None => return ScalarValue::Null,
                 }
             }

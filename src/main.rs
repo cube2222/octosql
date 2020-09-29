@@ -29,6 +29,7 @@ use crate::parser::parser::parse_sql;
 use crate::physical::physical::{EmptySchemaContext, ExecutionContext, noop_meta_send, ProduceContext, VariableContext};
 use crate::pretty::pretty_format_batches;
 use serde_json::ser::State::Empty;
+use crate::logical::optimizer::remove_wildcards::remove_wildcards;
 
 #[macro_use]
 mod physical;
@@ -104,6 +105,9 @@ fn main() {
     let query = parse_sql(sql.as_str());
     dbg!(&query);
     let logical_plan = query_to_logical_plan(query.as_ref());
+    dbg!(&logical_plan);
+
+    let logical_plan = remove_wildcards(logical_plan.as_ref()).unwrap();
     dbg!(&logical_plan);
 
     dbg!(logical_plan.metadata(Arc::new(EmptySchemaContext {})).unwrap());

@@ -63,11 +63,15 @@ pub enum Node {
         source: Box<Node>,
         filter_expr: Box<Expression>,
     },
-    Map {
+    MapWithWildcards {
         source: Box<Node>,
         expressions: Vec<(Box<Expression>, Identifier)>,
         wildcards: Vec<Option<String>>,
         keep_source_fields: bool,
+    },
+    Map {
+        source: Box<Node>,
+        expressions: Vec<(Box<Expression>, Identifier)>,
     },
     GroupBy {
         source: Box<Node>,
@@ -172,8 +176,38 @@ impl Node {
             Node::Filter { source, filter_expr } => {
                 source.metadata(schema_context.clone())
             }
+            Node::Map { source, expressions: expressions_with_names } => {
+                let source_metadata = source.metadata(schema_context.clone())?;
+                let source_schema = &source_metadata.schema;
+
+                let (expressions, names): (Vec<_>, Vec<_>) = expressions_with_names.iter()
+                    // For some reason .cloned() doesn't work here.
+                    .map(|(expr, ident)| (expr.clone(), ident.clone()))
+                    .unzip();
+
+                let mut new_schema_fields: Vec<Field> = expressions
+                    .iter()
+                    .map(|expr| {
+                        expr.metadata(schema_context.clone(), &source_schema)
+                            .unwrap_or_else(|err| {
+                                dbg!(err);
+                                unimplemented!()
+                            })
+                    })
+                    .enumerate()
+                    .map(|(i, field)| Field::new(names[i].to_string().as_str(), field.data_type().clone(), field.is_nullable()))
+                    .collect();
+
+                new_schema_fields.push(Field::new(RETRACTIONS_FIELD, DataType::Boolean, false));
+
+                Ok(NodeMetadata {
+                    partition_count: source_metadata.partition_count,
+                    schema: Arc::new(Schema::new(new_schema_fields)),
+                    time_column: None,
+                })
+            }
             // TODO: Just don't allow to use retractions field as field name.
-            Node::Map { source, expressions: expressions_with_names, wildcards, keep_source_fields } => {
+            Node::MapWithWildcards { source, expressions: expressions_with_names, wildcards, keep_source_fields } => {
                 let source_metadata = source.metadata(schema_context.clone())?;
                 let source_schema = &source_metadata.schema;
 
@@ -290,9 +324,11 @@ impl Node {
             Node::Requalifier { source, qualifier } => {
                 let source_metadata = source.metadata(schema_context.clone())?;
                 let source_schema = source_metadata.schema.as_ref();
-                let new_fields = source_schema.fields().iter()
+                let source_fields = source_schema.fields();
+                let mut new_fields: Vec<Field> = source_fields[0..source_fields.len()-1].iter()
                     .map(|f| Field::new(requalify(qualifier.as_str(), f.name()).as_str(), f.data_type().clone(), f.is_nullable()))
                     .collect();
+                new_fields.push(source_fields[source_fields.len()-1].clone());
 
                 Ok(NodeMetadata {
                     partition_count: source_metadata.partition_count,
@@ -374,10 +410,7 @@ impl Node {
                 )))
             }
             Node::Map {
-                source,
-                expressions,
-                wildcards,
-                keep_source_fields,
+                source, expressions
             } => {
                 let source_metadata = source.metadata(mat_ctx.schema_context.clone())?;
 
@@ -393,7 +426,15 @@ impl Node {
                     expr_vec.push(expr);
                     name_vec.push(name);
                 }
-                Ok(Arc::new(map::Map::new(logical_metadata, source.physical(mat_ctx)?, expr_vec, name_vec, wildcards.clone(), *keep_source_fields)))
+                Ok(Arc::new(map::Map::new(logical_metadata, source.physical(mat_ctx)?, expr_vec, name_vec)))
+            }
+            Node::MapWithWildcards {
+                source,
+                expressions,
+                wildcards,
+                keep_source_fields,
+            } => {
+                unimplemented!()
             }
             Node::GroupBy {
                 source,
@@ -569,7 +610,7 @@ impl Node {
                     &Node::Filter { source: source_tf, filter_expr: filter_expr_tf },
                 )
             }
-            Node::Map { source, expressions, wildcards, keep_source_fields } => {
+            Node::Map { source, expressions } => {
                 let source_schema = source.metadata(tf_ctx.schema_context.clone())?.schema;
                 let (source_tf, source_state) = source.transform(tf_ctx, transformers)?;
                 let (expressions_tf, expressions_state): (_, Vec<T>) = expressions.iter()
@@ -585,6 +626,27 @@ impl Node {
                     vec![source_state].into_iter().chain(expressions_state)
                         .fold1(&transformers.state_reduce).unwrap(),
                     &Node::Map {
+                        source: source_tf,
+                        expressions: expressions_tf,
+                    },
+                )
+            }
+            Node::MapWithWildcards { source, expressions, wildcards, keep_source_fields } => {
+                let source_schema = source.metadata(tf_ctx.schema_context.clone())?.schema;
+                let (source_tf, source_state) = source.transform(tf_ctx, transformers)?;
+                let (expressions_tf, expressions_state): (_, Vec<T>) = expressions.iter()
+                    .map(|(expr, ident)| {
+                        let (expr_phys, state) = expr.transform(tf_ctx, &source_schema, transformers)?;
+                        Ok(((expr_phys, ident.clone()), state))
+                    })
+                    .collect::<Result<Vec<_>>>()?
+                    .into_iter()
+                    .unzip();
+                tf(
+                    tf_ctx,
+                    vec![source_state].into_iter().chain(expressions_state)
+                        .fold1(&transformers.state_reduce).unwrap(),
+                    &Node::MapWithWildcards {
                         source: source_tf,
                         expressions: expressions_tf,
                         wildcards: wildcards.clone(),
@@ -711,7 +773,6 @@ impl Node {
                     &Node::Function(tbv_tf),
                 )
             }
-            _ => unimplemented!(),
         }
     }
 }

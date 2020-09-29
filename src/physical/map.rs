@@ -28,28 +28,15 @@ pub struct Map {
     source: Arc<dyn Node>,
     expressions: Vec<Arc<dyn Expression>>,
     names: Vec<Identifier>,
-    wildcards: Vec<Option<String>>,
-    keep_source_fields: bool,
 }
 
 impl Map {
-    pub fn new(logical_metadata: NodeMetadata, source: Arc<dyn Node>, expressions: Vec<Arc<dyn Expression>>, names: Vec<Identifier>, wildcards: Vec<Option<String>>, keep_source_fields: bool) -> Map {
-        let wildcards = wildcards.into_iter()
-            .map(|wildcard| {
-                wildcard.map(|mut qualifier| {
-                    qualifier.push_str(".");
-                    qualifier
-                })
-            })
-            .collect();
-
+    pub fn new(logical_metadata: NodeMetadata, source: Arc<dyn Node>, expressions: Vec<Arc<dyn Expression>>, names: Vec<Identifier>) -> Map {
         Map {
             logical_metadata,
             source,
             expressions,
             names,
-            wildcards,
-            keep_source_fields,
         }
     }
 }
@@ -65,49 +52,17 @@ impl Node for Map {
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<()> {
-        let source_schema = self.source.logical_metadata().schema;
         let output_schema = self.logical_metadata.schema.clone();
-        let wildcard_column_indices: Vec<usize> = self.wildcards.iter()
-            .flat_map(|qualifier| {
-                match qualifier {
-                    Some(qualifier) => {
-                        source_schema.fields().clone().into_iter()
-                            .enumerate()
-                            .filter(|(_column_index, f)| {
-                                f.name().starts_with(qualifier)
-                            })
-                            .collect::<Vec<_>>()
-                    }
-                    None => {
-                        source_schema.fields().clone().into_iter().enumerate().collect::<Vec<_>>()
-                    }
-                }
-            })
-            .filter(|(_column_index, f)| f.name() != RETRACTIONS_FIELD)
-            .map(|(column_index, _f)| column_index)
-            .collect();
 
         self.source.run(
             ctx,
             &mut |produce_ctx, batch| {
-                let mut new_columns: Vec<ArrayRef> = wildcard_column_indices.iter()
-                    .map(|column_index| batch.column(column_index.clone()).clone())
-                    .collect();
-
-                let mut new_evaluated_columns: Vec<ArrayRef> = self
+                let mut new_columns: Vec<ArrayRef> = self
                     .expressions
                     .iter()
                     .map(|expr| expr.evaluate(ctx, &batch))
                     .collect::<Result<_, _>>()?;
-                new_columns.append(&mut new_evaluated_columns);
                 new_columns.push(batch.column(batch.num_columns() - 1).clone());
-
-                if self.keep_source_fields {
-                    let mut to_append = new_columns;
-                    new_columns = batch.columns().iter().cloned().collect();
-                    new_columns.truncate(new_columns.len() - 1); // Remove retraction field.
-                    new_columns.append(&mut to_append);
-                }
 
                 let new_batch = RecordBatch::try_new(output_schema.clone(), new_columns).unwrap();
 

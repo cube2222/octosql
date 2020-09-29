@@ -56,7 +56,7 @@ pub fn query_to_logical_plan(query: &parser::Query) -> Box<Node> {
                         (expr, ident)
                     }).collect();
 
-                plan = Box::new(Node::Map {
+                plan = Box::new(Node::MapWithWildcards {
                     source: plan,
                     expressions: bottom_map_expressions,
                     wildcards: vec![],
@@ -71,7 +71,7 @@ pub fn query_to_logical_plan(query: &parser::Query) -> Box<Node> {
                     .map(|ident| (Box::new(Expression::Variable(ident.clone())), ident))
                     .collect();
 
-                plan = Box::new(Node::Map {
+                plan = Box::new(Node::MapWithWildcards {
                     source: plan,
                     expressions: topmost_map_expressions,
                     wildcards: topmost_map_wildcards,

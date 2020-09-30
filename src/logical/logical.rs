@@ -197,13 +197,26 @@ impl Node {
                     .enumerate()
                     .map(|(i, field)| Field::new(names[i].to_string().as_str(), field.data_type().clone(), field.is_nullable()))
                     .collect();
-
                 new_schema_fields.push(Field::new(RETRACTIONS_FIELD, DataType::Boolean, false));
+
+                let mut new_time_column = None;
+                let source_time_column = source_metadata.time_column;
+                if let Some(source_time_column) = source_time_column {
+                    let source_time_field = source_schema.field(source_time_column).name();
+                    for i in 0..expressions.len() {
+                        if let Expression::Variable(ident) = expressions[i].as_ref() {
+                            if &ident.to_string() == source_time_field {
+                                new_time_column = Some(i);
+                                break;
+                            }
+                        }
+                    }
+                }
 
                 Ok(NodeMetadata {
                     partition_count: source_metadata.partition_count,
                     schema: Arc::new(Schema::new(new_schema_fields)),
-                    time_column: None,
+                    time_column: new_time_column,
                 })
             }
             // TODO: Just don't allow to use retractions field as field name.

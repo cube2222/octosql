@@ -40,13 +40,12 @@ pub fn remove_wildcards(logical_plan: &Node) -> Result<Box<Node>> {
                         if *keep_source_fields {
                             // Wildcards don't matter when keep_source_fields is true.
                             let source_schema = source.metadata(ctx.schema_context.clone())?.schema;
-                            let mut new_expressions: Vec<_> = source_schema.fields().iter()
+                            let mut new_expressions = expressions.clone();
+                            new_expressions.extend(source_schema.fields().iter()
                                 .map(|field| field.name().clone())
                                 .filter(|name| name != RETRACTIONS_FIELD)
                                 .map(|name| name_to_ident(name.as_str()))
-                                .map(|ident| (Box::new(Expression::Variable(ident.clone())), ident))
-                                .collect();
-                            new_expressions.append(&mut expressions.clone());
+                                .map(|ident| (Box::new(Expression::Variable(ident.clone())), ident)));
 
                             let new_wildcard_selectable_fields = {
                                 let source_schema = source.metadata(ctx.schema_context.clone())?.schema;

@@ -129,6 +129,8 @@ pub enum Aggregate {
     Count,
     Sum,
     Avg,
+    Min,
+    Max,
 }
 
 #[derive(Clone, Debug)]
@@ -967,6 +969,7 @@ impl Aggregate {
         match self {
             Aggregate::KeyPart => Ok(input_type.clone()),
             Aggregate::Count => Ok(DataType::Int64),
+            Aggregate::Avg => Ok(DataType::Float64),
             Aggregate::Sum => {
                 match input_type {
                     DataType::Int8 => Ok(DataType::Int8),
@@ -985,7 +988,22 @@ impl Aggregate {
                     }
                 }
             }
-            Aggregate::Avg => Ok(DataType::Float64)
+            Aggregate::Min | Aggregate::Max => {
+                match input_type {
+                    DataType::Int8 => Ok(DataType::Int8),
+                    DataType::Int16 => Ok(DataType::Int16),
+                    DataType::Int32 => Ok(DataType::Int32),
+                    DataType::Int64 => Ok(DataType::Int64),
+                    DataType::UInt8 => Ok(DataType::UInt8),
+                    DataType::UInt16 => Ok(DataType::UInt16),
+                    DataType::UInt32 => Ok(DataType::UInt32),
+                    DataType::UInt64 => Ok(DataType::UInt64),
+                    _ => {
+                        dbg!(input_type);
+                        unimplemented!()
+                    }
+                }
+            }
         }
     }
 
@@ -997,6 +1015,8 @@ impl Aggregate {
             Aggregate::Count => Ok(Arc::new(aggregate::Count {})),
             Aggregate::Sum => Ok(Arc::new(aggregate::Sum {})),
             Aggregate::Avg => Ok(Arc::new(aggregate::Avg {})),
+            Aggregate::Min => Ok(Arc::new(aggregate::Min {})),
+            Aggregate::Max => Ok(Arc::new(aggregate::Max {})),
             _ => unimplemented!(),
         }
     }

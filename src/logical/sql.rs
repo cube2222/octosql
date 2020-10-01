@@ -241,6 +241,12 @@ pub fn aggregate_expression_to_logical_plan(expr: &parser::Expression) -> (Aggre
                         "avg" => {
                             (Aggregate::Avg, expression_to_logical_plan(args[0].as_ref()))
                         }
+                        "min" => {
+                            (Aggregate::Min, expression_to_logical_plan(args[0].as_ref()))
+                        }
+                        "max" => {
+                            (Aggregate::Max, expression_to_logical_plan(args[0].as_ref()))
+                        }
                         _ => unimplemented!(),
                     }
                 }

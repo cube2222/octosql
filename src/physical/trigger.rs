@@ -15,8 +15,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
-use arrow::array::{ArrayRef, Int64Builder, StringBuilder};
-use arrow::datatypes::DataType;
+use arrow::array::{ArrayRef, Int64Builder, StringBuilder, TimestampNanosecondArray, TimestampNanosecondBuilder};
+use arrow::datatypes::{DataType, TimeUnit};
 
 use crate::physical::arrow::{create_key, GroupByScalar};
 
@@ -40,6 +40,23 @@ impl CountingTriggerPrototype {
 impl TriggerPrototype for CountingTriggerPrototype {
     fn create_trigger(&self, key_data_types: Vec<DataType>, time_col: Option<usize>) -> Box<dyn Trigger> {
         Box::new(CountingTrigger::new(key_data_types, self.trigger_count))
+    }
+}
+
+#[derive(Debug)]
+pub struct WatermarkTriggerPrototype {
+}
+
+impl WatermarkTriggerPrototype {
+    pub fn new() -> WatermarkTriggerPrototype {
+        WatermarkTriggerPrototype {
+        }
+    }
+}
+
+impl TriggerPrototype for WatermarkTriggerPrototype {
+    fn create_trigger(&self, key_data_types: Vec<DataType>, time_col: Option<usize>) -> Box<dyn Trigger> {
+        Box::new(WatermarkTrigger::new(key_data_types, time_col.unwrap()))
     }
 }
 
@@ -125,10 +142,125 @@ impl Trigger for CountingTrigger {
                     });
                     output_columns.push(Arc::new(array.finish()) as ArrayRef);
                 }
+                DataType::Timestamp(TimeUnit::Nanosecond, _) => {
+                    let mut array = TimestampNanosecondBuilder::new(self.to_trigger.len());
+                    self.to_trigger.iter().for_each(|k| {
+                        match k[key_index] {
+                            GroupByScalar::Timestamp(n) => array.append_value(n).unwrap(),
+                            _ => panic!("bug: key doesn't match schema"),
+                            // TODO: Maybe use as_any -> downcast?
+                        }
+                    });
+                    output_columns.push(Arc::new(array.finish()) as ArrayRef);
+                }
                 _ => unimplemented!(),
             }
         }
         self.to_trigger.clear();
+        output_columns
+    }
+}
+
+#[derive(Debug)]
+pub struct WatermarkTrigger {
+    key_data_types: Vec<DataType>,
+    time_keys: BTreeSet<(i64, Vec<GroupByScalar>)>,
+    time_key_element: usize,
+    watermark: i64,
+}
+
+impl WatermarkTrigger {
+    pub fn new(key_data_types: Vec<DataType>, time_key_element: usize) -> WatermarkTrigger {
+        WatermarkTrigger {
+            key_data_types,
+            time_keys: Default::default(),
+            time_key_element,
+            watermark: 0,
+        }
+    }
+}
+
+impl Trigger for WatermarkTrigger {
+    fn end_of_stream_reached(&mut self) {
+        self.watermark = i64::max_value();
+    }
+
+    fn watermark_received(&mut self, watermark: i64) {
+        self.watermark = watermark as i64;
+    }
+
+    fn keys_received(&mut self, keys: Vec<ArrayRef>) {
+        let mut key_vec: Vec<GroupByScalar> = Vec::with_capacity(keys.len());
+        for _i in 0..self.key_data_types.len() {
+            key_vec.push(GroupByScalar::Int64(0))
+        }
+
+        let time_column = keys[self.time_key_element].as_any()
+            .downcast_ref::<TimestampNanosecondArray>().unwrap();
+
+        for row in 0..keys[0].len() {
+            if time_column.value(row) < self.watermark {
+                // TODO: Ignore late data for now.
+                continue
+            }
+            create_key(keys.as_slice(), row, &mut key_vec).unwrap();
+
+            self.time_keys.insert((time_column.value(row), key_vec.clone()));
+        }
+    }
+
+    fn poll(&mut self) -> Vec<ArrayRef> {
+        let mut output_columns: Vec<ArrayRef> = Vec::with_capacity(self.key_data_types.len());
+
+        let mut to_trigger = Vec::new();
+        for (ts, key) in &self.time_keys {
+            if ts.clone() > self.watermark {
+                break
+            }
+
+            to_trigger.push((ts.clone(), key.clone()))
+        }
+        for k in &to_trigger {
+            self.time_keys.remove(k);
+        }
+        for key_index in 0..self.key_data_types.len() {
+            match self.key_data_types[key_index] {
+                DataType::Utf8 => {
+                    let mut array = StringBuilder::new(to_trigger.len());
+                    to_trigger.iter().for_each(|(_, k)| {
+                        match &k[key_index] {
+                            GroupByScalar::Utf8(text) => array.append_value(text.as_str()).unwrap(),
+                            _ => panic!("bug: key doesn't match schema"),
+                            // TODO: Maybe use as_any -> downcast?
+                        }
+                    });
+                    output_columns.push(Arc::new(array.finish()) as ArrayRef);
+                }
+                DataType::Int64 => {
+                    let mut array = Int64Builder::new(to_trigger.len());
+                    to_trigger.iter().for_each(|(_, k)| {
+                        match k[key_index] {
+                            GroupByScalar::Int64(n) => array.append_value(n).unwrap(),
+                            _ => panic!("bug: key doesn't match schema"),
+                            // TODO: Maybe use as_any -> downcast?
+                        }
+                    });
+                    output_columns.push(Arc::new(array.finish()) as ArrayRef);
+                }
+                DataType::Timestamp(TimeUnit::Nanosecond, _) => {
+                    let mut array = TimestampNanosecondBuilder::new(to_trigger.len());
+                    to_trigger.iter().for_each(|(_, k)| {
+                        match k[key_index] {
+                            GroupByScalar::Timestamp(n) => array.append_value(n).unwrap(),
+                            _ => panic!("bug: key doesn't match schema"),
+                            // TODO: Maybe use as_any -> downcast?
+                        }
+                    });
+                    output_columns.push(Arc::new(array.finish()) as ArrayRef);
+                }
+                _ => unimplemented!(),
+            }
+        }
         output_columns
     }
 }

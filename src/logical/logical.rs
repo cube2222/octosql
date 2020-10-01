@@ -134,6 +134,7 @@ pub enum Aggregate {
 #[derive(Clone, Debug)]
 pub enum Trigger {
     Counting(u64),
+    Watermark,
 }
 
 pub struct MaterializationContext {
@@ -464,6 +465,18 @@ impl Node {
                     .map(|key_expr| key_expr.metadata(mat_ctx.schema_context.clone(), &source_metadata.schema).unwrap().data_type().clone())
                     .collect();
 
+                let mut key_time_part = None;
+                if let Some(time_col) = source_metadata.time_column {
+                    for i in 0..key_exprs.len() {
+                        if let Expression::Variable(ident) = key_exprs[i].as_ref() {
+                            if &ident.to_string() == source_metadata.schema.field(i).name() {
+                                key_time_part = Some(i);
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 let key_exprs_physical = key_exprs
                     .into_iter()
                     .map(|expr| expr.physical(mat_ctx, &source_metadata.schema))
@@ -525,6 +538,7 @@ impl Node {
                     logical_metadata,
                     key_types,
                     key_exprs_physical,
+                    key_time_part,
                     output_key_indices,
                     aggregated_exprs_physical,
                     aggregate_vec,
@@ -995,6 +1009,7 @@ impl Trigger {
     ) -> Result<Arc<dyn trigger::TriggerPrototype>> {
         match self {
             Trigger::Counting(n) => Ok(Arc::new(trigger::CountingTriggerPrototype::new(n.clone()))),
+            Trigger::Watermark => Ok(Arc::new(trigger::WatermarkTriggerPrototype::new())),
         }
     }
 }

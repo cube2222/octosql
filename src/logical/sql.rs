@@ -257,6 +257,7 @@ pub fn aggregate_expression_to_logical_plan(expr: &parser::Expression) -> (Aggre
 pub fn trigger_to_logical_plan(trigger: &parser::Trigger) -> Trigger {
     match trigger {
         parser::Trigger::Counting(n) => Trigger::Counting(n.clone()),
+        parser::Trigger::Watermark => Trigger::Watermark,
     }
 }
 

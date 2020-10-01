@@ -59,6 +59,7 @@ pub enum Expression {
 #[derive(Debug, Eq, PartialEq)]
 pub enum Trigger {
     Counting(u64),
+    Watermark,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

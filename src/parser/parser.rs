@@ -72,6 +72,7 @@ pub fn parse_select(select: &Select) -> Box<Query> {
 pub fn parse_trigger(trigger: &sqlparser::ast::Trigger) -> Trigger {
     match trigger {
         sqlparser::ast::Trigger::Counting(n) => Trigger::Counting(n.clone()),
+        sqlparser::ast::Trigger::Watermark => Trigger::Watermark,
         _ => unimplemented!(),
     }
 }

@@ -469,7 +469,7 @@ impl Node {
                 if let Some(time_col) = source_metadata.time_column {
                     for i in 0..key_exprs.len() {
                         if let Expression::Variable(ident) = key_exprs[i].as_ref() {
-                            if &ident.to_string() == source_metadata.schema.field(i).name() {
+                            if &ident.to_string() == source_metadata.schema.field(time_col).name() {
                                 key_time_part = Some(i);
                                 break;
                             }

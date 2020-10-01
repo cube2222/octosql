@@ -16,6 +16,8 @@ use std::ops::{AddAssign, SubAssign};
 
 use anyhow::Result;
 use arrow::datatypes::DataType;
+use std::collections::BTreeMap;
+use std::mem::drop;
 
 use crate::physical::physical::ScalarValue;
 
@@ -189,3 +191,155 @@ impl_avg_accumulator!(u32, UInt32);
 impl_avg_accumulator!(u64, UInt64);
 impl_avg_accumulator!(f32, Float32);
 impl_avg_accumulator!(f64, Float64);
+
+pub struct Min {}
+
+impl Aggregate for Min {
+    fn create_accumulator(&self, input_type: &DataType) -> Box<dyn Accumulator> {
+        match input_type {
+            DataType::Int8 => Box::new(MinAccumulator::<i8> { values_counts: BTreeMap::new() }),
+            DataType::Int16 => Box::new(MinAccumulator::<i16> { values_counts: BTreeMap::new() }),
+            DataType::Int32 => Box::new(MinAccumulator::<i32> { values_counts: BTreeMap::new() }),
+            DataType::Int64 => Box::new(MinAccumulator::<i64> { values_counts: BTreeMap::new() }),
+            DataType::UInt8 => Box::new(MinAccumulator::<u8> { values_counts: BTreeMap::new() }),
+            DataType::UInt16 => Box::new(MinAccumulator::<u16> { values_counts: BTreeMap::new() }),
+            DataType::UInt32 => Box::new(MinAccumulator::<u32> { values_counts: BTreeMap::new() }),
+            DataType::UInt64 => Box::new(MinAccumulator::<u64> { values_counts: BTreeMap::new() }),
+            _ => {
+                dbg!(input_type);
+                unimplemented!()
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+struct MinAccumulator<T> {
+    values_counts: BTreeMap<T, i64>,
+}
+
+macro_rules! impl_min_accumulator {
+    ($primitive_type: ident, $scalar_value_type: ident) => {
+        impl Accumulator for MinAccumulator<$primitive_type> {
+            fn add(&mut self, value: ScalarValue, retract: ScalarValue) -> bool {
+                if let ScalarValue::$scalar_value_type(raw_value) = value {
+                    let value_count = self.values_counts.entry(raw_value).or_insert(0);
+
+                    let is_retraction = match retract {
+                        ScalarValue::Boolean(x) => x,
+                        _ => panic!("retraction shall be boolean"),
+                    };
+                    if !is_retraction {
+                        *value_count += 1;
+                    } else {
+                        *value_count -= 1;
+                    }
+
+                    let should_remove = *value_count == 0; // we can clear the value if it was retracted
+
+                    drop(value_count);
+
+                    if should_remove {
+                        self.values_counts.remove(&raw_value);
+                    }
+
+                    !should_remove
+                } else {
+                    panic!("bad aggregate argument");
+                }
+            }
+
+            fn trigger(&self) -> ScalarValue {
+                match self.values_counts.keys().next() {
+                    Some(val) => return ScalarValue::$scalar_value_type(val.clone()),
+                    None => return ScalarValue::Null,
+                }
+            }
+        }
+    }
+}
+
+impl_min_accumulator!(i8, Int8);
+impl_min_accumulator!(i16, Int16);
+impl_min_accumulator!(i32, Int32);
+impl_min_accumulator!(i64, Int64);
+impl_min_accumulator!(u8, UInt8);
+impl_min_accumulator!(u16, UInt16);
+impl_min_accumulator!(u32, UInt32);
+impl_min_accumulator!(u64, UInt64);
+
+pub struct Max {}
+
+impl Aggregate for Max {
+    fn create_accumulator(&self, input_type: &DataType) -> Box<dyn Accumulator> {
+        match input_type {
+            DataType::Int8 => Box::new(MaxAccumulator::<i8> { values_counts: BTreeMap::new() }),
+            DataType::Int16 => Box::new(MaxAccumulator::<i16> { values_counts: BTreeMap::new() }),
+            DataType::Int32 => Box::new(MaxAccumulator::<i32> { values_counts: BTreeMap::new() }),
+            DataType::Int64 => Box::new(MaxAccumulator::<i64> { values_counts: BTreeMap::new() }),
+            DataType::UInt8 => Box::new(MaxAccumulator::<u8> { values_counts: BTreeMap::new() }),
+            DataType::UInt16 => Box::new(MaxAccumulator::<u16> { values_counts: BTreeMap::new() }),
+            DataType::UInt32 => Box::new(MaxAccumulator::<u32> { values_counts: BTreeMap::new() }),
+            DataType::UInt64 => Box::new(MaxAccumulator::<u64> { values_counts: BTreeMap::new() }),
+            _ => {
+                dbg!(input_type);
+                unimplemented!()
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+struct MaxAccumulator<T> {
+    values_counts: BTreeMap<T, i64>,
+}
+
+macro_rules! impl_max_accumulator {
+    ($primitive_type: ident, $scalar_value_type: ident) => {
+        impl Accumulator for MaxAccumulator<$primitive_type> {
+            fn add(&mut self, value: ScalarValue, retract: ScalarValue) -> bool {
+                if let ScalarValue::$scalar_value_type(raw_value) = value {
+                    let value_count = self.values_counts.entry(raw_value).or_insert(0);
+
+                    let is_retraction = match retract {
+                        ScalarValue::Boolean(x) => x,
+                        _ => panic!("retraction shall be boolean"),
+                    };
+                    if !is_retraction {
+                        *value_count += 1;
+                    } else {
+                        *value_count -= 1;
+                    }
+
+                    let should_remove = *value_count == 0; // we can clear the value if it was retracted
+
+                    drop(value_count);
+
+                    if should_remove {
+                        self.values_counts.remove(&raw_value);
+                    }
+
+                    !should_remove
+                } else {
+                    panic!("bad aggregate argument");
+                }
+            }
+
+            fn trigger(&self) -> ScalarValue {
+                match self.values_counts.keys().next_back() { // only difference to Min is here
+                    Some(val) => return ScalarValue::$scalar_value_type(val.clone()),
+                    None => return ScalarValue::Null,
+                }
+            }
+        }
+    }
+}
+
+impl_max_accumulator!(i8, Int8);
+impl_max_accumulator!(i16, Int16);
+impl_max_accumulator!(i32, Int32);
+impl_max_accumulator!(i64, Int64);
+impl_max_accumulator!(u8, UInt8);
+impl_max_accumulator!(u16, UInt16);
+impl_max_accumulator!(u32, UInt32);
+impl_max_accumulator!(u64, UInt64);

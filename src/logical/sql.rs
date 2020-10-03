@@ -247,6 +247,9 @@ pub fn aggregate_expression_to_logical_plan(expr: &parser::Expression) -> (Aggre
                         "max" => {
                             (Aggregate::Max, expression_to_logical_plan(args[0].as_ref()))
                         }
+                        "first" => {
+                            (Aggregate::First, expression_to_logical_plan(args[0].as_ref()))
+                        }
                         _ => unimplemented!(),
                     }
                 }

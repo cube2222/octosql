@@ -131,6 +131,7 @@ pub enum Aggregate {
     Avg,
     Min,
     Max,
+    First,
 }
 
 #[derive(Clone, Debug)]
@@ -988,7 +989,7 @@ impl Aggregate {
                     }
                 }
             }
-            Aggregate::Min | Aggregate::Max => {
+            Aggregate::Min | Aggregate::Max | Aggregate::First => {
                 match input_type {
                     DataType::Int8 => Ok(DataType::Int8),
                     DataType::Int16 => Ok(DataType::Int16),
@@ -998,7 +999,7 @@ impl Aggregate {
                     DataType::UInt16 => Ok(DataType::UInt16),
                     DataType::UInt32 => Ok(DataType::UInt32),
                     DataType::UInt64 => Ok(DataType::UInt64),
-                    _ => {
+                    _ => { // TODO: implement for Floats (they cannot be used as key type in a map)
                         dbg!(input_type);
                         unimplemented!()
                     }
@@ -1017,6 +1018,7 @@ impl Aggregate {
             Aggregate::Avg => Ok(Arc::new(aggregate::Avg {})),
             Aggregate::Min => Ok(Arc::new(aggregate::Min {})),
             Aggregate::Max => Ok(Arc::new(aggregate::Max {})),
+            Aggregate::First => Ok(Arc::new(aggregate::First {})),
             _ => unimplemented!(),
         }
     }

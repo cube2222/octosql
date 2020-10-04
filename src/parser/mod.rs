@@ -72,6 +72,7 @@ pub enum Identifier {
 pub enum Value {
     Integer(i64),
     String(String),
+    Duration(i64),
 }
 
 #[derive(Debug, Eq, PartialEq)]

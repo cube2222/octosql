@@ -15,7 +15,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use arrow::array::{ArrayBuilder, ArrayRef, BooleanArray, TimestampNanosecondBuilder};
+use arrow::array::{ArrayBuilder, ArrayRef, BooleanArray, DurationNanosecondBuilder, TimestampNanosecondBuilder};
 use arrow::array::{BooleanBuilder, Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder, Int8Builder, StringBuilder, UInt16Builder, UInt32Builder, UInt64Builder, UInt8Builder};
 use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use arrow::record_batch::RecordBatch;
@@ -267,7 +267,6 @@ impl Node for GroupBy {
             &mut |ctx, msg| {
                 match msg {
                     MetadataMessage::Watermark(watermark) => {
-                        dbg!("watermark received");
                         let trigger_box = &mut *trigger_cell.borrow_mut();
 
                         trigger_box.watermark_received(watermark);
@@ -323,6 +322,7 @@ impl GroupBy {
                 DataType::UInt16 => push_retraction_keys!(UInt16, UInt16Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
                 DataType::UInt32 => push_retraction_keys!(UInt32, UInt32Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
                 DataType::UInt64 => push_retraction_keys!(UInt64, UInt64Builder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
+                DataType::Duration(TimeUnit::Nanosecond) => push_retraction_keys!(Duration, DurationNanosecondBuilder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
                 DataType::Timestamp(TimeUnit::Nanosecond, _) => push_retraction_keys!(Timestamp, TimestampNanosecondBuilder, key_columns, key_vec, last_triggered_values, key_index, retraction_key_columns),
                 _ => unimplemented!(),
             }
@@ -345,6 +345,7 @@ impl GroupBy {
                 DataType::UInt16 => push_retraction_values!(UInt16, UInt16Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
                 DataType::UInt32 => push_retraction_values!(UInt32, UInt32Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
                 DataType::UInt64 => push_retraction_values!(UInt64, UInt64Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
+                DataType::Duration(TimeUnit::Nanosecond) => push_retraction_values!(Duration, DurationNanosecondBuilder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
                 DataType::Timestamp(TimeUnit::Nanosecond, _) => push_retraction_values!(Timestamp, TimestampNanosecondBuilder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
                 DataType::Float32 => push_retraction_values!(Float32, Float32Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
                 DataType::Float64 => push_retraction_values!(Float64, Float64Builder, retraction_key_columns, key_vec, last_triggered_values, aggregate_index, retraction_columns),
@@ -383,6 +384,7 @@ impl GroupBy {
                 DataType::UInt16 => push_values!(UInt16, UInt16Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
                 DataType::UInt32 => push_values!(UInt32, UInt32Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
                 DataType::UInt64 => push_values!(UInt64, UInt64Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
+                DataType::Duration(TimeUnit::Nanosecond) => push_values!(Duration, DurationNanosecondBuilder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
                 DataType::Timestamp(TimeUnit::Nanosecond, _) => push_values!(Timestamp, TimestampNanosecondBuilder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
                 DataType::Float32 => push_values!(Float32, Float32Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
                 DataType::Float64 => push_values!(Float64, Float64Builder, key_columns, key_vec, accumulators_map, last_triggered_values, aggregate_index, output_columns),
@@ -402,6 +404,7 @@ impl GroupBy {
                 DataType::UInt16 => combine_columns!(UInt16Builder, retraction_columns, output_columns, column_index),
                 DataType::UInt32 => combine_columns!(UInt32Builder, retraction_columns, output_columns, column_index),
                 DataType::UInt64 => combine_columns!(UInt64Builder, retraction_columns, output_columns, column_index),
+                DataType::Duration(TimeUnit::Nanosecond) => combine_columns!(TimestampNanosecondBuilder, retraction_columns, output_columns, column_index),
                 DataType::Timestamp(TimeUnit::Nanosecond, _) => combine_columns!(TimestampNanosecondBuilder, retraction_columns, output_columns, column_index),
                 DataType::Float32 => combine_columns!(Float32Builder, retraction_columns, output_columns, column_index),
                 DataType::Float64 => combine_columns!(Float64Builder, retraction_columns, output_columns, column_index),

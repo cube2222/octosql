@@ -61,6 +61,7 @@ pub enum ScalarValue {
     UInt32(u32),
     UInt64(u64),
     Utf8(String),
+    Duration(i64),
     Timestamp(i64),
     Struct(Vec<ScalarValue>),
 }
@@ -81,6 +82,7 @@ impl ScalarValue {
             ScalarValue::UInt32(_) => DataType::UInt32,
             ScalarValue::UInt64(_) => DataType::UInt64,
             ScalarValue::Utf8(_) => DataType::Utf8,
+            ScalarValue::Duration(_) => DataType::Duration(TimeUnit::Nanosecond),
             ScalarValue::Timestamp(_) => DataType::Timestamp(TimeUnit::Nanosecond, None),
             ScalarValue::Struct(_) => /*DataType::Struct*/ unimplemented!(),
         }
@@ -103,6 +105,7 @@ impl Hash for ScalarValue {
             ScalarValue::UInt32(x) => x.hash(state),
             ScalarValue::UInt64(x) => x.hash(state),
             ScalarValue::Utf8(x) => x.hash(state),
+            ScalarValue::Duration(x) => x.hash(state),
             ScalarValue::Timestamp(x) => x.hash(state),
             ScalarValue::Struct(x) => x.hash(state),
         }

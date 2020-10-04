@@ -115,6 +115,9 @@ fn array_value_to_string(column: array::ArrayRef, row: usize) -> Result<String> 
         DataType::Float16 => make_string!(array::Float32Array, column, row),
         DataType::Float32 => make_string!(array::Float32Array, column, row),
         DataType::Float64 => make_string!(array::Float64Array, column, row),
+        DataType::Duration(unit) if *unit == TimeUnit::Nanosecond => {
+            make_string!(array::DurationNanosecondArray, column, row)
+        },
         DataType::Timestamp(unit, _) if *unit == TimeUnit::Second => {
             make_string!(array::TimestampSecondArray, column, row)
         }

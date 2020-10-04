@@ -19,6 +19,7 @@ use super::sqlparser::ast;
 use super::sqlparser::ast::{BinaryOperator, Expr, Function, FunctionArg, Ident, Select, SelectItem, SetExpr, Statement, TableFactor};
 use super::sqlparser::dialect::GenericDialect;
 use super::sqlparser::parser::Parser;
+use crate::parser::sqlparser::ast::DateTimeField;
 
 pub fn parse_sql(text: &str) -> Box<Query> {
     let dialect = GenericDialect {}; // or AnsiDialect, or your own dialect ...
@@ -166,6 +167,26 @@ pub fn parse_function_arg(arg: &FunctionArg) -> Box<Expression> {
 
 pub fn parse_value(value: &ast::Value) -> Value {
     match value {
+        ast::Value::Interval { value, leading_field, leading_precision, last_field, fractional_seconds_precision } => {
+            let nanoseconds = value * match leading_field {
+                None => {
+                    dbg!(value);
+                    unimplemented!()
+                }
+                Some(unit) => {
+                    match unit {
+                        DateTimeField::Day => 1000000000 * 60 * 60 * 24,
+                        DateTimeField::Hour => 1000000000 * 60 * 60,
+                        DateTimeField::Minute => 1000000000 * 60,
+                        DateTimeField::Second => 1000000000,
+                        _ => {
+                            unimplemented!("{:?}", unit)
+                        }
+                    }
+                }
+            };
+            Value::Duration(nanoseconds)
+        },
         ast::Value::Number(val) => {
             let val_str: &str = val.as_str();
             Value::Integer(val_str.parse::<i64>().unwrap())

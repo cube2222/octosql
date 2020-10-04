@@ -113,8 +113,9 @@ pub fn remove_wildcards(logical_plan: &Node) -> Result<Box<Node>> {
                     },
                     Node::Function(tbv) => {
                         match tbv {
-                            TableValuedFunction::Range(_, _) => Ok((Box::new(node.clone()), None)),
                             TableValuedFunction::MaxDiffWatermarkGenerator(_, _, _) => Ok((Box::new(node.clone()), state)),
+                            TableValuedFunction::Range(_, _) => Ok((Box::new(node.clone()), None)),
+                            TableValuedFunction::Tumble(_, _, _, _) => Ok((Box::new(node.clone()), state)),
                         }
                     }
                     Node::Map { .. } => unimplemented!(),

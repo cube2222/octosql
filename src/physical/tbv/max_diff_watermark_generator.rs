@@ -53,10 +53,10 @@ impl Node for MaxDiffWatermarkGenerator {
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<()> {
-        let max_diff =  if let ScalarValue::Int64(v) = self.max_diff.evaluate_scalar(exec_ctx)? {
+        let max_diff =  if let ScalarValue::Duration(v) = self.max_diff.evaluate_scalar(exec_ctx)? {
             v
         } else {
-            Err(anyhow!("max difference must be integer"))?
+            Err(anyhow!("max difference must be duration"))?
         };
 
         let source_schema = self.source.logical_metadata().schema;

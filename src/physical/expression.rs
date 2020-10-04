@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use arrow::array::{ArrayDataBuilder, ArrayRef, BooleanBufferBuilder, BufferBuilderTrait, Int64Builder, StringBuilder, StructArray};
+use arrow::array::{ArrayDataBuilder, ArrayRef, BooleanBufferBuilder, BufferBuilderTrait, Int64Builder, StringBuilder, StructArray, TimestampNanosecondBuilder, DurationNanosecondBuilder};
 use arrow::buffer::MutableBuffer;
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -78,6 +78,13 @@ impl Constant {
 impl Expression for Constant {
     fn evaluate(&self, _ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef> {
         match &self.value {
+            ScalarValue::Duration(n) => {
+                let mut array = DurationNanosecondBuilder::new(record.num_rows());
+                for _i in 0..record.num_rows() {
+                    array.append_value(*n).unwrap();
+                }
+                Ok(Arc::new(array.finish()) as ArrayRef)
+            }
             ScalarValue::Int64(n) => {
                 let mut array = Int64Builder::new(record.num_rows());
                 for _i in 0..record.num_rows() {

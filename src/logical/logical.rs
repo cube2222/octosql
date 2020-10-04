@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use arrow::{csv, json};
-use arrow::datatypes::{DataType, Field, Schema};
+use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use itertools::Itertools;
 
 use crate::physical::aggregate;
@@ -37,6 +37,7 @@ use crate::physical::stream_join::StreamJoin;
 use crate::physical::tbv::max_diff_watermark_generator::MaxDiffWatermarkGenerator;
 use crate::physical::tbv::range::Range;
 use crate::physical::trigger;
+use crate::physical::tbv::tumble::Tumble;
 
 pub struct TransformationContext {
     pub schema_context: Arc<dyn SchemaContext>,
@@ -103,8 +104,9 @@ pub struct NodeMetadata {
 
 #[derive(Clone, Debug)]
 pub enum TableValuedFunction {
-    Range(TableValuedFunctionArgument, TableValuedFunctionArgument),
     MaxDiffWatermarkGenerator(TableValuedFunctionArgument, TableValuedFunctionArgument, TableValuedFunctionArgument),
+    Range(TableValuedFunctionArgument, TableValuedFunctionArgument),
+    Tumble(TableValuedFunctionArgument, TableValuedFunctionArgument, TableValuedFunctionArgument, TableValuedFunctionArgument),
 }
 
 #[derive(Clone, Debug)]
@@ -360,16 +362,6 @@ impl Node {
             }
             Node::Function(tbv) => {
                 match tbv {
-                    TableValuedFunction::Range(_, _) => {
-                        Ok(NodeMetadata {
-                            partition_count: 1,
-                            schema: Arc::new(Schema::new(vec![
-                                Field::new("i", DataType::Int64, false),
-                                Field::new(RETRACTIONS_FIELD, DataType::Boolean, false),
-                            ])),
-                            time_column: None,
-                        })
-                    }
                     TableValuedFunction::MaxDiffWatermarkGenerator(time_field_name, max_diff, source) => {
                         let time_field_name = if let TableValuedFunctionArgument::Descriptior(ident) = time_field_name {
                             ident
@@ -393,6 +385,52 @@ impl Node {
                         Ok(NodeMetadata {
                             partition_count: source_metadata.partition_count,
                             schema: source_metadata.schema.clone(),
+                            time_column: time_col,
+                        })
+                    }
+                    TableValuedFunction::Range(_, _) => {
+                        Ok(NodeMetadata {
+                            partition_count: 1,
+                            schema: Arc::new(Schema::new(vec![
+                                Field::new("i", DataType::Int64, false),
+                                Field::new(RETRACTIONS_FIELD, DataType::Boolean, false),
+                            ])),
+                            time_column: None,
+                        })
+                    }
+                    TableValuedFunction::Tumble(time_field_name, window_size, offset, source) => {
+                        let time_field_name = if let TableValuedFunctionArgument::Descriptior(ident) = time_field_name {
+                            ident
+                        } else {
+                            return Err(anyhow!("tumble time_field_name must be identifier"));
+                        };
+                        let source_node = if let TableValuedFunctionArgument::Table(query) = source {
+                            query
+                        } else {
+                            return Err(anyhow!("tumble source must be query"));
+                        };
+
+                        let source_metadata = source_node.metadata(schema_context.clone())?;
+                        let mut time_col = None;
+                        if let Some(source_time_col) = source_metadata.time_column {
+                            if &time_field_name.to_string() == source_metadata.schema.field(source_time_col).name() {
+                                // We add 2 columns, window_start and window_end, but move the retraction column to the end.
+                                time_col = Some(source_metadata.schema.fields().len())
+                            }
+                        }
+                        let mut new_schema_fields = source_metadata.schema.fields().clone();
+                        new_schema_fields.insert(
+                            new_schema_fields.len()-1,
+                            Field::new("window_start", DataType::Timestamp(TimeUnit::Nanosecond, None), false),
+                        );
+                        new_schema_fields.insert(
+                            new_schema_fields.len()-1,
+                            Field::new("window_end", DataType::Timestamp(TimeUnit::Nanosecond, None), false),
+                        );
+
+                        Ok(NodeMetadata {
+                            partition_count: source_metadata.partition_count,
+                            schema: Arc::new(Schema::new(new_schema_fields)),
                             time_column: time_col,
                         })
                     }
@@ -588,19 +626,6 @@ impl Node {
             }
             Node::Function(function) => {
                 match function {
-                    TableValuedFunction::Range(start, end) => {
-                        let start_expr = if let TableValuedFunctionArgument::Expresion(expr) = start {
-                            expr.physical(mat_ctx, &Arc::new(Schema::new(vec![])))?
-                        } else {
-                            return Err(anyhow!("range start must be expression"));
-                        };
-                        let end_expr = if let TableValuedFunctionArgument::Expresion(expr) = end {
-                            expr.physical(mat_ctx, &Arc::new(Schema::new(vec![])))?
-                        } else {
-                            return Err(anyhow!("range end must be expression"));
-                        };
-                        Ok(Arc::new(Range::new(logical_metadata, start_expr, end_expr)))
-                    }
                     TableValuedFunction::MaxDiffWatermarkGenerator(time_field_name, max_diff, source) => {
                         let time_field_name = if let TableValuedFunctionArgument::Descriptior(ident) = time_field_name {
                             ident.clone()
@@ -619,6 +644,43 @@ impl Node {
                             return Err(anyhow!("max diff watermark generator max_diff must be expression"));
                         };
                         Ok(Arc::new(MaxDiffWatermarkGenerator::new(logical_metadata, time_field_name, max_diff_expr, source_node)))
+                    }
+                    TableValuedFunction::Range(start, end) => {
+                        let start_expr = if let TableValuedFunctionArgument::Expresion(expr) = start {
+                            expr.physical(mat_ctx, &Arc::new(Schema::new(vec![])))?
+                        } else {
+                            return Err(anyhow!("range start must be expression"));
+                        };
+                        let end_expr = if let TableValuedFunctionArgument::Expresion(expr) = end {
+                            expr.physical(mat_ctx, &Arc::new(Schema::new(vec![])))?
+                        } else {
+                            return Err(anyhow!("range end must be expression"));
+                        };
+                        Ok(Arc::new(Range::new(logical_metadata, start_expr, end_expr)))
+                    }
+                    TableValuedFunction::Tumble(time_field_name, window_size, offset, source) => {
+                        let time_field_name = if let TableValuedFunctionArgument::Descriptior(ident) = time_field_name {
+                            ident.clone()
+                        } else {
+                            return Err(anyhow!("tumble time_field_name must be identifier"));
+                        };
+                        let source_node = if let TableValuedFunctionArgument::Table(query) = source {
+                            query.physical(mat_ctx)?
+                        } else {
+                            return Err(anyhow!("tumble source must be query"));
+                        };
+                        let source_schema = source_node.logical_metadata();
+                        let window_size_expr = if let TableValuedFunctionArgument::Expresion(expr) = window_size {
+                            expr.physical(mat_ctx, &source_schema.schema)?
+                        } else {
+                            return Err(anyhow!("tumble window_size must be expression"));
+                        };
+                        let offset_expr = if let TableValuedFunctionArgument::Expresion(expr) = offset {
+                            expr.physical(mat_ctx, &source_schema.schema)?
+                        } else {
+                            return Err(anyhow!("tumble offset must be expression"));
+                        };
+                        Ok(Arc::new(Tumble::new(logical_metadata, time_field_name, window_size_expr, offset_expr, source_node)))
                     }
                 }
             }
@@ -760,22 +822,6 @@ impl Node {
             }
             Node::Function(tbv) => {
                 let (tbv_tf, states) = match tbv {
-                    TableValuedFunction::Range(start, end) => {
-                        let (start_expr_tf, start_expr_state) = if let TableValuedFunctionArgument::Expresion(expr) = start {
-                            expr.transform(tf_ctx, &Arc::new(Schema::new(vec![])), transformers)?
-                        } else {
-                            return Err(anyhow!("range start must be expression"));
-                        };
-                        let (end_expr_tf, end_expr_state) = if let TableValuedFunctionArgument::Expresion(expr) = end {
-                            expr.transform(tf_ctx, &Arc::new(Schema::new(vec![])), transformers)?
-                        } else {
-                            return Err(anyhow!("range end must be expression"));
-                        };
-                        (TableValuedFunction::Range(
-                            TableValuedFunctionArgument::Expresion(start_expr_tf),
-                            TableValuedFunctionArgument::Expresion(end_expr_tf),
-                        ), vec![start_expr_state, end_expr_state])
-                    }
                     TableValuedFunction::MaxDiffWatermarkGenerator(time_field_name, max_diff, source) => {
                         let (record_schema, (query_tf, query_state)) = if let TableValuedFunctionArgument::Table(query) = source {
                             (
@@ -800,6 +846,53 @@ impl Node {
                             TableValuedFunctionArgument::Expresion(max_diff_tf),
                             TableValuedFunctionArgument::Table(query_tf),
                         ), vec![query_state, max_diff_state])
+                    }
+                    TableValuedFunction::Range(start, end) => {
+                        let (start_expr_tf, start_expr_state) = if let TableValuedFunctionArgument::Expresion(expr) = start {
+                            expr.transform(tf_ctx, &Arc::new(Schema::new(vec![])), transformers)?
+                        } else {
+                            return Err(anyhow!("range start must be expression"));
+                        };
+                        let (end_expr_tf, end_expr_state) = if let TableValuedFunctionArgument::Expresion(expr) = end {
+                            expr.transform(tf_ctx, &Arc::new(Schema::new(vec![])), transformers)?
+                        } else {
+                            return Err(anyhow!("range end must be expression"));
+                        };
+                        (TableValuedFunction::Range(
+                            TableValuedFunctionArgument::Expresion(start_expr_tf),
+                            TableValuedFunctionArgument::Expresion(end_expr_tf),
+                        ), vec![start_expr_state, end_expr_state])
+                    }
+                    TableValuedFunction::Tumble(time_field_name, window_size, offset, source) => {
+                        let (record_schema, (query_tf, query_state)) = if let TableValuedFunctionArgument::Table(query) = source {
+                            (
+                                query.metadata(tf_ctx.schema_context.clone())?.schema,
+                                query.transform(tf_ctx, transformers)?,
+                            )
+                        } else {
+                            return Err(anyhow!("tumble source must be query"));
+                        };
+                        let time_field_name = if let TableValuedFunctionArgument::Descriptior(ident) = time_field_name {
+                            ident.clone()
+                        } else {
+                            return Err(anyhow!("tumble time_field_name must be identifier"));
+                        };
+                        let (window_size_tf, window_size_state) = if let TableValuedFunctionArgument::Expresion(expr) = window_size {
+                            expr.transform(tf_ctx, &record_schema, transformers)?
+                        } else {
+                            return Err(anyhow!("tumble window_size must be expression"));
+                        };
+                        let (offset_tf, offset_state) = if let TableValuedFunctionArgument::Expresion(expr) = offset {
+                            expr.transform(tf_ctx, &record_schema, transformers)?
+                        } else {
+                            return Err(anyhow!("tumble offset must be expression"));
+                        };
+                        (TableValuedFunction::Tumble(
+                            TableValuedFunctionArgument::Descriptior(time_field_name),
+                            TableValuedFunctionArgument::Expresion(window_size_tf),
+                            TableValuedFunctionArgument::Expresion(offset_tf),
+                            TableValuedFunctionArgument::Table(query_tf),
+                        ), vec![query_state, window_size_state, offset_state])
                     }
                 };
                 tf(

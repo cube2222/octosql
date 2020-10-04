@@ -19,6 +19,7 @@ use crate::parser;
 use crate::parser::{Operator, SelectExpression, Value, Source};
 use crate::physical::physical::{Identifier, ScalarValue};
 use crate::logical::logical::TableValuedFunctionArgument::Table;
+use datafusion::logicalplan::FunctionType::Scalar;
 
 pub fn query_to_logical_plan(query: &parser::Query) -> Box<Node> {
     match query {
@@ -144,6 +145,16 @@ pub fn source_to_logical_plan(expr: &parser::Source) -> Box<Node> {
         }
         Source::TableValuedFunction(ident, args) => match ident {
             parser::Identifier::SimpleIdentifier(name) => match name.as_str() {
+                "max_diff_watermark" => {
+                    if args.len() != 3 {
+                        unimplemented!()
+                    }
+                    Box::new(Node::Function(TableValuedFunction::MaxDiffWatermarkGenerator(
+                        table_valued_function_argument_to_logical_plan(&args[0]),
+                        table_valued_function_argument_to_logical_plan(&args[1]),
+                        table_valued_function_argument_to_logical_plan(&args[2]),
+                    )))
+                }
                 "range" => {
                     if args.len() != 2 {
                         unimplemented!()
@@ -153,14 +164,15 @@ pub fn source_to_logical_plan(expr: &parser::Source) -> Box<Node> {
                         table_valued_function_argument_to_logical_plan(&args[1]),
                     )))
                 }
-                "max_diff_watermark" => {
-                    if args.len() != 3 {
+                "tumble" => {
+                    if args.len() != 4 {
                         unimplemented!()
                     }
-                    Box::new(Node::Function(TableValuedFunction::MaxDiffWatermarkGenerator(
+                    Box::new(Node::Function(TableValuedFunction::Tumble(
                         table_valued_function_argument_to_logical_plan(&args[0]),
                         table_valued_function_argument_to_logical_plan(&args[1]),
                         table_valued_function_argument_to_logical_plan(&args[2]),
+                        table_valued_function_argument_to_logical_plan(&args[3]),
                     )))
                 }
                 _ => unimplemented!(),
@@ -280,6 +292,9 @@ pub fn identifier_to_logical_plan(ident: &parser::Identifier) -> Identifier {
 
 pub fn value_to_logical_plan(val: &parser::Value) -> ScalarValue {
     match val {
+        parser::Value::Duration(v) => {
+            ScalarValue::Duration(v.clone())
+        }
         parser::Value::Integer(v) => {
             ScalarValue::Int64(v.clone())
         }

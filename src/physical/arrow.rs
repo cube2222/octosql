@@ -48,6 +48,7 @@ pub enum GroupByScalar {
     Int16(i16),
     Int32(i32),
     Int64(i64),
+    Duration(i64),
     Timestamp(i64),
     Utf8(String),
 }
@@ -96,6 +97,10 @@ pub fn create_key(
             DataType::Int64 => {
                 let array = col.as_any().downcast_ref::<Int64Array>().unwrap();
                 vec[i] = GroupByScalar::Int64(array.value(row))
+            }
+            DataType::Duration(TimeUnit::Nanosecond) => {
+                let array = col.as_any().downcast_ref::<DurationNanosecondArray>().unwrap();
+                vec[i] = GroupByScalar::Duration(array.value(row))
             }
             DataType::Timestamp(TimeUnit::Nanosecond, _) => {
                 let array = col.as_any().downcast_ref::<TimestampNanosecondArray>().unwrap();
@@ -250,6 +255,13 @@ pub fn get_scalar_value(array: &ArrayRef, row: usize) -> Result<ScalarValue> {
                 .downcast_ref::<array::Int64Array>()
                 .expect("Failed to cast array");
             ScalarValue::Int64(array.value(row))
+        }
+        DataType::Duration(unit) if *unit == TimeUnit::Nanosecond => {
+            let array = array
+                .as_any()
+                .downcast_ref::<array::DurationNanosecondArray>()
+                .expect("Failed to cast array");
+            ScalarValue::Duration(array.value(row))
         }
         DataType::Timestamp(TimeUnit::Nanosecond, _) => {
             let array = array

@@ -56,16 +56,16 @@ impl Node for Tumble {
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<()> {
-        let window_size = if let ScalarValue::Int64(v) = self.window_size.evaluate_scalar(exec_ctx)? {
+        let window_size = if let ScalarValue::Duration(v) = self.window_size.evaluate_scalar(exec_ctx)? {
             v
         } else {
-            Err(anyhow!("window size must be an integer"))?
+            Err(anyhow!("window size must be a duration"))?
         };
 
-        let offset = if let ScalarValue::Int64(v) = self.offset.evaluate_scalar(exec_ctx)? {
+        let offset = if let ScalarValue::Duration(v) = self.offset.evaluate_scalar(exec_ctx)? {
             v
         } else {
-            Err(anyhow!("offset must be an integer"))?
+            Err(anyhow!("offset must be a duration"))?
         };
 
         let source_schema = self.source.logical_metadata().schema;
@@ -88,7 +88,7 @@ impl Node for Tumble {
 
                 Ok(())
             },
-            &mut noop_meta_send,
+            meta_send,
         )?;
         Ok(())
     }

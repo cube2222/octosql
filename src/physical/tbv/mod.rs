@@ -14,3 +14,4 @@
 
 pub mod range;
 pub mod max_diff_watermark_generator;
+pub mod tumble;

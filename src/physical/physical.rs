@@ -21,7 +21,7 @@ use anyhow::{Context, Result};
 use crate::logical::logical::NodeMetadata;
 
 pub const BATCH_SIZE: usize = 8192;
-pub const RETRACTIONS_FIELD: &str = "retraction";
+pub const RETRACTIONS_FIELD: &str = "sys.undo";
 
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 pub enum Identifier {

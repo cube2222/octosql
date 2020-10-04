@@ -342,7 +342,13 @@ impl Node {
                 let source_schema = source_metadata.schema.as_ref();
                 let source_fields = source_schema.fields();
                 let mut new_fields: Vec<Field> = source_fields[0..source_fields.len()-1].iter()
-                    .map(|f| Field::new(requalify(qualifier.as_str(), f.name()).as_str(), f.data_type().clone(), f.is_nullable()))
+                    .map(|f| {
+                        if !f.name().starts_with("sys.") {
+                            Field::new(requalify(qualifier.as_str(), f.name()).as_str(), f.data_type().clone(), f.is_nullable())
+                        } else {
+                            f.clone()
+                        }
+                    })
                     .collect();
                 new_fields.push(source_fields[source_fields.len()-1].clone());
 

@@ -273,7 +273,10 @@ impl Node for GroupBy {
 
                         self.trigger_output(exec_ctx, *produce_cell.borrow_mut(), ctx, trigger_box.as_mut(), &mut *accumulators_map_cell.borrow_mut(), &mut *last_triggered_values_cell.borrow_mut())?;
 
-                        meta_send(ctx, MetadataMessage::Watermark(watermark))?;
+                        // Propagate event_time only if we're grouping by event time.
+                        if self.key_time_part.is_some() {
+                            meta_send(ctx, MetadataMessage::Watermark(watermark))?;
+                        }
 
                         Ok(())
                     }

@@ -20,6 +20,7 @@ use anyhow::Result;
 use arrow::datatypes::DataType;
 
 use crate::physical::physical::ScalarValue;
+use arrow::ipc::Utf8;
 
 pub trait Aggregate: Send + Sync {
     fn create_accumulator(&self, input_type: &DataType) -> Box<dyn Accumulator>;
@@ -357,6 +358,9 @@ impl Aggregate for First {
             DataType::UInt16 => Box::new(FirstAccumulator::<u16> { values_order: VecDeque::new(), values_counts: BTreeMap::new() }),
             DataType::UInt32 => Box::new(FirstAccumulator::<u32> { values_order: VecDeque::new(), values_counts: BTreeMap::new() }),
             DataType::UInt64 => Box::new(FirstAccumulator::<u64> { values_order: VecDeque::new(), values_counts: BTreeMap::new() }),
+            //DataType::Utf8 => Box::new(FirstAccumulator::<?> { values_order: VecDeque::new(), values_counts: BTreeMap::new() }),
+            DataType::Boolean => Box::new(FirstAccumulator::<bool> { values_order: VecDeque::new(), values_counts: BTreeMap::new() }),
+            //DataType::Null => Box::new(FirstAccumulator::<?> { values_order: VecDeque::new(), values_counts: BTreeMap::new() }),
             _ => {
                 dbg!(input_type);
                 unimplemented!()

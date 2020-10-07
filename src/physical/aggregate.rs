@@ -350,17 +350,17 @@ pub struct First {}
 impl Aggregate for First {
     fn create_accumulator(&self, input_type: &DataType) -> Box<dyn Accumulator> {
         match input_type {
-            DataType::Int8 => Box::new(FirstAccumulator::<i8> { values_order: VecDeque::new(), values_counts: BTreeMap::new() }),
-            DataType::Int16 => Box::new(FirstAccumulator::<i16> { values_order: VecDeque::new(), values_counts: BTreeMap::new() }),
-            DataType::Int32 => Box::new(FirstAccumulator::<i32> { values_order: VecDeque::new(), values_counts: BTreeMap::new() }),
-            DataType::Int64 => Box::new(FirstAccumulator::<i64> { values_order: VecDeque::new(), values_counts: BTreeMap::new() }),
-            DataType::UInt8 => Box::new(FirstAccumulator::<u8> { values_order: VecDeque::new(), values_counts: BTreeMap::new() }),
-            DataType::UInt16 => Box::new(FirstAccumulator::<u16> { values_order: VecDeque::new(), values_counts: BTreeMap::new() }),
-            DataType::UInt32 => Box::new(FirstAccumulator::<u32> { values_order: VecDeque::new(), values_counts: BTreeMap::new() }),
-            DataType::UInt64 => Box::new(FirstAccumulator::<u64> { values_order: VecDeque::new(), values_counts: BTreeMap::new() }),
-            //DataType::Utf8 => Box::new(FirstAccumulator::<?> { values_order: VecDeque::new(), values_counts: BTreeMap::new() }),
-            DataType::Boolean => Box::new(FirstAccumulator::<bool> { values_order: VecDeque::new(), values_counts: BTreeMap::new() }),
             //DataType::Null => Box::new(FirstAccumulator::<?> { values_order: VecDeque::new(), values_counts: BTreeMap::new() }),
+            DataType::Boolean => Box::new(FirstAccumulator::<bool> { values_order: VecDeque::new(), values_retractions: BTreeMap::new() }),
+            DataType::Int8 => Box::new(FirstAccumulator::<i8> { values_order: VecDeque::new(), values_retractions: BTreeMap::new() }),
+            DataType::Int16 => Box::new(FirstAccumulator::<i16> { values_order: VecDeque::new(), values_retractions: BTreeMap::new() }),
+            DataType::Int32 => Box::new(FirstAccumulator::<i32> { values_order: VecDeque::new(), values_retractions: BTreeMap::new() }),
+            DataType::Int64 => Box::new(FirstAccumulator::<i64> { values_order: VecDeque::new(), values_retractions: BTreeMap::new() }),
+            DataType::UInt8 => Box::new(FirstAccumulator::<u8> { values_order: VecDeque::new(), values_retractions: BTreeMap::new() }),
+            DataType::UInt16 => Box::new(FirstAccumulator::<u16> { values_order: VecDeque::new(), values_retractions: BTreeMap::new() }),
+            DataType::UInt32 => Box::new(FirstAccumulator::<u32> { values_order: VecDeque::new(), values_retractions: BTreeMap::new() }),
+            DataType::UInt64 => Box::new(FirstAccumulator::<u64> { values_order: VecDeque::new(), values_retractions: BTreeMap::new() }),
+            //DataType::Utf8 => Box::new(FirstAccumulator::<?> { values_order: VecDeque::new(), values_counts: BTreeMap::new() }),
             _ => {
                 dbg!(input_type);
                 unimplemented!()
@@ -372,7 +372,7 @@ impl Aggregate for First {
 #[derive(Debug)]
 struct FirstAccumulator<T> {
     values_order: VecDeque<T>,
-    values_counts: BTreeMap<T, i64>,
+    values_retractions: BTreeMap<T, i64>,
 }
 
 macro_rules! impl_first_accumulator {
@@ -380,56 +380,56 @@ macro_rules! impl_first_accumulator {
         impl Accumulator for FirstAccumulator<$primitive_type> {
             fn add(&mut self, value: ScalarValue, retract: ScalarValue) -> bool {
                 if let ScalarValue::$scalar_value_type(raw_value) = value {
-                    let value_count = self.values_counts.entry(raw_value).or_insert(0);
+                    self.values_order.push_back(raw_value);
+
+                    let value_retractions = self.values_retractions.entry(raw_value).or_insert(0);
 
                     let is_retraction = match retract {
                         ScalarValue::Boolean(x) => x,
                         _ => panic!("retraction shall be boolean"),
                     };
                     if !is_retraction {
-                        *value_count += 1;
-
-                        self.values_order.push_back(raw_value);
-                    } else {
-                        *value_count -= 1;
+                        *value_retractions += 1;
                     }
 
-                    let should_remove = *value_count == 0; // we can clear the value if it was retracted
+                    drop(value_retractions);
 
-                    drop(value_count);
+                    loop {
+                        let key = match self.values_order.front() {
+                            Some(k) => k,
+                            None => break,
+                        };
+                        let value_retractions = match self.values_retractions.get_mut(&key) {
+                            Some(v) => v,
+                            None => break,
+                        };
 
-                    if should_remove {
-                        self.values_counts.remove(&raw_value);
+                        if *value_retractions > 0 {
+                            *value_retractions -= 1;
+                            self.values_order.pop_front();
+                        } else {
+                            break; // this means that the front element is not retracted, so 'trigger' call will return a proper value
+                        }
                     }
 
-                    !should_remove
+                    !is_retraction // TODO - ?
                 } else {
                     panic!("bad aggregate argument");
                 }
             }
 
             fn trigger(&self) -> ScalarValue {
-                loop {
-                    let key = match self.values_order.front() {
-                        Some(k) => k,
-                        None => return ScalarValue::Null,
-                    };
-                    let value_count = match self.values_counts.get(&key) {
-                        Some(v) => v,
-                        None => &0,
-                    };
-
-                    if *value_count > 0 {
-                        return ScalarValue::$scalar_value_type(key.clone());
-                    } else {
-                        self.values_order.pop_front(); // TODO - #help `self` is a `&` reference, so the data it refers to cannot be borrowed as mutable
-                    }
+                match self.values_order.front() {
+                    Some(val) => return ScalarValue::$scalar_value_type(val.clone()),
+                    None => return ScalarValue::Null,
                 }
             }
         }
     }
 }
 
+//impl_first_accumulator!(?, Null);
+impl_first_accumulator!(bool, Boolean);
 impl_first_accumulator!(i8, Int8);
 impl_first_accumulator!(i16, Int16);
 impl_first_accumulator!(i32, Int32);
@@ -438,3 +438,4 @@ impl_first_accumulator!(u8, UInt8);
 impl_first_accumulator!(u16, UInt16);
 impl_first_accumulator!(u32, UInt32);
 impl_first_accumulator!(u64, UInt64);
+//impl_first_accumulator!(?, Utf8);

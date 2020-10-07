@@ -382,17 +382,17 @@ macro_rules! impl_first_accumulator {
                 if let ScalarValue::$scalar_value_type(raw_value) = value {
                     self.values_order.push_back(raw_value);
 
-                    let value_retractions = self.values_retractions.entry(raw_value).or_insert(0);
+                    let cur_value_retractions = self.values_retractions.entry(raw_value).or_insert(0);
 
                     let is_retraction = match retract {
                         ScalarValue::Boolean(x) => x,
                         _ => panic!("retraction shall be boolean"),
                     };
                     if !is_retraction {
-                        *value_retractions += 1;
+                        *cur_value_retractions += 1;
                     }
 
-                    drop(value_retractions);
+                    drop(cur_value_retractions);
 
                     loop {
                         let key = match self.values_order.front() {
@@ -412,7 +412,7 @@ macro_rules! impl_first_accumulator {
                         }
                     }
 
-                    !is_retraction // TODO - ?
+                    true
                 } else {
                     panic!("bad aggregate argument");
                 }

@@ -1018,7 +1018,7 @@ impl Aggregate {
                     DataType::Utf8 => Ok(DataType::Utf8),
                     //DataType::Timestamp(Nanosecond, _) => Ok(DataType::Timestamp(Nanosecond, _)), // TODO - sth not working
                     DataType::Boolean => Ok(DataType::Boolean),
-                    DataType::Null => Ok(DataType::Null),
+                    //DataType::Null => Ok(DataType::Null),
                     _ => { // TODO: implement for Floats AND Structs (they cannot be used as key type in a map)
                         dbg!(input_type);
                         unimplemented!()

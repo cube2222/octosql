@@ -30,6 +30,7 @@ use crate::physical::physical::{EmptySchemaContext, ExecutionContext, noop_meta_
 use crate::pretty::pretty_format_batches;
 use serde_json::ser::State::Empty;
 use crate::logical::optimizer::remove_wildcards::remove_wildcards;
+use crate::logical::optimizer::optimizer::optimize;
 
 #[macro_use]
 mod physical;
@@ -110,20 +111,8 @@ fn main() {
     let logical_plan = remove_wildcards(logical_plan.as_ref()).unwrap();
     dbg!(&logical_plan);
 
-    dbg!(logical_plan.metadata(Arc::new(EmptySchemaContext {})).unwrap());
-
-    let (transformed, state) = logical_plan.transform(
-        &TransformationContext {
-            schema_context: Arc::new(EmptySchemaContext{}),
-        },
-        &Transformers::<_> {
-            node_fn: None,
-            expr_fn: Some(Box::new(|tf_ctx, record_schema, state, expr| Ok((Box::new(expr.clone()), state + 1)))),
-            base_state: 0 as usize,
-            state_reduce: Box::new(|x, y| x + y),
-        }).unwrap();
-    dbg!(transformed);
-    dbg!(state);
+    let logical_plan = optimize(logical_plan).unwrap();
+    dbg!(&logical_plan);
 
     let plan = logical_plan.physical(&MaterializationContext { schema_context: Arc::new(EmptySchemaContext {}) }).unwrap();
 

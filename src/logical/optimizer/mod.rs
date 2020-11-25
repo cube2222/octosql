@@ -13,3 +13,6 @@
 // limitations under the License.
 
 pub mod remove_wildcards;
+pub mod optimizer;
+mod push_down_filters;
+mod merge_requalifiers;

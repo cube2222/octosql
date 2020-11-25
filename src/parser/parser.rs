@@ -20,6 +20,7 @@ use super::sqlparser::ast::{BinaryOperator, Expr, Function, FunctionArg, Ident, 
 use super::sqlparser::dialect::GenericDialect;
 use super::sqlparser::parser::Parser;
 use crate::parser::sqlparser::ast::DateTimeField;
+use crate::parser::sqlparser::dialect::keywords::Keyword::OPEN;
 
 pub fn parse_sql(text: &str) -> Box<Query> {
     let dialect = GenericDialect {}; // or AnsiDialect, or your own dialect ...
@@ -208,6 +209,7 @@ pub fn parse_binary_operator(op: &BinaryOperator) -> Operator {
         BinaryOperator::Eq => Operator::Eq,
         BinaryOperator::GtEq => Operator::GtEq,
         BinaryOperator::Gt => Operator::Gt,
+        BinaryOperator::And => Operator::AND,
         _ => unimplemented!(),
     }
 }
@@ -230,7 +232,7 @@ pub fn parse_ident(ident: &Ident) -> Identifier {
 fn test() {
     let sql = "SELECT c2.name as name, c2.livesleft, 3 as myconst \
     FROM (SELECT c.name, c.livesleft, c.age FROM cats c) as c2 \
-    WHERE c2.age = c2.livesleft";
+    WHERE c2.age = c2.livesleft AND c2.age = c2.livesleft";
 
     parse_sql(sql);
 }

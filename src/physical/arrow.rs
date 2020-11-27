@@ -372,7 +372,7 @@ macro_rules! compute_op {
             .as_any()
             .downcast_ref::<$DT>()
             .expect("compute_op failed to downcast array");
-        Ok(Arc::new($OP(&ll, &rr)?))
+        Ok(Arc::new($OP(&ll, &rr)?) as ArrayRef)
     }};
 }
 
@@ -445,6 +445,36 @@ macro_rules! binary_array_op {
             DataType::Utf8 => compute_utf8_op!($LEFT, $RIGHT, $OP, StringArray),
             DataType::Timestamp(TimeUnit::Nanosecond, None) => {
                 compute_op!($LEFT, $RIGHT, $OP, TimestampNanosecondArray)
+            }
+            DataType::Duration(TimeUnit::Nanosecond) => {
+                compute_op!($LEFT, $RIGHT, $OP, DurationNanosecondArray)
+            }
+            other => {
+                dbg!(other);
+                unimplemented!()
+            }
+        }
+    }};
+}
+
+macro_rules! binary_numeric_array_op {
+    ($LEFT:expr, $RIGHT:expr, $OP:ident) => {{
+        match $LEFT.data_type() {
+            DataType::Int8 => compute_op!($LEFT, $RIGHT, $OP, Int8Array),
+            DataType::Int16 => compute_op!($LEFT, $RIGHT, $OP, Int16Array),
+            DataType::Int32 => compute_op!($LEFT, $RIGHT, $OP, Int32Array),
+            DataType::Int64 => compute_op!($LEFT, $RIGHT, $OP, Int64Array),
+            DataType::UInt8 => compute_op!($LEFT, $RIGHT, $OP, UInt8Array),
+            DataType::UInt16 => compute_op!($LEFT, $RIGHT, $OP, UInt16Array),
+            DataType::UInt32 => compute_op!($LEFT, $RIGHT, $OP, UInt32Array),
+            DataType::UInt64 => compute_op!($LEFT, $RIGHT, $OP, UInt64Array),
+            DataType::Float32 => compute_op!($LEFT, $RIGHT, $OP, Float32Array),
+            DataType::Float64 => compute_op!($LEFT, $RIGHT, $OP, Float64Array),
+            DataType::Timestamp(TimeUnit::Nanosecond, None) => {
+                compute_op!($LEFT, $RIGHT, $OP, TimestampNanosecondArray)
+            }
+            DataType::Duration(TimeUnit::Nanosecond) => {
+                compute_op!($LEFT, $RIGHT, $OP, DurationNanosecondArray)
             }
             other => {
                 dbg!(other);

@@ -311,6 +311,8 @@ pub fn operator_to_logical_plan(op: &parser::Operator) -> Identifier {
         Operator::Gt => ">".to_string(),
         Operator::Plus => "+".to_string(),
         Operator::Minus => "-".to_string(),
+        Operator::Multiply => "*".to_string(),
+        Operator::Divide => "/".to_string(),
         Operator::AND => "AND".to_string(),
         Operator::OR => "OR".to_string(),
     })

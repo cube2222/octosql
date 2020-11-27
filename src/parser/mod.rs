@@ -84,6 +84,8 @@ pub enum Operator {
     Gt,
     Plus,
     Minus,
+    Multiply,
+    Divide,
     AND,
     OR,
 }

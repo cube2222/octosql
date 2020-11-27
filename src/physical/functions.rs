@@ -15,9 +15,10 @@
 use std::sync::Arc;
 use std::collections::HashMap;
 
-use arrow::array::{Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, StringArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array, StringBuilder, TimestampNanosecondBuilder};
+use arrow::array::{Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, StringArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array, StringBuilder, TimestampNanosecondBuilder, DurationNanosecondArray};
 use arrow::array::ArrayRef;
 use arrow::compute::kernels::comparison::{lt, lt_eq, eq, gt_eq, gt, lt_utf8, lt_eq_utf8, eq_utf8, gt_eq_utf8, gt_utf8};
+use arrow::compute::kernels::arithmetic::{add, subtract, multiply, divide};
 use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
@@ -32,7 +33,7 @@ use arrow::datatypes::TimeUnit::Nanosecond;
 // TODO: Add "custom function" expression.
 
 type EvaluateFunction = Arc<dyn Fn(Vec<ArrayRef>) -> Result<ArrayRef> + Send + Sync>;
-type MetaFunction = Arc<dyn Fn(&Arc<dyn SchemaContext>, &Arc<Schema>) -> Result<Field> + Send + Sync>;
+type MetaFunction = Arc<dyn Fn(Vec<Field>) -> Result<Field> + Send + Sync>;
 
 pub struct FunctionExpression {
     meta_function: MetaFunction,
@@ -68,8 +69,21 @@ impl Expression for FunctionExpression
 
 macro_rules! make_const_meta_body {
     ($data_type: expr) => {
-        Arc::new(|_schema_context, _record_schema| {
+        Arc::new(|args| {
             Ok(Field::new("", $data_type, false))
+        })
+    }
+}
+
+// TODO: Fixme check if args[0] is actually a numeric type.
+macro_rules! make_numeric_meta_body {
+    () => {
+        Arc::new(|args| {
+            if args[0].data_type() == args[1].data_type() {
+                Ok(Field::new("", args[0].data_type().clone(), true))
+            } else {
+                Err(anyhow!("Both arguments of a numeric operator must be of the same type."))
+            }
         })
     }
 }
@@ -87,6 +101,15 @@ macro_rules! make_binary_array_evaluate_function {
     ($function: ident) => {
         Arc::new(|args: Vec<ArrayRef>| {
             let output: Result<_, ArrowError> = binary_array_op!(args[0], args[1], $function);
+            Ok(output? as ArrayRef)
+        })
+    }
+}
+
+macro_rules! make_binary_numeric_array_evaluate_function {
+    ($function: ident) => {
+        Arc::new(|args: Vec<ArrayRef>| {
+            let output: Result<_, ArrowError> = binary_numeric_array_op!(args[0], args[1], $function);
             Ok(output? as ArrayRef)
         })
     }
@@ -115,6 +138,10 @@ lazy_static! {
         register_function!(m, "=", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(eq));
         register_function!(m, ">=", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(gt_eq));
         register_function!(m, ">", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(gt));
+        register_function!(m, "+", make_numeric_meta_body!(), make_binary_numeric_array_evaluate_function!(add));
+        register_function!(m, "-", make_numeric_meta_body!(), make_binary_numeric_array_evaluate_function!(subtract));
+        register_function!(m, "*", make_numeric_meta_body!(), make_binary_numeric_array_evaluate_function!(multiply));
+        register_function!(m, "/", make_numeric_meta_body!(), make_binary_numeric_array_evaluate_function!(divide));
         register_function!(m, "upper", make_const_meta_body!(DataType::Utf8), Arc::new(|args: Vec<ArrayRef>| {
             let output: Result<_, ArrowError> = compute_single_arg_str!(args[0], StringArray, StringBuilder, |text: &str| {
                 text.to_uppercase()

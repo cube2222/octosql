@@ -210,6 +210,10 @@ pub fn parse_binary_operator(op: &BinaryOperator) -> Operator {
         BinaryOperator::GtEq => Operator::GtEq,
         BinaryOperator::Gt => Operator::Gt,
         BinaryOperator::And => Operator::AND,
+        BinaryOperator::Plus => Operator::Plus,
+        BinaryOperator::Minus => Operator::Minus,
+        BinaryOperator::Multiply => Operator::Multiply,
+        BinaryOperator::Divide => Operator::Divide,
         _ => unimplemented!(),
     }
 }

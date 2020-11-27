@@ -947,7 +947,11 @@ impl Expression {
                     _ => unimplemented!(),
                 };
 
-                meta_fn(&schema_context, record_schema)
+                let arg_types = args.iter()
+                    .map(|expr| expr.metadata(schema_context.clone(), record_schema))
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                meta_fn(arg_types)
             }
             Expression::Wildcard(qualifier_opt) => {
                 let fields = record_schema.fields().iter()

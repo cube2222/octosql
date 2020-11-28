@@ -15,9 +15,9 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use arrow::array::{ArrayBuilder, ArrayRef, BooleanArray, DurationNanosecondBuilder, TimestampNanosecondBuilder};
+use arrow::array::{PrimitiveArrayOps, ArrayBuilder, ArrayRef, DurationNanosecondBuilder, TimestampNanosecondBuilder, PrimitiveArray};
 use arrow::array::{BooleanBuilder, Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder, Int8Builder, StringBuilder, UInt16Builder, UInt32Builder, UInt64Builder, UInt8Builder};
-use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
+use arrow::datatypes::{DataType, Field, Schema, TimeUnit, BooleanType};
 use arrow::record_batch::RecordBatch;
 use anyhow::Result;
 
@@ -231,7 +231,7 @@ impl Node for GroupBy {
                     .collect::<Result<_, _>>()?;
                 let source_retractions = batch.column(batch.num_columns() - 1)
                     .as_any()
-                    .downcast_ref::<BooleanArray>()
+                    .downcast_ref::<PrimitiveArray<BooleanType>>()
                     .unwrap();
 
                 let mut key_vec: Vec<GroupByScalar> = Vec::with_capacity(key_columns.len());

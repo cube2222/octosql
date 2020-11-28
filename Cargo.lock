@@ -80,6 +80,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "arrow"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7277b39e5f419c207c5e01f56ad8a91ffcc78548b85d6bb083560a667b567e11"
+dependencies = [
+ "chrono",
+ "csv",
+ "flatbuffers",
+ "hex",
+ "indexmap",
+ "lazy_static",
+ "num",
+ "rand",
+ "regex",
+ "serde",
+ "serde_derive",
+ "serde_json",
+]
+
+[[package]]
 name = "arrow-flight"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -390,7 +410,7 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3ac06e300fea276312cb230a744a24b60cf311a81fa1b963b6bb852e1f8d1eb"
 dependencies = [
- "arrow",
+ "arrow 1.0.0",
  "clap",
  "crossbeam",
  "fnv",
@@ -593,12 +613,9 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.8.1"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34f595585f103464d8d2f6e9864682d74c1601fed5e07d62b1c9058dba8246fb"
-dependencies = [
- "autocfg",
-]
+checksum = "d7afe4a420e3fe79967a00898cc1f4db7c8a49a9333a29f8a4bd76a253d5cd04"
 
 [[package]]
 name = "heck"
@@ -677,9 +694,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "1.5.0"
+version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b88cd59ee5f71fea89a62248fc8f387d44400cefe05ef548466d61ced9029a7"
+checksum = "55e2e4c765aa53a0424761bf9f41aa7a6ac1efa87238f59560640e27fca028f2"
 dependencies = [
  "autocfg",
  "hashbrown",
@@ -1006,7 +1023,7 @@ name = "octosql"
 version = "0.0.1"
 dependencies = [
  "anyhow",
- "arrow",
+ "arrow 2.0.0",
  "bigdecimal",
  "chrono",
  "datafusion",
@@ -1038,7 +1055,7 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "234036500c16044c0f7c96bcd77c6655762c7663264a4ef154c52eeab6235003"
 dependencies = [
- "arrow",
+ "arrow 1.0.0",
  "brotli",
  "byteorder",
  "chrono",

@@ -29,8 +29,8 @@
 use std::sync::Arc;
 
 use arrow::array;
-use arrow::array::{BooleanArray, Int8Array, Int16Array, Int32Array, Int64Array, UInt8Array, UInt16Array, UInt32Array, UInt64Array, Float32Array, Float64Array, Date32Array, Date64Array, Time32SecondArray, Time32MillisecondArray, Time64MicrosecondArray, Time64NanosecondArray, TimestampSecondArray, TimestampMillisecondArray, TimestampMicrosecondArray, TimestampNanosecondArray, IntervalYearMonthArray, IntervalDayTimeArray, DurationSecondArray, DurationMillisecondArray, DurationMicrosecondArray, DurationNanosecondArray, BinaryArray, LargeBinaryArray, FixedSizeBinaryArray, StringArray, LargeStringArray, ListArray, LargeListArray, StructArray, UnionArray, FixedSizeListArray, NullArray, DictionaryArray, ArrayRef, ArrayDataRef};
-use arrow::datatypes::{DataType, TimeUnit, DateUnit, Int8Type, Int16Type, Int32Type, Int64Type, UInt8Type, UInt16Type, UInt32Type, UInt64Type, IntervalUnit};
+use arrow::array::{PrimitiveArray, PrimitiveArrayOps, BinaryArray, LargeBinaryArray, FixedSizeBinaryArray, StringArray, LargeStringArray, ListArray, LargeListArray, StructArray, UnionArray, FixedSizeListArray, NullArray, DictionaryArray, ArrayRef, ArrayDataRef};
+use arrow::datatypes::{DataType, TimeUnit, DateUnit, Int8Type, Int16Type, Int32Type, Int64Type, UInt8Type, UInt16Type, UInt32Type, UInt64Type, IntervalUnit, BooleanType, DurationNanosecondType, TimestampNanosecondType, Float32Type, Float64Type, Date32Type, Date64Type, Time32SecondType, Time32MillisecondType, Time64MicrosecondType, Time64NanosecondType, TimestampSecondType, TimestampMillisecondType, TimestampMicrosecondType, IntervalYearMonthType, IntervalDayTimeType, DurationSecondType, DurationMillisecondType, DurationMicrosecondType};
 use anyhow::Result;
 
 use crate::physical::physical::ScalarValue;
@@ -63,47 +63,47 @@ pub fn create_key(
         let col = &group_by_keys[i];
         match col.data_type() {
             DataType::Boolean => {
-                let array = col.as_any().downcast_ref::<BooleanArray>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<BooleanType>>().unwrap();
                 vec[i] = GroupByScalar::Boolean(array.value(row))
             }
             DataType::UInt8 => {
-                let array = col.as_any().downcast_ref::<UInt8Array>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<UInt8Type>>().unwrap();
                 vec[i] = GroupByScalar::UInt8(array.value(row))
             }
             DataType::UInt16 => {
-                let array = col.as_any().downcast_ref::<UInt16Array>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<UInt16Type>>().unwrap();
                 vec[i] = GroupByScalar::UInt16(array.value(row))
             }
             DataType::UInt32 => {
-                let array = col.as_any().downcast_ref::<UInt32Array>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<UInt32Type>>().unwrap();
                 vec[i] = GroupByScalar::UInt32(array.value(row))
             }
             DataType::UInt64 => {
-                let array = col.as_any().downcast_ref::<UInt64Array>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<UInt64Type>>().unwrap();
                 vec[i] = GroupByScalar::UInt64(array.value(row))
             }
             DataType::Int8 => {
-                let array = col.as_any().downcast_ref::<Int8Array>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<Int8Type>>().unwrap();
                 vec[i] = GroupByScalar::Int8(array.value(row))
             }
             DataType::Int16 => {
-                let array = col.as_any().downcast_ref::<Int16Array>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<Int16Type>>().unwrap();
                 vec[i] = GroupByScalar::Int16(array.value(row))
             }
             DataType::Int32 => {
-                let array = col.as_any().downcast_ref::<Int32Array>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<Int32Type>>().unwrap();
                 vec[i] = GroupByScalar::Int32(array.value(row))
             }
             DataType::Int64 => {
-                let array = col.as_any().downcast_ref::<Int64Array>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<Int64Type>>().unwrap();
                 vec[i] = GroupByScalar::Int64(array.value(row))
             }
             DataType::Duration(TimeUnit::Nanosecond) => {
-                let array = col.as_any().downcast_ref::<DurationNanosecondArray>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<DurationNanosecondType>>().unwrap();
                 vec[i] = GroupByScalar::Duration(array.value(row))
             }
             DataType::Timestamp(TimeUnit::Nanosecond, _) => {
-                let array = col.as_any().downcast_ref::<TimestampNanosecondArray>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<TimestampNanosecondType>>().unwrap();
                 vec[i] = GroupByScalar::Timestamp(array.value(row))
             }
             DataType::Utf8 => {
@@ -127,51 +127,55 @@ pub fn create_row(
         let col = &columns[i];
         match col.data_type() {
             DataType::Boolean => {
-                let array = col.as_any().downcast_ref::<BooleanArray>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<BooleanType>>().unwrap();
                 vec[i] = ScalarValue::Boolean(array.value(row))
             }
             DataType::UInt8 => {
-                let array = col.as_any().downcast_ref::<UInt8Array>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<UInt8Type>>().unwrap();
                 vec[i] = ScalarValue::UInt8(array.value(row))
             }
             DataType::UInt16 => {
-                let array = col.as_any().downcast_ref::<UInt16Array>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<UInt16Type>>().unwrap();
                 vec[i] = ScalarValue::UInt16(array.value(row))
             }
             DataType::UInt32 => {
-                let array = col.as_any().downcast_ref::<UInt32Array>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<UInt32Type>>().unwrap();
                 vec[i] = ScalarValue::UInt32(array.value(row))
             }
             DataType::UInt64 => {
-                let array = col.as_any().downcast_ref::<UInt64Array>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<UInt64Type>>().unwrap();
                 vec[i] = ScalarValue::UInt64(array.value(row))
             }
             DataType::Int8 => {
-                let array = col.as_any().downcast_ref::<Int8Array>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<Int8Type>>().unwrap();
                 vec[i] = ScalarValue::Int8(array.value(row))
             }
             DataType::Int16 => {
-                let array = col.as_any().downcast_ref::<Int16Array>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<Int16Type>>().unwrap();
                 vec[i] = ScalarValue::Int16(array.value(row))
             }
             DataType::Int32 => {
-                let array = col.as_any().downcast_ref::<Int32Array>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<Int32Type>>().unwrap();
                 vec[i] = ScalarValue::Int32(array.value(row))
             }
             DataType::Int64 => {
-                let array = col.as_any().downcast_ref::<Int64Array>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<Int64Type>>().unwrap();
                 vec[i] = ScalarValue::Int64(array.value(row))
             }
+            DataType::Duration(TimeUnit::Nanosecond) => {
+                let array = col.as_any().downcast_ref::<PrimitiveArray<DurationNanosecondType>>().unwrap();
+                vec[i] = ScalarValue::Timestamp(array.value(row))
+            }
             DataType::Timestamp(TimeUnit::Nanosecond, _) => {
-                let array = col.as_any().downcast_ref::<TimestampNanosecondArray>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<TimestampNanosecondType>>().unwrap();
                 vec[i] = ScalarValue::Timestamp(array.value(row))
             }
             DataType::Float32 => {
-                let array = col.as_any().downcast_ref::<Float32Array>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<Float32Type>>().unwrap();
                 vec[i] = ScalarValue::Float32(array.value(row))
             }
             DataType::Float64 => {
-                let array = col.as_any().downcast_ref::<Float64Array>().unwrap();
+                let array = col.as_any().downcast_ref::<PrimitiveArray<Float64Type>>().unwrap();
                 vec[i] = ScalarValue::Float64(array.value(row))
             }
             DataType::Utf8 => {
@@ -196,91 +200,91 @@ pub fn get_scalar_value(array: &ArrayRef, row: usize) -> Result<ScalarValue> {
         DataType::Boolean => {
             let array = array
                 .as_any()
-                .downcast_ref::<array::BooleanArray>()
+                .downcast_ref::<PrimitiveArray<BooleanType>>()
                 .expect("Failed to cast array");
             ScalarValue::Boolean(array.value(row))
         }
         DataType::UInt8 => {
             let array = array
                 .as_any()
-                .downcast_ref::<array::UInt8Array>()
+                .downcast_ref::<PrimitiveArray<UInt8Type>>()
                 .expect("Failed to cast array");
             ScalarValue::UInt8(array.value(row))
         }
         DataType::UInt16 => {
             let array = array
                 .as_any()
-                .downcast_ref::<array::UInt16Array>()
+                .downcast_ref::<PrimitiveArray<UInt16Type>>()
                 .expect("Failed to cast array");
             ScalarValue::UInt16(array.value(row))
         }
         DataType::UInt32 => {
             let array = array
                 .as_any()
-                .downcast_ref::<array::UInt32Array>()
+                .downcast_ref::<PrimitiveArray<UInt32Type>>()
                 .expect("Failed to cast array");
             ScalarValue::UInt32(array.value(row))
         }
         DataType::UInt64 => {
             let array = array
                 .as_any()
-                .downcast_ref::<array::UInt64Array>()
+                .downcast_ref::<PrimitiveArray<UInt64Type>>()
                 .expect("Failed to cast array");
             ScalarValue::UInt64(array.value(row))
         }
         DataType::Int8 => {
             let array = array
                 .as_any()
-                .downcast_ref::<array::Int8Array>()
+                .downcast_ref::<PrimitiveArray<Int8Type>>()
                 .expect("Failed to cast array");
             ScalarValue::Int8(array.value(row))
         }
         DataType::Int16 => {
             let array = array
                 .as_any()
-                .downcast_ref::<array::Int16Array>()
+                .downcast_ref::<PrimitiveArray<Int16Type>>()
                 .expect("Failed to cast array");
             ScalarValue::Int16(array.value(row))
         }
         DataType::Int32 => {
             let array = array
                 .as_any()
-                .downcast_ref::<array::Int32Array>()
+                .downcast_ref::<PrimitiveArray<Int32Type>>()
                 .expect("Failed to cast array");
             ScalarValue::Int32(array.value(row))
         }
         DataType::Int64 => {
             let array = array
                 .as_any()
-                .downcast_ref::<array::Int64Array>()
+                .downcast_ref::<PrimitiveArray<Int64Type>>()
                 .expect("Failed to cast array");
             ScalarValue::Int64(array.value(row))
         }
         DataType::Duration(unit) if *unit == TimeUnit::Nanosecond => {
             let array = array
                 .as_any()
-                .downcast_ref::<array::DurationNanosecondArray>()
+                .downcast_ref::<PrimitiveArray<DurationNanosecondType>>()
                 .expect("Failed to cast array");
             ScalarValue::Duration(array.value(row))
         }
         DataType::Timestamp(TimeUnit::Nanosecond, _) => {
             let array = array
                 .as_any()
-                .downcast_ref::<array::TimestampNanosecondArray>()
+                .downcast_ref::<PrimitiveArray<TimestampNanosecondType>>()
                 .unwrap();
             ScalarValue::Timestamp(array.value(row))
         }
         DataType::Float32 => {
             let array = array
                 .as_any()
-                .downcast_ref::<array::Float32Array>()
+                .downcast_ref::<PrimitiveArray<Float32Type>>()
                 .unwrap();
             ScalarValue::Float32(array.value(row))
         }
         DataType::Float64 => {
             let array = array
                 .as_any()
-                .downcast_ref::<array::Float64Array>()
+                .downcast_ref::<PrimitiveArray<Float64Type>>()
                 .unwrap();
             ScalarValue::Float64(array.value(row))
         }
@@ -309,13 +313,13 @@ pub fn get_scalar_value(array: &ArrayRef, row: usize) -> Result<ScalarValue> {
 }
 
 macro_rules! compute_single_arg {
-    ($arg:expr, $input_type:ident, $output_builder:ident, $op:expr) => {{
+    ($arg:expr, $input_type:ty, $output_builder:ty, $op:expr) => {{
         let arg = $arg
             .as_any()
             .downcast_ref::<$input_type>()
             .expect("compute_single_arg failed to downcast array");
 
-        let mut result = $output_builder::new($arg.len());
+        let mut result = <$output_builder>::new($arg.len());
         for i in 0..$arg.len() {
             result.append_value($op(arg.value(i))?)?;
         }
@@ -325,7 +329,7 @@ macro_rules! compute_single_arg {
 }
 
 macro_rules! compute_single_arg_str {
-    ($arg:expr, $input_type:ident, $output_builder:ident, $op:expr) => {{
+    ($arg:expr, $input_type:ty, $output_builder:ident, $op:expr) => {{
         let arg = $arg
             .as_any()
             .downcast_ref::<$input_type>()
@@ -341,7 +345,7 @@ macro_rules! compute_single_arg_str {
 }
 
 macro_rules! compute_two_arg {
-    ($arg1:expr, $arg2:expr, $input_type1:ident, $input_type2:ident, $output_builder:ident, $op:expr) => {{
+    ($arg1:expr, $arg2:expr, $input_type1:ty, $input_type2:ty, $output_builder:ty, $op:expr) => {{
         let arg1 = $arg1
             .as_any()
             .downcast_ref::<$input_type1>()
@@ -352,7 +356,7 @@ macro_rules! compute_two_arg {
             .downcast_ref::<$input_type2>()
             .expect("compute_single_arg failed to downcast array");
 
-        let mut result = $output_builder::new($arg1.len());
+        let mut result = <$output_builder>::new($arg1.len());
         for i in 0..$arg1.len() {
             result.append_value($op(arg1.value(i), arg2.value(i))?)?;
         }
@@ -363,7 +367,7 @@ macro_rules! compute_two_arg {
 
 /// Invoke a compute kernel on a pair of arrays
 macro_rules! compute_op {
-    ($LEFT:expr, $RIGHT:expr, $OP:ident, $DT:ident) => {{
+    ($LEFT:expr, $RIGHT:expr, $OP:ident, $DT:ty) => {{
         let ll = $LEFT
             .as_any()
             .downcast_ref::<$DT>()
@@ -378,7 +382,7 @@ macro_rules! compute_op {
 
 /// Invoke a compute kernel on a pair of binary data arrays
 macro_rules! compute_utf8_op {
-    ($LEFT:expr, $RIGHT:expr, $OP:ident, $DT:ident) => {{
+    ($LEFT:expr, $RIGHT:expr, $OP:ident, $DT:ty) => {{
         let ll = $LEFT
             .as_any()
             .downcast_ref::<$DT>()
@@ -432,22 +436,22 @@ macro_rules! compute_utf8_op {
 macro_rules! binary_array_op {
     ($LEFT:expr, $RIGHT:expr, $OP:ident) => {{
         match $LEFT.data_type() {
-            DataType::Int8 => compute_op!($LEFT, $RIGHT, $OP, Int8Array),
-            DataType::Int16 => compute_op!($LEFT, $RIGHT, $OP, Int16Array),
-            DataType::Int32 => compute_op!($LEFT, $RIGHT, $OP, Int32Array),
-            DataType::Int64 => compute_op!($LEFT, $RIGHT, $OP, Int64Array),
-            DataType::UInt8 => compute_op!($LEFT, $RIGHT, $OP, UInt8Array),
-            DataType::UInt16 => compute_op!($LEFT, $RIGHT, $OP, UInt16Array),
-            DataType::UInt32 => compute_op!($LEFT, $RIGHT, $OP, UInt32Array),
-            DataType::UInt64 => compute_op!($LEFT, $RIGHT, $OP, UInt64Array),
-            DataType::Float32 => compute_op!($LEFT, $RIGHT, $OP, Float32Array),
-            DataType::Float64 => compute_op!($LEFT, $RIGHT, $OP, Float64Array),
+            DataType::Int8 => compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<Int8Type>),
+            DataType::Int16 => compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<Int16Type>),
+            DataType::Int32 => compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<Int32Type>),
+            DataType::Int64 => compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<Int64Type>),
+            DataType::UInt8 => compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<UInt8Type>),
+            DataType::UInt16 => compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<UInt16Type>),
+            DataType::UInt32 => compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<UInt32Type>),
+            DataType::UInt64 => compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<UInt64Type>),
+            DataType::Float32 => compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<Float32Type>),
+            DataType::Float64 => compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<Float64Type>),
             DataType::Utf8 => compute_utf8_op!($LEFT, $RIGHT, $OP, StringArray),
             DataType::Timestamp(TimeUnit::Nanosecond, None) => {
-                compute_op!($LEFT, $RIGHT, $OP, TimestampNanosecondArray)
+                compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<TimestampNanosecondType>)
             }
             DataType::Duration(TimeUnit::Nanosecond) => {
-                compute_op!($LEFT, $RIGHT, $OP, DurationNanosecondArray)
+                compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<DurationNanosecondType>)
             }
             other => {
                 dbg!(other);
@@ -460,21 +464,21 @@ macro_rules! binary_array_op {
 macro_rules! binary_numeric_array_op {
     ($LEFT:expr, $RIGHT:expr, $OP:ident) => {{
         match $LEFT.data_type() {
-            DataType::Int8 => compute_op!($LEFT, $RIGHT, $OP, Int8Array),
-            DataType::Int16 => compute_op!($LEFT, $RIGHT, $OP, Int16Array),
-            DataType::Int32 => compute_op!($LEFT, $RIGHT, $OP, Int32Array),
-            DataType::Int64 => compute_op!($LEFT, $RIGHT, $OP, Int64Array),
-            DataType::UInt8 => compute_op!($LEFT, $RIGHT, $OP, UInt8Array),
-            DataType::UInt16 => compute_op!($LEFT, $RIGHT, $OP, UInt16Array),
-            DataType::UInt32 => compute_op!($LEFT, $RIGHT, $OP, UInt32Array),
-            DataType::UInt64 => compute_op!($LEFT, $RIGHT, $OP, UInt64Array),
-            DataType::Float32 => compute_op!($LEFT, $RIGHT, $OP, Float32Array),
-            DataType::Float64 => compute_op!($LEFT, $RIGHT, $OP, Float64Array),
+            DataType::Int8 => compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<Int8Type>),
+            DataType::Int16 => compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<Int16Type>),
+            DataType::Int32 => compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<Int32Type>),
+            DataType::Int64 => compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<Int64Type>),
+            DataType::UInt8 => compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<UInt8Type>),
+            DataType::UInt16 => compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<UInt16Type>),
+            DataType::UInt32 => compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<UInt32Type>),
+            DataType::UInt64 => compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<UInt64Type>),
+            DataType::Float32 => compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<Float32Type>),
+            DataType::Float64 => compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<Float64Type>),
             DataType::Timestamp(TimeUnit::Nanosecond, None) => {
-                compute_op!($LEFT, $RIGHT, $OP, TimestampNanosecondArray)
+                compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<TimestampNanosecondType>)
             }
             DataType::Duration(TimeUnit::Nanosecond) => {
-                compute_op!($LEFT, $RIGHT, $OP, DurationNanosecondArray)
+                compute_op!($LEFT, $RIGHT, $OP, PrimitiveArray<DurationNanosecondType>)
             }
             other => {
                 dbg!(other);
@@ -501,63 +505,63 @@ macro_rules! binary_numeric_array_op {
 
 pub fn make_array(data: ArrayDataRef) -> ArrayRef {
     match data.data_type() {
-        DataType::Boolean => Arc::new(BooleanArray::from(data)) as ArrayRef,
-        DataType::Int8 => Arc::new(Int8Array::from(data)) as ArrayRef,
-        DataType::Int16 => Arc::new(Int16Array::from(data)) as ArrayRef,
-        DataType::Int32 => Arc::new(Int32Array::from(data)) as ArrayRef,
-        DataType::Int64 => Arc::new(Int64Array::from(data)) as ArrayRef,
-        DataType::UInt8 => Arc::new(UInt8Array::from(data)) as ArrayRef,
-        DataType::UInt16 => Arc::new(UInt16Array::from(data)) as ArrayRef,
-        DataType::UInt32 => Arc::new(UInt32Array::from(data)) as ArrayRef,
-        DataType::UInt64 => Arc::new(UInt64Array::from(data)) as ArrayRef,
+        DataType::Boolean => Arc::new(PrimitiveArray::<BooleanType>::from(data)) as ArrayRef,
+        DataType::Int8 => Arc::new(PrimitiveArray::<UInt8Type>::from(data)) as ArrayRef,
+        DataType::Int16 => Arc::new(PrimitiveArray::<UInt16Type>::from(data)) as ArrayRef,
+        DataType::Int32 => Arc::new(PrimitiveArray::<UInt32Type>::from(data)) as ArrayRef,
+        DataType::Int64 => Arc::new(PrimitiveArray::<UInt64Type>::from(data)) as ArrayRef,
+        DataType::UInt8 => Arc::new(PrimitiveArray::<Int8Type>::from(data)) as ArrayRef,
+        DataType::UInt16 => Arc::new(PrimitiveArray::<Int16Type>::from(data)) as ArrayRef,
+        DataType::UInt32 => Arc::new(PrimitiveArray::<Int32Type>::from(data)) as ArrayRef,
+        DataType::UInt64 => Arc::new(PrimitiveArray::<Int64Type>::from(data)) as ArrayRef,
         DataType::Float16 => panic!("Float16 datatype not supported"),
-        DataType::Float32 => Arc::new(Float32Array::from(data)) as ArrayRef,
-        DataType::Float64 => Arc::new(Float64Array::from(data)) as ArrayRef,
-        DataType::Date32(DateUnit::Day) => Arc::new(Date32Array::from(data)) as ArrayRef,
+        DataType::Float32 => Arc::new(PrimitiveArray::<Float32Type>::from(data)) as ArrayRef,
+        DataType::Float64 => Arc::new(PrimitiveArray::<Float64Type>::from(data)) as ArrayRef,
+        DataType::Date32(DateUnit::Day) => Arc::new(PrimitiveArray::<Date32Type>::from(data)) as ArrayRef,
         DataType::Date64(DateUnit::Millisecond) => {
-            Arc::new(Date64Array::from(data)) as ArrayRef
+            Arc::new(PrimitiveArray::<Date64Type>::from(data)) as ArrayRef
         }
         DataType::Time32(TimeUnit::Second) => {
-            Arc::new(Time32SecondArray::from(data)) as ArrayRef
+            Arc::new(PrimitiveArray::<Time32SecondType>::from(data)) as ArrayRef
         }
         DataType::Time32(TimeUnit::Millisecond) => {
-            Arc::new(Time32MillisecondArray::from(data)) as ArrayRef
+            Arc::new(PrimitiveArray::<Time32MillisecondType>::from(data)) as ArrayRef
         }
         DataType::Time64(TimeUnit::Microsecond) => {
-            Arc::new(Time64MicrosecondArray::from(data)) as ArrayRef
+            Arc::new(PrimitiveArray::<Time64MicrosecondType>::from(data)) as ArrayRef
         }
         DataType::Time64(TimeUnit::Nanosecond) => {
-            Arc::new(Time64NanosecondArray::from(data)) as ArrayRef
+            Arc::new(PrimitiveArray::<Time64NanosecondType>::from(data)) as ArrayRef
         }
         DataType::Timestamp(TimeUnit::Second, _) => {
-            Arc::new(TimestampSecondArray::from(data)) as ArrayRef
+            Arc::new(PrimitiveArray::<TimestampSecondType>::from(data)) as ArrayRef
         }
         DataType::Timestamp(TimeUnit::Millisecond, _) => {
-            Arc::new(TimestampMillisecondArray::from(data)) as ArrayRef
+            Arc::new(PrimitiveArray::<TimestampMillisecondType>::from(data)) as ArrayRef
         }
         DataType::Timestamp(TimeUnit::Microsecond, _) => {
-            Arc::new(TimestampMicrosecondArray::from(data)) as ArrayRef
+            Arc::new(PrimitiveArray::<TimestampMicrosecondType>::from(data)) as ArrayRef
         }
         DataType::Timestamp(TimeUnit::Nanosecond, _) => {
-            Arc::new(TimestampNanosecondArray::from(data)) as ArrayRef
+            Arc::new(PrimitiveArray::<TimestampNanosecondType>::from(data)) as ArrayRef
         }
         DataType::Interval(IntervalUnit::YearMonth) => {
-            Arc::new(IntervalYearMonthArray::from(data)) as ArrayRef
+            Arc::new(PrimitiveArray::<IntervalYearMonthType>::from(data)) as ArrayRef
         }
         DataType::Interval(IntervalUnit::DayTime) => {
-            Arc::new(IntervalDayTimeArray::from(data)) as ArrayRef
+            Arc::new(PrimitiveArray::<IntervalDayTimeType>::from(data)) as ArrayRef
         }
         DataType::Duration(TimeUnit::Second) => {
-            Arc::new(DurationSecondArray::from(data)) as ArrayRef
+            Arc::new(PrimitiveArray::<DurationSecondType>::from(data)) as ArrayRef
         }
         DataType::Duration(TimeUnit::Millisecond) => {
-            Arc::new(DurationMillisecondArray::from(data)) as ArrayRef
+            Arc::new(PrimitiveArray::<DurationMillisecondType>::from(data)) as ArrayRef
         }
         DataType::Duration(TimeUnit::Microsecond) => {
-            Arc::new(DurationMicrosecondArray::from(data)) as ArrayRef
+            Arc::new(PrimitiveArray::<DurationMicrosecondType>::from(data)) as ArrayRef
         }
         DataType::Duration(TimeUnit::Nanosecond) => {
-            Arc::new(DurationNanosecondArray::from(data)) as ArrayRef
+            Arc::new(PrimitiveArray::<DurationNanosecondType>::from(data)) as ArrayRef
         }
         DataType::Binary => Arc::new(BinaryArray::from(data)) as ArrayRef,
         DataType::LargeBinary => Arc::new(LargeBinaryArray::from(data)) as ArrayRef,

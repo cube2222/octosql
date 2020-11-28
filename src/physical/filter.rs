@@ -14,15 +14,15 @@
 
 use std::sync::Arc;
 
-use arrow::array::BooleanArray;
 use arrow::compute::kernels::filter;
-use arrow::datatypes::Schema;
+use arrow::datatypes::{Schema, BooleanType};
 use arrow::record_batch::RecordBatch;
 use anyhow::Result;
 
 use crate::physical::expression::Expression;
 use crate::physical::physical::*;
 use crate::logical::logical::NodeMetadata;
+use arrow::array::PrimitiveArray;
 
 pub struct Filter {
     logical_metadata: NodeMetadata,
@@ -56,7 +56,7 @@ impl Node for Filter {
                     .evaluate(exec_ctx, &batch)?;
                 let predicate_column = predicate_column_untyped
                     .as_any()
-                    .downcast_ref::<BooleanArray>()
+                    .downcast_ref::<PrimitiveArray<BooleanType>>()
                     .unwrap();
                 let new_columns = batch
                     .columns()

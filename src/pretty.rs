@@ -31,7 +31,8 @@
 use std::time::{Duration, UNIX_EPOCH};
 
 use arrow::array;
-use arrow::datatypes::{DataType, TimeUnit};
+use arrow::array::PrimitiveArrayOps;
+use arrow::datatypes::{Field, Schema, DataType, TimeUnit, DateUnit, Int8Type, Int16Type, Int32Type, Int64Type, UInt8Type, UInt16Type, UInt32Type, UInt64Type, IntervalUnit, BooleanType, DurationNanosecondType, TimestampNanosecondType, Float32Type, Float64Type, Date32Type, Date64Type, Time32SecondType, Time32MillisecondType, Time64MicrosecondType, Time64NanosecondType, TimestampSecondType, TimestampMillisecondType, TimestampMicrosecondType, IntervalYearMonthType, IntervalDayTimeType, DurationSecondType, DurationMillisecondType, DurationMicrosecondType};
 use arrow::error::{ArrowError, Result};
 use arrow::record_batch::RecordBatch;
 use chrono::{DateTime, Utc};
@@ -104,28 +105,28 @@ fn array_value_to_string(column: array::ArrayRef, row: usize) -> Result<String> 
             .unwrap()
             .value(row)
             .to_string()),
-        DataType::Boolean => make_string!(array::BooleanArray, column, row),
-        DataType::Int16 => make_string!(array::Int16Array, column, row),
-        DataType::Int32 => make_string!(array::Int32Array, column, row),
-        DataType::Int64 => make_string!(array::Int64Array, column, row),
-        DataType::UInt8 => make_string!(array::UInt8Array, column, row),
-        DataType::UInt16 => make_string!(array::UInt16Array, column, row),
-        DataType::UInt32 => make_string!(array::UInt32Array, column, row),
-        DataType::UInt64 => make_string!(array::UInt64Array, column, row),
-        DataType::Float16 => make_string!(array::Float32Array, column, row),
-        DataType::Float32 => make_string!(array::Float32Array, column, row),
-        DataType::Float64 => make_string!(array::Float64Array, column, row),
+        DataType::Boolean => make_string!(array::PrimitiveArray<BooleanType>, column, row),
+        DataType::Int16 => make_string!(array::PrimitiveArray<Int16Type>, column, row),
+        DataType::Int32 => make_string!(array::PrimitiveArray<Int32Type>, column, row),
+        DataType::Int64 => make_string!(array::PrimitiveArray<Int64Type>, column, row),
+        DataType::UInt8 => make_string!(array::PrimitiveArray<UInt8Type>, column, row),
+        DataType::UInt16 => make_string!(array::PrimitiveArray<UInt16Type>, column, row),
+        DataType::UInt32 => make_string!(array::PrimitiveArray<UInt32Type>, column, row),
+        DataType::UInt64 => make_string!(array::PrimitiveArray<UInt64Type>, column, row),
+        DataType::Float16 => unimplemented!(),
+        DataType::Float32 => make_string!(array::PrimitiveArray<Float32Type>, column, row),
+        DataType::Float64 => make_string!(array::PrimitiveArray<Float64Type>, column, row),
         DataType::Duration(unit) if *unit == TimeUnit::Nanosecond => {
-            make_string!(array::DurationNanosecondArray, column, row)
+            make_string!(array::PrimitiveArray<DurationNanosecondType>, column, row)
         },
         DataType::Timestamp(unit, _) if *unit == TimeUnit::Second => {
-            make_string!(array::TimestampSecondArray, column, row)
+            make_string!(array::PrimitiveArray<TimestampSecondType>, column, row)
         }
         DataType::Timestamp(unit, _) if *unit == TimeUnit::Millisecond => {
-            make_string!(array::TimestampMillisecondArray, column, row)
+            make_string!(array::PrimitiveArray<TimestampMillisecondType>, column, row)
         }
         DataType::Timestamp(unit, _) if *unit == TimeUnit::Microsecond => {
-            make_string!(array::TimestampMicrosecondArray, column, row)
+            make_string!(array::PrimitiveArray<TimestampMicrosecondType>, column, row)
         }
         DataType::Timestamp(unit, _) if *unit == TimeUnit::Nanosecond => {
             if column.is_null(row) {
@@ -133,26 +134,26 @@ fn array_value_to_string(column: array::ArrayRef, row: usize) -> Result<String> 
             } else {
                 let nano_duration = UNIX_EPOCH + Duration::from_nanos(column
                     .as_any()
-                    .downcast_ref::<array::TimestampNanosecondArray>()
+                    .downcast_ref::<array::PrimitiveArray<TimestampNanosecondType>>()
                     .unwrap()
                     .value(row) as u64);
                 let datetime = DateTime::<Utc>::from(nano_duration);
                 Ok(datetime.to_rfc3339())
             }
         }
-        DataType::Date32(_) => make_string!(array::Date32Array, column, row),
-        DataType::Date64(_) => make_string!(array::Date64Array, column, row),
+        DataType::Date32(_) => make_string!(array::PrimitiveArray<Date32Type>, column, row),
+        DataType::Date64(_) => make_string!(array::PrimitiveArray<Date64Type>, column, row),
         DataType::Time32(unit) if *unit == TimeUnit::Second => {
-            make_string!(array::Time32SecondArray, column, row)
+            make_string!(array::PrimitiveArray<Time32SecondType>, column, row)
         }
         DataType::Time32(unit) if *unit == TimeUnit::Millisecond => {
-            make_string!(array::Time32MillisecondArray, column, row)
+            make_string!(array::PrimitiveArray<Time32MillisecondType>, column, row)
         }
         DataType::Time32(unit) if *unit == TimeUnit::Microsecond => {
-            make_string!(array::Time64MicrosecondArray, column, row)
+            make_string!(array::PrimitiveArray<Time64MicrosecondType>, column, row)
         }
         DataType::Time64(unit) if *unit == TimeUnit::Nanosecond => {
-            make_string!(array::Time64NanosecondArray, column, row)
+            make_string!(array::PrimitiveArray<Time64NanosecondType>, column, row)
         }
         _ => Err(ArrowError::InvalidArgumentError(format!(
             "Unsupported {:?} type for repl.",

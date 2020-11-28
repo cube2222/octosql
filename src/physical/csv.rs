@@ -60,11 +60,11 @@ impl Node for CSVSource {
         let retraction_array = Arc::new(retraction_array_builder.finish());
         let schema = self.logical_metadata.schema.clone();
         loop {
-            let maybe_rec = r.next().unwrap();
+            let maybe_rec = r.next();
             match maybe_rec {
                 None => break,
                 Some(rec) => {
-                    let mut columns: Vec<ArrayRef> = rec.columns().iter().cloned().collect();
+                    let mut columns: Vec<ArrayRef> = rec?.columns().iter().cloned().collect();
                     if columns[0].len() == BATCH_SIZE {
                         columns.push(retraction_array.clone() as ArrayRef)
                     } else {

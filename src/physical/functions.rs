@@ -15,11 +15,10 @@
 use std::sync::Arc;
 use std::collections::HashMap;
 
-use arrow::array::{Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, StringArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array, StringBuilder, TimestampNanosecondBuilder, DurationNanosecondArray};
-use arrow::array::ArrayRef;
+use arrow::array::{ArrayRef, PrimitiveArray, PrimitiveBuilder, StringArray, StringBuilder};
+use arrow::datatypes::{Field, Schema, DataType, TimeUnit, DateUnit, Int8Type, Int16Type, Int32Type, Int64Type, UInt8Type, UInt16Type, UInt32Type, UInt64Type, IntervalUnit, BooleanType, DurationNanosecondType, TimestampNanosecondType, Float32Type, Float64Type, Date32Type, Date64Type, Time32SecondType, Time32MillisecondType, Time64MicrosecondType, Time64NanosecondType, TimestampSecondType, TimestampMillisecondType, TimestampMicrosecondType, IntervalYearMonthType, IntervalDayTimeType, DurationSecondType, DurationMillisecondType, DurationMicrosecondType};
 use arrow::compute::kernels::comparison::{lt, lt_eq, eq, gt_eq, gt, lt_utf8, lt_eq_utf8, eq_utf8, gt_eq_utf8, gt_utf8};
 use arrow::compute::kernels::arithmetic::{add, subtract, multiply, divide};
-use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 use anyhow::Result;
@@ -149,7 +148,7 @@ lazy_static! {
             Ok(output? as ArrayRef)
         }));
         register_function!(m, "parse_datetime_rfc3339", make_const_meta_body!(DataType::Timestamp(Nanosecond, None)), Arc::new(|args: Vec<ArrayRef>| {
-            let output: Result<_> = compute_single_arg!(args[0], StringArray, TimestampNanosecondBuilder, |text: &str| -> Result<i64> {
+            let output: Result<_> = compute_single_arg!(args[0], StringArray, PrimitiveBuilder<TimestampNanosecondType>, |text: &str| -> Result<i64> {
                 match DateTime::parse_from_rfc3339(text) {
                     Ok(dt) => Ok(dt.timestamp_nanos()),
                     Err(err) => Err(err)?,
@@ -158,7 +157,7 @@ lazy_static! {
             Ok(output? as ArrayRef)
         }));
         register_function!(m, "parse_datetime_tz", make_const_meta_body!(DataType::Timestamp(Nanosecond, None)), Arc::new(|args: Vec<ArrayRef>| {
-            let output: Result<_> = compute_two_arg!(args[0], args[1], StringArray, StringArray, TimestampNanosecondBuilder, |fmt: &str, text: &str| -> Result<i64> {
+            let output: Result<_> = compute_two_arg!(args[0], args[1], StringArray, StringArray, PrimitiveBuilder<TimestampNanosecondType>, |fmt: &str, text: &str| -> Result<i64> {
                 match DateTime::parse_from_str(text, fmt) {
                     Ok(dt) => Ok(dt.timestamp_nanos()),
                     Err(err) => Err(err)?

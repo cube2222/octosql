@@ -15,7 +15,7 @@
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use arrow::array::{ArrayRef, TimestampNanosecondArray, TimestampNanosecondBuilder};
+use arrow::array::{ArrayRef, PrimitiveArrayOps, TimestampNanosecondArray, TimestampNanosecondBuilder};
 use arrow::compute::kernels::aggregate::max;
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;

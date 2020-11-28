@@ -15,7 +15,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
-use arrow::array::{ArrayRef, Int64Builder, StringBuilder, TimestampNanosecondArray, TimestampNanosecondBuilder};
+use arrow::array::{PrimitiveArrayOps, ArrayRef, Int64Builder, StringBuilder, TimestampNanosecondArray, TimestampNanosecondBuilder};
 use arrow::datatypes::{DataType, TimeUnit};
 
 use crate::physical::arrow::{create_key, GroupByScalar};

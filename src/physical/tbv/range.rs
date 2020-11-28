@@ -16,8 +16,8 @@ use std::cmp::min;
 use std::sync::Arc;
 
 use anyhow::Result;
-use arrow::array::{BooleanBuilder, Int64Array, Int64Builder};
-use arrow::datatypes::{DataType, Field, Schema};
+use arrow::array::{BooleanBuilder, PrimitiveBuilder};
+use arrow::datatypes::{DataType, Field, Schema, Int64Type};
 use arrow::record_batch::RecordBatch;
 
 use crate::physical::expression::Expression;
@@ -66,7 +66,7 @@ impl Node for Range {
         while start < end {
             let batch_end = min(start + (BATCH_SIZE as i64), end);
 
-            let mut batch_builder = Int64Builder::new((batch_end - start) as usize);
+            let mut batch_builder = PrimitiveBuilder::<Int64Type>::new((batch_end - start) as usize);
             for i in start..batch_end {
                 batch_builder.append_value(i)?
             }

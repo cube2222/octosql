@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use arrow::array::{ArrayDataBuilder, ArrayRef, BooleanBufferBuilder, BufferBuilderTrait, Int64Builder, StringBuilder, StructArray, TimestampNanosecondBuilder, DurationNanosecondBuilder};
+use arrow::array::{ArrayDataBuilder, ArrayRef, BooleanBufferBuilder, BufferBuilderTrait, Int64Builder, StringBuilder, StructArray, DurationNanosecondBuilder};
 use arrow::buffer::MutableBuffer;
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 
 use crate::physical::arrow::{create_row, get_scalar_value, make_array};
-use crate::physical::physical::{ExecutionContext, Identifier, Node, noop_meta_send, ScalarValue, SchemaContext, SchemaContextWithSchema, VariableContext};
+use crate::physical::physical::{ExecutionContext, Identifier, Node, noop_meta_send, ScalarValue, VariableContext};
 
 pub trait Expression: Send + Sync {
     fn evaluate(&self, ctx: &ExecutionContext, record: &RecordBatch) -> Result<ArrayRef>;

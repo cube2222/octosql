@@ -15,7 +15,7 @@
 use std::sync::Arc;
 
 use arrow::compute::kernels::filter;
-use arrow::datatypes::{Schema, BooleanType};
+use arrow::datatypes::{BooleanType};
 use arrow::record_batch::RecordBatch;
 use anyhow::Result;
 

@@ -16,7 +16,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, mpsc};
 
 use arrow::array::{ArrayRef, BooleanBuilder, Int64Builder, StringBuilder};
-use arrow::datatypes::{DataType, Field, Schema};
+use arrow::datatypes::{DataType};
 use arrow::record_batch::RecordBatch;
 use anyhow::Result;
 

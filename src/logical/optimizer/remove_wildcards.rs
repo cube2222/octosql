@@ -17,8 +17,8 @@ use anyhow::Result;
 use crate::logical::logical::{Node, Transformers, TransformationContext, TableValuedFunction, Expression};
 use crate::physical::physical::{Identifier, EmptySchemaContext, RETRACTIONS_FIELD};
 use std::sync::Arc;
-use itertools::Itertools;
-use crate::parser::parser::parse_ident;
+
+
 
 fn name_to_ident(name: &str) -> Identifier {
     if let Some(i) = name.find(".") {
@@ -103,7 +103,7 @@ pub fn remove_wildcards(logical_plan: &Node) -> Result<Box<Node>> {
                     Node::Filter { .. } => Ok((Box::new(node.clone()), state)),
                     Node::GroupBy { .. } => Ok((Box::new(node.clone()), None)),
                     Node::Join { .. } => Ok((Box::new(node.clone()), state)),
-                    Node::Requalifier { source, qualifier } => {
+                    Node::Requalifier { source: _, qualifier } => {
                         let new_state: Option<Vec<_>> = state.map(|idents| idents.into_iter().map(|ident| match ident {
                             Identifier::SimpleIdentifier(name) => Identifier::NamespacedIdentifier(qualifier.clone(), name),
                             Identifier::NamespacedIdentifier(_, name) => Identifier::NamespacedIdentifier(qualifier.clone(), name),
@@ -123,9 +123,9 @@ pub fn remove_wildcards(logical_plan: &Node) -> Result<Box<Node>> {
             })),
             expr_fn: None,
             base_state: None,
-            state_reduce: Box::new(|mut x, mut y| {
+            state_reduce: Box::new(|x, y| {
                 let mut output: Option<Vec<Identifier>> = None;
-                if let Some(mut tab) = x {
+                if let Some(tab) = x {
                     output = Some(tab)
                 }
                 if let Some(mut tab) = y {

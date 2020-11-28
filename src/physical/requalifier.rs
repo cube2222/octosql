@@ -14,7 +14,7 @@
 
 use std::sync::Arc;
 
-use arrow::datatypes::{Field, Schema};
+
 use arrow::record_batch::RecordBatch;
 use anyhow::Result;
 

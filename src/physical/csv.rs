@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use arrow::array::{ArrayRef, BooleanBuilder};
 use arrow::csv;
-use arrow::datatypes::{DataType, Field, Schema};
+
 use arrow::record_batch::RecordBatch;
 use anyhow::Result;
 
@@ -42,7 +42,7 @@ impl Node for CSVSource {
 
     fn run(
         &self,
-        ctx: &ExecutionContext,
+        _ctx: &ExecutionContext,
         produce: ProduceFn,
         _meta_send: MetaSendFn,
     ) -> Result<()> {

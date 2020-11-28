@@ -15,13 +15,13 @@
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use arrow::array::{StringArray, TimestampNanosecondArray};
+use arrow::array::{TimestampNanosecondArray};
 use arrow::compute::kernels::aggregate::max;
-use arrow::datatypes::{DataType, Field, Schema};
-use arrow::record_batch::RecordBatch;
+
+
 
 use crate::physical::expression::Expression;
-use crate::physical::physical::{ExecutionContext, Identifier, MetadataMessage, MetaSendFn, Node, noop_meta_send, ProduceFn, ScalarValue, SchemaContext};
+use crate::physical::physical::{ExecutionContext, Identifier, MetadataMessage, MetaSendFn, Node, noop_meta_send, ProduceFn, ScalarValue};
 use crate::logical::logical::NodeMetadata;
 
 pub struct MaxDiffWatermarkGenerator {

@@ -19,7 +19,7 @@ use crate::physical::physical::{EmptySchemaContext, Identifier};
 use anyhow::Result;
 use std::sync::Arc;
 use itertools::Itertools;
-use std::collections::HashMap;
+
 use std::collections::BTreeMap;
 
 pub fn push_down_filters(logical_plan: &Node) -> Result<(Box<Node>, bool)> {
@@ -160,7 +160,7 @@ pub fn push_down_filters(logical_plan: &Node) -> Result<(Box<Node>, bool)> {
             })),
             expr_fn: None,
             base_state: false,
-            state_reduce: Box::new(|mut x, mut y| {
+            state_reduce: Box::new(|x, y| {
                 x || y
             }),
         })?;
@@ -179,8 +179,8 @@ fn variables_used(expr: &Expression) -> Option<Vec<Identifier>> {
 fn variables_used_internal(expr: &Expression, vars: &mut Vec<Identifier>) -> bool {
     match expr {
         Expression::Variable(x) => vars.push(x.clone()),
-        Expression::Constant(x) => {}
-        Expression::Function(name, args) => {
+        Expression::Constant(_x) => {}
+        Expression::Function(_name, args) => {
             for arg in args {
                 let ok = variables_used_internal(arg.as_ref(), vars);
                 if !ok {

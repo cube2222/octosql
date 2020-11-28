@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use arrow::array::{PrimitiveArrayOps, ArrayBuilder, ArrayRef, DurationNanosecondBuilder, TimestampNanosecondBuilder, PrimitiveArray};
 use arrow::array::{BooleanBuilder, Float32Builder, Float64Builder, Int16Builder, Int32Builder, Int64Builder, Int8Builder, StringBuilder, UInt16Builder, UInt32Builder, UInt64Builder, UInt8Builder};
-use arrow::datatypes::{DataType, Field, Schema, TimeUnit, BooleanType};
+use arrow::datatypes::{DataType, TimeUnit, BooleanType};
 use arrow::record_batch::RecordBatch;
 use anyhow::Result;
 
@@ -200,18 +200,18 @@ impl Node for GroupBy {
         produce: ProduceFn,
         meta_send: MetaSendFn,
     ) -> Result<()> {
-        let source_schema = self.source.logical_metadata().schema;
+        let _source_schema = self.source.logical_metadata().schema;
 
-        let mut accumulators_map_cell: RefCell<BTreeMap<Vec<GroupByScalar>, Vec<Box<dyn Accumulator>>>> =
+        let accumulators_map_cell: RefCell<BTreeMap<Vec<GroupByScalar>, Vec<Box<dyn Accumulator>>>> =
             RefCell::new(BTreeMap::new());
-        let mut last_triggered_values_cell: RefCell<BTreeMap<Vec<GroupByScalar>, Vec<ScalarValue>>> =
+        let last_triggered_values_cell: RefCell<BTreeMap<Vec<GroupByScalar>, Vec<ScalarValue>>> =
             RefCell::new(BTreeMap::new());
 
-        let mut trigger_cell: RefCell<Box<dyn Trigger>> = RefCell::new(self.trigger_prototypes.get(0)
+        let trigger_cell: RefCell<Box<dyn Trigger>> = RefCell::new(self.trigger_prototypes.get(0)
             .map(|prototype| prototype.create_trigger(self.key_types.clone(), self.key_time_part))
             .unwrap_or_else(|| Box::new(CountingTrigger::new(self.key_types.clone(), 1))));
 
-        let mut produce_cell = RefCell::new(produce);
+        let produce_cell = RefCell::new(produce);
 
         // TODO: Maybe the trigger_output function should take those references and return a closure,
         // which would be put in a refcell and contained all dependencies.
@@ -293,7 +293,7 @@ impl Node for GroupBy {
 }
 
 impl GroupBy {
-    fn trigger_output(&self, exec_ctx: &ExecutionContext, produce: ProduceFn, ctx: &ProduceContext, trigger: &mut dyn Trigger, accumulators_map: &mut BTreeMap<Vec<GroupByScalar>, Vec<Box<dyn Accumulator>>>, last_triggered_values: &mut BTreeMap<Vec<GroupByScalar>, Vec<ScalarValue>>) -> Result<()> {
+    fn trigger_output(&self, _exec_ctx: &ExecutionContext, produce: ProduceFn, ctx: &ProduceContext, trigger: &mut dyn Trigger, accumulators_map: &mut BTreeMap<Vec<GroupByScalar>, Vec<Box<dyn Accumulator>>>, last_triggered_values: &mut BTreeMap<Vec<GroupByScalar>, Vec<ScalarValue>>) -> Result<()> {
         // Check if we can trigger something
         let key_columns = trigger.poll();
         if key_columns[0].len() == 0 {

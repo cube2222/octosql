@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use arrow::array::{BooleanBuilder, PrimitiveBuilder};
-use arrow::datatypes::{DataType, Field, Schema, Int64Type};
+use arrow::datatypes::{Int64Type};
 use arrow::record_batch::RecordBatch;
 
 use crate::physical::expression::Expression;
@@ -42,7 +42,7 @@ impl Node for Range {
     }
 
     // TODO: Put batchsize into execution context.
-    fn run(&self, ctx: &ExecutionContext, produce: ProduceFn, meta_send: MetaSendFn) -> Result<()> {
+    fn run(&self, ctx: &ExecutionContext, produce: ProduceFn, _meta_send: MetaSendFn) -> Result<()> {
         // Create BATCH_SIZE sized retraction_array for later reuse.
         let mut retraction_array_builder = BooleanBuilder::new(BATCH_SIZE);
         for _i in 0..BATCH_SIZE {
@@ -75,7 +75,7 @@ impl Node for Range {
                 retraction_array.clone()
             } else {
                 let mut retraction_array_builder = BooleanBuilder::new(BATCH_SIZE);
-                for i in start..batch_end {
+                for _i in start..batch_end {
                     retraction_array_builder.append_value(false)?;
                 }
                 Arc::new(retraction_array_builder.finish())

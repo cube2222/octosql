@@ -18,8 +18,8 @@ use crate::logical::logical::{Aggregate, Expression, Node, Trigger, TableValuedF
 use crate::parser;
 use crate::parser::{Operator, SelectExpression, Value, Source};
 use crate::physical::physical::{Identifier, ScalarValue};
-use crate::logical::logical::TableValuedFunctionArgument::Table;
-use datafusion::logicalplan::FunctionType::Scalar;
+
+
 
 pub fn query_to_logical_plan(query: &parser::Query) -> Box<Node> {
     match query {

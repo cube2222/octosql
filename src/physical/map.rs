@@ -15,7 +15,7 @@
 use std::sync::Arc;
 
 use arrow::array::ArrayRef;
-use arrow::datatypes::{DataType, Field, Schema};
+
 use arrow::record_batch::RecordBatch;
 use anyhow::Result;
 

@@ -24,7 +24,7 @@ use arrow::record_batch::RecordBatch;
 use anyhow::Result;
 
 use crate::physical::expression::Expression;
-use crate::physical::physical::{ExecutionContext, SchemaContext};
+use crate::physical::physical::{ExecutionContext};
 
 use chrono::{DateTime};
 use arrow::datatypes::TimeUnit::Nanosecond;
@@ -68,7 +68,7 @@ impl Expression for FunctionExpression
 
 macro_rules! make_const_meta_body {
     ($data_type: expr) => {
-        Arc::new(|args| {
+        Arc::new(|_args| {
             Ok(Field::new("", $data_type, false))
         })
     }

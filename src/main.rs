@@ -21,14 +21,14 @@ use std::sync::Arc;
 
 use arrow::datatypes::Schema;
 use arrow::record_batch::RecordBatch;
-use anyhow::{Result, Error};
+use anyhow::{Result};
 
-use crate::logical::logical::{MaterializationContext, Transformers, TransformationContext};
+use crate::logical::logical::{MaterializationContext};
 use crate::logical::sql::query_to_logical_plan;
 use crate::parser::parser::parse_sql;
-use crate::physical::physical::{EmptySchemaContext, ExecutionContext, noop_meta_send, ProduceContext, VariableContext};
+use crate::physical::physical::{EmptySchemaContext, ExecutionContext, ProduceContext, VariableContext};
 use crate::pretty::pretty_format_batches;
-use serde_json::ser::State::Empty;
+
 use crate::logical::optimizer::remove_wildcards::remove_wildcards;
 use crate::logical::optimizer::optimizer::optimize;
 
@@ -126,7 +126,7 @@ fn main() {
             }),
         },
         &mut record_print,
-        &mut |ctx, msg| {
+        &mut |_ctx, msg| {
             dbg!(msg);
             Ok(())
         },

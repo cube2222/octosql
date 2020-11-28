@@ -16,7 +16,7 @@ use std::fs::File;
 use std::sync::Arc;
 
 use arrow::array::{ArrayRef, BooleanBuilder};
-use arrow::datatypes::{DataType, Field, Schema};
+
 use arrow::json;
 use arrow::record_batch::RecordBatch;
 use anyhow::Result;
@@ -42,7 +42,7 @@ impl Node for JSONSource {
 
     fn run(
         &self,
-        ctx: &ExecutionContext,
+        _ctx: &ExecutionContext,
         produce: ProduceFn,
         _meta_send: MetaSendFn,
     ) -> Result<()> {

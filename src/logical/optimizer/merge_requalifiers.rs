@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::logical::logical::{Node, Transformers, TransformationContext};
-use crate::physical::physical::{EmptySchemaContext, Identifier};
+use crate::physical::physical::{EmptySchemaContext};
 use std::sync::Arc;
 use anyhow::Result;
 
@@ -23,7 +23,7 @@ pub fn merge_requalifiers(logical_plan: &Node) -> Result<(Box<Node>, bool)> {
             schema_context: Arc::new(EmptySchemaContext {})
         },
         &Transformers::<bool> {
-            node_fn: Some(Box::new(|ctx, state, node| {
+            node_fn: Some(Box::new(|_ctx, state, node| {
                 Ok(match node {
                     Node::Requalifier { source: upper_requalifier_source, qualifier: upper_qualifier } => {
                         match upper_requalifier_source.as_ref() {
@@ -38,7 +38,7 @@ pub fn merge_requalifiers(logical_plan: &Node) -> Result<(Box<Node>, bool)> {
             })),
             expr_fn: None,
             base_state: false,
-            state_reduce: Box::new(|mut x, mut y| {
+            state_reduce: Box::new(|x, y| {
                 x || y
             }),
         })?;

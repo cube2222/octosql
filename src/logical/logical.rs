@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::error::Error;
+
 use std::fs::File;
 use std::sync::Arc;
 
@@ -148,7 +148,7 @@ pub struct MaterializationContext {
 impl Node {
     pub fn metadata(&self, schema_context: Arc<dyn SchemaContext>) -> Result<NodeMetadata> {
         match self {
-            Node::Source { name, alias } => {
+            Node::Source { name, alias: _ } => {
                 let path = name.to_string();
                 if path.contains(".json") {
                     let file = File::open(path.as_str()).unwrap();
@@ -178,7 +178,7 @@ impl Node {
                     unimplemented!()
                 }
             }
-            Node::Filter { source, filter_expr } => {
+            Node::Filter { source, filter_expr: _ } => {
                 source.metadata(schema_context.clone())
             }
             Node::Map { source, expressions: expressions_with_names } => {
@@ -277,20 +277,20 @@ impl Node {
                     time_column: if keep_source_fields.clone() { source_metadata.time_column.clone() } else { None },
                 })
             }
-            Node::GroupBy { source, key_exprs, aggregates, aggregated_exprs, output_fields, trigger } => {
+            Node::GroupBy { source, key_exprs: _, aggregates, aggregated_exprs, output_fields, trigger: _ } => {
                 let source_metadata = source.metadata(schema_context.clone())?;
                 let source_schema = &source_metadata.schema;
                 let mut key_fields: Vec<Field> = aggregates
                     .iter()
                     .enumerate()
-                    .filter(|(i, aggregate)| if let Aggregate::KeyPart = **aggregate { true } else { false })
-                    .map(|(i, aggregate)| aggregated_exprs[i].metadata(schema_context.clone(), &source_schema))
+                    .filter(|(_i, aggregate)| if let Aggregate::KeyPart = **aggregate { true } else { false })
+                    .map(|(i, _aggregate)| aggregated_exprs[i].metadata(schema_context.clone(), &source_schema))
                     .collect::<Result<Vec<Field>>>()?;
 
                 let aggregated_field_types: Vec<DataType> = aggregated_exprs
                     .iter()
                     .enumerate()
-                    .filter(|(i, column_expr)| if let Aggregate::KeyPart = &aggregates[i.clone()] { false } else { true })
+                    .filter(|(i, _column_expr)| if let Aggregate::KeyPart = &aggregates[i.clone()] { false } else { true })
                     .map(|(i, column_expr)| {
                         aggregates[i].metadata(column_expr.metadata(schema_context.clone(), source_schema)?.data_type())
                     })
@@ -299,8 +299,8 @@ impl Node {
                 let aggregated_field_output_names: Vec<Identifier> = aggregated_exprs
                     .iter()
                     .enumerate()
-                    .filter(|(i, column_expr)| if let Aggregate::KeyPart = &aggregates[i.clone()] { false } else { true })
-                    .map(|(i, column_expr)| {
+                    .filter(|(i, _column_expr)| if let Aggregate::KeyPart = &aggregates[i.clone()] { false } else { true })
+                    .map(|(i, _column_expr)| {
                         output_fields[i].clone()
                     })
                     .collect();
@@ -320,7 +320,7 @@ impl Node {
                     time_column: None,
                 })
             }
-            Node::Join { source, source_key, joined, joined_key } => {
+            Node::Join { source, source_key: _, joined, joined_key: _ } => {
                 let mut source_schema_fields = source.metadata(schema_context.clone())?.schema.fields().clone();
                 source_schema_fields.truncate(source_schema_fields.len() - 1);
                 let joined_schema_fields = joined.metadata(schema_context.clone())?.schema.fields().clone();
@@ -362,7 +362,7 @@ impl Node {
             }
             Node::Function(tbv) => {
                 match tbv {
-                    TableValuedFunction::MaxDiffWatermarkGenerator(time_field_name, max_diff, source) => {
+                    TableValuedFunction::MaxDiffWatermarkGenerator(time_field_name, _max_diff, source) => {
                         let time_field_name = if let TableValuedFunctionArgument::Descriptior(ident) = time_field_name {
                             ident
                         } else {
@@ -398,7 +398,7 @@ impl Node {
                             time_column: None,
                         })
                     }
-                    TableValuedFunction::Tumble(time_field_name, window_size, offset, source) => {
+                    TableValuedFunction::Tumble(time_field_name, _window_size, _offset, source) => {
                         let time_field_name = if let TableValuedFunctionArgument::Descriptior(ident) = time_field_name {
                             ident
                         } else {
@@ -489,10 +489,10 @@ impl Node {
                 Ok(Arc::new(map::Map::new(logical_metadata, source.physical(mat_ctx)?, expr_vec, name_vec)))
             }
             Node::MapWithWildcards {
-                source,
-                expressions,
-                wildcards,
-                keep_source_fields,
+                source: _,
+                expressions: _,
+                wildcards: _,
+                keep_source_fields: _,
             } => {
                 unimplemented!()
             }
@@ -689,14 +689,14 @@ impl Node {
 
     // TODO: Switch to Arc's, less expensive when cloning.
     pub fn transform<T: Clone>(&self, tf_ctx: &TransformationContext, transformers: &Transformers<T>) -> Result<(Box<Self>, T)> {
-        let default_tf: TransformNodeFn<T> = Box::new(|tf_ctx: &TransformationContext, state: T, node: &Node| Ok((Box::new(node.clone()), state)));
+        let default_tf: TransformNodeFn<T> = Box::new(|_tf_ctx: &TransformationContext, state: T, node: &Node| Ok((Box::new(node.clone()), state)));
         let tf = if let Some(tf) = &transformers.node_fn {
             tf
         } else {
             &default_tf
         };
         match self {
-            Node::Source { name, alias } => tf(tf_ctx, transformers.base_state.clone(), self),
+            Node::Source { name: _, alias: _ } => tf(tf_ctx, transformers.base_state.clone(), self),
             Node::Filter { source, filter_expr } => {
                 let source_schema = source.metadata(tf_ctx.schema_context.clone())?.schema;
                 let (source_tf, source_state) = source.transform(tf_ctx, transformers)?;
@@ -1018,7 +1018,7 @@ impl Expression {
     }
 
     pub fn transform<T: Clone>(&self, tf_ctx: &TransformationContext, record_schema: &Arc<Schema>, transformers: &Transformers<T>) -> Result<(Box<Self>, T)> {
-        let default_tf: TransformExpressionFn<T> = Box::new(|tf_ctx: &TransformationContext, record_schema: &Arc<Schema>, state: T, expr: &Expression| Ok((Box::new(expr.clone()), state)));
+        let default_tf: TransformExpressionFn<T> = Box::new(|_tf_ctx: &TransformationContext, _record_schema: &Arc<Schema>, state: T, expr: &Expression| Ok((Box::new(expr.clone()), state)));
         let tf = if let Some(tf) = &transformers.expr_fn {
             tf
         } else {

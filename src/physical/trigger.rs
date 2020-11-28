@@ -38,7 +38,7 @@ impl CountingTriggerPrototype {
 }
 
 impl TriggerPrototype for CountingTriggerPrototype {
-    fn create_trigger(&self, key_data_types: Vec<DataType>, time_col: Option<usize>) -> Box<dyn Trigger> {
+    fn create_trigger(&self, key_data_types: Vec<DataType>, _time_col: Option<usize>) -> Box<dyn Trigger> {
         Box::new(CountingTrigger::new(key_data_types, self.trigger_count))
     }
 }
@@ -91,12 +91,12 @@ impl Trigger for CountingTrigger {
         let mut counts = BTreeMap::new();
         std::mem::swap(&mut counts, &mut self.counts);
 
-        for (key, value) in counts {
+        for (key, _value) in counts {
             self.to_trigger.insert(key);
         }
     }
 
-    fn watermark_received(&mut self, watermark: i64) {}
+    fn watermark_received(&mut self, _watermark: i64) {}
 
     fn keys_received(&mut self, keys: Vec<ArrayRef>) {
         let mut key_vec: Vec<GroupByScalar> = Vec::with_capacity(keys.len());

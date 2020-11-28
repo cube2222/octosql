@@ -14,7 +14,7 @@
 
 use std::ops::{AddAssign, SubAssign};
 
-use anyhow::Result;
+
 use arrow::datatypes::DataType;
 use std::collections::BTreeMap;
 use std::mem::drop;

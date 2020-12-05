@@ -94,7 +94,7 @@ func NewRecordFromRecord(record *Record, opts ...RecordOption) *Record {
 	return r
 }
 
-var SystemSource string = "sys"
+const SystemSource string = "sys"
 
 func SystemField(field string) octosql.VariableName {
 	return octosql.NewVariableName(fmt.Sprintf("%s.%s", SystemSource, field))
@@ -266,3 +266,78 @@ type RecordStream interface {
 }
 
 var ErrEndOfStream = errors.New("end of stream")
+
+// These two functions can be used when you need to store a record in storage.
+
+// Transforms a record into a value. The inclusion of ID, undo, and the eventTimeField in the
+// octosql.Value can be specified. We want this to be deterministic i.e for two same records always
+// return the same octosql.Value (what more we don't want to use octosql.Object, since its
+// monotonic marshal isn't deterministic)
+func RecordToValue(record *Record, includeID, includeUndo, includeETF bool) octosql.Value {
+	includes := make([]octosql.Value, 3)
+	metadataSlice := make([]octosql.Value, 3)
+
+	for i := range includes {
+		includes[i] = octosql.MakeBool(false)
+	}
+
+	if includeID {
+		includes[0] = octosql.MakeBool(true)
+		metadataSlice[0] = octosql.MakeString(record.ID().ID)
+	}
+	if includeUndo {
+		includes[1] = octosql.MakeBool(true)
+		metadataSlice[1] = octosql.MakeBool(record.IsUndo())
+	}
+	if includeETF {
+		includes[2] = octosql.MakeBool(true)
+		metadataSlice[2] = octosql.MakeString(record.EventTimeField().String())
+	}
+
+	fields := make([]octosql.Value, len(record.FieldNames))
+	data := make([]octosql.Value, len(record.Data))
+
+	for i := range record.FieldNames {
+		fields[i] = octosql.MakeString(record.FieldNames[i])
+		data[i] = *record.Data[i]
+	}
+
+	valuesTogether := make([]octosql.Value, 4)
+	valuesTogether[0] = octosql.MakeTuple(fields)
+	valuesTogether[1] = octosql.MakeTuple(data)
+	valuesTogether[2] = octosql.MakeTuple(includes)
+	valuesTogether[3] = octosql.MakeTuple(metadataSlice)
+
+	return octosql.MakeTuple(valuesTogether)
+}
+
+// Translates the octosql.Value created by RecordToValue back into a record.
+func ValueToRecord(value octosql.Value) *Record {
+	slice := value.AsSlice()
+
+	fieldNameValues := slice[0].AsSlice()
+	values := slice[1].AsSlice()
+	includes := slice[2].AsSlice()
+	metadataSlice := slice[3].AsSlice()
+
+	fieldNames := make([]octosql.VariableName, len(fieldNameValues))
+	for i, fieldName := range fieldNameValues {
+		fieldNames[i] = octosql.NewVariableName(fieldName.AsString())
+	}
+
+	opts := make([]RecordOption, 0, 3)
+
+	if includes[0].AsBool() {
+		opts = append(opts, WithID(NewRecordID(metadataSlice[0].AsString())))
+	}
+	if includes[1].AsBool() {
+		if metadataSlice[1].AsBool() {
+			opts = append(opts, WithUndo())
+		}
+	}
+	if includes[2].AsBool() {
+		opts = append(opts, WithEventTimeField(octosql.NewVariableName(metadataSlice[2].AsString())))
+	}
+
+	return NewRecordFromSlice(fieldNames, values, opts...)
+}

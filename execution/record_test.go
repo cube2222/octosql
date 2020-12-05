@@ -391,3 +391,97 @@ func TestRecordConstructors(t *testing.T) {
 		})
 	}
 }
+
+func TestRecordToValue(t *testing.T) {
+	type args struct {
+		record      *Record
+		includeID   bool
+		includeUndo bool
+		includeETF  bool
+	}
+	tests := []struct {
+		name string
+		args args
+		want *Record
+	}{
+		{
+			name: "no metadata",
+			args: args{
+				record: NewRecordFromSliceWithNormalize(
+					octosql.StringsToVariableNames([]string{"age", "id", "event_time"}),
+					[]interface{}{17, 9, time.Unix(123456, 0)},
+				),
+			},
+			want: NewRecordFromSliceWithNormalize(
+				octosql.StringsToVariableNames([]string{"age", "id", "event_time"}),
+				[]interface{}{17, 9, time.Unix(123456, 0)},
+			),
+		},
+		{
+			name: "metadata in record, but not in translation",
+			args: args{
+				record: NewRecordFromSliceWithNormalize(
+					octosql.StringsToVariableNames([]string{"a", "b", "c"}),
+					[]interface{}{"xxx", false, time.Unix(123456, 0)},
+					WithUndo(),
+					WithID(NewRecordID("some_id")),
+					WithEventTimeField(octosql.NewVariableName("c")),
+				),
+			},
+			want: NewRecordFromSliceWithNormalize(
+				octosql.StringsToVariableNames([]string{"a", "b", "c"}),
+				[]interface{}{"xxx", false, time.Unix(123456, 0)},
+			),
+		},
+		{
+			name: "metadata in record and ID stored",
+			args: args{
+				record: NewRecordFromSliceWithNormalize(
+					octosql.StringsToVariableNames([]string{"a", "b", "c"}),
+					[]interface{}{"xxx", false, time.Unix(123456, 0)},
+					WithUndo(),
+					WithID(NewRecordID("some_id")),
+					WithEventTimeField(octosql.NewVariableName("c")),
+				),
+				includeID: true,
+			},
+			want: NewRecordFromSliceWithNormalize(
+				octosql.StringsToVariableNames([]string{"a", "b", "c"}),
+				[]interface{}{"xxx", false, time.Unix(123456, 0)},
+				WithID(NewRecordID("some_id")),
+			),
+		},
+		{
+			name: "metadata in record all metadata stored",
+			args: args{
+				record: NewRecordFromSliceWithNormalize(
+					octosql.StringsToVariableNames([]string{"a", "b", "c"}),
+					[]interface{}{"xxx", false, time.Unix(123456, 0)},
+					WithID(NewRecordID("some_id")),
+					WithUndo(),
+					WithEventTimeField(octosql.NewVariableName("c")),
+				),
+				includeID:   true,
+				includeUndo: true,
+				includeETF:  true,
+			},
+			want: NewRecordFromSliceWithNormalize(
+				octosql.StringsToVariableNames([]string{"a", "b", "c"}),
+				[]interface{}{"xxx", false, time.Unix(123456, 0)},
+				WithID(NewRecordID("some_id")),
+				WithUndo(),
+				WithEventTimeField(octosql.NewVariableName("c")),
+			),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotValue := RecordToValue(tt.args.record, tt.args.includeID, tt.args.includeUndo, tt.args.includeETF)
+			gotRecord := ValueToRecord(gotValue)
+
+			if !gotRecord.Equal(tt.want) {
+				log.Fatal("Different records")
+			}
+		})
+	}
+}

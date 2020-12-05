@@ -241,8 +241,8 @@ func AreStreamsEqualNoOrderingWithRetractionReductionAndIDChecking(ctx context.C
 		return errors.Wrap(err, "couldn't read got streams records")
 	}
 
-	if err := areIDsUniqueAndFromSameStream(gotRecords); err != nil {
-		return errors.Wrap(err, "record ids aren't unique, or don't come from the same stream")
+	if err := areIDsUnique(gotRecords); err != nil {
+		return errors.Wrap(err, "record ids aren't unique")
 	}
 
 	for _, rec := range gotRecords {
@@ -317,6 +317,26 @@ func AreStreamsEqualNoOrderingWithIDCheck(ctx context.Context, stateStorage stor
 
 	if err := areIDsUniqueAndFromSameStream(gotRecords); err != nil {
 		return errors.Wrap(err, "record ids aren't unique, or don't come from the same stream")
+	}
+
+	return nil
+}
+
+func areIDsUnique(records []*Record) error {
+	if len(records) == 0 {
+		return nil
+	}
+
+	seenIDs := make(map[string]struct{})
+	for i := range records {
+		record := records[i]
+		stringID := record.ID().ID
+
+		if _, ok := seenIDs[stringID]; ok {
+			return errors.Errorf("the ID %s is repeated", stringID)
+		}
+
+		seenIDs[stringID] = struct{}{}
 	}
 
 	return nil

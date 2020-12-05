@@ -200,6 +200,9 @@ func (js *JoinedStream) AddRecord(ctx context.Context, tx storage.StateTransacti
 	return nil
 }
 
+// Keeps track of how many times some specific record appeared in the stream join. This is useful
+// because if a we get 5 early retractions for some record, we will just store such information, and then
+// when the record starts appearing we will just bump the count up by 1 until it reaches 1.
 func keepTrackOfCount(tx storage.StateTransaction, isRetraction bool) (int, error) {
 	var recordCount octosql.Value
 	recordCountState := storage.NewValueState(tx)
@@ -329,63 +332,30 @@ func (js *JoinedStream) Trigger(ctx context.Context, tx storage.StateTransaction
 	return allRecordsToTrigger, nil
 }
 
+// An auxiliary function that calls RecordToValue with appropriate flags
 func recordToValue(rec *Record) octosql.Value {
-	fields := make([]octosql.Value, len(rec.FieldNames))
-	data := make([]octosql.Value, len(rec.Data))
-	eventTimeField := octosql.MakeString(rec.EventTimeField().String())
-
-	for i := range rec.FieldNames {
-		fields[i] = octosql.MakeString(rec.FieldNames[i])
-		data[i] = *rec.Data[i]
-	}
-
-	valuesTogether := make([]octosql.Value, 4)
-
-	valuesTogether[0] = octosql.MakeTuple(fields)
-	valuesTogether[1] = octosql.MakeTuple(data)
-	valuesTogether[2] = octosql.MakeBool(rec.IsUndo())
-	valuesTogether[3] = eventTimeField
-
-	return octosql.MakeTuple(valuesTogether)
+	return RecordToValue(rec, false, true, true)
 }
 
+// Reads all records from a set and transforms the resulting octosql.Values into records
 func readAllAndTransformIntoRecords(tx storage.StateTransaction) ([]*Record, error) {
 	set := storage.NewMultiSet(tx)
-
 	recordValues, err := set.ReadAll()
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't read values from set")
 	}
 
 	records := make([]*Record, len(recordValues))
-
 	for i, recordValue := range recordValues {
-		records[i] = valueToRecord(recordValue)
+		records[i] = ValueToRecord(recordValue)
 	}
 
 	return records, nil
 }
 
-func valueToRecord(val octosql.Value) *Record {
-	slice := val.AsSlice()
-
-	fieldNameValues := slice[0].AsSlice()
-	values := slice[1].AsSlice()
-	isUndo := slice[2].AsBool()
-	eventTimeField := octosql.NewVariableName(slice[3].AsString())
-
-	fieldNames := make([]octosql.VariableName, len(fieldNameValues))
-
-	for i, fieldName := range fieldNameValues {
-		fieldNames[i] = octosql.NewVariableName(fieldName.AsString())
-	}
-
-	if isUndo {
-		return NewRecordFromSlice(fieldNames, values, WithEventTimeField(eventTimeField), WithUndo())
-	}
-	return NewRecordFromSlice(fieldNames, values, WithEventTimeField(eventTimeField), WithNoUndo())
-}
-
+// Returns the cartesian product of leftRecords and rightRecords.
+// BaseOffset is used to describe the starting offset for the newly created records alongside streamID.
+// The mergeRecords function is used to create a record from the two records.
 func createPairsOfRecords(leftRecords, rightRecords []*Record, baseOffset int, streamID *StreamID, eventTimeField octosql.VariableName) []*Record {
 	records := make([]*Record, len(leftRecords)*len(rightRecords))
 	recordCount := 0
@@ -412,6 +382,7 @@ func createPairsOfRecords(leftRecords, rightRecords []*Record, baseOffset int, s
 	return records
 }
 
+// Merges two records into one. Simply creates a new record that has columns and data from both.
 func mergeRecords(left, right *Record, ID *RecordID, isUndo bool, eventTimeField octosql.VariableName) *Record {
 	mergedFieldNames := octosql.StringsToVariableNames(append(left.FieldNames, right.FieldNames...))
 	mergedDataPointers := append(left.Data, right.Data...)
@@ -429,12 +400,17 @@ func mergeRecords(left, right *Record, ID *RecordID, isUndo bool, eventTimeField
 		mergedData = append(mergedData, eventTime)
 	}
 
+	opts := []RecordOption{WithID(ID), WithEventTimeField(eventTimeField)}
 	if isUndo {
-		return NewRecordFromSlice(mergedFieldNames, mergedData, WithID(ID), WithUndo(), WithEventTimeField(eventTimeField))
+		opts = append(opts, WithUndo())
+	} else {
+		opts = append(opts, WithNoUndo())
 	}
-	return NewRecordFromSlice(mergedFieldNames, mergedData, WithID(ID), WithNoUndo(), WithEventTimeField(eventTimeField))
+
+	return NewRecordFromSlice(mergedFieldNames, mergedData, opts...)
 }
 
+// Copies records but assigns new IDs to them (this is used in case some LEFT/OUTER join is used)
 func renameRecords(records []*Record, baseOffset int, streamID *StreamID) []*Record {
 	newRecords := make([]*Record, len(records))
 
@@ -446,6 +422,8 @@ func renameRecords(records []*Record, baseOffset int, streamID *StreamID) []*Rec
 	return newRecords
 }
 
+// Takes all the records from the "new" record set, moves them to the "old" record set (with retraction reduction)
+// and clears the "new" set.
 func mergeNewAndOldRecords(tx storage.StateTransaction, newRecords []*Record, newRecordsPrefix, oldRecordsPrefix []byte) error {
 	oldRecordsSet := storage.NewMultiSet(tx.WithPrefix(oldRecordsPrefix))
 
@@ -472,12 +450,14 @@ func mergeNewAndOldRecords(tx storage.StateTransaction, newRecords []*Record, ne
 				panic("A record we are retracting isn't present in a set in JoinedStream.Trigger()")
 			}
 
+			// Remove the copy
 			if err := oldRecordsSet.Erase(recordValue); err != nil {
 				return errors.Wrap(err, "couldn't remove record from the old records set")
 			}
 		}
 	}
 
+	// We clear the "new" records, since they have already been moved to the "old" record set
 	newRecordsSet := storage.NewMultiSet(tx.WithPrefix(newRecordsPrefix))
 	if err := newRecordsSet.Clear(); err != nil {
 		return errors.Wrap(err, "couldn't clear new records set")

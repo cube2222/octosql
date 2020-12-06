@@ -246,10 +246,6 @@ lazy_static! {
         register_function!(m, "=", equal);
         register_function!(m, ">=", greater_than_equal);
         register_function!(m, ">", greater_than);
-        // register_function!(m, "<=", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(lt_eq));
-        // register_function!(m, "=", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(eq));
-        // register_function!(m, ">=", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(gt_eq));
-        // register_function!(m, ">", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(gt));
         // register_function!(m, "+", make_numeric_meta_body!(), make_binary_numeric_array_evaluate_function!(add));
         // register_function!(m, "-", make_numeric_meta_body!(), make_binary_numeric_array_evaluate_function!(subtract));
         // register_function!(m, "*", Arc::new(|args| {

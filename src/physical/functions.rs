@@ -266,8 +266,33 @@ fn add(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
                 Ok(Arc::new(PrimitiveArray::<TimestampNanosecondType>::new(out_int64.len(), out_int64.values(), out_int64.null_count(), out_int64.offset())))
             }))
         }
-        // TODO: concat
-        // (DataType::Utf8, DataType::Utf8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt_utf8, StringArray),
+        (DataType::Utf8, DataType::Utf8) => {
+            (DataType::Utf8, Arc::new(|args: Vec<ArrayRef>| -> Result<ArrayRef> {
+                let arg_0 = args[0]
+                    .as_any()
+                    .downcast_ref::<StringArray>()
+                    .expect("add failed to downcast array");
+
+                let arg_1 = args[1]
+                    .as_any()
+                    .downcast_ref::<StringArray>()
+                    .expect("add failed to downcast array");
+
+                let mut result = StringBuilder::new(args[0].len());
+                let mut string_buffer = String::new();
+                for i in 0..args[0].len() {
+                    if args[0].is_null(i) || args[1].is_null(i) {
+                        result.append_null();
+                    }
+                    string_buffer.clear();
+                    string_buffer.push_str(arg_0.value(i));
+                    string_buffer.push_str(arg_1.value(i));
+                    result.append_value(string_buffer.as_str())?;
+                }
+
+                Ok(Arc::new(result.finish()) as ArrayRef)
+            }))
+        },
         _ => return Err(anyhow!("Invalid arithmetic operator argument types."))
     };
 

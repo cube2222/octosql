@@ -225,6 +225,11 @@ fn greater_than(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
     Ok((Field::new("", DataType::Boolean, false), Arc::new(eval_fn)))
 }
 
+fn any_nullable(args: &[Field]) -> bool {
+    return args.iter()
+        .any(|arg| arg.is_nullable());
+}
+
 fn add(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
     let eval_fn = match (args[0].data_type(), args[1].data_type()) {
         (DataType::UInt8, DataType::UInt8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::add, PrimitiveArray<Int8Type>),
@@ -243,7 +248,7 @@ fn add(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
         _ => return Err(anyhow!("Invalid comparison operator argument types."))
     };
 
-    Ok((Field::new("", args[0].data_type().clone(), false), Arc::new(eval_fn)))
+    Ok((Field::new("", args[0].data_type().clone(), any_nullable(args.as_ref())), Arc::new(eval_fn)))
 }
 
 fn subtract(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
@@ -264,7 +269,7 @@ fn subtract(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
         _ => return Err(anyhow!("Invalid comparison operator argument types."))
     };
 
-    Ok((Field::new("", args[0].data_type().clone(), false), Arc::new(eval_fn)))
+    Ok((Field::new("", args[0].data_type().clone(), any_nullable(args.as_ref())), Arc::new(eval_fn)))
 }
 
 macro_rules! register_function {

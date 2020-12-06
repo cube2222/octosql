@@ -35,7 +35,6 @@ type EvaluateFunction = Arc<dyn Fn(Vec<ArrayRef>) -> Result<ArrayRef> + Send + S
 type MetaFunction = Arc<dyn Fn(Vec<Field>) -> Result<Field> + Send + Sync>;
 
 pub struct FunctionExpression {
-    meta_function: MetaFunction,
     evaluate_function: EvaluateFunction,
     args: Vec<Arc<dyn Expression>>,
 }
@@ -43,14 +42,12 @@ pub struct FunctionExpression {
 impl FunctionExpression
 {
     pub fn new(
-        meta_function: MetaFunction,
         evaluate_function: EvaluateFunction,
         args: Vec<Arc<dyn Expression>>,
     ) -> FunctionExpression {
         FunctionExpression {
-            meta_function,
             evaluate_function,
-            args
+            args,
         }
     }
 }
@@ -123,16 +120,132 @@ macro_rules! make_binary_numeric_array_evaluate_function {
 //     }
 // }
 
+fn less_than(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
+    let eval_fn = match (args[0].data_type(), args[1].data_type()) {
+        (DataType::UInt8, DataType::UInt8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt, PrimitiveArray<Int8Type>),
+        (DataType::UInt16, DataType::UInt16) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt, PrimitiveArray<UInt16Type>),
+        (DataType::UInt32, DataType::UInt32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt, PrimitiveArray<UInt32Type>),
+        (DataType::UInt64, DataType::UInt64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt, PrimitiveArray<UInt64Type>),
+        (DataType::Int8, DataType::Int8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt, PrimitiveArray<Int8Type>),
+        (DataType::Int16, DataType::Int16) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt, PrimitiveArray<Int16Type>),
+        (DataType::Int32, DataType::Int32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt, PrimitiveArray<Int32Type>),
+        (DataType::Int64, DataType::Int64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt, PrimitiveArray<Int64Type>),
+        (DataType::Float32, DataType::Float32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt, PrimitiveArray<Float32Type>),
+        (DataType::Float64, DataType::Float64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt, PrimitiveArray<Float64Type>),
+        (DataType::Duration(TimeUnit::Nanosecond), DataType::Duration(TimeUnit::Nanosecond)) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt, PrimitiveArray<DurationNanosecondType>),
+        (DataType::Timestamp(TimeUnit::Nanosecond, None), DataType::Timestamp(TimeUnit::Nanosecond, None)) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt, PrimitiveArray<TimestampNanosecondType>),
+        (DataType::Utf8, DataType::Utf8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt_utf8, StringArray),
+        _ => return Err(anyhow!("Invalid comparison operator argument types."))
+    };
+
+    Ok((Field::new("", DataType::Boolean, false), Arc::new(eval_fn)))
+}
+
+fn less_than_equal(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
+    let eval_fn = match (args[0].data_type(), args[1].data_type()) {
+        (DataType::UInt8, DataType::UInt8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt_eq, PrimitiveArray<Int8Type>),
+        (DataType::UInt16, DataType::UInt16) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt_eq, PrimitiveArray<UInt16Type>),
+        (DataType::UInt32, DataType::UInt32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt_eq, PrimitiveArray<UInt32Type>),
+        (DataType::UInt64, DataType::UInt64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt_eq, PrimitiveArray<UInt64Type>),
+        (DataType::Int8, DataType::Int8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt_eq, PrimitiveArray<Int8Type>),
+        (DataType::Int16, DataType::Int16) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt_eq, PrimitiveArray<Int16Type>),
+        (DataType::Int32, DataType::Int32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt_eq, PrimitiveArray<Int32Type>),
+        (DataType::Int64, DataType::Int64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt_eq, PrimitiveArray<Int64Type>),
+        (DataType::Float32, DataType::Float32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt_eq, PrimitiveArray<Float32Type>),
+        (DataType::Float64, DataType::Float64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt_eq, PrimitiveArray<Float64Type>),
+        (DataType::Duration(TimeUnit::Nanosecond), DataType::Duration(TimeUnit::Nanosecond)) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt_eq, PrimitiveArray<DurationNanosecondType>),
+        (DataType::Timestamp(TimeUnit::Nanosecond, None), DataType::Timestamp(TimeUnit::Nanosecond, None)) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt_eq, PrimitiveArray<TimestampNanosecondType>),
+        (DataType::Utf8, DataType::Utf8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], lt_eq_utf8, StringArray),
+        _ => return Err(anyhow!("Invalid comparison operator argument types."))
+    };
+
+    Ok((Field::new("", DataType::Boolean, false), Arc::new(eval_fn)))
+}
+
+fn equal(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
+    let eval_fn = match (args[0].data_type(), args[1].data_type()) {
+        (DataType::UInt8, DataType::UInt8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], eq, PrimitiveArray<Int8Type>),
+        (DataType::UInt16, DataType::UInt16) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], eq, PrimitiveArray<UInt16Type>),
+        (DataType::UInt32, DataType::UInt32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], eq, PrimitiveArray<UInt32Type>),
+        (DataType::UInt64, DataType::UInt64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], eq, PrimitiveArray<UInt64Type>),
+        (DataType::Int8, DataType::Int8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], eq, PrimitiveArray<Int8Type>),
+        (DataType::Int16, DataType::Int16) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], eq, PrimitiveArray<Int16Type>),
+        (DataType::Int32, DataType::Int32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], eq, PrimitiveArray<Int32Type>),
+        (DataType::Int64, DataType::Int64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], eq, PrimitiveArray<Int64Type>),
+        (DataType::Float32, DataType::Float32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], eq, PrimitiveArray<Float32Type>),
+        (DataType::Float64, DataType::Float64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], eq, PrimitiveArray<Float64Type>),
+        (DataType::Duration(TimeUnit::Nanosecond), DataType::Duration(TimeUnit::Nanosecond)) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], eq, PrimitiveArray<DurationNanosecondType>),
+        (DataType::Timestamp(TimeUnit::Nanosecond, None), DataType::Timestamp(TimeUnit::Nanosecond, None)) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], eq, PrimitiveArray<TimestampNanosecondType>),
+        (DataType::Utf8, DataType::Utf8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], eq_utf8, StringArray),
+        _ => return Err(anyhow!("Invalid comparison operator argument types."))
+    };
+
+    Ok((Field::new("", DataType::Boolean, false), Arc::new(eval_fn)))
+}
+
+fn greater_than_equal(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
+    let eval_fn = match (args[0].data_type(), args[1].data_type()) {
+        (DataType::UInt8, DataType::UInt8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt_eq, PrimitiveArray<Int8Type>),
+        (DataType::UInt16, DataType::UInt16) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt_eq, PrimitiveArray<UInt16Type>),
+        (DataType::UInt32, DataType::UInt32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt_eq, PrimitiveArray<UInt32Type>),
+        (DataType::UInt64, DataType::UInt64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt_eq, PrimitiveArray<UInt64Type>),
+        (DataType::Int8, DataType::Int8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt_eq, PrimitiveArray<Int8Type>),
+        (DataType::Int16, DataType::Int16) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt_eq, PrimitiveArray<Int16Type>),
+        (DataType::Int32, DataType::Int32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt_eq, PrimitiveArray<Int32Type>),
+        (DataType::Int64, DataType::Int64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt_eq, PrimitiveArray<Int64Type>),
+        (DataType::Float32, DataType::Float32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt_eq, PrimitiveArray<Float32Type>),
+        (DataType::Float64, DataType::Float64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt_eq, PrimitiveArray<Float64Type>),
+        (DataType::Duration(TimeUnit::Nanosecond), DataType::Duration(TimeUnit::Nanosecond)) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt_eq, PrimitiveArray<DurationNanosecondType>),
+        (DataType::Timestamp(TimeUnit::Nanosecond, None), DataType::Timestamp(TimeUnit::Nanosecond, None)) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt_eq, PrimitiveArray<TimestampNanosecondType>),
+        (DataType::Utf8, DataType::Utf8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt_eq_utf8, StringArray),
+        _ => return Err(anyhow!("Invalid comparison operator argument types."))
+    };
+
+    Ok((Field::new("", DataType::Boolean, false), Arc::new(eval_fn)))
+}
+
+fn greater_than(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
+    let eval_fn = match (args[0].data_type(), args[1].data_type()) {
+        (DataType::UInt8, DataType::UInt8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt, PrimitiveArray<Int8Type>),
+        (DataType::UInt16, DataType::UInt16) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt, PrimitiveArray<UInt16Type>),
+        (DataType::UInt32, DataType::UInt32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt, PrimitiveArray<UInt32Type>),
+        (DataType::UInt64, DataType::UInt64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt, PrimitiveArray<UInt64Type>),
+        (DataType::Int8, DataType::Int8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt, PrimitiveArray<Int8Type>),
+        (DataType::Int16, DataType::Int16) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt, PrimitiveArray<Int16Type>),
+        (DataType::Int32, DataType::Int32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt, PrimitiveArray<Int32Type>),
+        (DataType::Int64, DataType::Int64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt, PrimitiveArray<Int64Type>),
+        (DataType::Float32, DataType::Float32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt, PrimitiveArray<Float32Type>),
+        (DataType::Float64, DataType::Float64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt, PrimitiveArray<Float64Type>),
+        (DataType::Duration(TimeUnit::Nanosecond), DataType::Duration(TimeUnit::Nanosecond)) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt, PrimitiveArray<DurationNanosecondType>),
+        (DataType::Timestamp(TimeUnit::Nanosecond, None), DataType::Timestamp(TimeUnit::Nanosecond, None)) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt, PrimitiveArray<TimestampNanosecondType>),
+        (DataType::Utf8, DataType::Utf8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt_utf8, StringArray),
+        _ => return Err(anyhow!("Invalid comparison operator argument types."))
+    };
+
+    Ok((Field::new("", DataType::Boolean, false), Arc::new(eval_fn)))
+}
+
+
 macro_rules! register_function {
-    ($map: expr, $name: expr, $meta_fn: expr, $eval_fn: expr) => {
-        $map.insert($name, ($meta_fn, Arc::new(|args: Vec<Arc<dyn Expression>>| Arc::new(FunctionExpression::new($meta_fn, $eval_fn, args)))));
+    ($map: expr, $name: expr, $meta_fn: expr) => {
+        $map.insert($name, (Arc::new(|args: Vec<Field>| {
+            let (out_meta, _) = ($meta_fn)(args)?;
+            Ok(out_meta)
+        }), Arc::new(|arg_types: Vec<Field>, args: Vec<Arc<dyn Expression>>| {
+            let (_, eval_fn) = ($meta_fn)(arg_types).unwrap();
+            Arc::new(FunctionExpression::new(eval_fn, args))
+        })));
     }
 }
 
 lazy_static! {
-    pub static ref BUILTIN_FUNCTIONS: HashMap<&'static str, (MetaFunction, Arc<dyn Fn(Vec<Arc<dyn Expression>>)-> Arc<FunctionExpression> + Send + Sync>)> = {
-        let mut m: HashMap<&'static str, (MetaFunction, Arc<dyn Fn(Vec<Arc<dyn Expression>>)-> Arc<FunctionExpression> + Send + Sync>)> = HashMap::new();
-        // register_function!(m, "<", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(lt));
+    pub static ref BUILTIN_FUNCTIONS: HashMap<&'static str, (MetaFunction, Arc<dyn Fn(Vec<Field>, Vec<Arc<dyn Expression>>)-> Arc<FunctionExpression> + Send + Sync>)> = {
+        let mut m: HashMap<&'static str, (MetaFunction, Arc<dyn Fn(Vec<Field>, Vec<Arc<dyn Expression>>)-> Arc<FunctionExpression> + Send + Sync>)> = HashMap::new();
+        register_function!(m, "<", less_than);
+        register_function!(m, "<=", less_than_equal);
+        register_function!(m, "=", equal);
+        register_function!(m, ">=", greater_than_equal);
+        register_function!(m, ">", greater_than);
         // register_function!(m, "<=", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(lt_eq));
         // register_function!(m, "=", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(eq));
         // register_function!(m, ">=", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(gt_eq));
@@ -151,10 +264,10 @@ lazy_static! {
         //         (DataType::Int32, DataType::Int32) => DataType::Int32,
         //         (DataType::Int64, DataType::Int64) => DataType::Int64,
         //         (DataType::Duration, DataType::Duration) => DataType::Duration(TimeUnit::Nanosecond),
-        //         (DataType::Timestamp, DataType::Timestamp) => DataType::Timestamp(TimeUnit::Nanosecond), None),
+        //         (DataType::Timestamp, DataType::Timestamp) => DataType::Timestamp(TimeUnit::Nanosecond),
         //         (DataType::Float32, DataType::Float32) => DataType::Float32,
         //         (DataType::Float64, DataType::Float64) => DataType::Float64,
-        //         _ => return Err(anyhow!("Invalid numeric operator argument type."))
+        //         _ => return Err(anyhow!("Invalid numeric operator argument types."))
         //     }, true)) // TODO: Fixme nullability
         // }), Arc::new(|args: Vec<ArrayRef>| {
         //     let output: Result<_, ArrowError> = binary_numeric_array_op!(args[0], args[1], multiply);

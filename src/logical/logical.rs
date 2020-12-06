@@ -990,6 +990,10 @@ impl Expression {
             Expression::Variable(name) => Ok(Arc::new(expression::FieldExpression::new(name.clone()))),
             Expression::Constant(value) => Ok(Arc::new(expression::Constant::new(value.clone()))),
             Expression::Function(name, args) => {
+                let arg_types = args.iter()
+                    .map(|expr| expr.metadata(mat_ctx.schema_context.clone(), record_schema))
+                    .collect::<Result<Vec<_>, _>>()?;
+
                 let args_physical = args
                     .into_iter()
                     .map(|expr| expr.physical(mat_ctx, record_schema))
@@ -999,7 +1003,7 @@ impl Expression {
                     Identifier::SimpleIdentifier(ident) => {
                         match BUILTIN_FUNCTIONS.get(ident.to_lowercase().as_str()) {
                             None => Err(anyhow!("unknown function: {}", ident.as_str())),
-                            Some((_, fn_constructor)) => Ok(fn_constructor(args_physical)),
+                            Some((_, fn_constructor)) => Ok(fn_constructor(arg_types, args_physical)),
                         }
                     }
                     _ => unimplemented!(),

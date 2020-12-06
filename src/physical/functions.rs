@@ -32,6 +32,37 @@ use arrow::datatypes::TimeUnit::Nanosecond;
 
 // TODO: Add "custom function" expression.
 
+macro_rules! register_function {
+    ($map: expr, $name: expr, $meta_fn: expr) => {
+        $map.insert($name, (Arc::new(|args: Vec<Field>| {
+            let (out_meta, _) = ($meta_fn)(args)?;
+            Ok(out_meta)
+        }), Arc::new(|arg_types: Vec<Field>, args: Vec<Arc<dyn Expression>>| {
+            let (_, eval_fn) = ($meta_fn)(arg_types).unwrap();
+            Arc::new(FunctionExpression::new(eval_fn, args))
+        })));
+    }
+}
+
+lazy_static! {
+    pub static ref BUILTIN_FUNCTIONS: HashMap<&'static str, (MetaFunction, Arc<dyn Fn(Vec<Field>, Vec<Arc<dyn Expression>>)-> Arc<FunctionExpression> + Send + Sync>)> = {
+        let mut m: HashMap<&'static str, (MetaFunction, Arc<dyn Fn(Vec<Field>, Vec<Arc<dyn Expression>>)-> Arc<FunctionExpression> + Send + Sync>)> = HashMap::new();
+        register_function!(m, "<", less_than);
+        register_function!(m, "<=", less_than_equal);
+        register_function!(m, "=", equal);
+        register_function!(m, ">=", greater_than_equal);
+        register_function!(m, ">", greater_than);
+        register_function!(m, "+", add);
+        register_function!(m, "-", subtract);
+        register_function!(m, "*", multiply);
+        register_function!(m, "/", divide);
+        register_function!(m, "upper", upper);
+        register_function!(m, "parse_datetime_rfc3339", parse_datetime_rfc3339);
+        register_function!(m, "parse_datetime_tz", parse_datetime_tz);
+        m
+    };
+}
+
 type EvaluateFunction = Arc<dyn Fn(Vec<ArrayRef>) -> Result<ArrayRef> + Send + Sync>;
 type MetaFunction = Arc<dyn Fn(Vec<Field>) -> Result<Field> + Send + Sync>;
 
@@ -63,63 +94,6 @@ impl Expression for FunctionExpression
         (self.evaluate_function)(args)
     }
 }
-
-macro_rules! make_const_meta_body {
-    ($data_type: expr) => {
-        Arc::new(|_args| {
-            Ok(Field::new("", $data_type, false))
-        })
-    }
-}
-
-// TODO: Fixme check if args[0] is actually a numeric type.
-macro_rules! make_numeric_meta_body {
-    () => {
-        Arc::new(|args| {
-            if args[0].data_type() == args[1].data_type() {
-                Ok(Field::new("", args[0].data_type().clone(), true))
-            } else {
-                Err(anyhow!("Both arguments of a numeric operator must be of the same type."))
-            }
-        })
-    }
-}
-
-// macro_rules! make_binary_primitive_array_evaluate_function {
-//     ($function: ident) => {
-//         Arc::new(|args: Vec<ArrayRef>| {
-//             let output: Result<_, ArrowError> = binary_primitive_array_op!(args[0], args[1], $function);
-//             Ok(output? as ArrayRef)
-//         })
-//     }
-// }
-
-macro_rules! make_binary_array_evaluate_function {
-    ($function: ident) => {
-        Arc::new(|args: Vec<ArrayRef>| {
-            let output: Result<_, ArrowError> = binary_array_op!(args[0], args[1], $function);
-            Ok(output? as ArrayRef)
-        })
-    }
-}
-
-macro_rules! make_binary_numeric_array_evaluate_function {
-    ($function: ident) => {
-        Arc::new(|args: Vec<ArrayRef>| {
-            let output: Result<_, ArrowError> = binary_numeric_array_op!(args[0], args[1], $function);
-            Ok(output? as ArrayRef)
-        })
-    }
-}
-
-// macro_rules! make_single_arg_evaluate_function {
-//     ($function: ident) => {
-//         Arc::new(|args: Vec<ArrayRef>| {
-//             let output: Result<_, ArrowError> = binary_primitive_array_op!(args[0], args[1], $function);
-//             Ok(output? as ArrayRef)
-//         })
-//     }
-// }
 
 fn less_than(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
     let eval_fn = match (args[0].data_type(), args[1].data_type()) {
@@ -468,35 +442,4 @@ fn parse_datetime_tz(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
     };
 
     Ok((Field::new("", DataType::Timestamp(Nanosecond, None), any_nullable(args.as_ref())), Arc::new(eval_fn)))
-}
-
-macro_rules! register_function {
-    ($map: expr, $name: expr, $meta_fn: expr) => {
-        $map.insert($name, (Arc::new(|args: Vec<Field>| {
-            let (out_meta, _) = ($meta_fn)(args)?;
-            Ok(out_meta)
-        }), Arc::new(|arg_types: Vec<Field>, args: Vec<Arc<dyn Expression>>| {
-            let (_, eval_fn) = ($meta_fn)(arg_types).unwrap();
-            Arc::new(FunctionExpression::new(eval_fn, args))
-        })));
-    }
-}
-
-lazy_static! {
-    pub static ref BUILTIN_FUNCTIONS: HashMap<&'static str, (MetaFunction, Arc<dyn Fn(Vec<Field>, Vec<Arc<dyn Expression>>)-> Arc<FunctionExpression> + Send + Sync>)> = {
-        let mut m: HashMap<&'static str, (MetaFunction, Arc<dyn Fn(Vec<Field>, Vec<Arc<dyn Expression>>)-> Arc<FunctionExpression> + Send + Sync>)> = HashMap::new();
-        register_function!(m, "<", less_than);
-        register_function!(m, "<=", less_than_equal);
-        register_function!(m, "=", equal);
-        register_function!(m, ">=", greater_than_equal);
-        register_function!(m, ">", greater_than);
-        register_function!(m, "+", add);
-        register_function!(m, "-", subtract);
-        register_function!(m, "*", multiply);
-        register_function!(m, "/", divide);
-        register_function!(m, "upper", upper);
-        register_function!(m, "parse_datetime_rfc3339", parse_datetime_rfc3339);
-        register_function!(m, "parse_datetime_tz", parse_datetime_tz);
-        m
-    };
 }

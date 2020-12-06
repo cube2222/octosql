@@ -164,7 +164,7 @@ pub fn create_row(
             }
             DataType::Duration(TimeUnit::Nanosecond) => {
                 let array = col.as_any().downcast_ref::<PrimitiveArray<DurationNanosecondType>>().unwrap();
-                vec[i] = ScalarValue::Timestamp(array.value(row))
+                vec[i] = ScalarValue::Duration(array.value(row))
             }
             DataType::Timestamp(TimeUnit::Nanosecond, _) => {
                 let array = col.as_any().downcast_ref::<PrimitiveArray<TimestampNanosecondType>>().unwrap();

@@ -132,39 +132,59 @@ macro_rules! register_function {
 lazy_static! {
     pub static ref BUILTIN_FUNCTIONS: HashMap<&'static str, (MetaFunction, Arc<dyn Fn(Vec<Arc<dyn Expression>>)-> Arc<FunctionExpression> + Send + Sync>)> = {
         let mut m: HashMap<&'static str, (MetaFunction, Arc<dyn Fn(Vec<Arc<dyn Expression>>)-> Arc<FunctionExpression> + Send + Sync>)> = HashMap::new();
-        register_function!(m, "<", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(lt));
-        register_function!(m, "<=", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(lt_eq));
-        register_function!(m, "=", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(eq));
-        register_function!(m, ">=", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(gt_eq));
-        register_function!(m, ">", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(gt));
-        register_function!(m, "+", make_numeric_meta_body!(), make_binary_numeric_array_evaluate_function!(add));
-        register_function!(m, "-", make_numeric_meta_body!(), make_binary_numeric_array_evaluate_function!(subtract));
-        register_function!(m, "*", make_numeric_meta_body!(), make_binary_numeric_array_evaluate_function!(multiply));
-        register_function!(m, "/", make_numeric_meta_body!(), make_binary_numeric_array_evaluate_function!(divide));
-        register_function!(m, "upper", make_const_meta_body!(DataType::Utf8), Arc::new(|args: Vec<ArrayRef>| {
-            let output: Result<_, ArrowError> = compute_single_arg_str!(args[0], StringArray, StringBuilder, |text: &str| {
-                text.to_uppercase()
-            });
-            Ok(output? as ArrayRef)
-        }));
-        register_function!(m, "parse_datetime_rfc3339", make_const_meta_body!(DataType::Timestamp(Nanosecond, None)), Arc::new(|args: Vec<ArrayRef>| {
-            let output: Result<_> = compute_single_arg!(args[0], StringArray, PrimitiveBuilder<TimestampNanosecondType>, |text: &str| -> Result<i64> {
-                match DateTime::parse_from_rfc3339(text) {
-                    Ok(dt) => Ok(dt.timestamp_nanos()),
-                    Err(err) => Err(err)?,
-                }
-            });
-            Ok(output? as ArrayRef)
-        }));
-        register_function!(m, "parse_datetime_tz", make_const_meta_body!(DataType::Timestamp(Nanosecond, None)), Arc::new(|args: Vec<ArrayRef>| {
-            let output: Result<_> = compute_two_arg!(args[0], args[1], StringArray, StringArray, PrimitiveBuilder<TimestampNanosecondType>, |fmt: &str, text: &str| -> Result<i64> {
-                match DateTime::parse_from_str(text, fmt) {
-                    Ok(dt) => Ok(dt.timestamp_nanos()),
-                    Err(err) => Err(err)?
-                }
-            });
-            Ok(output? as ArrayRef)
-        }));
+        // register_function!(m, "<", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(lt));
+        // register_function!(m, "<=", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(lt_eq));
+        // register_function!(m, "=", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(eq));
+        // register_function!(m, ">=", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(gt_eq));
+        // register_function!(m, ">", make_const_meta_body!(DataType::Boolean), make_binary_array_evaluate_function!(gt));
+        // register_function!(m, "+", make_numeric_meta_body!(), make_binary_numeric_array_evaluate_function!(add));
+        // register_function!(m, "-", make_numeric_meta_body!(), make_binary_numeric_array_evaluate_function!(subtract));
+        // register_function!(m, "*", Arc::new(|args| {
+        //     Ok(Field::new("", match (args[0].data_type(), args[1].data_type()) {
+        //         (DataType::Int64, DataType::Int64) => DataType::Int64,
+        //         (DataType::UInt8, DataType::UInt8) => DataType::UInt8,
+        //         (DataType::UInt16, DataType::UInt16) => DataType::UInt16,
+        //         (DataType::UInt32, DataType::UInt32) => DataType::UInt32,
+        //         (DataType::UInt64, DataType::UInt64) => DataType::UInt64,
+        //         (DataType::Int8, DataType::Int8) => DataType::Int8,
+        //         (DataType::Int16, DataType::Int16) => DataType::Int16,
+        //         (DataType::Int32, DataType::Int32) => DataType::Int32,
+        //         (DataType::Int64, DataType::Int64) => DataType::Int64,
+        //         (DataType::Duration, DataType::Duration) => DataType::Duration(TimeUnit::Nanosecond),
+        //         (DataType::Timestamp, DataType::Timestamp) => DataType::Timestamp(TimeUnit::Nanosecond), None),
+        //         (DataType::Float32, DataType::Float32) => DataType::Float32,
+        //         (DataType::Float64, DataType::Float64) => DataType::Float64,
+        //         _ => return Err(anyhow!("Invalid numeric operator argument type."))
+        //     }, true)) // TODO: Fixme nullability
+        // }), Arc::new(|args: Vec<ArrayRef>| {
+        //     let output: Result<_, ArrowError> = binary_numeric_array_op!(args[0], args[1], multiply);
+        //     Ok(output? as ArrayRef)
+        // }));
+        // register_function!(m, "/", make_numeric_meta_body!(), make_binary_numeric_array_evaluate_function!(divide));
+        // register_function!(m, "upper", make_const_meta_body!(DataType::Utf8), Arc::new(|args: Vec<ArrayRef>| {
+        //     let output: Result<_, ArrowError> = compute_single_arg_str!(args[0], StringArray, StringBuilder, |text: &str| {
+        //         text.to_uppercase()
+        //     });
+        //     Ok(output? as ArrayRef)
+        // }));
+        // register_function!(m, "parse_datetime_rfc3339", make_const_meta_body!(DataType::Timestamp(Nanosecond, None)), Arc::new(|args: Vec<ArrayRef>| {
+        //     let output: Result<_> = compute_single_arg!(args[0], StringArray, PrimitiveBuilder<TimestampNanosecondType>, |text: &str| -> Result<i64> {
+        //         match DateTime::parse_from_rfc3339(text) {
+        //             Ok(dt) => Ok(dt.timestamp_nanos()),
+        //             Err(err) => Err(err)?,
+        //         }
+        //     });
+        //     Ok(output? as ArrayRef)
+        // }));
+        // register_function!(m, "parse_datetime_tz", make_const_meta_body!(DataType::Timestamp(Nanosecond, None)), Arc::new(|args: Vec<ArrayRef>| {
+        //     let output: Result<_> = compute_two_arg!(args[0], args[1], StringArray, StringArray, PrimitiveBuilder<TimestampNanosecondType>, |fmt: &str, text: &str| -> Result<i64> {
+        //         match DateTime::parse_from_str(text, fmt) {
+        //             Ok(dt) => Ok(dt.timestamp_nanos()),
+        //             Err(err) => Err(err)?
+        //         }
+        //     });
+        //     Ok(output? as ArrayRef)
+        // }));
         m
     };
 }

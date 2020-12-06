@@ -367,7 +367,7 @@ macro_rules! compute_two_arg {
 
 /// Invoke a compute kernel on a pair of arrays
 macro_rules! compute_op {
-    ($LEFT:expr, $RIGHT:expr, $OP:ident, $DT:ty) => {{
+    ($LEFT:expr, $RIGHT:expr, $OP:expr, $DT:ty) => {{
         let ll = $LEFT
             .as_any()
             .downcast_ref::<$DT>()

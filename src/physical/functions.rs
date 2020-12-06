@@ -15,10 +15,10 @@
 use std::sync::Arc;
 use std::collections::HashMap;
 
-use arrow::array::{ArrayRef, PrimitiveArray, PrimitiveBuilder, StringArray, StringBuilder};
+use arrow::array::{ArrayRef, PrimitiveArray, PrimitiveBuilder, StringArray, StringBuilder, Array};
 use arrow::datatypes::{Field, Schema, DataType, TimeUnit, DateUnit, Int8Type, Int16Type, Int32Type, Int64Type, UInt8Type, UInt16Type, UInt32Type, UInt64Type, IntervalUnit, BooleanType, DurationNanosecondType, TimestampNanosecondType, Float32Type, Float64Type, Date32Type, Date64Type, Time32SecondType, Time32MillisecondType, Time64MicrosecondType, Time64NanosecondType, TimestampSecondType, TimestampMillisecondType, TimestampMicrosecondType, IntervalYearMonthType, IntervalDayTimeType, DurationSecondType, DurationMillisecondType, DurationMicrosecondType};
 use arrow::compute::kernels::comparison::{lt, lt_eq, eq, gt_eq, gt, lt_utf8, lt_eq_utf8, eq_utf8, gt_eq_utf8, gt_utf8};
-use arrow::compute::kernels::arithmetic::{add, subtract, multiply, divide};
+use arrow::compute::kernels::arithmetic;
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 use anyhow::Result;
@@ -225,6 +225,47 @@ fn greater_than(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
     Ok((Field::new("", DataType::Boolean, false), Arc::new(eval_fn)))
 }
 
+fn add(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
+    let eval_fn = match (args[0].data_type(), args[1].data_type()) {
+        (DataType::UInt8, DataType::UInt8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::add, PrimitiveArray<Int8Type>),
+        (DataType::UInt16, DataType::UInt16) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::add, PrimitiveArray<UInt16Type>),
+        (DataType::UInt32, DataType::UInt32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::add, PrimitiveArray<UInt32Type>),
+        (DataType::UInt64, DataType::UInt64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::add, PrimitiveArray<UInt64Type>),
+        (DataType::Int8, DataType::Int8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::add, PrimitiveArray<Int8Type>),
+        (DataType::Int16, DataType::Int16) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::add, PrimitiveArray<Int16Type>),
+        (DataType::Int32, DataType::Int32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::add, PrimitiveArray<Int32Type>),
+        (DataType::Int64, DataType::Int64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::add, PrimitiveArray<Int64Type>),
+        (DataType::Float32, DataType::Float32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::add, PrimitiveArray<Float32Type>),
+        (DataType::Float64, DataType::Float64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::add, PrimitiveArray<Float64Type>),
+        (DataType::Duration(TimeUnit::Nanosecond), DataType::Duration(TimeUnit::Nanosecond)) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::add, PrimitiveArray<DurationNanosecondType>),
+        (DataType::Timestamp(TimeUnit::Nanosecond, None), DataType::Timestamp(TimeUnit::Nanosecond, None)) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::add, PrimitiveArray<TimestampNanosecondType>),
+        // (DataType::Utf8, DataType::Utf8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt_utf8, StringArray),
+        _ => return Err(anyhow!("Invalid comparison operator argument types."))
+    };
+
+    Ok((Field::new("", args[0].data_type().clone(), false), Arc::new(eval_fn)))
+}
+
+fn subtract(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
+    let eval_fn = match (args[0].data_type(), args[1].data_type()) {
+        (DataType::UInt8, DataType::UInt8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::subtract, PrimitiveArray<Int8Type>),
+        (DataType::UInt16, DataType::UInt16) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::subtract, PrimitiveArray<UInt16Type>),
+        (DataType::UInt32, DataType::UInt32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::subtract, PrimitiveArray<UInt32Type>),
+        (DataType::UInt64, DataType::UInt64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::subtract, PrimitiveArray<UInt64Type>),
+        (DataType::Int8, DataType::Int8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::subtract, PrimitiveArray<Int8Type>),
+        (DataType::Int16, DataType::Int16) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::subtract, PrimitiveArray<Int16Type>),
+        (DataType::Int32, DataType::Int32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::subtract, PrimitiveArray<Int32Type>),
+        (DataType::Int64, DataType::Int64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::subtract, PrimitiveArray<Int64Type>),
+        (DataType::Float32, DataType::Float32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::subtract, PrimitiveArray<Float32Type>),
+        (DataType::Float64, DataType::Float64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::subtract, PrimitiveArray<Float64Type>),
+        (DataType::Duration(TimeUnit::Nanosecond), DataType::Duration(TimeUnit::Nanosecond)) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::subtract, PrimitiveArray<DurationNanosecondType>),
+        (DataType::Timestamp(TimeUnit::Nanosecond, None), DataType::Timestamp(TimeUnit::Nanosecond, None)) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::subtract, PrimitiveArray<TimestampNanosecondType>),
+        // (DataType::Utf8, DataType::Utf8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt_utf8, StringArray),
+        _ => return Err(anyhow!("Invalid comparison operator argument types."))
+    };
+
+    Ok((Field::new("", args[0].data_type().clone(), false), Arc::new(eval_fn)))
+}
 
 macro_rules! register_function {
     ($map: expr, $name: expr, $meta_fn: expr) => {
@@ -246,6 +287,8 @@ lazy_static! {
         register_function!(m, "=", equal);
         register_function!(m, ">=", greater_than_equal);
         register_function!(m, ">", greater_than);
+        register_function!(m, "+", add);
+        register_function!(m, "-", subtract);
         // register_function!(m, "+", make_numeric_meta_body!(), make_binary_numeric_array_evaluate_function!(add));
         // register_function!(m, "-", make_numeric_meta_body!(), make_binary_numeric_array_evaluate_function!(subtract));
         // register_function!(m, "*", Arc::new(|args| {

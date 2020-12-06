@@ -15,10 +15,11 @@
 use std::sync::Arc;
 use std::collections::HashMap;
 
-use arrow::array::{ArrayRef, PrimitiveArray, PrimitiveBuilder, StringArray, StringBuilder, Array};
+use arrow::array::{ArrayRef, PrimitiveArray, PrimitiveBuilder, StringArray, StringBuilder, Array, PrimitiveArrayOps};
 use arrow::datatypes::{Field, Schema, DataType, TimeUnit, DateUnit, Int8Type, Int16Type, Int32Type, Int64Type, UInt8Type, UInt16Type, UInt32Type, UInt64Type, IntervalUnit, BooleanType, DurationNanosecondType, TimestampNanosecondType, Float32Type, Float64Type, Date32Type, Date64Type, Time32SecondType, Time32MillisecondType, Time64MicrosecondType, Time64NanosecondType, TimestampSecondType, TimestampMillisecondType, TimestampMicrosecondType, IntervalYearMonthType, IntervalDayTimeType, DurationSecondType, DurationMillisecondType, DurationMicrosecondType};
 use arrow::compute::kernels::comparison::{lt, lt_eq, eq, gt_eq, gt, lt_utf8, lt_eq_utf8, eq_utf8, gt_eq_utf8, gt_utf8};
 use arrow::compute::kernels::arithmetic;
+use arrow::compute::kernels::cast::cast;
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 use anyhow::Result;
@@ -243,7 +244,8 @@ fn add(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
         (DataType::Float32, DataType::Float32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::add, PrimitiveArray<Float32Type>),
         (DataType::Float64, DataType::Float64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::add, PrimitiveArray<Float64Type>),
         (DataType::Duration(TimeUnit::Nanosecond), DataType::Duration(TimeUnit::Nanosecond)) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::add, PrimitiveArray<DurationNanosecondType>),
-        (DataType::Timestamp(TimeUnit::Nanosecond, None), DataType::Timestamp(TimeUnit::Nanosecond, None)) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::add, PrimitiveArray<TimestampNanosecondType>),
+        // TODO: timestamp + duration: (DataType::Timestamp(TimeUnit::Nanosecond, None), DataType::Timestamp(TimeUnit::Nanosecond, None)) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::add, PrimitiveArray<TimestampNanosecondType>),
+        // TODO: concat
         // (DataType::Utf8, DataType::Utf8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt_utf8, StringArray),
         _ => return Err(anyhow!("Invalid arithmetic operator argument types."))
     };
@@ -264,8 +266,7 @@ fn subtract(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
         (DataType::Float32, DataType::Float32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::subtract, PrimitiveArray<Float32Type>),
         (DataType::Float64, DataType::Float64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::subtract, PrimitiveArray<Float64Type>),
         (DataType::Duration(TimeUnit::Nanosecond), DataType::Duration(TimeUnit::Nanosecond)) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::subtract, PrimitiveArray<DurationNanosecondType>),
-        (DataType::Timestamp(TimeUnit::Nanosecond, None), DataType::Timestamp(TimeUnit::Nanosecond, None)) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::subtract, PrimitiveArray<TimestampNanosecondType>),
-        // (DataType::Utf8, DataType::Utf8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], gt_utf8, StringArray),
+        // TODO: timestamp - duration: (DataType::Timestamp(TimeUnit::Nanosecond, None), DataType::Timestamp(TimeUnit::Nanosecond, None)) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::subtract, PrimitiveArray<TimestampNanosecondType>),
         _ => return Err(anyhow!("Invalid arithmetic operator argument types."))
     };
 
@@ -273,23 +274,53 @@ fn subtract(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
 }
 
 fn multiply(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
-    let eval_fn = match (args[0].data_type(), args[1].data_type()) {
-        (DataType::UInt8, DataType::UInt8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::multiply, PrimitiveArray<Int8Type>),
-        (DataType::UInt16, DataType::UInt16) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::multiply, PrimitiveArray<UInt16Type>),
-        (DataType::UInt32, DataType::UInt32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::multiply, PrimitiveArray<UInt32Type>),
-        (DataType::UInt64, DataType::UInt64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::multiply, PrimitiveArray<UInt64Type>),
-        (DataType::Int8, DataType::Int8) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::multiply, PrimitiveArray<Int8Type>),
-        (DataType::Int16, DataType::Int16) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::multiply, PrimitiveArray<Int16Type>),
-        (DataType::Int32, DataType::Int32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::multiply, PrimitiveArray<Int32Type>),
-        (DataType::Int64, DataType::Int64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::multiply, PrimitiveArray<Int64Type>),
-        (DataType::Float32, DataType::Float32) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::multiply, PrimitiveArray<Float32Type>),
-        (DataType::Float64, DataType::Float64) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::multiply, PrimitiveArray<Float64Type>),
-        // TODO: Duration * Int64
-        // TODO: Timestamp * Int64
+    let (out_type, eval_fn): (DataType, Arc<dyn Fn(Vec<ArrayRef>) -> Result<ArrayRef> + Send + Sync>) = match (args[0].data_type(), args[1].data_type()) {
+        (DataType::UInt8, DataType::UInt8) => (DataType::UInt8, Arc::new(|args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::multiply, PrimitiveArray<Int8Type>))),
+        (DataType::UInt16, DataType::UInt16) => (DataType::UInt16, Arc::new(|args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::multiply, PrimitiveArray<UInt16Type>))),
+        (DataType::UInt32, DataType::UInt32) => (DataType::UInt32, Arc::new(|args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::multiply, PrimitiveArray<UInt32Type>))),
+        (DataType::UInt64, DataType::UInt64) => (DataType::UInt64, Arc::new(|args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::multiply, PrimitiveArray<UInt64Type>))),
+        (DataType::Int8, DataType::Int8) => (DataType::Int8, Arc::new(|args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::multiply, PrimitiveArray<Int8Type>))),
+        (DataType::Int16, DataType::Int16) => (DataType::Int16, Arc::new(|args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::multiply, PrimitiveArray<Int16Type>))),
+        (DataType::Int32, DataType::Int32) => (DataType::Int32, Arc::new(|args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::multiply, PrimitiveArray<Int32Type>))),
+        (DataType::Int64, DataType::Int64) => (DataType::Int64, Arc::new(|args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::multiply, PrimitiveArray<Int64Type>))),
+        (DataType::Float32, DataType::Float32) => (DataType::Float32, Arc::new(|args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::multiply, PrimitiveArray<Float32Type>))),
+        (DataType::Float64, DataType::Float64) => (DataType::Float64, Arc::new(|args: Vec<ArrayRef>| compute_op!(args[0], args[1], arithmetic::multiply, PrimitiveArray<Float64Type>))),
+        (DataType::Duration(TimeUnit::Nanosecond), DataType::Int64) => {
+            (DataType::Duration(TimeUnit::Nanosecond), Arc::new(|args: Vec<ArrayRef>| -> Result<ArrayRef> {
+                let first_arg = args[0]
+                    .as_any()
+                    .downcast_ref::<PrimitiveArray<DurationNanosecondType>>()
+                    .expect("multiply failed to downcast array");
+                let first_arg_int64 = PrimitiveArray::<Int64Type>::new(first_arg.len(), first_arg.values(), first_arg.null_count(), first_arg.offset());
+                let out_res: Result<ArrayRef, ArrowError> = compute_op!(first_arg_int64, args[1], arithmetic::multiply, PrimitiveArray<Int64Type>);
+                let out = out_res?;
+                let out_int64 = out
+                    .as_any()
+                    .downcast_ref::<PrimitiveArray<Int64Type>>()
+                    .expect("multiply failed to downcast array");
+                Ok(Arc::new(PrimitiveArray::<DurationNanosecondType>::new(out_int64.len(), out_int64.values(), out_int64.null_count(), out_int64.offset())))
+            }))
+        }
+        (DataType::Int64, DataType::Duration(TimeUnit::Nanosecond)) => {
+            (DataType::Duration(TimeUnit::Nanosecond), Arc::new(|args: Vec<ArrayRef>| -> Result<ArrayRef> {
+                let second_arg = args[1]
+                    .as_any()
+                    .downcast_ref::<PrimitiveArray<DurationNanosecondType>>()
+                    .expect("multiply failed to downcast array");
+                let second_arg_int64 = PrimitiveArray::<Int64Type>::new(second_arg.len(), second_arg.values(), second_arg.null_count(), second_arg.offset());
+                let out_res: Result<ArrayRef, ArrowError> = compute_op!(args[0], second_arg_int64, arithmetic::multiply, PrimitiveArray<Int64Type>);
+                let out = out_res?;
+                let out_int64 = out
+                    .as_any()
+                    .downcast_ref::<PrimitiveArray<Int64Type>>()
+                    .expect("multiply failed to downcast array");
+                Ok(Arc::new(PrimitiveArray::<DurationNanosecondType>::new(out_int64.len(), out_int64.values(), out_int64.null_count(), out_int64.offset())))
+            }))
+        },
         _ => return Err(anyhow!("Invalid arithmetic operator argument types."))
     };
 
-    Ok((Field::new("", args[0].data_type().clone(), any_nullable(args.as_ref())), Arc::new(eval_fn)))
+    Ok((Field::new("", out_type, any_nullable(args.as_ref())), eval_fn))
 }
 
 fn divide(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
@@ -319,7 +350,7 @@ fn upper(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
                 text.to_uppercase()
             })
         }
-        _ => return Err(anyhow!("Invalid arithmetic operator argument types."))
+        _ => return Err(anyhow!("Invalid upper function argument types."))
     };
 
     Ok((Field::new("", DataType::Utf8, any_nullable(args.as_ref())), Arc::new(eval_fn)))
@@ -335,7 +366,7 @@ fn parse_datetime_rfc3339(args: Vec<Field>) -> Result<(Field, EvaluateFunction)>
                 }
             })
         }
-        _ => return Err(anyhow!("Invalid arithmetic operator argument types."))
+        _ => return Err(anyhow!("Invalid parse_datetime_rfc3339 function argument types."))
     };
 
     Ok((Field::new("", DataType::Timestamp(Nanosecond, None), any_nullable(args.as_ref())), Arc::new(eval_fn)))
@@ -351,7 +382,7 @@ fn parse_datetime_tz(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
                 }
             })
         }
-        _ => return Err(anyhow!("Invalid arithmetic operator argument types."))
+        _ => return Err(anyhow!("Invalid parse_datetime_tz function argument types."))
     };
 
     Ok((Field::new("", DataType::Timestamp(Nanosecond, None), any_nullable(args.as_ref())), Arc::new(eval_fn)))

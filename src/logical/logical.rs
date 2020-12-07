@@ -38,6 +38,7 @@ use crate::physical::tbv::max_diff_watermark_generator::MaxDiffWatermarkGenerato
 use crate::physical::tbv::range::Range;
 use crate::physical::trigger;
 use crate::physical::tbv::tumble::Tumble;
+use crate::physical::shuffle::Shuffle;
 
 pub struct TransformationContext {
     pub schema_context: Arc<dyn SchemaContext>,
@@ -590,7 +591,7 @@ impl Node {
                     aggregate_vec,
                     aggregate_output_names,
                     trigger_prototypes,
-                    source.physical(mat_ctx)?,
+                    Arc::new(Shuffle::new(source_metadata, source.physical(mat_ctx)?)),
                 )))
             }
             Node::Join {

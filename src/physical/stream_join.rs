@@ -87,7 +87,7 @@ impl Node for StreamJoin {
                     sender1.send((0, batch)).unwrap();
                     Ok(())
                 },
-                &mut noop_meta_send,
+                &mut noop_meta_send, // TODO: Watermark handling.
             ).unwrap();
         });
         let sender2 = sender.clone();

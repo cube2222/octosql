@@ -28,7 +28,6 @@ pub fn optimize(mut logical_plan: Box<Node>) -> Result<Box<Node>> {
 
         for rule in &rules {
             let (transformed_plan, cur_changed) = (rule)(logical_plan.as_ref())?;
-            dbg!(&cur_changed);
             if cur_changed {
                 logical_plan = transformed_plan
             }

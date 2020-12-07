@@ -104,15 +104,10 @@ fn main() {
     dbg!(&sql);
 
     let query = parse_sql(sql.as_str());
-    dbg!(&query);
     let logical_plan = query_to_logical_plan(query.as_ref());
-    dbg!(&logical_plan);
-
     let logical_plan = remove_wildcards(logical_plan.as_ref()).unwrap();
-    dbg!(&logical_plan);
-
     let logical_plan = optimize(logical_plan).unwrap();
-    dbg!(&logical_plan);
+    dbg!(logical_plan.metadata(Arc::new(EmptySchemaContext{})).unwrap());
 
     let plan = logical_plan.physical(&MaterializationContext { schema_context: Arc::new(EmptySchemaContext {}) }).unwrap();
 

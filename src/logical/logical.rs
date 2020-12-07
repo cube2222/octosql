@@ -39,6 +39,7 @@ use crate::physical::tbv::range::Range;
 use crate::physical::trigger;
 use crate::physical::tbv::tumble::Tumble;
 use crate::physical::shuffle::Shuffle;
+use crate::physical::postgres;
 
 pub struct TransformationContext {
     pub schema_context: Arc<dyn SchemaContext>,
@@ -175,8 +176,7 @@ impl Node {
 
                     Ok(NodeMetadata { partition_count: 1, schema: Arc::new(Schema::new(fields)), time_column: None })
                 } else {
-                    dbg!(name);
-                    unimplemented!()
+                    postgres::infer_schema(path)
                 }
             }
             Node::Filter { source, filter_expr: _ } => {

@@ -19,6 +19,7 @@ use arrow::array::{ArrayRef, PrimitiveArray, PrimitiveBuilder, StringArray, Stri
 use arrow::datatypes::{Field, Schema, DataType, TimeUnit, DateUnit, Int8Type, Int16Type, Int32Type, Int64Type, UInt8Type, UInt16Type, UInt32Type, UInt64Type, IntervalUnit, BooleanType, DurationNanosecondType, TimestampNanosecondType, Float32Type, Float64Type, Date32Type, Date64Type, Time32SecondType, Time32MillisecondType, Time64MicrosecondType, Time64NanosecondType, TimestampSecondType, TimestampMillisecondType, TimestampMicrosecondType, IntervalYearMonthType, IntervalDayTimeType, DurationSecondType, DurationMillisecondType, DurationMicrosecondType};
 use arrow::compute::kernels::comparison::{lt, lt_eq, eq, gt_eq, gt, lt_utf8, lt_eq_utf8, eq_utf8, gt_eq_utf8, gt_utf8};
 use arrow::compute::kernels::arithmetic;
+use arrow::compute::kernels::boolean;
 use arrow::compute::kernels::cast::cast;
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
@@ -52,6 +53,9 @@ lazy_static! {
         register_function!(m, "=", equal);
         register_function!(m, ">=", greater_than_equal);
         register_function!(m, ">", greater_than);
+        register_function!(m, "and", and);
+        register_function!(m, "or", or);
+        register_function!(m, "not", not);
         register_function!(m, "+", add);
         register_function!(m, "-", subtract);
         register_function!(m, "*", multiply);
@@ -203,6 +207,41 @@ fn greater_than(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
 fn any_nullable(args: &[Field]) -> bool {
     return args.iter()
         .any(|arg| arg.is_nullable());
+}
+
+fn and(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
+    let eval_fn = match (args[0].data_type(), args[1].data_type()) {
+        (DataType::Boolean, DataType::Boolean) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], boolean::and, PrimitiveArray<BooleanType>),
+        _ => return Err(anyhow!("Invalid logic operator argument types."))
+    };
+
+    Ok((Field::new("", DataType::Boolean, any_nullable(args.as_ref())), Arc::new(eval_fn)))
+}
+
+fn or(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
+    let eval_fn = match (args[0].data_type(), args[1].data_type()) {
+        (DataType::Boolean, DataType::Boolean) => |args: Vec<ArrayRef>| compute_op!(args[0], args[1], boolean::or, PrimitiveArray<BooleanType>),
+        _ => return Err(anyhow!("Invalid logic operator argument types."))
+    };
+
+    Ok((Field::new("", DataType::Boolean, any_nullable(args.as_ref())), Arc::new(eval_fn)))
+}
+
+fn not(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {
+    let eval_fn = match args[0].data_type() {
+        DataType::Boolean => {
+            |args: Vec<ArrayRef>| {
+                let arg = args[0]
+                    .as_any()
+                    .downcast_ref::<PrimitiveArray<BooleanType>>()
+                    .expect("not failed to downcast array");
+                Ok(Arc::new(boolean::not(arg)?) as ArrayRef)
+            }
+        },
+        _ => return Err(anyhow!("Invalid logic operator argument types."))
+    };
+
+    Ok((Field::new("", DataType::Boolean, any_nullable(args.as_ref())), Arc::new(eval_fn)))
 }
 
 fn add(args: Vec<Field>) -> Result<(Field, EvaluateFunction)> {

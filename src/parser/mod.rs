@@ -52,6 +52,7 @@ pub enum Expression {
     Constant(Value),
     Function(Identifier, Vec<Box<Expression>>),
     Operator(Box<Expression>, Operator, Box<Expression>),
+    UnaryOperator(UnaryOperator, Box<Expression>),
     Wildcard(Option<String>),
     Subquery(Box<Query>),
 }
@@ -88,4 +89,9 @@ pub enum Operator {
     Divide,
     AND,
     OR,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum UnaryOperator {
+    NOT
 }

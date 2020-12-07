@@ -16,7 +16,7 @@ use std::collections::BTreeMap;
 
 use crate::logical::logical::{Aggregate, Expression, Node, Trigger, TableValuedFunction, TableValuedFunctionArgument};
 use crate::parser;
-use crate::parser::{Operator, SelectExpression, Value, Source};
+use crate::parser::{Operator, SelectExpression, Value, Source, UnaryOperator};
 use crate::physical::physical::{Identifier, ScalarValue};
 
 
@@ -221,6 +221,9 @@ pub fn expression_to_logical_plan(expr: &parser::Expression) -> Box<Expression> 
         parser::Expression::Operator(left, op, right) => {
             Box::new(Expression::Function(operator_to_logical_plan(op), vec![expression_to_logical_plan(left.as_ref()), expression_to_logical_plan(right.as_ref())]))
         }
+        parser::Expression::UnaryOperator(op, arg) => {
+            Box::new(Expression::Function(unary_operator_to_logical_plan(op), vec![expression_to_logical_plan(arg.as_ref())]))
+        }
         parser::Expression::Wildcard(qualifier) => {
             Box::new(Expression::Wildcard(qualifier.clone()))
         }
@@ -300,6 +303,12 @@ pub fn value_to_logical_plan(val: &parser::Value) -> ScalarValue {
         }
         Value::String(v) => { ScalarValue::Utf8(v.clone()) }
     }
+}
+
+pub fn unary_operator_to_logical_plan(op: &parser::UnaryOperator) -> Identifier {
+    Identifier::SimpleIdentifier(match op {
+        UnaryOperator::NOT => "NOT".to_string(),
+    })
 }
 
 pub fn operator_to_logical_plan(op: &parser::Operator) -> Identifier {

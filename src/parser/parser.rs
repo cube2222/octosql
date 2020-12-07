@@ -12,14 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::parser::{Expression, Identifier, Operator, Query, SelectExpression, Source, Trigger, Value, TableValuedFunctionArgument};
+use crate::parser::{Expression, Identifier, Operator, Query, SelectExpression, Source, Trigger, Value, TableValuedFunctionArgument, UnaryOperator};
 
 use super::sqlparser;
 use super::sqlparser::ast;
 use super::sqlparser::ast::{BinaryOperator, Expr, Function, FunctionArg, Ident, Select, SelectItem, SetExpr, Statement, TableFactor};
 use super::sqlparser::dialect::GenericDialect;
 use super::sqlparser::parser::Parser;
-use crate::parser::sqlparser::ast::DateTimeField;
+use crate::parser::sqlparser::ast::UnaryOperator as sqlparserUnaryOperator;
+use crate::parser::sqlparser::ast::{DateTimeField};
 
 
 pub fn parse_sql(text: &str) -> Box<Query> {
@@ -140,6 +141,12 @@ pub fn parse_expr(expr: &Expr) -> Box<Expression> {
                 parse_expr(right.as_ref()),
             ))
         }
+        Expr::UnaryOp { op, expr } => {
+            Box::new(Expression::UnaryOperator(
+                parse_unary_operator(op),
+                parse_expr(expr.as_ref()),
+            ))
+        }
         Expr::Function(Function { name, args, over: _, distinct: _ }) => {
             Box::new(Expression::Function(parse_ident(&name.0[0]), args.iter().map(parse_function_arg).collect()))
         }
@@ -152,6 +159,7 @@ pub fn parse_expr(expr: &Expr) -> Box<Expression> {
         Expr::Subquery(subquery) => {
             Box::new(Expression::Subquery(parse_query(subquery)))
         }
+        Expr::Nested(expr) => parse_expr(expr.as_ref()),
         _ => {
             dbg!(expr);
             unimplemented!()
@@ -210,10 +218,18 @@ pub fn parse_binary_operator(op: &BinaryOperator) -> Operator {
         BinaryOperator::GtEq => Operator::GtEq,
         BinaryOperator::Gt => Operator::Gt,
         BinaryOperator::And => Operator::AND,
+        BinaryOperator::Or => Operator::OR,
         BinaryOperator::Plus => Operator::Plus,
         BinaryOperator::Minus => Operator::Minus,
         BinaryOperator::Multiply => Operator::Multiply,
         BinaryOperator::Divide => Operator::Divide,
+        _ => unimplemented!(),
+    }
+}
+
+pub fn parse_unary_operator(op: &sqlparserUnaryOperator) -> UnaryOperator {
+    match op {
+        sqlparserUnaryOperator::Not => UnaryOperator::NOT,
         _ => unimplemented!(),
     }
 }

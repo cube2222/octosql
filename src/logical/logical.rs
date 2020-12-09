@@ -135,6 +135,7 @@ pub enum Aggregate {
     Avg,
     Min,
     Max,
+    First,
 }
 
 #[derive(Clone, Debug)]
@@ -1106,7 +1107,27 @@ impl Aggregate {
                     DataType::UInt16 => Ok(DataType::UInt16),
                     DataType::UInt32 => Ok(DataType::UInt32),
                     DataType::UInt64 => Ok(DataType::UInt64),
-                    _ => {
+                    _ => { // TODO: implement for Floats (they cannot be used as key type in a map)
+                        dbg!(input_type);
+                        unimplemented!()
+                    }
+                }
+            }
+            Aggregate::First => {
+                match input_type {
+                    DataType::Int8 => Ok(DataType::Int8),
+                    DataType::Int16 => Ok(DataType::Int16),
+                    DataType::Int32 => Ok(DataType::Int32),
+                    DataType::Int64 => Ok(DataType::Int64),
+                    DataType::UInt8 => Ok(DataType::UInt8),
+                    DataType::UInt16 => Ok(DataType::UInt16),
+                    DataType::UInt32 => Ok(DataType::UInt32),
+                    DataType::UInt64 => Ok(DataType::UInt64),
+                    DataType::Utf8 => Ok(DataType::Utf8),
+                    //DataType::Timestamp(Nanosecond, _) => Ok(DataType::Timestamp(Nanosecond, _)), // TODO - sth not working
+                    DataType::Boolean => Ok(DataType::Boolean),
+                    //DataType::Null => Ok(DataType::Null),
+                    _ => { // TODO: implement for Floats AND Structs (they cannot be used as key type in a map)
                         dbg!(input_type);
                         unimplemented!()
                     }
@@ -1125,6 +1146,7 @@ impl Aggregate {
             Aggregate::Avg => Ok(Arc::new(aggregate::Avg {})),
             Aggregate::Min => Ok(Arc::new(aggregate::Min {})),
             Aggregate::Max => Ok(Arc::new(aggregate::Max {})),
+            Aggregate::First => Ok(Arc::new(aggregate::First {})),
             _ => unimplemented!(),
         }
     }

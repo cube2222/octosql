@@ -2,12 +2,14 @@ package octosql
 
 import "time"
 
+var ZeroValue = Value{}
+
 type Value struct {
 	Type        Type
 	Int         int
 	Float       float64
 	Boolean     bool
-	String      string
+	Str         string
 	Time        time.Time
 	Duration    time.Duration
 	List        []Value

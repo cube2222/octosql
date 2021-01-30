@@ -12,13 +12,9 @@ import (
 type GroupBy struct {
 	aggregatePrototypes []func() Aggregate
 	aggregateExprs      []Expression
-
-	// Const (zero) or Field.
-	recordTimeExpr Expression
-
-	keyExprs         []Expression
-	source           Node
-	triggerPrototype func() Trigger
+	keyExprs            []Expression
+	source              Node
+	triggerPrototype    func() Trigger
 }
 
 type Aggregate interface {

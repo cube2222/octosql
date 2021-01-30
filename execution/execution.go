@@ -2,7 +2,6 @@ package execution
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/cube2222/octosql"
@@ -15,6 +14,13 @@ type Node interface {
 type ExecutionContext struct {
 	context.Context
 	VariableContext *VariableContext
+}
+
+func (ctx ExecutionContext) WithRecord(record Record) ExecutionContext {
+	return ExecutionContext{
+		Context:         ctx.Context,
+		VariableContext: ctx.VariableContext.WithRecord(record),
+	}
 }
 
 type VariableContext struct {
@@ -45,6 +51,12 @@ type Record struct {
 	Values []octosql.Value
 }
 
+func NewRecord(values []octosql.Value) Record {
+	return Record{
+		Values: values,
+	}
+}
+
 type MetaSendFn func(ctx ProduceContext, msg MetadataMessage) error
 
 type MetadataMessage struct {
@@ -57,65 +69,3 @@ type MetadataMessageType int
 const (
 	MetadataMessageTypeWatermark MetadataMessageType = iota
 )
-
-type Expression interface {
-	Evaluate(ctx ExecutionContext) (octosql.Value, error)
-}
-
-type Variable struct {
-	level, index int
-}
-
-func (r *Variable) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
-	curVars := ctx.VariableContext
-	for i := r.level; i != 0; i-- {
-		curVars = curVars.Parent
-	}
-	return curVars.Values[r.index], nil
-}
-
-func NewVariable(level, index int) *Variable {
-	return &Variable{
-		level: level,
-		index: index,
-	}
-}
-
-type Constant struct {
-	value octosql.Value
-}
-
-func (c *Constant) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
-	return c.value, nil
-}
-
-func NewConstant(value octosql.Value) *Constant {
-	return &Constant{
-		value: value,
-	}
-}
-
-type TypeAssertion struct {
-	expected octosql.Type
-	expr     Expression
-}
-
-func (c *TypeAssertion) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
-	value, err := c.expr.Evaluate(ctx)
-	if err != nil {
-		return octosql.ZeroValue, err
-	}
-
-	if !value.Type.Is(c.expected) {
-		return octosql.ZeroValue, fmt.Errorf("invalid type: %s, expected: %s", value.Type, c.expected)
-	}
-
-	return value, nil
-}
-
-func NewTypeAssert(expected octosql.Type, expr Expression) *TypeAssertion {
-	return &TypeAssertion{
-		expected: expected,
-		expr:     expr,
-	}
-}

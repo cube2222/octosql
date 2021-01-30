@@ -48,7 +48,8 @@ func ProduceFromExecutionContext(ctx ExecutionContext) ProduceContext {
 }
 
 type Record struct {
-	Values []octosql.Value
+	Values     []octosql.Value
+	Retraction bool
 }
 
 func NewRecord(values []octosql.Value) Record {

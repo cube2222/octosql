@@ -6,6 +6,8 @@ import (
 	"github.com/cube2222/octosql"
 )
 
+const DefaultBTreeDegree = 12
+
 type Expression interface {
 	Evaluate(ctx ExecutionContext) (octosql.Value, error)
 }
@@ -144,3 +146,5 @@ func NewOr(args []Expression) *Or {
 		args: args,
 	}
 }
+
+// TODO: sys.undo should create an expression which reads the current retraction status.

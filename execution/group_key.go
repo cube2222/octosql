@@ -35,13 +35,3 @@ func (key GroupKey) Less(than btree.Item) bool {
 
 	return false
 }
-
-type GroupTree struct {
-	btree *btree.BTree
-}
-
-func NewGroupTree() *GroupTree {
-	return &GroupTree{
-		btree: btree.New(12),
-	}
-}

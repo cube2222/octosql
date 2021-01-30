@@ -96,3 +96,51 @@ func NewFunctionCall(function func([]octosql.Value) (octosql.Value, error), args
 		args:     args,
 	}
 }
+
+type And struct {
+	args []Expression
+}
+
+func (c *And) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
+	for i := range c.args {
+		value, err := c.args[i].Evaluate(ctx)
+		if err != nil {
+			return octosql.ZeroValue, fmt.Errorf("couldn't evaluate %d argument: %w", i, err)
+		}
+		if !value.Boolean {
+			return value, nil
+		}
+	}
+
+	return octosql.NewBoolean(true), nil
+}
+
+func NewAnd(args []Expression) *And {
+	return &And{
+		args: args,
+	}
+}
+
+type Or struct {
+	args []Expression
+}
+
+func (c *Or) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
+	for i := range c.args {
+		value, err := c.args[i].Evaluate(ctx)
+		if err != nil {
+			return octosql.ZeroValue, fmt.Errorf("couldn't evaluate %d argument: %w", i, err)
+		}
+		if value.Boolean {
+			return value, nil
+		}
+	}
+
+	return octosql.NewBoolean(false), nil
+}
+
+func NewOr(args []Expression) *Or {
+	return &Or{
+		args: args,
+	}
+}

@@ -17,6 +17,22 @@ type GroupBy struct {
 	triggerPrototype    func() Trigger
 }
 
+func NewGroupBy(
+	aggregatePrototypes []func() Aggregate,
+	aggregateExprs []Expression,
+	keyExprs []Expression,
+	source Node,
+	triggerPrototype func() Trigger,
+) *GroupBy {
+	return &GroupBy{
+		aggregatePrototypes: aggregatePrototypes,
+		aggregateExprs:      aggregateExprs,
+		keyExprs:            keyExprs,
+		source:              source,
+		triggerPrototype:    triggerPrototype,
+	}
+}
+
 type Aggregate interface {
 	Add(retraction bool, value octosql.Value) bool
 	Trigger() octosql.Value

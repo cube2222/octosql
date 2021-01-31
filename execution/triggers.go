@@ -70,5 +70,17 @@ func (c *CountingTrigger) KeyReceived(key GroupKey) {
 func (c *CountingTrigger) Poll() []GroupKey {
 	output := c.toTrigger
 	c.toTrigger = c.toTrigger[:0]
+	if c.endOfStreamReached {
+		c.counts.Ascend(func(item btree.Item) bool {
+			itemTyped, ok := item.(*countingTriggerItem)
+			if !ok {
+				panic(fmt.Sprintf("invalid received item: %v", item))
+			}
+
+			output = append(output, itemTyped.GroupKey)
+
+			return true
+		})
+	}
 	return output
 }

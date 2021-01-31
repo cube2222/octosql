@@ -4,5 +4,6 @@ go 1.15
 
 require (
 	github.com/google/btree v1.0.0
+	github.com/segmentio/encoding v0.2.7
 	github.com/stretchr/testify v1.7.0
 )

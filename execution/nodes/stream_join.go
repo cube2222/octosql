@@ -41,46 +41,59 @@ func (s *StreamJoin) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaS
 		metadata        bool
 		metadataMessage MetadataMessage
 		record          Record
+		err             error
 	}
 
 	leftMessages := make(chan chanMessage, 10000)
 	rightMessages := make(chan chanMessage, 10000)
 
-	if err := s.left.Run(ctx, func(produceCtx ProduceContext, record Record) error {
-		leftMessages <- chanMessage{
-			metadata: false,
-			record:   record,
+	go func() {
+		if err := s.left.Run(ctx, func(produceCtx ProduceContext, record Record) error {
+			leftMessages <- chanMessage{
+				metadata: false,
+				record:   record,
+			}
+
+			return nil
+		}, func(ctx ProduceContext, msg MetadataMessage) error {
+			leftMessages <- chanMessage{
+				metadata:        true,
+				metadataMessage: msg,
+			}
+
+			return nil
+		}); err != nil {
+			leftMessages <- chanMessage{
+				err: fmt.Errorf("couldn't run left stream join source: %w", err),
+			}
 		}
 
-		return nil
-	}, func(ctx ProduceContext, msg MetadataMessage) error {
-		leftMessages <- chanMessage{
-			metadata:        true,
-			metadataMessage: msg,
+		close(leftMessages)
+	}()
+
+	go func() {
+		if err := s.right.Run(ctx, func(produceCtx ProduceContext, record Record) error {
+			rightMessages <- chanMessage{
+				metadata: false,
+				record:   record,
+			}
+
+			return nil
+		}, func(ctx ProduceContext, msg MetadataMessage) error {
+			rightMessages <- chanMessage{
+				metadata:        true,
+				metadataMessage: msg,
+			}
+
+			return nil
+		}); err != nil {
+			rightMessages <- chanMessage{
+				err: fmt.Errorf("couldn't run right stream join source: %w", err),
+			}
 		}
 
-		return nil
-	}); err != nil {
-		return fmt.Errorf("couldn't run left stream join source: %w", err)
-	}
-
-	if err := s.right.Run(ctx, func(produceCtx ProduceContext, record Record) error {
-		rightMessages <- chanMessage{
-			metadata: false,
-			record:   record,
-		}
-
-		return nil
-	}, func(ctx ProduceContext, msg MetadataMessage) error {
-		rightMessages <- chanMessage{
-			metadata:        true,
-			metadataMessage: msg,
-		}
-
-		return nil
-	}); err != nil {
-		return fmt.Errorf("couldn't run right stream join source: %w", err)
-	}
+		close(rightMessages)
+	}()
 
 	leftRecords := btree.New(BTreeDefaultDegree)
 	rightRecords := btree.New(BTreeDefaultDegree)
@@ -95,7 +108,11 @@ receiveLoop:
 				leftDone = true
 				break receiveLoop
 			}
+			if msg.err != nil {
+				return msg.err
+			}
 			if msg.metadata {
+				// TODO: Propagate minimum on watermarks.
 				if err := metaSend(ProduceFromExecutionContext(ctx), msg.metadataMessage); err != nil {
 					return fmt.Errorf("couldn't send metadata: %w", err)
 				}
@@ -109,6 +126,9 @@ receiveLoop:
 			if !ok {
 				leftDone = false
 				break receiveLoop
+			}
+			if msg.err != nil {
+				return msg.err
 			}
 			if msg.metadata {
 				if err := metaSend(ProduceFromExecutionContext(ctx), msg.metadataMessage); err != nil {
@@ -131,6 +151,9 @@ receiveLoop:
 	}
 
 	for msg := range openChannel {
+		if msg.err != nil {
+			return msg.err
+		}
 		if msg.metadata {
 			if err := metaSend(ProduceFromExecutionContext(ctx), msg.metadataMessage); err != nil {
 				return fmt.Errorf("couldn't send metadata: %w", err)
@@ -155,6 +178,8 @@ receiveLoop:
 }
 
 func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRecords, otherRecords *btree.BTree, amLeft bool, record Record) error {
+	ctx = ctx.WithRecord(record)
+
 	var keyExprs []Expression
 	if amLeft {
 		keyExprs = s.keyExprsLeft
@@ -177,7 +202,7 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 		var itemTyped *streamJoinItem
 
 		if item == nil {
-			itemTyped = &streamJoinItem{GroupKey: key}
+			itemTyped = &streamJoinItem{GroupKey: key, values: btree.New(BTreeDefaultDegree)}
 			myRecords.ReplaceOrInsert(itemTyped)
 		} else {
 			var ok bool

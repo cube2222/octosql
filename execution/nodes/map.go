@@ -12,6 +12,13 @@ type Map struct {
 	exprs  []Expression
 }
 
+func NewMap(source Node, exprs []Expression) *Map {
+	return &Map{
+		source: source,
+		exprs:  exprs,
+	}
+}
+
 func (m *Map) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
 	if err := m.source.Run(ctx, func(produceCtx ProduceContext, record Record) error {
 		ctx := ctx.WithRecord(record)

@@ -14,12 +14,27 @@ import (
 )
 
 func main() {
-	start := time.Now()
-
 	entries := make([]memory.Entry, 2000000)
 	for i := range entries {
-		entries[i] = memory.Entry{Record: execution.NewRecord([]octosql.Value{octosql.NewInt(rand.Intn(4)), octosql.NewString(getRandomGroupName()), octosql.NewInt(rand.Intn(100)), octosql.NewInt(rand.Intn(50))}, false)}
+		var toBeFiltered bool
+		if rand.Intn(4) == 0 {
+			toBeFiltered = true
+		} else {
+			toBeFiltered = false
+		}
+		entries[i] = memory.Entry{Record: execution.NewRecord(
+			[]octosql.Value{
+				octosql.NewInt(rand.Intn(4)),
+				octosql.NewString(getRandomGroupName()),
+				octosql.NewInt(rand.Intn(100)),
+				octosql.NewInt(rand.Intn(50)),
+				octosql.NewBoolean(!toBeFiltered),
+			},
+			false,
+		)}
 	}
+
+	start := time.Now()
 
 	var plan execution.Node
 
@@ -33,10 +48,13 @@ func main() {
 
 	// TODO: Add map and filter in between.
 
+	plan = nodes.NewMap(plan, []execution.Expression{execution.NewVariable(0, 1), execution.NewVariable(0, 4)})
+	plan = nodes.NewFilter(plan, execution.NewVariable(0, 1))
+
 	plan = nodes.NewGroupBy(
 		[]func() nodes.Aggregate{aggregates.NewCountPrototype()},
-		[]execution.Expression{execution.NewVariable(0, 0)},
 		[]execution.Expression{execution.NewVariable(0, 1)},
+		[]execution.Expression{execution.NewVariable(0, 0)},
 		plan,
 		execution.NewCountingTriggerPrototype(100000),
 	)

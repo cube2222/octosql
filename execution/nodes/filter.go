@@ -11,6 +11,13 @@ type Filter struct {
 	predicate Expression
 }
 
+func NewFilter(source Node, predicate Expression) *Filter {
+	return &Filter{
+		source:    source,
+		predicate: predicate,
+	}
+}
+
 func (m *Filter) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
 	if err := m.source.Run(ctx, func(produceCtx ProduceContext, record Record) error {
 		ctx := ctx.WithRecord(record)

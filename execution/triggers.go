@@ -23,7 +23,7 @@ type CountingTrigger struct {
 	toTrigger          []GroupKey
 }
 
-func NewTriggerPrototype(triggerAfter uint) func() Trigger {
+func NewCountingTriggerPrototype(triggerAfter uint) func() Trigger {
 	return func() Trigger {
 		return &CountingTrigger{
 			triggerAfter:       triggerAfter,
@@ -35,17 +35,8 @@ func NewTriggerPrototype(triggerAfter uint) func() Trigger {
 }
 
 type countingTriggerItem struct {
-	Key   GroupKey
+	GroupKey
 	Count uint
-}
-
-func (c *countingTriggerItem) Less(than btree.Item) bool {
-	thanTyped, ok := than.(*countingTriggerItem)
-	if !ok {
-		panic(fmt.Sprintf("invalid key comparison: %T", than))
-	}
-
-	return c.Key.Less(thanTyped.Key)
 }
 
 func (c *CountingTrigger) EndOfStreamReached() {
@@ -55,11 +46,11 @@ func (c *CountingTrigger) EndOfStreamReached() {
 func (c *CountingTrigger) WatermarkReceived(watermark time.Time) {}
 
 func (c *CountingTrigger) KeyReceived(key GroupKey) {
-	item := c.counts.Get(&countingTriggerItem{Key: key})
+	item := c.counts.Get(key)
 	var itemTyped *countingTriggerItem
 
 	if item == nil {
-		itemTyped = &countingTriggerItem{Key: key}
+		itemTyped = &countingTriggerItem{GroupKey: key}
 		c.counts.ReplaceOrInsert(itemTyped)
 	} else {
 		var ok bool
@@ -70,7 +61,7 @@ func (c *CountingTrigger) KeyReceived(key GroupKey) {
 	}
 	itemTyped.Count++
 	if itemTyped.Count == c.triggerAfter {
-		c.toTrigger = append(c.toTrigger, itemTyped.Key)
+		c.toTrigger = append(c.toTrigger, itemTyped.GroupKey)
 		c.counts.Delete(itemTyped)
 	}
 }

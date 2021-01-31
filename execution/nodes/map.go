@@ -25,7 +25,7 @@ func (m *Map) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) 
 			}
 			values[i] = value
 		}
-		if err := produce(produceCtx, NewRecord(values)); err != nil {
+		if err := produce(produceCtx, NewRecord(values, record.Retraction)); err != nil {
 			return fmt.Errorf("couldn't produce: %w", err)
 		}
 

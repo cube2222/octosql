@@ -52,9 +52,11 @@ type Record struct {
 	Retraction bool
 }
 
-func NewRecord(values []octosql.Value) Record {
+// Functional options?
+func NewRecord(values []octosql.Value, retraction bool) Record {
 	return Record{
-		Values: values,
+		Values:     values,
+		Retraction: retraction,
 	}
 }
 

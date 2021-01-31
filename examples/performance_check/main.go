@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/datasources/json"
 	"github.com/cube2222/octosql/datasources/memory"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/execution/aggregates"
@@ -38,23 +39,25 @@ func main() {
 
 	var plan execution.Node
 
-	plan = &memory.Datasource{
-		Entries: entries,
-	}
-	// plan = &json.Datasource{
-	// 	Path:   "goals_big.json",
-	// 	Fields: []string{"time", "team"},
+	// plan = &memory.Datasource{
+	// 	Entries: entries,
 	// }
+	plan = &json.Datasource{
+		Path:   "goals_big.json",
+		Fields: []string{"time", "team"},
+	}
 
 	// TODO: Add map and filter in between.
 
-	plan = nodes.NewMap(plan, []execution.Expression{execution.NewVariable(0, 1), execution.NewVariable(0, 4)})
-	plan = nodes.NewFilter(plan, execution.NewVariable(0, 1))
+	plan = nodes.NewTumble(plan, 0, time.Minute*10, 0)
+
+	// plan = nodes.NewMap(plan, []execution.Expression{execution.NewVariable(0, 1), execution.NewVariable(0, 4)})
+	// plan = nodes.NewFilter(plan, execution.NewVariable(0, 1))
 
 	plan = nodes.NewGroupBy(
 		[]func() nodes.Aggregate{aggregates.NewCountPrototype()},
 		[]execution.Expression{execution.NewVariable(0, 1)},
-		[]execution.Expression{execution.NewVariable(0, 0)},
+		[]execution.Expression{execution.NewVariable(0, 3)},
 		plan,
 		execution.NewCountingTriggerPrototype(100000),
 	)

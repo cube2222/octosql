@@ -1,6 +1,10 @@
 package octosql
 
-import "time"
+import (
+	"fmt"
+	"strings"
+	"time"
+)
 
 var ZeroValue = Value{}
 
@@ -180,6 +184,60 @@ func (value Value) Compare(other Value) int {
 		}
 
 		return 0
+
+	case TypeIDUnion:
+		panic("can't have union type as concrete value instance")
+	default:
+		panic("impossible, type switch bug")
+	}
+}
+
+func (value Value) String() string {
+	builder := strings.Builder{}
+	value.append(builder)
+	return builder.String()
+}
+
+func (value Value) append(builder strings.Builder) {
+	switch value.Type.TypeID {
+	case TypeIDNull:
+		builder.WriteString("null")
+
+	case TypeIDInt:
+		builder.WriteString(fmt.Sprint(value.Int))
+
+	case TypeIDFloat:
+		builder.WriteString(fmt.Sprint(value.Float))
+
+	case TypeIDBoolean:
+		builder.WriteString(fmt.Sprint(value.Boolean))
+
+	case TypeIDString:
+		builder.WriteString(fmt.Sprint(value.Str))
+
+	case TypeIDTime:
+		builder.WriteString(fmt.Sprint(value.Time))
+
+	case TypeIDDuration:
+		builder.WriteString(fmt.Sprint(value.Duration))
+
+	case TypeIDList:
+		builder.WriteString("[")
+		for _, v := range value.List {
+			v.append(builder)
+			builder.WriteString(", ")
+		}
+		builder.WriteString("]")
+
+	case TypeIDStruct:
+		builder.WriteString("{ ")
+		for i, v := range value.FieldValues {
+			builder.WriteString(value.Type.Struct.Fields[i].Name)
+			builder.WriteString(": ")
+			v.append(builder)
+			builder.WriteString(", ")
+		}
+		builder.WriteString(" }")
 
 	case TypeIDUnion:
 		panic("can't have union type as concrete value instance")

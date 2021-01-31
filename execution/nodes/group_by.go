@@ -49,8 +49,8 @@ type previouslySentValuesItem struct {
 }
 
 func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
-	aggregates := btree.New(DefaultBTreeDegree)
-	previouslySentValues := btree.New(DefaultBTreeDegree)
+	aggregates := btree.New(BTreeDefaultDegree)
+	previouslySentValues := btree.New(BTreeDefaultDegree)
 	trigger := g.triggerPrototype()
 
 	if err := g.source.Run(ctx, func(produceCtx ProduceContext, record Record) error {

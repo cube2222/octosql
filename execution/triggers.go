@@ -27,7 +27,7 @@ func NewCountingTriggerPrototype(triggerAfter uint) func() Trigger {
 	return func() Trigger {
 		return &CountingTrigger{
 			triggerAfter:       triggerAfter,
-			counts:             btree.New(DefaultBTreeDegree),
+			counts:             btree.New(BTreeDefaultDegree),
 			endOfStreamReached: false,
 			toTrigger:          []GroupKey{},
 		}
@@ -96,7 +96,7 @@ type WatermarkTrigger struct {
 func NewWatermarkTriggerPrototype() func() Trigger {
 	return func() Trigger {
 		return &WatermarkTrigger{
-			timeKeys:           btree.New(DefaultBTreeDegree),
+			timeKeys:           btree.New(BTreeDefaultDegree),
 			endOfStreamReached: false,
 			watermark:          time.Time{},
 			outputKeysSlice:    make([]GroupKey, 0),

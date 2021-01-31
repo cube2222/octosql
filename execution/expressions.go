@@ -6,7 +6,7 @@ import (
 	"github.com/cube2222/octosql"
 )
 
-const DefaultBTreeDegree = 12
+const BTreeDefaultDegree = 12
 
 type Expression interface {
 	Evaluate(ctx ExecutionContext) (octosql.Value, error)

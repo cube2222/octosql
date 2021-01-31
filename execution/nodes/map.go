@@ -23,7 +23,7 @@ func (m *Map) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) 
 	if err := m.source.Run(ctx, func(produceCtx ProduceContext, record Record) error {
 		ctx := ctx.WithRecord(record)
 
-		// TODO: Reuse this slice on every produce call?
+		// TODO: Reuse this slice on every produce call? NO, because of stream join for instance.
 		values := make([]octosql.Value, len(m.exprs))
 		for i, expr := range m.exprs {
 			value, err := expr.Evaluate(ctx)

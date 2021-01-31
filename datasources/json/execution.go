@@ -46,6 +46,7 @@ func (d *Datasource) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaS
 			case float64:
 				values[i] = octosql.NewFloat(value)
 			case string:
+				// TODO: this should happen based on the schema only.
 				if t, err := time.Parse(time.RFC3339Nano, value); err == nil {
 					values[i] = octosql.NewTime(t)
 				} else {

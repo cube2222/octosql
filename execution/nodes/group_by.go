@@ -114,7 +114,16 @@ func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSend
 		}
 
 		return nil
-	}, metaSend); err != nil {
+	}, func(ctx ProduceContext, msg MetadataMessage) error {
+		// log.Printf("watermark received: %s", msg.Watermark)
+		if msg.Type == MetadataMessageTypeWatermark {
+			trigger.WatermarkReceived(msg.Watermark)
+			if err := g.trigger(ctx, aggregates, previouslySentValues, trigger, produce); err != nil {
+				return fmt.Errorf("couldn't trigger keys on watermark")
+			}
+		}
+		return nil
+	}); err != nil {
 		return fmt.Errorf("couldn't run source: %w", err)
 	}
 

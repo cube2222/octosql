@@ -84,3 +84,69 @@ func (c *CountingTrigger) Poll() []GroupKey {
 	}
 	return output
 }
+
+type WatermarkTrigger struct {
+	timeKeys           *btree.BTree
+	endOfStreamReached bool
+	watermark          time.Time
+
+	outputKeysSlice []GroupKey
+}
+
+func NewWatermarkTriggerPrototype() func() Trigger {
+	return func() Trigger {
+		return &WatermarkTrigger{
+			timeKeys:           btree.New(DefaultBTreeDegree),
+			endOfStreamReached: false,
+			watermark:          time.Time{},
+			outputKeysSlice:    make([]GroupKey, 0),
+		}
+	}
+}
+
+func (c *WatermarkTrigger) EndOfStreamReached() {
+	c.endOfStreamReached = true
+}
+
+func (c *WatermarkTrigger) WatermarkReceived(watermark time.Time) {
+	c.watermark = watermark
+}
+
+// TODO: Event time has to be the first element of the key.
+func (c *WatermarkTrigger) KeyReceived(key GroupKey) {
+	c.timeKeys.ReplaceOrInsert(key)
+}
+
+// The returned slice will be made invalid after following operations on the trigger.
+func (c *WatermarkTrigger) Poll() []GroupKey {
+	c.outputKeysSlice = c.outputKeysSlice[:0]
+	if !c.endOfStreamReached {
+		c.timeKeys.Ascend(func(item btree.Item) bool {
+			itemTyped, ok := item.(GroupKey)
+			if !ok {
+				panic(fmt.Sprintf("invalid received item: %v", item))
+			}
+
+			if itemTyped[0].Time.After(c.watermark) {
+				return false
+			}
+
+			c.outputKeysSlice = append(c.outputKeysSlice, itemTyped)
+			c.timeKeys.Delete(item)
+
+			return true
+		})
+	} else {
+		c.timeKeys.Ascend(func(item btree.Item) bool {
+			itemTyped, ok := item.(GroupKey)
+			if !ok {
+				panic(fmt.Sprintf("invalid received item: %v", item))
+			}
+
+			c.outputKeysSlice = append(c.outputKeysSlice, itemTyped)
+
+			return true
+		})
+	}
+	return c.outputKeysSlice
+}

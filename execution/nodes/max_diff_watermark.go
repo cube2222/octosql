@@ -13,6 +13,18 @@ type MaxDifferenceWatermark struct {
 	timeFieldIndex int
 }
 
+func NewMaxDifferenceWatermark(
+	source Node,
+	maxDifference time.Duration,
+	timeFieldIndex int,
+) *MaxDifferenceWatermark {
+	return &MaxDifferenceWatermark{
+		source:         source,
+		maxDifference:  maxDifference,
+		timeFieldIndex: timeFieldIndex,
+	}
+}
+
 func (m *MaxDifferenceWatermark) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
 	maxValue := time.Time{}
 

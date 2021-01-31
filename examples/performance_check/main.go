@@ -49,7 +49,8 @@ func main() {
 
 	// TODO: Add map and filter in between.
 
-	plan = nodes.NewTumble(plan, 0, time.Minute*10, 0)
+	plan = nodes.NewMaxDifferenceWatermark(plan, time.Second*10, 0)
+	plan = nodes.NewTumble(plan, 0, time.Minute, 0)
 
 	// plan = nodes.NewMap(plan, []execution.Expression{execution.NewVariable(0, 1), execution.NewVariable(0, 4)})
 	// plan = nodes.NewFilter(plan, execution.NewVariable(0, 1))
@@ -57,9 +58,9 @@ func main() {
 	plan = nodes.NewGroupBy(
 		[]func() nodes.Aggregate{aggregates.NewCountPrototype()},
 		[]execution.Expression{execution.NewVariable(0, 1)},
-		[]execution.Expression{execution.NewVariable(0, 3)},
+		[]execution.Expression{execution.NewVariable(0, 3), execution.NewVariable(0, 1)},
 		plan,
-		execution.NewCountingTriggerPrototype(100000),
+		execution.NewWatermarkTriggerPrototype(),
 	)
 
 	if err := plan.Run(

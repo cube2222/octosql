@@ -43,12 +43,7 @@ func (t *Tumble) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendF
 		}
 
 		return nil
-	}, func(ctx ProduceContext, msg MetadataMessage) error {
-		if msg.Type != MetadataMessageTypeWatermark {
-			return metaSend(ctx, msg)
-		}
-		return nil
-	}); err != nil {
+	}, metaSend); err != nil {
 		return fmt.Errorf("couldn't run source: %w", err)
 	}
 

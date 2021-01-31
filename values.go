@@ -193,12 +193,12 @@ func (value Value) Compare(other Value) int {
 }
 
 func (value Value) String() string {
-	builder := strings.Builder{}
+	builder := &strings.Builder{}
 	value.append(builder)
 	return builder.String()
 }
 
-func (value Value) append(builder strings.Builder) {
+func (value Value) append(builder *strings.Builder) {
 	switch value.Type.TypeID {
 	case TypeIDNull:
 		builder.WriteString("null")
@@ -213,19 +213,21 @@ func (value Value) append(builder strings.Builder) {
 		builder.WriteString(fmt.Sprint(value.Boolean))
 
 	case TypeIDString:
-		builder.WriteString(fmt.Sprint(value.Str))
+		builder.WriteString(fmt.Sprintf("'%s'", value.Str))
 
 	case TypeIDTime:
-		builder.WriteString(fmt.Sprint(value.Time))
+		builder.WriteString(value.Time.Format(time.RFC3339))
 
 	case TypeIDDuration:
 		builder.WriteString(fmt.Sprint(value.Duration))
 
 	case TypeIDList:
 		builder.WriteString("[")
-		for _, v := range value.List {
+		for i, v := range value.List {
 			v.append(builder)
-			builder.WriteString(", ")
+			if i != len(value.List)-1 {
+				builder.WriteString(", ")
+			}
 		}
 		builder.WriteString("]")
 

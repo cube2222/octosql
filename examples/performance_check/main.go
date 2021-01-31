@@ -6,7 +6,8 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/cube2222/octosql/datasources/json"
+	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/datasources/memory"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/execution/aggregates"
 	"github.com/cube2222/octosql/execution/nodes"
@@ -15,20 +16,20 @@ import (
 func main() {
 	start := time.Now()
 
-	// entries := make([]memory.Entry, 2000000)
-	// for i := range entries {
-	// 	entries[i] = memory.Entry{Record: execution.NewRecord([]octosql.Value{octosql.NewInt(rand.Intn(4)), octosql.NewString(getRandomGroupName()), octosql.NewInt(rand.Intn(100)), octosql.NewInt(rand.Intn(50))}, false)}
-	// }
+	entries := make([]memory.Entry, 2000000)
+	for i := range entries {
+		entries[i] = memory.Entry{Record: execution.NewRecord([]octosql.Value{octosql.NewInt(rand.Intn(4)), octosql.NewString(getRandomGroupName()), octosql.NewInt(rand.Intn(100)), octosql.NewInt(rand.Intn(50))}, false)}
+	}
 
 	var plan execution.Node
 
-	// plan = &memory.Datasource{
-	// 	Entries: entries,
-	// }
-	plan = &json.Datasource{
-		Path:   "goals_big.json",
-		Fields: []string{"time", "team"},
+	plan = &memory.Datasource{
+		Entries: entries,
 	}
+	// plan = &json.Datasource{
+	// 	Path:   "goals_big.json",
+	// 	Fields: []string{"time", "team"},
+	// }
 
 	// TODO: Add map and filter in between.
 
@@ -46,7 +47,7 @@ func main() {
 			VariableContext: &execution.VariableContext{},
 		},
 		func(ctx execution.ProduceContext, record execution.Record) error {
-			log.Printf("%+v", record)
+			log.Println(record)
 			return nil
 		},
 		func(ctx execution.ProduceContext, msg execution.MetadataMessage) error {

@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/cube2222/octosql"
@@ -58,6 +59,25 @@ func NewRecord(values []octosql.Value, retraction bool) Record {
 		Values:     values,
 		Retraction: retraction,
 	}
+}
+
+func (record Record) String() string {
+	builder := strings.Builder{}
+	builder.WriteString("{")
+	if !record.Retraction {
+		builder.WriteString("+")
+	} else {
+		builder.WriteString("-")
+	}
+	builder.WriteString("| ")
+	for i := range record.Values {
+		builder.WriteString(record.Values[i].String())
+		if i != len(record.Values)-1 {
+			builder.WriteString(", ")
+		}
+	}
+	builder.WriteString(" |}")
+	return builder.String()
 }
 
 type MetaSendFn func(ctx ProduceContext, msg MetadataMessage) error

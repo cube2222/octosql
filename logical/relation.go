@@ -27,7 +27,7 @@ func NewRelation(relation string) Relation {
 	return Relation(relation)
 }
 
-func (rel Relation) Physical(ctx context.Context) (physical.Relation, error) {
+func (rel Relation) Typecheck(ctx context.Context) (physical.Relation, error) {
 	switch Relation(strings.ToLower(string(rel))) {
 	case Equal:
 		return physical.Equal, nil

@@ -24,7 +24,7 @@ func NewFunctionExpression(name string, args []Expression) *FunctionExpression {
 	}
 }
 
-func (fe *FunctionExpression) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
+func (fe *FunctionExpression) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
 	args := make([]physical.Expression, 0)
 	variables := octosql.NoVariables()
 

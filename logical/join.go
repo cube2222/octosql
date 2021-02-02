@@ -46,7 +46,7 @@ func (node *Join) Visualize() *graph.Node {
 	return n
 }
 
-func (node *Join) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
+func (node *Join) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	sourceNodes, sourceVariables, err := node.source.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for join source nodes")

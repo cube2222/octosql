@@ -18,7 +18,7 @@ func NewUnionAll(first, second Node) *UnionAll {
 	return &UnionAll{first: first, second: second}
 }
 
-func (node *UnionAll) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
+func (node *UnionAll) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	variables := octosql.NoVariables()
 	leftNodes, firstVariables, err := node.first.Physical(ctx, physicalCreator)
 	if err != nil {

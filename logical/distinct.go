@@ -20,7 +20,7 @@ func NewDistinct(child Node) *Distinct {
 	return &Distinct{child: child}
 }
 
-func (node *Distinct) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
+func (node *Distinct) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	groupByParallelism, err := config.GetInt(
 		physicalCreator.physicalConfig,
 		"groupByParallelism",

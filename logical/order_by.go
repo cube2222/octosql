@@ -26,7 +26,7 @@ func NewOrderBy(expressions []Expression, directions []OrderDirection, source No
 	}
 }
 
-func (node *OrderBy) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
+func (node *OrderBy) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	sourceNodes, variables, err := node.source.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan of source nodes in order by")

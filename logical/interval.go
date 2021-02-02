@@ -19,7 +19,7 @@ func NewInterval(count Expression, unit Expression) *Interval {
 	return &Interval{count: count, unit: unit}
 }
 
-func (v *Interval) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
+func (v *Interval) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
 	physCount, countVariables, err := v.count.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for count expression")

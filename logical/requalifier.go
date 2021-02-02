@@ -19,7 +19,7 @@ func NewRequalifier(qualifier string, child Node) *Requalifier {
 	return &Requalifier{qualifier: qualifier, source: child}
 }
 
-func (node *Requalifier) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
+func (node *Requalifier) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	sourceNodes, variables, err := node.source.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for requalifier source nodes")

@@ -24,7 +24,7 @@ func NewWith(cteNames []string, cteNodes []Node, source Node) *With {
 	}
 }
 
-func (node *With) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
+func (node *With) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	variables := octosql.NoVariables()
 	for i := range node.cteNodes {
 		physicalNode, nodeVariables, err := node.cteNodes[i].Physical(ctx, physicalCreator)

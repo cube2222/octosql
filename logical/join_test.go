@@ -24,7 +24,7 @@ func NewStubNode(metadata *metadata.NodeMetadata, variables octosql.Variables) *
 	}
 }
 
-func (sb *StubNode) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
+func (sb *StubNode) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	return []physical.Node{physical.NewStubNode(sb.metadata)}, sb.variables, nil
 }
 

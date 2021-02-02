@@ -58,7 +58,7 @@ func NewCountingTrigger(count Expression) *CountingTrigger {
 	return &CountingTrigger{Count: count}
 }
 
-func (w *CountingTrigger) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Trigger, octosql.Variables, error) {
+func (w *CountingTrigger) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Trigger, octosql.Variables, error) {
 	countExpr, vars, err := w.Count.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for count expression")
@@ -80,7 +80,7 @@ func NewDelayTrigger(delay Expression) *DelayTrigger {
 	return &DelayTrigger{Delay: delay}
 }
 
-func (w *DelayTrigger) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Trigger, octosql.Variables, error) {
+func (w *DelayTrigger) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Trigger, octosql.Variables, error) {
 	delayExpr, vars, err := w.Delay.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for delay expression")
@@ -101,7 +101,7 @@ func NewWatermarkTrigger() *WatermarkTrigger {
 	return &WatermarkTrigger{}
 }
 
-func (w *WatermarkTrigger) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Trigger, octosql.Variables, error) {
+func (w *WatermarkTrigger) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Trigger, octosql.Variables, error) {
 	return physical.NewWatermarkTrigger(), octosql.NoVariables(), nil
 }
 
@@ -126,7 +126,7 @@ func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, ag
 	return &GroupBy{source: source, key: key, fields: fields, aggregates: aggregates, as: as, triggers: triggers}
 }
 
-func (node *GroupBy) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
+func (node *GroupBy) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	variables := octosql.NoVariables()
 
 	sourceNodes, sourceVariables, err := node.source.Physical(ctx, physicalCreator)

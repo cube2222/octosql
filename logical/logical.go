@@ -63,7 +63,7 @@ type OutputOptions struct {
 	Offset             Expression
 }
 
-func (opts *OutputOptions) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (*physical.OutputOptions, octosql.Variables, error) {
+func (opts *OutputOptions) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) (*physical.OutputOptions, octosql.Variables, error) {
 	orderByExpressions := make([]physical.Expression, len(opts.OrderByExpressions))
 	variables := octosql.NoVariables()
 	for i := range opts.OrderByExpressions {
@@ -134,7 +134,7 @@ func NewDataSource(name string, alias string) *DataSource {
 	return &DataSource{name: name, alias: alias}
 }
 
-func (ds *DataSource) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
+func (ds *DataSource) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	outDs, err := physicalCreator.dataSourceRepo.Get(ds.name, ds.alias)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get data source")
@@ -155,12 +155,6 @@ type Expression interface {
 	Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error)
 }
 
-type NamedExpression interface {
-	Expression
-	Name() octosql.VariableName
-	PhysicalNamed(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.NamedExpression, octosql.Variables, error)
-}
-
 type StarExpression struct {
 	qualifier string
 }
@@ -169,15 +163,7 @@ func NewStarExpression(qualifier string) *StarExpression {
 	return &StarExpression{qualifier: qualifier}
 }
 
-func (se *StarExpression) Name() octosql.VariableName {
-	if se.qualifier == "" {
-		return octosql.StarExpressionName
-	}
-
-	return octosql.NewVariableName(fmt.Sprintf("%s.%s", se.qualifier, octosql.StarExpressionName))
-}
-
-func (se *StarExpression) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
+func (se *StarExpression) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
 	return se.PhysicalNamed(ctx, physicalCreator)
 }
 
@@ -199,11 +185,7 @@ func NewVariable(name octosql.VariableName) *Variable {
 	return &Variable{name: name}
 }
 
-func (v *Variable) Name() octosql.VariableName {
-	return v.name
-}
-
-func (v *Variable) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
+func (v *Variable) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
 	return v.PhysicalNamed(ctx, physicalCreator)
 }
 
@@ -225,7 +207,7 @@ func NewConstant(value interface{}) *Constant {
 	return &Constant{value: value}
 }
 
-func (c *Constant) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
+func (c *Constant) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
 	name := physicalCreator.GetVariableName()
 	return physical.NewVariable(name), octosql.NewVariables(map[octosql.VariableName]octosql.Value{
 		name: octosql.NormalizeType(c.value),
@@ -246,7 +228,7 @@ func NewTuple(expressions []Expression) *Tuple {
 	return &Tuple{expressions: expressions}
 }
 
-func (tup *Tuple) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
+func (tup *Tuple) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
 	physicalExprs := make([]physical.Expression, len(tup.expressions))
 	variables := octosql.NoVariables()
 	for i := range tup.expressions {
@@ -288,7 +270,7 @@ func NewNodeExpression(node Node) *NodeExpression {
 	return &NodeExpression{node: node}
 }
 
-func (ne *NodeExpression) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
+func (ne *NodeExpression) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
 	sourceNodes, variables, err := ne.node.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for node expression")
@@ -315,7 +297,7 @@ func NewLogicExpression(formula Formula) *LogicExpression {
 	return &LogicExpression{formula: formula}
 }
 
-func (le *LogicExpression) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
+func (le *LogicExpression) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
 	physicalNode, variables, err := le.formula.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for logic expression")
@@ -340,11 +322,7 @@ func NewAliasedExpression(name octosql.VariableName, expr Expression) NamedExpre
 	return &AliasedExpression{name: name, expr: expr}
 }
 
-func (alExpr *AliasedExpression) Name() octosql.VariableName {
-	return alExpr.name
-}
-
-func (alExpr *AliasedExpression) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
+func (alExpr *AliasedExpression) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
 	return alExpr.PhysicalNamed(ctx, physicalCreator)
 }
 

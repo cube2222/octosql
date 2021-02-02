@@ -28,7 +28,7 @@ func NewTableValuedFunctionArgumentValueExpression(expression Expression) *Table
 	return &TableValuedFunctionArgumentValueExpression{expression: expression}
 }
 
-func (arg *TableValuedFunctionArgumentValueExpression) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.TableValuedFunctionArgumentValue, octosql.Variables, error) {
+func (arg *TableValuedFunctionArgumentValueExpression) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.TableValuedFunctionArgumentValue, octosql.Variables, error) {
 	physExpression, variables, err := arg.expression.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical expression")
@@ -53,7 +53,7 @@ func NewTableValuedFunctionArgumentValueTable(source Node) *TableValuedFunctionA
 	return &TableValuedFunctionArgumentValueTable{source: source}
 }
 
-func (arg *TableValuedFunctionArgumentValueTable) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.TableValuedFunctionArgumentValue, octosql.Variables, error) {
+func (arg *TableValuedFunctionArgumentValueTable) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.TableValuedFunctionArgumentValue, octosql.Variables, error) {
 	sourceNodes, variables, err := arg.source.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical node")
@@ -83,7 +83,7 @@ func NewTableValuedFunctionArgumentValueDescriptor(descriptor octosql.VariableNa
 	return &TableValuedFunctionArgumentValueDescriptor{descriptor: descriptor}
 }
 
-func (arg *TableValuedFunctionArgumentValueDescriptor) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.TableValuedFunctionArgumentValue, octosql.Variables, error) {
+func (arg *TableValuedFunctionArgumentValueDescriptor) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.TableValuedFunctionArgumentValue, octosql.Variables, error) {
 	return []physical.TableValuedFunctionArgumentValue{physical.NewTableValuedFunctionArgumentValueDescriptor(arg.descriptor)}, octosql.NoVariables(), nil
 }
 
@@ -102,7 +102,7 @@ func NewTableValuedFunction(name string, arguments map[octosql.VariableName]Tabl
 	return &TableValuedFunction{name: name, arguments: arguments}
 }
 
-func (node *TableValuedFunction) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
+func (node *TableValuedFunction) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	variables := octosql.NoVariables()
 
 	physArguments := make(map[octosql.VariableName][]physical.TableValuedFunctionArgumentValue)

@@ -19,7 +19,7 @@ func NewFilter(formula Formula, child Node) *Filter {
 	return &Filter{formula: formula, source: child}
 }
 
-func (node *Filter) Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
+func (node *Filter) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
 	formula, formulaVariables, err := node.formula.Physical(ctx, physicalCreator)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't get physical plan for formula")

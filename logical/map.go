@@ -10,11 +10,10 @@ type Map struct {
 	expressions []Expression
 	aliases     []string
 	source      Node
-	keep        bool
 }
 
-func NewMap(expressions []Expression, aliases []string, child Node, keep bool) *Map {
-	return &Map{expressions: expressions, aliases: aliases, source: child, keep: keep}
+func NewMap(expressions []Expression, aliases []string, child Node) *Map {
+	return &Map{expressions: expressions, aliases: aliases, source: child}
 }
 
 func (node *Map) Typecheck(ctx context.Context, env physical.Environment, state physical.State) ([]physical.Node, error) {

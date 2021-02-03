@@ -49,16 +49,14 @@ type GroupBy struct {
 	source Node
 	key    []Expression
 
-	fields     []string
-	aggregates []string
-
-	as []string
+	expressions []Expression
+	aggregates  []string
 
 	triggers []Trigger
 }
 
-func NewGroupBy(source Node, key []Expression, fields []string, aggregates []string, as []string, triggers []Trigger) *GroupBy {
-	return &GroupBy{source: source, key: key, fields: fields, aggregates: aggregates, as: as, triggers: triggers}
+func NewGroupBy(source Node, key []Expression, expressions []Expression, aggregates []string, triggers []Trigger) *GroupBy {
+	return &GroupBy{source: source, key: key, expressions: expressions, aggregates: aggregates, triggers: triggers}
 }
 
 func (node *GroupBy) Typecheck(ctx context.Context, env physical.Environment, state physical.State) ([]physical.Node, error) {

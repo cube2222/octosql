@@ -255,98 +255,71 @@ package logical
 // 	return fmt.Errorf("incompatible types: %v and %v", reflect.TypeOf(expr1), reflect.TypeOf(expr2))
 // }
 //
-// func EqualExpressions(expr1, expr2 Expression) error {
-// 	switch expr1 := expr1.(type) {
-// 	case *StarExpression:
-// 		if expr2, ok := expr2.(*StarExpression); ok {
-// 			if expr1.Name() != expr2.Name() {
-// 				return errors.Errorf("qualifiers not equal: %v %v", expr1.Name().Source(), expr2.Name().Source())
-// 			}
-//
-// 			return nil
-// 		}
-// 	case *Constant:
-// 		if expr2, ok := expr2.(*Constant); ok {
-// 			if expr1.value != expr2.value {
-// 				return fmt.Errorf("values not equal: %v %v, %v %v", reflect.TypeOf(expr1.value), expr1.value, reflect.TypeOf(expr2.value), expr2.value)
-// 			}
-// 			return nil
-// 		}
-//
-// 	case *Variable:
-// 		if expr2, ok := expr2.(*Variable); ok {
-// 			if expr1.name != expr2.name {
-// 				return fmt.Errorf("names not equal: %v, %v", expr1.name, expr2.name)
-// 			}
-// 			return nil
-// 		}
-//
-// 	case *Tuple:
-// 		if expr2, ok := expr2.(*Tuple); ok {
-// 			if len(expr1.expressions) != len(expr2.expressions) {
-// 				return fmt.Errorf("expressions count not equal: %v, %v", len(expr1.expressions), len(expr2.expressions))
-// 			}
-// 			for i := range expr1.expressions {
-// 				if err := EqualExpressions(expr1.expressions[i], expr2.expressions[i]); err != nil {
-// 					return errors.Wrapf(err, "expression %v not equal", i)
-// 				}
-// 			}
-// 			return nil
-// 		}
-//
-// 	case *NodeExpression:
-// 		if expr2, ok := expr2.(*NodeExpression); ok {
-// 			if err := EqualNodes(expr1.node, expr2.node); err != nil {
-// 				return errors.Wrap(err, "nodes not equal")
-// 			}
-// 			return nil
-// 		}
-//
-// 	case *AliasedExpression:
-// 		if expr2, ok := expr2.(*AliasedExpression); ok {
-// 			if expr1.name != expr2.name {
-// 				return fmt.Errorf("names not equal: %v, %v", expr1.name, expr2.name)
-// 			}
-// 			if err := EqualExpressions(expr1.expr, expr2.expr); err != nil {
-// 				return errors.Wrap(err, "expressions not equal")
-// 			}
-// 			return nil
-// 		}
-//
-// 	case *FunctionExpression:
-// 		if expr2, ok := expr2.(*FunctionExpression); ok {
-// 			if expr1.name != expr2.name {
-// 				return fmt.Errorf("names not equal: %v, %v", expr1.name, expr2.name)
-// 			}
-// 			if len(expr1.arguments) != len(expr2.arguments) {
-// 				return fmt.Errorf("argument counts not equal: %v and %v", len(expr1.arguments), len(expr2.arguments))
-// 			}
-// 			for i := range expr1.arguments {
-// 				if err := EqualExpressions(expr1.arguments[i], expr2.arguments[i]); err != nil {
-// 					return errors.Wrapf(err, "argument with index %v not equal", i)
-// 				}
-// 			}
-// 			return nil
-// 		}
-//
-// 	case *Interval:
-// 		if expr2, ok := expr2.(*Interval); ok {
-// 			if err := EqualExpressions(expr1.count, expr2.count); err != nil {
-// 				return errors.Wrap(err, "count not equal")
-// 			}
-// 			if err := EqualExpressions(expr1.unit, expr2.unit); err != nil {
-// 				return errors.Wrap(err, "units not equal")
-// 			}
-// 			return nil
-// 		}
-//
-// 	default:
-// 		log.Fatalf("Unsupported equality comparison %v and %v", reflect.TypeOf(expr1), reflect.TypeOf(expr2))
-// 	}
-//
-// 	return fmt.Errorf("incompatible types: %v and %v", reflect.TypeOf(expr1), reflect.TypeOf(expr2))
-// }
-//
+
+func EqualExpressions(expr1, expr2 Expression) bool {
+	switch expr1 := expr1.(type) {
+	case *And:
+		if expr2, ok := expr2.(*And); ok {
+			return EqualExpressions(expr1.left, expr2.left) && EqualExpressions(expr1.right, expr2.right)
+		}
+	case *Or:
+		if expr2, ok := expr2.(*Or); ok {
+			return EqualExpressions(expr1.left, expr2.left) && EqualExpressions(expr1.right, expr2.right)
+		}
+	case *StarExpression:
+		if expr2, ok := expr2.(*StarExpression); ok {
+			return expr1.qualifier == expr2.qualifier
+		}
+	case *Constant:
+		if expr2, ok := expr2.(*Constant); ok {
+			return expr1.value == expr2.value
+		}
+
+	case *Variable:
+		if expr2, ok := expr2.(*Variable); ok {
+			return expr1.name == expr2.name
+		}
+
+	case *Tuple:
+		if expr2, ok := expr2.(*Tuple); ok {
+			if len(expr1.expressions) != len(expr2.expressions) {
+				return false
+			}
+			for i := range expr1.expressions {
+				if !EqualExpressions(expr1.expressions[i], expr2.expressions[i]) {
+					return false
+				}
+			}
+			return true
+		}
+
+	// case *NodeExpression:
+	// 	if expr2, ok := expr2.(*NodeExpression); ok {
+	// 		if err := EqualNodes(expr1.node, expr2.node); err != nil {
+	// 			return errors.Wrap(err, "nodes not equal")
+	// 		}
+	// 		return nil
+	// 	}
+
+	case *FunctionExpression:
+		if expr2, ok := expr2.(*FunctionExpression); ok {
+			if expr1.name != expr2.name {
+				return false
+			}
+			if len(expr1.arguments) != len(expr2.arguments) {
+				return false
+			}
+			for i := range expr1.arguments {
+				if !EqualExpressions(expr1.arguments[i], expr2.arguments[i]) {
+					return false
+				}
+			}
+			return true
+		}
+	}
+	return false
+}
+
 // func EqualTableValuedFunctionArgumentValue(value1 TableValuedFunctionArgumentValue, value2 TableValuedFunctionArgumentValue) error {
 // 	switch value1 := value1.(type) {
 // 	case *TableValuedFunctionArgumentValueExpression:

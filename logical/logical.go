@@ -112,3 +112,27 @@ func NewNodeExpression(node Node) *NodeExpression {
 func (ne *NodeExpression) Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.Expression, error) {
 	panic("implement me")
 }
+
+type And struct {
+	left, right Expression
+}
+
+func NewAnd(left, right Expression) *And {
+	return &And{left: left, right: right}
+}
+
+func (and *And) Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.Expression, error) {
+	panic("implement me")
+}
+
+type Or struct {
+	left, right Expression
+}
+
+func NewOr(left, right Expression) *Or {
+	return &Or{left: left, right: right}
+}
+
+func (and *Or) Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.Expression, error) {
+	panic("implement me")
+}

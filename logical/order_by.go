@@ -3,10 +3,6 @@ package logical
 import (
 	"context"
 
-	"github.com/pkg/errors"
-
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 )
 

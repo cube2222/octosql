@@ -2,21 +2,12 @@ package logical
 
 import (
 	"context"
-	"fmt"
-	"runtime"
-	"strconv"
-	"strings"
 
-	"github.com/pkg/errors"
-
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/config"
-	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 )
 
 type Trigger interface {
-	Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Trigger, octosql.Variables, error)
+	Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.Trigger, error)
 }
 
 type CountingTrigger struct {
@@ -27,7 +18,7 @@ func NewCountingTrigger(count Expression) *CountingTrigger {
 	return &CountingTrigger{Count: count}
 }
 
-func (w *CountingTrigger) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Trigger, octosql.Variables, error) {
+func (w *CountingTrigger) Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.Trigger, error) {
 	panic("implement me")
 }
 
@@ -39,7 +30,7 @@ func NewDelayTrigger(delay Expression) *DelayTrigger {
 	return &DelayTrigger{Delay: delay}
 }
 
-func (w *DelayTrigger) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Trigger, octosql.Variables, error) {
+func (w *DelayTrigger) Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.Trigger, error) {
 	panic("implement me")
 }
 
@@ -50,7 +41,7 @@ func NewWatermarkTrigger() *WatermarkTrigger {
 	return &WatermarkTrigger{}
 }
 
-func (w *WatermarkTrigger) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Trigger, octosql.Variables, error) {
+func (w *WatermarkTrigger) Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.Trigger, error) {
 	panic("implement me")
 }
 
@@ -58,15 +49,15 @@ type GroupBy struct {
 	source Node
 	key    []Expression
 
-	fields     []octosql.VariableName
-	aggregates []Aggregate
+	fields     []string
+	aggregates []string
 
-	as []octosql.VariableName
+	as []string
 
 	triggers []Trigger
 }
 
-func NewGroupBy(source Node, key []Expression, fields []octosql.VariableName, aggregates []Aggregate, as []octosql.VariableName, triggers []Trigger) *GroupBy {
+func NewGroupBy(source Node, key []Expression, fields []string, aggregates []string, as []string, triggers []Trigger) *GroupBy {
 	return &GroupBy{source: source, key: key, fields: fields, aggregates: aggregates, as: as, triggers: triggers}
 }
 

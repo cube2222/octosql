@@ -2,29 +2,29 @@ package logical
 
 import (
 	"context"
-	"fmt"
-	"runtime"
 
 	"github.com/pkg/errors"
 
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/config"
-	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
-	"github.com/cube2222/octosql/physical/metadata"
 )
 
 var ErrFallbackToLookupJoin = errors.New("fallback to lookup join")
 
+type JoinType string
+
+const (
+	JoinTypeLeft  JoinType = "Left"
+	JoinTypeInner JoinType = "Inner"
+)
+
 type Join struct {
 	source   Node
 	joined   Node
-	joinType execution.JoinType
+	joinType JoinType
 	triggers []Trigger
 }
 
-func NewJoin(source, joined Node, joinType execution.JoinType) *Join {
+func NewJoin(source, joined Node, joinType JoinType) *Join {
 	return &Join{
 		source:   source,
 		joined:   joined,

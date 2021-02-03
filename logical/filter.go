@@ -3,20 +3,16 @@ package logical
 import (
 	"context"
 
-	"github.com/pkg/errors"
-
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 )
 
 type Filter struct {
-	formula Formula
-	source  Node
+	predicate Expression
+	source    Node
 }
 
-func NewFilter(formula Formula, child Node) *Filter {
-	return &Filter{formula: formula, source: child}
+func NewFilter(predicate Expression, child Node) *Filter {
+	return &Filter{predicate: predicate, source: child}
 }
 
 func (node *Filter) Typecheck(ctx context.Context, env physical.Environment, state physical.State) ([]physical.Node, error) {

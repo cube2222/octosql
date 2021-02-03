@@ -3,13 +3,12 @@ package logical
 import (
 	"context"
 
-	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/physical"
 )
 
 type TableValuedFunctionArgumentValue interface {
 	iTableValuedFunctionArgumentValue()
-	Physical(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.TableValuedFunctionArgumentValue, octosql.Variables, error)
+	Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.TableValuedFunctionArgument, error)
 }
 
 func (*TableValuedFunctionArgumentValueExpression) iTableValuedFunctionArgumentValue() {}
@@ -24,7 +23,7 @@ func NewTableValuedFunctionArgumentValueExpression(expression Expression) *Table
 	return &TableValuedFunctionArgumentValueExpression{expression: expression}
 }
 
-func (arg *TableValuedFunctionArgumentValueExpression) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.TableValuedFunctionArgumentValue, octosql.Variables, error) {
+func (arg *TableValuedFunctionArgumentValueExpression) Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.TableValuedFunctionArgument, error) {
 	panic("implement me")
 }
 
@@ -36,7 +35,7 @@ func NewTableValuedFunctionArgumentValueTable(source Node) *TableValuedFunctionA
 	return &TableValuedFunctionArgumentValueTable{source: source}
 }
 
-func (arg *TableValuedFunctionArgumentValueTable) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.TableValuedFunctionArgumentValue, octosql.Variables, error) {
+func (arg *TableValuedFunctionArgumentValueTable) Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.TableValuedFunctionArgument, error) {
 	panic("implement me")
 	// sourceNodes, variables, err := arg.source.Physical(ctx, physicalCreator)
 	// if err != nil {
@@ -52,14 +51,14 @@ func (arg *TableValuedFunctionArgumentValueTable) Typecheck(ctx context.Context,
 }
 
 type TableValuedFunctionArgumentValueDescriptor struct {
-	descriptor octosql.VariableName
+	descriptor string
 }
 
-func NewTableValuedFunctionArgumentValueDescriptor(descriptor octosql.VariableName) *TableValuedFunctionArgumentValueDescriptor {
+func NewTableValuedFunctionArgumentValueDescriptor(descriptor string) *TableValuedFunctionArgumentValueDescriptor {
 	return &TableValuedFunctionArgumentValueDescriptor{descriptor: descriptor}
 }
 
-func (arg *TableValuedFunctionArgumentValueDescriptor) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.TableValuedFunctionArgumentValue, octosql.Variables, error) {
+func (arg *TableValuedFunctionArgumentValueDescriptor) Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.TableValuedFunctionArgument, error) {
 	panic("implement me")
 }
 
@@ -68,7 +67,7 @@ type TableValuedFunction struct {
 	arguments map[string]TableValuedFunctionArgumentValue
 }
 
-func NewTableValuedFunction(name string, arguments map[octosql.VariableName]TableValuedFunctionArgumentValue) *TableValuedFunction {
+func NewTableValuedFunction(name string, arguments map[string]TableValuedFunctionArgumentValue) *TableValuedFunction {
 	return &TableValuedFunction{name: name, arguments: arguments}
 }
 

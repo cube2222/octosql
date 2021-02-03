@@ -22,7 +22,7 @@ func NewMap(expressions []NamedExpression, child Node, keep bool) *Map {
 	return &Map{expressions: expressions, source: child, keep: keep}
 }
 
-func (node *Map) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
+func (node *Map) Typecheck(ctx context.Context, env physical.Environment, state physical.State) ([]physical.Node, error) {
 	physicalExprs := make([]physical.NamedExpression, len(node.expressions))
 	variables := octosql.NoVariables()
 	for i := range node.expressions {

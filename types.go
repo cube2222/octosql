@@ -45,9 +45,17 @@ type StructField struct {
 	Type Type
 }
 
-func (t Type) Is(other Type) bool {
+type TypeRelation int
+
+const (
+	TypeRelationIs TypeRelation = iota
+	TypeRelationMaybe
+	TypeRelationIsnt
+)
+
+func (t Type) Is(other Type) TypeRelation {
 	// TODO: Implement me
-	return true
+	return TypeRelationIs
 }
 
 func (t Type) String() string {
@@ -85,3 +93,13 @@ func (t Type) String() string {
 	}
 	panic("impossible, type switch bug")
 }
+
+var (
+	Null     Type = Type{TypeID: TypeIDNull}
+	Int      Type = Type{TypeID: TypeIDInt}
+	Float    Type = Type{TypeID: TypeIDFloat}
+	Boolean  Type = Type{TypeID: TypeIDBoolean}
+	Str      Type = Type{TypeID: TypeIDString}
+	Time     Type = Type{TypeID: TypeIDTime}
+	Duration Type = Type{TypeID: TypeIDDuration}
+)

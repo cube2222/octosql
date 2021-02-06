@@ -2,7 +2,9 @@ package logical
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/physical"
 )
 
@@ -74,7 +76,20 @@ func NewVariable(name string) *Variable {
 }
 
 func (v *Variable) Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.Expression, error) {
-	panic("implement me")
+	for varCtx := env.VariableContext; varCtx != nil; varCtx = varCtx.Parent {
+		for _, field := range varCtx.Fields {
+			if field.Name == v.name {
+				return physical.Expression{
+					Type:           field.Type,
+					ExpressionType: physical.ExpressionTypeVariable,
+					Variable: &physical.Variable{
+						Name: v.name,
+					},
+				}, nil
+			}
+		}
+	}
+	return physical.Expression{}, fmt.Errorf("unkown variable: '%s'", v.name)
 }
 
 type Constant struct {
@@ -122,7 +137,21 @@ func NewAnd(left, right Expression) *And {
 }
 
 func (and *And) Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.Expression, error) {
-	panic("implement me")
+	left, err := TypecheckExpression(ctx, env, state, octosql.Boolean, and.left)
+	if err != nil {
+		return physical.Expression{}, err
+	}
+	right, err := TypecheckExpression(ctx, env, state, octosql.Boolean, and.right)
+	if err != nil {
+		return physical.Expression{}, err
+	}
+	return physical.Expression{
+		Type:           octosql.Boolean,
+		ExpressionType: physical.ExpressionTypeAnd,
+		And: &physical.And{
+			Arguments: []physical.Expression{left, right},
+		},
+	}, nil
 }
 
 type Or struct {
@@ -133,6 +162,43 @@ func NewOr(left, right Expression) *Or {
 	return &Or{left: left, right: right}
 }
 
-func (and *Or) Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.Expression, error) {
-	panic("implement me")
+func (or *Or) Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.Expression, error) {
+	left, err := TypecheckExpression(ctx, env, state, octosql.Boolean, or.left)
+	if err != nil {
+		return physical.Expression{}, err
+	}
+	right, err := TypecheckExpression(ctx, env, state, octosql.Boolean, or.right)
+	if err != nil {
+		return physical.Expression{}, err
+	}
+	return physical.Expression{
+		Type:           octosql.Boolean,
+		ExpressionType: physical.ExpressionTypeOr,
+		Or: &physical.Or{
+			Arguments: []physical.Expression{left, right},
+		},
+	}, nil
+}
+
+func TypecheckExpression(ctx context.Context, env physical.Environment, state physical.State, expected octosql.Type, expression Expression) (physical.Expression, error) {
+	expr, err := expression.Typecheck(ctx, env, state)
+	if err != nil {
+		return physical.Expression{}, err
+	}
+	rel := expr.Type.Is(expected)
+	if rel == octosql.TypeRelationIsnt {
+		return physical.Expression{}, fmt.Errorf("expected %s, got %s", expected, expr.Type)
+	}
+	if rel == octosql.TypeRelationMaybe {
+		return physical.Expression{
+			Type:           expected,
+			ExpressionType: physical.ExpressionTypeTypeAssertion,
+			TypeAssertion: &physical.TypeAssertion{
+				Expression: expr,
+				TargetType: expected,
+			},
+		}, nil
+	}
+
+	return expr, nil
 }

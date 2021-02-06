@@ -11,7 +11,26 @@ type Environment struct {
 	Datasources *DatasourceRepository
 	Functions   *FunctionRepository
 	// aggregates *Aggregates
-	PhysicalConfig map[string]interface{}
+	PhysicalConfig  map[string]interface{}
+	VariableContext *VariableContext
+}
+
+func (env Environment) WithRecordSchema(schema Schema) Environment {
+	newEnv := env
+	newEnv.VariableContext = newEnv.VariableContext.WithRecordSchema(schema)
+	return newEnv
+}
+
+type VariableContext struct {
+	Parent *VariableContext
+	Fields []SchemaFields
+}
+
+func (varCtx *VariableContext) WithRecordSchema(schema Schema) *VariableContext {
+	return &VariableContext{
+		Parent: varCtx,
+		Fields: schema.Fields,
+	}
 }
 
 type DatasourceRepository struct {

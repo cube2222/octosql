@@ -7,21 +7,23 @@ type Expression struct {
 
 	ExpressionType ExpressionType
 	// Only one of the below may be non-null.
-	Variable     *Variable
-	Constant     *Constant
-	FunctionCall *FunctionCall
-	And          *And
-	Or           *Or
+	Variable      *Variable
+	Constant      *Constant
+	FunctionCall  *FunctionCall
+	And           *And
+	Or            *Or
+	TypeAssertion *TypeAssertion
 }
 
 type ExpressionType int
 
 const (
-	ExpressionTypeFilter ExpressionType = iota
-	ExpressionTypeGroupBy
-	ExpressionTypeMap
-	ExpressionTypeJoin
-	ExpressionTypeTableValuedFunction
+	ExpressionTypeVariable ExpressionType = iota
+	ExpressionTypeConstant
+	ExpressionTypeFunctionCall
+	ExpressionTypeAnd
+	ExpressionTypeOr
+	ExpressionTypeTypeAssertion
 )
 
 type Variable struct {
@@ -43,4 +45,9 @@ type And struct {
 
 type Or struct {
 	Arguments []Expression
+}
+
+type TypeAssertion struct {
+	Expression Expression
+	TargetType octosql.Type
 }

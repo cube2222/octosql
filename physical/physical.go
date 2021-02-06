@@ -41,15 +41,19 @@ type AggregateDescriptor struct {
 }
 
 type DatasourceRepository struct {
-	Datasources map[string]func(name string) DatasourceImplementation
+	Datasources map[string]func(name string) (DatasourceImplementation, error)
 }
 
 func (dr *DatasourceRepository) GetDatasource(name string) (DatasourceImplementation, error) {
 	// TODO: Special name.json handling. Best would be even 'path/to/file.json', but maybe achieve that using a function.
 	if strings.HasSuffix(name, ".json") {
-		return dr.Datasources["json"](name), nil
+		return dr.Datasources["json"](name)
 	}
-	return dr.Datasources[name](name), nil
+	// All this doesn't really make any sense TBH.
+	if ds, ok := dr.Datasources[name]; ok {
+		return ds(name)
+	}
+	return nil, fmt.Errorf("unknown datasource: %s", name)
 }
 
 type DatasourceImplementation interface {
@@ -73,11 +77,4 @@ type FunctionDescriptor interface {
 }
 
 type State struct {
-	variableCounter int
-}
-
-func (state *State) GetVariableName() (out string) {
-	out = fmt.Sprintf("var_%d", state.variableCounter)
-	state.variableCounter++
-	return
 }

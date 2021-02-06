@@ -71,13 +71,15 @@ func (node *Map) Typecheck(ctx context.Context, env physical.Environment, state 
 		}
 	}
 
-	sourceTimeFieldName := source.Schema.Fields[source.Schema.TimeField].Name
 	outTimeFieldIndex := -1
-	for i := range expressions {
-		if expressions[i].ExpressionType == physical.ExpressionTypeVariable {
-			if expressions[i].Variable.Name == sourceTimeFieldName {
-				outTimeFieldIndex = i
-				break
+	if source.Schema.TimeField != -1 {
+		sourceTimeFieldName := source.Schema.Fields[source.Schema.TimeField].Name
+		for i := range expressions {
+			if expressions[i].ExpressionType == physical.ExpressionTypeVariable {
+				if expressions[i].Variable.Name == sourceTimeFieldName {
+					outTimeFieldIndex = i
+					break
+				}
 			}
 		}
 	}

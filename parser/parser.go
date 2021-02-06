@@ -260,7 +260,11 @@ func ParseTableExpression(expr sqlparser.TableExpr) (logical.Node, error) {
 func ParseAliasedTableExpression(expr *sqlparser.AliasedTableExpr) (logical.Node, error) {
 	switch subExpr := expr.Expr.(type) {
 	case sqlparser.TableName:
-		return logical.NewDataSource(subExpr.Name.String(), expr.As.String()), nil
+		name := subExpr.Name.String()
+		if !subExpr.Qualifier.IsEmpty() {
+			name = fmt.Sprintf("%s.%s", subExpr.Qualifier.String(), name)
+		}
+		return logical.NewDataSource(name, expr.As.String()), nil
 
 	case *sqlparser.Subquery:
 		subQuery, err := ParseNode(subExpr.Select)

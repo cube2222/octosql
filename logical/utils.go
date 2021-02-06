@@ -272,7 +272,7 @@ func EqualExpressions(expr1, expr2 Expression) bool {
 		}
 	case *Constant:
 		if expr2, ok := expr2.(*Constant); ok {
-			return expr1.value == expr2.value
+			return expr1.value.Compare(expr2.value) == 0
 		}
 
 	case *Variable:

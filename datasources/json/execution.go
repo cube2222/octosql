@@ -39,6 +39,7 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 		values := make([]octosql.Value, len(d.Fields))
 		for i := range values {
 			value := msg[d.Fields[i].Name]
+			// TODO: What if it's null?
 			switch value := value.(type) {
 			case int:
 				values[i] = octosql.NewInt(value)

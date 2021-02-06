@@ -111,10 +111,10 @@ func (v *Variable) Typecheck(ctx context.Context, env physical.Environment, stat
 }
 
 type Constant struct {
-	value interface{}
+	value octosql.Value
 }
 
-func NewConstant(value interface{}) *Constant {
+func NewConstant(value octosql.Value) *Constant {
 	return &Constant{value: value}
 }
 

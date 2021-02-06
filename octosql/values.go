@@ -20,6 +20,12 @@ type Value struct {
 	FieldValues []Value
 }
 
+func NewNull() Value {
+	return Value{
+		Type: Type{TypeID: TypeIDNull},
+	}
+}
+
 func NewInt(value int) Value {
 	return Value{
 		Type: Type{TypeID: TypeIDInt},

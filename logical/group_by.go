@@ -13,15 +13,20 @@ type Trigger interface {
 }
 
 type CountingTrigger struct {
-	Count Expression
+	Count uint
 }
 
-func NewCountingTrigger(count Expression) *CountingTrigger {
+func NewCountingTrigger(count uint) *CountingTrigger {
 	return &CountingTrigger{Count: count}
 }
 
 func (w *CountingTrigger) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Trigger {
-	panic("implement me")
+	return physical.Trigger{
+		TriggerType: physical.TriggerTypeCounting,
+		CountingTrigger: &physical.CountingTrigger{
+			TriggerAfter: w.Count,
+		},
+	}
 }
 
 type DelayTrigger struct {

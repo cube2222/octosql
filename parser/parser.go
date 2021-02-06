@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql/logical"
+	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/parser/sqlparser"
 )
 
@@ -411,11 +412,18 @@ func ParseAggregate(expr sqlparser.Expr) (string, logical.Expression, error) {
 func ParseTrigger(trigger sqlparser.Trigger) (logical.Trigger, error) {
 	switch trigger := trigger.(type) {
 	case *sqlparser.CountingTrigger:
-		countExpr, err := ParseExpression(trigger.Count)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't parse count expression")
+		c, ok := trigger.Count.(*sqlparser.SQLVal)
+		if !ok {
+			return nil, errors.Errorf("counting trigger parameter must be constant, is: %+v", trigger.Count)
 		}
-		return logical.NewCountingTrigger(countExpr), nil
+		if c.Type != sqlparser.IntVal {
+			return nil, errors.Errorf("counting trigger parameter must be int constant, is: %+v", c)
+		}
+		i, err := strconv.ParseInt(string(c.Val), 10, 64)
+		if err != nil {
+			return nil, errors.Wrap(err, "counting trigger parameter must be int constant, couldn't parse")
+		}
+		return logical.NewCountingTrigger(uint(i)), nil
 
 	case *sqlparser.DelayTrigger:
 		delayExpr, err := ParseExpression(trigger.Delay)
@@ -517,17 +525,19 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 		return logical.NewNodeExpression(subquery), nil
 
 	case *sqlparser.SQLVal:
-		var value interface{}
+		var value octosql.Value
 		var err error
 		switch expr.Type {
 		case sqlparser.IntVal:
 			var i int64
 			i, err = strconv.ParseInt(string(expr.Val), 10, 64)
-			value = int(i)
+			value = octosql.NewInt(int(i))
 		case sqlparser.FloatVal:
-			value, err = strconv.ParseFloat(string(expr.Val), 64)
+			var val float64
+			val, err = strconv.ParseFloat(string(expr.Val), 64)
+			value = octosql.NewFloat(val)
 		case sqlparser.StrVal:
-			value = string(expr.Val)
+			value = octosql.NewString(string(expr.Val))
 		default:
 			err = errors.Errorf("constant value type unsupported")
 		}
@@ -537,10 +547,10 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 		return logical.NewConstant(value), nil
 
 	case *sqlparser.NullVal:
-		return logical.NewConstant(nil), nil
+		return logical.NewConstant(octosql.NewNull()), nil
 
 	case sqlparser.BoolVal:
-		return logical.NewConstant(expr), nil
+		return logical.NewConstant(octosql.NewBoolean(bool(expr))), nil
 
 	case sqlparser.ValTuple:
 		if len(expr) == 1 {

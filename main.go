@@ -9,6 +9,7 @@ import (
 
 	"github.com/cube2222/octosql/datasources/json"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/execution/aggregates"
 	"github.com/cube2222/octosql/parser"
 	"github.com/cube2222/octosql/parser/sqlparser"
 	"github.com/cube2222/octosql/physical"
@@ -27,7 +28,9 @@ func main() {
 	physicalPlan := logicalPlan.Typecheck(
 		context.Background(),
 		physical.Environment{
-			Aggregates: nil,
+			Aggregates: map[string][]physical.AggregateDescriptor{
+				"count": aggregates.CountOverloads,
+			},
 			Datasources: &physical.DatasourceRepository{
 				Datasources: map[string]func(name string) (physical.DatasourceImplementation, error){
 					"json": json.Creator,

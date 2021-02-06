@@ -3,7 +3,16 @@ package aggregates
 import (
 	"github.com/cube2222/octosql/execution/nodes"
 	"github.com/cube2222/octosql/octosql"
+	"github.com/cube2222/octosql/physical"
 )
+
+var CountOverloads = []physical.AggregateDescriptor{
+	{
+		ArgumentType: octosql.Any,
+		OutputType:   octosql.Int,
+		Prototype:    NewCountPrototype(),
+	},
+}
 
 type Count struct {
 	count int

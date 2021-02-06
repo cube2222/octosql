@@ -18,6 +18,7 @@ const (
 	TypeIDList
 	TypeIDStruct
 	TypeIDUnion
+	TypeIDAny
 )
 
 type Type struct {
@@ -38,6 +39,7 @@ type Type struct {
 	Union struct {
 		Alternatives []Type
 	}
+	Any struct{}
 }
 
 type StructField struct {
@@ -90,6 +92,8 @@ func (t Type) String() string {
 		}
 
 		return fmt.Sprintf("Union<%s>", strings.Join(typeStrings, ", "))
+	case TypeIDAny:
+		return "Any"
 	}
 	panic("impossible, type switch bug")
 }
@@ -102,4 +106,5 @@ var (
 	String   Type = Type{TypeID: TypeIDString}
 	Time     Type = Type{TypeID: TypeIDTime}
 	Duration Type = Type{TypeID: TypeIDDuration}
+	Any      Type = Type{TypeID: TypeIDAny}
 )

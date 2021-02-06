@@ -2,12 +2,14 @@ package logical
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/physical"
 )
 
 type Trigger interface {
-	Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.Trigger, error)
+	Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Trigger
 }
 
 type CountingTrigger struct {
@@ -18,7 +20,7 @@ func NewCountingTrigger(count Expression) *CountingTrigger {
 	return &CountingTrigger{Count: count}
 }
 
-func (w *CountingTrigger) Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.Trigger, error) {
+func (w *CountingTrigger) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Trigger {
 	panic("implement me")
 }
 
@@ -30,7 +32,7 @@ func NewDelayTrigger(delay Expression) *DelayTrigger {
 	return &DelayTrigger{Delay: delay}
 }
 
-func (w *DelayTrigger) Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.Trigger, error) {
+func (w *DelayTrigger) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Trigger {
 	panic("implement me")
 }
 
@@ -41,7 +43,7 @@ func NewWatermarkTrigger() *WatermarkTrigger {
 	return &WatermarkTrigger{}
 }
 
-func (w *WatermarkTrigger) Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.Trigger, error) {
+func (w *WatermarkTrigger) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Trigger {
 	panic("implement me")
 }
 
@@ -60,89 +62,76 @@ func NewGroupBy(source Node, key []Expression, expressions []Expression, aggrega
 }
 
 func (node *GroupBy) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node {
-	panic("implement me")
-	// variables := octosql.NoVariables()
-	//
-	// sourceNodes, sourceVariables, err := node.source.Physical(ctx, physicalCreator)
-	// if err != nil {
-	// 	return nil, nil, errors.Wrap(err, "couldn't get physical plan for group by sources")
-	// }
-	// variables, err = variables.MergeWith(sourceVariables)
-	// if err != nil {
-	// 	return nil, nil, errors.Wrap(err, "couldn't merge variables with those of sources")
-	// }
-	//
-	// key := make([]physical.Expression, len(node.key))
-	// for i := range node.key {
-	// 	expr, exprVariables, err := node.key[i].Physical(ctx, physicalCreator)
-	// 	if err != nil {
-	// 		return nil, nil, errors.Wrapf(err, "couldn't get physical plan for group key expression with index %d", i)
-	// 	}
-	// 	variables, err = variables.MergeWith(exprVariables)
-	// 	if err != nil {
-	// 		return nil, nil, errors.Wrapf(err, "couldn't merge variables with those of group key expression with index %d", i)
-	// 	}
-	//
-	// 	key[i] = expr
-	// }
-	//
-	// aggregates := make([]physical.Aggregate, len(node.aggregates))
-	// for i := range node.aggregates {
-	// 	switch Aggregate(strings.ToLower(string(node.aggregates[i]))) {
-	// 	case Avg:
-	// 		aggregates[i] = physical.Avg
-	// 	case AvgDistinct:
-	// 		aggregates[i] = physical.AvgDistinct
-	// 	case Count:
-	// 		aggregates[i] = physical.Count
-	// 	case CountDistinct:
-	// 		aggregates[i] = physical.CountDistinct
-	// 	case First:
-	// 		aggregates[i] = physical.First
-	// 	case Key:
-	// 		aggregates[i] = physical.Key
-	// 	case Last:
-	// 		aggregates[i] = physical.Last
-	// 	case Max:
-	// 		aggregates[i] = physical.Max
-	// 	case Min:
-	// 		aggregates[i] = physical.Min
-	// 	case Sum:
-	// 		aggregates[i] = physical.Sum
-	// 	case SumDistinct:
-	// 		aggregates[i] = physical.SumDistinct
-	// 	default:
-	// 		return nil, nil, errors.Errorf("invalid aggregate: %s", node.aggregates[i])
-	// 	}
-	// }
-	//
-	// triggers := make([]physical.Trigger, len(node.triggers))
-	// for i := range node.triggers {
-	// 	out, triggerVariables, err := node.triggers[i].Physical(ctx, physicalCreator)
-	// 	if err != nil {
-	// 		return nil, nil, errors.Wrapf(err, "couldn't get physical plan for trigger with index %d", i)
-	// 	}
-	// 	variables, err = variables.MergeWith(triggerVariables)
-	// 	if err != nil {
-	// 		return nil, nil, errors.Wrapf(err, "couldn't merge variables with those of trigger with index %d", i)
-	// 	}
-	//
-	// 	triggers[i] = out
-	// }
-	//
-	// groupByParallelism, err := config.GetInt(
-	// 	physicalCreator.physicalConfig,
-	// 	"groupByParallelism",
-	// 	config.WithDefault(runtime.GOMAXPROCS(0)),
-	// )
-	// if err != nil {
-	// 	return nil, nil, errors.Wrap(err, "couldn't get groupByParallelism configuration")
-	// }
-	//
-	// outNodes := physical.NewShuffle(groupByParallelism, physical.NewKeyHashingStrategy(key), sourceNodes)
-	// for i := range outNodes {
-	// 	outNodes[i] = physical.NewGroupBy(outNodes[i], key, node.fields, aggregates, node.as, triggers)
-	// }
-	//
-	// return outNodes, variables, nil
+	source := node.source.Typecheck(ctx, env, state)
+
+	// TODO: Event time has to be the first defined element of the key.
+	key := make([]physical.Expression, len(node.key))
+	for i := range node.key {
+		key[i] = node.key[i].Typecheck(ctx, env.WithRecordSchema(source.Schema), state)
+	}
+
+	expressions := make([]physical.Expression, len(node.expressions))
+	for i := range node.expressions {
+		expressions[i] = node.expressions[i].Typecheck(ctx, env.WithRecordSchema(source.Schema), state)
+	}
+
+	aggregates := make([]physical.Aggregate, len(node.aggregates))
+	for i := range node.aggregates {
+		aggregates[i] = physical.Aggregate{
+			Name:       node.aggregates[i], // TODO: Check if this aggregate can be used with that type.
+			OutputType: octosql.Type{},     // TODO: Fixme
+		}
+	}
+
+	triggers := make([]physical.Trigger, len(node.triggers))
+	for i := range node.triggers {
+		triggers[i] = node.triggers[i].Typecheck(ctx, env, state)
+	}
+	var trigger physical.Trigger
+	if len(triggers) == 0 {
+		trigger = physical.Trigger{
+			TriggerType:        physical.TriggerTypeEndOfStream,
+			EndOfStreamTrigger: &physical.EndOfStreamTrigger{},
+		}
+	} else if len(triggers) == 1 {
+		trigger = triggers[0]
+	} else {
+		trigger = physical.Trigger{
+			TriggerType: physical.TriggerTypeMulti,
+			MultiTrigger: &physical.MultiTrigger{
+				Triggers: triggers,
+			},
+		}
+	}
+
+	schemaFields := make([]physical.SchemaField, len(key)+len(aggregates))
+	for i := range key {
+		schemaFields[i] = physical.SchemaField{
+			Name: fmt.Sprintf("key_%d", i),
+			Type: key[i].Type,
+		}
+	}
+	for i := range aggregates {
+		schemaFields[len(key)+i] = physical.SchemaField{
+			Name: fmt.Sprintf("agg_%d", i),
+			Type: aggregates[i].OutputType,
+		}
+	}
+
+	// TODO: Calculate time field if grouping by time field.
+
+	return physical.Node{
+		Schema: physical.Schema{
+			Fields:    schemaFields,
+			TimeField: -1,
+		},
+		NodeType: physical.NodeTypeGroupBy,
+		GroupBy: &physical.GroupBy{
+			Source:               source,
+			Aggregates:           aggregates,
+			AggregateExpressions: expressions,
+			Key:                  key,
+			Trigger:              trigger,
+		},
+	}
 }

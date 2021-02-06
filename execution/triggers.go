@@ -150,3 +150,65 @@ func (c *WatermarkTrigger) Poll() []GroupKey {
 	}
 	return c.outputKeysSlice
 }
+
+type EndOfStreamTrigger struct {
+	keys               *btree.BTree
+	endOfStreamReached bool
+}
+
+func EndOfStreamTriggerPrototype() func() Trigger {
+	return func() Trigger {
+		return &EndOfStreamTrigger{
+			keys:               btree.New(BTreeDefaultDegree),
+			endOfStreamReached: false,
+		}
+	}
+}
+
+func (c *EndOfStreamTrigger) EndOfStreamReached() {
+	c.endOfStreamReached = true
+}
+
+func (c *EndOfStreamTrigger) WatermarkReceived(watermark time.Time) {}
+
+func (c *EndOfStreamTrigger) KeyReceived(key GroupKey) {
+	c.keys.ReplaceOrInsert(key)
+}
+
+func (c *EndOfStreamTrigger) Poll() []GroupKey {
+	output := make([]GroupKey, 0, c.keys.Len())
+	c.keys.Ascend(func(item btree.Item) bool {
+		itemTyped, ok := item.(GroupKey)
+		if !ok {
+			panic(fmt.Sprintf("invalid received item: %v", item))
+		}
+
+		output = append(output, itemTyped)
+
+		return true
+	})
+	return output
+}
+
+type MultiTrigger struct {
+}
+
+func MultiTriggerPrototype([]func() Trigger) func() Trigger {
+	panic("implement me")
+}
+
+func (c *MultiTrigger) MultiReached() {
+	panic("implement me")
+}
+
+func (c *MultiTrigger) WatermarkReceived(watermark time.Time) {
+	panic("implement me")
+}
+
+func (c *MultiTrigger) KeyReceived(key GroupKey) {
+	panic("implement me")
+}
+
+func (c *MultiTrigger) Poll() []GroupKey {
+	panic("implement me")
+}

@@ -66,7 +66,8 @@ type GroupBy struct {
 }
 
 type Aggregate struct {
-	Name string
+	Name       string
+	OutputType octosql.Type
 }
 
 type Join struct {

@@ -8,9 +8,9 @@ import (
 )
 
 type Environment struct {
-	Aggregates      map[string][]AggregateDescriptor
-	Datasources     *DatasourceRepository
-	Functions       *FunctionRepository
+	Aggregates  map[string][]AggregateDescriptor
+	Datasources *DatasourceRepository
+	// Functions       *FunctionRepository
 	PhysicalConfig  map[string]interface{}
 	VariableContext *VariableContext
 }
@@ -40,10 +40,10 @@ type AggregateDescriptor struct {
 }
 
 type DatasourceRepository struct {
-	Datasources map[string]func(name string) DatasourceDescriptor
+	Datasources map[string]func(name string) DatasourceImplementation
 }
 
-func (dr *DatasourceRepository) GetDatasource(name string) (DatasourceDescriptor, error) {
+func (dr *DatasourceRepository) GetDatasource(name string) (DatasourceImplementation, error) {
 	// TODO: Special name.json handling. Best would be even 'path/to/file.json', but maybe achieve that using a function.
 	if strings.HasSuffix(name, ".json") {
 		return dr.Datasources["json"](name), nil
@@ -51,8 +51,9 @@ func (dr *DatasourceRepository) GetDatasource(name string) (DatasourceDescriptor
 	return dr.Datasources[name](name), nil
 }
 
-type DatasourceDescriptor interface {
+type DatasourceImplementation interface {
 	Schema() (Schema, error)
+	// TODO: Function checking for push-down
 }
 
 type FunctionRepository struct {

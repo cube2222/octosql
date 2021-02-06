@@ -83,10 +83,7 @@ func (node *Map) Typecheck(ctx context.Context, env physical.Environment, state 
 	}
 
 	return physical.Node{
-		Schema: physical.Schema{
-			Fields:    outFields,
-			TimeField: outTimeFieldIndex,
-		},
+		Schema:   physical.NewSchema(outFields, outTimeFieldIndex),
 		NodeType: physical.NodeTypeMap,
 		Map: &physical.Map{
 			Source:      source,

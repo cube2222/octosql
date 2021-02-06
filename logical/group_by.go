@@ -146,10 +146,7 @@ aggregateLoop:
 	// TODO: Calculate time field if grouping by time field.
 
 	return physical.Node{
-		Schema: physical.Schema{
-			Fields:    schemaFields,
-			TimeField: -1,
-		},
+		Schema:   physical.NewSchema(schemaFields, -1),
 		NodeType: physical.NodeTypeGroupBy,
 		GroupBy: &physical.GroupBy{
 			Source:               source,

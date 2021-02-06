@@ -49,7 +49,8 @@ const (
 )
 
 type Datasource struct {
-	Name string
+	Name                     string
+	DatasourceImplementation DatasourceImplementation
 }
 
 type Filter struct {

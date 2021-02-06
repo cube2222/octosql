@@ -8,31 +8,31 @@ import (
 	"github.com/cube2222/octosql/physical"
 )
 
-type CommonTableExpressionsRepository struct {
-}
-
-func (ctes *CommonTableExpressionsRepository) WithCommonTableExpression(name string, nodes []physical.Node) *CommonTableExpressionsRepository {
-	panic("implement me")
-	// newDataSourceRepo := ctes.dataSourceRepo.WithFactory(
-	// 	name,
-	// 	func(name, alias string) []physical.Node {
-	// 		out := nodes
-	// 		if len(alias) > 0 {
-	// 			for i := range out {
-	// 				out[i] = physical.NewRequalifier(alias, out[i])
-	// 			}
-	// 		}
-	// 		return out
-	// 	},
-	// )
-	//
-	// newCreator := &PhysicalPlanCreator{
-	// 	variableCounter: creator.variableCounter,
-	// 	dataSourceRepo:  newDataSourceRepo,
-	// }
-	//
-	// return newCreator
-}
+// type CommonTableExpressionsRepository struct {
+// }
+//
+// func (ctes *CommonTableExpressionsRepository) WithCommonTableExpression(name string, nodes []physical.Node) *CommonTableExpressionsRepository {
+// 	panic("implement me")
+// 	// newDataSourceRepo := ctes.dataSourceRepo.WithFactory(
+// 	// 	name,
+// 	// 	func(name, alias string) []physical.Node {
+// 	// 		out := nodes
+// 	// 		if len(alias) > 0 {
+// 	// 			for i := range out {
+// 	// 				out[i] = physical.NewRequalifier(alias, out[i])
+// 	// 			}
+// 	// 		}
+// 	// 		return out
+// 	// 	},
+// 	// )
+// 	//
+// 	// newCreator := &PhysicalPlanCreator{
+// 	// 	variableCounter: creator.variableCounter,
+// 	// 	dataSourceRepo:  newDataSourceRepo,
+// 	// }
+// 	//
+// 	// return newCreator
+// }
 
 type Node interface {
 	// Typechecking panics on error, because it will never be handled otherwise than being bubbled up to the top.

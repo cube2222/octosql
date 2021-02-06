@@ -10,14 +10,15 @@ import (
 
 	"github.com/cube2222/octosql"
 	. "github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/physical"
 )
 
-type Datasource struct {
+type DatasourceExecuting struct {
 	Path   string
-	Fields []string
+	Fields []physical.SchemaField
 }
 
-func (d *Datasource) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
+func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
 	f, err := os.Open(d.Path)
 	if err != nil {
 		return fmt.Errorf("couldn't open file: %w", err)
@@ -37,7 +38,7 @@ func (d *Datasource) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaS
 
 		values := make([]octosql.Value, len(d.Fields))
 		for i := range values {
-			value := msg[d.Fields[i]]
+			value := msg[d.Fields[i].Name]
 			switch value := value.(type) {
 			case int:
 				values[i] = octosql.NewInt(value)

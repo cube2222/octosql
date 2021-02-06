@@ -99,7 +99,7 @@ var (
 	Int      Type = Type{TypeID: TypeIDInt}
 	Float    Type = Type{TypeID: TypeIDFloat}
 	Boolean  Type = Type{TypeID: TypeIDBoolean}
-	Str      Type = Type{TypeID: TypeIDString}
+	String   Type = Type{TypeID: TypeIDString}
 	Time     Type = Type{TypeID: TypeIDTime}
 	Duration Type = Type{TypeID: TypeIDDuration}
 )

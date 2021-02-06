@@ -49,7 +49,23 @@ func NewDataSource(name string, alias string) *DataSource {
 }
 
 func (ds *DataSource) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node {
-	panic("implement me")
+	datasource, err := env.Datasources.GetDatasource(ds.name)
+	if err != nil {
+		panic(fmt.Errorf("couldn't create datasource: %v", err))
+	}
+	schema, err := datasource.Schema()
+	if err != nil {
+		panic(fmt.Errorf("couldn't get datasource schema: %v", err))
+	}
+	// TODO: Hande alias.
+	return physical.Node{
+		Schema:   schema,
+		NodeType: physical.NodeTypeDatasource,
+		Datasource: &physical.Datasource{
+			Name:                     ds.name,
+			DatasourceImplementation: datasource,
+		},
+	}
 }
 
 type Expression interface {

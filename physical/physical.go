@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/execution"
 )
 
 type Environment struct {
@@ -53,6 +54,7 @@ func (dr *DatasourceRepository) GetDatasource(name string) (DatasourceImplementa
 
 type DatasourceImplementation interface {
 	Schema() (Schema, error)
+	Materialize() (execution.Node, error)
 	// TODO: Function checking for push-down
 }
 

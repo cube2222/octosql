@@ -1,8 +1,8 @@
 package aggregates
 
 import (
-	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution/nodes"
+	"github.com/cube2222/octosql/octosql"
 )
 
 type Count struct {

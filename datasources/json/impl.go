@@ -8,8 +8,8 @@ import (
 
 	"github.com/segmentio/encoding/json"
 
-	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
 

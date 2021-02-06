@@ -1,6 +1,8 @@
 package physical
 
-import "github.com/cube2222/octosql"
+import (
+	"github.com/cube2222/octosql/octosql"
+)
 
 type Expression struct {
 	Type octosql.Type

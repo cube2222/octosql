@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/octosql"
 )
 
 type Node interface {

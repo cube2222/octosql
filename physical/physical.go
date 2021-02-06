@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cube2222/octosql"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/octosql"
 )
 
 type Environment struct {

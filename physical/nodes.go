@@ -1,7 +1,7 @@
 package physical
 
 import (
-	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/octosql"
 )
 
 type Node struct {

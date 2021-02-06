@@ -8,9 +8,9 @@ import (
 )
 
 type Environment struct {
-	Datasources *DatasourceRepository
-	Functions   *FunctionRepository
-	// aggregates *Aggregates
+	Aggregates      map[string][]AggregateDescriptor
+	Datasources     *DatasourceRepository
+	Functions       *FunctionRepository
 	PhysicalConfig  map[string]interface{}
 	VariableContext *VariableContext
 }
@@ -31,6 +31,12 @@ func (varCtx *VariableContext) WithRecordSchema(schema Schema) *VariableContext 
 		Parent: varCtx,
 		Fields: schema.Fields,
 	}
+}
+
+type AggregateDescriptor struct {
+	ArgumentType octosql.Type
+	OutputType   octosql.Type
+	Prototype    func() Aggregate
 }
 
 type DatasourceRepository struct {

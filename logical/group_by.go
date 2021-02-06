@@ -76,11 +76,36 @@ func (node *GroupBy) Typecheck(ctx context.Context, env physical.Environment, st
 	}
 
 	aggregates := make([]physical.Aggregate, len(node.aggregates))
-	for i := range node.aggregates {
-		aggregates[i] = physical.Aggregate{
-			Name:       node.aggregates[i], // TODO: Check if this aggregate can be used with that type.
-			OutputType: octosql.Type{},     // TODO: Fixme
+aggregateLoop:
+	for i, aggname := range node.aggregates {
+		descriptors := env.Aggregates[aggname]
+		for _, descriptor := range descriptors {
+			if expressions[i].Type.Is(descriptor.ArgumentType) == octosql.TypeRelationIs {
+				aggregates[i] = physical.Aggregate{
+					Name:       node.aggregates[i],
+					OutputType: descriptor.OutputType,
+				}
+				continue aggregateLoop
+			}
 		}
+		for _, descriptor := range descriptors {
+			if expressions[i].Type.Is(descriptor.ArgumentType) == octosql.TypeRelationMaybe {
+				aggregates[i] = physical.Aggregate{
+					Name:       node.aggregates[i],
+					OutputType: descriptor.OutputType,
+				}
+				expressions[i] = physical.Expression{
+					ExpressionType: physical.ExpressionTypeTypeAssertion,
+					Type:           descriptor.ArgumentType,
+					TypeAssertion: &physical.TypeAssertion{
+						Expression: expressions[i],
+						TargetType: descriptor.ArgumentType,
+					},
+				}
+				continue aggregateLoop
+			}
+		}
+		panic(fmt.Sprintf("no such aggregate: %s(%s)", aggname, expressions[i].Type))
 	}
 
 	triggers := make([]physical.Trigger, len(node.triggers))

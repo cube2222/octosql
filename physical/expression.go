@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/davecgh/go-spew/spew"
-
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
 )
@@ -63,7 +61,6 @@ type TypeAssertion struct {
 func (expr *Expression) Materialize(ctx context.Context, env Environment) (execution.Expression, error) {
 	switch expr.ExpressionType {
 	case ExpressionTypeVariable:
-		spew.Dump(expr.Variable.Name, env.VariableContext)
 		level := 0
 		index := 0
 	ctxLoop:

@@ -23,7 +23,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	spew.Dump(logicalPlan)
 	// TODO: Wrap panics into errors in subfunction.
 	physicalPlan := logicalPlan.Typecheck(
 		context.Background(),
@@ -39,7 +38,6 @@ func main() {
 		},
 		physical.State{},
 	)
-	spew.Dump(physicalPlan)
 	spew.Dump(physicalPlan.Schema)
 	executionPlan, err := physicalPlan.Materialize(
 		context.Background(),

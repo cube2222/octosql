@@ -28,7 +28,11 @@ func (node *Map) Typecheck(ctx context.Context, env physical.Environment, state 
 	for i := range node.isStar {
 		if !node.isStar[i] {
 			expressions = append(expressions, node.expressions[i].Typecheck(ctx, env.WithRecordSchema(source.Schema), state))
-			aliases = append(aliases, &node.aliases[i])
+			if node.aliases[i] != "" {
+				aliases = append(aliases, &node.aliases[i])
+			} else {
+				aliases = append(aliases, nil)
+			}
 		} else {
 			for _, field := range source.Schema.Fields {
 				if qualifier := node.starQualifier[i]; qualifier != "" {

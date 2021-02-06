@@ -1,10 +1,12 @@
 package physical
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/execution/nodes"
 	"github.com/cube2222/octosql/octosql"
 )
 
@@ -37,7 +39,7 @@ func (varCtx *VariableContext) WithRecordSchema(schema Schema) *VariableContext 
 type AggregateDescriptor struct {
 	ArgumentType octosql.Type
 	OutputType   octosql.Type
-	Prototype    func() Aggregate
+	Prototype    func() nodes.Aggregate
 }
 
 type DatasourceRepository struct {
@@ -58,7 +60,7 @@ func (dr *DatasourceRepository) GetDatasource(name string) (DatasourceImplementa
 
 type DatasourceImplementation interface {
 	Schema() (Schema, error)
-	Materialize() (execution.Node, error)
+	Materialize(ctx context.Context, env Environment) (execution.Node, error)
 	// TODO: Function checking for push-down
 }
 

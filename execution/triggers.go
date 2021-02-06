@@ -156,7 +156,7 @@ type EndOfStreamTrigger struct {
 	endOfStreamReached bool
 }
 
-func EndOfStreamTriggerPrototype() func() Trigger {
+func NewEndOfStreamTriggerPrototype() func() Trigger {
 	return func() Trigger {
 		return &EndOfStreamTrigger{
 			keys:               btree.New(BTreeDefaultDegree),
@@ -176,6 +176,9 @@ func (c *EndOfStreamTrigger) KeyReceived(key GroupKey) {
 }
 
 func (c *EndOfStreamTrigger) Poll() []GroupKey {
+	if !c.endOfStreamReached {
+		return nil
+	}
 	output := make([]GroupKey, 0, c.keys.Len())
 	c.keys.Ascend(func(item btree.Item) bool {
 		itemTyped, ok := item.(GroupKey)
@@ -193,7 +196,7 @@ func (c *EndOfStreamTrigger) Poll() []GroupKey {
 type MultiTrigger struct {
 }
 
-func MultiTriggerPrototype([]func() Trigger) func() Trigger {
+func NewMultiTriggerPrototype([]func() Trigger) func() Trigger {
 	panic("implement me")
 }
 

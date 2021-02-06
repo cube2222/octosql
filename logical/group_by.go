@@ -82,8 +82,8 @@ aggregateLoop:
 		for _, descriptor := range descriptors {
 			if expressions[i].Type.Is(descriptor.ArgumentType) == octosql.TypeRelationIs {
 				aggregates[i] = physical.Aggregate{
-					Name:       node.aggregates[i],
-					OutputType: descriptor.OutputType,
+					Name:                node.aggregates[i],
+					AggregateDescriptor: descriptor,
 				}
 				continue aggregateLoop
 			}
@@ -91,8 +91,8 @@ aggregateLoop:
 		for _, descriptor := range descriptors {
 			if expressions[i].Type.Is(descriptor.ArgumentType) == octosql.TypeRelationMaybe {
 				aggregates[i] = physical.Aggregate{
-					Name:       node.aggregates[i],
-					OutputType: descriptor.OutputType,
+					Name:                node.aggregates[i],
+					AggregateDescriptor: descriptor,
 				}
 				expressions[i] = physical.Expression{
 					ExpressionType: physical.ExpressionTypeTypeAssertion,
@@ -139,7 +139,7 @@ aggregateLoop:
 	for i := range aggregates {
 		schemaFields[len(key)+i] = physical.SchemaField{
 			Name: fmt.Sprintf("agg_%d", i),
-			Type: aggregates[i].OutputType,
+			Type: aggregates[i].AggregateDescriptor.OutputType,
 		}
 	}
 

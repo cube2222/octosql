@@ -1,6 +1,7 @@
 package json
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -104,7 +105,7 @@ func (i *impl) Schema() (physical.Schema, error) {
 	return i.schema, nil
 }
 
-func (i *impl) Materialize() (execution.Node, error) {
+func (i *impl) Materialize(ctx context.Context, env physical.Environment) (execution.Node, error) {
 	return &DatasourceExecuting{
 		Path:   i.path,
 		Fields: i.schema.Fields,

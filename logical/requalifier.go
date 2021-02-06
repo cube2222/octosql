@@ -15,6 +15,6 @@ func NewRequalifier(qualifier string, child Node) *Requalifier {
 	return &Requalifier{qualifier: qualifier, source: child}
 }
 
-func (node *Requalifier) Typecheck(ctx context.Context, env physical.Environment, state physical.State) ([]physical.Node, error) {
+func (node *Requalifier) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node {
 	panic("implement me")
 }

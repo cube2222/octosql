@@ -22,7 +22,7 @@ func NewOrderBy(expressions []Expression, directions []OrderDirection, source No
 	}
 }
 
-func (node *OrderBy) Typecheck(ctx context.Context, env physical.Environment, state physical.State) ([]physical.Node, error) {
+func (node *OrderBy) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node {
 	panic("implement me")
 	// 	sourceNodes, variables, err := node.source.Physical(ctx, physicalCreator)
 	// 	if err != nil {

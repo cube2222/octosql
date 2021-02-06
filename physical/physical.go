@@ -23,7 +23,7 @@ func (env Environment) WithRecordSchema(schema Schema) Environment {
 
 type VariableContext struct {
 	Parent *VariableContext
-	Fields []SchemaFields
+	Fields []SchemaField
 }
 
 func (varCtx *VariableContext) WithRecordSchema(schema Schema) *VariableContext {

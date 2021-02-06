@@ -14,6 +14,6 @@ func NewUnionAll(first, second Node) *UnionAll {
 	return &UnionAll{first: first, second: second}
 }
 
-func (node *UnionAll) Typecheck(ctx context.Context, env physical.Environment, state physical.State) ([]physical.Node, error) {
+func (node *UnionAll) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node {
 	panic("implement me")
 }

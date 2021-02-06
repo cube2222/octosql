@@ -20,7 +20,7 @@ func NewWith(cteNames []string, cteNodes []Node, source Node) *With {
 	}
 }
 
-func (node *With) Typecheck(ctx context.Context, env physical.Environment, state physical.State) ([]physical.Node, error) {
+func (node *With) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node {
 	panic("implement me")
 	// variables := octosql.NoVariables()
 	// for i := range node.cteNodes {

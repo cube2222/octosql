@@ -32,7 +32,7 @@ func NewJoin(source, joined Node, joinType JoinType) *Join {
 	}
 }
 
-func (node *Join) Typecheck(ctx context.Context, env physical.Environment, state physical.State) ([]physical.Node, error) {
+func (node *Join) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node {
 	panic("implement me")
 	// sourceNodes, sourceVariables, err := node.source.Physical(ctx, physicalCreator)
 	// if err != nil {

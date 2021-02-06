@@ -19,11 +19,19 @@ type Node struct {
 }
 
 type Schema struct {
-	Fields    []SchemaFields
+	Fields []SchemaField
+	// TimeField is -1 if not present.
 	TimeField int
 }
 
-type SchemaFields struct {
+func NewSchema(fields []SchemaField, timeField int) Schema {
+	return Schema{
+		Fields:    fields,
+		TimeField: timeField,
+	}
+}
+
+type SchemaField struct {
 	Name string
 	Type octosql.Type
 }

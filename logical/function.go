@@ -18,6 +18,6 @@ func NewFunctionExpression(name string, args []Expression) *FunctionExpression {
 	}
 }
 
-func (fe *FunctionExpression) Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.Expression, error) {
+func (fe *FunctionExpression) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Expression {
 	panic("implement me")
 }

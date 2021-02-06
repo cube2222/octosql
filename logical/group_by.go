@@ -59,7 +59,7 @@ func NewGroupBy(source Node, key []Expression, expressions []Expression, aggrega
 	return &GroupBy{source: source, key: key, expressions: expressions, aggregates: aggregates, triggers: triggers}
 }
 
-func (node *GroupBy) Typecheck(ctx context.Context, env physical.Environment, state physical.State) ([]physical.Node, error) {
+func (node *GroupBy) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node {
 	panic("implement me")
 	// variables := octosql.NoVariables()
 	//

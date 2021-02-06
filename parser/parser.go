@@ -141,17 +141,17 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		}
 
 		root = logical.NewGroupBy(root, key, aggregateExprs, nonKeyAggregates, triggers)
-		root = logical.NewMap(outputExprs, make([]string, len(outputExprs)), root)
+		root = logical.NewMap(outputExprs, make([]string, len(outputExprs)), make([]string, len(outputExprs)), make([]bool, len(outputExprs)), root)
 	} else {
 		expressions := make([]logical.Expression, len(statement.SelectExprs))
+		starQualifiers := make([]string, len(statement.SelectExprs))
+		isStar := make([]bool, len(statement.SelectExprs))
 		aliases := make([]string, len(statement.SelectExprs))
 
 		for i := range statement.SelectExprs {
 			if starExpr, ok := statement.SelectExprs[i].(*sqlparser.StarExpr); ok {
-				expressions[i], err = ParseStarExpression(starExpr)
-				if err != nil {
-					return nil, errors.Wrap(err, "couldn't parse star expression")
-				}
+				starQualifiers[i] = starExpr.TableName.Qualifier.String()
+				isStar[i] = true
 
 				continue
 			}
@@ -168,7 +168,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 			}
 		}
 
-		root = logical.NewMap(expressions, aliases, root)
+		root = logical.NewMap(expressions, aliases, starQualifiers, isStar, root)
 	}
 
 	// if statement.OrderBy != nil {
@@ -434,10 +434,6 @@ func ParseAliasedExpression(expr *sqlparser.AliasedExpr) (logical.Expression, st
 	}
 
 	return subExpr, expr.As.String(), nil
-}
-
-func ParseStarExpression(expr *sqlparser.StarExpr) (logical.Expression, error) {
-	return logical.NewStarExpression(expr.TableName.Name.String()), nil
 }
 
 func ParseFunctionArgument(expr *sqlparser.AliasedExpr) (logical.Expression, error) {

@@ -2,11 +2,10 @@ package logical
 
 import (
 	"context"
+	"fmt"
+	"regexp"
+	"strings"
 
-	"github.com/pkg/errors"
-
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 )
 
@@ -19,25 +18,29 @@ func NewRequalifier(qualifier string, child Node) *Requalifier {
 	return &Requalifier{qualifier: qualifier, source: child}
 }
 
-func (node *Requalifier) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
-	sourceNodes, variables, err := node.source.Physical(ctx, physicalCreator)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get physical plan for requalifier source nodes")
+var qualifiedNameRegexp = regexp.MustCompile(`^[^.]+\..+$`)
+
+func (node *Requalifier) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node {
+	source := node.source.Typecheck(ctx, env, state)
+	outFields := make([]physical.SchemaField, source.NodeType)
+	for i, field := range source.Schema.Fields {
+		name := field.Name
+		if qualifiedNameRegexp.MatchString(name) {
+			dotIndex := strings.Index(name, ".")
+			name = fmt.Sprintf("%s.%s", node.qualifier, name[dotIndex+1:])
+		}
+		outFields[i] = physical.SchemaField{
+			Name: name,
+			Type: field.Type,
+		}
 	}
 
-	outputNodes := make([]physical.Node, len(sourceNodes))
-	for i := range outputNodes {
-		outputNodes[i] = physical.NewRequalifier(node.qualifier, sourceNodes[i])
+	return physical.Node{
+		Schema:   physical.NewSchema(outFields, source.Schema.TimeField),
+		NodeType: physical.NodeTypeRequalifier,
+		Requalifier: &physical.Requalifier{
+			Source:    source,
+			Qualifier: node.qualifier,
+		},
 	}
-
-	return outputNodes, variables, nil
-}
-
-func (node Requalifier) Visualize() *graph.Node {
-	n := graph.NewNode("Requalifier")
-	n.AddField("qualifier", node.qualifier)
-	if node.source != nil {
-		n.AddChild("source", node.source.Visualize())
-	}
-	return n
 }

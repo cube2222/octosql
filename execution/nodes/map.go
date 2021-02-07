@@ -3,8 +3,8 @@ package nodes
 import (
 	"fmt"
 
-	"github.com/cube2222/octosql"
 	. "github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/octosql"
 )
 
 type Map struct {

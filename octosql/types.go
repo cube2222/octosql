@@ -18,6 +18,7 @@ const (
 	TypeIDList
 	TypeIDStruct
 	TypeIDUnion
+	TypeIDAny
 )
 
 type Type struct {
@@ -38,6 +39,7 @@ type Type struct {
 	Union struct {
 		Alternatives []Type
 	}
+	Any struct{}
 }
 
 type StructField struct {
@@ -45,9 +47,20 @@ type StructField struct {
 	Type Type
 }
 
-func (t Type) Is(other Type) bool {
+type TypeRelation int
+
+const (
+	TypeRelationIs TypeRelation = iota
+	TypeRelationMaybe
+	TypeRelationIsnt
+)
+
+func (t Type) Is(other Type) TypeRelation {
 	// TODO: Implement me
-	return true
+	if other.TypeID == TypeIDAny {
+		return TypeRelationIs
+	}
+	return TypeRelationIs
 }
 
 func (t Type) String() string {
@@ -82,6 +95,19 @@ func (t Type) String() string {
 		}
 
 		return fmt.Sprintf("Union<%s>", strings.Join(typeStrings, ", "))
+	case TypeIDAny:
+		return "Any"
 	}
 	panic("impossible, type switch bug")
 }
+
+var (
+	Null     Type = Type{TypeID: TypeIDNull}
+	Int      Type = Type{TypeID: TypeIDInt}
+	Float    Type = Type{TypeID: TypeIDFloat}
+	Boolean  Type = Type{TypeID: TypeIDBoolean}
+	String   Type = Type{TypeID: TypeIDString}
+	Time     Type = Type{TypeID: TypeIDTime}
+	Duration Type = Type{TypeID: TypeIDDuration}
+	Any      Type = Type{TypeID: TypeIDAny}
+)

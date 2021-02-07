@@ -3,52 +3,35 @@ package logical
 import (
 	"context"
 
-	"github.com/pkg/errors"
-
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/graph"
+	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
 
 type Filter struct {
-	formula Formula
-	source  Node
+	predicate Expression
+	source    Node
 }
 
-func NewFilter(formula Formula, child Node) *Filter {
-	return &Filter{formula: formula, source: child}
+func NewFilter(predicate Expression, child Node) *Filter {
+	return &Filter{predicate: predicate, source: child}
 }
 
-func (node *Filter) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) ([]physical.Node, octosql.Variables, error) {
-	formula, formulaVariables, err := node.formula.Physical(ctx, physicalCreator)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get physical plan for formula")
-	}
-	sourceNodes, sourceVariables, err := node.source.Physical(ctx, physicalCreator)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't get physical plan for filter source node")
-	}
+func (node *Filter) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node {
+	source := node.source.Typecheck(ctx, env, state)
+	predicate := TypecheckExpression(
+		ctx,
+		env.WithRecordSchema(source.Schema),
+		state,
+		octosql.Boolean,
+		node.predicate,
+	)
 
-	variables, err := sourceVariables.MergeWith(formulaVariables)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't merge variables for filter source")
+	return physical.Node{
+		Schema:   source.Schema,
+		NodeType: physical.NodeTypeFilter,
+		Filter: &physical.Filter{
+			Source:    source,
+			Predicate: predicate,
+		},
 	}
-
-	outputNodes := make([]physical.Node, len(sourceNodes))
-	for i := range outputNodes {
-		outputNodes[i] = physical.NewFilter(formula, sourceNodes[i])
-	}
-
-	return outputNodes, variables, nil
-}
-
-func (node *Filter) Visualize() *graph.Node {
-	n := graph.NewNode("Filter")
-	if node.formula != nil {
-		n.AddChild("formula", node.formula.Visualize())
-	}
-	if node.source != nil {
-		n.AddChild("source", node.source.Visualize())
-	}
-	return n
 }

@@ -3,7 +3,7 @@ package execution
 import (
 	"fmt"
 
-	"github.com/cube2222/octosql"
+	"github.com/cube2222/octosql/octosql"
 )
 
 const BTreeDefaultDegree = 12
@@ -56,7 +56,7 @@ func (c *TypeAssertion) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 		return octosql.ZeroValue, err
 	}
 
-	if !value.Type.Is(c.expected) {
+	if value.Type.Is(c.expected) != octosql.TypeRelationIs {
 		return octosql.ZeroValue, fmt.Errorf("invalid type: %s, expected: %s", value.Type, c.expected)
 	}
 

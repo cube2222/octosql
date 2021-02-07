@@ -37,10 +37,10 @@ func main() {
 
 	var plan execution.Node
 
-	// plan = &memory.Datasource{
+	// plan = &memory.DatasourceExecuting{
 	// 	Entries: entries,
 	// }
-	// plan = &json.Datasource{
+	// plan = &json.DatasourceExecuting{
 	// 	Path:   "goals_big.json",
 	// 	Fields: []string{"time", "team"},
 	// }
@@ -50,11 +50,11 @@ func main() {
 	// plan = nodes.NewMap(plan, []execution.Expression{execution.NewVariable(0, 1), execution.NewVariable(0, 4)})
 	// plan = nodes.NewFilter(plan, execution.NewVariable(0, 1))
 
-	left := &json.Datasource{
+	left := &json.DatasourceExecuting{
 		Path:   "goals_big.json",
 		Fields: []string{"time", "team"},
 	}
-	right := &json.Datasource{
+	right := &json.DatasourceExecuting{
 		Path:   "teams.json",
 		Fields: []string{"id", "city"},
 	}

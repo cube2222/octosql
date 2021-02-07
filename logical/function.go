@@ -1,15 +1,9 @@
 package logical
 
 import (
-	"strconv"
-
-	"github.com/cube2222/octosql"
-	"github.com/cube2222/octosql/graph"
 	"github.com/cube2222/octosql/physical"
 
 	"context"
-
-	"github.com/pkg/errors"
 )
 
 type FunctionExpression struct {
@@ -24,33 +18,6 @@ func NewFunctionExpression(name string, args []Expression) *FunctionExpression {
 	}
 }
 
-func (fe *FunctionExpression) Typecheck(ctx context.Context, physicalCreator *PhysicalPlanCreator) (physical.Expression, octosql.Variables, error) {
-	args := make([]physical.Expression, 0)
-	variables := octosql.NoVariables()
-
-	for i := range fe.arguments {
-		arg := fe.arguments[i]
-
-		phys, vars, err := arg.Physical(ctx, physicalCreator)
-		if err != nil {
-			return nil, nil, errors.Wrap(err, "couldn't get physical expression from argument")
-		}
-
-		variables, err = variables.MergeWith(vars)
-		if err != nil {
-			return nil, nil, errors.Wrap(err, "couldn't merge variables")
-		}
-
-		args = append(args, phys)
-	}
-
-	return physical.NewFunctionExpression(fe.name, args), variables, nil
-}
-
-func (fe *FunctionExpression) Visualize() *graph.Node {
-	n := graph.NewNode("Function(" + fe.name + ")")
-	for idx, arg := range fe.arguments {
-		n.AddChild("arg_"+strconv.Itoa(idx), arg.Visualize())
-	}
-	return n
+func (fe *FunctionExpression) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Expression {
+	panic("implement me")
 }

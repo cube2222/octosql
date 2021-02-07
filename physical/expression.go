@@ -33,7 +33,8 @@ const (
 )
 
 type Variable struct {
-	Name string
+	Name     string
+	IsLevel0 bool
 }
 
 type Constant struct {

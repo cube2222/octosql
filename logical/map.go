@@ -44,7 +44,8 @@ func (node *Map) Typecheck(ctx context.Context, env physical.Environment, state 
 					Type:           field.Type,
 					ExpressionType: physical.ExpressionTypeVariable,
 					Variable: &physical.Variable{
-						Name: field.Name,
+						Name:     field.Name,
+						IsLevel0: true,
 					},
 				})
 				aliases = append(aliases, nil)

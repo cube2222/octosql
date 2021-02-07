@@ -98,6 +98,7 @@ func NewVariable(name string) *Variable {
 }
 
 func (v *Variable) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Expression {
+	isLevel0 := true
 	for varCtx := env.VariableContext; varCtx != nil; varCtx = varCtx.Parent {
 		for _, field := range varCtx.Fields {
 			if field.Name == v.name {
@@ -105,11 +106,13 @@ func (v *Variable) Typecheck(ctx context.Context, env physical.Environment, stat
 					Type:           field.Type,
 					ExpressionType: physical.ExpressionTypeVariable,
 					Variable: &physical.Variable{
-						Name: v.name,
+						Name:     v.name,
+						IsLevel0: isLevel0,
 					},
 				}
 			}
 		}
+		isLevel0 = false
 	}
 	// TODO: Expression typecheck errors should contain context. (position in input SQL)
 	panic(fmt.Errorf("unkown variable: '%s'", v.name))

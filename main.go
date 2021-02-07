@@ -40,7 +40,8 @@ func main() {
 			},
 		},
 		TableValuedFunctions: map[string][]physical.TableValuedFunctionDescriptor{
-			"tumble": table_valued_functions.Tumble,
+			"max_diff_watermark": table_valued_functions.MaxDiffWatermark,
+			"tumble":             table_valued_functions.Tumble,
 		},
 		PhysicalConfig:  nil,
 		VariableContext: nil,

@@ -40,6 +40,7 @@ var Tumble = []physical.TableValuedFunctionDescriptor{
 		OutputSchema: func(ctx context.Context, env physical.Environment, args map[string]physical.TableValuedFunctionArgument) (physical.Schema, error) {
 			source := args["source"].Table.Table
 			if timeField, ok := args["time_field"]; ok {
+				found := false
 				for _, field := range source.Schema.Fields {
 					if !physical.VariableNameMatchesField(timeField.Descriptor.Descriptor, field.Name) {
 						continue
@@ -47,7 +48,11 @@ var Tumble = []physical.TableValuedFunctionDescriptor{
 					if field.Type.TypeID != octosql.TypeIDTime {
 						return physical.Schema{}, fmt.Errorf("time_field must reference Time typed field, is %s", field.Type.String())
 					}
+					found = true
 					break
+				}
+				if !found {
+					return physical.Schema{}, fmt.Errorf("no %s field in source stream", timeField.Descriptor.Descriptor)
 				}
 			} else {
 				if source.Schema.TimeField == -1 {

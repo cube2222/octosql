@@ -128,7 +128,13 @@ func NewConstant(value octosql.Value) *Constant {
 }
 
 func (c *Constant) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Expression {
-	panic("implement me")
+	return physical.Expression{
+		Type:           c.value.Type,
+		ExpressionType: physical.ExpressionTypeConstant,
+		Constant: &physical.Constant{
+			Value: c.value,
+		},
+	}
 }
 
 type Tuple struct {

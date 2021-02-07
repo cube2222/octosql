@@ -425,7 +425,7 @@ func ParseAggregate(expr sqlparser.Expr) (string, logical.Expression, error) {
 			}
 
 		case *sqlparser.StarExpr:
-			parsedArg = nil
+			parsedArg = logical.NewConstant(octosql.NewNull())
 
 		default:
 			return "", nil, errors.Errorf(

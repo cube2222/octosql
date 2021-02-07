@@ -57,6 +57,9 @@ const (
 
 func (t Type) Is(other Type) TypeRelation {
 	// TODO: Implement me
+	if other.TypeID == TypeIDAny {
+		return TypeRelationIs
+	}
 	return TypeRelationIs
 }
 

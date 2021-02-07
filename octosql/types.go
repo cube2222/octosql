@@ -50,9 +50,9 @@ type StructField struct {
 type TypeRelation int
 
 const (
-	TypeRelationIs TypeRelation = iota
+	TypeRelationIsnt TypeRelation = iota
 	TypeRelationMaybe
-	TypeRelationIsnt
+	TypeRelationIs
 )
 
 func (t Type) Is(other Type) TypeRelation {
@@ -60,7 +60,68 @@ func (t Type) Is(other Type) TypeRelation {
 	if other.TypeID == TypeIDAny {
 		return TypeRelationIs
 	}
-	return TypeRelationIs
+	if t.TypeID == TypeIDUnion {
+		anyFits := false
+		allFit := true
+		for _, alternative := range t.Union.Alternatives {
+			rel := alternative.Is(other)
+			if rel == TypeRelationIs {
+				anyFits = true
+			} else if rel == TypeRelationMaybe {
+				anyFits = true
+				allFit = false
+			} else {
+				allFit = false
+			}
+		}
+		if allFit {
+			return TypeRelationIs
+		} else if anyFits {
+			return TypeRelationMaybe
+		} else {
+			return TypeRelationIsnt
+		}
+	}
+	if other.TypeID == TypeIDUnion {
+		out := TypeRelationIsnt
+		for _, alternative := range other.Union.Alternatives {
+			rel := t.Is(alternative)
+			if rel > out {
+				out = rel
+			}
+		}
+		return out
+	}
+	if t.TypeID == TypeIDList {
+		if other.TypeID != TypeIDList {
+			return TypeRelationIsnt
+		}
+		if t.List.Element.Is(*other.List.Element) < TypeRelationIs {
+			return TypeRelationIsnt
+		}
+		return TypeRelationIs
+	}
+	if t.TypeID == TypeIDStruct {
+		if other.TypeID != TypeIDStruct {
+			return TypeRelationIsnt
+		}
+		if len(t.Struct.Fields) != len(other.Struct.Fields) {
+			return TypeRelationIsnt
+		}
+		for i := range t.Struct.Fields {
+			if t.Struct.Fields[i].Name != other.Struct.Fields[i].Name {
+				return TypeRelationIsnt
+			}
+			if t.Struct.Fields[i].Type.Is(other.Struct.Fields[i].Type) < TypeRelationIs {
+				return TypeRelationIsnt
+			}
+		}
+		return TypeRelationIs
+	}
+	if t.TypeID == other.TypeID {
+		return TypeRelationIs
+	}
+	return TypeRelationIsnt
 }
 
 func (t Type) String() string {
@@ -94,7 +155,7 @@ func (t Type) String() string {
 			typeStrings[i] = alternative.String()
 		}
 
-		return fmt.Sprintf("Union<%s>", strings.Join(typeStrings, ", "))
+		return strings.Join(typeStrings, " | ")
 	case TypeIDAny:
 		return "Any"
 	}

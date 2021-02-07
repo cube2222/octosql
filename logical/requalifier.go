@@ -20,8 +20,8 @@ func NewRequalifier(qualifier string, child Node) *Requalifier {
 
 var qualifiedNameRegexp = regexp.MustCompile(`^[^.]+\..+$`)
 
-func (node *Requalifier) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node {
-	source := node.source.Typecheck(ctx, env, state)
+func (node *Requalifier) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
+	source := node.source.Typecheck(ctx, env, logicalEnv)
 	outFields := make([]physical.SchemaField, len(source.Schema.Fields))
 	for i, field := range source.Schema.Fields {
 		name := field.Name

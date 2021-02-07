@@ -34,10 +34,10 @@ func NewJoin(left, right Node, predicate Expression, joinType JoinType) *Join {
 	}
 }
 
-func (node *Join) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node {
-	left := node.left.Typecheck(ctx, env, state)
-	right := node.right.Typecheck(ctx, env, state)
-	predicate := node.predicate.Typecheck(ctx, env.WithRecordSchema(left.Schema).WithRecordSchema(right.Schema), state)
+func (node *Join) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
+	left := node.left.Typecheck(ctx, env, logicalEnv)
+	right := node.right.Typecheck(ctx, env, logicalEnv)
+	predicate := node.predicate.Typecheck(ctx, env.WithRecordSchema(left.Schema).WithRecordSchema(right.Schema), logicalEnv)
 
 	return physical.Node{
 		Schema: physical.Schema{

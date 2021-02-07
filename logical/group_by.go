@@ -9,7 +9,7 @@ import (
 )
 
 type Trigger interface {
-	Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Trigger
+	Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Trigger
 }
 
 type CountingTrigger struct {
@@ -20,7 +20,7 @@ func NewCountingTrigger(count uint) *CountingTrigger {
 	return &CountingTrigger{Count: count}
 }
 
-func (w *CountingTrigger) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Trigger {
+func (w *CountingTrigger) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Trigger {
 	return physical.Trigger{
 		TriggerType: physical.TriggerTypeCounting,
 		CountingTrigger: &physical.CountingTrigger{
@@ -37,7 +37,7 @@ func NewDelayTrigger(delay Expression) *DelayTrigger {
 	return &DelayTrigger{Delay: delay}
 }
 
-func (w *DelayTrigger) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Trigger {
+func (w *DelayTrigger) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Trigger {
 	panic("implement me")
 }
 
@@ -48,7 +48,7 @@ func NewWatermarkTrigger() *WatermarkTrigger {
 	return &WatermarkTrigger{}
 }
 
-func (w *WatermarkTrigger) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Trigger {
+func (w *WatermarkTrigger) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Trigger {
 	panic("implement me")
 }
 
@@ -68,18 +68,18 @@ func NewGroupBy(source Node, key []Expression, keyNames []string, expressions []
 	return &GroupBy{source: source, key: key, keyNames: keyNames, expressions: expressions, aggregates: aggregates, aggregateNames: aggregateNames, triggers: triggers}
 }
 
-func (node *GroupBy) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node {
-	source := node.source.Typecheck(ctx, env, state)
+func (node *GroupBy) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
+	source := node.source.Typecheck(ctx, env, logicalEnv)
 
 	// TODO: Event time has to be the first defined element of the key.
 	key := make([]physical.Expression, len(node.key))
 	for i := range node.key {
-		key[i] = node.key[i].Typecheck(ctx, env.WithRecordSchema(source.Schema), state)
+		key[i] = node.key[i].Typecheck(ctx, env.WithRecordSchema(source.Schema), logicalEnv)
 	}
 
 	expressions := make([]physical.Expression, len(node.expressions))
 	for i := range node.expressions {
-		expressions[i] = node.expressions[i].Typecheck(ctx, env.WithRecordSchema(source.Schema), state)
+		expressions[i] = node.expressions[i].Typecheck(ctx, env.WithRecordSchema(source.Schema), logicalEnv)
 	}
 
 	aggregates := make([]physical.Aggregate, len(node.aggregates))
@@ -117,7 +117,7 @@ aggregateLoop:
 
 	triggers := make([]physical.Trigger, len(node.triggers))
 	for i := range node.triggers {
-		triggers[i] = node.triggers[i].Typecheck(ctx, env, state)
+		triggers[i] = node.triggers[i].Typecheck(ctx, env, logicalEnv)
 	}
 	var trigger physical.Trigger
 	if len(triggers) == 0 {

@@ -8,47 +8,28 @@ import (
 	"github.com/cube2222/octosql/physical"
 )
 
-// type CommonTableExpressionsRepository struct {
-// }
-//
-// func (ctes *CommonTableExpressionsRepository) WithCommonTableExpression(name string, nodes []physical.Node) *CommonTableExpressionsRepository {
-// 	panic("implement me")
-// 	// newDataSourceRepo := ctes.dataSourceRepo.WithFactory(
-// 	// 	name,
-// 	// 	func(name, alias string) []physical.Node {
-// 	// 		out := nodes
-// 	// 		if len(alias) > 0 {
-// 	// 			for i := range out {
-// 	// 				out[i] = physical.NewRequalifier(alias, out[i])
-// 	// 			}
-// 	// 		}
-// 	// 		return out
-// 	// 	},
-// 	// )
-// 	//
-// 	// newCreator := &PhysicalPlanCreator{
-// 	// 	variableCounter: creator.variableCounter,
-// 	// 	dataSourceRepo:  newDataSourceRepo,
-// 	// }
-// 	//
-// 	// return newCreator
-// }
+type Environment struct {
+	CommonTableExpressions map[string]physical.Node
+}
 
 type Node interface {
 	// Typechecking panics on error, because it will never be handled otherwise than being bubbled up to the top.
-	Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node
+	Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node
 }
 
 type DataSource struct {
-	name  string
-	alias string
+	name string
 }
 
 func NewDataSource(name string) *DataSource {
 	return &DataSource{name: name}
 }
 
-func (ds *DataSource) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node {
+func (ds *DataSource) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
+	if node, ok := logicalEnv.CommonTableExpressions[ds.name]; ok {
+		return node
+	}
+
 	datasource, err := env.Datasources.GetDatasource(ds.name)
 	if err != nil {
 		panic(fmt.Errorf("couldn't create datasource: %v", err))
@@ -57,7 +38,6 @@ func (ds *DataSource) Typecheck(ctx context.Context, env physical.Environment, s
 	if err != nil {
 		panic(fmt.Errorf("couldn't get datasource schema: %v", err))
 	}
-	// TODO: Hande alias.
 	return physical.Node{
 		Schema:   schema,
 		NodeType: physical.NodeTypeDatasource,
@@ -69,7 +49,7 @@ func (ds *DataSource) Typecheck(ctx context.Context, env physical.Environment, s
 }
 
 type Expression interface {
-	Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Expression
+	Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression
 }
 
 // FieldNamer can be implemented by expressions with pretty default names based on their content.
@@ -85,7 +65,7 @@ func NewStarExpression(qualifier string) *StarExpression {
 	return &StarExpression{qualifier: qualifier}
 }
 
-func (se *StarExpression) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Expression {
+func (se *StarExpression) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
 	panic("implement me")
 }
 
@@ -97,7 +77,7 @@ func NewVariable(name string) *Variable {
 	return &Variable{name: name}
 }
 
-func (v *Variable) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Expression {
+func (v *Variable) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
 	isLevel0 := true
 	for varCtx := env.VariableContext; varCtx != nil; varCtx = varCtx.Parent {
 		for _, field := range varCtx.Fields {
@@ -130,7 +110,7 @@ func NewConstant(value octosql.Value) *Constant {
 	return &Constant{value: value}
 }
 
-func (c *Constant) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Expression {
+func (c *Constant) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
 	return physical.Expression{
 		Type:           c.value.Type,
 		ExpressionType: physical.ExpressionTypeConstant,
@@ -148,7 +128,7 @@ func NewTuple(expressions []Expression) *Tuple {
 	return &Tuple{expressions: expressions}
 }
 
-func (tup *Tuple) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Expression {
+func (tup *Tuple) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
 	panic("implement me")
 }
 
@@ -160,7 +140,7 @@ func NewNodeExpression(node Node) *NodeExpression {
 	return &NodeExpression{node: node}
 }
 
-func (ne *NodeExpression) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Expression {
+func (ne *NodeExpression) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
 	panic("implement me")
 }
 
@@ -172,14 +152,14 @@ func NewAnd(left, right Expression) *And {
 	return &And{left: left, right: right}
 }
 
-func (and *And) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Expression {
+func (and *And) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
 	return physical.Expression{
 		Type:           octosql.Boolean,
 		ExpressionType: physical.ExpressionTypeAnd,
 		And: &physical.And{
 			Arguments: []physical.Expression{
-				TypecheckExpression(ctx, env, state, octosql.Boolean, and.left),
-				TypecheckExpression(ctx, env, state, octosql.Boolean, and.right),
+				TypecheckExpression(ctx, env, logicalEnv, octosql.Boolean, and.left),
+				TypecheckExpression(ctx, env, logicalEnv, octosql.Boolean, and.right),
 			},
 		},
 	}
@@ -193,21 +173,21 @@ func NewOr(left, right Expression) *Or {
 	return &Or{left: left, right: right}
 }
 
-func (or *Or) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Expression {
+func (or *Or) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
 	return physical.Expression{
 		Type:           octosql.Boolean,
 		ExpressionType: physical.ExpressionTypeOr,
 		Or: &physical.Or{
 			Arguments: []physical.Expression{
-				TypecheckExpression(ctx, env, state, octosql.Boolean, or.left),
-				TypecheckExpression(ctx, env, state, octosql.Boolean, or.right),
+				TypecheckExpression(ctx, env, logicalEnv, octosql.Boolean, or.left),
+				TypecheckExpression(ctx, env, logicalEnv, octosql.Boolean, or.right),
 			},
 		},
 	}
 }
 
-func TypecheckExpression(ctx context.Context, env physical.Environment, state physical.State, expected octosql.Type, expression Expression) physical.Expression {
-	expr := expression.Typecheck(ctx, env, state)
+func TypecheckExpression(ctx context.Context, env physical.Environment, logicalEnv Environment, expected octosql.Type, expression Expression) physical.Expression {
+	expr := expression.Typecheck(ctx, env, logicalEnv)
 	rel := expr.Type.Is(expected)
 	if rel == octosql.TypeRelationIsnt {
 		panic(fmt.Errorf("expected %s, got %s", expected, expr.Type))

@@ -21,10 +21,10 @@ func NewFunctionExpression(name string, args []Expression) *FunctionExpression {
 	}
 }
 
-func (fe *FunctionExpression) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Expression {
+func (fe *FunctionExpression) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
 	arguments := make([]physical.Expression, len(fe.arguments))
 	for i := range fe.arguments {
-		arguments[i] = fe.arguments[i].Typecheck(ctx, env, state)
+		arguments[i] = fe.arguments[i].Typecheck(ctx, env, logicalEnv)
 	}
 
 	descriptors := env.Functions[fe.name]

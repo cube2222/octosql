@@ -14,7 +14,7 @@ func NewUnionDistinct(first, second Node) *UnionDistinct {
 	return &UnionDistinct{first: first, second: second}
 }
 
-func (node *UnionDistinct) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node {
+func (node *UnionDistinct) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
 	panic("implement me")
 	// return NewDistinct(NewUnionAll(node.first, node.second)).Physical(ctx, physicalCreator)
 }

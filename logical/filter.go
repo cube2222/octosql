@@ -16,12 +16,12 @@ func NewFilter(predicate Expression, child Node) *Filter {
 	return &Filter{predicate: predicate, source: child}
 }
 
-func (node *Filter) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node {
-	source := node.source.Typecheck(ctx, env, state)
+func (node *Filter) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
+	source := node.source.Typecheck(ctx, env, logicalEnv)
 	predicate := TypecheckExpression(
 		ctx,
 		env.WithRecordSchema(source.Schema),
-		state,
+		logicalEnv,
 		octosql.Boolean,
 		node.predicate,
 	)

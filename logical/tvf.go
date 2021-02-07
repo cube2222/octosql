@@ -71,7 +71,7 @@ func NewTableValuedFunction(name string, arguments map[string]TableValuedFunctio
 	return &TableValuedFunction{name: name, arguments: arguments}
 }
 
-func (node *TableValuedFunction) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node {
+func (node *TableValuedFunction) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
 	panic("implement me")
 	// variables := octosql.NoVariables()
 	//

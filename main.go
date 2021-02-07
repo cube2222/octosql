@@ -11,6 +11,7 @@ import (
 	"github.com/cube2222/octosql/datasources/json"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/functions"
+	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/parser"
 	"github.com/cube2222/octosql/parser/sqlparser"
 	"github.com/cube2222/octosql/physical"
@@ -21,7 +22,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	logicalPlan, err := parser.ParseSelect(statement.(*sqlparser.Select))
+	logicalPlan, err := parser.ParseNode(statement.(sqlparser.SelectStatement))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -44,7 +45,9 @@ func main() {
 	physicalPlan := logicalPlan.Typecheck(
 		context.Background(),
 		env,
-		physical.State{},
+		logical.Environment{
+			CommonTableExpressions: map[string]physical.Node{},
+		},
 	)
 	spew.Dump(physicalPlan.Schema)
 	executionPlan, err := physicalPlan.Materialize(

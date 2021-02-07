@@ -165,7 +165,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 				} else if namer, ok := key[i].(logical.FieldNamer); ok {
 					name = getUniqueName(namer.FieldName())
 				} else {
-					name = fmt.Sprintf("key_%d", keyPart[i])
+					name = getUniqueName(fmt.Sprintf("key_%d", keyPart[i]))
 				}
 				outputExprs[i] = logical.NewVariable(name)
 				keyFieldNames = append(keyFieldNames, name)

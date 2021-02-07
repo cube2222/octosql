@@ -7,7 +7,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/segmentio/encoding/json"
 
 	"github.com/cube2222/octosql/execution"
@@ -37,7 +36,6 @@ func Creator(name string) (physical.DatasourceImplementation, error) {
 
 		for k := range msg {
 			value := msg[k]
-			spew.Dump(value)
 			switch value := value.(type) {
 			case int:
 				if t, ok := fields[k]; !ok {

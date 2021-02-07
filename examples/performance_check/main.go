@@ -6,9 +6,9 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/cube2222/octosql/aggregates"
 	"github.com/cube2222/octosql/datasources/json"
 	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/execution/aggregates"
 	"github.com/cube2222/octosql/execution/nodes"
 )
 

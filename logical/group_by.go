@@ -112,7 +112,7 @@ aggregateLoop:
 				continue aggregateLoop
 			}
 		}
-		panic(fmt.Sprintf("no such aggregate: %s(%s)", aggname, expressions[i].Type))
+		panic(fmt.Sprintf("unknown aggregate: %s(%s)", aggname, expressions[i].Type))
 	}
 
 	triggers := make([]physical.Trigger, len(node.triggers))

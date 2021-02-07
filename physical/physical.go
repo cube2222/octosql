@@ -11,9 +11,9 @@ import (
 )
 
 type Environment struct {
-	Aggregates  map[string][]AggregateDescriptor
-	Datasources *DatasourceRepository
-	// Functions       *FunctionRepository
+	Aggregates      map[string][]AggregateDescriptor
+	Datasources     *DatasourceRepository
+	Functions       map[string][]FunctionDescriptor
 	PhysicalConfig  map[string]interface{}
 	VariableContext *VariableContext
 }
@@ -64,18 +64,10 @@ type DatasourceImplementation interface {
 	// TODO: Function checking for push-down
 }
 
-type FunctionRepository struct {
-	FunctionOverloads map[string][]struct {
-		ArgTypes []octosql.Type
-		FunctionDescriptor
-	}
-}
-
-func (fr *FunctionRepository) GetFunction(name string, arguments []octosql.Type) (FunctionDescriptor, error) {
-	panic("implement me")
-}
-
-type FunctionDescriptor interface {
+type FunctionDescriptor struct {
+	ArgumentTypes []octosql.Type
+	OutputType    octosql.Type
+	Function      func([]octosql.Value) (octosql.Value, error)
 }
 
 type State struct {

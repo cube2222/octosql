@@ -167,7 +167,81 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (execution.N
 
 		return nodes.NewGroupBy(aggregates, expressions, key, source, trigger), nil
 	case NodeTypeJoin:
-		panic("implement me")
+		left, err := node.Join.Left.Materialize(ctx, env)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't materialize left join source: %w", err)
+		}
+		right, err := node.Join.Right.Materialize(ctx, env)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't materialize right join source: %w", err)
+		}
+
+		// TODO: Move to physical.Join
+		parts := node.Join.On.SplitByAnd()
+		leftKey := make([]Expression, len(parts))
+		rightKey := make([]Expression, len(parts))
+		for i, part := range parts {
+			if part.ExpressionType != ExpressionTypeFunctionCall {
+				panic("only equality joins currently supported")
+			}
+			if part.FunctionCall.Name != "=" {
+				panic("only equality joins currently supported")
+			}
+			firstPart := part.FunctionCall.Arguments[0]
+			secondPart := part.FunctionCall.Arguments[1]
+			// TODO: Move ambiguity errors to typecheck phase.
+			firstPartVariables := firstPart.VariablesUsed()
+			firstPartUsesLeft, firstPartUsesRight, err := usesVariablesFromLeftOrRight(node.Join.Left.Schema, node.Join.Right.Schema, firstPartVariables)
+			if err != nil {
+				return nil, err
+			}
+			secondPartVariables := secondPart.VariablesUsed()
+			secondPartUsesLeft, secondPartUsesRight, err := usesVariablesFromLeftOrRight(node.Join.Left.Schema, node.Join.Right.Schema, secondPartVariables)
+			if err != nil {
+				return nil, err
+			}
+
+			if firstPartUsesLeft && firstPartUsesRight {
+				return nil, fmt.Errorf("left hand side of %d join predicate equality uses variables from both input tables", i)
+			}
+			if secondPartUsesLeft && secondPartUsesRight {
+				return nil, fmt.Errorf("right hand side of %d join predicate equality uses variables from both input tables", i)
+			}
+
+			if firstPartUsesLeft && secondPartUsesLeft {
+				return nil, fmt.Errorf("both side of %d join predicate equality use variables from the left input table", i)
+			}
+			if firstPartUsesRight && secondPartUsesRight {
+				return nil, fmt.Errorf("both side of %d join predicate equality use variables from the right input table", i)
+			}
+
+			if firstPartUsesLeft && secondPartUsesRight {
+				leftKey[i] = firstPart
+				rightKey[i] = secondPart
+			} else if firstPartUsesRight && secondPartUsesLeft {
+				leftKey[i] = secondPart
+				rightKey[i] = firstPart
+			}
+		}
+
+		leftKeyExprs := make([]execution.Expression, len(leftKey))
+		for i := range leftKey {
+			expr, err := leftKey[i].Materialize(ctx, env.WithRecordSchema(node.Join.Left.Schema))
+			if err != nil {
+				return nil, fmt.Errorf("couldn't materialize stream join left key expression with index %d: %w", i, err)
+			}
+			leftKeyExprs[i] = expr
+		}
+		rightKeyExprs := make([]execution.Expression, len(rightKey))
+		for i := range rightKey {
+			expr, err := rightKey[i].Materialize(ctx, env.WithRecordSchema(node.Join.Right.Schema))
+			if err != nil {
+				return nil, fmt.Errorf("couldn't materialize stream join right key expression with index %d: %w", i, err)
+			}
+			rightKeyExprs[i] = expr
+		}
+
+		return nodes.NewStreamJoin(left, right, leftKeyExprs, rightKeyExprs), nil
 	case NodeTypeMap:
 		source, err := node.Map.Source.Materialize(ctx, env)
 		if err != nil {
@@ -190,5 +264,29 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (execution.N
 		panic("implement me")
 	}
 
-	panic("unexhaustive node type match")
+	panic(fmt.Sprintf("unexhaustive node type match: %d", node.NodeType))
+}
+
+func usesVariablesFromLeftOrRight(left, right Schema, variables []string) (usesLeft bool, usesRight bool, err error) {
+	for _, name := range variables {
+		var matchedLeft, matchedRight bool
+		for _, field := range left.Fields {
+			if VariableNameMatchesField(name, field.Name) {
+				usesLeft = true
+				matchedLeft = true
+				break
+			}
+		}
+		for _, field := range right.Fields {
+			if VariableNameMatchesField(name, field.Name) {
+				usesRight = true
+				matchedRight = true
+				break
+			}
+		}
+		if matchedLeft && matchedRight {
+			return false, false, fmt.Errorf("ambiguous variable name in join predicate: %s", name)
+		}
+	}
+	return
 }

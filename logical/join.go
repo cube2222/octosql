@@ -20,15 +20,17 @@ const (
 type Join struct {
 	left, right Node
 	predicate   Expression
-	joinType    JoinType
-	triggers    []Trigger
+	// TODO: Handle other join types.
+	joinType JoinType
+	triggers []Trigger
 }
 
 func NewJoin(left, right Node, predicate Expression, joinType JoinType) *Join {
 	return &Join{
-		left:     left,
-		right:    right,
-		joinType: joinType,
+		left:      left,
+		right:     right,
+		predicate: predicate,
+		joinType:  joinType,
 	}
 }
 
@@ -37,16 +39,17 @@ func (node *Join) Typecheck(ctx context.Context, env physical.Environment, state
 	right := node.right.Typecheck(ctx, env, state)
 	predicate := node.predicate.Typecheck(ctx, env.WithRecordSchema(left.Schema).WithRecordSchema(right.Schema), state)
 
-	parts := predicate.SplitByAnd()
-	for _, part := range parts {
-		if part.ExpressionType != physical.ExpressionTypeFunctionCall {
-			panic("only equality joins currently supported")
-		}
-		if part.FunctionCall.Name != "=" {
-			panic("only equality joins currently supported")
-		}
+	return physical.Node{
+		Schema: physical.Schema{
+			Fields: append(left.Schema.Fields[:len(left.Schema.Fields):len(left.Schema.Fields)], right.Schema.Fields[:len(right.Schema.Fields):len(right.Schema.Fields)]...),
+		}, // TODO
+		NodeType: physical.NodeTypeJoin,
+		Join: &physical.Join{
+			Left:  left,
+			Right: right,
+			On:    predicate,
+		},
 	}
-	panic("implement me")
 
 	//
 	// // Based on the cardinality of sources we decide whether we will create a stream_join or a lookup_join

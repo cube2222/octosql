@@ -3,7 +3,6 @@ package logical
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
@@ -102,19 +101,7 @@ func (v *Variable) Typecheck(ctx context.Context, env physical.Environment, stat
 	isLevel0 := true
 	for varCtx := env.VariableContext; varCtx != nil; varCtx = varCtx.Parent {
 		for _, field := range varCtx.Fields {
-			if field.Name == v.name {
-				return physical.Expression{
-					Type:           field.Type,
-					ExpressionType: physical.ExpressionTypeVariable,
-					Variable: &physical.Variable{
-						Name:     v.name,
-						IsLevel0: isLevel0,
-					},
-				}
-			} else if !strings.Contains(v.name, ".") &&
-				strings.Contains(field.Name, ".") &&
-				field.Name[strings.Index(field.Name, ".")+1:] == v.name {
-
+			if physical.VariableNameMatchesField(v.name, field.Name) {
 				return physical.Expression{
 					Type:           field.Type,
 					ExpressionType: physical.ExpressionTypeVariable,

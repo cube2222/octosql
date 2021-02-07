@@ -68,13 +68,7 @@ func (expr *Expression) Materialize(ctx context.Context, env Environment) (execu
 	ctxLoop:
 		for varCtx := env.VariableContext; varCtx != nil; varCtx = varCtx.Parent {
 			for i, field := range varCtx.Fields {
-				if field.Name == expr.Variable.Name {
-					index = i
-					break ctxLoop
-				} else if !strings.Contains(expr.Variable.Name, ".") &&
-					strings.Contains(field.Name, ".") &&
-					field.Name[strings.Index(field.Name, ".")+1:] == expr.Variable.Name {
-
+				if VariableNameMatchesField(expr.Variable.Name, field.Name) {
 					index = i
 					break ctxLoop
 				}
@@ -119,6 +113,18 @@ func (expr *Expression) Materialize(ctx context.Context, env Environment) (execu
 	panic("unexhaustive expression type match")
 }
 
+func VariableNameMatchesField(varName, fieldName string) bool {
+	if varName == fieldName {
+		return true
+	}
+	if !strings.Contains(varName, ".") &&
+		strings.Contains(fieldName, ".") &&
+		fieldName[strings.Index(fieldName, ".")+1:] == varName {
+		return true
+	}
+	return false
+}
+
 func (expr Expression) SplitByAnd() []Expression {
 	if expr.ExpressionType != ExpressionTypeAnd {
 		return []Expression{expr}
@@ -128,4 +134,45 @@ func (expr Expression) SplitByAnd() []Expression {
 		parts = append(parts, arg.SplitByAnd()...)
 	}
 	return parts
+}
+
+func (expr Expression) VariablesUsed() []string {
+	acc := make(map[string]struct{})
+	expr.variablesUsed(acc)
+
+	var out []string
+	for k := range acc {
+		out = append(out, k)
+	}
+	return out
+}
+
+func (expr Expression) variablesUsed(acc map[string]struct{}) {
+	switch expr.ExpressionType {
+	case ExpressionTypeVariable:
+		acc[expr.Variable.Name] = struct{}{}
+		return
+	case ExpressionTypeConstant:
+		return
+	case ExpressionTypeFunctionCall:
+		for _, arg := range expr.FunctionCall.Arguments {
+			arg.variablesUsed(acc)
+		}
+		return
+	case ExpressionTypeAnd:
+		for _, arg := range expr.And.Arguments {
+			arg.variablesUsed(acc)
+		}
+		return
+	case ExpressionTypeOr:
+		for _, arg := range expr.Or.Arguments {
+			arg.variablesUsed(acc)
+		}
+		return
+	case ExpressionTypeTypeAssertion:
+		expr.TypeAssertion.Expression.variablesUsed(acc)
+		return
+	}
+
+	panic("unexhaustive expression type match")
 }

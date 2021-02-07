@@ -3,19 +3,24 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 
 	"github.com/davecgh/go-spew/spew"
 
+	"github.com/cube2222/octosql/aggregates"
 	"github.com/cube2222/octosql/datasources/json"
 	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/execution/aggregates"
+	"github.com/cube2222/octosql/functions"
 	"github.com/cube2222/octosql/parser"
 	"github.com/cube2222/octosql/parser/sqlparser"
 	"github.com/cube2222/octosql/physical"
 )
 
 func main() {
+	go http.ListenAndServe(":4000", nil)
+
 	statement, err := sqlparser.Parse(os.Args[1])
 	if err != nil {
 		log.Fatal(err)
@@ -24,36 +29,31 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	env := physical.Environment{
+		Aggregates: map[string][]physical.AggregateDescriptor{
+			"count": aggregates.CountOverloads,
+		},
+		Functions: map[string][]physical.FunctionDescriptor{
+			"=": functions.Equals,
+		},
+		Datasources: &physical.DatasourceRepository{
+			Datasources: map[string]func(name string) (physical.DatasourceImplementation, error){
+				"json": json.Creator,
+			},
+		},
+		PhysicalConfig:  nil,
+		VariableContext: nil,
+	}
 	// TODO: Wrap panics into errors in subfunction.
 	physicalPlan := logicalPlan.Typecheck(
 		context.Background(),
-		physical.Environment{
-			Aggregates: map[string][]physical.AggregateDescriptor{
-				"count": aggregates.CountOverloads,
-			},
-			Datasources: &physical.DatasourceRepository{
-				Datasources: map[string]func(name string) (physical.DatasourceImplementation, error){
-					"json": json.Creator,
-				},
-			},
-			PhysicalConfig:  nil,
-			VariableContext: nil,
-		},
+		env,
 		physical.State{},
 	)
 	spew.Dump(physicalPlan.Schema)
 	executionPlan, err := physicalPlan.Materialize(
 		context.Background(),
-		physical.Environment{
-			Aggregates: nil,
-			Datasources: &physical.DatasourceRepository{
-				Datasources: map[string]func(name string) (physical.DatasourceImplementation, error){
-					"json": json.Creator,
-				},
-			},
-			PhysicalConfig:  nil,
-			VariableContext: nil,
-		},
+		env,
 	)
 	if err != nil {
 		log.Fatal(err)

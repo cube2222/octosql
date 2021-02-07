@@ -44,8 +44,8 @@ type DataSource struct {
 	alias string
 }
 
-func NewDataSource(name string, alias string) *DataSource {
-	return &DataSource{name: name, alias: alias}
+func NewDataSource(name string) *DataSource {
+	return &DataSource{name: name}
 }
 
 func (ds *DataSource) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node {

@@ -22,12 +22,14 @@ var qualifiedNameRegexp = regexp.MustCompile(`^[^.]+\..+$`)
 
 func (node *Requalifier) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node {
 	source := node.source.Typecheck(ctx, env, state)
-	outFields := make([]physical.SchemaField, source.NodeType)
+	outFields := make([]physical.SchemaField, len(source.Schema.Fields))
 	for i, field := range source.Schema.Fields {
 		name := field.Name
 		if qualifiedNameRegexp.MatchString(name) {
 			dotIndex := strings.Index(name, ".")
 			name = fmt.Sprintf("%s.%s", node.qualifier, name[dotIndex+1:])
+		} else {
+			name = fmt.Sprintf("%s.%s", node.qualifier, name)
 		}
 		outFields[i] = physical.SchemaField{
 			Name: name,

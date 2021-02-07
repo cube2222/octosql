@@ -296,7 +296,11 @@ func ParseAliasedTableExpression(expr *sqlparser.AliasedTableExpr) (logical.Node
 		if !subExpr.Qualifier.IsEmpty() {
 			name = fmt.Sprintf("%s.%s", subExpr.Qualifier.String(), name)
 		}
-		return logical.NewDataSource(name, expr.As.String()), nil
+		var out logical.Node = logical.NewDataSource(name)
+		if !expr.As.IsEmpty() {
+			out = logical.NewRequalifier(expr.As.String(), out)
+		}
+		return out, nil
 
 	case *sqlparser.Subquery:
 		subQuery, err := ParseNode(subExpr.Select)

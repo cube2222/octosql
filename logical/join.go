@@ -18,36 +18,36 @@ const (
 )
 
 type Join struct {
-	source   Node
-	joined   Node
-	joinType JoinType
-	triggers []Trigger
+	left, right Node
+	predicate   Expression
+	joinType    JoinType
+	triggers    []Trigger
 }
 
-func NewJoin(source, joined Node, joinType JoinType) *Join {
+func NewJoin(left, right Node, predicate Expression, joinType JoinType) *Join {
 	return &Join{
-		source:   source,
-		joined:   joined,
+		left:     left,
+		right:    right,
 		joinType: joinType,
 	}
 }
 
 func (node *Join) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node {
+	left := node.left.Typecheck(ctx, env, state)
+	right := node.right.Typecheck(ctx, env, state)
+	predicate := node.predicate.Typecheck(ctx, env.WithRecordSchema(left.Schema).WithRecordSchema(right.Schema), state)
+
+	parts := predicate.SplitByAnd()
+	for _, part := range parts {
+		if part.ExpressionType != physical.ExpressionTypeFunctionCall {
+			panic("only equality joins currently supported")
+		}
+		if part.FunctionCall.Name != "=" {
+			panic("only equality joins currently supported")
+		}
+	}
 	panic("implement me")
-	// sourceNodes, sourceVariables, err := node.source.Physical(ctx, physicalCreator)
-	// if err != nil {
-	// 	return nil, nil, errors.Wrap(err, "couldn't get physical plan for join source nodes")
-	// }
-	//
-	// joinedNodes, joinedVariables, err := node.joined.Physical(ctx, physicalCreator)
-	// if err != nil {
-	// 	return nil, nil, errors.Wrap(err, "couldn't get physical plan for left join joined nodes")
-	// }
-	//
-	// variables, err := sourceVariables.MergeWith(joinedVariables)
-	// if err != nil {
-	// 	return nil, nil, errors.Wrap(err, "couldn't merge variables for source and joined nodes")
-	// }
+
 	//
 	// // Based on the cardinality of sources we decide whether we will create a stream_join or a lookup_join
 	// // Stream joins support only equity conjunctions (i.e a.x = b.y AND a.v + 17 = b.something * 2)
@@ -101,10 +101,10 @@ func (node *Join) Typecheck(ctx context.Context, env physical.Environment, state
 
 // func (node *Join) physicalStreamJoin(ctx context.Context, physicalCreator *PhysicalPlanCreator, variables octosql.Variables, sourceNodes, joinedNodes []physical.Node) ([]physical.Node, octosql.Variables, error) {
 // 	var formula physical.Formula
-// 	// If the joined node is a formula, it means there are some conditions in the ON part of the join
-// 	// (otherwise it's just two nodes). We take the formula from the filter to create the key, and set the joined node
-// 	// as the source of the filter (basically we get rid of the formula node-wise, create key expressions for it,
-// 	// and the sources are the source and the source of the filter)
+// 	// If the right node is a formula, it means there are some conditions in the ON part of the join
+// 	// (otherwise it's just two nodes). We take the formula from the filter to create the key, and set the right node
+// 	// as the left of the filter (basically we get rid of the formula node-wise, create key expressions for it,
+// 	// and the sources are the left and the left of the filter)
 // 	if filter, ok := joinedNodes[0].(*physical.Filter); ok {
 // 		formula = filter.Formula
 // 		for i := range joinedNodes {
@@ -120,13 +120,13 @@ func (node *Join) Typecheck(ctx context.Context, env physical.Environment, state
 // 		return nil, nil, ErrFallbackToLookupJoin
 // 	}
 //
-// 	// Create necessary namespaces of source and joined
+// 	// Create necessary namespaces of left and right
 // 	sourceNamespace := sourceNodes[0].Metadata().Namespace() // TODO: should these be merged with variables
 // 	joinedNamespace := joinedNodes[0].Metadata().Namespace()
 // 	eventTimeField := sourceNodes[0].Metadata().EventTimeField()
 //
 // 	// Create the appropriate keys from the formula. Basically how it works is it goes through predicates i.e a.x = b.y
-// 	// and then decides whether a.x forms part of source or joined and then adds it to the appropriate key.
+// 	// and then decides whether a.x forms part of left or right and then adds it to the appropriate key.
 // 	sourceKey, joinedKey, err := getKeysFromFormula(formula, sourceNamespace, joinedNamespace)
 // 	if err != nil {
 // 		return nil, nil, errors.Wrap(err, "couldn't create keys from join formula")
@@ -218,24 +218,24 @@ func (node *Join) Typecheck(ctx context.Context, env physical.Environment, state
 // 		} else if !doesLeftMatchSource && !doesRightMatchSource {
 // 			return nil, nil, errors.New("neither side of predicate matches sources namespace")
 // 		} else if !doesLeftMatchJoined && !doesRightMatchJoined {
-// 			return nil, nil, errors.New("neither side of predicate matches joined sources namespace")
+// 			return nil, nil, errors.New("neither side of predicate matches right sources namespace")
 // 		}
 //
 // 		// Now we want to decide which part of the predicate belong to which key
 // 		if !doesLeftMatchSource {
-// 			// If left doesn't match source, then right surely does and also left must match joined
+// 			// If left doesn't match left, then right surely does and also left must match right
 // 			sourceKey = append(sourceKey, rightExpression)
 // 			joinedKey = append(joinedKey, leftExpression)
 // 		} else if !doesLeftMatchJoined {
-// 			// Likewise if left doesn't match joined, then right surely does and also left must match source
+// 			// Likewise if left doesn't match right, then right surely does and also left must match left
 // 			sourceKey = append(sourceKey, leftExpression)
 // 			joinedKey = append(joinedKey, rightExpression)
 // 		} else if !doesRightMatchSource {
-// 			// Left matches both, but right doesn't match source, so right is joined, left is source
+// 			// Left matches both, but right doesn't match left, so right is right, left is left
 // 			sourceKey = append(sourceKey, leftExpression)
 // 			joinedKey = append(joinedKey, rightExpression)
 // 		} else {
-// 			// Left matches both, and right matches source, so right is source, left is joined
+// 			// Left matches both, and right matches left, so right is left, left is right
 // 			sourceKey = append(sourceKey, rightExpression)
 // 			joinedKey = append(joinedKey, leftExpression)
 // 		}
@@ -246,8 +246,8 @@ func (node *Join) Typecheck(ctx context.Context, env physical.Environment, state
 //
 // func (node *Join) WithTriggers(triggers []Trigger) *Join {
 // 	return &Join{
-// 		source:   node.source,
-// 		joined:   node.joined,
+// 		left:   node.left,
+// 		right:   node.right,
 // 		joinType: node.joinType,
 // 		triggers: triggers,
 // 	}

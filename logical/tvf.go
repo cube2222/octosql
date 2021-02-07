@@ -37,7 +37,7 @@ func NewTableValuedFunctionArgumentValueTable(source Node) *TableValuedFunctionA
 
 func (arg *TableValuedFunctionArgumentValueTable) Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.TableValuedFunctionArgument, error) {
 	panic("implement me")
-	// sourceNodes, variables, err := arg.source.Physical(ctx, physicalCreator)
+	// sourceNodes, variables, err := arg.left.Physical(ctx, physicalCreator)
 	// if err != nil {
 	// 	return nil, nil, errors.Wrap(err, "couldn't get physical node")
 	// }
@@ -96,7 +96,7 @@ func (node *TableValuedFunction) Typecheck(ctx context.Context, env physical.Env
 	// 	physArguments[k] = physArg
 	// }
 	//
-	// // We only want one source node with multiple partitions for a table valued function, otherwise partitioning gets nasty.
+	// // We only want one left node with multiple partitions for a table valued function, otherwise partitioning gets nasty.
 	// // So we find it here if it exists.
 	// multipartitionCount := 0
 	// multipartitionArgumentName := octosql.NewVariableName("")
@@ -109,7 +109,7 @@ func (node *TableValuedFunction) Typecheck(ctx context.Context, env physical.Env
 	//
 	// // If there is more that one multipartition stream input, we error.
 	// if multipartitionCount > 1 {
-	// 	return nil, octosql.NoVariables(), errors.Errorf("only one source node with multiple partitions allowed for table valued function, got %d", multipartitionCount)
+	// 	return nil, octosql.NoVariables(), errors.Errorf("only one left node with multiple partitions allowed for table valued function, got %d", multipartitionCount)
 	// }
 	//
 	// // If there are no multipartition input streams, we return a single partition.

@@ -3,6 +3,7 @@ package physical
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
@@ -70,6 +71,12 @@ func (expr *Expression) Materialize(ctx context.Context, env Environment) (execu
 				if field.Name == expr.Variable.Name {
 					index = i
 					break ctxLoop
+				} else if !strings.Contains(expr.Variable.Name, ".") &&
+					strings.Contains(field.Name, ".") &&
+					field.Name[strings.Index(field.Name, ".")+1:] == expr.Variable.Name {
+
+					index = i
+					break ctxLoop
 				}
 			}
 			level++
@@ -110,4 +117,15 @@ func (expr *Expression) Materialize(ctx context.Context, env Environment) (execu
 	}
 
 	panic("unexhaustive expression type match")
+}
+
+func (expr Expression) SplitByAnd() []Expression {
+	if expr.ExpressionType != ExpressionTypeAnd {
+		return []Expression{expr}
+	}
+	var parts []Expression
+	for _, arg := range expr.And.Arguments {
+		parts = append(parts, arg.SplitByAnd()...)
+	}
+	return parts
 }

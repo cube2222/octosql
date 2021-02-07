@@ -299,6 +299,9 @@ func ParseAliasedTableExpression(expr *sqlparser.AliasedTableExpr) (logical.Node
 		var out logical.Node = logical.NewDataSource(name)
 		if !expr.As.IsEmpty() {
 			out = logical.NewRequalifier(expr.As.String(), out)
+		} else {
+			alias := strings.TrimSuffix(name, ".json")
+			out = logical.NewRequalifier(alias, out)
 		}
 		return out, nil
 
@@ -336,20 +339,19 @@ func ParseJoinTableExpression(expr *sqlparser.JoinTableExpr) (logical.Node, erro
 		return nil, errors.Errorf("invalid join expression: %v", expr.Join)
 	}
 
+	var predicate logical.Expression = logical.NewConstant(octosql.NewBoolean(true))
 	if expr.Condition.On != nil {
-		condition, err := ParseExpression(expr.Condition.On)
+		predicate, err = ParseExpression(expr.Condition.On)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't parse ON condition in join")
+			return nil, errors.Wrap(err, "couldn't parse ON predicate in join")
 		}
-
-		joined = logical.NewFilter(condition, joined)
 	}
 
 	switch expr.Join {
 	case sqlparser.LeftJoinStr, sqlparser.RightJoinStr:
-		return logical.NewJoin(source, joined, logical.JoinTypeLeft), nil
+		return logical.NewJoin(source, joined, predicate, logical.JoinTypeLeft), nil
 	case sqlparser.JoinStr:
-		return logical.NewJoin(source, joined, logical.JoinTypeInner), nil
+		return logical.NewJoin(source, joined, predicate, logical.JoinTypeInner), nil
 	default:
 		return nil, errors.Errorf("invalid join expression: %v", expr.Join)
 	}

@@ -15,8 +15,8 @@ package logical
 // 					return errors.Wrapf(err, "cte nodes with index %d not equal: %+v, %+v", i, node1.cteNodes[i], node2.cteNodes[i])
 // 				}
 // 			}
-// 			if err := EqualNodes(node1.source, node2.source); err != nil {
-// 				return errors.Wrapf(err, "source node not equal: %+v, %+v", node1.source, node2.source)
+// 			if err := EqualNodes(node1.left, node2.left); err != nil {
+// 				return errors.Wrapf(err, "left node not equal: %+v, %+v", node1.left, node2.left)
 // 			}
 // 			return nil
 // 		}
@@ -53,7 +53,7 @@ package logical
 // 					return errors.Wrapf(err, "expression %v not equal", i)
 // 				}
 // 			}
-// 			if err := EqualNodes(node1.source, node2.source); err != nil {
+// 			if err := EqualNodes(node1.left, node2.left); err != nil {
 // 				return errors.Wrap(err, "sources not equal")
 // 			}
 //
@@ -69,7 +69,7 @@ package logical
 // 			if err := EqualFormula(node1.formula, node2.formula); err != nil {
 // 				return errors.Wrap(err, "formulas not equal")
 // 			}
-// 			if err := EqualNodes(node1.source, node2.source); err != nil {
+// 			if err := EqualNodes(node1.left, node2.left); err != nil {
 // 				return errors.Wrap(err, "sources not equal")
 // 			}
 // 			return nil
@@ -80,7 +80,7 @@ package logical
 // 			if node1.qualifier != node2.qualifier {
 // 				return fmt.Errorf("qualifiers not equal: %v, %v", node1.qualifier, node2.qualifier)
 // 			}
-// 			if err := EqualNodes(node1.source, node2.source); err != nil {
+// 			if err := EqualNodes(node1.left, node2.left); err != nil {
 // 				return errors.Wrap(err, "sources not qual")
 // 			}
 // 			return nil
@@ -107,11 +107,11 @@ package logical
 //
 // 	case *Join:
 // 		if node2, ok := node2.(*Join); ok {
-// 			if err := EqualNodes(node1.source, node2.source); err != nil {
-// 				return errors.Wrap(err, "source nodes underneath not equal")
+// 			if err := EqualNodes(node1.left, node2.left); err != nil {
+// 				return errors.Wrap(err, "left nodes underneath not equal")
 // 			}
-// 			if err := EqualNodes(node1.joined, node2.joined); err != nil {
-// 				return errors.Wrap(err, "joined nodes underneath not equal")
+// 			if err := EqualNodes(node1.right, node2.right); err != nil {
+// 				return errors.Wrap(err, "right nodes underneath not equal")
 // 			}
 //
 // 			if node1.joinType != node2.joinType {
@@ -123,7 +123,7 @@ package logical
 //
 // 	case *GroupBy:
 // 		if node2, ok := node2.(*GroupBy); ok {
-// 			if err := EqualNodes(node1.source, node2.source); err != nil {
+// 			if err := EqualNodes(node1.left, node2.left); err != nil {
 // 				return errors.Wrap(err, "sources not equal")
 // 			}
 //
@@ -332,7 +332,7 @@ func EqualExpressions(expr1, expr2 Expression) bool {
 //
 // 	case *TableValuedFunctionArgumentValueTable:
 // 		if value2, ok := value2.(*TableValuedFunctionArgumentValueTable); ok {
-// 			if err := EqualNodes(value1.source, value2.source); err != nil {
+// 			if err := EqualNodes(value1.left, value2.left); err != nil {
 // 				return errors.Wrap(err, "sources not equal")
 // 			}
 // 			return nil

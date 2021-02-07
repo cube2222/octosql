@@ -43,15 +43,15 @@ func (node *With) Typecheck(ctx context.Context, env physical.Environment, state
 	// 	*physicalCreator = *physicalCreator.WithCommonTableExpression(node.cteNames[i], physicalNode)
 	// }
 	//
-	// source, childVariables, err := node.source.Physical(ctx, physicalCreator)
+	// left, childVariables, err := node.left.Physical(ctx, physicalCreator)
 	// if err != nil {
-	// 	return nil, nil, errors.Wrap(err, "couldn't get physical plan for with source node")
+	// 	return nil, nil, errors.Wrap(err, "couldn't get physical plan for with left node")
 	// }
 	//
 	// variables, err = childVariables.MergeWith(variables)
 	// if err != nil {
-	// 	return nil, nil, errors.Wrap(err, "couldn't merge variables for with source")
+	// 	return nil, nil, errors.Wrap(err, "couldn't merge variables for with left")
 	// }
 	//
-	// return source, variables, nil
+	// return left, variables, nil
 }

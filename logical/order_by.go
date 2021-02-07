@@ -24,9 +24,9 @@ func NewOrderBy(expressions []Expression, directions []OrderDirection, source No
 
 func (node *OrderBy) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node {
 	panic("implement me")
-	// 	sourceNodes, variables, err := node.source.Physical(ctx, physicalCreator)
+	// 	sourceNodes, variables, err := node.left.Physical(ctx, physicalCreator)
 	// 	if err != nil {
-	// 		return nil, nil, errors.Wrap(err, "couldn't get physical plan of source nodes in order by")
+	// 		return nil, nil, errors.Wrap(err, "couldn't get physical plan of left nodes in order by")
 	// 	}
 	//
 	// 	expressions := make([]physical.Expression, len(node.expressions))
@@ -55,7 +55,7 @@ func (node *OrderBy) Typecheck(ctx context.Context, env physical.Environment, st
 	// 		}
 	// 	}
 	//
-	// 	// OrderBy operates on a single, joined stream.
+	// 	// OrderBy operates on a single, right stream.
 	// 	outNodes := physical.NewShuffle(1, physical.NewConstantStrategy(0), sourceNodes)
 	//
 	// 	return []physical.Node{physical.NewOrderBy(expressions, directions, outNodes[0])}, variables, nil

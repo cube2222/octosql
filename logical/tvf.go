@@ -2,13 +2,16 @@ package logical
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
+	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
 
 type TableValuedFunctionArgumentValue interface {
 	iTableValuedFunctionArgumentValue()
-	Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.TableValuedFunctionArgument, error)
+	Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.TableValuedFunctionArgument
 }
 
 func (*TableValuedFunctionArgumentValueExpression) iTableValuedFunctionArgumentValue() {}
@@ -23,8 +26,13 @@ func NewTableValuedFunctionArgumentValueExpression(expression Expression) *Table
 	return &TableValuedFunctionArgumentValueExpression{expression: expression}
 }
 
-func (arg *TableValuedFunctionArgumentValueExpression) Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.TableValuedFunctionArgument, error) {
-	panic("implement me")
+func (arg *TableValuedFunctionArgumentValueExpression) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.TableValuedFunctionArgument {
+	return physical.TableValuedFunctionArgument{
+		TableValuedFunctionArgumentType: physical.TableValuedFunctionArgumentTypeExpression,
+		Expression: &physical.TableValuedFunctionArgumentExpression{
+			Expression: arg.expression.Typecheck(ctx, env, logicalEnv),
+		},
+	}
 }
 
 type TableValuedFunctionArgumentValueTable struct {
@@ -35,19 +43,13 @@ func NewTableValuedFunctionArgumentValueTable(source Node) *TableValuedFunctionA
 	return &TableValuedFunctionArgumentValueTable{source: source}
 }
 
-func (arg *TableValuedFunctionArgumentValueTable) Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.TableValuedFunctionArgument, error) {
-	panic("implement me")
-	// sourceNodes, variables, err := arg.left.Physical(ctx, physicalCreator)
-	// if err != nil {
-	// 	return nil, nil, errors.Wrap(err, "couldn't get physical node")
-	// }
-	//
-	// outputArguments := make([]physical.TableValuedFunctionArgumentValue, len(sourceNodes))
-	// for i := range sourceNodes {
-	// 	outputArguments[i] = physical.NewTableValuedFunctionArgumentValueTable(sourceNodes[i])
-	// }
-	//
-	// return outputArguments, variables, nil
+func (arg *TableValuedFunctionArgumentValueTable) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.TableValuedFunctionArgument {
+	return physical.TableValuedFunctionArgument{
+		TableValuedFunctionArgumentType: physical.TableValuedFunctionArgumentTypeTable,
+		Table: &physical.TableValuedFunctionArgumentTable{
+			Table: arg.source.Typecheck(ctx, env, logicalEnv),
+		},
+	}
 }
 
 type TableValuedFunctionArgumentValueDescriptor struct {
@@ -58,8 +60,13 @@ func NewTableValuedFunctionArgumentValueDescriptor(descriptor string) *TableValu
 	return &TableValuedFunctionArgumentValueDescriptor{descriptor: descriptor}
 }
 
-func (arg *TableValuedFunctionArgumentValueDescriptor) Typecheck(ctx context.Context, env physical.Environment, state physical.State) (physical.TableValuedFunctionArgument, error) {
-	panic("implement me")
+func (arg *TableValuedFunctionArgumentValueDescriptor) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.TableValuedFunctionArgument {
+	return physical.TableValuedFunctionArgument{
+		TableValuedFunctionArgumentType: physical.TableValuedFunctionArgumentTypeDescriptor,
+		Descriptor: &physical.TableValuedFunctionArgumentDescriptor{
+			Descriptor: arg.descriptor,
+		},
+	}
 }
 
 type TableValuedFunction struct {
@@ -72,78 +79,95 @@ func NewTableValuedFunction(name string, arguments map[string]TableValuedFunctio
 }
 
 func (node *TableValuedFunction) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
-	panic("implement me")
-	// variables := octosql.NoVariables()
-	//
-	// physArguments := make(map[octosql.VariableName][]physical.TableValuedFunctionArgumentValue)
-	// for k, v := range node.arguments {
-	// 	physArg, argVariables, err := v.Physical(ctx, physicalCreator)
-	// 	if err != nil {
-	// 		return nil, nil, errors.Wrapf(
-	// 			err,
-	// 			"couldn't get physical plan for table valued function argument \"%s\"", k,
-	// 		)
-	// 	}
-	//
-	// 	variables, err = variables.MergeWith(argVariables)
-	// 	if err != nil {
-	// 		return nil, nil, errors.Wrapf(
-	// 			err,
-	// 			"couldn't merge variables with those of table valued function argument \"%s\"", k,
-	// 		)
-	// 	}
-	//
-	// 	physArguments[k] = physArg
-	// }
-	//
-	// // We only want one left node with multiple partitions for a table valued function, otherwise partitioning gets nasty.
-	// // So we find it here if it exists.
-	// multipartitionCount := 0
-	// multipartitionArgumentName := octosql.NewVariableName("")
-	// for arg, argValue := range physArguments {
-	// 	if len(argValue) > 1 {
-	// 		multipartitionArgumentName = arg
-	// 		multipartitionCount++
-	// 	}
-	// }
-	//
-	// // If there is more that one multipartition stream input, we error.
-	// if multipartitionCount > 1 {
-	// 	return nil, octosql.NoVariables(), errors.Errorf("only one left node with multiple partitions allowed for table valued function, got %d", multipartitionCount)
-	// }
-	//
-	// // If there are no multipartition input streams, we return a single partition.
-	// if multipartitionCount == 0 {
-	// 	singleArguments := make(map[octosql.VariableName]physical.TableValuedFunctionArgumentValue)
-	// 	for k, v := range physArguments {
-	// 		singleArguments[k] = v[0]
-	// 	}
-	//
-	// 	return []physical.Node{physical.NewTableValuedFunction(
-	// 		node.name,
-	// 		singleArguments,
-	// 	)}, variables, nil
-	// }
-	//
-	// // Otherwise we add one instance of this table valued function to each partition, and return the resulting partitions.
-	// multipartitionSourceNodes := physArguments[multipartitionArgumentName]
-	//
-	// outNodes := make([]physical.Node, len(multipartitionSourceNodes))
-	// for i, sourceNode := range physArguments[multipartitionArgumentName] {
-	// 	singleArguments := make(map[octosql.VariableName]physical.TableValuedFunctionArgumentValue)
-	// 	for k, v := range physArguments {
-	// 		if k == multipartitionArgumentName {
-	// 			continue
-	// 		}
-	// 		singleArguments[k] = v[0]
-	// 	}
-	// 	singleArguments[multipartitionArgumentName] = sourceNode
-	//
-	// 	outNodes[i] = physical.NewTableValuedFunction(
-	// 		node.name,
-	// 		singleArguments,
-	// 	)
-	// }
-	//
-	// return outNodes, variables, nil
+	arguments := map[string]physical.TableValuedFunctionArgument{}
+	for k, v := range node.arguments {
+		arguments[k] = v.Typecheck(ctx, env, logicalEnv)
+	}
+	descriptors := env.TableValuedFunctions[node.name]
+descriptorLoop:
+	for _, descriptor := range descriptors {
+		for name, arg := range descriptor.Arguments {
+			if arg.Required {
+				if _, ok := arguments[name]; !ok {
+					continue descriptorLoop
+				}
+			}
+		}
+		for name, arg := range arguments {
+			matcher, ok := descriptor.Arguments[name]
+			if !ok {
+				continue descriptorLoop
+			}
+			if arg.TableValuedFunctionArgumentType != matcher.TableValuedFunctionArgumentMatcherType {
+				continue descriptorLoop
+			}
+			switch arg.TableValuedFunctionArgumentType {
+			case physical.TableValuedFunctionArgumentTypeExpression:
+				if rel := arg.Expression.Expression.Type.Is(matcher.Expression.Type); rel < octosql.TypeRelationIs {
+					continue descriptorLoop
+				}
+			case physical.TableValuedFunctionArgumentTypeTable:
+			case physical.TableValuedFunctionArgumentTypeDescriptor:
+			}
+		}
+		outSchema, err := descriptor.OutputSchema(ctx, env, arguments)
+		if err != nil {
+			panic(err)
+		}
+		return physical.Node{
+			Schema:   outSchema,
+			NodeType: physical.NodeTypeTableValuedFunction,
+			TableValuedFunction: &physical.TableValuedFunction{
+				Name:               node.name,
+				Arguments:          arguments,
+				FunctionDescriptor: descriptor,
+			},
+		}
+	}
+descriptorLoop2:
+	for _, descriptor := range descriptors {
+		for name, arg := range descriptor.Arguments {
+			if arg.Required {
+				if _, ok := arguments[name]; !ok {
+					continue descriptorLoop2
+				}
+			}
+		}
+		for name, arg := range arguments {
+			matcher, ok := descriptor.Arguments[name]
+			if !ok {
+				continue descriptorLoop2
+			}
+			if arg.TableValuedFunctionArgumentType != matcher.TableValuedFunctionArgumentMatcherType {
+				continue descriptorLoop2
+			}
+			switch arg.TableValuedFunctionArgumentType {
+			case physical.TableValuedFunctionArgumentTypeExpression:
+				if rel := arg.Expression.Expression.Type.Is(matcher.Expression.Type); rel < octosql.TypeRelationMaybe {
+					continue descriptorLoop2
+				}
+			case physical.TableValuedFunctionArgumentTypeTable:
+			case physical.TableValuedFunctionArgumentTypeDescriptor:
+			}
+		}
+		outSchema, err := descriptor.OutputSchema(ctx, env, arguments)
+		if err != nil {
+			panic(err)
+		}
+		return physical.Node{
+			Schema:   outSchema,
+			NodeType: physical.NodeTypeTableValuedFunction,
+			TableValuedFunction: &physical.TableValuedFunction{
+				Name:               node.name,
+				Arguments:          arguments,
+				FunctionDescriptor: descriptor,
+			},
+		}
+	}
+	var argNames []string
+	for k, v := range arguments {
+		argNames = append(argNames, fmt.Sprintf("%s=>%s", k, v.String()))
+	}
+	// TODO: Print available overloads.
+	panic(fmt.Sprintf("unknown table valued function: %s(%s)", node.name, strings.Join(argNames, ", ")))
 }

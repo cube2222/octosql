@@ -11,11 +11,12 @@ import (
 )
 
 type Environment struct {
-	Aggregates      map[string][]AggregateDescriptor
-	Datasources     *DatasourceRepository
-	Functions       map[string][]FunctionDescriptor
-	PhysicalConfig  map[string]interface{}
-	VariableContext *VariableContext
+	Aggregates           map[string][]AggregateDescriptor
+	Datasources          *DatasourceRepository
+	Functions            map[string][]FunctionDescriptor
+	PhysicalConfig       map[string]interface{}
+	TableValuedFunctions map[string][]TableValuedFunctionDescriptor
+	VariableContext      *VariableContext
 }
 
 func (env Environment) WithRecordSchema(schema Schema) Environment {
@@ -68,6 +69,32 @@ type FunctionDescriptor struct {
 	ArgumentTypes []octosql.Type
 	OutputType    octosql.Type
 	Function      func([]octosql.Value) (octosql.Value, error)
+}
+
+type TableValuedFunctionDescriptor struct {
+	Arguments map[string]TableValuedFunctionArgumentMatcher
+	// Here we can check the inputs.
+	OutputSchema func(context.Context, Environment, map[string]TableValuedFunctionArgument) (Schema, error)
+	Materialize  func(context.Context, Environment, map[string]TableValuedFunctionArgument) (execution.Node, error)
+}
+
+type TableValuedFunctionArgumentMatcher struct {
+	Required                               bool
+	TableValuedFunctionArgumentMatcherType TableValuedFunctionArgumentType
+	// Only one of the below may be non-null.
+	Expression *TableValuedFunctionArgumentMatcherExpression
+	Table      *TableValuedFunctionArgumentMatcherTable
+	Descriptor *TableValuedFunctionArgumentMatcherDescriptor
+}
+
+type TableValuedFunctionArgumentMatcherExpression struct {
+	Type octosql.Type
+}
+
+type TableValuedFunctionArgumentMatcherTable struct {
+}
+
+type TableValuedFunctionArgumentMatcherDescriptor struct {
 }
 
 type State struct {

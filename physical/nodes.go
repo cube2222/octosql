@@ -93,18 +93,29 @@ type Requalifier struct {
 }
 
 type TableValuedFunction struct {
-	Name      string
-	Arguments []TableValuedFunctionArgument
+	Name               string
+	Arguments          map[string]TableValuedFunctionArgument
+	FunctionDescriptor TableValuedFunctionDescriptor
 }
 
 type TableValuedFunctionArgument struct {
-	Name *string
-
 	TableValuedFunctionArgumentType TableValuedFunctionArgumentType
 	// Only one of the below may be non-null.
-	TableValuedFunctionArgumentExpression *TableValuedFunctionArgumentExpression
-	TableValuedFunctionArgumentTable      *TableValuedFunctionArgumentTable
-	TableValuedFunctionArgumentDescriptor *TableValuedFunctionArgumentDescriptor
+	Expression *TableValuedFunctionArgumentExpression
+	Table      *TableValuedFunctionArgumentTable
+	Descriptor *TableValuedFunctionArgumentDescriptor
+}
+
+func (arg *TableValuedFunctionArgument) String() string {
+	switch arg.TableValuedFunctionArgumentType {
+	case TableValuedFunctionArgumentTypeExpression:
+		return arg.Expression.Expression.Type.String()
+	case TableValuedFunctionArgumentTypeTable:
+		return "TABLE"
+	case TableValuedFunctionArgumentTypeDescriptor:
+		return "DESCRIPTOR"
+	}
+	panic("unexhaustive table valued function argument type match")
 }
 
 type TableValuedFunctionArgumentType int
@@ -116,12 +127,15 @@ const (
 )
 
 type TableValuedFunctionArgumentExpression struct {
+	Expression Expression
 }
 
 type TableValuedFunctionArgumentTable struct {
+	Table Node
 }
 
 type TableValuedFunctionArgumentDescriptor struct {
+	Descriptor string
 }
 
 func (node *Node) Materialize(ctx context.Context, env Environment) (execution.Node, error) {

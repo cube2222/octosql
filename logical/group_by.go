@@ -53,17 +53,19 @@ func (w *WatermarkTrigger) Typecheck(ctx context.Context, env physical.Environme
 }
 
 type GroupBy struct {
-	source Node
-	key    []Expression
+	source   Node
+	key      []Expression
+	keyNames []string
 
-	expressions []Expression
-	aggregates  []string
+	expressions    []Expression
+	aggregates     []string
+	aggregateNames []string
 
 	triggers []Trigger
 }
 
-func NewGroupBy(source Node, key []Expression, expressions []Expression, aggregates []string, triggers []Trigger) *GroupBy {
-	return &GroupBy{source: source, key: key, expressions: expressions, aggregates: aggregates, triggers: triggers}
+func NewGroupBy(source Node, key []Expression, keyNames []string, expressions []Expression, aggregates []string, aggregateNames []string, triggers []Trigger) *GroupBy {
+	return &GroupBy{source: source, key: key, keyNames: keyNames, expressions: expressions, aggregates: aggregates, aggregateNames: aggregateNames, triggers: triggers}
 }
 
 func (node *GroupBy) Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Node {
@@ -137,13 +139,13 @@ aggregateLoop:
 	schemaFields := make([]physical.SchemaField, len(key)+len(aggregates))
 	for i := range key {
 		schemaFields[i] = physical.SchemaField{
-			Name: fmt.Sprintf("key_%d", i),
+			Name: node.keyNames[i],
 			Type: key[i].Type,
 		}
 	}
 	for i := range aggregates {
 		schemaFields[len(key)+i] = physical.SchemaField{
-			Name: fmt.Sprintf("agg_%d", i),
+			Name: node.aggregateNames[i],
 			Type: aggregates[i].AggregateDescriptor.OutputType,
 		}
 	}

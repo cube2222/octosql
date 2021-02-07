@@ -72,6 +72,11 @@ type Expression interface {
 	Typecheck(ctx context.Context, env physical.Environment, state physical.State) physical.Expression
 }
 
+// FieldNamer can be implemented by expressions with pretty default names based on their content.
+type FieldNamer interface {
+	FieldName() string
+}
+
 type StarExpression struct {
 	qualifier string
 }
@@ -108,6 +113,10 @@ func (v *Variable) Typecheck(ctx context.Context, env physical.Environment, stat
 	}
 	// TODO: Expression typecheck errors should contain context. (position in input SQL)
 	panic(fmt.Errorf("unkown variable: '%s'", v.name))
+}
+
+func (v *Variable) FieldName() string {
+	return v.name
 }
 
 type Constant struct {

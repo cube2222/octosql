@@ -95,9 +95,11 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		isAggregate := make([]bool, len(statement.SelectExprs))
 		aggregates := make([]string, len(statement.SelectExprs))
 		keyPart := make([]int, len(statement.SelectExprs))
+		aliases := make([]string, len(statement.SelectExprs))
 	selectExprLoop:
 		for i := range statement.SelectExprs {
 			inExpr := statement.SelectExprs[i].(*sqlparser.AliasedExpr).Expr
+			aliases[i] = statement.SelectExprs[i].(*sqlparser.AliasedExpr).As.String()
 			agg, expr, err := ParseAggregate(inExpr)
 			if err == nil {
 				isAggregate[i] = true
@@ -131,17 +133,46 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		outputExprs := make([]logical.Expression, len(isAggregate))
 		var nonKeyAggregates []string
 		var aggregateExprs []logical.Expression
+		var aggregateFieldNames []string
+		var keyFieldNames []string
+		nameCounter := map[string]int{}
+		getUniqueName := func(name string) string {
+			count, ok := nameCounter[name]
+			if ok {
+				name = fmt.Sprintf("%s_%d", name, count)
+			}
+			nameCounter[name] = count + 1
+			return name
+		}
 		for i, ok := range isAggregate {
 			if ok {
 				nonKeyAggregates = append(nonKeyAggregates, aggregates[i])
 				aggregateExprs = append(aggregateExprs, expressions[i])
-				outputExprs[i] = logical.NewVariable(fmt.Sprintf("agg_%d", len(aggregateExprs)-1))
+				var name string
+				if aliases[i] != "" {
+					name = getUniqueName(aliases[i])
+				} else if namer, ok := expressions[i].(logical.FieldNamer); ok {
+					name = getUniqueName(fmt.Sprintf("%s_%s", aggregates[i], namer.FieldName()))
+				} else {
+					name = getUniqueName(aggregates[i])
+				}
+				outputExprs[i] = logical.NewVariable(name)
+				aggregateFieldNames = append(aggregateFieldNames, name)
 			} else {
-				outputExprs[i] = logical.NewVariable(fmt.Sprintf("key_%d", keyPart[i]))
+				var name string
+				if aliases[i] != "" {
+					name = getUniqueName(aliases[i])
+				} else if namer, ok := key[i].(logical.FieldNamer); ok {
+					name = getUniqueName(namer.FieldName())
+				} else {
+					name = fmt.Sprintf("key_%d", keyPart[i])
+				}
+				outputExprs[i] = logical.NewVariable(name)
+				keyFieldNames = append(keyFieldNames, name)
 			}
 		}
 
-		root = logical.NewGroupBy(root, key, aggregateExprs, nonKeyAggregates, triggers)
+		root = logical.NewGroupBy(root, key, keyFieldNames, aggregateExprs, nonKeyAggregates, aggregateFieldNames, triggers)
 		root = logical.NewMap(outputExprs, make([]string, len(outputExprs)), make([]string, len(outputExprs)), make([]bool, len(outputExprs)), root)
 	} else {
 		expressions := make([]logical.Expression, len(statement.SelectExprs))

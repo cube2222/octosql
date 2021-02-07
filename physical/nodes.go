@@ -275,7 +275,7 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (execution.N
 		return node.Requalifier.Source.Materialize(ctx, env)
 
 	case NodeTypeTableValuedFunction:
-		panic("implement me")
+		return node.TableValuedFunction.FunctionDescriptor.Materialize(ctx, env, node.TableValuedFunction.Arguments)
 	}
 
 	panic(fmt.Sprintf("unexhaustive node type match: %d", node.NodeType))

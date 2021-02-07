@@ -15,6 +15,7 @@ import (
 	"github.com/cube2222/octosql/parser"
 	"github.com/cube2222/octosql/parser/sqlparser"
 	"github.com/cube2222/octosql/physical"
+	"github.com/cube2222/octosql/table_valued_functions"
 )
 
 func main() {
@@ -37,6 +38,9 @@ func main() {
 			Datasources: map[string]func(name string) (physical.DatasourceImplementation, error){
 				"json": json.Creator,
 			},
+		},
+		TableValuedFunctions: map[string][]physical.TableValuedFunctionDescriptor{
+			"tumble": table_valued_functions.Tumble,
 		},
 		PhysicalConfig:  nil,
 		VariableContext: nil,

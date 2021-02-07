@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -454,11 +455,11 @@ func ParseTrigger(trigger sqlparser.Trigger) (logical.Trigger, error) {
 			return nil, errors.Errorf("counting trigger parameter must be constant, is: %+v", trigger.Count)
 		}
 		if c.Type != sqlparser.IntVal {
-			return nil, errors.Errorf("counting trigger parameter must be int constant, is: %+v", c)
+			return nil, errors.Errorf("counting trigger parameter must be Int constant, is: %+v", c)
 		}
 		i, err := strconv.ParseInt(string(c.Val), 10, 64)
 		if err != nil {
-			return nil, errors.Wrap(err, "counting trigger parameter must be int constant, couldn't parse")
+			return nil, errors.Wrap(err, "counting trigger parameter must be Int constant, couldn't parse")
 		}
 		return logical.NewCountingTrigger(uint(i)), nil
 
@@ -604,16 +605,40 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 		}
 		return logical.NewTuple(expressions), nil
 
-	// case *sqlparser.IntervalExpr:
-	// 	subExpr, err := ParseExpression(expr.Expr)
-	// 	if err != nil {
-	// 		return nil, errors.Wrap(err, "couldn't parse expression in interval")
-	// 	}
-	//
-	// 	return logical.NewInterval(
-	// 		subExpr,
-	// 		logical.NewConstant(strings.TrimSuffix(strings.ToLower(expr.Unit), "s")),
-	// 	), nil
+	case *sqlparser.IntervalExpr:
+		c, ok := expr.Expr.(*sqlparser.SQLVal)
+		if !ok {
+			return nil, errors.Errorf("interval expression parameter must be constant, is: %+v", expr.Expr)
+		}
+		if c.Type != sqlparser.IntVal {
+			return nil, errors.Errorf("interval expression parameter must be Int constant, is: %+v", c)
+		}
+		i, err := strconv.ParseInt(string(c.Val), 10, 64)
+		if err != nil {
+			return nil, errors.Wrap(err, "interval expression parameter must be Int constant, couldn't parse")
+		}
+
+		var unit time.Duration
+		switch strings.TrimSuffix(strings.ToLower(expr.Unit), "s") {
+		case "nanosecond":
+			unit = time.Nanosecond
+		case "microsecond":
+			unit = time.Microsecond
+		case "millisecond":
+			unit = time.Millisecond
+		case "second":
+			unit = time.Second
+		case "minute":
+			unit = time.Minute
+		case "hour":
+			unit = time.Hour
+		case "day":
+			unit = time.Hour * 24
+		default:
+			return nil, errors.Errorf("invalid interval expression unit: %s, must be one of: nanosecond, microsecond, millisecond, second, minute, hour, day", expr.Unit)
+		}
+
+		return logical.NewConstant(octosql.NewDuration(time.Duration(i) * unit)), nil
 
 	case *sqlparser.AndExpr:
 		return ParseInfixOperator(expr.Left, expr.Right, "AND")

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"log"
-	"net/http"
 	_ "net/http/pprof"
 	"os"
 
@@ -19,8 +18,6 @@ import (
 )
 
 func main() {
-	go http.ListenAndServe(":4000", nil)
-
 	statement, err := sqlparser.Parse(os.Args[1])
 	if err != nil {
 		log.Fatal(err)

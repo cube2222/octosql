@@ -2,6 +2,7 @@ package nodes
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/google/btree"
 
@@ -100,6 +101,8 @@ func (s *StreamJoin) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaS
 
 	var leftDone bool
 
+	var leftWatermark, rightWatermark, minWatermark time.Time
+
 receiveLoop:
 	for {
 		select {
@@ -112,10 +115,24 @@ receiveLoop:
 				return msg.err
 			}
 			if msg.metadata {
-				// TODO: Propagate minimum on watermarks.
-				if err := metaSend(ProduceFromExecutionContext(ctx), msg.metadataMessage); err != nil {
-					return fmt.Errorf("couldn't send metadata: %w", err)
+				leftWatermark = msg.metadataMessage.Watermark
+
+				var min time.Time
+				if leftWatermark.After(rightWatermark) {
+					min = rightWatermark
+				} else {
+					min = leftWatermark
 				}
+				if min.After(minWatermark) {
+					minWatermark = min
+					if err := metaSend(ProduceFromExecutionContext(ctx), MetadataMessage{
+						Type:      MetadataMessageTypeWatermark,
+						Watermark: minWatermark,
+					}); err != nil {
+						return fmt.Errorf("couldn't send metadata: %w", err)
+					}
+				}
+
 				continue
 			}
 			if err := s.receiveRecord(ctx, produce, leftRecords, rightRecords, true, msg.record); err != nil {
@@ -131,9 +148,24 @@ receiveLoop:
 				return msg.err
 			}
 			if msg.metadata {
-				if err := metaSend(ProduceFromExecutionContext(ctx), msg.metadataMessage); err != nil {
-					return fmt.Errorf("couldn't send metadata: %w", err)
+				rightWatermark = msg.metadataMessage.Watermark
+
+				var min time.Time
+				if rightWatermark.After(leftWatermark) {
+					min = leftWatermark
+				} else {
+					min = rightWatermark
 				}
+				if min.After(minWatermark) {
+					minWatermark = min
+					if err := metaSend(ProduceFromExecutionContext(ctx), MetadataMessage{
+						Type:      MetadataMessageTypeWatermark,
+						Watermark: minWatermark,
+					}); err != nil {
+						return fmt.Errorf("couldn't send metadata: %w", err)
+					}
+				}
+
 				continue
 			}
 			if err := s.receiveRecord(ctx, produce, rightRecords, leftRecords, false, msg.record); err != nil {

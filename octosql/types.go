@@ -172,3 +172,44 @@ var (
 	Duration Type = Type{TypeID: TypeIDDuration}
 	Any      Type = Type{TypeID: TypeIDAny}
 )
+
+func TypeSum(t1, t2 Type) Type {
+	if t1.Is(t2) == TypeRelationIs {
+		return t2
+	}
+	if t2.Is(t1) == TypeRelationIs {
+		return t1
+	}
+	var alternatives []Type
+	addType := func(t Type) {
+		if t.Is(Type{
+			TypeID: TypeIDUnion,
+			Union:  struct{ Alternatives []Type }{Alternatives: alternatives},
+		}) != TypeRelationIs {
+			alternatives = append(alternatives, t)
+		}
+	}
+	if t1.TypeID != TypeIDUnion {
+		addType(t1)
+	} else {
+		for _, alternative := range t1.Union.Alternatives {
+			addType(alternative)
+		}
+	}
+	if t2.TypeID != TypeIDUnion {
+		addType(t2)
+	} else {
+		for _, alternative := range t2.Union.Alternatives {
+			addType(alternative)
+		}
+	}
+	// This could be even more normalized, by removing all alternative elements for which:
+	// alternatives[i].Is(Union{alternatives[..i] ++ alternatives[i+1..]})
+	if len(alternatives) == 1 {
+		return alternatives[0]
+	}
+	return Type{
+		TypeID: TypeIDUnion,
+		Union:  struct{ Alternatives []Type }{Alternatives: alternatives},
+	}
+}

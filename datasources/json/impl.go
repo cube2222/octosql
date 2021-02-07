@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/segmentio/encoding/json"
 
 	"github.com/cube2222/octosql/execution"
@@ -36,48 +37,54 @@ func Creator(name string) (physical.DatasourceImplementation, error) {
 
 		for k := range msg {
 			value := msg[k]
+			spew.Dump(value)
 			switch value := value.(type) {
 			case int:
 				if t, ok := fields[k]; !ok {
+					fields[k] = octosql.TypeSum(t, octosql.Int)
+				} else {
 					fields[k] = octosql.Int
-				} else if octosql.Int.Is(t) != octosql.TypeRelationIs {
-					fields[k] = octosql.Int // TODO: Should be union of old and new. ClosestCommonType function.
 				}
 			case bool:
-				if t, ok := fields[k]; !ok {
+				if t, ok := fields[k]; ok {
+					fields[k] = octosql.TypeSum(t, octosql.Boolean)
+				} else {
 					fields[k] = octosql.Boolean
-				} else if octosql.Boolean.Is(t) != octosql.TypeRelationIs {
-					fields[k] = octosql.Boolean // TODO: Should be union of old and new. ClosestCommonType function.
 				}
 			case float64:
-				if t, ok := fields[k]; !ok {
+				if t, ok := fields[k]; ok {
+					fields[k] = octosql.TypeSum(t, octosql.Float)
+				} else {
 					fields[k] = octosql.Float
-				} else if octosql.Float.Is(t) != octosql.TypeRelationIs {
-					fields[k] = octosql.Float // TODO: Should be union of old and new. ClosestCommonType function.
 				}
 			case string:
-				// TODO: this should happen based on the schema only.
 				if _, err := time.Parse(time.RFC3339Nano, value); err == nil {
-					if t, ok := fields[k]; !ok {
+					if t, ok := fields[k]; ok {
+						fields[k] = octosql.TypeSum(t, octosql.Time)
+					} else {
 						fields[k] = octosql.Time
-					} else if octosql.Time.Is(t) != octosql.TypeRelationIs {
-						fields[k] = octosql.Time // TODO: Should be union of old and new. ClosestCommonType function.
 					}
 				} else {
-					if t, ok := fields[k]; !ok {
+					if t, ok := fields[k]; ok {
+						fields[k] = octosql.TypeSum(t, octosql.String)
+					} else {
 						fields[k] = octosql.String
-					} else if octosql.String.Is(t) != octosql.TypeRelationIs {
-						fields[k] = octosql.String // TODO: Should be union of old and new. ClosestCommonType function.
 					}
 				}
 			case time.Time:
-				if t, ok := fields[k]; !ok {
+				if t, ok := fields[k]; ok {
+					fields[k] = octosql.TypeSum(t, octosql.Time)
+				} else {
 					fields[k] = octosql.Time
-				} else if octosql.Time.Is(t) != octosql.TypeRelationIs {
-					fields[k] = octosql.Time // TODO: Should be union of old and new. ClosestCommonType function.
 				}
-				// TODO: Handle lists.
-				// TODO: Handle nested objects.
+			// TODO: Handle lists.
+			// TODO: Handle nested objects.
+			case nil:
+				if t, ok := fields[k]; ok {
+					fields[k] = octosql.TypeSum(t, octosql.Null)
+				} else {
+					fields[k] = octosql.Null
+				}
 			}
 		}
 	}

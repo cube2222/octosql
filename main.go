@@ -26,21 +26,6 @@ import (
 )
 
 func main() {
-	// runtime.GOMAXPROCS(1)
-	// f, err := os.Create("trace.trace")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// defer f.Close()
-	// if err := pprof.StartCPUProfile(f); err != nil {
-	// 	log.Fatal(err)
-	// }
-	// defer pprof.StopCPUProfile()
-	// if err := trace.Start(f); err != nil {
-	// 	log.Fatal(err)
-	// }
-	// defer trace.Stop()
-
 	statement, err := sqlparser.Parse(os.Args[1])
 	if err != nil {
 		log.Fatal(err)

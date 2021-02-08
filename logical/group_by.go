@@ -9,7 +9,7 @@ import (
 )
 
 type Trigger interface {
-	Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Trigger
+	Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment, keyTimeIndex int) physical.Trigger
 }
 
 type CountingTrigger struct {
@@ -20,7 +20,7 @@ func NewCountingTrigger(count uint) *CountingTrigger {
 	return &CountingTrigger{Count: count}
 }
 
-func (w *CountingTrigger) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Trigger {
+func (w *CountingTrigger) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment, keyTimeIndex int) physical.Trigger {
 	return physical.Trigger{
 		TriggerType: physical.TriggerTypeCounting,
 		CountingTrigger: &physical.CountingTrigger{
@@ -37,7 +37,7 @@ func NewDelayTrigger(delay Expression) *DelayTrigger {
 	return &DelayTrigger{Delay: delay}
 }
 
-func (w *DelayTrigger) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Trigger {
+func (w *DelayTrigger) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment, keyTimeIndex int) physical.Trigger {
 	panic("implement me")
 }
 
@@ -48,8 +48,16 @@ func NewWatermarkTrigger() *WatermarkTrigger {
 	return &WatermarkTrigger{}
 }
 
-func (w *WatermarkTrigger) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Trigger {
-	panic("implement me")
+func (w *WatermarkTrigger) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment, keyTimeIndex int) physical.Trigger {
+	if keyTimeIndex == -1 {
+		panic(fmt.Errorf("can't use watermark trigger when not grouping by time field"))
+	}
+	return physical.Trigger{
+		TriggerType: physical.TriggerTypeWatermark,
+		WatermarkTrigger: &physical.WatermarkTrigger{
+			TimeFieldIndex: keyTimeIndex,
+		},
+	}
 }
 
 type GroupBy struct {
@@ -71,10 +79,17 @@ func NewGroupBy(source Node, key []Expression, keyNames []string, expressions []
 func (node *GroupBy) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
 	source := node.source.Typecheck(ctx, env, logicalEnv)
 
-	// TODO: Event time has to be the first defined element of the key.
+	keyTimeIndex := -1
+
 	key := make([]physical.Expression, len(node.key))
 	for i := range node.key {
 		key[i] = node.key[i].Typecheck(ctx, env.WithRecordSchema(source.Schema), logicalEnv)
+		if source.Schema.TimeField != -1 &&
+			key[i].ExpressionType == physical.ExpressionTypeVariable &&
+			physical.VariableNameMatchesField(key[i].Variable.Name, source.Schema.Fields[source.Schema.TimeField].Name) {
+
+			keyTimeIndex = i
+		}
 	}
 
 	expressions := make([]physical.Expression, len(node.expressions))
@@ -117,7 +132,7 @@ aggregateLoop:
 
 	triggers := make([]physical.Trigger, len(node.triggers))
 	for i := range node.triggers {
-		triggers[i] = node.triggers[i].Typecheck(ctx, env, logicalEnv)
+		triggers[i] = node.triggers[i].Typecheck(ctx, env, logicalEnv, keyTimeIndex)
 	}
 	var trigger physical.Trigger
 	if len(triggers) == 0 {

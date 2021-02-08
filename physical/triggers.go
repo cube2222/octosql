@@ -32,6 +32,7 @@ type EndOfStreamTrigger struct {
 }
 
 type WatermarkTrigger struct {
+	TimeFieldIndex int
 }
 
 type MultiTrigger struct {
@@ -45,7 +46,7 @@ func (t *Trigger) Materialize(ctx context.Context, env Environment) func() execu
 	case TriggerTypeEndOfStream:
 		return execution.NewEndOfStreamTriggerPrototype()
 	case TriggerTypeWatermark:
-		return execution.NewWatermarkTriggerPrototype()
+		return execution.NewWatermarkTriggerPrototype(t.WatermarkTrigger.TimeFieldIndex)
 	case TriggerTypeMulti:
 		prototypes := make([]func() execution.Trigger, len(t.MultiTrigger.Triggers))
 		for i := range t.MultiTrigger.Triggers {

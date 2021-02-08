@@ -85,7 +85,27 @@ func (c *CountingTrigger) Poll() []GroupKey {
 	return output
 }
 
+type watermarkTriggerKey struct {
+	Time     time.Time
+	GroupKey GroupKey
+}
+
+func (key watermarkTriggerKey) Less(than btree.Item) bool {
+	thanTyped, ok := than.(watermarkTriggerKey)
+	if !ok {
+		panic(fmt.Sprintf("invalid key comparison: %T", than))
+	}
+
+	if key.Time == thanTyped.Time {
+		return key.GroupKey.Less(thanTyped.GroupKey)
+	} else {
+		return key.Time.Before(thanTyped.Time)
+	}
+}
+
 type WatermarkTrigger struct {
+	timeFieldKeyIndex int
+
 	timeKeys           *btree.BTree
 	endOfStreamReached bool
 	watermark          time.Time
@@ -93,9 +113,10 @@ type WatermarkTrigger struct {
 	outputKeysSlice []GroupKey
 }
 
-func NewWatermarkTriggerPrototype() func() Trigger {
+func NewWatermarkTriggerPrototype(timeFieldKeyIndex int) func() Trigger {
 	return func() Trigger {
 		return &WatermarkTrigger{
+			timeFieldKeyIndex:  timeFieldKeyIndex,
 			timeKeys:           btree.New(BTreeDefaultDegree),
 			endOfStreamReached: false,
 			watermark:          time.Time{},
@@ -114,7 +135,10 @@ func (c *WatermarkTrigger) WatermarkReceived(watermark time.Time) {
 
 // TODO: Event time has to be the first element of the key.
 func (c *WatermarkTrigger) KeyReceived(key GroupKey) {
-	c.timeKeys.ReplaceOrInsert(key)
+	c.timeKeys.ReplaceOrInsert(watermarkTriggerKey{
+		Time:     key[c.timeFieldKeyIndex].Time,
+		GroupKey: key,
+	})
 }
 
 // The returned slice will be made invalid after following operations on the trigger.
@@ -122,28 +146,28 @@ func (c *WatermarkTrigger) Poll() []GroupKey {
 	c.outputKeysSlice = c.outputKeysSlice[:0]
 	if !c.endOfStreamReached {
 		c.timeKeys.Ascend(func(item btree.Item) bool {
-			itemTyped, ok := item.(GroupKey)
+			itemTyped, ok := item.(watermarkTriggerKey)
 			if !ok {
 				panic(fmt.Sprintf("invalid received item: %v", item))
 			}
 
-			if itemTyped[0].Time.After(c.watermark) {
+			if itemTyped.Time.After(c.watermark) {
 				return false
 			}
 
-			c.outputKeysSlice = append(c.outputKeysSlice, itemTyped)
+			c.outputKeysSlice = append(c.outputKeysSlice, itemTyped.GroupKey)
 			c.timeKeys.Delete(item)
 
 			return true
 		})
 	} else {
 		c.timeKeys.Ascend(func(item btree.Item) bool {
-			itemTyped, ok := item.(GroupKey)
+			itemTyped, ok := item.(watermarkTriggerKey)
 			if !ok {
 				panic(fmt.Sprintf("invalid received item: %v", item))
 			}
 
-			c.outputKeysSlice = append(c.outputKeysSlice, itemTyped)
+			c.outputKeysSlice = append(c.outputKeysSlice, itemTyped.GroupKey)
 
 			return true
 		})

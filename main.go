@@ -54,8 +54,8 @@ func main() {
 			"count": aggregates.CountOverloads,
 		},
 		Functions: map[string][]physical.FunctionDescriptor{
-			"=":         functions.Equals,
-			"from_unix": functions.FromUnix,
+			"=":              functions.Equals,
+			"time_from_unix": functions.TimeFromUnix,
 		},
 		Datasources: &physical.DatasourceRepository{
 			Datasources: map[string]func(name string) (physical.DatasourceImplementation, error){

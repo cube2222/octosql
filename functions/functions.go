@@ -17,8 +17,7 @@ var Equals = []physical.FunctionDescriptor{
 		},
 	},
 }
-var FromUnix = []physical.FunctionDescriptor{
-	// TODO: Specializations for concrete primitive types.
+var TimeFromUnix = []physical.FunctionDescriptor{
 	{
 		ArgumentTypes: []octosql.Type{octosql.Int},
 		OutputType:    octosql.Time,

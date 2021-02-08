@@ -1,11 +1,18 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"log"
 	"os"
+	"sync"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/google/btree"
+	"github.com/gosuri/uilive"
+	"github.com/olekukonko/tablewriter"
 
 	"github.com/cube2222/octosql/aggregates"
 	"github.com/cube2222/octosql/datasources/json"
@@ -19,6 +26,17 @@ import (
 )
 
 func main() {
+	// runtime.GOMAXPROCS(1)
+	// f, err := os.Create("profile.pprof")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer f.Close()
+	// if err := pprof.StartCPUProfile(f); err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer pprof.StopCPUProfile()
+
 	statement, err := sqlparser.Parse(os.Args[1])
 	if err != nil {
 		log.Fatal(err)
@@ -59,6 +77,59 @@ func main() {
 		context.Background(),
 		env,
 	)
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	mutex := sync.Mutex{}
+	outputRecords := btree.New(execution.BTreeDefaultDegree)
+	watermark := time.Time{}
+	done := false
+
+	go func() {
+		defer wg.Done()
+		liveWriter := uilive.New()
+
+		for range time.Tick(time.Second / 4) {
+			var buf bytes.Buffer
+
+			table := tablewriter.NewWriter(&buf)
+			table.SetColWidth(64)
+			table.SetRowLine(false)
+			header := make([]string, len(physicalPlan.Schema.Fields))
+			for i := range physicalPlan.Schema.Fields {
+				header[i] = physicalPlan.Schema.Fields[i].Name
+			}
+			table.SetHeader(header)
+			table.SetAutoFormatHeaders(false)
+
+			mutex.Lock()
+			outputRecords.Ascend(func(item btree.Item) bool {
+				itemTyped := item.(execution.GroupKeyIface)
+				key := itemTyped.GetGroupKey()
+				row := make([]string, len(key))
+				for i := range key {
+					row[i] = key[i].String()
+				}
+				table.Append(row)
+				return true
+			})
+			watermark := watermark
+			done := done
+			mutex.Unlock()
+
+			table.Render()
+
+			fmt.Fprintf(&buf, "watermark: %s\n", watermark.Format(time.RFC3339Nano))
+
+			buf.WriteTo(liveWriter)
+			liveWriter.Flush()
+
+			if done {
+				return
+			}
+		}
+	}()
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -68,14 +139,29 @@ func main() {
 			VariableContext: nil,
 		},
 		func(ctx execution.ProduceContext, record execution.Record) error {
-			log.Println(record.String())
+			mutex.Lock()
+			if !record.Retraction {
+				// This destroys duplicate records :)
+				outputRecords.ReplaceOrInsert(execution.GroupKey(record.Values))
+			} else {
+				outputRecords.Delete(execution.GroupKey(record.Values))
+			}
+			mutex.Unlock()
 			return nil
 		},
 		func(ctx execution.ProduceContext, msg execution.MetadataMessage) error {
-			log.Printf("%+v", msg)
+			mutex.Lock()
+			watermark = msg.Watermark
+			mutex.Unlock()
 			return nil
 		},
 	); err != nil {
 		log.Fatal(err)
 	}
+
+	mutex.Lock()
+	done = true
+	mutex.Unlock()
+
+	wg.Wait()
 }

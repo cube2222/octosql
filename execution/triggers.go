@@ -218,24 +218,43 @@ func (c *EndOfStreamTrigger) Poll() []GroupKey {
 }
 
 type MultiTrigger struct {
+	triggers []Trigger
 }
 
-func NewMultiTriggerPrototype([]func() Trigger) func() Trigger {
-	panic("implement me")
+func NewMultiTriggerPrototype(triggerPrototypes []func() Trigger) func() Trigger {
+	return func() Trigger {
+		triggers := make([]Trigger, len(triggerPrototypes))
+		for i := range triggerPrototypes {
+			triggers[i] = triggerPrototypes[i]()
+		}
+		return &MultiTrigger{
+			triggers: triggers,
+		}
+	}
 }
 
-func (c *MultiTrigger) MultiReached() {
-	panic("implement me")
+func (c *MultiTrigger) EndOfStreamReached() {
+	for i := range c.triggers {
+		c.triggers[i].EndOfStreamReached()
+	}
 }
 
 func (c *MultiTrigger) WatermarkReceived(watermark time.Time) {
-	panic("implement me")
+	for i := range c.triggers {
+		c.triggers[i].WatermarkReceived(watermark)
+	}
 }
 
 func (c *MultiTrigger) KeyReceived(key GroupKey) {
-	panic("implement me")
+	for i := range c.triggers {
+		c.triggers[i].KeyReceived(key)
+	}
 }
 
 func (c *MultiTrigger) Poll() []GroupKey {
-	panic("implement me")
+	var output []GroupKey
+	for i := range c.triggers {
+		output = append(output, c.triggers[i].Poll()...)
+	}
+	return output
 }

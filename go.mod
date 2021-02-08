@@ -7,7 +7,10 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/golang/protobuf v1.4.3
 	github.com/google/btree v1.0.0
+	github.com/gosuri/uilive v0.0.4
 	github.com/kr/pretty v0.1.0 // indirect
+	github.com/mattn/go-isatty v0.0.12 // indirect
+	github.com/olekukonko/tablewriter v0.0.4
 	github.com/pkg/errors v0.9.1
 	github.com/segmentio/encoding v0.2.7
 	github.com/stretchr/testify v1.7.0

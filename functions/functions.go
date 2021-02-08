@@ -7,6 +7,7 @@ import (
 	"github.com/cube2222/octosql/physical"
 )
 
+// TODO: Change this to the final map in place.
 var Equals = []physical.FunctionDescriptor{
 	// TODO: Specializations for concrete primitive types.
 	{
@@ -30,6 +31,15 @@ var TimeFromUnix = []physical.FunctionDescriptor{
 		OutputType:    octosql.Time,
 		Function: func(values []octosql.Value) (octosql.Value, error) {
 			return octosql.NewTime(time.Unix(int64(values[0].Float), 0)), nil
+		},
+	},
+}
+var Int = []physical.FunctionDescriptor{
+	{
+		ArgumentTypes: []octosql.Type{octosql.Float},
+		OutputType:    octosql.Int,
+		Function: func(values []octosql.Value) (octosql.Value, error) {
+			return octosql.NewInt(int(values[0].Float)), nil
 		},
 	},
 }

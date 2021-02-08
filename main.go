@@ -41,6 +41,7 @@ func main() {
 		},
 		Functions: map[string][]physical.FunctionDescriptor{
 			"=":              functions.Equals,
+			"int":            functions.Int,
 			"time_from_unix": functions.TimeFromUnix,
 		},
 		Datasources: &physical.DatasourceRepository{
@@ -79,7 +80,7 @@ func main() {
 			VariableContext: nil,
 		},
 		func(ctx execution.ProduceContext, record execution.Record) error {
-			// log.Println(record.String())
+			log.Println(record.String())
 			return nil
 		},
 		func(ctx execution.ProduceContext, msg execution.MetadataMessage) error {

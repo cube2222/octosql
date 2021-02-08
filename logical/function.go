@@ -42,8 +42,9 @@ descriptorLoop:
 			Type:           descriptor.OutputType,
 			ExpressionType: physical.ExpressionTypeFunctionCall,
 			FunctionCall: &physical.FunctionCall{
-				Name:      fe.name,
-				Arguments: arguments,
+				Name:               fe.name,
+				Arguments:          arguments,
+				FunctionDescriptor: descriptor,
 			},
 		}
 	}
@@ -76,8 +77,9 @@ descriptorLoop2:
 			Type:           descriptor.OutputType,
 			ExpressionType: physical.ExpressionTypeFunctionCall,
 			FunctionCall: &physical.FunctionCall{
-				Name:      fe.name,
-				Arguments: arguments,
+				Name:               fe.name,
+				Arguments:          arguments,
+				FunctionDescriptor: descriptor,
 			},
 		}
 	}

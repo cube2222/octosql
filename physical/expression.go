@@ -43,8 +43,9 @@ type Constant struct {
 }
 
 type FunctionCall struct {
-	Name      string
-	Arguments []Expression
+	Name               string
+	Arguments          []Expression
+	FunctionDescriptor FunctionDescriptor
 }
 
 type And struct {
@@ -80,7 +81,15 @@ func (expr *Expression) Materialize(ctx context.Context, env Environment) (execu
 	case ExpressionTypeConstant:
 		return execution.NewConstant(expr.Constant.Value), nil
 	case ExpressionTypeFunctionCall:
-		panic("implement me")
+		expressions := make([]execution.Expression, len(expr.FunctionCall.Arguments))
+		for i := range expr.FunctionCall.Arguments {
+			expression, err := expr.FunctionCall.Arguments[i].Materialize(ctx, env)
+			if err != nil {
+				return nil, fmt.Errorf("couldn't materialize function argument with index %d: %w", i, err)
+			}
+			expressions[i] = expression
+		}
+		return execution.NewFunctionCall(expr.FunctionCall.FunctionDescriptor.Function, expressions), nil
 	case ExpressionTypeAnd:
 		expressions := make([]execution.Expression, len(expr.And.Arguments))
 		for i := range expr.And.Arguments {

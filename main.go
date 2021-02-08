@@ -27,7 +27,7 @@ import (
 
 func main() {
 	// runtime.GOMAXPROCS(1)
-	// f, err := os.Create("profile.pprof")
+	// f, err := os.Create("trace.trace")
 	// if err != nil {
 	// 	log.Fatal(err)
 	// }
@@ -36,6 +36,10 @@ func main() {
 	// 	log.Fatal(err)
 	// }
 	// defer pprof.StopCPUProfile()
+	// if err := trace.Start(f); err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer trace.Stop()
 
 	statement, err := sqlparser.Parse(os.Args[1])
 	if err != nil {
@@ -50,7 +54,8 @@ func main() {
 			"count": aggregates.CountOverloads,
 		},
 		Functions: map[string][]physical.FunctionDescriptor{
-			"=": functions.Equals,
+			"=":         functions.Equals,
+			"from_unix": functions.FromUnix,
 		},
 		Datasources: &physical.DatasourceRepository{
 			Datasources: map[string]func(name string) (physical.DatasourceImplementation, error){

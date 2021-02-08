@@ -78,15 +78,42 @@ func main() {
 		env,
 	)
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	mutex := sync.Mutex{}
-	outputRecords := btree.New(execution.BTreeDefaultDegree)
-	watermark := time.Time{}
-	done := false
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := executionPlan.Run(
+		execution.ExecutionContext{
+			Context:         context.Background(),
+			VariableContext: nil,
+		},
+		func(ctx execution.ProduceContext, record execution.Record) error {
+			log.Println(record.String())
+			return nil
+		},
+		func(ctx execution.ProduceContext, msg execution.MetadataMessage) error {
+			// log.Println(msg.Watermark)
+			return nil
+		},
+	); err != nil {
+		log.Fatal(err)
+	}
+}
+
+type TableOutput struct {
+	wg            sync.WaitGroup
+	mutex         sync.Mutex
+	outputRecords *btree.BTree
+	watermark     time.Time
+	done          bool
+}
+
+func NewTableOutput(schema physical.Schema) *TableOutput {
+	to := &TableOutput{
+		outputRecords: btree.New(execution.BTreeDefaultDegree),
+	}
 
 	go func() {
-		defer wg.Done()
+		defer to.wg.Done()
 		liveWriter := uilive.New()
 
 		for range time.Tick(time.Second / 4) {
@@ -95,15 +122,15 @@ func main() {
 			table := tablewriter.NewWriter(&buf)
 			table.SetColWidth(64)
 			table.SetRowLine(false)
-			header := make([]string, len(physicalPlan.Schema.Fields))
-			for i := range physicalPlan.Schema.Fields {
-				header[i] = physicalPlan.Schema.Fields[i].Name
+			header := make([]string, len(schema.Fields))
+			for i := range schema.Fields {
+				header[i] = schema.Fields[i].Name
 			}
 			table.SetHeader(header)
 			table.SetAutoFormatHeaders(false)
 
-			mutex.Lock()
-			outputRecords.Ascend(func(item btree.Item) bool {
+			to.mutex.Lock()
+			to.outputRecords.Ascend(func(item btree.Item) bool {
 				itemTyped := item.(execution.GroupKeyIface)
 				key := itemTyped.GetGroupKey()
 				row := make([]string, len(key))
@@ -113,9 +140,9 @@ func main() {
 				table.Append(row)
 				return true
 			})
-			watermark := watermark
-			done := done
-			mutex.Unlock()
+			watermark := to.watermark
+			done := to.done
+			to.mutex.Unlock()
 
 			table.Render()
 
@@ -130,38 +157,31 @@ func main() {
 		}
 	}()
 
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := executionPlan.Run(
-		execution.ExecutionContext{
-			Context:         context.Background(),
-			VariableContext: nil,
-		},
-		func(ctx execution.ProduceContext, record execution.Record) error {
-			mutex.Lock()
-			if !record.Retraction {
-				// This destroys duplicate records :)
-				outputRecords.ReplaceOrInsert(execution.GroupKey(record.Values))
-			} else {
-				outputRecords.Delete(execution.GroupKey(record.Values))
-			}
-			mutex.Unlock()
-			return nil
-		},
-		func(ctx execution.ProduceContext, msg execution.MetadataMessage) error {
-			mutex.Lock()
-			watermark = msg.Watermark
-			mutex.Unlock()
-			return nil
-		},
-	); err != nil {
-		log.Fatal(err)
-	}
+	return to
+}
 
-	mutex.Lock()
-	done = true
-	mutex.Unlock()
+func (to *TableOutput) SendRecord(ctx execution.ProduceContext, record execution.Record) error {
+	to.mutex.Lock()
+	if !record.Retraction {
+		// TODO: This destroys duplicate records :) Should be counter.
+		to.outputRecords.ReplaceOrInsert(execution.GroupKey(record.Values))
+	} else {
+		to.outputRecords.Delete(execution.GroupKey(record.Values))
+	}
+	to.mutex.Unlock()
+	return nil
+}
 
-	wg.Wait()
+func (to *TableOutput) SendMeta(ctx execution.ProduceContext, msg execution.MetadataMessage) error {
+	to.mutex.Lock()
+	to.watermark = msg.Watermark
+	to.mutex.Unlock()
+	return nil
+}
+
+func (to *TableOutput) Stop() {
+	to.mutex.Lock()
+	to.done = true
+	to.mutex.Unlock()
+	to.wg.Wait()
 }

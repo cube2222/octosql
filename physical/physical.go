@@ -52,6 +52,9 @@ func (dr *DatasourceRepository) GetDatasource(name string) (DatasourceImplementa
 	if strings.HasSuffix(name, ".json") {
 		return dr.Datasources["json"](name)
 	}
+	if strings.HasSuffix(name, ".csv") {
+		return dr.Datasources["csv"](name)
+	}
 	// All this doesn't really make any sense TBH.
 	if ds, ok := dr.Datasources[name]; ok {
 		return ds(name)

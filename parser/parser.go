@@ -302,6 +302,7 @@ func ParseAliasedTableExpression(expr *sqlparser.AliasedTableExpr) (logical.Node
 			out = logical.NewRequalifier(expr.As.String(), out)
 		} else {
 			alias := strings.TrimSuffix(name, ".json")
+			alias = strings.TrimSuffix(alias, ".csv")
 			out = logical.NewRequalifier(alias, out)
 		}
 		return out, nil

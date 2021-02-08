@@ -15,6 +15,7 @@ import (
 	"github.com/olekukonko/tablewriter"
 
 	"github.com/cube2222/octosql/aggregates"
+	"github.com/cube2222/octosql/datasources/csv"
 	"github.com/cube2222/octosql/datasources/json"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/functions"
@@ -45,6 +46,7 @@ func main() {
 		Datasources: &physical.DatasourceRepository{
 			Datasources: map[string]func(name string) (physical.DatasourceImplementation, error){
 				"json": json.Creator,
+				"csv":  csv.Creator,
 			},
 		},
 		TableValuedFunctions: map[string][]physical.TableValuedFunctionDescriptor{
@@ -77,7 +79,7 @@ func main() {
 			VariableContext: nil,
 		},
 		func(ctx execution.ProduceContext, record execution.Record) error {
-			log.Println(record.String())
+			// log.Println(record.String())
 			return nil
 		},
 		func(ctx execution.ProduceContext, msg execution.MetadataMessage) error {

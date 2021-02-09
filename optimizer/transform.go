@@ -48,7 +48,7 @@ func (t *Transformers) TransformNode(node Node) Node {
 			Schema:   node.Schema,
 			NodeType: node.NodeType,
 			GroupBy: &GroupBy{
-				Source:               t.TransformNode(node.Filter.Source),
+				Source:               t.TransformNode(node.GroupBy.Source),
 				Aggregates:           aggregates,
 				AggregateExpressions: aggregateExpressions,
 				Key:                  key,
@@ -77,7 +77,7 @@ func (t *Transformers) TransformNode(node Node) Node {
 			Schema:   node.Schema,
 			NodeType: node.NodeType,
 			Map: &Map{
-				Source:      t.TransformNode(node.Filter.Source),
+				Source:      t.TransformNode(node.Map.Source),
 				Expressions: expressions,
 				Aliases:     aliases,
 			},
@@ -87,7 +87,7 @@ func (t *Transformers) TransformNode(node Node) Node {
 			Schema:   node.Schema,
 			NodeType: node.NodeType,
 			Requalifier: &Requalifier{
-				Source:    t.TransformNode(node.Filter.Source),
+				Source:    t.TransformNode(node.Requalifier.Source),
 				Qualifier: node.Requalifier.Qualifier,
 			},
 		}

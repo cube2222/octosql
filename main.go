@@ -20,6 +20,7 @@ import (
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/functions"
 	"github.com/cube2222/octosql/logical"
+	"github.com/cube2222/octosql/optimizer"
 	"github.com/cube2222/octosql/parser"
 	"github.com/cube2222/octosql/parser/sqlparser"
 	"github.com/cube2222/octosql/physical"
@@ -66,6 +67,7 @@ func main() {
 		},
 	)
 	spew.Dump(physicalPlan.Schema)
+	physicalPlan = optimizer.PushDownFilterUnderRequalifier(physicalPlan)
 	executionPlan, err := physicalPlan.Materialize(
 		context.Background(),
 		env,

@@ -126,6 +126,6 @@ func (i *impl) Materialize(ctx context.Context, env physical.Environment) (execu
 	}, nil
 }
 
-func (i *impl) PushDownPredicates(ctx context.Context, env physical.Environment, newPredicates, pushedDownPredicates []physical.Expression) (rejected []physical.Expression, pushedDown []physical.Expression, changed bool) {
+func (i *impl) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression) (rejected []physical.Expression, pushedDown []physical.Expression, changed bool) {
 	return newPredicates, []physical.Expression{}, false
 }

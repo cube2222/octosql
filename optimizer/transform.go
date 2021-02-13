@@ -9,16 +9,22 @@ type Transformers struct {
 	ExpressionTransformer func(expr Expression) Expression
 }
 
+// TODO: This should probably push down and make available the environment.
 func (t *Transformers) TransformNode(node Node) Node {
 	var out Node
 	switch node.NodeType {
 	case NodeTypeDatasource:
+		pushedDownPredicates := make([]Expression, len(node.Datasource.Predicates))
+		for i := range node.Datasource.Predicates {
+			pushedDownPredicates[i] = t.TransformExpr(node.Datasource.Predicates[i])
+		}
 		out = Node{
 			Schema:   node.Schema,
 			NodeType: node.NodeType,
 			Datasource: &Datasource{
 				Name:                     node.Datasource.Name,
 				DatasourceImplementation: node.Datasource.DatasourceImplementation,
+				Predicates:               pushedDownPredicates,
 			},
 		}
 	case NodeTypeFilter:

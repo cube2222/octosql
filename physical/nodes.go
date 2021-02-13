@@ -56,7 +56,7 @@ const (
 type Datasource struct {
 	Name                     string
 	DatasourceImplementation DatasourceImplementation
-	// This is the place to put optional pushed down predicates.
+	Predicates               []Expression
 }
 
 type Filter struct {

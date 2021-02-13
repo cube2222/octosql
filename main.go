@@ -67,7 +67,7 @@ func main() {
 		},
 	)
 	spew.Dump(physicalPlan.Schema)
-	physicalPlan = optimizer.PushDownFilterUnderRequalifier(physicalPlan)
+	physicalPlan = optimizer.Optimize(physicalPlan)
 	executionPlan, err := physicalPlan.Materialize(
 		context.Background(),
 		env,

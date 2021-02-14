@@ -8,6 +8,7 @@ import (
 	"github.com/gofrs/uuid"
 
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/optimizer"
 	"github.com/cube2222/octosql/physical"
 )
 
@@ -43,7 +44,38 @@ func (i *impl) Materialize(ctx context.Context, env physical.Environment) (execu
 	}, nil
 }
 
-func (i *impl) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression) (rejected []physical.Expression, pushedDown []physical.Expression, changed bool) {
-	// TODO: Implement predicate pushdown for postgres
-	return newPredicates, pushedDownPredicates, false
+func (i *impl) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression) (rejected []physical.Expression, newPushedDown []physical.Expression, changed bool) {
+	newPushedDown = make([]physical.Expression, len(pushedDownPredicates))
+	copy(newPushedDown, pushedDownPredicates)
+	for _, pred := range newPredicates {
+		isOk := true
+		predicateChecker := optimizer.Transformers{
+			ExpressionTransformer: func(expr physical.Expression) physical.Expression {
+				switch expr.ExpressionType {
+				case physical.ExpressionTypeVariable:
+				case physical.ExpressionTypeConstant:
+				case physical.ExpressionTypeFunctionCall:
+					switch expr.FunctionCall.Name {
+					case ">", ">=", "=", "<", "<=":
+					default:
+						isOk = false
+					}
+				case physical.ExpressionTypeAnd:
+				case physical.ExpressionTypeOr:
+				default:
+					isOk = false
+				}
+				return expr
+			},
+		}
+		predicateChecker.TransformExpr(pred)
+		if isOk {
+			newPushedDown = append(newPushedDown, pred)
+		} else {
+			rejected = append(rejected, pred)
+		}
+	}
+	changed = len(newPushedDown) > len(pushedDownPredicates)
+	panic("implement me")
+	return
 }

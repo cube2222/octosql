@@ -112,8 +112,8 @@ func (i *impl) Schema() (physical.Schema, error) {
 
 func (i *impl) Materialize(ctx context.Context, env physical.Environment) (execution.Node, error) {
 	return &DatasourceExecuting{
-		Path:   i.path,
-		Fields: i.schema.Fields,
+		path:   i.path,
+		fields: i.schema.Fields,
 	}, nil
 }
 

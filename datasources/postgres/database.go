@@ -107,10 +107,16 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 		}
 	}
 
+	if err := db.Close(); err != nil {
+		return nil, fmt.Errorf("couldn't close database: %w", err)
+	}
+
 	return &impl{
+		config: d.Config,
 		schema: physical.Schema{
 			Fields:    fields,
 			TimeField: -1,
 		},
+		table: name,
 	}, nil
 }

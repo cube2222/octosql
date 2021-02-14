@@ -15,12 +15,12 @@ import (
 )
 
 type DatasourceExecuting struct {
-	Path   string
-	Fields []physical.SchemaField
+	path   string
+	fields []physical.SchemaField
 }
 
 func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
-	f, err := os.Open(d.Path)
+	f, err := os.Open(d.path)
 	if err != nil {
 		return fmt.Errorf("couldn't open file: %w", err)
 	}
@@ -42,7 +42,7 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 			return fmt.Errorf("couldn't decode message: %w", err)
 		}
 
-		values := make([]octosql.Value, len(d.Fields))
+		values := make([]octosql.Value, len(d.fields))
 		for i := range row {
 			str := row[i]
 			integer, err := strconv.ParseInt(str, 10, 64)

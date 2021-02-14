@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/gofrs/uuid"
+
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 )
@@ -29,7 +31,7 @@ func (i *impl) Materialize(ctx context.Context, env physical.Environment) (execu
 	for index := range i.schema.Fields {
 		fields[index] = i.schema.Fields[index].Name
 	}
-	stmt, err := db.PrepareContext(ctx, fmt.Sprintf("SELECT %s FROM %s", strings.Join(fields, ", "), i.table))
+	stmt, err := db.PrepareEx(ctx, uuid.Must(uuid.NewV4()).String(), fmt.Sprintf("SELECT %s FROM %s", strings.Join(fields, ", "), i.table), nil)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't prepare statement: %w", err)
 	}

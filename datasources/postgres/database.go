@@ -2,10 +2,10 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 
+	"github.com/jackc/pgx"
 	_ "github.com/jackc/pgx/stdlib"
 
 	"github.com/cube2222/octosql/config"
@@ -25,8 +25,15 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-func connect(config *Config) (*sql.DB, error) {
-	db, err := sql.Open("pgx", fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", config.Host, config.Port, config.User, config.Password, config.Database))
+func connect(config *Config) (*pgx.Conn, error) {
+	db, err := pgx.Connect(pgx.ConnConfig{
+		Host:      config.Host,
+		Port:      uint16(config.Port),
+		User:      config.User,
+		Database:  config.Database,
+		Password:  config.Password,
+		TLSConfig: nil,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("couldn't open database: %w", err)
 	}
@@ -34,13 +41,13 @@ func connect(config *Config) (*sql.DB, error) {
 }
 
 // This should then store creators as my-postgres.table-name
-func Creator(configUntyped config.DatabaseSpecificConfig) (physical.Database, error) {
+func Creator(ctx context.Context, configUntyped config.DatabaseSpecificConfig) (physical.Database, error) {
 	cfg := configUntyped.(*Config)
 	db, err := connect(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't connect to database: %w", err)
 	}
-	if err := db.Ping(); err != nil {
+	if err := db.Ping(ctx); err != nil {
 		return nil, fmt.Errorf("couldn't ping database: %w", err)
 	}
 	if err := db.Close(); err != nil {
@@ -65,7 +72,7 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 		return nil, fmt.Errorf("couldn't connect to database: %w", err)
 	}
 
-	rows, err := db.QueryContext(ctx, "SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = $1 ORDER BY ordinal_position", name)
+	rows, err := db.QueryEx(ctx, "SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = $1 ORDER BY ordinal_position", nil, name)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't describe table: %w", err)
 	}

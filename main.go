@@ -30,7 +30,7 @@ import (
 )
 
 func main() {
-	databaseCreators := map[string]func(configUntyped config.DatabaseSpecificConfig) (physical.Database, error){
+	databaseCreators := map[string]func(ctx context.Context, configUntyped config.DatabaseSpecificConfig) (physical.Database, error){
 		"postgres": postgres.Creator,
 	}
 
@@ -42,7 +42,7 @@ func main() {
 
 	databases := make(map[string]physical.Database)
 	for _, dbConfig := range cfg.Databases {
-		db, err := databaseCreators[dbConfig.Type](dbConfig.Config)
+		db, err := databaseCreators[dbConfig.Type](context.Background(), dbConfig.Config)
 		if err != nil {
 			log.Fatal(err)
 		}

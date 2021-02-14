@@ -30,7 +30,7 @@ func (ds *DataSource) Typecheck(ctx context.Context, env physical.Environment, l
 		return node
 	}
 
-	datasource, err := env.Datasources.GetDatasource(ds.name)
+	datasource, err := env.Datasources.GetDatasource(ctx, ds.name)
 	if err != nil {
 		panic(fmt.Errorf("couldn't create datasource: %v", err))
 	}

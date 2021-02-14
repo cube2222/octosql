@@ -52,11 +52,11 @@ type DatasourceRepository struct {
 }
 
 type Database interface {
-	ListTables() ([]string, error)
-	GetTable(name string) (DatasourceImplementation, error)
+	ListTables(ctx context.Context) ([]string, error)
+	GetTable(ctx context.Context, name string) (DatasourceImplementation, error)
 }
 
-func (dr *DatasourceRepository) GetDatasource(name string) (DatasourceImplementation, error) {
+func (dr *DatasourceRepository) GetDatasource(ctx context.Context, name string) (DatasourceImplementation, error) {
 	// TODO: Special name.json handling. Best would be even 'path/to/file.json', but maybe achieve that using a function.
 	// Should maybe be file.`path/to/file.json`?
 	if strings.HasSuffix(name, ".json") {
@@ -65,9 +65,16 @@ func (dr *DatasourceRepository) GetDatasource(name string) (DatasourceImplementa
 	if strings.HasSuffix(name, ".csv") {
 		return dr.FileHandlers["csv"](name)
 	}
-	if ds, ok := dr.Databases[name]; ok {
-		return ds.GetTable(name)
+	if index := strings.Index(name, "."); index != -1 {
+		dbName := name[:index]
+		db, ok := dr.Databases[dbName]
+		if !ok {
+			return nil, fmt.Errorf("no such database: %s, as in %s", dbName, name)
+		}
+
+		return db.GetTable(ctx, name[index+1:])
 	}
+	// TODO: If there is no dot, iterate over all tables in all datasources.
 	return nil, fmt.Errorf("unknown datasource: %s", name)
 }
 

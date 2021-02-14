@@ -39,7 +39,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	spew.Dump(cfg)
 
 	databases := make(map[string]physical.Database)
 	for _, dbConfig := range cfg.Databases {
@@ -68,6 +67,7 @@ func main() {
 			"time_from_unix": functions.TimeFromUnix,
 		},
 		Datasources: &physical.DatasourceRepository{
+			Databases: databases,
 			FileHandlers: map[string]func(name string) (physical.DatasourceImplementation, error){
 				"json": json.Creator,
 				"csv":  csv.Creator,

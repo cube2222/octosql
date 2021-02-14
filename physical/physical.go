@@ -44,20 +44,29 @@ type AggregateDescriptor struct {
 }
 
 type DatasourceRepository struct {
-	Datasources map[string]func(name string) (DatasourceImplementation, error)
+	// TODO: A może jednak ten bardziej dynamiczny interfejs? Że database.<table> i wtedy sie resolvuje
+	// Bo inaczej będzie na start strasznie dużo rzeczy ładować niepotrzebnych dla wszystkich
+	// skonfigurowanych baz danych.
+	Databases    map[string]Database
+	FileHandlers map[string]func(name string) (DatasourceImplementation, error)
+}
+
+type Database interface {
+	ListTables() ([]string, error)
+	GetTable(name string) (DatasourceImplementation, error)
 }
 
 func (dr *DatasourceRepository) GetDatasource(name string) (DatasourceImplementation, error) {
 	// TODO: Special name.json handling. Best would be even 'path/to/file.json', but maybe achieve that using a function.
+	// Should maybe be file.`path/to/file.json`?
 	if strings.HasSuffix(name, ".json") {
-		return dr.Datasources["json"](name)
+		return dr.FileHandlers["json"](name)
 	}
 	if strings.HasSuffix(name, ".csv") {
-		return dr.Datasources["csv"](name)
+		return dr.FileHandlers["csv"](name)
 	}
-	// All this doesn't really make any sense TBH.
-	if ds, ok := dr.Datasources[name]; ok {
-		return ds(name)
+	if ds, ok := dr.Databases[name]; ok {
+		return ds.GetTable(name)
 	}
 	return nil, fmt.Errorf("unknown datasource: %s", name)
 }

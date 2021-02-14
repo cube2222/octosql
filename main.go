@@ -15,8 +15,10 @@ import (
 	"github.com/olekukonko/tablewriter"
 
 	"github.com/cube2222/octosql/aggregates"
+	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/datasources/csv"
 	"github.com/cube2222/octosql/datasources/json"
+	"github.com/cube2222/octosql/datasources/postgres"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/functions"
 	"github.com/cube2222/octosql/logical"
@@ -28,6 +30,26 @@ import (
 )
 
 func main() {
+	databaseCreators := map[string]func(configUntyped config.DatabaseSpecificConfig) (physical.Database, error){
+		"postgres": postgres.Creator,
+	}
+
+	config.RegisterDatabaseType("postgres", func() config.DatabaseSpecificConfig { return &postgres.Config{} })
+	cfg, err := config.Read()
+	if err != nil {
+		log.Fatal(err)
+	}
+	spew.Dump(cfg)
+
+	databases := make(map[string]physical.Database)
+	for _, dbConfig := range cfg.Databases {
+		db, err := databaseCreators[dbConfig.Type](dbConfig.Config)
+		if err != nil {
+			log.Fatal(err)
+		}
+		databases[dbConfig.Name] = db
+	}
+
 	statement, err := sqlparser.Parse(os.Args[1])
 	if err != nil {
 		log.Fatal(err)
@@ -46,7 +68,7 @@ func main() {
 			"time_from_unix": functions.TimeFromUnix,
 		},
 		Datasources: &physical.DatasourceRepository{
-			Datasources: map[string]func(name string) (physical.DatasourceImplementation, error){
+			FileHandlers: map[string]func(name string) (physical.DatasourceImplementation, error){
 				"json": json.Creator,
 				"csv":  csv.Creator,
 			},

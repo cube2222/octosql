@@ -253,3 +253,24 @@ func (value Value) append(builder *strings.Builder) {
 		panic("impossible, type switch bug")
 	}
 }
+
+func (value Value) ToRawGoValue() interface{} {
+	switch value.Type.TypeID {
+	case TypeIDNull:
+		return nil
+	case TypeIDInt:
+		return value.Int
+	case TypeIDFloat:
+		return value.Float
+	case TypeIDBoolean:
+		return value.Boolean
+	case TypeIDString:
+		return value.Str
+	case TypeIDTime:
+		return value.Time
+	case TypeIDDuration:
+		return value.Duration
+	default:
+		panic("invalid octosql.Value to get Raw Go value for")
+	}
+}

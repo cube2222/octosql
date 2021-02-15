@@ -14,6 +14,7 @@ var Equals = []physical.FunctionDescriptor{
 		ArgumentTypes: []octosql.Type{octosql.Any, octosql.Any},
 		OutputType:    octosql.Boolean,
 		Function: func(values []octosql.Value) (octosql.Value, error) {
+			// TODO: Null should probably not equal Null.
 			return octosql.NewBoolean(values[0].Compare(values[1]) == 0), nil
 		},
 	},

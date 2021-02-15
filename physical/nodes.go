@@ -142,7 +142,7 @@ type TableValuedFunctionArgumentDescriptor struct {
 func (node *Node) Materialize(ctx context.Context, env Environment) (execution.Node, error) {
 	switch node.NodeType {
 	case NodeTypeDatasource:
-		return node.Datasource.DatasourceImplementation.Materialize(ctx, env)
+		return node.Datasource.DatasourceImplementation.Materialize(ctx, env, node.Datasource.Predicates)
 	case NodeTypeFilter:
 		source, err := node.Filter.Source.Materialize(ctx, env)
 		if err != nil {

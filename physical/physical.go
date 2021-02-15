@@ -80,7 +80,7 @@ func (dr *DatasourceRepository) GetDatasource(ctx context.Context, name string) 
 
 type DatasourceImplementation interface {
 	Schema() (Schema, error)
-	Materialize(ctx context.Context, env Environment) (execution.Node, error)
+	Materialize(ctx context.Context, env Environment, pushedDownPredicates []Expression) (execution.Node, error)
 	PushDownPredicates(newPredicates, pushedDownPredicates []Expression) (rejected []Expression, pushedDown []Expression, changed bool)
 	// TODO: Function checking for push-down
 }

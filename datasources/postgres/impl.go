@@ -8,6 +8,7 @@ import (
 	"github.com/gofrs/uuid"
 
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/optimizer"
 	"github.com/cube2222/octosql/physical"
 )
@@ -18,33 +19,120 @@ type impl struct {
 	table  string
 }
 
-func (i *impl) Schema() (physical.Schema, error) {
-	return i.schema, nil
+func (impl *impl) Schema() (physical.Schema, error) {
+	return impl.schema, nil
 }
 
-func (i *impl) Materialize(ctx context.Context, env physical.Environment) (execution.Node, error) {
+func (impl *impl) Materialize(ctx context.Context, env physical.Environment, pushedDownPredicates []physical.Expression) (execution.Node, error) {
 	// Prepare statement
-	db, err := connect(i.config)
+	db, err := connect(impl.config)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't connect to database: %w", err)
 	}
-	fields := make([]string, len(i.schema.Fields))
-	for index := range i.schema.Fields {
-		fields[index] = i.schema.Fields[index].Name
+	fields := make([]string, len(impl.schema.Fields))
+	for index := range impl.schema.Fields {
+		fields[index] = impl.schema.Fields[index].Name
 	}
-	stmt, err := db.PrepareEx(ctx, uuid.Must(uuid.NewV4()).String(), fmt.Sprintf("SELECT %s FROM %s", strings.Join(fields, ", "), i.table), nil)
+
+	predicateSQL, placeholderExpressions := predicatesToSQL(pushedDownPredicates)
+	stmt, err := db.PrepareEx(ctx, uuid.Must(uuid.NewV4()).String(), fmt.Sprintf("SELECT %s FROM %s WHERE %s", strings.Join(fields, ", "), impl.table, predicateSQL), nil)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't prepare statement: %w", err)
 	}
+
+	executionPlaceholderExprs := make([]execution.Expression, len(placeholderExpressions))
+	for i := range placeholderExpressions {
+		expr, err := placeholderExpressions[i].Materialize(ctx, env)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't materialize pushed-down predicate placeholder expression: %w", err)
+		}
+		executionPlaceholderExprs[i] = expr
+	}
+
 	return &DatasourceExecuting{
-		fields: i.schema.Fields,
-		table:  i.table,
-		db:     db,
-		stmt:   stmt,
+		fields:           impl.schema.Fields,
+		table:            impl.table,
+		placeholderExprs: executionPlaceholderExprs,
+		db:               db,
+		stmt:             stmt,
 	}, nil
 }
 
-func (i *impl) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression) (rejected []physical.Expression, newPushedDown []physical.Expression, changed bool) {
+func predicatesToSQL(predicates []physical.Expression) (predicateSQL string, placeholderExprs []physical.Expression) {
+	if len(predicates) == 0 {
+		return "(TRUE)", nil
+	}
+
+	var builder strings.Builder
+	var placeholderExpressions []physical.Expression
+	var predicateExpr physical.Expression
+	if len(predicates) == 1 {
+		predicateExpr = predicates[0]
+	} else {
+		predicateExpr = physical.Expression{
+			Type:           octosql.Boolean,
+			ExpressionType: physical.ExpressionTypeAnd,
+			And: &physical.And{
+				Arguments: predicates,
+			},
+		}
+	}
+
+	predicateToSQL(&builder, &placeholderExpressions, predicateExpr)
+	return builder.String(), placeholderExpressions
+}
+
+func predicateToSQL(builder *strings.Builder, placeholderExpressions *[]physical.Expression, expression physical.Expression) {
+	builder.WriteString(" (")
+	switch expression.ExpressionType {
+	case physical.ExpressionTypeVariable:
+		if expression.Variable.IsLevel0 {
+			builder.WriteString(expression.Variable.Name)
+		} else {
+			builder.WriteString(fmt.Sprintf("$%d", len(*placeholderExpressions)+1))
+			*placeholderExpressions = append(*placeholderExpressions, expression)
+		}
+	case physical.ExpressionTypeConstant:
+		switch expression.Type.TypeID {
+		case octosql.TypeIDNull:
+			builder.WriteString("NULL")
+		case octosql.TypeIDInt, octosql.TypeIDFloat, octosql.TypeIDBoolean,
+			octosql.TypeIDString, octosql.TypeIDTime:
+			builder.WriteString(fmt.Sprintf("$%d", len(*placeholderExpressions)+1))
+			*placeholderExpressions = append(*placeholderExpressions, expression)
+		default:
+			panic("invalid pushed down predicate constant")
+		}
+	case physical.ExpressionTypeFunctionCall:
+		switch expression.FunctionCall.Name {
+		case ">", ">=", "=", "<=", "<": // Operators
+			predicateToSQL(builder, placeholderExpressions, expression.FunctionCall.Arguments[0])
+			builder.WriteString(expression.FunctionCall.Name)
+			predicateToSQL(builder, placeholderExpressions, expression.FunctionCall.Arguments[1])
+		default:
+			panic("invalid pushed down predicate function")
+		}
+	case physical.ExpressionTypeAnd:
+		for i := range expression.And.Arguments {
+			predicateToSQL(builder, placeholderExpressions, expression.And.Arguments[i])
+			if i != len(expression.And.Arguments)-1 {
+				builder.WriteString("AND")
+			}
+		}
+	case physical.ExpressionTypeOr:
+		for i := range expression.And.Arguments {
+			predicateToSQL(builder, placeholderExpressions, expression.And.Arguments[i])
+			if i != len(expression.And.Arguments)-1 {
+				builder.WriteString(" OR ")
+			}
+		}
+	default:
+		panic("invalid pushed down predicate")
+	}
+	builder.WriteString(") ")
+}
+
+func (impl *impl) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression) (rejected []physical.Expression, newPushedDown []physical.Expression, changed bool) {
 	newPushedDown = make([]physical.Expression, len(pushedDownPredicates))
 	copy(newPushedDown, pushedDownPredicates)
 	for _, pred := range newPredicates {
@@ -54,6 +142,12 @@ func (i *impl) PushDownPredicates(newPredicates, pushedDownPredicates []physical
 				switch expr.ExpressionType {
 				case physical.ExpressionTypeVariable:
 				case physical.ExpressionTypeConstant:
+					switch expr.Type.TypeID {
+					case octosql.TypeIDInt, octosql.TypeIDFloat, octosql.TypeIDBoolean,
+						octosql.TypeIDString, octosql.TypeIDTime, octosql.TypeIDNull:
+					default:
+						isOk = false
+					}
 				case physical.ExpressionTypeFunctionCall:
 					switch expr.FunctionCall.Name {
 					case ">", ">=", "=", "<", "<=":
@@ -76,6 +170,5 @@ func (i *impl) PushDownPredicates(newPredicates, pushedDownPredicates []physical
 		}
 	}
 	changed = len(newPushedDown) > len(pushedDownPredicates)
-	panic("implement me")
 	return
 }

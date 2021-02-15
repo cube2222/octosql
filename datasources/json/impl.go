@@ -110,7 +110,7 @@ func (i *impl) Schema() (physical.Schema, error) {
 	return i.schema, nil
 }
 
-func (i *impl) Materialize(ctx context.Context, env physical.Environment) (execution.Node, error) {
+func (i *impl) Materialize(ctx context.Context, env physical.Environment, pushedDownPredicates []physical.Expression) (execution.Node, error) {
 	return &DatasourceExecuting{
 		path:   i.path,
 		fields: i.schema.Fields,

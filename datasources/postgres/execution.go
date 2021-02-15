@@ -18,12 +18,22 @@ type DatasourceExecuting struct {
 	fields []physical.SchemaField
 	table  string
 
-	db   *pgx.Conn
-	stmt *pgx.PreparedStatement
+	placeholderExprs []Expression
+	db               *pgx.Conn
+	stmt             *pgx.PreparedStatement
 }
 
 func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
-	rows, err := d.db.QueryEx(ctx, d.stmt.SQL, nil)
+	placeholderValues := make([]interface{}, len(d.placeholderExprs))
+	for i := range d.placeholderExprs {
+		value, err := d.placeholderExprs[i].Evaluate(ctx)
+		if err != nil {
+			return fmt.Errorf("couldn't evaluate pushed-down predicate placeholder expression: %w", err)
+		}
+		placeholderValues[i] = value.ToRawGoValue()
+	}
+
+	rows, err := d.db.QueryEx(ctx, d.stmt.SQL, nil, placeholderValues...)
 	if err != nil {
 		return fmt.Errorf("couldn't execute database query: %w", err)
 	}

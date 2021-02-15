@@ -25,6 +25,13 @@ func (c *Config) Validate() error {
 	return nil
 }
 
+type testLogger struct {
+}
+
+func (t *testLogger) Log(level pgx.LogLevel, msg string, data map[string]interface{}) {
+	log.Printf("%s %s %+v", level, msg, data)
+}
+
 func connect(config *Config) (*pgx.Conn, error) {
 	db, err := pgx.Connect(pgx.ConnConfig{
 		Host:      config.Host,
@@ -33,7 +40,9 @@ func connect(config *Config) (*pgx.Conn, error) {
 		Database:  config.Database,
 		Password:  config.Password,
 		TLSConfig: nil,
+		Logger:    &testLogger{},
 	})
+	db.SetLogLevel(pgx.LogLevelTrace)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't open database: %w", err)
 	}

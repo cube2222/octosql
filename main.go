@@ -61,11 +61,7 @@ func main() {
 		Aggregates: map[string][]physical.AggregateDescriptor{
 			"count": aggregates.CountOverloads,
 		},
-		Functions: map[string][]physical.FunctionDescriptor{
-			"=":              functions.Equals,
-			"int":            functions.Int,
-			"time_from_unix": functions.TimeFromUnix,
-		},
+		Functions: functions.FunctionMap(),
 		Datasources: &physical.DatasourceRepository{
 			Databases: databases,
 			FileHandlers: map[string]func(name string) (physical.DatasourceImplementation, error){

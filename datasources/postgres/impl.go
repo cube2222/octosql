@@ -83,26 +83,32 @@ func predicatesToSQL(predicates []physical.Expression) (predicateSQL string, pla
 }
 
 func predicateToSQL(builder *strings.Builder, placeholderExpressions *[]physical.Expression, expression physical.Expression) {
+	// If the expression doesn't contain record variables and is of a proper type, we can evaluate it in memory.
+	// This handles constants and non-record variables.
+
+	// TODO: Check variables types when pushing down.
+	if !containsRecordVariables(expression) {
+		switch expression.Type.TypeID {
+		case octosql.TypeIDNull, octosql.TypeIDInt, octosql.TypeIDFloat,
+			octosql.TypeIDBoolean, octosql.TypeIDString, octosql.TypeIDTime:
+			builder.WriteString(fmt.Sprintf("($%d)", len(*placeholderExpressions)+1))
+			*placeholderExpressions = append(*placeholderExpressions, expression)
+			return
+		default:
+		}
+	}
+
 	builder.WriteString(" (")
 	switch expression.ExpressionType {
 	case physical.ExpressionTypeVariable:
 		if expression.Variable.IsLevel0 {
 			builder.WriteString(expression.Variable.Name)
 		} else {
-			builder.WriteString(fmt.Sprintf("$%d", len(*placeholderExpressions)+1))
-			*placeholderExpressions = append(*placeholderExpressions, expression)
+			panic("non-record variable slipped through on pushdown")
 		}
 	case physical.ExpressionTypeConstant:
-		switch expression.Type.TypeID {
-		case octosql.TypeIDNull:
-			builder.WriteString("NULL")
-		case octosql.TypeIDInt, octosql.TypeIDFloat, octosql.TypeIDBoolean,
-			octosql.TypeIDString, octosql.TypeIDTime:
-			builder.WriteString(fmt.Sprintf("$%d", len(*placeholderExpressions)+1))
-			*placeholderExpressions = append(*placeholderExpressions, expression)
-		default:
-			panic("invalid pushed down predicate constant")
-		}
+		// Handled above by the beginning-of-function early return.
+		panic("constant expression slipped through on pushdown")
 	case physical.ExpressionTypeFunctionCall:
 		switch expression.FunctionCall.Name {
 		case ">", ">=", "=", "<=", "<": // Operators
@@ -139,15 +145,24 @@ func (impl *impl) PushDownPredicates(newPredicates, pushedDownPredicates []physi
 		isOk := true
 		predicateChecker := optimizer.Transformers{
 			ExpressionTransformer: func(expr physical.Expression) physical.Expression {
+				if !containsRecordVariables(expr) {
+					switch expr.Type.TypeID {
+					case octosql.TypeIDNull, octosql.TypeIDInt, octosql.TypeIDFloat,
+						octosql.TypeIDBoolean, octosql.TypeIDString, octosql.TypeIDTime:
+						return expr
+					default:
+					}
+				}
+
 				switch expr.ExpressionType {
 				case physical.ExpressionTypeVariable:
-				case physical.ExpressionTypeConstant:
-					switch expr.Type.TypeID {
-					case octosql.TypeIDInt, octosql.TypeIDFloat, octosql.TypeIDBoolean,
-						octosql.TypeIDString, octosql.TypeIDTime, octosql.TypeIDNull:
-					default:
+					if !expr.Variable.IsLevel0 {
+						// All non-record variables of proper types have been handled by the early return above.
 						isOk = false
 					}
+				case physical.ExpressionTypeConstant:
+					// All constants of proper types have been handled by the early return above.
+					isOk = false
 				case physical.ExpressionTypeFunctionCall:
 					switch expr.FunctionCall.Name {
 					case ">", ">=", "=", "<", "<=":
@@ -171,4 +186,21 @@ func (impl *impl) PushDownPredicates(newPredicates, pushedDownPredicates []physi
 	}
 	changed = len(newPushedDown) > len(pushedDownPredicates)
 	return
+}
+
+func containsRecordVariables(expr physical.Expression) bool {
+	contains := false
+	checker := optimizer.Transformers{
+		ExpressionTransformer: func(expr physical.Expression) physical.Expression {
+			switch expr.ExpressionType {
+			case physical.ExpressionTypeVariable:
+				if expr.Variable.IsLevel0 {
+					contains = true
+				}
+			}
+			return expr
+		},
+	}
+	checker.TransformExpr(expr)
+	return contains
 }

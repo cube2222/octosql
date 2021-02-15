@@ -19,6 +19,7 @@ type Node struct {
 	GroupBy             *GroupBy
 	Join                *Join
 	Map                 *Map
+	OrderBy             *OrderBy
 	Requalifier         *Requalifier
 	TableValuedFunction *TableValuedFunction
 }
@@ -49,6 +50,7 @@ const (
 	NodeTypeGroupBy
 	NodeTypeJoin
 	NodeTypeMap
+	NodeTypeOrderBy
 	NodeTypeRequalifier
 	NodeTypeTableValuedFunction
 )
@@ -86,6 +88,12 @@ type Map struct {
 	Source      Node
 	Expressions []Expression
 	Aliases     []*string
+}
+
+type OrderBy struct {
+	Source               Node
+	Key                  []Expression
+	DirectionMultipliers []int
 }
 
 type Requalifier struct {
@@ -272,6 +280,20 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (execution.N
 		}
 
 		return nodes.NewMap(source, expressions), nil
+	case NodeTypeOrderBy:
+		source, err := node.OrderBy.Source.Materialize(ctx, env)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't materialize order by source: %w", err)
+		}
+		keyExprs := make([]execution.Expression, len(node.OrderBy.Key))
+		for i := range node.OrderBy.Key {
+			expr, err := node.OrderBy.Key[i].Materialize(ctx, env.WithRecordSchema(node.OrderBy.Source.Schema))
+			if err != nil {
+				return nil, fmt.Errorf("couldn't materialize order by key with index %d: %w", i, err)
+			}
+			keyExprs[i] = expr
+		}
+		return nodes.NewBatchOrderBy(source, keyExprs, node.OrderBy.DirectionMultipliers), nil
 	case NodeTypeRequalifier:
 		return node.Requalifier.Source.Materialize(ctx, env)
 

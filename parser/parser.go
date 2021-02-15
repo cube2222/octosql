@@ -204,15 +204,15 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		root = logical.NewMap(expressions, aliases, starQualifiers, isStar, root)
 	}
 
-	// if statement.OrderBy != nil {
-	// 	orderByExpressions, orderByDirections, err := parseOrderByExpressions(statement.OrderBy)
-	// 	if err != nil {
-	// 		return nil, errors.Wrap(err, "couldn't parse arguments of order by")
-	// 	}
-	//
-	// 	outputOptions.OrderByDirections = orderByDirections
-	// 	outputOptions.OrderByExpressions = orderByExpressions
-	// }
+	if statement.OrderBy != nil {
+		orderByExpressions, orderByDirections, err := parseOrderByExpressions(statement.OrderBy)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't parse keys of order by")
+		}
+
+		// TODO: Optimization which pushes order by into output printer. For live batch output.
+		root = logical.NewOrderBy(orderByExpressions, orderByDirections, root)
+	}
 
 	// if len(statement.Distinct) > 0 {
 	// 	root = logical.NewDistinct(root)

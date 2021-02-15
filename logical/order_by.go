@@ -2,6 +2,7 @@ package logical
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cube2222/octosql/physical"
 )
@@ -9,54 +10,46 @@ import (
 type OrderDirection string
 
 type OrderBy struct {
-	expressions []Expression
-	directions  []OrderDirection
-	source      Node
+	keyExprs   []Expression
+	directions []OrderDirection
+	source     Node
 }
 
-func NewOrderBy(expressions []Expression, directions []OrderDirection, source Node) *OrderBy {
+func NewOrderBy(keyExprs []Expression, directions []OrderDirection, source Node) *OrderBy {
 	return &OrderBy{
-		expressions: expressions,
-		directions:  directions,
-		source:      source,
+		keyExprs:   keyExprs,
+		directions: directions,
+		source:     source,
 	}
 }
 
 func (node *OrderBy) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
-	panic("implement me")
-	// 	sourceNodes, variables, err := node.left.Physical(ctx, physicalCreator)
-	// 	if err != nil {
-	// 		return nil, nil, errors.Wrap(err, "couldn't get physical plan of left nodes in order by")
-	// 	}
-	//
-	// 	expressions := make([]physical.Expression, len(node.expressions))
-	// 	for i := range node.expressions {
-	// 		expr, exprVariables, err := node.expressions[i].Physical(ctx, physicalCreator)
-	// 		if err != nil {
-	// 			return nil, nil, errors.Wrapf(err, "couldn't get physical plan for order by expression with index %d", i)
-	// 		}
-	// 		variables, err = variables.MergeWith(exprVariables)
-	// 		if err != nil {
-	// 			return nil, nil, errors.Wrapf(err, "couldn't merge variables with those of order by expression with index %d", i)
-	// 		}
-	//
-	// 		expressions[i] = expr
-	// 	}
-	//
-	// 	directions := make([]physical.OrderDirection, len(node.expressions))
-	// 	for i, direction := range node.directions {
-	// 		switch direction {
-	// 		case "asc":
-	// 			directions[i] = physical.Ascending
-	// 		case "desc":
-	// 			directions[i] = physical.Descending
-	// 		default:
-	// 			return nil, nil, errors.Errorf("invalid order by direction: %v", direction)
-	// 		}
-	// 	}
-	//
-	// 	// OrderBy operates on a single, right stream.
-	// 	outNodes := physical.NewShuffle(1, physical.NewConstantStrategy(0), sourceNodes)
-	//
-	// 	return []physical.Node{physical.NewOrderBy(expressions, directions, outNodes[0])}, variables, nil
+	source := node.source.Typecheck(ctx, env, logicalEnv)
+
+	keyExprs := make([]physical.Expression, len(node.keyExprs))
+	for i := range node.keyExprs {
+		keyExprs[i] = node.keyExprs[i].Typecheck(ctx, env.WithRecordSchema(source.Schema), logicalEnv)
+	}
+
+	directionMultipliers := make([]int, len(node.keyExprs))
+	for i, direction := range node.directions {
+		switch direction {
+		case "asc":
+			directionMultipliers[i] = 1
+		case "desc":
+			directionMultipliers[i] = -1
+		default:
+			panic(fmt.Errorf("invalid order by direction: %s", direction))
+		}
+	}
+
+	return physical.Node{
+		Schema:   source.Schema,
+		NodeType: physical.NodeTypeOrderBy,
+		OrderBy: &physical.OrderBy{
+			Source:               source,
+			Key:                  keyExprs,
+			DirectionMultipliers: directionMultipliers,
+		},
+	}
 }

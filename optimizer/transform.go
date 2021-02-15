@@ -88,6 +88,23 @@ func (t *Transformers) TransformNode(node Node) Node {
 				Aliases:     aliases,
 			},
 		}
+	case NodeTypeOrderBy:
+		keyExprs := make([]Expression, len(node.OrderBy.Key))
+		for i := range node.OrderBy.Key {
+			keyExprs[i] = t.TransformExpr(node.OrderBy.Key[i])
+		}
+		directionMultipliers := make([]int, len(node.OrderBy.DirectionMultipliers))
+		copy(directionMultipliers, node.OrderBy.DirectionMultipliers)
+
+		out = Node{
+			Schema:   node.Schema,
+			NodeType: node.NodeType,
+			OrderBy: &OrderBy{
+				Source:               t.TransformNode(node.OrderBy.Source),
+				Key:                  keyExprs,
+				DirectionMultipliers: directionMultipliers,
+			},
+		}
 	case NodeTypeRequalifier:
 		out = Node{
 			Schema:   node.Schema,

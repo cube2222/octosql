@@ -41,6 +41,9 @@ type Aggregate interface {
 type aggregatesItem struct {
 	GroupKey
 	Aggregates []Aggregate
+
+	// AggregatedSetSize omits NULL inputs.
+	AggregatedSetSize []int
 }
 
 type previouslySentValuesItem struct {
@@ -84,7 +87,7 @@ func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSend
 					newAggregates[i] = g.aggregatePrototypes[i]()
 				}
 
-				itemTyped = &aggregatesItem{GroupKey: key, Aggregates: newAggregates}
+				itemTyped = &aggregatesItem{GroupKey: key, Aggregates: newAggregates, AggregatedSetSize: make([]int, len(g.aggregatePrototypes))}
 				aggregates.ReplaceOrInsert(itemTyped)
 			} else {
 				var ok bool
@@ -102,6 +105,11 @@ func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSend
 				}
 
 				if aggregateInput.Type.TypeID != octosql.TypeIDNull {
+					if !record.Retraction {
+						itemTyped.AggregatedSetSize[i]++
+					} else {
+						itemTyped.AggregatedSetSize[i]--
+					}
 					itemTyped.Aggregates[i].Add(record.Retraction, aggregateInput)
 				}
 			}
@@ -170,7 +178,11 @@ func (g *GroupBy) trigger(produceCtx ProduceContext, aggregates, previouslySentV
 				copy(outputValues, key)
 
 				for i := range itemTyped.Aggregates {
-					outputValues[len(key)+i] = itemTyped.Aggregates[i].Trigger()
+					if itemTyped.AggregatedSetSize[i] > 0 {
+						outputValues[len(key)+i] = itemTyped.Aggregates[i].Trigger()
+					} else {
+						outputValues[len(key)+i] = octosql.NewNull()
+					}
 				}
 
 				if err := produce(produceCtx, NewRecord(outputValues, false)); err != nil {

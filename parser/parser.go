@@ -699,6 +699,14 @@ func ParseInfixComparison(left, right sqlparser.Expr, operator string) (logical.
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't parse right hand side of %s comparator %+v", operator, right)
 	}
+	if operator == "not like" {
+		return logical.NewFunctionExpression(
+			"not",
+			[]logical.Expression{
+				logical.NewFunctionExpression("like", []logical.Expression{leftParsed, rightParsed}),
+			},
+		), nil
+	}
 	return logical.NewFunctionExpression(operator, []logical.Expression{leftParsed, rightParsed}), nil
 }
 

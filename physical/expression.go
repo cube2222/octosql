@@ -92,7 +92,15 @@ func (expr *Expression) Materialize(ctx context.Context, env Environment) (execu
 			}
 			expressions[i] = expression
 		}
-		return execution.NewFunctionCall(expr.FunctionCall.FunctionDescriptor.Function, expressions), nil
+		var nullCheckIndices []int
+		if expr.FunctionCall.FunctionDescriptor.Strict {
+			for i := range expr.FunctionCall.Arguments {
+				if octosql.Null.Is(expr.FunctionCall.Arguments[i].Type) == octosql.TypeRelationIs {
+					nullCheckIndices = append(nullCheckIndices, i)
+				}
+			}
+		}
+		return execution.NewFunctionCall(expr.FunctionCall.FunctionDescriptor.Function, expressions, nullCheckIndices), nil
 	case ExpressionTypeAnd:
 		expressions := make([]execution.Expression, len(expr.And.Arguments))
 		for i := range expr.And.Arguments {

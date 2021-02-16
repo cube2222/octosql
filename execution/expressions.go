@@ -16,6 +16,13 @@ type Variable struct {
 	level, index int
 }
 
+func NewVariable(level, index int) *Variable {
+	return &Variable{
+		level: level,
+		index: index,
+	}
+}
+
 func (r *Variable) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 	curVars := ctx.VariableContext
 	for i := r.level; i != 0; i-- {
@@ -24,19 +31,8 @@ func (r *Variable) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 	return curVars.Values[r.index], nil
 }
 
-func NewVariable(level, index int) *Variable {
-	return &Variable{
-		level: level,
-		index: index,
-	}
-}
-
 type Constant struct {
 	value octosql.Value
-}
-
-func (c *Constant) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
-	return c.value, nil
 }
 
 func NewConstant(value octosql.Value) *Constant {
@@ -45,9 +41,20 @@ func NewConstant(value octosql.Value) *Constant {
 	}
 }
 
+func (c *Constant) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
+	return c.value, nil
+}
+
 type TypeAssertion struct {
 	expected octosql.Type
 	expr     Expression
+}
+
+func NewTypeAssertion(expected octosql.Type, expr Expression) *TypeAssertion {
+	return &TypeAssertion{
+		expected: expected,
+		expr:     expr,
+	}
 }
 
 func (c *TypeAssertion) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
@@ -63,16 +70,18 @@ func (c *TypeAssertion) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 	return value, nil
 }
 
-func NewTypeAssertion(expected octosql.Type, expr Expression) *TypeAssertion {
-	return &TypeAssertion{
-		expected: expected,
-		expr:     expr,
-	}
+type FunctionCall struct {
+	function         func([]octosql.Value) (octosql.Value, error)
+	args             []Expression
+	nullCheckIndices []int
 }
 
-type FunctionCall struct {
-	function func([]octosql.Value) (octosql.Value, error)
-	args     []Expression
+func NewFunctionCall(function func([]octosql.Value) (octosql.Value, error), args []Expression, nullCheckIndices []int) *FunctionCall {
+	return &FunctionCall{
+		function:         function,
+		args:             args,
+		nullCheckIndices: nullCheckIndices,
+	}
 }
 
 func (c *FunctionCall) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
@@ -84,6 +93,11 @@ func (c *FunctionCall) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 		}
 		argValues[i] = value
 	}
+	for _, index := range c.nullCheckIndices {
+		if argValues[index].Type.TypeID == octosql.TypeIDNull {
+			return octosql.NewNull(), nil
+		}
+	}
 
 	value, err := c.function(argValues)
 	if err != nil {
@@ -92,15 +106,14 @@ func (c *FunctionCall) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 	return value, nil
 }
 
-func NewFunctionCall(function func([]octosql.Value) (octosql.Value, error), args []Expression) *FunctionCall {
-	return &FunctionCall{
-		function: function,
-		args:     args,
-	}
-}
-
 type And struct {
 	args []Expression
+}
+
+func NewAnd(args []Expression) *And {
+	return &And{
+		args: args,
+	}
 }
 
 func (c *And) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
@@ -117,14 +130,14 @@ func (c *And) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 	return octosql.NewBoolean(true), nil
 }
 
-func NewAnd(args []Expression) *And {
-	return &And{
-		args: args,
-	}
-}
-
 type Or struct {
 	args []Expression
+}
+
+func NewOr(args []Expression) *Or {
+	return &Or{
+		args: args,
+	}
 }
 
 func (c *Or) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
@@ -139,12 +152,6 @@ func (c *Or) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 	}
 
 	return octosql.NewBoolean(false), nil
-}
-
-func NewOr(args []Expression) *Or {
-	return &Or{
-		args: args,
-	}
 }
 
 // TODO: sys.undo should create an expression which reads the current retraction status.

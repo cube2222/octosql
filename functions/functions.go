@@ -19,6 +19,7 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 			{
 				ArgumentTypes: []octosql.Type{octosql.Any, octosql.Any},
 				OutputType:    octosql.Boolean,
+				Strict:        true,
 				Function: func(values []octosql.Value) (octosql.Value, error) {
 					// TODO: Null should probably not equal Null.
 					return octosql.NewBoolean(values[0].Compare(values[1]) < 0), nil
@@ -30,17 +31,21 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 			{
 				ArgumentTypes: []octosql.Type{octosql.Any, octosql.Any},
 				OutputType:    octosql.Boolean,
+				Strict:        true,
 				Function: func(values []octosql.Value) (octosql.Value, error) {
 					// TODO: Null should probably not equal Null.
 					return octosql.NewBoolean(values[0].Compare(values[1]) <= 0), nil
 				},
 			},
 		},
+		// TODO: Maybe equals shouldn't be a function? It has very specific type checking needs.
+		// TODO: Adding function strictness fixes the problem of NULL equality.
 		"=": {
 			// TODO: Specializations for concrete primitive types.
 			{
 				ArgumentTypes: []octosql.Type{octosql.Any, octosql.Any},
 				OutputType:    octosql.Boolean,
+				Strict:        true,
 				Function: func(values []octosql.Value) (octosql.Value, error) {
 					// TODO: Null should probably not equal Null.
 					return octosql.NewBoolean(values[0].Compare(values[1]) == 0), nil
@@ -52,6 +57,7 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 			{
 				ArgumentTypes: []octosql.Type{octosql.Any, octosql.Any},
 				OutputType:    octosql.Boolean,
+				Strict:        true,
 				Function: func(values []octosql.Value) (octosql.Value, error) {
 					// TODO: Null should probably not equal Null.
 					return octosql.NewBoolean(values[0].Compare(values[1]) >= 0), nil
@@ -63,6 +69,7 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 			{
 				ArgumentTypes: []octosql.Type{octosql.Any, octosql.Any},
 				OutputType:    octosql.Boolean,
+				Strict:        true,
 				Function: func(values []octosql.Value) (octosql.Value, error) {
 					// TODO: Null should probably not equal Null.
 					return octosql.NewBoolean(values[0].Compare(values[1]) > 0), nil
@@ -75,6 +82,7 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 			{
 				ArgumentTypes: []octosql.Type{octosql.Boolean},
 				OutputType:    octosql.Boolean,
+				Strict:        true,
 				Function: func(values []octosql.Value) (octosql.Value, error) {
 					return octosql.NewBoolean(!values[0].Boolean), nil
 				},
@@ -85,6 +93,7 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 			{
 				ArgumentTypes: []octosql.Type{octosql.String, octosql.String},
 				OutputType:    octosql.Boolean,
+				Strict:        true,
 				Function: func(values []octosql.Value) (octosql.Value, error) {
 					const likeEscape = '\\'
 					const likeAny = '_'
@@ -168,6 +177,7 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 			{
 				ArgumentTypes: []octosql.Type{octosql.String, octosql.String},
 				OutputType:    octosql.Boolean,
+				Strict:        true,
 				Function: func(values []octosql.Value) (octosql.Value, error) {
 					reg, err := regexp.Compile(values[1].Str)
 					if err != nil {
@@ -182,6 +192,7 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 			{
 				ArgumentTypes: []octosql.Type{octosql.String, octosql.String},
 				OutputType:    octosql.Boolean,
+				Strict:        true,
 				Function: func(values []octosql.Value) (octosql.Value, error) {
 					reg, err := regexp.Compile(strings.ToLower(values[1].Str))
 					if err != nil {
@@ -196,6 +207,7 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 			{
 				ArgumentTypes: []octosql.Type{octosql.Float},
 				OutputType:    octosql.Int,
+				Strict:        true,
 				Function: func(values []octosql.Value) (octosql.Value, error) {
 					return octosql.NewInt(int(values[0].Float)), nil
 				},
@@ -206,6 +218,7 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 			{
 				ArgumentTypes: []octosql.Type{},
 				OutputType:    octosql.Time,
+				Strict:        true,
 				Function: func(values []octosql.Value) (octosql.Value, error) {
 					return octosql.NewTime(time.Now()), nil
 				},
@@ -215,6 +228,7 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 			{
 				ArgumentTypes: []octosql.Type{octosql.Int},
 				OutputType:    octosql.Time,
+				Strict:        true,
 				Function: func(values []octosql.Value) (octosql.Value, error) {
 					return octosql.NewTime(time.Unix(int64(values[0].Int), 0)), nil
 				},
@@ -222,6 +236,7 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 			{
 				ArgumentTypes: []octosql.Type{octosql.Float},
 				OutputType:    octosql.Time,
+				Strict:        true,
 				Function: func(values []octosql.Value) (octosql.Value, error) {
 					return octosql.NewTime(time.Unix(int64(values[0].Float), 0)), nil
 				},

@@ -216,7 +216,7 @@ func (value Value) String() string {
 func (value Value) append(builder *strings.Builder) {
 	switch value.Type.TypeID {
 	case TypeIDNull:
-		builder.WriteString("null")
+		builder.WriteString("<null>")
 
 	case TypeIDInt:
 		builder.WriteString(fmt.Sprint(value.Int))

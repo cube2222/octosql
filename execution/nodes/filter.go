@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	. "github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/octosql"
 )
 
 type Filter struct {
@@ -26,7 +27,7 @@ func (m *Filter) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendF
 		if err != nil {
 			return fmt.Errorf("couldn't evaluate condition: %w", err)
 		}
-		if ok.Boolean {
+		if ok.Type.TypeID == octosql.TypeIDBoolean && ok.Boolean {
 			if err := produce(produceCtx, record); err != nil {
 				return fmt.Errorf("couldn't produce: %w", err)
 			}

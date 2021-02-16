@@ -238,10 +238,10 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (execution.N
 				return nil, fmt.Errorf("both side of %d join predicate equality use variables from the right input table", i)
 			}
 
-			if firstPartUsesLeft && secondPartUsesRight {
+			if !firstPartUsesRight && !secondPartUsesLeft {
 				leftKey[i] = firstPart
 				rightKey[i] = secondPart
-			} else if firstPartUsesRight && secondPartUsesLeft {
+			} else if !firstPartUsesLeft && !secondPartUsesRight {
 				leftKey[i] = secondPart
 				rightKey[i] = firstPart
 			}

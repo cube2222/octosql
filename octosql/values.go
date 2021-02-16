@@ -125,12 +125,21 @@ func (value Value) Compare(other Value) int {
 		}
 
 	case TypeIDString:
-		if value.Str < other.Str {
+		left := strings.ToLower(value.Str)
+		right := strings.ToLower(other.Str)
+		if left < right {
 			return -1
-		} else if value.Str > other.Str {
+		} else if left > right {
 			return 1
 		} else {
-			return 0
+			// Here we reverse the ordering, cause Go would want upper-case letters to go first, we want lower-case letters first.
+			if value.Str < other.Str {
+				return 1
+			} else if value.Str > other.Str {
+				return -1
+			} else {
+				return 0
+			}
 		}
 
 	case TypeIDTime:

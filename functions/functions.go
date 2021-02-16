@@ -10,6 +10,28 @@ import (
 // TODO: Change this to the final map in place.
 func FunctionMap() map[string][]physical.FunctionDescriptor {
 	return map[string][]physical.FunctionDescriptor{
+		"<": {
+			// TODO: Specializations for concrete primitive types.
+			{
+				ArgumentTypes: []octosql.Type{octosql.Any, octosql.Any},
+				OutputType:    octosql.Boolean,
+				Function: func(values []octosql.Value) (octosql.Value, error) {
+					// TODO: Null should probably not equal Null.
+					return octosql.NewBoolean(values[0].Compare(values[1]) < 0), nil
+				},
+			},
+		},
+		"<=": {
+			// TODO: Specializations for concrete primitive types.
+			{
+				ArgumentTypes: []octosql.Type{octosql.Any, octosql.Any},
+				OutputType:    octosql.Boolean,
+				Function: func(values []octosql.Value) (octosql.Value, error) {
+					// TODO: Null should probably not equal Null.
+					return octosql.NewBoolean(values[0].Compare(values[1]) <= 0), nil
+				},
+			},
+		},
 		"=": {
 			// TODO: Specializations for concrete primitive types.
 			{
@@ -18,6 +40,28 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 				Function: func(values []octosql.Value) (octosql.Value, error) {
 					// TODO: Null should probably not equal Null.
 					return octosql.NewBoolean(values[0].Compare(values[1]) == 0), nil
+				},
+			},
+		},
+		">=": {
+			// TODO: Specializations for concrete primitive types.
+			{
+				ArgumentTypes: []octosql.Type{octosql.Any, octosql.Any},
+				OutputType:    octosql.Boolean,
+				Function: func(values []octosql.Value) (octosql.Value, error) {
+					// TODO: Null should probably not equal Null.
+					return octosql.NewBoolean(values[0].Compare(values[1]) >= 0), nil
+				},
+			},
+		},
+		">": {
+			// TODO: Specializations for concrete primitive types.
+			{
+				ArgumentTypes: []octosql.Type{octosql.Any, octosql.Any},
+				OutputType:    octosql.Boolean,
+				Function: func(values []octosql.Value) (octosql.Value, error) {
+					// TODO: Null should probably not equal Null.
+					return octosql.NewBoolean(values[0].Compare(values[1]) > 0), nil
 				},
 			},
 		},

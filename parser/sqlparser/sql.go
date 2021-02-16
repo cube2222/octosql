@@ -5570,25 +5570,25 @@ yydefault:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line sql.y:2276
 		{
-			yyVAL.expr = &ComparisonExpr{Left: yyDollar[1].expr, Operator: RegexpLikeStr, Right: yyDollar[3].expr}
+			yyVAL.expr = &ComparisonExpr{Left: yyDollar[1].expr, Operator: LikeRegexpStr, Right: yyDollar[3].expr}
 		}
 	case 428:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line sql.y:2280
 		{
-			yyVAL.expr = &ComparisonExpr{Left: yyDollar[1].expr, Operator: RegexpLikeCaseInsensitiveStr, Right: yyDollar[3].expr}
+			yyVAL.expr = &ComparisonExpr{Left: yyDollar[1].expr, Operator: LikeRegexpCaseInsensitiveStr, Right: yyDollar[3].expr}
 		}
 	case 429:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line sql.y:2284
 		{
-			yyVAL.expr = &ComparisonExpr{Left: yyDollar[1].expr, Operator: RegexpNotLikeStr, Right: yyDollar[3].expr}
+			yyVAL.expr = &ComparisonExpr{Left: yyDollar[1].expr, Operator: NotLikeRegexpStr, Right: yyDollar[3].expr}
 		}
 	case 430:
 		yyDollar = yyS[yypt-3 : yypt+1]
 //line sql.y:2288
 		{
-			yyVAL.expr = &ComparisonExpr{Left: yyDollar[1].expr, Operator: RegexpNotLikeCaseInsensitiveStr, Right: yyDollar[3].expr}
+			yyVAL.expr = &ComparisonExpr{Left: yyDollar[1].expr, Operator: NotLikeRegexpCaseInsensitiveStr, Right: yyDollar[3].expr}
 		}
 	case 431:
 		yyDollar = yyS[yypt-3 : yypt+1]

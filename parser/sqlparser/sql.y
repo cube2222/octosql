@@ -2274,19 +2274,19 @@ condition:
   }
 | value_expression '~' value_expression
   {
- 	  $$ = &ComparisonExpr{Left: $1, Operator: RegexpLikeStr, Right: $3}
+ 	  $$ = &ComparisonExpr{Left: $1, Operator: LikeRegexpStr, Right: $3}
   }
  | value_expression LIKE_REGEXP_CASE_INSENSITIVE value_expression
    {
-     $$ = &ComparisonExpr{Left: $1, Operator: RegexpLikeCaseInsensitiveStr, Right: $3}
+     $$ = &ComparisonExpr{Left: $1, Operator: LikeRegexpCaseInsensitiveStr, Right: $3}
    }
 | value_expression NOT_LIKE_REGEXP value_expression
   {
-    $$ = &ComparisonExpr{Left: $1, Operator: RegexpNotLikeStr, Right: $3}
+    $$ = &ComparisonExpr{Left: $1, Operator: NotLikeRegexpStr, Right: $3}
   }
  | value_expression NOT_LIKE_REGEXP_CASE_INSENSITIVE value_expression
    {
-     $$ = &ComparisonExpr{Left: $1, Operator: RegexpNotLikeCaseInsensitiveStr, Right: $3}
+     $$ = &ComparisonExpr{Left: $1, Operator: NotLikeRegexpCaseInsensitiveStr, Right: $3}
    }
 | value_expression REGEXP value_expression
   {

@@ -76,6 +76,7 @@ type GroupBy struct {
 
 type Aggregate struct {
 	Name                string
+	OutputType          octosql.Type
 	AggregateDescriptor AggregateDescriptor
 }
 

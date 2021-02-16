@@ -102,27 +102,41 @@ aggregateLoop:
 	for i, aggname := range node.aggregates {
 		descriptors := env.Aggregates[aggname]
 		for _, descriptor := range descriptors {
-			if expressions[i].Type.Is(descriptor.ArgumentType) == octosql.TypeRelationIs {
+			if expressions[i].Type.Is(octosql.TypeSum(descriptor.ArgumentType, octosql.Null)) == octosql.TypeRelationIs {
+				outputType := descriptor.OutputType
+				if octosql.Null.Is(expressions[i].Type) == octosql.TypeRelationIs {
+					outputType = octosql.TypeSum(descriptor.OutputType, octosql.Null)
+				}
+
 				aggregates[i] = physical.Aggregate{
 					Name:                node.aggregates[i],
+					OutputType:          outputType,
 					AggregateDescriptor: descriptor,
 				}
 				continue aggregateLoop
 			}
 		}
 		for _, descriptor := range descriptors {
-			if expressions[i].Type.Is(descriptor.ArgumentType) == octosql.TypeRelationMaybe {
-				aggregates[i] = physical.Aggregate{
-					Name:                node.aggregates[i],
-					AggregateDescriptor: descriptor,
-				}
+			if expressions[i].Type.Is(octosql.TypeSum(descriptor.ArgumentType, octosql.Null)) == octosql.TypeRelationMaybe {
+				assertedExprType := *octosql.TypeIntersection(octosql.TypeSum(descriptor.ArgumentType, octosql.Null), expressions[i].Type)
 				expressions[i] = physical.Expression{
 					ExpressionType: physical.ExpressionTypeTypeAssertion,
-					Type:           *octosql.TypeIntersection(descriptor.ArgumentType, expressions[i].Type),
+					Type:           assertedExprType,
 					TypeAssertion: &physical.TypeAssertion{
 						Expression: expressions[i],
 						TargetType: descriptor.ArgumentType,
 					},
+				}
+
+				outputType := descriptor.OutputType
+				if octosql.Null.Is(assertedExprType) == octosql.TypeRelationIs {
+					outputType = octosql.TypeSum(descriptor.OutputType, octosql.Null)
+				}
+
+				aggregates[i] = physical.Aggregate{
+					Name:                node.aggregates[i],
+					OutputType:          outputType,
+					AggregateDescriptor: descriptor,
 				}
 				continue aggregateLoop
 			}
@@ -161,14 +175,12 @@ aggregateLoop:
 	for i := range aggregates {
 		schemaFields[len(key)+i] = physical.SchemaField{
 			Name: node.aggregateNames[i],
-			Type: aggregates[i].AggregateDescriptor.OutputType,
+			Type: aggregates[i].OutputType,
 		}
 	}
 
-	// TODO: Calculate time field if grouping by time field.
-
 	return physical.Node{
-		Schema:   physical.NewSchema(schemaFields, -1),
+		Schema:   physical.NewSchema(schemaFields, keyTimeIndex),
 		NodeType: physical.NodeTypeGroupBy,
 		GroupBy: &physical.GroupBy{
 			Source:               source,

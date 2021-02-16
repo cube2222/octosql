@@ -101,7 +101,9 @@ func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSend
 					return fmt.Errorf("couldn't evaluate %d aggregate expression: %w", i, err)
 				}
 
-				itemTyped.Aggregates[i].Add(record.Retraction, aggregateInput)
+				if aggregateInput.Type.TypeID != octosql.TypeIDNull {
+					itemTyped.Aggregates[i].Add(record.Retraction, aggregateInput)
+				}
 			}
 
 			// TODO: Delete entry if deletable.

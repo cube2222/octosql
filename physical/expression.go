@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
-
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
 )
@@ -71,7 +69,6 @@ func (expr *Expression) Materialize(ctx context.Context, env Environment) (execu
 	ctxLoop:
 		for varCtx := env.VariableContext; varCtx != nil; varCtx = varCtx.Parent {
 			for i, field := range varCtx.Fields {
-				spew.Dump(expr)
 				if VariableNameMatchesField(expr.Variable.Name, field.Name) {
 					index = i
 					break ctxLoop

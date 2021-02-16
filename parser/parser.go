@@ -135,7 +135,10 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		var nonKeyAggregates []string
 		var aggregateExprs []logical.Expression
 		var aggregateFieldNames []string
-		var keyFieldNames []string
+		keyFieldNames := make([]string, len(key))
+		for i := range key {
+			keyFieldNames[i] = fmt.Sprintf("key_%d", i)
+		}
 		nameCounter := map[string]int{}
 		getUniqueName := func(name string) string {
 			count, ok := nameCounter[name]
@@ -157,19 +160,19 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 				} else {
 					name = getUniqueName(aggregates[i])
 				}
-				outputExprs[i] = logical.NewVariable(name)
 				aggregateFieldNames = append(aggregateFieldNames, name)
+				outputExprs[i] = logical.NewVariable(name)
 			} else {
 				var name string
 				if aliases[i] != "" {
 					name = getUniqueName(aliases[i])
-				} else if namer, ok := key[i].(logical.FieldNamer); ok {
+				} else if namer, ok := key[keyPart[i]].(logical.FieldNamer); ok {
 					name = getUniqueName(namer.FieldName())
 				} else {
 					name = getUniqueName(fmt.Sprintf("key_%d", keyPart[i]))
 				}
+				keyFieldNames[keyPart[i]] = name
 				outputExprs[i] = logical.NewVariable(name)
-				keyFieldNames = append(keyFieldNames, name)
 			}
 		}
 
@@ -436,7 +439,7 @@ func ParseAggregate(expr sqlparser.Expr) (string, logical.Expression, error) {
 			}
 
 		case *sqlparser.StarExpr:
-			parsedArg = logical.NewConstant(octosql.NewNull())
+			parsedArg = logical.NewConstant(octosql.NewBoolean(true))
 
 		default:
 			return "", nil, errors.Errorf(

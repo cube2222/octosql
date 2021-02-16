@@ -538,10 +538,16 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 	default:
 		tkn.next()
 		switch ch {
-		case '=', ',', '(', ')', '+', '*', '%', '^', '~':
+		case '=', ',', '(', ')', '+', '*', '%', '^':
 			if tkn.lastChar == '>' {
 				tkn.next()
 				return RIGHTARROW, nil
+			}
+			return int(ch), nil
+		case '~':
+			if tkn.lastChar == '*' {
+				tkn.next()
+				return LIKE_REGEXP_CASE_INSENSITIVE, nil
 			}
 			return int(ch), nil
 		case '&':
@@ -631,6 +637,16 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 			if tkn.lastChar == '=' {
 				tkn.next()
 				return NE, nil
+			}
+			if tkn.lastChar == '~' {
+				tkn.next()
+				switch tkn.lastChar {
+				case '*':
+					tkn.next()
+					return NOT_LIKE_REGEXP_CASE_INSENSITIVE, nil
+				default:
+					return NOT_LIKE_REGEXP, nil
+				}
 			}
 			return int(ch), nil
 		case '\'', '"':

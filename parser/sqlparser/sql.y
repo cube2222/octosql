@@ -159,7 +159,7 @@ func skipToEnd(yylex interface{}) {
 %left <bytes> '+' '-'
 %left <bytes> '*' '/' DIV '%' MOD
 %left <bytes> '^'
-%right <bytes> '~' UNARY
+%right <bytes> '~' NOT_LIKE_REGEXP LIKE_REGEXP_CASE_INSENSITIVE NOT_LIKE_REGEXP_CASE_INSENSITIVE UNARY
 %left <bytes> COLLATE
 %right <bytes> BINARY UNDERSCORE_BINARY UNDERSCORE_UTF8MB4
 %right <bytes> INTERVAL
@@ -2272,6 +2272,22 @@ condition:
   {
     $$ = &ComparisonExpr{Left: $1, Operator: NotLikeStr, Right: $4, Escape: $5}
   }
+| value_expression '~' value_expression
+  {
+ 	  $$ = &ComparisonExpr{Left: $1, Operator: RegexpLikeStr, Right: $3}
+  }
+ | value_expression LIKE_REGEXP_CASE_INSENSITIVE value_expression
+   {
+     $$ = &ComparisonExpr{Left: $1, Operator: RegexpLikeCaseInsensitiveStr, Right: $3}
+   }
+| value_expression NOT_LIKE_REGEXP value_expression
+  {
+    $$ = &ComparisonExpr{Left: $1, Operator: RegexpNotLikeStr, Right: $3}
+  }
+ | value_expression NOT_LIKE_REGEXP_CASE_INSENSITIVE value_expression
+   {
+     $$ = &ComparisonExpr{Left: $1, Operator: RegexpNotLikeCaseInsensitiveStr, Right: $3}
+   }
 | value_expression REGEXP value_expression
   {
     $$ = &ComparisonExpr{Left: $1, Operator: RegexpStr, Right: $3}

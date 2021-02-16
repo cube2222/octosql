@@ -8,6 +8,8 @@ import (
 	"os"
 	"sort"
 	"time"
+	"strings"
+	"net/http"
 
 	"github.com/pkg/errors"
 
@@ -154,15 +156,27 @@ func (rs *RecordStream) RunWorker(ctx context.Context) error {
 		}
 
 		tx.Abort() // We only read data above, no need to risk failing now.
+		
+		if(strings.HasPrefix(rs.filePath, "http")){
+			httpClient := http.Client{
+				Timeout: time.Second * 2, // Timeout after 2 seconds
+			}
 
-		// Load/Reload file
-		file, err := os.Open(rs.filePath)
-		if err != nil {
-			return errors.Wrap(err, "couldn't open file")
+			r, err := httpClient.Get(rs.filePath)
+			if err != nil {
+				return errors.Wrap(err, "couldn't open api")
+			}
+			defer r.Body.Close()
+			rs.decoder = json.NewDecoder(r.Body)
+		} else {
+			// Load/Reload file
+			file, err := os.Open(rs.filePath)
+			if err != nil {
+				return errors.Wrap(err, "couldn't open file")
+			}
+			rs.file = file
+			rs.decoder = json.NewDecoder(file)
 		}
-
-		rs.file = file
-		rs.decoder = json.NewDecoder(file)
 
 		// Moving file iterator by `rs.offset`
 		for i := 0; i < rs.offset; i++ {

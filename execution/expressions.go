@@ -117,14 +117,22 @@ func NewAnd(args []Expression) *And {
 }
 
 func (c *And) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
+	nullEncountered := false
 	for i := range c.args {
 		value, err := c.args[i].Evaluate(ctx)
 		if err != nil {
-			return octosql.ZeroValue, fmt.Errorf("couldn't evaluate %d argument: %w", i, err)
+			return octosql.ZeroValue, fmt.Errorf("couldn't evaluate %d AND argument: %w", i, err)
+		}
+		if value.Type.TypeID == octosql.TypeIDNull {
+			nullEncountered = true
+			continue
 		}
 		if !value.Boolean {
 			return value, nil
 		}
+	}
+	if nullEncountered {
+		return octosql.NewNull(), nil
 	}
 
 	return octosql.NewBoolean(true), nil
@@ -141,16 +149,22 @@ func NewOr(args []Expression) *Or {
 }
 
 func (c *Or) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
+	nullEncountered := false
 	for i := range c.args {
 		value, err := c.args[i].Evaluate(ctx)
 		if err != nil {
-			return octosql.ZeroValue, fmt.Errorf("couldn't evaluate %d argument: %w", i, err)
+			return octosql.ZeroValue, fmt.Errorf("couldn't evaluate %d OR argument: %w", i, err)
 		}
 		if value.Boolean {
 			return value, nil
 		}
+		if value.Type.TypeID == octosql.TypeIDNull {
+			nullEncountered = true
+		}
 	}
-
+	if nullEncountered {
+		return octosql.NewNull(), nil
+	}
 	return octosql.NewBoolean(false), nil
 }
 

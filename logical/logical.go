@@ -153,13 +153,20 @@ func NewAnd(left, right Expression) *And {
 }
 
 func (and *And) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
+	left := TypecheckExpression(ctx, env, logicalEnv, octosql.TypeSum(octosql.Boolean, octosql.Null), and.left)
+	right := TypecheckExpression(ctx, env, logicalEnv, octosql.TypeSum(octosql.Boolean, octosql.Null), and.right)
+	outputType := octosql.Boolean
+	if octosql.Null.Is(left.Type) == octosql.TypeRelationIs ||
+		octosql.Null.Is(right.Type) == octosql.TypeRelationIs {
+		outputType = octosql.TypeSum(octosql.Boolean, octosql.Null)
+	}
 	return physical.Expression{
-		Type:           octosql.Boolean,
+		Type:           outputType,
 		ExpressionType: physical.ExpressionTypeAnd,
 		And: &physical.And{
 			Arguments: []physical.Expression{
-				TypecheckExpression(ctx, env, logicalEnv, octosql.Boolean, and.left),
-				TypecheckExpression(ctx, env, logicalEnv, octosql.Boolean, and.right),
+				left,
+				right,
 			},
 		},
 	}
@@ -174,13 +181,20 @@ func NewOr(left, right Expression) *Or {
 }
 
 func (or *Or) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
+	left := TypecheckExpression(ctx, env, logicalEnv, octosql.TypeSum(octosql.Boolean, octosql.Null), or.left)
+	right := TypecheckExpression(ctx, env, logicalEnv, octosql.TypeSum(octosql.Boolean, octosql.Null), or.right)
+	outputType := octosql.Boolean
+	if octosql.Null.Is(left.Type) == octosql.TypeRelationIs ||
+		octosql.Null.Is(right.Type) == octosql.TypeRelationIs {
+		outputType = octosql.TypeSum(octosql.Boolean, octosql.Null)
+	}
 	return physical.Expression{
-		Type:           octosql.Boolean,
+		Type:           outputType,
 		ExpressionType: physical.ExpressionTypeOr,
 		Or: &physical.Or{
 			Arguments: []physical.Expression{
-				TypecheckExpression(ctx, env, logicalEnv, octosql.Boolean, or.left),
-				TypecheckExpression(ctx, env, logicalEnv, octosql.Boolean, or.right),
+				left,
+				right,
 			},
 		},
 	}
@@ -194,7 +208,7 @@ func TypecheckExpression(ctx context.Context, env physical.Environment, logicalE
 	}
 	if rel == octosql.TypeRelationMaybe {
 		return physical.Expression{
-			Type:           expected,
+			Type:           *octosql.TypeIntersection(expected, expr.Type),
 			ExpressionType: physical.ExpressionTypeTypeAssertion,
 			TypeAssertion: &physical.TypeAssertion{
 				Expression: expr,

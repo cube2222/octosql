@@ -118,7 +118,7 @@ aggregateLoop:
 				}
 				expressions[i] = physical.Expression{
 					ExpressionType: physical.ExpressionTypeTypeAssertion,
-					Type:           descriptor.ArgumentType,
+					Type:           *octosql.TypeIntersection(descriptor.ArgumentType, expressions[i].Type),
 					TypeAssertion: &physical.TypeAssertion{
 						Expression: expressions[i],
 						TargetType: descriptor.ArgumentType,

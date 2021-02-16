@@ -213,3 +213,42 @@ func TypeSum(t1, t2 Type) Type {
 		Union:  struct{ Alternatives []Type }{Alternatives: alternatives},
 	}
 }
+
+func TypeIntersection(t1, t2 Type) *Type {
+	leftPossibleTypes := t1.possiblePrimitiveTypes()
+	rightPossibleTypes := t2.possiblePrimitiveTypes()
+
+	var outputType *Type
+	for _, t := range leftPossibleTypes {
+		if t.Is(t2) == TypeRelationIs {
+			if outputType == nil {
+				outputType = &t
+			} else {
+				*outputType = TypeSum(*outputType, t)
+			}
+		}
+	}
+	for _, t := range rightPossibleTypes {
+		if t.Is(t1) == TypeRelationIs {
+			if outputType == nil {
+				outputType = &t
+			} else {
+				*outputType = TypeSum(*outputType, t)
+			}
+		}
+	}
+	return outputType
+}
+
+func (t Type) possiblePrimitiveTypes() []Type {
+	switch t.TypeID {
+	case TypeIDUnion:
+		out := make([]Type, 0, len(t.Union.Alternatives))
+		for i := range t.Union.Alternatives {
+			out = append(out, t.Union.Alternatives[i].possiblePrimitiveTypes()...)
+		}
+		return out
+	default:
+		return []Type{t}
+	}
+}

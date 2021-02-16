@@ -74,7 +74,7 @@ descriptorLoop:
 					}
 					arguments[i] = physical.Expression{
 						ExpressionType: physical.ExpressionTypeTypeAssertion,
-						Type:           descriptor.ArgumentTypes[i],
+						Type:           *octosql.TypeIntersection(descriptor.ArgumentTypes[i], arguments[i].Type),
 						TypeAssertion: &physical.TypeAssertion{
 							Expression: arguments[i],
 							TargetType: descriptor.ArgumentTypes[i],

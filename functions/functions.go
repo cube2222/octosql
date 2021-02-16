@@ -39,7 +39,6 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 			},
 		},
 		// TODO: Maybe equals shouldn't be a function? It has very specific type checking needs.
-		// TODO: Adding function strictness fixes the problem of NULL equality.
 		"=": {
 			// TODO: Specializations for concrete primitive types.
 			{

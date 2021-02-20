@@ -59,11 +59,14 @@ func main() {
 	}
 	env := physical.Environment{
 		Aggregates: map[string][]physical.AggregateDescriptor{
-			"count": aggregates.CountOverloads,
-			"sum":   aggregates.SumOverloads,
-			"avg":   aggregates.AverageOverloads,
-			"max":   aggregates.MaxOverloads,
-			"min":   aggregates.MinOverloads,
+			"count":          aggregates.CountOverloads,
+			"count_distinct": aggregates.DistinctAggregateOverloads(aggregates.CountOverloads),
+			"sum":            aggregates.SumOverloads,
+			"sum_distinct":   aggregates.DistinctAggregateOverloads(aggregates.SumOverloads),
+			"avg":            aggregates.AverageOverloads,
+			"avg_distinct":   aggregates.DistinctAggregateOverloads(aggregates.AverageOverloads),
+			"max":            aggregates.MaxOverloads,
+			"min":            aggregates.MinOverloads,
 		},
 		Functions: functions.FunctionMap(),
 		Datasources: &physical.DatasourceRepository{

@@ -42,7 +42,6 @@ func connect(config *Config) (*pgx.Conn, error) {
 		TLSConfig: nil,
 		Logger:    &testLogger{},
 	})
-	db.SetLogLevel(pgx.LogLevelTrace)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't open database: %w", err)
 	}

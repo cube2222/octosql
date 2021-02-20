@@ -60,6 +60,10 @@ func main() {
 	env := physical.Environment{
 		Aggregates: map[string][]physical.AggregateDescriptor{
 			"count": aggregates.CountOverloads,
+			"sum":   aggregates.SumOverloads,
+			"avg":   aggregates.AverageOverloads,
+			"max":   aggregates.MaxOverloads,
+			"min":   aggregates.MinOverloads,
 		},
 		Functions: functions.FunctionMap(),
 		Datasources: &physical.DatasourceRepository{

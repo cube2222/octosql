@@ -22,6 +22,7 @@ type JoinStrategy string
 const (
 	JoinStrategyUndefined JoinStrategy = "UNDEFINED"
 	JoinStrategyLookup    JoinStrategy = "LOOKUP"
+	JoinStrategyStream    JoinStrategy = "STREAM"
 )
 
 type Join struct {
@@ -46,6 +47,8 @@ func NewJoin(left, right Node, predicate Expression, strategy JoinStrategy, join
 func (node *Join) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
 	if node.strategy == JoinStrategyLookup {
 		panic("Lookup join not implemented yet.")
+	} else if node.strategy == JoinStrategyStream {
+		panic("Stream join forcing not implemented yet.")
 	}
 
 	left := node.left.Typecheck(ctx, env, logicalEnv)

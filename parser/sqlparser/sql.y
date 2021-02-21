@@ -320,7 +320,7 @@ func skipToEnd(yylex interface{}) {
 %type <indexColumns> index_column_list
 %type <indexOption> index_option
 %type <indexOptions> index_option_list
-%type <boolVal> lookup_opt
+%type <str> strategy_opt
 %type <constraintInfo> constraint_info
 %type <partDefs> partition_definitions
 %type <partDef> partition_definition
@@ -2038,9 +2038,9 @@ partition_list:
 // first construct, which automatically makes the second construct a
 // syntax error. This is the same behavior as MySQL.
 join_table:
-  table_reference lookup_opt inner_join table_factor join_condition_opt
+  table_reference strategy_opt inner_join table_factor join_condition_opt
   {
-    $$ = &JoinTableExpr{LeftExpr: $1, ForceLookup: bool($2), Join: $3, RightExpr: $4, Condition: $5}
+    $$ = &JoinTableExpr{LeftExpr: $1, Strategy: $2, Join: $3, RightExpr: $4, Condition: $5}
   }
 | table_reference straight_join table_factor on_expression_opt
   {
@@ -2091,10 +2091,12 @@ as_opt_id:
     $$ = $2
   }
 
-lookup_opt:
-  { $$ = false }
+strategy_opt:
+  { $$ = UndefinedJoinStrategy }
 | LOOKUP
-  { $$ = true }
+  { $$ = LookupJoinStrategy }
+| STREAM
+  { $$ = StreamJoinStrategy }
 
 table_alias:
   table_id

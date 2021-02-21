@@ -356,8 +356,10 @@ func ParseJoinTableExpression(expr *sqlparser.JoinTableExpr) (logical.Node, erro
 	}
 
 	strategy := logical.JoinStrategyUndefined
-	if expr.ForceLookup {
+	if expr.Strategy == sqlparser.LookupJoinStrategy {
 		strategy = logical.JoinStrategyLookup
+	} else if expr.Strategy == sqlparser.StreamJoinStrategy {
+		strategy = logical.JoinStrategyStream
 	}
 
 	switch expr.Join {

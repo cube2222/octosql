@@ -2073,22 +2073,25 @@ func (node JoinCondition) walkSubtree(visit Visit) error {
 
 // JoinTableExpr represents a TableExpr that's a JOIN operation.
 type JoinTableExpr struct {
-	LeftExpr    TableExpr
-	ForceLookup bool
-	Join        string
-	RightExpr   TableExpr
-	Condition   JoinCondition
+	LeftExpr  TableExpr
+	Strategy  string
+	Join      string
+	RightExpr TableExpr
+	Condition JoinCondition
 }
 
 // JoinTableExpr.Join
 const (
-	JoinStr             = "join"
-	StraightJoinStr     = "straight_join"
-	LeftJoinStr         = "left join"
-	RightJoinStr        = "right join"
-	NaturalJoinStr      = "natural join"
-	NaturalLeftJoinStr  = "natural left join"
-	NaturalRightJoinStr = "natural right join"
+	JoinStr               = "join"
+	StraightJoinStr       = "straight_join"
+	LeftJoinStr           = "left join"
+	RightJoinStr          = "right join"
+	NaturalJoinStr        = "natural join"
+	NaturalLeftJoinStr    = "natural left join"
+	NaturalRightJoinStr   = "natural right join"
+	UndefinedJoinStrategy = "undefined"
+	LookupJoinStrategy    = "lookup"
+	StreamJoinStrategy    = "stream"
 )
 
 // Format formats the node.

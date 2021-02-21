@@ -2,95 +2,105 @@ package slicedb
 
 import (
 	"fmt"
-	"log"
-	"math"
-	"time"
-
-	"github.com/jackc/pgx"
-	"github.com/jackc/pgx/pgtype"
+	"reflect"
 
 	. "github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
-	"github.com/cube2222/octosql/physical"
 )
 
 type DatasourceExecuting struct {
-	fields []physical.SchemaField
-	table  string
-
-	placeholderExprs []Expression
-	db               *pgx.Conn
-	stmt             *pgx.PreparedStatement
+	values interface{}
 }
 
 func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
-	placeholderValues := make([]interface{}, len(d.placeholderExprs))
-	for i := range d.placeholderExprs {
-		value, err := d.placeholderExprs[i].Evaluate(ctx)
-		if err != nil {
-			return fmt.Errorf("couldn't evaluate pushed-down predicate placeholder expression: %w", err)
-		}
-		placeholderValues[i] = value.ToRawGoValue()
-	}
+	tableValue := reflect.ValueOf(d.values)
+	for i := 0; i < tableValue.Len(); i++ {
+		value := getValueFromReflectValue(tableValue.Index(i))
 
-	rows, err := d.db.QueryEx(ctx, d.stmt.SQL, nil, placeholderValues...)
-	if err != nil {
-		return fmt.Errorf("couldn't execute database query: %w", err)
-	}
-
-	for rows.Next() {
-		values, err := rows.Values()
-		if err != nil {
-			return fmt.Errorf("couldn't get row values: %w", err)
-		}
-		recordValues := make([]octosql.Value, len(values))
-		for i, value := range values {
-			switch value := value.(type) {
-			case int:
-				recordValues[i] = octosql.NewInt(value)
-			case int8:
-				recordValues[i] = octosql.NewInt(int(value))
-			case int16:
-				recordValues[i] = octosql.NewInt(int(value))
-			case int32:
-				recordValues[i] = octosql.NewInt(int(value))
-			case int64:
-				recordValues[i] = octosql.NewInt(int(value))
-			case uint8:
-				recordValues[i] = octosql.NewInt(int(value))
-			case uint16:
-				recordValues[i] = octosql.NewInt(int(value))
-			case uint32:
-				recordValues[i] = octosql.NewInt(int(value))
-			case uint64:
-				recordValues[i] = octosql.NewInt(int(value))
-			case bool:
-				recordValues[i] = octosql.NewBoolean(value)
-			case float32:
-				recordValues[i] = octosql.NewFloat(float64(value))
-			case float64:
-				recordValues[i] = octosql.NewFloat(value)
-			case string:
-				recordValues[i] = octosql.NewString(value)
-			case time.Time:
-				recordValues[i] = octosql.NewTime(value)
-			case nil:
-				recordValues[i] = octosql.NewNull()
-			case *pgtype.Numeric:
-				recordValues[i] = octosql.NewFloat(float64(value.Int.Int64()) * math.Pow10(int(value.Exp)))
-			default:
-				log.Printf("unknown postgres value type, setting null: %T, %+v", value, value)
-				recordValues[i] = octosql.NewNull()
-
-				// TODO: Handle more types.
-			}
-		}
-		if err := produce(ProduceFromExecutionContext(ctx), NewRecord(recordValues, false)); err != nil {
+		if err := produce(ProduceFromExecutionContext(ctx), NewRecord(value.FieldValues, false)); err != nil {
 			return fmt.Errorf("couldn't produce record: %w", err)
 		}
 	}
-	if err := d.db.Close(); err != nil {
-		return fmt.Errorf("couldn't close database: %w", err)
-	}
+
 	return nil
+}
+
+var boolType = reflect.TypeOf(false)
+var intType = reflect.TypeOf(int(0))
+var float64Type = reflect.TypeOf(float64(0))
+var stringType = reflect.TypeOf(string(""))
+
+func getValueFromReflectValue(v reflect.Value) octosql.Value {
+	switch v.Kind() {
+	case reflect.Bool:
+		return octosql.NewBoolean(v.Convert(boolType).Interface().(bool))
+	case reflect.Int:
+		return octosql.NewInt(v.Convert(intType).Interface().(int))
+	case reflect.Float64:
+		return octosql.NewFloat(v.Convert(float64Type).Interface().(float64))
+	// case reflect.Array:
+	case reflect.Ptr:
+		if v.IsNil() {
+			return octosql.NewNull()
+		}
+		return getValueFromReflectValue(v.Elem())
+	case reflect.Slice:
+		values := make([]octosql.Value, v.Len())
+		var listType *octosql.Type
+		for i := 0; i < v.Len(); i++ {
+			values[i] = getValueFromReflectValue(v.Index(i))
+			if listType == nil {
+				listType = &values[i].Type
+			} else {
+				newType := octosql.TypeSum(*listType, values[i].Type)
+				listType = &newType
+			}
+		}
+		outType := octosql.Type{
+			TypeID: octosql.TypeIDList,
+			List: struct {
+				Element *octosql.Type
+			}{
+				Element: listType,
+			},
+		}
+		return octosql.Value{
+			Type: outType,
+			List: values,
+		}
+	case reflect.String:
+		return octosql.NewString(v.Convert(stringType).Interface().(string))
+	case reflect.Struct:
+		fieldCount := v.NumField()
+		fields := make([]octosql.StructField, 0, fieldCount)
+		values := make([]octosql.Value, 0, fieldCount)
+		for i := 0; i < fieldCount; i++ {
+			if !v.Field(i).CanInterface() {
+				continue
+			}
+			name := v.Type().Field(i).Name
+			if alias, ok := v.Type().Field(i).Tag.Lookup("slicequery"); ok {
+				name = alias
+			}
+			value := getValueFromReflectValue(v.Field(i))
+			fields = append(fields, octosql.StructField{
+				Name: name,
+				Type: value.Type,
+			})
+			values = append(values, value)
+		}
+		outType := octosql.Type{
+			TypeID: octosql.TypeIDStruct,
+			Struct: struct{ Fields []octosql.StructField }{Fields: fields},
+		}
+		return octosql.Value{
+			Type:        outType,
+			FieldValues: values,
+		}
+	case reflect.Interface:
+		return getValueFromReflectValue(v.Elem())
+	default:
+		// TODO: Test if array catches this.
+		panic(fmt.Sprintf("unsupported field type: %s", v.Type()))
+	}
 }

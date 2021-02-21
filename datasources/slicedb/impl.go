@@ -9,7 +9,7 @@ import (
 
 type impl struct {
 	schema physical.Schema
-	table  string
+	values interface{}
 }
 
 func (impl *impl) Schema() (physical.Schema, error) {
@@ -17,7 +17,9 @@ func (impl *impl) Schema() (physical.Schema, error) {
 }
 
 func (impl *impl) Materialize(ctx context.Context, env physical.Environment, pushedDownPredicates []physical.Expression) (execution.Node, error) {
-	panic("implement me")
+	return &DatasourceExecuting{
+		values: impl.values,
+	}, nil
 }
 
 func (impl *impl) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression) (rejected []physical.Expression, newPushedDown []physical.Expression, changed bool) {

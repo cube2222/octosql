@@ -29,17 +29,20 @@ func NewDatabase(tables map[string]interface{}) (*Database, error) {
 			sampleSize = 10
 		}
 
-		tableType := octosql.Type{
-			TypeID: octosql.TypeIDStruct,
-		}
+		var tableType *octosql.Type
 		for i := 0; i < tableValue.Len(); i++ {
 			value := tableValue.Index(i)
 			if value.Kind() != reflect.Struct {
 				return nil, fmt.Errorf("table %s elements must be structs, got %T", name, value.Type().String())
 			}
 
-			typename := getTypeFromReflectType(value.Type())
-			tableType = octosql.TypeSum(tableType, typename)
+			typename := getTypeFromReflectValue(value)
+			if tableType == nil {
+				tableType = &typename
+			} else {
+				newType := octosql.TypeSum(*tableType, typename)
+				tableType = &newType
+			}
 		}
 		fields := make([]physical.SchemaField, len(tableType.Struct.Fields))
 		for i := range tableType.Struct.Fields {
@@ -53,7 +56,7 @@ func NewDatabase(tables map[string]interface{}) (*Database, error) {
 				Fields:    fields,
 				TimeField: -1,
 			},
-			table: name,
+			values: table,
 		}
 	}
 
@@ -62,8 +65,8 @@ func NewDatabase(tables map[string]interface{}) (*Database, error) {
 	}, nil
 }
 
-func getTypeFromReflectType(t reflect.Type) octosql.Type {
-	switch t.Kind() {
+func getTypeFromReflectValue(v reflect.Value) octosql.Type {
+	switch v.Kind() {
 	case reflect.Bool:
 		return octosql.Boolean
 	case reflect.Int:
@@ -72,9 +75,12 @@ func getTypeFromReflectType(t reflect.Type) octosql.Type {
 		return octosql.Float
 	// case reflect.Array:
 	case reflect.Ptr:
-		return octosql.TypeSum(getTypeFromReflectType(t.Elem()), octosql.Null)
+		if v.IsNil() {
+			return octosql.Null
+		}
+		return octosql.TypeSum(getTypeFromReflectValue(v.Elem()), octosql.Null)
 	case reflect.Slice:
-		typename := getTypeFromReflectType(t.Elem())
+		typename := getTypeFromReflectValue(v.Elem())
 		return octosql.Type{
 			TypeID: octosql.TypeIDList,
 			List: struct {
@@ -86,23 +92,30 @@ func getTypeFromReflectType(t reflect.Type) octosql.Type {
 	case reflect.String:
 		return octosql.String
 	case reflect.Struct:
-		fieldCount := t.NumField()
-		fields := make([]octosql.StructField, fieldCount)
+		fieldCount := v.NumField()
+		fields := make([]octosql.StructField, 0, fieldCount)
 		for i := 0; i < fieldCount; i++ {
-			field := t.Field(i)
-
-			fields[i] = octosql.StructField{
-				Name: field.Name,
-				Type: getTypeFromReflectType(field.Type),
+			if !v.Field(i).CanInterface() {
+				continue
 			}
+			name := v.Type().Field(i).Name
+			if alias, ok := v.Type().Field(i).Tag.Lookup("slicequery"); ok {
+				name = alias
+			}
+			fields = append(fields, octosql.StructField{
+				Name: name,
+				Type: getTypeFromReflectValue(v.Field(i)),
+			})
 		}
 		return octosql.Type{
 			TypeID: octosql.TypeIDStruct,
 			Struct: struct{ Fields []octosql.StructField }{Fields: fields},
 		}
+	case reflect.Interface:
+		return getTypeFromReflectValue(v.Elem())
 	default:
 		// TODO: Test if array catches this.
-		panic(fmt.Sprintf("unsupported field type: %s", t.String()))
+		panic(fmt.Sprintf("unsupported field type: %s", v.Type()))
 	}
 }
 

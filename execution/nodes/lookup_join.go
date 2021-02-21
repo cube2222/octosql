@@ -19,6 +19,7 @@ func NewLookupJoin(source, joined Node) *LookupJoin {
 }
 
 func (s *LookupJoin) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
+	// TODO: Add parallelism here.
 	if err := s.source.Run(ctx, func(produceCtx ProduceContext, sourceRecord Record) error {
 		ctx := ctx.WithRecord(sourceRecord)
 

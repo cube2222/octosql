@@ -65,6 +65,7 @@ func NewDatabase(tables map[string]interface{}) (*Database, error) {
 	}, nil
 }
 
+// TODO: Handle Time and Duration.
 func getTypeFromReflectValue(v reflect.Value) octosql.Type {
 	switch v.Kind() {
 	case reflect.Bool:

@@ -174,11 +174,51 @@ var (
 )
 
 func TypeSum(t1, t2 Type) Type {
+	// TODO: For field access, field.* would be nice, to get all fields out of a structure.
 	if t1.Is(t2) == TypeRelationIs {
 		return t2
 	}
 	if t2.Is(t1) == TypeRelationIs {
 		return t1
+	}
+	if t1.TypeID == TypeIDStruct && t2.TypeID == TypeIDStruct {
+		// TODO: Nullable struct + Nullable struct should also work. Overall, it should try to match if there are multiple struct alternatives.
+		// Sum of structs is a struct. We operate on the fields.
+		// This only works if all non-overlapping fields are nullable.
+		outFields := make([]StructField, len(t1.Struct.Fields))
+		copy(outFields, t1.Struct.Fields)
+		matchedFields := make([]bool, len(t1.Struct.Fields))
+
+	newFieldLoop:
+		for _, field := range t2.Struct.Fields {
+			for i, existing := range outFields {
+				if existing.Name == field.Name {
+					outFields[i].Type = TypeSum(existing.Type, field.Type)
+					matchedFields[i] = true
+					continue newFieldLoop
+				}
+			}
+			outFields = append(outFields, field)
+			matchedFields = append(matchedFields, false)
+		}
+
+		nonNullableFieldsMatch := true
+		for i := range outFields {
+			if !matchedFields[i] && Null.Is(outFields[i].Type) < TypeRelationIs {
+				nonNullableFieldsMatch = false
+			}
+		}
+
+		if nonNullableFieldsMatch {
+			return Type{
+				TypeID: TypeIDStruct,
+				Struct: struct {
+					Fields []StructField
+				}{
+					Fields: outFields,
+				},
+			}
+		}
 	}
 	var alternatives []Type
 	addType := func(t Type) {

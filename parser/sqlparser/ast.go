@@ -2073,10 +2073,11 @@ func (node JoinCondition) walkSubtree(visit Visit) error {
 
 // JoinTableExpr represents a TableExpr that's a JOIN operation.
 type JoinTableExpr struct {
-	LeftExpr  TableExpr
-	Join      string
-	RightExpr TableExpr
-	Condition JoinCondition
+	LeftExpr    TableExpr
+	ForceLookup bool
+	Join        string
+	RightExpr   TableExpr
+	Condition   JoinCondition
 }
 
 // JoinTableExpr.Join

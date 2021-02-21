@@ -355,11 +355,16 @@ func ParseJoinTableExpression(expr *sqlparser.JoinTableExpr) (logical.Node, erro
 		}
 	}
 
+	strategy := logical.JoinStrategyUndefined
+	if expr.ForceLookup {
+		strategy = logical.JoinStrategyLookup
+	}
+
 	switch expr.Join {
 	case sqlparser.LeftJoinStr, sqlparser.RightJoinStr:
-		return logical.NewJoin(source, joined, predicate, logical.JoinTypeLeft), nil
+		return logical.NewJoin(source, joined, predicate, strategy, logical.JoinTypeLeft), nil
 	case sqlparser.JoinStr:
-		return logical.NewJoin(source, joined, predicate, logical.JoinTypeInner), nil
+		return logical.NewJoin(source, joined, predicate, strategy, logical.JoinTypeInner), nil
 	default:
 		return nil, errors.Errorf("invalid join expression: %v", expr.Join)
 	}

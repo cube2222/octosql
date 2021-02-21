@@ -17,24 +17,37 @@ const (
 	JoinTypeInner JoinType = "Inner"
 )
 
+type JoinStrategy string
+
+const (
+	JoinStrategyUndefined JoinStrategy = "UNDEFINED"
+	JoinStrategyLookup    JoinStrategy = "LOOKUP"
+)
+
 type Join struct {
 	left, right Node
 	predicate   Expression
+	strategy    JoinStrategy
 	// TODO: Handle other join types.
 	joinType JoinType
 	triggers []Trigger
 }
 
-func NewJoin(left, right Node, predicate Expression, joinType JoinType) *Join {
+func NewJoin(left, right Node, predicate Expression, strategy JoinStrategy, joinType JoinType) *Join {
 	return &Join{
 		left:      left,
 		right:     right,
 		predicate: predicate,
+		strategy:  strategy,
 		joinType:  joinType,
 	}
 }
 
 func (node *Join) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
+	if node.strategy == JoinStrategyLookup {
+		panic("Lookup join not implemented yet.")
+	}
+
 	left := node.left.Typecheck(ctx, env, logicalEnv)
 	right := node.right.Typecheck(ctx, env, logicalEnv)
 	predicate := node.predicate.Typecheck(ctx, env.WithRecordSchema(left.Schema).WithRecordSchema(right.Schema), logicalEnv)

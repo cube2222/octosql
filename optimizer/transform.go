@@ -61,14 +61,33 @@ func (t *Transformers) TransformNode(node Node) Node {
 				Trigger:              node.GroupBy.Trigger,
 			},
 		}
-	case NodeTypeJoin:
+	case NodeTypeStreamJoin:
+		leftKey := make([]Expression, len(node.StreamJoin.LeftKey))
+		for i := range node.StreamJoin.LeftKey {
+			leftKey[i] = t.TransformExpr(node.StreamJoin.LeftKey[i])
+		}
+		rightKey := make([]Expression, len(node.StreamJoin.RightKey))
+		for i := range node.StreamJoin.RightKey {
+			rightKey[i] = t.TransformExpr(node.StreamJoin.RightKey[i])
+		}
+
 		out = Node{
 			Schema:   node.Schema,
 			NodeType: node.NodeType,
-			Join: &Join{
-				Left:  t.TransformNode(node.Join.Left),
-				Right: t.TransformNode(node.Join.Right),
-				On:    t.TransformExpr(node.Join.On),
+			StreamJoin: &StreamJoin{
+				Left:     t.TransformNode(node.StreamJoin.Left),
+				Right:    t.TransformNode(node.StreamJoin.Right),
+				LeftKey:  leftKey,
+				RightKey: rightKey,
+			},
+		}
+	case NodeTypeLookupJoin:
+		out = Node{
+			Schema:   node.Schema,
+			NodeType: node.NodeType,
+			LookupJoin: &LookupJoin{
+				Source: t.TransformNode(node.LookupJoin.Source),
+				Joined: t.TransformNode(node.LookupJoin.Joined),
 			},
 		}
 	case NodeTypeMap:

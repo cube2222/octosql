@@ -17,7 +17,8 @@ type Node struct {
 	Datasource          *Datasource
 	Filter              *Filter
 	GroupBy             *GroupBy
-	Join                *Join
+	LookupJoin          *LookupJoin
+	StreamJoin          *StreamJoin
 	Map                 *Map
 	OrderBy             *OrderBy
 	Requalifier         *Requalifier
@@ -48,7 +49,8 @@ const (
 	NodeTypeDatasource NodeType = iota
 	NodeTypeFilter
 	NodeTypeGroupBy
-	NodeTypeJoin
+	NodeTypeLookupJoin
+	NodeTypeStreamJoin
 	NodeTypeMap
 	NodeTypeOrderBy
 	NodeTypeRequalifier
@@ -80,9 +82,13 @@ type Aggregate struct {
 	AggregateDescriptor AggregateDescriptor
 }
 
-type Join struct {
-	Left, Right Node
-	On          Expression
+type StreamJoin struct {
+	Left, Right       Node
+	LeftKey, RightKey []Expression
+}
+
+type LookupJoin struct {
+	Source, Joined Node
 }
 
 type Map struct {
@@ -190,75 +196,27 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (execution.N
 		trigger := node.GroupBy.Trigger.Materialize(ctx, env)
 
 		return nodes.NewGroupBy(aggregates, expressions, key, source, trigger), nil
-	case NodeTypeJoin:
-		left, err := node.Join.Left.Materialize(ctx, env)
+	case NodeTypeStreamJoin:
+		left, err := node.StreamJoin.Left.Materialize(ctx, env)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't materialize left join source: %w", err)
 		}
-		right, err := node.Join.Right.Materialize(ctx, env)
+		right, err := node.StreamJoin.Right.Materialize(ctx, env)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't materialize right join source: %w", err)
 		}
 
-		// TODO: Move to physical.Join
-		parts := node.Join.On.SplitByAnd()
-		leftKey := make([]Expression, len(parts))
-		rightKey := make([]Expression, len(parts))
-		for i, part := range parts {
-			if part.ExpressionType != ExpressionTypeFunctionCall {
-				panic("only equality joins currently supported")
-			}
-			if part.FunctionCall.Name != "=" {
-				panic("only equality joins currently supported")
-			}
-			firstPart := part.FunctionCall.Arguments[0]
-			secondPart := part.FunctionCall.Arguments[1]
-			// TODO: Move ambiguity errors to typecheck phase.
-			firstPartVariables := firstPart.VariablesUsed()
-			firstPartUsesLeft, firstPartUsesRight, err := usesVariablesFromLeftOrRight(node.Join.Left.Schema, node.Join.Right.Schema, firstPartVariables)
-			if err != nil {
-				return nil, err
-			}
-			secondPartVariables := secondPart.VariablesUsed()
-			secondPartUsesLeft, secondPartUsesRight, err := usesVariablesFromLeftOrRight(node.Join.Left.Schema, node.Join.Right.Schema, secondPartVariables)
-			if err != nil {
-				return nil, err
-			}
-
-			if firstPartUsesLeft && firstPartUsesRight {
-				return nil, fmt.Errorf("left hand side of %d join predicate equality uses variables from both input tables", i)
-			}
-			if secondPartUsesLeft && secondPartUsesRight {
-				return nil, fmt.Errorf("right hand side of %d join predicate equality uses variables from both input tables", i)
-			}
-
-			if firstPartUsesLeft && secondPartUsesLeft {
-				return nil, fmt.Errorf("both side of %d join predicate equality use variables from the left input table", i)
-			}
-			if firstPartUsesRight && secondPartUsesRight {
-				return nil, fmt.Errorf("both side of %d join predicate equality use variables from the right input table", i)
-			}
-
-			if !firstPartUsesRight && !secondPartUsesLeft {
-				leftKey[i] = firstPart
-				rightKey[i] = secondPart
-			} else if !firstPartUsesLeft && !secondPartUsesRight {
-				leftKey[i] = secondPart
-				rightKey[i] = firstPart
-			}
-		}
-
-		leftKeyExprs := make([]execution.Expression, len(leftKey))
-		for i := range leftKey {
-			expr, err := leftKey[i].Materialize(ctx, env.WithRecordSchema(node.Join.Left.Schema))
+		leftKeyExprs := make([]execution.Expression, len(node.StreamJoin.LeftKey))
+		for i := range node.StreamJoin.LeftKey {
+			expr, err := node.StreamJoin.LeftKey[i].Materialize(ctx, env.WithRecordSchema(node.StreamJoin.Left.Schema))
 			if err != nil {
 				return nil, fmt.Errorf("couldn't materialize stream join left key expression with index %d: %w", i, err)
 			}
 			leftKeyExprs[i] = expr
 		}
-		rightKeyExprs := make([]execution.Expression, len(rightKey))
-		for i := range rightKey {
-			expr, err := rightKey[i].Materialize(ctx, env.WithRecordSchema(node.Join.Right.Schema))
+		rightKeyExprs := make([]execution.Expression, len(node.StreamJoin.RightKey))
+		for i := range node.StreamJoin.RightKey {
+			expr, err := node.StreamJoin.RightKey[i].Materialize(ctx, env.WithRecordSchema(node.StreamJoin.Right.Schema))
 			if err != nil {
 				return nil, fmt.Errorf("couldn't materialize stream join right key expression with index %d: %w", i, err)
 			}
@@ -266,6 +224,17 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (execution.N
 		}
 
 		return nodes.NewStreamJoin(left, right, leftKeyExprs, rightKeyExprs), nil
+	case NodeTypeLookupJoin:
+		source, err := node.LookupJoin.Source.Materialize(ctx, env)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't materialize left join source: %w", err)
+		}
+		joined, err := node.LookupJoin.Joined.Materialize(ctx, env.WithRecordSchema(node.LookupJoin.Source.Schema))
+		if err != nil {
+			return nil, fmt.Errorf("couldn't materialize right join source: %w", err)
+		}
+
+		return nodes.NewLookupJoin(source, joined), nil
 	case NodeTypeMap:
 		source, err := node.Map.Source.Materialize(ctx, env)
 		if err != nil {

@@ -19,7 +19,7 @@ type DatasourceExecuting struct {
 	table  string
 
 	placeholderExprs []Expression
-	db               *pgx.Conn
+	db               *pgx.ConnPool
 	stmt             *pgx.PreparedStatement
 }
 
@@ -88,9 +88,6 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 		if err := produce(ProduceFromExecutionContext(ctx), NewRecord(recordValues, false)); err != nil {
 			return fmt.Errorf("couldn't produce record: %w", err)
 		}
-	}
-	if err := d.db.Close(); err != nil {
-		return fmt.Errorf("couldn't close database: %w", err)
 	}
 	return nil
 }

@@ -32,15 +32,18 @@ func (t *testLogger) Log(level pgx.LogLevel, msg string, data map[string]interfa
 	log.Printf("%s %s %+v", level, msg, data)
 }
 
-func connect(config *Config) (*pgx.Conn, error) {
-	db, err := pgx.Connect(pgx.ConnConfig{
-		Host:      config.Host,
-		Port:      uint16(config.Port),
-		User:      config.User,
-		Database:  config.Database,
-		Password:  config.Password,
-		TLSConfig: nil,
-		Logger:    &testLogger{},
+func connect(config *Config) (*pgx.ConnPool, error) {
+	db, err := pgx.NewConnPool(pgx.ConnPoolConfig{
+		ConnConfig: pgx.ConnConfig{
+			Host:      config.Host,
+			Port:      uint16(config.Port),
+			User:      config.User,
+			Database:  config.Database,
+			Password:  config.Password,
+			TLSConfig: nil,
+			Logger:    &testLogger{},
+		},
+		MaxConnections: 128,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("couldn't open database: %w", err)
@@ -55,12 +58,14 @@ func Creator(ctx context.Context, configUntyped config.DatabaseSpecificConfig) (
 	if err != nil {
 		return nil, fmt.Errorf("couldn't connect to database: %w", err)
 	}
-	if err := db.Ping(ctx); err != nil {
+	conn, err := db.Acquire()
+	if err != nil {
+		return nil, fmt.Errorf("couldn't acquire connection from pool: %w", err)
+	}
+	if err := conn.Ping(ctx); err != nil {
 		return nil, fmt.Errorf("couldn't ping database: %w", err)
 	}
-	if err := db.Close(); err != nil {
-		return nil, fmt.Errorf("couldn't close database: %w", err)
-	}
+	db.Release(conn)
 	return &Database{
 		Config: cfg,
 	}, nil
@@ -120,10 +125,6 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 			Name: descriptions[i][0],
 			Type: t,
 		}
-	}
-
-	if err := db.Close(); err != nil {
-		return nil, fmt.Errorf("couldn't close database: %w", err)
 	}
 
 	return &impl{

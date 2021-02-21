@@ -174,11 +174,35 @@ var (
 )
 
 func TypeSum(t1, t2 Type) Type {
+	// TODO: For field access, field.* would be nice, to get all fields out of a structure.
 	if t1.Is(t2) == TypeRelationIs {
 		return t2
 	}
 	if t2.Is(t1) == TypeRelationIs {
 		return t1
+	}
+	if t1.TypeID == TypeIDStruct && t2.TypeID == TypeIDStruct {
+		// Sum of structs is a struct. We operate on the fields.
+		outFields := make([]StructField, len(t1.Struct.Fields))
+		copy(outFields, t1.Struct.Fields)
+	newFieldLoop:
+		for _, field := range t2.Struct.Fields {
+			for i, existing := range outFields {
+				if existing.Name == field.Name {
+					outFields[i].Type = TypeSum(existing.Type, field.Type)
+					continue newFieldLoop
+				}
+			}
+			outFields = append(outFields, field)
+		}
+		return Type{
+			TypeID: TypeIDStruct,
+			Struct: struct {
+				Fields []StructField
+			}{
+				Fields: outFields,
+			},
+		}
 	}
 	var alternatives []Type
 	addType := func(t Type) {

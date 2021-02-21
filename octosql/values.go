@@ -252,7 +252,9 @@ func (value Value) append(builder *strings.Builder) {
 			builder.WriteString(value.Type.Struct.Fields[i].Name)
 			builder.WriteString(": ")
 			v.append(builder)
-			builder.WriteString(", ")
+			if i != len(value.FieldValues)-1 {
+				builder.WriteString(", ")
+			}
 		}
 		builder.WriteString(" }")
 

@@ -47,8 +47,9 @@ type DatasourceRepository struct {
 	// TODO: A może jednak ten bardziej dynamiczny interfejs? Że database.<table> i wtedy sie resolvuje
 	// Bo inaczej będzie na start strasznie dużo rzeczy ładować niepotrzebnych dla wszystkich
 	// skonfigurowanych baz danych.
-	Databases    map[string]Database
-	FileHandlers map[string]func(name string) (DatasourceImplementation, error)
+	Databases       map[string]Database
+	DefaultDatabase string
+	FileHandlers    map[string]func(name string) (DatasourceImplementation, error)
 }
 
 type Database interface {
@@ -73,6 +74,10 @@ func (dr *DatasourceRepository) GetDatasource(ctx context.Context, name string) 
 		}
 
 		return db.GetTable(ctx, name[index+1:])
+	}
+	db, ok := dr.Databases[dr.DefaultDatabase]
+	if ok {
+		return db.GetTable(ctx, name)
 	}
 	// TODO: If there is no dot, iterate over all tables in all datasources.
 	return nil, fmt.Errorf("unknown datasource: %s", name)

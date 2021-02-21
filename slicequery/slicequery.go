@@ -56,7 +56,8 @@ func Query(ctx context.Context, tables map[string]interface{}, query string, onE
 		},
 		Functions: functions.FunctionMap(),
 		Datasources: &physical.DatasourceRepository{
-			Databases: databases,
+			Databases:       databases,
+			DefaultDatabase: "args",
 			FileHandlers: map[string]func(name string) (physical.DatasourceImplementation, error){
 				"json": json.Creator,
 				"csv":  csv.Creator,

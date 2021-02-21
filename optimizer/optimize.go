@@ -1,8 +1,6 @@
 package optimizer
 
 import (
-	"log"
-
 	. "github.com/cube2222/octosql/physical"
 )
 
@@ -15,7 +13,6 @@ func Optimize(node Node) Node {
 	changed := true
 	i := 0
 	for changed {
-		log.Printf("running %d round of optimizations", i)
 		i++
 		changed = false
 		for _, rule := range defaultOptimizationRules {

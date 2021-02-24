@@ -79,21 +79,22 @@ message Or {
     repeated Expression arguments = 2;
 }
 message TypeAssertion {
-    Expression argument = 1;
+    Expression expression = 1;
     Type target_type = 2;
 }
 
 message Value {
     Type type = 1;
     oneof value {
-        int64 int = 2;
-        float float = 3;
-        bool bool = 4;
-        string str = 5;
-        google.protobuf.Timestamp time = 6;
-        google.protobuf.Duration duration = 7;
-        Values list = 8;
-        Values field_values = 9;
+        bool null = 2;
+        int64 int = 3;
+        double float = 4;
+        bool boolean = 5;
+        string str = 6;
+        google.protobuf.Timestamp time = 7;
+        google.protobuf.Duration duration = 8;
+        Values list = 9;
+        Values field_values = 10;
     }
 }
 

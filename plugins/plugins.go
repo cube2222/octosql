@@ -5,6 +5,7 @@ import (
 
 	"github.com/gogo/protobuf/types"
 
+	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
@@ -313,4 +314,15 @@ func ExpressionFromProto(expr *Expression) physical.Expression {
 	}
 
 	panic("unexhaustive expression type match")
+}
+
+func RecordToProto(record execution.Record) *Record {
+	values := make([]*Value, len(record.Values))
+	for i := range record.Values {
+		values[i] = ValueToProto(record.Values[i])
+	}
+	return &Record{
+		Value:      &Values{Values: values},
+		Retraction: record.Retraction,
+	}
 }

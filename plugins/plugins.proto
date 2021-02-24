@@ -45,8 +45,9 @@ message SchemaField {
 }
 
 message RunRequest {
-    Expression predicate = 1;
-    map<string, Value> variable_values = 2;
+    string table = 1;
+    Expression predicate = 2;
+    map<string, Value> variable_values = 3;
 }
 
 message Expression {

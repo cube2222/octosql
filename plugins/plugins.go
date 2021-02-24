@@ -326,3 +326,11 @@ func RecordToProto(record execution.Record) *Record {
 		Retraction: record.Retraction,
 	}
 }
+
+func RecordFromProto(record *Record) execution.Record {
+	values := make([]octosql.Value, len(record.Value.Values))
+	for i := range record.Value.Values {
+		values[i] = ValueFromProto(record.Value.Values[i])
+	}
+	return execution.NewRecord(values, record.Retraction)
+}

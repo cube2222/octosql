@@ -20,9 +20,12 @@ import (
 	"github.com/cube2222/octosql/datasources/json"
 	"github.com/cube2222/octosql/datasources/postgres"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/execution/nodes"
 	"github.com/cube2222/octosql/functions"
 	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/optimizer"
+	"github.com/cube2222/octosql/outputs/batch"
+	"github.com/cube2222/octosql/outputs/stream"
 	"github.com/cube2222/octosql/parser"
 	"github.com/cube2222/octosql/parser/sqlparser"
 	"github.com/cube2222/octosql/physical"
@@ -53,7 +56,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	logicalPlan, err := parser.ParseNode(statement.(sqlparser.SelectStatement))
+	logicalPlan, outputOptions, err := parser.ParseNode(statement.(sqlparser.SelectStatement), true)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -92,27 +95,72 @@ func main() {
 		},
 	)
 	spew.Dump(physicalPlan.Schema)
+	start := time.Now()
 	physicalPlan = optimizer.Optimize(physicalPlan)
+	log.Printf("time for optimisation: %s", time.Since(start))
 	executionPlan, err := physicalPlan.Materialize(
 		context.Background(),
 		env,
 	)
-
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := executionPlan.Run(
+	// TODO: Each setup costs us a DESCRIBE, so caching is really a must. Specifically, caching of a materialized plan.
+	log.Printf("time to materialization: %s", time.Since(start))
+
+	orderByExpressions := make([]execution.Expression, len(outputOptions.OrderByExpressions))
+	for i := range outputOptions.OrderByExpressions {
+		physicalExpr := outputOptions.OrderByExpressions[i].Typecheck(context.Background(), env.WithRecordSchema(physicalPlan.Schema), logical.Environment{})
+		execExpr, err := physicalExpr.Materialize(context.Background(), env.WithRecordSchema(physicalPlan.Schema))
+		if err != nil {
+			log.Fatalf("couldn't materialize output order by expression with index %d: %v", i, err)
+		}
+		orderByExpressions[i] = execExpr
+	}
+	orderByDirections := logical.DirectionsToMultipliers(outputOptions.OrderByDirections)
+
+	var sink interface {
+		Run(execCtx execution.ExecutionContext) error
+	}
+
+	switch os.Getenv("OCTOSQL_OUTPUT") {
+	case "live_table":
+		sink = batch.NewOutputPrinter(
+			executionPlan,
+			orderByExpressions,
+			logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
+			physicalPlan.Schema,
+			batch.NewTableFormatter,
+			true,
+		)
+	case "batch_table":
+		sink = batch.NewOutputPrinter(
+			executionPlan,
+			orderByExpressions,
+			logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
+			physicalPlan.Schema,
+			batch.NewTableFormatter,
+			false,
+		)
+	case "stream_native":
+		if len(orderByExpressions) > 0 {
+			executionPlan = nodes.NewBatchOrderBy(
+				executionPlan,
+				orderByExpressions,
+				orderByDirections,
+			)
+		}
+
+		sink = stream.NewOutputPrinter(
+			executionPlan,
+			stream.NewNativeFormat(physicalPlan.Schema),
+		)
+	}
+
+	if err := sink.Run(
 		execution.ExecutionContext{
 			Context:         context.Background(),
 			VariableContext: nil,
-		},
-		func(ctx execution.ProduceContext, record execution.Record) error {
-			log.Println(record.String())
-			return nil
-		},
-		func(ctx execution.ProduceContext, msg execution.MetadataMessage) error {
-			// log.Println(msg.Watermark)
-			return nil
 		},
 	); err != nil {
 		log.Fatal(err)

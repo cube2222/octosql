@@ -41,7 +41,7 @@ func connect(config *Config) (*pgx.ConnPool, error) {
 			Database:  config.Database,
 			Password:  config.Password,
 			TLSConfig: nil,
-			Logger:    &testLogger{},
+			// Logger:    &testLogger{},
 		},
 		MaxConnections: 128,
 	})

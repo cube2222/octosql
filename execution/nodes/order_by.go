@@ -17,8 +17,6 @@ type OrderBy struct {
 	directionMultipliers []int
 }
 
-// TODO: key and comparator
-
 func NewBatchOrderBy(source Node, keyExprs []Expression, directionMultipliers []int) *OrderBy {
 	return &OrderBy{
 		source:               source,

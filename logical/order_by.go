@@ -9,6 +9,22 @@ import (
 
 type OrderDirection string
 
+func DirectionsToMultipliers(directions []OrderDirection) []int {
+	directionMultipliers := make([]int, len(directions))
+	for i, direction := range directions {
+		switch direction {
+		case "asc":
+			directionMultipliers[i] = 1
+		case "desc":
+			directionMultipliers[i] = -1
+		default:
+			panic(fmt.Errorf("invalid order by direction: %s", direction))
+		}
+	}
+
+	return directionMultipliers
+}
+
 type OrderBy struct {
 	keyExprs   []Expression
 	directions []OrderDirection
@@ -31,17 +47,7 @@ func (node *OrderBy) Typecheck(ctx context.Context, env physical.Environment, lo
 		keyExprs[i] = node.keyExprs[i].Typecheck(ctx, env.WithRecordSchema(source.Schema), logicalEnv)
 	}
 
-	directionMultipliers := make([]int, len(node.keyExprs))
-	for i, direction := range node.directions {
-		switch direction {
-		case "asc":
-			directionMultipliers[i] = 1
-		case "desc":
-			directionMultipliers[i] = -1
-		default:
-			panic(fmt.Errorf("invalid order by direction: %s", direction))
-		}
-	}
+	directionMultipliers := DirectionsToMultipliers(node.directions)
 
 	return physical.Node{
 		Schema:   source.Schema,

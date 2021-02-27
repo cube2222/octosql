@@ -45,40 +45,35 @@ import (
 // 	return root, nil
 // }
 
-func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
+type OutputOptions struct {
+	Limit              int
+	OrderByExpressions []logical.Expression
+	OrderByDirections  []logical.OrderDirection
+}
+
+func ParseSelect(statement *sqlparser.Select, topmost bool) (logical.Node, *OutputOptions, error) {
 	var err error
 	var root logical.Node
-	// var outputOptions logical.OutputOptions
+	var outputOptions *OutputOptions
+	if topmost {
+		outputOptions = &OutputOptions{}
+	}
 
 	if len(statement.From) != 1 {
-		return nil, errors.Errorf("currently only one expression in from supported, got %v", len(statement.From))
+		return nil, nil, errors.Errorf("currently only one expression in from supported, got %v", len(statement.From))
 	}
 
 	root, err = ParseTableExpression(statement.From[0])
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't parse from expression")
+		return nil, nil, errors.Wrap(err, "couldn't parse from expression")
 	}
-
-	// If we get a join we want to parse triggers for it. It is done here, because otherwise passing statement.Triggers
-	// would have to get to like 4 functions, which is a bit of a pain, since the type check here.
-	// if joinRoot, ok := root.(*logical.Join); ok {
-	// 	triggers := make([]logical.Trigger, len(statement.Trigger))
-	// 	for i := range statement.Trigger {
-	// 		triggers[i], err = ParseTrigger(statement.Trigger[i])
-	// 		if err != nil {
-	// 			return nil, errors.Wrapf(err, "couldn't parse trigger with index %d", i)
-	// 		}
-	// 	}
-	//
-	// 	root = joinRoot.WithTriggers(triggers)
-	// }
 
 	// We want to have normal expressions first, star expressions later
 
 	if statement.Where != nil {
 		filterFormula, err := ParseExpression(statement.Where.Expr)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't parse where expression")
+			return nil, nil, errors.Wrap(err, "couldn't parse where expression")
 		}
 		root = logical.NewFilter(filterFormula, root)
 	}
@@ -88,7 +83,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 		for i := range statement.GroupBy {
 			key[i], err = ParseExpression(statement.GroupBy[i])
 			if err != nil {
-				return nil, errors.Wrapf(err, "couldn't parse group key expression with index %v", i)
+				return nil, nil, errors.Wrapf(err, "couldn't parse group key expression with index %v", i)
 			}
 		}
 
@@ -118,16 +113,16 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 						continue selectExprLoop
 					}
 				}
-				return nil, errors.Errorf("non-aggregate %d expression in grouping must be part of group by key", i)
+				return nil, nil, errors.Errorf("non-aggregate %d expression in grouping must be part of group by key", i)
 			}
-			return nil, errors.Errorf("couldn't parse expression as aggregate nor expression: %s %s", err, exprErr)
+			return nil, nil, errors.Errorf("couldn't parse expression as aggregate nor expression: %s %s", err, exprErr)
 		}
 
 		triggers := make([]logical.Trigger, len(statement.Trigger))
 		for i := range statement.Trigger {
 			triggers[i], err = ParseTrigger(statement.Trigger[i])
 			if err != nil {
-				return nil, errors.Wrapf(err, "couldn't parse trigger with index %d", i)
+				return nil, nil, errors.Wrapf(err, "couldn't parse trigger with index %d", i)
 			}
 		}
 
@@ -194,13 +189,13 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 
 			aliasedExpression, ok := statement.SelectExprs[i].(*sqlparser.AliasedExpr)
 			if !ok {
-				return nil, errors.Errorf("expected aliased expression in select on index %v, got %v %v",
+				return nil, nil, errors.Errorf("expected aliased expression in select on index %v, got %v %v",
 					i, statement.SelectExprs[i], reflect.TypeOf(statement.SelectExprs[i]))
 			}
 
 			expressions[i], aliases[i], err = ParseAliasedExpression(aliasedExpression)
 			if err != nil {
-				return nil, errors.Wrapf(err, "couldn't parse aliased expression with index %d", i)
+				return nil, nil, errors.Wrapf(err, "couldn't parse aliased expression with index %d", i)
 			}
 		}
 
@@ -210,71 +205,82 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, error) {
 	if statement.OrderBy != nil {
 		orderByExpressions, orderByDirections, err := parseOrderByExpressions(statement.OrderBy)
 		if err != nil {
-			return nil, errors.Wrap(err, "couldn't parse keys of order by")
+			return nil, nil, errors.Wrap(err, "couldn't parse keys of order by")
 		}
 
-		// TODO: Optimization which pushes order by into output printer. For live batch output.
-		root = logical.NewOrderBy(orderByExpressions, orderByDirections, root)
+		if !topmost {
+			// TODO: Optimization which pushes order by into output printer. For live batch output.
+			root = logical.NewOrderBy(orderByExpressions, orderByDirections, root)
+		} else {
+			outputOptions.OrderByExpressions = orderByExpressions
+			outputOptions.OrderByDirections = orderByDirections
+		}
 	}
 
 	// if len(statement.Distinct) > 0 {
 	// 	root = logical.NewDistinct(root)
 	// }
 
-	// if statement.Limit != nil {
-	// 	limitExpr, offsetExpr, err := parseTwoSubexpressions(statement.Limit.Rowcount, statement.Limit.Offset)
-	// 	if err != nil {
-	// 		return nil, errors.Wrap(err, "couldn't parse limit/offset clause subexpression")
-	// 	}
-	//
-	// 	if limitExpr != nil {
-	// 		// outputOptions.Limit = limitExpr
-	// 	}
-	// 	if offsetExpr != nil {
-	// 		// outputOptions.Offset = offsetExpr
-	// 	}
-	// }
+	if statement.Limit != nil {
+		if !topmost {
+			return nil, nil, errors.Errorf("LIMIT in non-topmost expression not currently supported.")
+		}
 
-	return root, nil
+		l, ok := statement.Limit.Rowcount.(*sqlparser.SQLVal)
+		if !ok {
+			return nil, nil, errors.Errorf("LIMIT parameter must be constant, is: %+v", statement.Limit.Rowcount)
+		}
+		if l.Type != sqlparser.IntVal {
+			return nil, nil, errors.Errorf("LIMIT parameter must be Int constant, is: %+v", l.Type)
+		}
+		i, err := strconv.ParseInt(string(l.Val), 10, 64)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "LIMIT parameter must be Int constant, couldn't parse")
+		}
+
+		outputOptions.Limit = int(i)
+	}
+
+	return root, outputOptions, nil
 }
 
-func ParseWith(statement *sqlparser.With) (logical.Node, error) {
-	source, err := ParseNode(statement.Select)
+func ParseWith(statement *sqlparser.With, topmost bool) (logical.Node, *OutputOptions, error) {
+	source, outputOptions, err := ParseNode(statement.Select, topmost)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't parse underlying select in WITH statement")
+		return nil, nil, errors.Wrap(err, "couldn't parse underlying select in WITH statement")
 	}
 
 	nodes := make([]logical.Node, len(statement.CommonTableExpressions))
 	names := make([]string, len(statement.CommonTableExpressions))
 	for i, cte := range statement.CommonTableExpressions {
-		node, err := ParseNode(cte.Select)
+		node, _, err := ParseNode(cte.Select, false)
 		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't parse common table expression %s with index %d", cte.Name, i)
+			return nil, nil, errors.Wrapf(err, "couldn't parse common table expression %s with index %d", cte.Name, i)
 		}
 		nodes[i] = node
 		names[i] = cte.Name.String()
 	}
 
-	return logical.NewWith(names, nodes, source), nil
+	return logical.NewWith(names, nodes, source), outputOptions, nil
 }
 
-func ParseNode(statement sqlparser.SelectStatement) (logical.Node, error) {
+func ParseNode(statement sqlparser.SelectStatement, topmost bool) (logical.Node, *OutputOptions, error) {
 	switch statement := statement.(type) {
 	case *sqlparser.Select:
-		return ParseSelect(statement)
+		return ParseSelect(statement, topmost)
 
 	// case *sqlparser.Union:
 	// 	plan, err := ParseUnion(statement)
 	// 	return plan, &logical.OutputOptions{}, err
 
 	case *sqlparser.ParenSelect:
-		return ParseNode(statement.Select)
+		return ParseNode(statement.Select, topmost)
 
 	case *sqlparser.With:
-		return ParseWith(statement)
+		return ParseWith(statement, topmost)
 
 	default:
-		return nil, errors.Errorf("unsupported select %+v of type %v", statement, reflect.TypeOf(statement))
+		return nil, nil, errors.Errorf("unsupported select %+v of type %v", statement, reflect.TypeOf(statement))
 	}
 }
 
@@ -314,7 +320,7 @@ func ParseAliasedTableExpression(expr *sqlparser.AliasedTableExpr) (logical.Node
 		return out, nil
 
 	case *sqlparser.Subquery:
-		subQuery, err := ParseNode(subExpr.Select)
+		subQuery, _, err := ParseNode(subExpr.Select, false)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't parse subquery")
 		}
@@ -570,7 +576,7 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 			return nil, errors.Errorf("expected select statement in subquery, go %v %v",
 				expr.Select, reflect.TypeOf(expr.Select))
 		}
-		subquery, err := ParseNode(selectExpr)
+		subquery, _, err := ParseNode(selectExpr, false)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't parse select expression")
 		}
@@ -749,34 +755,4 @@ func parseOrderByExpressions(orderBy sqlparser.OrderBy) ([]logical.Expression, [
 	}
 
 	return expressions, directions, nil
-}
-
-func parseTwoSubexpressions(limit, offset sqlparser.Expr) (logical.Expression, logical.Expression, error) {
-	/* 	to be strict neither LIMIT nor OFFSET is in SQL standard...
-	*	parser doesn't support OFFSET clause without LIMIT clause - Google BigQuery syntax
-	*	TODO (?): add support of OFFSET clause without LIMIT clause to parser:
-	*	just append to limit_opt in sqlparser/sql.y clause:
-	*		| OFFSET expression
-	*		  {
-	*			$$ = &Limit{Offset: $2}
-	*		  }
-	 */
-	var limitExpr, offsetExpr logical.Expression = nil, nil
-	var err error
-
-	if limit != nil {
-		limitExpr, err = ParseExpression(limit)
-		if err != nil {
-			return nil, nil, errors.Errorf("couldn't parse limit's Rowcount subexpression")
-		}
-	}
-
-	if offset != nil {
-		offsetExpr, err = ParseExpression(offset)
-		if err != nil {
-			return nil, nil, errors.Errorf("couldn't parse limit's Offset subexpression")
-		}
-	}
-
-	return limitExpr, offsetExpr, nil
 }

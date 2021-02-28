@@ -1,7 +1,8 @@
 package stream
 
 import (
-	"log"
+	"fmt"
+	"os"
 
 	"github.com/pkg/errors"
 
@@ -53,12 +54,12 @@ func NewNativeFormat(schema physical.Schema) *NativeFormat {
 }
 
 func (n *NativeFormat) WriteRecord(record Record) error {
-	log.Println(record.String())
+	fmt.Fprintf(os.Stdout, record.String()+"\n")
 	return nil
 }
 
 func (n *NativeFormat) WriteMeta(message MetadataMessage) error {
-	log.Println("watermark: ", message.Watermark)
+	fmt.Fprintf(os.Stdout, "watermark: %s\n", message.Watermark)
 	return nil
 }
 

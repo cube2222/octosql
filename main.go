@@ -152,6 +152,9 @@ func main() {
 				orderByDirections,
 			)
 		}
+		if outputOptions.Limit > 0 {
+			log.Fatal("LIMIT clause not supported with stream output.")
+		}
 
 		sink = stream.NewOutputPrinter(
 			executionPlan,

@@ -15,6 +15,7 @@ type Node struct {
 	NodeType NodeType
 	// Only one of the below may be non-null.
 	Datasource          *Datasource
+	Distinct            *Distinct
 	Filter              *Filter
 	GroupBy             *GroupBy
 	LookupJoin          *LookupJoin
@@ -47,6 +48,7 @@ type NodeType int
 
 const (
 	NodeTypeDatasource NodeType = iota
+	NodeTypeDistinct
 	NodeTypeFilter
 	NodeTypeGroupBy
 	NodeTypeLookupJoin
@@ -61,6 +63,10 @@ type Datasource struct {
 	Name                     string
 	DatasourceImplementation DatasourceImplementation
 	Predicates               []Expression
+}
+
+type Distinct struct {
+	Source Node
 }
 
 type Filter struct {
@@ -158,6 +164,12 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (execution.N
 	switch node.NodeType {
 	case NodeTypeDatasource:
 		return node.Datasource.DatasourceImplementation.Materialize(ctx, env, node.Datasource.Predicates)
+	case NodeTypeDistinct:
+		source, err := node.Distinct.Source.Materialize(ctx, env)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't materialize distinct source: %w", err)
+		}
+		return nodes.NewDistinct(source), nil
 	case NodeTypeFilter:
 		source, err := node.Filter.Source.Materialize(ctx, env)
 		if err != nil {

@@ -27,6 +27,14 @@ func (t *Transformers) TransformNode(node Node) Node {
 				Predicates:               pushedDownPredicates,
 			},
 		}
+	case NodeTypeDistinct:
+		out = Node{
+			Schema:   node.Schema,
+			NodeType: node.NodeType,
+			Distinct: &Distinct{
+				Source: t.TransformNode(node.Distinct.Source),
+			},
+		}
 	case NodeTypeFilter:
 		// TODO: I think we'd like a function which automatically does type deduction again on each transformation?
 		// Naah, we can do that based on the currently executing transformation.

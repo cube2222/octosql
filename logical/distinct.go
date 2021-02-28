@@ -7,13 +7,21 @@ import (
 )
 
 type Distinct struct {
-	child Node
+	source Node
 }
 
-func NewDistinct(child Node) *Distinct {
-	return &Distinct{child: child}
+func NewDistinct(source Node) *Distinct {
+	return &Distinct{source: source}
 }
 
 func (node *Distinct) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
-	panic("implement me")
+	source := node.source.Typecheck(ctx, env, logicalEnv)
+
+	return physical.Node{
+		Schema:   source.Schema,
+		NodeType: physical.NodeTypeDistinct,
+		Distinct: &physical.Distinct{
+			Source: source,
+		},
+	}
 }

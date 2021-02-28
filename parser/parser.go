@@ -217,9 +217,9 @@ func ParseSelect(statement *sqlparser.Select, topmost bool) (logical.Node, *Outp
 		}
 	}
 
-	// if len(statement.Distinct) > 0 {
-	// 	root = logical.NewDistinct(root)
-	// }
+	if len(statement.Distinct) > 0 {
+		root = logical.NewDistinct(root)
+	}
 
 	if statement.Limit != nil {
 		if !topmost {

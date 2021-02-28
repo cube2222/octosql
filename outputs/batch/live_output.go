@@ -84,7 +84,7 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 	recordCounts := btree.New(BTreeDefaultDegree)
 	watermark := time.Time{}
 	mutex := sync.Mutex{}
-	done := false
+	done := make(chan struct{})
 	liveWriter := uilive.New()
 
 	wg := sync.WaitGroup{}
@@ -92,38 +92,39 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for range time.Tick(time.Second / 4) {
-				var buf bytes.Buffer
+			ticker := time.Tick(time.Second / 4)
+			for {
+				select {
+				case <-ticker:
+					var buf bytes.Buffer
 
-				format := o.format(&buf)
-				format.SetSchema(o.schema)
+					format := o.format(&buf)
+					format.SetSchema(o.schema)
 
-				i := 0
-				mutex.Lock()
-				recordCounts.Ascend(func(item btree.Item) bool {
-					if o.limit > 0 && i == o.limit {
-						return false
-					}
-					i++
+					i := 0
+					mutex.Lock()
+					recordCounts.Ascend(func(item btree.Item) bool {
+						if o.limit > 0 && i == o.limit {
+							return false
+						}
+						i++
 
-					itemTyped := item.(*outputItem)
-					for i := 0; i < itemTyped.Count; i++ {
-						format.Write(itemTyped.Values)
-					}
-					return true
-				})
-				watermark := watermark
-				done := done
-				mutex.Unlock()
+						itemTyped := item.(*outputItem)
+						for i := 0; i < itemTyped.Count; i++ {
+							format.Write(itemTyped.Values)
+						}
+						return true
+					})
+					watermark := watermark
+					mutex.Unlock()
 
-				format.Close()
+					format.Close()
 
-				fmt.Fprintf(&buf, "watermark: %s\n", watermark.Format(time.RFC3339Nano))
+					fmt.Fprintf(&buf, "watermark: %s\n", watermark.Format(time.RFC3339Nano))
 
-				buf.WriteTo(liveWriter)
-				liveWriter.Flush()
-
-				if done {
+					buf.WriteTo(liveWriter)
+					liveWriter.Flush()
+				case <-done:
 					return
 				}
 			}
@@ -182,9 +183,7 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 		return err
 	}
 
-	mutex.Lock()
-	done = true
-	mutex.Unlock()
+	close(done)
 	wg.Wait()
 
 	var buf bytes.Buffer

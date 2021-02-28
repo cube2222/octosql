@@ -32,17 +32,19 @@ type OutputPrinter struct {
 	source               Node
 	keyExprs             []Expression
 	directionMultipliers []int
+	limit                int
 
 	schema physical.Schema
 	format func(io.Writer) Format
 	live   bool
 }
 
-func NewOutputPrinter(source Node, keyExprs []Expression, directionMultipliers []int, schema physical.Schema, format func(io.Writer) Format, live bool) *OutputPrinter {
+func NewOutputPrinter(source Node, keyExprs []Expression, directionMultipliers []int, limit int, schema physical.Schema, format func(io.Writer) Format, live bool) *OutputPrinter {
 	return &OutputPrinter{
 		source:               source,
 		keyExprs:             keyExprs,
 		directionMultipliers: directionMultipliers,
+		limit:                limit,
 		schema:               schema,
 		format:               format,
 		live:                 live,
@@ -96,8 +98,14 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 				format := o.format(&buf)
 				format.SetSchema(o.schema)
 
+				i := 0
 				mutex.Lock()
 				recordCounts.Ascend(func(item btree.Item) bool {
+					if o.limit > 0 && i == o.limit {
+						return false
+					}
+					i++
+
 					itemTyped := item.(*outputItem)
 					for i := 0; i < itemTyped.Count; i++ {
 						format.Write(itemTyped.Values)
@@ -182,7 +190,13 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 	var buf bytes.Buffer
 	format := o.format(&buf)
 	format.SetSchema(o.schema)
+	i := 0
 	recordCounts.Ascend(func(item btree.Item) bool {
+		if o.limit > 0 && i == o.limit {
+			return false
+		}
+		i++
+
 		itemTyped := item.(*outputItem)
 		for i := 0; i < itemTyped.Count; i++ {
 			format.Write(itemTyped.Values)

@@ -180,6 +180,16 @@ func (t *Transformers) TransformNode(node Node) Node {
 				FunctionDescriptor: node.TableValuedFunction.FunctionDescriptor,
 			},
 		}
+	case NodeTypeUnnest:
+		out = Node{
+			Schema:   node.Schema,
+			NodeType: node.NodeType,
+			Unnest: &Unnest{
+				Source: t.TransformNode(node.Unnest.Source),
+				Field:  node.Unnest.Field,
+			},
+		}
+
 	default:
 		panic("unexhaustive node type match")
 	}

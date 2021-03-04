@@ -24,6 +24,7 @@ type Node struct {
 	OrderBy             *OrderBy
 	Requalifier         *Requalifier
 	TableValuedFunction *TableValuedFunction
+	Unnest              *Unnest
 }
 
 type Schema struct {
@@ -57,6 +58,7 @@ const (
 	NodeTypeOrderBy
 	NodeTypeRequalifier
 	NodeTypeTableValuedFunction
+	NodeTypeUnnest
 )
 
 type Datasource struct {
@@ -158,6 +160,11 @@ type TableValuedFunctionArgumentTable struct {
 
 type TableValuedFunctionArgumentDescriptor struct {
 	Descriptor string
+}
+
+type Unnest struct {
+	Source Node
+	Field  string
 }
 
 func (node *Node) Materialize(ctx context.Context, env Environment) (execution.Node, error) {
@@ -281,31 +288,27 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (execution.N
 
 	case NodeTypeTableValuedFunction:
 		return node.TableValuedFunction.FunctionDescriptor.Materialize(ctx, env, node.TableValuedFunction.Arguments)
+
+	case NodeTypeUnnest:
+		source, err := node.Unnest.Source.Materialize(ctx, env)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't materialize unnest source: %w", err)
+		}
+
+		index := -1
+		// This must be found, we are past timecheck phase
+		for i, field := range node.Schema.Fields {
+			if node.Unnest.Field == field.Name {
+				index = i
+				break
+			}
+		}
+		if index == -1 {
+			panic(fmt.Sprintf("unnest field '%s' not found, should be caught in typecheck", node.Unnest.Field))
+		}
+
+		return nodes.NewUnnest(source, index), nil
 	}
 
 	panic(fmt.Sprintf("unexhaustive node type match: %d", node.NodeType))
-}
-
-func usesVariablesFromLeftOrRight(left, right Schema, variables []string) (usesLeft bool, usesRight bool, err error) {
-	for _, name := range variables {
-		var matchedLeft, matchedRight bool
-		for _, field := range left.Fields {
-			if VariableNameMatchesField(name, field.Name) {
-				usesLeft = true
-				matchedLeft = true
-				break
-			}
-		}
-		for _, field := range right.Fields {
-			if VariableNameMatchesField(name, field.Name) {
-				usesRight = true
-				matchedRight = true
-				break
-			}
-		}
-		if matchedLeft && matchedRight {
-			return false, false, fmt.Errorf("ambiguous variable name in join predicate: %s", name)
-		}
-	}
-	return
 }

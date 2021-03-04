@@ -303,14 +303,14 @@ func EqualExpressions(expr1, expr2 Expression) bool {
 
 	case *FunctionExpression:
 		if expr2, ok := expr2.(*FunctionExpression); ok {
-			if expr1.name != expr2.name {
+			if expr1.Name != expr2.Name {
 				return false
 			}
-			if len(expr1.arguments) != len(expr2.arguments) {
+			if len(expr1.Arguments) != len(expr2.Arguments) {
 				return false
 			}
-			for i := range expr1.arguments {
-				if !EqualExpressions(expr1.arguments[i], expr2.arguments[i]) {
+			for i := range expr1.Arguments {
+				if !EqualExpressions(expr1.Arguments[i], expr2.Arguments[i]) {
 					return false
 				}
 			}

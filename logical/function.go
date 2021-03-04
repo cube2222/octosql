@@ -10,27 +10,27 @@ import (
 )
 
 type FunctionExpression struct {
-	name      string
-	arguments []Expression
+	Name      string
+	Arguments []Expression
 }
 
 func NewFunctionExpression(name string, args []Expression) *FunctionExpression {
 	return &FunctionExpression{
-		name:      name,
-		arguments: args,
+		Name:      name,
+		Arguments: args,
 	}
 }
 
 func (fe *FunctionExpression) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
-	arguments := make([]physical.Expression, len(fe.arguments))
-	for i := range fe.arguments {
-		arguments[i] = fe.arguments[i].Typecheck(ctx, env, logicalEnv)
+	arguments := make([]physical.Expression, len(fe.Arguments))
+	for i := range fe.Arguments {
+		arguments[i] = fe.Arguments[i].Typecheck(ctx, env, logicalEnv)
 	}
 
 	var out physical.Expression
 	var found bool
 
-	descriptors := env.Functions[fe.name]
+	descriptors := env.Functions[fe.Name]
 descriptorLoop:
 	for _, descriptor := range descriptors {
 		if len(arguments) != len(descriptor.ArgumentTypes) {
@@ -46,7 +46,7 @@ descriptorLoop:
 			Type:           descriptor.OutputType,
 			ExpressionType: physical.ExpressionTypeFunctionCall,
 			FunctionCall: &physical.FunctionCall{
-				Name:               fe.name,
+				Name:               fe.Name,
 				Arguments:          arguments,
 				FunctionDescriptor: descriptor,
 			},
@@ -87,7 +87,7 @@ descriptorLoop:
 				Type:           descriptor.OutputType,
 				ExpressionType: physical.ExpressionTypeFunctionCall,
 				FunctionCall: &physical.FunctionCall{
-					Name:               fe.name,
+					Name:               fe.Name,
 					Arguments:          arguments,
 					FunctionDescriptor: descriptor,
 				},
@@ -100,7 +100,7 @@ descriptorLoop:
 		for i := range argTypeNames {
 			argTypeNames[i] = arguments[i].Type.String()
 		}
-		panic(fmt.Sprintf("unknown function: %s(%s)", fe.name, strings.Join(argTypeNames, ", ")))
+		panic(fmt.Sprintf("unknown function: %s(%s)", fe.Name, strings.Join(argTypeNames, ", ")))
 	}
 
 	if out.FunctionCall.FunctionDescriptor.Strict {

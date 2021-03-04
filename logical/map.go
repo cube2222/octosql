@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
 
@@ -25,9 +26,21 @@ func (node *Map) Typecheck(ctx context.Context, env physical.Environment, logica
 
 	var expressions []physical.Expression
 	var aliases []*string
+	var unnests []int
 	for i := range node.isStar {
 		if !node.isStar[i] {
-			expressions = append(expressions, node.expressions[i].Typecheck(ctx, env.WithRecordSchema(source.Schema), logicalEnv))
+			unnestLevel := 0
+			curExpression := node.expressions[i]
+			for fe, ok := curExpression.(*FunctionExpression); ok && fe.Name == "unnest"; fe, ok = curExpression.(*FunctionExpression) {
+				if len(fe.Arguments) != 1 {
+					panic("unnest takes exactly 1 argument")
+				}
+				unnestLevel++
+				curExpression = fe.Arguments[0]
+			}
+			unnests = append(unnests, unnestLevel)
+
+			expressions = append(expressions, curExpression.Typecheck(ctx, env.WithRecordSchema(source.Schema), logicalEnv))
 			if node.aliases[i] != "" {
 				aliases = append(aliases, &node.aliases[i])
 			} else {
@@ -49,6 +62,7 @@ func (node *Map) Typecheck(ctx context.Context, env physical.Environment, logica
 					},
 				})
 				aliases = append(aliases, nil)
+				unnests = append(unnests, 0)
 			}
 		}
 	}
@@ -89,7 +103,7 @@ func (node *Map) Typecheck(ctx context.Context, env physical.Environment, logica
 		}
 	}
 
-	return physical.Node{
+	outputNode := physical.Node{
 		Schema:   physical.NewSchema(outFields, outTimeFieldIndex),
 		NodeType: physical.NodeTypeMap,
 		Map: &physical.Map{
@@ -98,4 +112,35 @@ func (node *Map) Typecheck(ctx context.Context, env physical.Environment, logica
 			Aliases:     aliases,
 		},
 	}
+
+	for i, level := range unnests {
+		for j := 0; j < level; j++ {
+			predecessorFields := outputNode.Schema.Fields
+
+			if predecessorFields[i].Type.TypeID != octosql.TypeIDList {
+				panic(fmt.Sprintf("unnest argument must be list, is %s", predecessorFields[i].Type))
+			}
+
+			unnestedFields := make([]physical.SchemaField, len(predecessorFields))
+			copy(unnestedFields, predecessorFields[:i])
+			unnestedFields[i] = physical.SchemaField{
+				Name: predecessorFields[i].Name,
+				Type: *predecessorFields[i].Type.List.Element,
+			}
+			if i < len(predecessorFields)-1 {
+				copy(unnestedFields[i+1:], predecessorFields[i+1:])
+			}
+
+			outputNode = physical.Node{
+				Schema:   physical.NewSchema(unnestedFields, outputNode.Schema.TimeField),
+				NodeType: physical.NodeTypeUnnest,
+				Unnest: &physical.Unnest{
+					Source: outputNode,
+					Field:  predecessorFields[i].Name,
+				},
+			}
+		}
+	}
+
+	return outputNode
 }

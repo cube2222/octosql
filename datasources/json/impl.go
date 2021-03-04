@@ -35,54 +35,10 @@ func Creator(name string) (physical.DatasourceImplementation, error) {
 		}
 
 		for k := range msg {
-			value := msg[k]
-			switch value := value.(type) {
-			case int:
-				if t, ok := fields[k]; !ok {
-					fields[k] = octosql.TypeSum(t, octosql.Int)
-				} else {
-					fields[k] = octosql.Int
-				}
-			case bool:
-				if t, ok := fields[k]; ok {
-					fields[k] = octosql.TypeSum(t, octosql.Boolean)
-				} else {
-					fields[k] = octosql.Boolean
-				}
-			case float64:
-				if t, ok := fields[k]; ok {
-					fields[k] = octosql.TypeSum(t, octosql.Float)
-				} else {
-					fields[k] = octosql.Float
-				}
-			case string:
-				if _, err := time.Parse(time.RFC3339Nano, value); err == nil {
-					if t, ok := fields[k]; ok {
-						fields[k] = octosql.TypeSum(t, octosql.Time)
-					} else {
-						fields[k] = octosql.Time
-					}
-				} else {
-					if t, ok := fields[k]; ok {
-						fields[k] = octosql.TypeSum(t, octosql.String)
-					} else {
-						fields[k] = octosql.String
-					}
-				}
-			case time.Time:
-				if t, ok := fields[k]; ok {
-					fields[k] = octosql.TypeSum(t, octosql.Time)
-				} else {
-					fields[k] = octosql.Time
-				}
-			// TODO: Handle lists.
-			// TODO: Handle nested objects.
-			case nil:
-				if t, ok := fields[k]; ok {
-					fields[k] = octosql.TypeSum(t, octosql.Null)
-				} else {
-					fields[k] = octosql.Null
-				}
+			if t, ok := fields[k]; !ok {
+				fields[k] = octosql.TypeSum(t, getOctoSQLType(msg[k]))
+			} else {
+				fields[k] = getOctoSQLType(msg[k])
 			}
 		}
 	}
@@ -99,6 +55,51 @@ func Creator(name string) (physical.DatasourceImplementation, error) {
 		path:   name,
 		schema: physical.NewSchema(schemaFields, -1),
 	}, nil
+}
+
+func getOctoSQLType(value interface{}) octosql.Type {
+	switch value := value.(type) {
+	case int:
+		return octosql.Int
+	case bool:
+		return octosql.Boolean
+	case float64:
+		return octosql.Float
+	case string:
+		if _, err := time.Parse(time.RFC3339Nano, value); err == nil {
+			return octosql.Time
+		} else {
+			return octosql.String
+		}
+	case time.Time:
+		return octosql.Time
+	// TODO: Handle nested objects.
+	case []interface{}:
+		var elementType *octosql.Type
+		for i := range value {
+			if elementType != nil {
+				t := octosql.TypeSum(*elementType, getOctoSQLType(value[i]))
+				elementType = &t
+			} else {
+				t := getOctoSQLType(value[i])
+				elementType = &t
+			}
+		}
+		// TODO: Ticking time bomb, because we don't currently handle the case where this is null, because the list is empty.
+		return octosql.Type{
+			TypeID: octosql.TypeIDList,
+			List: struct {
+				Element *octosql.Type
+			}{
+				Element: elementType,
+			},
+		}
+
+	case nil:
+		return octosql.Null
+	}
+
+	panic(fmt.Sprintf("unexhaustive json input value match: %T %+v", value, value))
 }
 
 type impl struct {

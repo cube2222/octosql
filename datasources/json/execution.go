@@ -38,31 +38,42 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 
 		values := make([]octosql.Value, len(d.fields))
 		for i := range values {
-			value := msg[d.fields[i].Name]
-			// TODO: What if it's null?
-			switch value := value.(type) {
-			case int:
-				values[i] = octosql.NewInt(value)
-			case bool:
-				values[i] = octosql.NewBoolean(value)
-			case float64:
-				values[i] = octosql.NewFloat(value)
-			case string:
-				// TODO: this should happen based on the schema only.
-				if t, err := time.Parse(time.RFC3339Nano, value); err == nil {
-					values[i] = octosql.NewTime(t)
-				} else {
-					values[i] = octosql.NewString(value)
-				}
-			case time.Time:
-				values[i] = octosql.NewTime(value)
-				// TODO: Parse lists.
-				// TODO: Parse nested objects.
-			}
+			values[i] = getOctoSQLValue(msg[d.fields[i].Name])
 		}
 
 		if err := produce(ProduceFromExecutionContext(ctx), NewRecord(values, false)); err != nil {
 			return fmt.Errorf("couldn't produce record: %w", err)
 		}
 	}
+}
+
+func getOctoSQLValue(value interface{}) octosql.Value {
+	// TODO: What if it's null?
+
+	switch value := value.(type) {
+	case int:
+		return octosql.NewInt(value)
+	case bool:
+		return octosql.NewBoolean(value)
+	case float64:
+		return octosql.NewFloat(value)
+	case string:
+		// TODO: this should happen based on the schema only.
+		if t, err := time.Parse(time.RFC3339Nano, value); err == nil {
+			return octosql.NewTime(t)
+		} else {
+			return octosql.NewString(value)
+		}
+	case time.Time:
+		return octosql.NewTime(value)
+		// TODO: Parse nested objects.
+	case []interface{}:
+		elements := make([]octosql.Value, len(value))
+		for i := range elements {
+			elements[i] = getOctoSQLValue(value[i])
+		}
+		return octosql.NewList(elements)
+	}
+
+	panic(fmt.Sprintf("unexhaustive json input value match: %T %+v", value, value))
 }

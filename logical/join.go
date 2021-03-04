@@ -196,7 +196,7 @@ func usesVariablesFromLeftOrRight(left, right physical.Schema, variables []strin
 			}
 		}
 		if matchedLeft && matchedRight {
-			panic(fmt.Errorf("ambiguous variable name in join predicate: %s", name))
+			panic(fmt.Errorf("ambiguous variable Name in join predicate: %s", name))
 		}
 	}
 	return

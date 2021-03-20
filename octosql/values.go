@@ -69,15 +69,28 @@ func NewDuration(value time.Duration) Value {
 }
 
 func NewList(value []Value) Value {
+	var t *Type
+	if len(value) > 0 {
+		curT := value[0].Type
+		t = &curT
+	}
 	return Value{
-		Type: Type{TypeID: TypeIDList},
+		Type: Type{TypeID: TypeIDList, List: struct{ Element *Type }{Element: t}},
 		List: value,
 	}
 }
 
-func NewFieldValues(value []Value) Value {
+func NewFieldValues(names []string, value []Value) Value {
+	// Fixme performance.
+	fieldTypes := make([]StructField, len(value))
+	for i := range value {
+		fieldTypes[i] = StructField{
+			Name: names[i],
+			Type: value[i].Type,
+		}
+	}
 	return Value{
-		Type:        Type{TypeID: TypeIDString},
+		Type:        Type{TypeID: TypeIDStruct, Struct: struct{ Fields []StructField }{Fields: fieldTypes}},
 		FieldValues: value,
 	}
 }

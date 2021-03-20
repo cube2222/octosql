@@ -1,18 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"fmt"
 	"log"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/google/btree"
-	"github.com/gosuri/uilive"
-	"github.com/olekukonko/tablewriter"
 
 	"github.com/cube2222/octosql/aggregates"
 	"github.com/cube2222/octosql/config"
@@ -62,14 +56,16 @@ func main() {
 	}
 	env := physical.Environment{
 		Aggregates: map[string][]physical.AggregateDescriptor{
-			"count":          aggregates.CountOverloads,
-			"count_distinct": aggregates.DistinctAggregateOverloads(aggregates.CountOverloads),
-			"sum":            aggregates.SumOverloads,
-			"sum_distinct":   aggregates.DistinctAggregateOverloads(aggregates.SumOverloads),
-			"avg":            aggregates.AverageOverloads,
-			"avg_distinct":   aggregates.DistinctAggregateOverloads(aggregates.AverageOverloads),
-			"max":            aggregates.MaxOverloads,
-			"min":            aggregates.MinOverloads,
+			"array_agg":          aggregates.ArrayOverloads,
+			"array_agg_distinct": aggregates.DistinctAggregateOverloads(aggregates.ArrayOverloads),
+			"count":              aggregates.CountOverloads,
+			"count_distinct":     aggregates.DistinctAggregateOverloads(aggregates.CountOverloads),
+			"sum":                aggregates.SumOverloads,
+			"sum_distinct":       aggregates.DistinctAggregateOverloads(aggregates.SumOverloads),
+			"avg":                aggregates.AverageOverloads,
+			"avg_distinct":       aggregates.DistinctAggregateOverloads(aggregates.AverageOverloads),
+			"max":                aggregates.MaxOverloads,
+			"min":                aggregates.MinOverloads,
 		},
 		Functions: functions.FunctionMap(),
 		Datasources: &physical.DatasourceRepository{
@@ -170,91 +166,4 @@ func main() {
 	); err != nil {
 		log.Fatal(err)
 	}
-}
-
-type TableOutput struct {
-	wg            sync.WaitGroup
-	mutex         sync.Mutex
-	outputRecords *btree.BTree
-	watermark     time.Time
-	done          bool
-}
-
-func NewTableOutput(schema physical.Schema) *TableOutput {
-	to := &TableOutput{
-		outputRecords: btree.New(execution.BTreeDefaultDegree),
-	}
-
-	go func() {
-		defer to.wg.Done()
-		liveWriter := uilive.New()
-
-		for range time.Tick(time.Second / 4) {
-			var buf bytes.Buffer
-
-			table := tablewriter.NewWriter(&buf)
-			table.SetColWidth(64)
-			table.SetRowLine(false)
-			header := make([]string, len(schema.Fields))
-			for i := range schema.Fields {
-				header[i] = schema.Fields[i].Name
-			}
-			table.SetHeader(header)
-			table.SetAutoFormatHeaders(false)
-
-			to.mutex.Lock()
-			to.outputRecords.Ascend(func(item btree.Item) bool {
-				itemTyped := item.(execution.GroupKeyIface)
-				key := itemTyped.GetGroupKey()
-				row := make([]string, len(key))
-				for i := range key {
-					row[i] = key[i].String()
-				}
-				table.Append(row)
-				return true
-			})
-			watermark := to.watermark
-			done := to.done
-			to.mutex.Unlock()
-
-			table.Render()
-
-			fmt.Fprintf(&buf, "watermark: %s\n", watermark.Format(time.RFC3339Nano))
-
-			buf.WriteTo(liveWriter)
-			liveWriter.Flush()
-
-			if done {
-				return
-			}
-		}
-	}()
-
-	return to
-}
-
-func (to *TableOutput) SendRecord(ctx execution.ProduceContext, record execution.Record) error {
-	to.mutex.Lock()
-	if !record.Retraction {
-		// TODO: This destroys duplicate records :) Should be counter.
-		to.outputRecords.ReplaceOrInsert(execution.GroupKey(record.Values))
-	} else {
-		to.outputRecords.Delete(execution.GroupKey(record.Values))
-	}
-	to.mutex.Unlock()
-	return nil
-}
-
-func (to *TableOutput) SendMeta(ctx execution.ProduceContext, msg execution.MetadataMessage) error {
-	to.mutex.Lock()
-	to.watermark = msg.Watermark
-	to.mutex.Unlock()
-	return nil
-}
-
-func (to *TableOutput) Stop() {
-	to.mutex.Lock()
-	to.done = true
-	to.mutex.Unlock()
-	to.wg.Wait()
 }

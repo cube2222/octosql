@@ -293,8 +293,8 @@ func EqualExpressions(expr1, expr2 Expression) bool {
 			return true
 		}
 
-	// case *NodeExpression:
-	// 	if expr2, ok := expr2.(*NodeExpression); ok {
+	// case *QueryExpression:
+	// 	if expr2, ok := expr2.(*QueryExpression); ok {
 	// 		if err := EqualNodes(expr1.node, expr2.node); err != nil {
 	// 			return errors.Wrap(err, "nodes not equal")
 	// 		}

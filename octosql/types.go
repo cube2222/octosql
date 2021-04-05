@@ -34,7 +34,7 @@ type Type struct {
 		Element *Type
 	}
 	Struct struct {
-		Fields []StructField
+		Fields []StructField // TODO: -> Names []string, Types []Type
 	}
 	Union struct {
 		Alternatives []Type

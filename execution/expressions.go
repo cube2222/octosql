@@ -168,4 +168,60 @@ func (c *Or) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 	return octosql.NewBoolean(false), nil
 }
 
+type SingleColumnQueryExpression struct {
+	source Node
+}
+
+func NewSingleColumnQueryExpression(source Node) *SingleColumnQueryExpression {
+	return &SingleColumnQueryExpression{
+		source: source,
+	}
+}
+
+func (e *SingleColumnQueryExpression) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
+	// TODO: Handle retractions.
+	var values []octosql.Value
+	e.source.Run(
+		ctx,
+		func(ctx ProduceContext, record Record) error {
+			if record.Retraction {
+				return fmt.Errorf("query expression currently can't handle retractions")
+			}
+			values = append(values, record.Values[0])
+			return nil
+		},
+		func(ctx ProduceContext, msg MetadataMessage) error { return nil },
+	)
+	return octosql.NewList(values), nil
+}
+
+type MultiColumnQueryExpression struct {
+	source     Node
+	fieldNames []string
+}
+
+func NewMultiColumnQueryExpression(source Node, fieldNames []string) *MultiColumnQueryExpression {
+	return &MultiColumnQueryExpression{
+		source:     source,
+		fieldNames: fieldNames,
+	}
+}
+
+func (e *MultiColumnQueryExpression) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
+	// TODO: Handle retractions.
+	var values []octosql.Value
+	e.source.Run(
+		ctx,
+		func(ctx ProduceContext, record Record) error {
+			if record.Retraction {
+				return fmt.Errorf("query expression currently can't handle retractions")
+			}
+			values = append(values, octosql.NewStruct(e.fieldNames, record.Values))
+			return nil
+		},
+		func(ctx ProduceContext, msg MetadataMessage) error { return nil },
+	)
+	return octosql.NewList(values), nil
+}
+
 // TODO: sys.undo should create an expression which reads the current retraction status.

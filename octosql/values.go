@@ -80,7 +80,7 @@ func NewList(value []Value) Value {
 	}
 }
 
-func NewFieldValues(names []string, value []Value) Value {
+func NewStruct(names []string, value []Value) Value {
 	// Fixme performance.
 	fieldTypes := make([]StructField, len(value))
 	for i := range value {

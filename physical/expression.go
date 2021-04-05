@@ -14,12 +14,13 @@ type Expression struct {
 
 	ExpressionType ExpressionType
 	// Only one of the below may be non-null.
-	Variable      *Variable
-	Constant      *Constant
-	FunctionCall  *FunctionCall
-	And           *And
-	Or            *Or
-	TypeAssertion *TypeAssertion
+	Variable        *Variable
+	Constant        *Constant
+	FunctionCall    *FunctionCall
+	And             *And
+	Or              *Or
+	QueryExpression *QueryExpression
+	TypeAssertion   *TypeAssertion
 }
 
 type ExpressionType int
@@ -30,6 +31,7 @@ const (
 	ExpressionTypeFunctionCall
 	ExpressionTypeAnd
 	ExpressionTypeOr
+	ExpressionTypeQueryExpression
 	ExpressionTypeTypeAssertion
 )
 
@@ -54,6 +56,10 @@ type And struct {
 
 type Or struct {
 	Arguments []Expression
+}
+
+type QueryExpression struct {
+	Source Node
 }
 
 type TypeAssertion struct {
@@ -118,6 +124,25 @@ func (expr *Expression) Materialize(ctx context.Context, env Environment) (execu
 			expressions[i] = expression
 		}
 		return execution.NewOr(expressions), nil
+	case ExpressionTypeQueryExpression:
+		source, err := expr.QueryExpression.Source.Materialize(ctx, env)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't materialize query expression source: %w", err)
+		}
+		singleColumn := false
+		if len(expr.QueryExpression.Source.Schema.Fields) == 1 {
+			singleColumn = true
+		}
+
+		if !singleColumn {
+			fieldNames := make([]string, len(expr.QueryExpression.Source.Schema.Fields))
+			for i := range expr.QueryExpression.Source.Schema.Fields {
+				fieldNames[i] = expr.QueryExpression.Source.Schema.Fields[i].Name
+			}
+			return execution.NewMultiColumnQueryExpression(source, fieldNames), nil
+		} else {
+			return execution.NewSingleColumnQueryExpression(source), nil
+		}
 	case ExpressionTypeTypeAssertion:
 		expression, err := expr.TypeAssertion.Expression.Materialize(ctx, env)
 		if err != nil {

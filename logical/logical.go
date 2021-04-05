@@ -13,7 +13,7 @@ type Environment struct {
 }
 
 type Node interface {
-	// Typechecking panics on error, because it will never be handled otherwise than being bubbled up to the top.
+	// Typechecking panics on error, because it will never be handled in a different way than being bubbled up to the top.
 	Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node
 }
 
@@ -95,7 +95,7 @@ func (v *Variable) Typecheck(ctx context.Context, env physical.Environment, logi
 		isLevel0 = false
 	}
 	// TODO: Expression typecheck errors should contain context. (position in input SQL)
-	panic(fmt.Errorf("unkown variable: '%s'", v.name))
+	panic(fmt.Errorf("unknown variable: '%s'", v.name))
 }
 
 func (v *Variable) FieldName() string {
@@ -132,16 +132,37 @@ func (tup *Tuple) Typecheck(ctx context.Context, env physical.Environment, logic
 	panic("implement me")
 }
 
-type NodeExpression struct {
+type QueryExpression struct {
 	node Node
 }
 
-func NewNodeExpression(node Node) *NodeExpression {
-	return &NodeExpression{node: node}
+func NewQueryExpression(node Node) *QueryExpression {
+	return &QueryExpression{node: node}
 }
 
-func (ne *NodeExpression) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
-	panic("implement me")
+func (ne *QueryExpression) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
+	source := ne.node.Typecheck(ctx, env, logicalEnv)
+	var elementType octosql.Type
+	if len(source.Schema.Fields) == 1 {
+		elementType = source.Schema.Fields[0].Type
+	} else {
+		structFields := make([]octosql.StructField, len(source.Schema.Fields))
+		for i := range source.Schema.Fields {
+			structFields[i] = octosql.StructField{
+				Name: source.Schema.Fields[i].Name,
+				Type: source.Schema.Fields[i].Type,
+			}
+		}
+		elementType = octosql.Type{TypeID: octosql.TypeIDStruct, Struct: struct{ Fields []octosql.StructField }{Fields: structFields}}
+	}
+
+	return physical.Expression{
+		Type:           octosql.Type{TypeID: octosql.TypeIDList, List: struct{ Element *octosql.Type }{Element: &elementType}},
+		ExpressionType: physical.ExpressionTypeQueryExpression,
+		QueryExpression: &physical.QueryExpression{
+			Source: source,
+		},
+	}
 }
 
 type And struct {

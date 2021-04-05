@@ -262,6 +262,14 @@ func (t *Transformers) TransformExpr(expr Expression) Expression {
 				Arguments: arguments,
 			},
 		}
+	case ExpressionTypeQueryExpression:
+		out = Expression{
+			Type:           expr.Type,
+			ExpressionType: expr.ExpressionType,
+			QueryExpression: &QueryExpression{
+				Source: expr.QueryExpression.Source,
+			},
+		}
 	case ExpressionTypeTypeAssertion:
 		out = Expression{
 			Type:           expr.Type,

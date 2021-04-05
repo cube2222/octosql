@@ -580,7 +580,7 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't parse select expression")
 		}
-		return logical.NewNodeExpression(subquery), nil
+		return logical.NewQueryExpression(subquery), nil
 
 	case *sqlparser.SQLVal:
 		var value octosql.Value

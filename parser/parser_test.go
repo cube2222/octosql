@@ -510,7 +510,7 @@ func TestParseNode(t *testing.T) {
 						logical.NewPredicate(
 							logical.NewVariable("p2.age"),
 							logical.In,
-							logical.NewNodeExpression(
+							logical.NewQueryExpression(
 								logical.NewMap(
 									[]logical.NamedExpression{
 										logical.NewStarExpression(""),
@@ -551,7 +551,7 @@ WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age`,
 				},
 				logical.NewFilter(
 					logical.NewPredicate(
-						logical.NewNodeExpression(
+						logical.NewQueryExpression(
 							logical.NewMap(
 								[]logical.NamedExpression{
 									logical.NewVariable("p2.age"),
@@ -581,7 +581,7 @@ WHERE (SELECT p2.age FROM people p2 WHERE p2.name = 'wojtek') > p3.age`,
 							logical.NewVariable("p3.name"),
 							logical.NewAliasedExpression(
 								"city",
-								logical.NewNodeExpression(
+								logical.NewQueryExpression(
 									logical.NewMap(
 										[]logical.NamedExpression{
 											logical.NewVariable("p1.city"),
@@ -741,7 +741,7 @@ SELECT p.name FROM cities c RIGHT JOIN people p ON p.city = c.name AND p.favorit
 								logical.NewConstant(3),
 							}),
 							logical.In,
-							logical.NewNodeExpression(
+							logical.NewQueryExpression(
 								logical.NewMap(
 									[]logical.NamedExpression{
 										logical.NewStarExpression(""),

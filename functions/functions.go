@@ -670,5 +670,26 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 				},
 			},
 		},
+		// Array Functions
+		"[]": {
+			{
+				TypeFn: func(ts []octosql.Type) (octosql.Type, bool) {
+					if len(ts) != 2 {
+						return octosql.Type{}, false
+					}
+					if ts[0].TypeID != octosql.TypeIDList {
+						return octosql.Type{}, false
+					}
+					if ts[1].TypeID != octosql.TypeIDInt {
+						return octosql.Type{}, false
+					}
+					return *ts[0].List.Element, true
+				},
+				Strict: true,
+				Function: func(values []octosql.Value) (octosql.Value, error) {
+					return values[0].List[values[1].Int], nil
+				},
+			},
+		},
 	}
 }

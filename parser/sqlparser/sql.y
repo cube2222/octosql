@@ -2547,6 +2547,10 @@ value_expression:
 | function_call_keyword
 | function_call_nonkeyword
 | function_call_conflict
+| value_expression '[' value_expression ']'
+  {
+    $$ = &BinaryExpr{Left: $1, Operator: ArrayElement, Right: $3}
+  }
 
 /*
   Regular function calls without special token or syntax, guaranteed to not

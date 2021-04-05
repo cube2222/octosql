@@ -94,6 +94,7 @@ type DatasourceImplementation interface {
 type FunctionDescriptor struct {
 	ArgumentTypes []octosql.Type
 	OutputType    octosql.Type
+	TypeFn        func([]octosql.Type) (octosql.Type, bool)
 	Strict        bool
 	Function      func([]octosql.Value) (octosql.Value, error)
 }

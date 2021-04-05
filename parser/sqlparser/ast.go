@@ -2949,6 +2949,7 @@ type BinaryExpr struct {
 
 // BinaryExpr.Operator
 const (
+	ArrayElement  = "[]"
 	BitAndStr     = "&"
 	BitOrStr      = "|"
 	BitXorStr     = "^"

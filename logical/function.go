@@ -33,23 +33,43 @@ func (fe *FunctionExpression) Typecheck(ctx context.Context, env physical.Enviro
 	descriptors := env.Functions[fe.Name]
 descriptorLoop:
 	for _, descriptor := range descriptors {
-		if len(arguments) != len(descriptor.ArgumentTypes) {
-			continue
-		}
-		for i := range arguments {
-			if arguments[i].Type.Is(descriptor.ArgumentTypes[i]) < octosql.TypeRelationIs {
-				continue descriptorLoop
+		if descriptor.TypeFn != nil {
+			ts := make([]octosql.Type, len(arguments))
+			for i := range arguments {
+				ts[i] = arguments[i].Type
 			}
-		}
-		found = true
-		out = physical.Expression{
-			Type:           descriptor.OutputType,
-			ExpressionType: physical.ExpressionTypeFunctionCall,
-			FunctionCall: &physical.FunctionCall{
-				Name:               fe.Name,
-				Arguments:          arguments,
-				FunctionDescriptor: descriptor,
-			},
+
+			if outputType, ok := descriptor.TypeFn(ts); ok {
+				found = true
+				out = physical.Expression{
+					Type:           outputType,
+					ExpressionType: physical.ExpressionTypeFunctionCall,
+					FunctionCall: &physical.FunctionCall{
+						Name:               fe.Name,
+						Arguments:          arguments,
+						FunctionDescriptor: descriptor,
+					},
+				}
+			}
+		} else {
+			if len(arguments) != len(descriptor.ArgumentTypes) {
+				continue
+			}
+			for i := range arguments {
+				if arguments[i].Type.Is(descriptor.ArgumentTypes[i]) < octosql.TypeRelationIs {
+					continue descriptorLoop
+				}
+			}
+			found = true
+			out = physical.Expression{
+				Type:           descriptor.OutputType,
+				ExpressionType: physical.ExpressionTypeFunctionCall,
+				FunctionCall: &physical.FunctionCall{
+					Name:               fe.Name,
+					Arguments:          arguments,
+					FunctionDescriptor: descriptor,
+				},
+			}
 		}
 	}
 	if !found {

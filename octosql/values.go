@@ -18,6 +18,7 @@ type Value struct {
 	Duration    time.Duration
 	List        []Value
 	FieldValues []Value
+	Tuple       []Value
 }
 
 func NewNull() Value {
@@ -92,6 +93,17 @@ func NewStruct(names []string, value []Value) Value {
 	return Value{
 		Type:        Type{TypeID: TypeIDStruct, Struct: struct{ Fields []StructField }{Fields: fieldTypes}},
 		FieldValues: value,
+	}
+}
+
+func NewTuple(values []Value) Value {
+	types := make([]Type, len(values))
+	for i := range values {
+		types[i] = values[i].Type
+	}
+	return Value{
+		Type:  Type{TypeID: TypeIDTuple, Tuple: struct{ Elements []Type }{Elements: types}},
+		Tuple: values,
 	}
 }
 
@@ -213,6 +225,26 @@ func (value Value) Compare(other Value) int {
 
 		return 0
 
+	case TypeIDTuple:
+		maxLen := len(value.Tuple)
+		if len(other.Tuple) > maxLen {
+			maxLen = len(other.Tuple)
+		}
+
+		for i := 0; i < maxLen; i++ {
+			if i == len(value.Tuple) {
+				return -1
+			} else if i == len(other.Tuple) {
+				return 1
+			}
+
+			if comp := value.Tuple[i].Compare(other.Tuple[i]); comp != 0 {
+				return comp
+			}
+		}
+
+		return 0
+
 	case TypeIDUnion:
 		panic("can't have union type as concrete value instance")
 	default:
@@ -270,6 +302,16 @@ func (value Value) append(builder *strings.Builder) {
 			}
 		}
 		builder.WriteString(" }")
+
+	case TypeIDTuple:
+		builder.WriteString("(")
+		for i, v := range value.Tuple {
+			v.append(builder)
+			if i != len(value.Tuple)-1 {
+				builder.WriteString(", ")
+			}
+		}
+		builder.WriteString(")")
 
 	case TypeIDUnion:
 		panic("can't have union type as concrete value instance")

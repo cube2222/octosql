@@ -17,6 +17,7 @@ const (
 	TypeIDDuration
 	TypeIDList
 	TypeIDStruct
+	TypeIDTuple
 	TypeIDUnion
 	TypeIDAny
 )
@@ -35,6 +36,9 @@ type Type struct {
 	}
 	Struct struct {
 		Fields []StructField // TODO: -> Names []string, Types []Type
+	}
+	Tuple struct {
+		Elements []Type
 	}
 	Union struct {
 		Alternatives []Type
@@ -149,6 +153,13 @@ func (t Type) String() string {
 		}
 
 		return fmt.Sprintf("{%s}", strings.Join(fieldStrings, "; "))
+	case TypeIDTuple:
+		typeStrings := make([]string, len(t.Tuple.Elements))
+		for i, element := range t.Tuple.Elements {
+			typeStrings[i] = element.String()
+		}
+
+		return fmt.Sprintf("(%s)", strings.Join(typeStrings, ", "))
 	case TypeIDUnion:
 		typeStrings := make([]string, len(t.Union.Alternatives))
 		for i, alternative := range t.Union.Alternatives {

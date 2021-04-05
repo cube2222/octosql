@@ -128,8 +128,20 @@ func NewTuple(expressions []Expression) *Tuple {
 	return &Tuple{expressions: expressions}
 }
 
-func (tup *Tuple) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
-	panic("implement me")
+func (t *Tuple) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
+	args := make([]physical.Expression, len(t.expressions))
+	argTypes := make([]octosql.Type, len(t.expressions))
+	for i := range t.expressions {
+		args[i] = t.expressions[i].Typecheck(ctx, env, logicalEnv)
+		argTypes[i] = args[i].Type
+	}
+	return physical.Expression{
+		Type:           octosql.Type{TypeID: octosql.TypeIDTuple, Tuple: struct{ Elements []octosql.Type }{Elements: argTypes}},
+		ExpressionType: physical.ExpressionTypeTuple,
+		Tuple: &physical.Tuple{
+			Arguments: args,
+		},
+	}
 }
 
 type And struct {

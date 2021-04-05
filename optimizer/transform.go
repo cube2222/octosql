@@ -283,6 +283,19 @@ func (t *Transformers) TransformExpr(expr Expression) Expression {
 				Arguments: arguments,
 			},
 		}
+	case ExpressionTypeTuple:
+		arguments := make([]Expression, len(expr.Tuple.Arguments))
+		for i := range expr.Tuple.Arguments {
+			arguments[i] = t.TransformExpr(expr.Tuple.Arguments[i])
+		}
+
+		out = Expression{
+			Type:           expr.Type,
+			ExpressionType: expr.ExpressionType,
+			Tuple: &Tuple{
+				Arguments: arguments,
+			},
+		}
 	case ExpressionTypeTypeAssertion:
 		out = Expression{
 			Type:           expr.Type,

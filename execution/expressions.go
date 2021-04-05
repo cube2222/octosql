@@ -247,4 +247,26 @@ func (c *Coalesce) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 	return octosql.NewNull(), nil
 }
 
+type Tuple struct {
+	args []Expression
+}
+
+func NewTuple(args []Expression) *Tuple {
+	return &Tuple{
+		args: args,
+	}
+}
+
+func (c *Tuple) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
+	values := make([]octosql.Value, len(c.args))
+	for i := range c.args {
+		value, err := c.args[i].Evaluate(ctx)
+		if err != nil {
+			return octosql.ZeroValue, fmt.Errorf("couldn't evaluate %d tuple argument: %w", i, err)
+		}
+		values[i] = value
+	}
+	return octosql.NewTuple(values), nil
+}
+
 // TODO: sys.undo should create an expression which reads the current retraction status.

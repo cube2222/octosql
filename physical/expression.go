@@ -21,6 +21,7 @@ type Expression struct {
 	Or              *Or
 	QueryExpression *QueryExpression
 	Coalesce        *Coalesce
+	Tuple           *Tuple
 	TypeAssertion   *TypeAssertion
 }
 
@@ -34,6 +35,7 @@ const (
 	ExpressionTypeOr
 	ExpressionTypeQueryExpression
 	ExpressionTypeCoalesce
+	ExpressionTypeTuple
 	ExpressionTypeTypeAssertion
 )
 
@@ -65,6 +67,10 @@ type QueryExpression struct {
 }
 
 type Coalesce struct {
+	Arguments []Expression
+}
+
+type Tuple struct {
 	Arguments []Expression
 }
 
@@ -159,6 +165,16 @@ func (expr *Expression) Materialize(ctx context.Context, env Environment) (execu
 			expressions[i] = expression
 		}
 		return execution.NewCoalesce(expressions), nil
+	case ExpressionTypeTuple:
+		expressions := make([]execution.Expression, len(expr.Tuple.Arguments))
+		for i := range expr.Tuple.Arguments {
+			expression, err := expr.Tuple.Arguments[i].Materialize(ctx, env)
+			if err != nil {
+				return nil, fmt.Errorf("couldn't materialize tuple argument with index %d: %w", i, err)
+			}
+			expressions[i] = expression
+		}
+		return execution.NewTuple(expressions), nil
 	case ExpressionTypeTypeAssertion:
 		expression, err := expr.TypeAssertion.Expression.Materialize(ctx, env)
 		if err != nil {

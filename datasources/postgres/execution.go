@@ -30,6 +30,7 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 		if err != nil {
 			return fmt.Errorf("couldn't evaluate pushed-down predicate placeholder expression: %w", err)
 		}
+		// TODO: Use internal function for this.
 		placeholderValues[i] = value.ToRawGoValue()
 	}
 

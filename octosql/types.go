@@ -117,6 +117,20 @@ func (t Type) Is(other Type) TypeRelation {
 				return TypeRelationIsnt
 			}
 			if t.Struct.Fields[i].Type.Is(other.Struct.Fields[i].Type) < TypeRelationIs {
+				return TypeRelationIsnt // TODO: Why is this isn't, and not maybe?
+			}
+		}
+		return TypeRelationIs
+	}
+	if t.TypeID == TypeIDTuple {
+		if other.TypeID != TypeIDTuple {
+			return TypeRelationIsnt
+		}
+		if len(t.Tuple.Elements) != len(other.Tuple.Elements) {
+			return TypeRelationIsnt
+		}
+		for i := range t.Tuple.Elements {
+			if t.Tuple.Elements[i].Is(other.Tuple.Elements[i]) < TypeRelationIs {
 				return TypeRelationIsnt
 			}
 		}

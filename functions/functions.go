@@ -694,6 +694,46 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 				},
 			},
 		},
+		"in": {
+			{
+				TypeFn: func(ts []octosql.Type) (octosql.Type, bool) {
+					if len(ts) != 2 {
+						return octosql.Type{}, false
+					}
+					// Two cases, the second one is a list of single values, or a list of structs.
+					if ts[1].TypeID != octosql.TypeIDList {
+						return octosql.Type{}, false
+					}
+					if ts[1].List.Element.TypeID == octosql.TypeIDStruct {
+						// TODO: Check each field type.
+						fieldTypes := make([]octosql.Type, len(ts[1].List.Element.Struct.Fields))
+						for i := range ts[1].List.Element.Struct.Fields {
+							fieldTypes[i] = ts[1].List.Element.Struct.Fields[i].Type
+						}
+						elementTypeAsTuple := octosql.Type{TypeID: octosql.TypeIDTuple, Tuple: struct{ Elements []octosql.Type }{
+							Elements: fieldTypes,
+						}}
+						if ts[0].Is(elementTypeAsTuple) < octosql.TypeRelationIs {
+							return octosql.Type{}, false
+						}
+					} else {
+						if ts[0].Is(*ts[1].List.Element) < octosql.TypeRelationIs {
+							return octosql.Type{}, false
+						}
+					}
+					return octosql.Boolean, true
+				},
+				Strict: true,
+				Function: func(values []octosql.Value) (octosql.Value, error) {
+					for i := range values[1].List {
+						if values[0].Compare(values[1].List[i]) == 0 {
+							return octosql.NewBoolean(true), nil
+						}
+					}
+					return octosql.NewBoolean(false), nil
+				},
+			},
+		},
 		// Utility functions
 		"panic": {
 			{

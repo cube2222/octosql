@@ -109,6 +109,7 @@ func NewTuple(values []Value) Value {
 
 func (value Value) Compare(other Value) int {
 	// Tuples compare positionally with structs.
+	// TODO: Think about if this really is a great idea.
 	if value.Type.TypeID == TypeIDTuple && other.Type.TypeID == TypeIDStruct ||
 		other.Type.TypeID == TypeIDTuple && value.Type.TypeID == TypeIDStruct {
 		var tuple, structure Value

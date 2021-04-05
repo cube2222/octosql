@@ -51,6 +51,9 @@ func Creator(name string) (physical.DatasourceImplementation, error) {
 			Type: t,
 		})
 	}
+	sort.Slice(schemaFields, func(i, j int) bool {
+		return schemaFields[i].Name < schemaFields[j].Name
+	})
 
 	return &impl{
 		path:   name,

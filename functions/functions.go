@@ -694,5 +694,16 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 				},
 			},
 		},
+		// Utility functions
+		"panic": {
+			{
+				ArgumentTypes: []octosql.Type{octosql.Any},
+				OutputType:    octosql.Any,
+				Strict:        false,
+				Function: func(values []octosql.Value) (octosql.Value, error) {
+					return octosql.ZeroValue, fmt.Errorf("panic: %s", values[0].String())
+				},
+			},
+		},
 	}
 }

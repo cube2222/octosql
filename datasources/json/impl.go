@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"time"
 
 	"github.com/segmentio/encoding/json"
@@ -74,6 +75,23 @@ func getOctoSQLType(value interface{}) octosql.Type {
 	case time.Time:
 		return octosql.Time
 	// TODO: Handle nested objects.
+	case map[string]interface{}:
+		fieldNames := make([]string, 0, len(value))
+		for k := range value {
+			fieldNames = append(fieldNames, k)
+		}
+		sort.Strings(fieldNames)
+		fields := make([]octosql.StructField, len(value))
+		for i := range fieldNames {
+			fields[i] = octosql.StructField{
+				Name: fieldNames[i],
+				Type: getOctoSQLType(value[fieldNames[i]]),
+			}
+		}
+		return octosql.Type{
+			TypeID: octosql.TypeIDStruct,
+			Struct: struct{ Fields []octosql.StructField }{Fields: fields},
+		}
 	case []interface{}:
 		var elementType *octosql.Type
 		for i := range value {
@@ -94,7 +112,6 @@ func getOctoSQLType(value interface{}) octosql.Type {
 				Element: elementType,
 			},
 		}
-
 	case nil:
 		return octosql.Null
 	}

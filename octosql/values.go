@@ -9,16 +9,16 @@ import (
 var ZeroValue = Value{}
 
 type Value struct {
-	Type        Type
-	Int         int
-	Float       float64
-	Boolean     bool
-	Str         string
-	Time        time.Time
-	Duration    time.Duration
-	List        []Value
-	FieldValues []Value
-	Tuple       []Value
+	Type     Type
+	Int      int
+	Float    float64
+	Boolean  bool
+	Str      string
+	Time     time.Time
+	Duration time.Duration
+	List     []Value
+	Struct   []Value
+	Tuple    []Value
 }
 
 func NewNull() Value {
@@ -91,8 +91,8 @@ func NewStruct(names []string, value []Value) Value {
 		}
 	}
 	return Value{
-		Type:        Type{TypeID: TypeIDStruct, Struct: struct{ Fields []StructField }{Fields: fieldTypes}},
-		FieldValues: value,
+		Type:   Type{TypeID: TypeIDStruct, Struct: struct{ Fields []StructField }{Fields: fieldTypes}},
+		Struct: value,
 	}
 }
 
@@ -108,6 +108,40 @@ func NewTuple(values []Value) Value {
 }
 
 func (value Value) Compare(other Value) int {
+	// Tuples compare positionally with structs.
+	if value.Type.TypeID == TypeIDTuple && other.Type.TypeID == TypeIDStruct ||
+		other.Type.TypeID == TypeIDTuple && value.Type.TypeID == TypeIDStruct {
+		var tuple, structure Value
+		multiplier := 1
+		if value.Type.TypeID == TypeIDTuple && other.Type.TypeID == TypeIDStruct {
+			tuple = value
+			structure = other
+		} else {
+			tuple = other
+			structure = value
+			multiplier = -1
+		}
+
+		maxLen := len(tuple.Tuple)
+		if len(structure.Struct) > maxLen {
+			maxLen = len(structure.Struct)
+		}
+
+		for i := 0; i < maxLen; i++ {
+			if i == len(tuple.Tuple) {
+				return -1 * multiplier
+			} else if i == len(structure.Struct) {
+				return 1 * multiplier
+			}
+
+			if comp := tuple.Tuple[i].Compare(structure.Struct[i]); comp != 0 {
+				return comp * multiplier
+			}
+		}
+
+		return 0
+	}
+
 	// The runtime types may be different for a union.
 	// The concrete instance type will be present.
 	if value.Type.TypeID != other.Type.TypeID {
@@ -206,19 +240,19 @@ func (value Value) Compare(other Value) int {
 		return 0
 
 	case TypeIDStruct:
-		maxLen := len(value.FieldValues)
-		if len(other.FieldValues) > maxLen {
-			maxLen = len(other.FieldValues)
+		maxLen := len(value.Struct)
+		if len(other.Struct) > maxLen {
+			maxLen = len(other.Struct)
 		}
 
 		for i := 0; i < maxLen; i++ {
-			if i == len(value.FieldValues) {
+			if i == len(value.Struct) {
 				return -1
-			} else if i == len(other.FieldValues) {
+			} else if i == len(other.Struct) {
 				return 1
 			}
 
-			if comp := value.FieldValues[i].Compare(other.FieldValues[i]); comp != 0 {
+			if comp := value.Struct[i].Compare(other.Struct[i]); comp != 0 {
 				return comp
 			}
 		}
@@ -293,11 +327,11 @@ func (value Value) append(builder *strings.Builder) {
 
 	case TypeIDStruct:
 		builder.WriteString("{ ")
-		for i, v := range value.FieldValues {
+		for i, v := range value.Struct {
 			builder.WriteString(value.Type.Struct.Fields[i].Name)
 			builder.WriteString(": ")
 			v.append(builder)
-			if i != len(value.FieldValues)-1 {
+			if i != len(value.Struct)-1 {
 				builder.WriteString(", ")
 			}
 		}

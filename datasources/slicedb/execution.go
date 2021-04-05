@@ -17,7 +17,7 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 	for i := 0; i < tableValue.Len(); i++ {
 		value := getValueFromReflectValue(tableValue.Index(i))
 
-		if err := produce(ProduceFromExecutionContext(ctx), NewRecord(value.FieldValues, false)); err != nil {
+		if err := produce(ProduceFromExecutionContext(ctx), NewRecord(value.Struct, false)); err != nil {
 			return fmt.Errorf("couldn't produce record: %w", err)
 		}
 	}
@@ -94,8 +94,8 @@ func getValueFromReflectValue(v reflect.Value) octosql.Value {
 			Struct: struct{ Fields []octosql.StructField }{Fields: fields},
 		}
 		return octosql.Value{
-			Type:        outType,
-			FieldValues: values,
+			Type:   outType,
+			Struct: values,
 		}
 	case reflect.Interface:
 		return getValueFromReflectValue(v.Elem())

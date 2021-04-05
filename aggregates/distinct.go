@@ -17,6 +17,7 @@ func DistinctAggregateOverloads(overloads []physical.AggregateDescriptor) []phys
 		out[i] = physical.AggregateDescriptor{
 			ArgumentType: overloads[i].ArgumentType,
 			OutputType:   overloads[i].OutputType,
+			TypeFn:       overloads[i].TypeFn,
 			Prototype:    NewDistinctPrototype(overloads[i].Prototype),
 		}
 	}

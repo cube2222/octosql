@@ -40,6 +40,7 @@ func (varCtx *VariableContext) WithRecordSchema(schema Schema) *VariableContext 
 type AggregateDescriptor struct {
 	ArgumentType octosql.Type
 	OutputType   octosql.Type
+	TypeFn       func(octosql.Type) (octosql.Type, bool)
 	Prototype    func() nodes.Aggregate
 }
 

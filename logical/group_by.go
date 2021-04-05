@@ -102,7 +102,20 @@ aggregateLoop:
 	for i, aggname := range node.aggregates {
 		descriptors := env.Aggregates[aggname]
 		for _, descriptor := range descriptors {
-			if expressions[i].Type.Is(octosql.TypeSum(descriptor.ArgumentType, octosql.Null)) == octosql.TypeRelationIs {
+			if descriptor.TypeFn != nil {
+				if outputType, ok := descriptor.TypeFn(expressions[i].Type); ok {
+					if octosql.Null.Is(expressions[i].Type) == octosql.TypeRelationIs {
+						outputType = octosql.TypeSum(outputType, octosql.Null)
+					}
+
+					aggregates[i] = physical.Aggregate{
+						Name:                node.aggregates[i],
+						OutputType:          outputType,
+						AggregateDescriptor: descriptor,
+					}
+					continue aggregateLoop
+				}
+			} else if expressions[i].Type.Is(octosql.TypeSum(descriptor.ArgumentType, octosql.Null)) == octosql.TypeRelationIs {
 				outputType := descriptor.OutputType
 				if octosql.Null.Is(expressions[i].Type) == octosql.TypeRelationIs {
 					outputType = octosql.TypeSum(descriptor.OutputType, octosql.Null)

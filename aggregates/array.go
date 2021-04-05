@@ -14,9 +14,10 @@ import (
 // TODO: Type variables or dynamic type description.
 var ArrayOverloads = []physical.AggregateDescriptor{
 	{
-		ArgumentType: octosql.Any,
-		OutputType:   octosql.Type{TypeID: octosql.TypeIDList, List: struct{ Element *octosql.Type }{Element: &octosql.Any}},
-		Prototype:    NewArrayPrototype(),
+		TypeFn: func(t octosql.Type) (octosql.Type, bool) {
+			return octosql.Type{TypeID: octosql.TypeIDList, List: struct{ Element *octosql.Type }{Element: &t}}, true
+		},
+		Prototype: NewArrayPrototype(),
 	},
 }
 

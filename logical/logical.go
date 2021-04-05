@@ -132,39 +132,6 @@ func (tup *Tuple) Typecheck(ctx context.Context, env physical.Environment, logic
 	panic("implement me")
 }
 
-type QueryExpression struct {
-	node Node
-}
-
-func NewQueryExpression(node Node) *QueryExpression {
-	return &QueryExpression{node: node}
-}
-
-func (ne *QueryExpression) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
-	source := ne.node.Typecheck(ctx, env, logicalEnv)
-	var elementType octosql.Type
-	if len(source.Schema.Fields) == 1 {
-		elementType = source.Schema.Fields[0].Type
-	} else {
-		structFields := make([]octosql.StructField, len(source.Schema.Fields))
-		for i := range source.Schema.Fields {
-			structFields[i] = octosql.StructField{
-				Name: source.Schema.Fields[i].Name,
-				Type: source.Schema.Fields[i].Type,
-			}
-		}
-		elementType = octosql.Type{TypeID: octosql.TypeIDStruct, Struct: struct{ Fields []octosql.StructField }{Fields: structFields}}
-	}
-
-	return physical.Expression{
-		Type:           octosql.Type{TypeID: octosql.TypeIDList, List: struct{ Element *octosql.Type }{Element: &elementType}},
-		ExpressionType: physical.ExpressionTypeQueryExpression,
-		QueryExpression: &physical.QueryExpression{
-			Source: source,
-		},
-	}
-}
-
 type And struct {
 	left, right Expression
 }
@@ -217,6 +184,71 @@ func (or *Or) Typecheck(ctx context.Context, env physical.Environment, logicalEn
 				left,
 				right,
 			},
+		},
+	}
+}
+
+type QueryExpression struct {
+	node Node
+}
+
+func NewQueryExpression(node Node) *QueryExpression {
+	return &QueryExpression{node: node}
+}
+
+func (ne *QueryExpression) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
+	source := ne.node.Typecheck(ctx, env, logicalEnv)
+	var elementType octosql.Type
+	if len(source.Schema.Fields) == 1 {
+		elementType = source.Schema.Fields[0].Type
+	} else {
+		structFields := make([]octosql.StructField, len(source.Schema.Fields))
+		for i := range source.Schema.Fields {
+			structFields[i] = octosql.StructField{
+				Name: source.Schema.Fields[i].Name,
+				Type: source.Schema.Fields[i].Type,
+			}
+		}
+		elementType = octosql.Type{TypeID: octosql.TypeIDStruct, Struct: struct{ Fields []octosql.StructField }{Fields: structFields}}
+	}
+
+	return physical.Expression{
+		Type:           octosql.Type{TypeID: octosql.TypeIDList, List: struct{ Element *octosql.Type }{Element: &elementType}},
+		ExpressionType: physical.ExpressionTypeQueryExpression,
+		QueryExpression: &physical.QueryExpression{
+			Source: source,
+		},
+	}
+}
+
+type Coalesce struct {
+	args []Expression
+}
+
+func NewCoalesce(args []Expression) *Coalesce {
+	return &Coalesce{args: args}
+}
+
+func (c *Coalesce) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
+	if len(c.args) == 0 {
+		panic("COALESCE must be provided at least 1 argument")
+	}
+
+	exprs := make([]physical.Expression, len(c.args))
+	for i := range c.args {
+		exprs[i] = c.args[i].Typecheck(ctx, env, logicalEnv)
+	}
+
+	outputType := exprs[0].Type
+	for _, expr := range exprs[1:] {
+		outputType = octosql.TypeSum(outputType, expr.Type)
+	}
+
+	return physical.Expression{
+		Type:           outputType,
+		ExpressionType: physical.ExpressionTypeCoalesce,
+		Coalesce: &physical.Coalesce{
+			Arguments: exprs,
 		},
 	}
 }

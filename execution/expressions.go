@@ -224,4 +224,27 @@ func (e *MultiColumnQueryExpression) Evaluate(ctx ExecutionContext) (octosql.Val
 	return octosql.NewList(values), nil
 }
 
+type Coalesce struct {
+	args []Expression
+}
+
+func NewCoalesce(args []Expression) *Coalesce {
+	return &Coalesce{
+		args: args,
+	}
+}
+
+func (c *Coalesce) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
+	for i := range c.args {
+		value, err := c.args[i].Evaluate(ctx)
+		if err != nil {
+			return octosql.ZeroValue, fmt.Errorf("couldn't evaluate %d OR argument: %w", i, err)
+		}
+		if value.Type.TypeID != octosql.TypeIDNull {
+			return value, nil
+		}
+	}
+	return octosql.NewNull(), nil
+}
+
 // TODO: sys.undo should create an expression which reads the current retraction status.

@@ -20,6 +20,7 @@ type Expression struct {
 	And             *And
 	Or              *Or
 	QueryExpression *QueryExpression
+	Coalesce        *Coalesce
 	TypeAssertion   *TypeAssertion
 }
 
@@ -32,6 +33,7 @@ const (
 	ExpressionTypeAnd
 	ExpressionTypeOr
 	ExpressionTypeQueryExpression
+	ExpressionTypeCoalesce
 	ExpressionTypeTypeAssertion
 )
 
@@ -60,6 +62,10 @@ type Or struct {
 
 type QueryExpression struct {
 	Source Node
+}
+
+type Coalesce struct {
+	Arguments []Expression
 }
 
 type TypeAssertion struct {
@@ -143,6 +149,16 @@ func (expr *Expression) Materialize(ctx context.Context, env Environment) (execu
 		} else {
 			return execution.NewSingleColumnQueryExpression(source), nil
 		}
+	case ExpressionTypeCoalesce:
+		expressions := make([]execution.Expression, len(expr.Coalesce.Arguments))
+		for i := range expr.Coalesce.Arguments {
+			expression, err := expr.Coalesce.Arguments[i].Materialize(ctx, env)
+			if err != nil {
+				return nil, fmt.Errorf("couldn't materialize COALESCE argument with index %d: %w", i, err)
+			}
+			expressions[i] = expression
+		}
+		return execution.NewCoalesce(expressions), nil
 	case ExpressionTypeTypeAssertion:
 		expression, err := expr.TypeAssertion.Expression.Materialize(ctx, env)
 		if err != nil {

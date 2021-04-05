@@ -270,6 +270,19 @@ func (t *Transformers) TransformExpr(expr Expression) Expression {
 				Source: expr.QueryExpression.Source,
 			},
 		}
+	case ExpressionTypeCoalesce:
+		arguments := make([]Expression, len(expr.Coalesce.Arguments))
+		for i := range expr.Coalesce.Arguments {
+			arguments[i] = t.TransformExpr(expr.Coalesce.Arguments[i])
+		}
+
+		out = Expression{
+			Type:           expr.Type,
+			ExpressionType: expr.ExpressionType,
+			Coalesce: &Coalesce{
+				Arguments: arguments,
+			},
+		}
 	case ExpressionTypeTypeAssertion:
 		out = Expression{
 			Type:           expr.Type,

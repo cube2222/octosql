@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"time"
 
 	"github.com/segmentio/encoding/json"
@@ -48,8 +49,6 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 }
 
 func getOctoSQLValue(value interface{}) octosql.Value {
-	// TODO: What if it's null?
-
 	switch value := value.(type) {
 	case int:
 		return octosql.NewInt(value)
@@ -66,13 +65,27 @@ func getOctoSQLValue(value interface{}) octosql.Value {
 		}
 	case time.Time:
 		return octosql.NewTime(value)
-		// TODO: Parse nested objects.
+	case map[string]interface{}:
+		// TODO: This won't work if we have structs with varying fields.
+		// We have to look at the type and base the names on that.
+		fieldNames := make([]string, 0, len(value))
+		for k := range value {
+			fieldNames = append(fieldNames, k)
+		}
+		sort.Strings(fieldNames)
+		values := make([]octosql.Value, len(value))
+		for i := range fieldNames {
+			values[i] = getOctoSQLValue(value[fieldNames[i]])
+		}
+		return octosql.NewStruct(fieldNames, values)
 	case []interface{}:
 		elements := make([]octosql.Value, len(value))
 		for i := range elements {
 			elements[i] = getOctoSQLValue(value[i])
 		}
 		return octosql.NewList(elements)
+	case nil:
+		return octosql.NewNull()
 	}
 
 	panic(fmt.Sprintf("unexhaustive json input value match: %T %+v", value, value))

@@ -561,6 +561,10 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 			arguments = append(arguments, logicArg)
 		}
 
+		if functionName == "coalesce" {
+			return logical.NewCoalesce(arguments), nil
+		}
+
 		return logical.NewFunctionExpression(functionName, arguments), nil
 
 	case *sqlparser.ColName:

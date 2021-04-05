@@ -683,10 +683,13 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 					if ts[1].TypeID != octosql.TypeIDInt {
 						return octosql.Type{}, false
 					}
-					return *ts[0].List.Element, true
+					return octosql.TypeSum(*ts[0].List.Element, octosql.Null), true
 				},
 				Strict: true,
 				Function: func(values []octosql.Value) (octosql.Value, error) {
+					if values[1].Int >= len(values[0].List) {
+						return octosql.NewNull(), nil
+					}
 					return values[0].List[values[1].Int], nil
 				},
 			},

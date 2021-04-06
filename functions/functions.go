@@ -15,18 +15,6 @@ import (
 	"github.com/cube2222/octosql/physical"
 )
 
-var standardRegexpCache, _ = ristretto.NewCache(&ristretto.Config{
-	NumCounters: 128,     // number of keys to track frequency of (10M).
-	MaxCost:     1 << 26, // maximum cost of cache (64MB).
-	BufferItems: 64,      // number of keys per Get buffer.
-})
-
-var likeRegexpCache, _ = ristretto.NewCache(&ristretto.Config{
-	NumCounters: 128,     // number of keys to track frequency of (10M).
-	MaxCost:     1 << 26, // maximum cost of cache (64MB).
-	BufferItems: 64,      // number of keys per Get buffer.
-})
-
 // TODO: Change this to the final map in place.
 func FunctionMap() map[string][]physical.FunctionDescriptor {
 	return map[string][]physical.FunctionDescriptor{
@@ -407,90 +395,101 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 				ArgumentTypes: []octosql.Type{octosql.String, octosql.String},
 				OutputType:    octosql.Boolean,
 				Strict:        true,
-				Function: func(values []octosql.Value) (octosql.Value, error) {
-					// TODO: Optimize, cache compiled regexps.
-					const likeEscape = '\\'
-					const likeAny = '_'
-					const likeAll = '%'
-
-					needsEscaping := func(r rune) bool {
-						return r == '+' ||
-							r == '?' ||
-							r == '(' ||
-							r == ')' ||
-							r == '{' ||
-							r == '}' ||
-							r == '[' ||
-							r == ']' ||
-							r == '^' ||
-							r == '$' ||
-							r == '.'
+				Function: func() func(values []octosql.Value) (octosql.Value, error) {
+					regexpCache, err := ristretto.NewCache(&ristretto.Config{
+						NumCounters: 128,     // number of keys to track frequency of (10M).
+						MaxCost:     1 << 26, // maximum cost of cache (64MB).
+						BufferItems: 64,      // number of keys per Get buffer.
+					})
+					if err != nil {
+						panic(fmt.Errorf("couldn't initialize regexp cache: %w", err))
 					}
 
-					// we assume that the escape character is '\'
-					likePatternToRegexp := func(pattern string) (*regexp.Regexp, error) {
-						if out, ok := likeRegexpCache.Get(pattern); ok {
-							return out.(*regexp.Regexp), nil
+					return func(values []octosql.Value) (octosql.Value, error) {
+						// TODO: Optimize, cache compiled regexps.
+						const likeEscape = '\\'
+						const likeAny = '_'
+						const likeAll = '%'
+
+						needsEscaping := func(r rune) bool {
+							return r == '+' ||
+								r == '?' ||
+								r == '(' ||
+								r == ')' ||
+								r == '{' ||
+								r == '}' ||
+								r == '[' ||
+								r == ']' ||
+								r == '^' ||
+								r == '$' ||
+								r == '.'
 						}
 
-						var sb strings.Builder
-						sb.WriteRune('^') // match start
+						// we assume that the escape character is '\'
+						likePatternToRegexp := func(pattern string) (*regexp.Regexp, error) {
+							if out, ok := regexpCache.Get(pattern); ok {
+								return out.(*regexp.Regexp), nil
+							}
 
-						escaping := false // was the character previously seen an escaping \
+							var sb strings.Builder
+							sb.WriteRune('^') // match start
 
-						for _, r := range pattern {
-							if escaping { // escaping \, _ and % is legal (we just write . or .*), otherwise an error occurs
-								if r != likeAny && r != likeAll && r != likeEscape {
-									return nil, fmt.Errorf("escaping invalid character in LIKE pattern: %v", r)
-								}
+							escaping := false // was the character previously seen an escaping \
 
-								escaping = false
-								sb.WriteRune(r)
+							for _, r := range pattern {
+								if escaping { // escaping \, _ and % is legal (we just write . or .*), otherwise an error occurs
+									if r != likeAny && r != likeAll && r != likeEscape {
+										return nil, fmt.Errorf("escaping invalid character in LIKE pattern: %v", r)
+									}
 
-								if r == likeEscape {
-									// since _ and % don't need to be escaped in regexp we just replace \_ with _
-									// but \ needs to be replaced in both, so we need to write an additional \
-									sb.WriteRune(likeEscape)
-								}
-							} else {
-								if r == likeEscape { // if we find an escape sequence we just handle it in the next step
-									escaping = true
-								} else if r == likeAny { // _ transforms to . (any character)
-									sb.WriteRune('.')
-								} else if r == likeAll { // % transforms to .* (any string)
-									sb.WriteString(".*")
-								} else if needsEscaping(r) { // escape characters that might break the regexp
-									sb.WriteRune('\\')
+									escaping = false
 									sb.WriteRune(r)
-								} else { // just write everything else
-									sb.WriteRune(r)
+
+									if r == likeEscape {
+										// since _ and % don't need to be escaped in regexp we just replace \_ with _
+										// but \ needs to be replaced in both, so we need to write an additional \
+										sb.WriteRune(likeEscape)
+									}
+								} else {
+									if r == likeEscape { // if we find an escape sequence we just handle it in the next step
+										escaping = true
+									} else if r == likeAny { // _ transforms to . (any character)
+										sb.WriteRune('.')
+									} else if r == likeAll { // % transforms to .* (any string)
+										sb.WriteString(".*")
+									} else if needsEscaping(r) { // escape characters that might break the regexp
+										sb.WriteRune('\\')
+										sb.WriteRune(r)
+									} else { // just write everything else
+										sb.WriteRune(r)
+									}
 								}
 							}
+
+							sb.WriteRune('$') // match end
+
+							if escaping {
+								return nil, fmt.Errorf("pattern ends with an escape character that doesn't escape anything")
+							}
+
+							reg, err := regexp.Compile(sb.String())
+							if err != nil {
+								return nil, fmt.Errorf("couldn't compile LIKE pattern regexp expression: '%s' => '%s': %w", values[1].Str, sb.String(), err)
+							}
+
+							regexpCache.Set(pattern, reg, 1)
+
+							return reg, nil
 						}
 
-						sb.WriteRune('$') // match end
-
-						if escaping {
-							return nil, fmt.Errorf("pattern ends with an escape character that doesn't escape anything")
-						}
-
-						reg, err := regexp.Compile(sb.String())
+						reg, err := likePatternToRegexp(values[1].Str)
 						if err != nil {
-							return nil, fmt.Errorf("couldn't compile LIKE pattern regexp expression: '%s' => '%s': %w", values[1].Str, sb.String(), err)
+							return octosql.Value{}, fmt.Errorf("couldn't transform LIKE pattern to regexp: %w", err)
 						}
 
-						likeRegexpCache.Set(pattern, reg, 1)
-
-						return reg, nil
+						return octosql.NewBoolean(reg.MatchString(values[0].Str)), nil
 					}
-
-					reg, err := likePatternToRegexp(values[1].Str)
-					if err != nil {
-						return octosql.Value{}, fmt.Errorf("couldn't transform LIKE pattern to regexp: %w", err)
-					}
-
-					return octosql.NewBoolean(reg.MatchString(values[0].Str)), nil
-				},
+				}(),
 			},
 		},
 		"~": {
@@ -498,24 +497,35 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 				ArgumentTypes: []octosql.Type{octosql.String, octosql.String},
 				OutputType:    octosql.Boolean,
 				Strict:        true,
-				Function: func(values []octosql.Value) (octosql.Value, error) {
-					pattern := values[1].Str
-
-					var reg *regexp.Regexp
-					if cached, ok := standardRegexpCache.Get(pattern); ok {
-						reg = cached.(*regexp.Regexp)
-					} else {
-						compiled, err := regexp.Compile(pattern)
-						if err != nil {
-							return octosql.Value{}, fmt.Errorf("couldn't compile ~ pattern regexp expression: '%s': %w", pattern, err)
-						}
-						reg = compiled
-
-						standardRegexpCache.Set(pattern, compiled, 1)
+				Function: func() func(values []octosql.Value) (octosql.Value, error) {
+					regexpCache, err := ristretto.NewCache(&ristretto.Config{
+						NumCounters: 128,     // number of keys to track frequency of (10M).
+						MaxCost:     1 << 26, // maximum cost of cache (64MB).
+						BufferItems: 64,      // number of keys per Get buffer.
+					})
+					if err != nil {
+						panic(fmt.Errorf("couldn't initialize regexp cache: %w", err))
 					}
 
-					return octosql.NewBoolean(reg.MatchString(values[0].Str)), nil
-				},
+					return func(values []octosql.Value) (octosql.Value, error) {
+						pattern := values[1].Str
+
+						var reg *regexp.Regexp
+						if cached, ok := regexpCache.Get(pattern); ok {
+							reg = cached.(*regexp.Regexp)
+						} else {
+							compiled, err := regexp.Compile(pattern)
+							if err != nil {
+								return octosql.Value{}, fmt.Errorf("couldn't compile ~ pattern regexp expression: '%s': %w", pattern, err)
+							}
+							reg = compiled
+
+							regexpCache.Set(pattern, compiled, 1)
+						}
+
+						return octosql.NewBoolean(reg.MatchString(values[0].Str)), nil
+					}
+				}(),
 			},
 		},
 		"~*": {
@@ -523,24 +533,35 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 				ArgumentTypes: []octosql.Type{octosql.String, octosql.String},
 				OutputType:    octosql.Boolean,
 				Strict:        true,
-				Function: func(values []octosql.Value) (octosql.Value, error) {
-					pattern := strings.ToLower(values[1].Str)
-
-					var reg *regexp.Regexp
-					if cached, ok := standardRegexpCache.Get(pattern); ok {
-						reg = cached.(*regexp.Regexp)
-					} else {
-						compiled, err := regexp.Compile(pattern)
-						if err != nil {
-							return octosql.Value{}, fmt.Errorf("couldn't compile ~ pattern regexp expression: '%s': %w", pattern, err)
-						}
-						reg = compiled
-
-						standardRegexpCache.Set(pattern, compiled, 1)
+				Function: func() func(values []octosql.Value) (octosql.Value, error) {
+					regexpCache, err := ristretto.NewCache(&ristretto.Config{
+						NumCounters: 128,     // number of keys to track frequency of (10M).
+						MaxCost:     1 << 26, // maximum cost of cache (64MB).
+						BufferItems: 64,      // number of keys per Get buffer.
+					})
+					if err != nil {
+						panic(fmt.Errorf("couldn't initialize regexp cache: %w", err))
 					}
 
-					return octosql.NewBoolean(reg.MatchString(strings.ToLower(values[0].Str))), nil
-				},
+					return func(values []octosql.Value) (octosql.Value, error) {
+						pattern := strings.ToLower(values[1].Str)
+
+						var reg *regexp.Regexp
+						if cached, ok := regexpCache.Get(pattern); ok {
+							reg = cached.(*regexp.Regexp)
+						} else {
+							compiled, err := regexp.Compile(pattern)
+							if err != nil {
+								return octosql.Value{}, fmt.Errorf("couldn't compile ~ pattern regexp expression: '%s': %w", pattern, err)
+							}
+							reg = compiled
+
+							regexpCache.Set(pattern, compiled, 1)
+						}
+
+						return octosql.NewBoolean(reg.MatchString(strings.ToLower(values[0].Str))), nil
+					}
+				}(),
 			},
 		},
 		"upper": {

@@ -9,9 +9,23 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dgraph-io/ristretto"
+
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
+
+var standardRegexpCache, _ = ristretto.NewCache(&ristretto.Config{
+	NumCounters: 128,     // number of keys to track frequency of (10M).
+	MaxCost:     1 << 26, // maximum cost of cache (64MB).
+	BufferItems: 64,      // number of keys per Get buffer.
+})
+
+var likeRegexpCache, _ = ristretto.NewCache(&ristretto.Config{
+	NumCounters: 128,     // number of keys to track frequency of (10M).
+	MaxCost:     1 << 26, // maximum cost of cache (64MB).
+	BufferItems: 64,      // number of keys per Get buffer.
+})
 
 // TODO: Change this to the final map in place.
 func FunctionMap() map[string][]physical.FunctionDescriptor {
@@ -414,7 +428,11 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 					}
 
 					// we assume that the escape character is '\'
-					likePatternToRegexp := func(pattern string) (string, error) {
+					likePatternToRegexp := func(pattern string) (*regexp.Regexp, error) {
+						if out, ok := likeRegexpCache.Get(pattern); ok {
+							return out.(*regexp.Regexp), nil
+						}
+
 						var sb strings.Builder
 						sb.WriteRune('^') // match start
 
@@ -423,7 +441,7 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 						for _, r := range pattern {
 							if escaping { // escaping \, _ and % is legal (we just write . or .*), otherwise an error occurs
 								if r != likeAny && r != likeAll && r != likeEscape {
-									return "", fmt.Errorf("escaping invalid character in LIKE pattern: %v", r)
+									return nil, fmt.Errorf("escaping invalid character in LIKE pattern: %v", r)
 								}
 
 								escaping = false
@@ -453,20 +471,22 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 						sb.WriteRune('$') // match end
 
 						if escaping {
-							return "", fmt.Errorf("pattern ends with an escape character that doesn't escape anything")
+							return nil, fmt.Errorf("pattern ends with an escape character that doesn't escape anything")
 						}
 
-						return sb.String(), nil
+						reg, err := regexp.Compile(sb.String())
+						if err != nil {
+							return nil, fmt.Errorf("couldn't compile LIKE pattern regexp expression: '%s' => '%s': %w", values[1].Str, sb.String(), err)
+						}
+
+						likeRegexpCache.Set(pattern, reg, 1)
+
+						return reg, nil
 					}
 
-					patternString, err := likePatternToRegexp(values[1].Str)
+					reg, err := likePatternToRegexp(values[1].Str)
 					if err != nil {
-						return octosql.Value{}, fmt.Errorf("couldn't transform LIKE pattern %s to regexp: %w", values[1].Str, err)
-					}
-
-					reg, err := regexp.Compile(patternString)
-					if err != nil {
-						return octosql.Value{}, fmt.Errorf("couldn't compile LIKE pattern regexp expression: '%s' => '%s': %w", values[1].Str, patternString, err)
+						return octosql.Value{}, fmt.Errorf("couldn't transform LIKE pattern to regexp: %w", err)
 					}
 
 					return octosql.NewBoolean(reg.MatchString(values[0].Str)), nil
@@ -479,9 +499,19 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 				OutputType:    octosql.Boolean,
 				Strict:        true,
 				Function: func(values []octosql.Value) (octosql.Value, error) {
-					reg, err := regexp.Compile(values[1].Str)
-					if err != nil {
-						return octosql.Value{}, fmt.Errorf("couldn't compile ~ pattern regexp expression: '%s': %w", values[1].Str, err)
+					pattern := values[1].Str
+
+					var reg *regexp.Regexp
+					if cached, ok := standardRegexpCache.Get(pattern); ok {
+						reg = cached.(*regexp.Regexp)
+					} else {
+						compiled, err := regexp.Compile(pattern)
+						if err != nil {
+							return octosql.Value{}, fmt.Errorf("couldn't compile ~ pattern regexp expression: '%s': %w", pattern, err)
+						}
+						reg = compiled
+
+						standardRegexpCache.Set(pattern, compiled, 1)
 					}
 
 					return octosql.NewBoolean(reg.MatchString(values[0].Str)), nil
@@ -494,9 +524,19 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 				OutputType:    octosql.Boolean,
 				Strict:        true,
 				Function: func(values []octosql.Value) (octosql.Value, error) {
-					reg, err := regexp.Compile(strings.ToLower(values[1].Str))
-					if err != nil {
-						return octosql.Value{}, fmt.Errorf("couldn't compile ~* pattern regexp expression: '%s': %w", values[1].Str, err)
+					pattern := strings.ToLower(values[1].Str)
+
+					var reg *regexp.Regexp
+					if cached, ok := standardRegexpCache.Get(pattern); ok {
+						reg = cached.(*regexp.Regexp)
+					} else {
+						compiled, err := regexp.Compile(pattern)
+						if err != nil {
+							return octosql.Value{}, fmt.Errorf("couldn't compile ~ pattern regexp expression: '%s': %w", pattern, err)
+						}
+						reg = compiled
+
+						standardRegexpCache.Set(pattern, compiled, 1)
 					}
 
 					return octosql.NewBoolean(reg.MatchString(strings.ToLower(values[0].Str))), nil

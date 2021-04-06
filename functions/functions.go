@@ -2,6 +2,7 @@ package functions
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"regexp"
 	"strconv"
@@ -150,6 +151,14 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 				},
 			},
 			{
+				ArgumentTypes: []octosql.Type{octosql.Int},
+				OutputType:    octosql.Int,
+				Strict:        true,
+				Function: func(values []octosql.Value) (octosql.Value, error) {
+					return octosql.NewInt(-values[0].Int), nil
+				},
+			},
+			{
 				ArgumentTypes: []octosql.Type{octosql.Float, octosql.Float},
 				OutputType:    octosql.Float,
 				Strict:        true,
@@ -158,11 +167,27 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 				},
 			},
 			{
+				ArgumentTypes: []octosql.Type{octosql.Float},
+				OutputType:    octosql.Float,
+				Strict:        true,
+				Function: func(values []octosql.Value) (octosql.Value, error) {
+					return octosql.NewFloat(-values[0].Float), nil
+				},
+			},
+			{
 				ArgumentTypes: []octosql.Type{octosql.Duration, octosql.Duration},
 				OutputType:    octosql.Duration,
 				Strict:        true,
 				Function: func(values []octosql.Value) (octosql.Value, error) {
 					return octosql.NewDuration(values[0].Duration - values[1].Duration), nil
+				},
+			},
+			{
+				ArgumentTypes: []octosql.Type{octosql.Duration},
+				OutputType:    octosql.Duration,
+				Strict:        true,
+				Function: func(values []octosql.Value) (octosql.Value, error) {
+					return octosql.NewDuration(-values[0].Duration), nil
 				},
 			},
 			{
@@ -369,6 +394,7 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 				OutputType:    octosql.Boolean,
 				Strict:        true,
 				Function: func(values []octosql.Value) (octosql.Value, error) {
+					// TODO: Optimize, cache compiled regexps.
 					const likeEscape = '\\'
 					const likeAny = '_'
 					const likeAll = '%'
@@ -568,6 +594,21 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 				Strict:        true,
 				Function: func(values []octosql.Value) (octosql.Value, error) {
 					return octosql.NewTime(time.Now()), nil
+				},
+			},
+		},
+		"parse_time": {
+			{
+				ArgumentTypes: []octosql.Type{octosql.String, octosql.String},
+				OutputType:    octosql.TypeSum(octosql.Time, octosql.Null),
+				Strict:        true,
+				Function: func(values []octosql.Value) (octosql.Value, error) {
+					t, err := time.Parse(values[0].Str, values[1].Str)
+					if err != nil {
+						log.Printf("error parsing time: %s", err)
+						return octosql.NewNull(), nil
+					}
+					return octosql.NewTime(t), nil
 				},
 			},
 		},

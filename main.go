@@ -78,6 +78,7 @@ func main() {
 		TableValuedFunctions: map[string][]physical.TableValuedFunctionDescriptor{
 			"max_diff_watermark": table_valued_functions.MaxDiffWatermark,
 			"tumble":             table_valued_functions.Tumble,
+			"range":              table_valued_functions.Range,
 		},
 		PhysicalConfig:  nil,
 		VariableContext: nil,

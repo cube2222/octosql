@@ -520,7 +520,7 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 		if ch == '@' && tkn.lastChar == '@' {
 			isDbSystemVariable = true
 		}
-		return tkn.scanIdentifier(byte(ch), isDbSystemVariable)
+		return tkn.scanIdentifier([]byte{byte(ch)}, isDbSystemVariable)
 	case isDigit(ch):
 		return tkn.scanNumber(false)
 	case ch == ':':
@@ -573,6 +573,9 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 		case '.':
 			if isDigit(tkn.lastChar) {
 				return tkn.scanNumber(true)
+			}
+			if tkn.lastChar == '/' {
+				return tkn.scanIdentifier([]byte{byte(ch), byte(tkn.lastChar)}, false)
 			}
 			return int(ch), nil
 		case '/':
@@ -681,9 +684,9 @@ func (tkn *Tokenizer) skipBlank() {
 	}
 }
 
-func (tkn *Tokenizer) scanIdentifier(firstByte byte, isDbSystemVariable bool) (int, []byte) {
+func (tkn *Tokenizer) scanIdentifier(firstBytes []byte, isDbSystemVariable bool) (int, []byte) {
 	buffer := &bytes2.Buffer{}
-	buffer.WriteByte(firstByte)
+	buffer.Write(firstBytes)
 	for isLetter(tkn.lastChar) || isDigit(tkn.lastChar) || (isDbSystemVariable && isCarat(tkn.lastChar)) {
 		buffer.WriteByte(byte(tkn.lastChar))
 		tkn.next()
@@ -850,7 +853,7 @@ func (tkn *Tokenizer) scanString(delim uint16, typ int) (int, []byte) {
 			}
 
 			buffer.Write(tkn.buf[start:tkn.bufPos])
-			tkn.Position += (tkn.bufPos - start)
+			tkn.Position += tkn.bufPos - start
 
 			if tkn.bufPos >= tkn.bufSize {
 				// Reached the end of the buffer without finding a delim or
@@ -987,7 +990,7 @@ func (tkn *Tokenizer) reset() {
 }
 
 func isLetter(ch uint16) bool {
-	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_' || ch == '@'
+	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_' || ch == '/' || ch == '@'
 }
 
 func isCarat(ch uint16) bool {

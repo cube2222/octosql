@@ -315,6 +315,9 @@ func ParseAliasedTableExpression(expr *sqlparser.AliasedTableExpr) (logical.Node
 			if index := strings.Index(alias, "."); index != -1 {
 				alias = alias[index+1:]
 			}
+			if index := strings.LastIndex(alias, "/"); index != -1 {
+				alias = alias[index+1:]
+			}
 			out = logical.NewRequalifier(alias, out)
 		}
 		return out, nil

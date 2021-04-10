@@ -157,6 +157,16 @@ func main() {
 			executionPlan,
 			stream.NewNativeFormat(physicalPlan.Schema),
 		)
+	default:
+		sink = batch.NewOutputPrinter(
+			executionPlan,
+			orderByExpressions,
+			logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
+			outputOptions.Limit,
+			physicalPlan.Schema,
+			batch.NewTableFormatter,
+			false,
+		)
 	}
 
 	if err := sink.Run(

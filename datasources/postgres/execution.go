@@ -79,6 +79,8 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 				recordValues[i] = octosql.NewNull()
 			case *pgtype.Numeric:
 				recordValues[i] = octosql.NewFloat(float64(value.Int.Int64()) * math.Pow10(int(value.Exp)))
+			case *pgtype.VarcharArray:
+				panic("todo")
 			default:
 				log.Printf("unknown postgres value type, setting null: %T, %+v", value, value)
 				recordValues[i] = octosql.NewNull()

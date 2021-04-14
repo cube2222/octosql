@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/jackc/pgx"
 	_ "github.com/jackc/pgx/stdlib"
@@ -85,7 +86,7 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 		return nil, fmt.Errorf("couldn't connect to database: %w", err)
 	}
 
-	rows, err := db.QueryEx(ctx, "SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = $1 ORDER BY ordinal_position", nil, name)
+	rows, err := db.QueryEx(ctx, "SELECT column_name, udt_name, is_nullable FROM information_schema.columns WHERE table_name = $1 ORDER BY ordinal_position", nil, name)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't describe table: %w", err)
 	}
@@ -101,23 +102,7 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 
 	fields := make([]physical.SchemaField, len(descriptions))
 	for i := range descriptions {
-		var t octosql.Type
-		switch descriptions[i][1] {
-		case "integer", "smallint":
-			t = octosql.Int
-		case "text", "character":
-			t = octosql.String
-		case "real", "numeric":
-			t = octosql.Float
-		case "boolean":
-			t = octosql.Boolean
-		default:
-			t = octosql.Null
-			log.Printf("unsupported postgres type: %s", descriptions[i][1])
-
-			// TODO: Support time.
-			// TODO: Support more types.
-		}
+		t := getOctoSQLType(descriptions[i][1])
 		if descriptions[i][2] == "YES" {
 			t = octosql.TypeSum(t, octosql.Null)
 		}
@@ -135,4 +120,42 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 		},
 		table: name,
 	}, nil
+}
+
+func getOctoSQLType(typename string) octosql.Type {
+	if strings.HasPrefix(typename, "_") {
+		elementType := getOctoSQLType(typename[1:])
+
+		return octosql.Type{
+			TypeID: octosql.TypeIDList,
+			List: struct {
+				Element *octosql.Type
+			}{Element: &elementType},
+		}
+	}
+
+	switch typename {
+	case "int", "int4", "int8":
+		return octosql.Int
+	case "text", "character", "varchar":
+		return octosql.String
+	case "real", "numeric", "float4", "float8":
+		return octosql.Float
+	case "bool":
+		return octosql.Boolean
+	case "timestamptz":
+		return octosql.Time
+	case "jsonb":
+		// TODO: Handle me better.
+		return octosql.String
+	case "bytea":
+		// TODO: Handle me better.
+		return octosql.String
+	default:
+		log.Fatalf("unsupported postgres field type: %s", typename)
+		return octosql.Null
+
+		// TODO: Support time.
+		// TODO: Support more types.
+	}
 }

@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"encoding/base64"
 	"fmt"
 	"log"
 	"math"
@@ -80,7 +81,20 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 			case *pgtype.Numeric:
 				recordValues[i] = octosql.NewFloat(float64(value.Int.Int64()) * math.Pow10(int(value.Exp)))
 			case *pgtype.VarcharArray:
-				panic("todo")
+				var strings []string
+				if err := value.AssignTo(&strings); err != nil {
+					log.Printf("couldn't decode varchar array: %s, setting null", err)
+					recordValues[i] = octosql.NewNull()
+				} else {
+					octoValues := make([]octosql.Value, len(strings))
+					for j := range strings {
+						octoValues[j] = octosql.NewString(strings[j])
+					}
+					recordValues[i] = octosql.NewList(octoValues)
+				}
+			case []byte:
+				// TODO: Create new datatype byte blob.
+				recordValues[i] = octosql.NewString(base64.StdEncoding.EncodeToString(value))
 			default:
 				log.Printf("unknown postgres value type, setting null: %T, %+v", value, value)
 				recordValues[i] = octosql.NewNull()

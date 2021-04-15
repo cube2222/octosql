@@ -135,15 +135,15 @@ func getOctoSQLType(typename string) octosql.Type {
 	}
 
 	switch typename {
-	case "int", "int4", "int8":
+	case "int", "int2", "int4", "int8":
 		return octosql.Int
 	case "text", "character", "varchar":
 		return octosql.String
 	case "real", "numeric", "float4", "float8":
 		return octosql.Float
-	case "bool":
+	case "bool", "boolean":
 		return octosql.Boolean
-	case "timestamptz":
+	case "timestamptz", "timestamp", "timetz", "time":
 		return octosql.Time
 	case "jsonb":
 		// TODO: Handle me better.

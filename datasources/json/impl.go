@@ -77,7 +77,6 @@ func getOctoSQLType(value interface{}) octosql.Type {
 		}
 	case time.Time:
 		return octosql.Time
-	// TODO: Handle nested objects.
 	case map[string]interface{}:
 		fieldNames := make([]string, 0, len(value))
 		for k := range value {

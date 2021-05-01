@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sort"
 	"time"
 
 	"github.com/segmentio/encoding/json"
@@ -39,7 +38,7 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 
 		values := make([]octosql.Value, len(d.fields))
 		for i := range values {
-			values[i] = getOctoSQLValue(msg[d.fields[i].Name])
+			values[i] = getOctoSQLValue(d.fields[i].Type, msg[d.fields[i].Name])
 		}
 
 		if err := produce(ProduceFromExecutionContext(ctx), NewRecord(values, false)); err != nil {
@@ -48,7 +47,7 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 	}
 }
 
-func getOctoSQLValue(value interface{}) octosql.Value {
+func getOctoSQLValue(t octosql.Type, value interface{}) octosql.Value {
 	switch value := value.(type) {
 	case int:
 		return octosql.NewInt(value)
@@ -58,30 +57,35 @@ func getOctoSQLValue(value interface{}) octosql.Value {
 		return octosql.NewFloat(value)
 	case string:
 		// TODO: this should happen based on the schema only.
-		if t, err := time.Parse(time.RFC3339Nano, value); err == nil {
-			return octosql.NewTime(t)
-		} else {
-			return octosql.NewString(value)
+		if t.Is(octosql.Time) >= octosql.TypeRelationMaybe {
+			if t, err := time.Parse(time.RFC3339Nano, value); err == nil {
+				return octosql.NewTime(t)
+			} else {
+				return octosql.NewString(value)
+			}
 		}
+		return octosql.NewString(value)
 	case time.Time:
 		return octosql.NewTime(value)
 	case map[string]interface{}:
 		// TODO: This won't work if we have structs with varying fields.
 		// We have to look at the type and base the names on that.
-		fieldNames := make([]string, 0, len(value))
-		for k := range value {
-			fieldNames = append(fieldNames, k)
+		values := make([]octosql.Value, len(t.Struct.Fields))
+		for i, field := range t.Struct.Fields {
+			values[i] = getOctoSQLValue(field.Type, value[field.Name])
 		}
-		sort.Strings(fieldNames)
-		values := make([]octosql.Value, len(value))
-		for i := range fieldNames {
-			values[i] = getOctoSQLValue(value[fieldNames[i]])
+		names := make([]string, len(t.Struct.Fields))
+		for i := range t.Struct.Fields {
+			names[i] = t.Struct.Fields[i].Name
 		}
-		return octosql.NewStruct(fieldNames, values)
+		return octosql.NewStruct(names, values)
 	case []interface{}:
 		elements := make([]octosql.Value, len(value))
 		for i := range elements {
-			elements[i] = getOctoSQLValue(value[i])
+			// TODO: This will not work for only empty lists.
+			// TODO: This will also not work for T1 | List<T2>, same for the structs above actually.
+			// TODO: Types just shouldn't be discriminated unions.
+			elements[i] = getOctoSQLValue(*t.List.Element, value[i])
 		}
 		return octosql.NewList(elements)
 	case nil:

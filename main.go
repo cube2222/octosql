@@ -32,7 +32,7 @@ import (
 )
 
 func main() {
-	describe := flag.Bool("describe", false, "")
+	describe := flag.Int("describe", 0, "")
 	if err := flag.CommandLine.Parse(os.Args[2:]); err != nil {
 		log.Fatal(err)
 	}
@@ -106,14 +106,14 @@ func main() {
 	physicalPlan = optimizer.Optimize(physicalPlan)
 	log.Printf("time for optimisation: %s", time.Since(start))
 
-	if *describe {
+	if *describe >= 1 {
 		file, err := os.CreateTemp(os.TempDir(), "octosql-describe-*.png")
 		if err != nil {
 			log.Fatal(err)
 		}
-		os.WriteFile("describe.txt", []byte(graph.Show(physical.DescribeNode(physicalPlan)).String()), os.ModePerm)
+		os.WriteFile("describe.txt", []byte(graph.Show(physical.DescribeNode(physicalPlan, true)).String()), os.ModePerm)
 		cmd := exec.Command("dot", "-Tpng")
-		cmd.Stdin = strings.NewReader(graph.Show(physical.DescribeNode(physicalPlan)).String())
+		cmd.Stdin = strings.NewReader(graph.Show(physical.DescribeNode(physicalPlan, *describe >= 2)).String())
 		cmd.Stdout = file
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {

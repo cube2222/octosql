@@ -84,9 +84,11 @@ func getGraphNode(gb *graphBuilder, node *Node) string {
 			fields[i] = fmt.Sprintf("<%s> %s", field.Name, field.Name)
 		}
 	}
-	childPorts := make([]string, len(node.Children))
-	for i, child := range node.Children {
-		childPorts[i] = fmt.Sprintf("<%s> %s", child.Name, child.Name)
+	childPorts := make([]string, 0)
+	for _, child := range node.Children {
+		if child.Name != "" {
+			childPorts = append(childPorts, fmt.Sprintf("<%s> %s", child.Name, child.Name))
+		}
 	}
 
 	var labelParts []string
@@ -115,9 +117,14 @@ func getGraphNode(gb *graphBuilder, node *Node) string {
 
 	for _, child := range node.Children {
 		childGraphNode := getGraphNode(gb, child.Node)
-		err := gb.graph.AddPortEdge(id, "<"+child.Name+">", childGraphNode, "", true, map[string]string{})
-		if err != nil {
-			log.Fatal(err)
+		if child.Name != "" {
+			if err := gb.graph.AddPortEdge(id, "<"+child.Name+">", childGraphNode, "", true, map[string]string{}); err != nil {
+				log.Fatal(err)
+			}
+		} else {
+			if err := gb.graph.AddEdge(id, childGraphNode, true, map[string]string{}); err != nil {
+				log.Fatal(err)
+			}
 		}
 	}
 	return id

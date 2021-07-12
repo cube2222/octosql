@@ -7,6 +7,7 @@ import (
 var defaultOptimizationRules = []func(Node) (output Node, changed bool){
 	PushDownFilterUnderRequalifier,
 	PushDownPredicatesToDatasource,
+	MergeFilters,
 }
 
 func Optimize(node Node) Node {

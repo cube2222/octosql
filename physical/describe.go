@@ -153,7 +153,6 @@ func DescribeExpr(expr Expression, withTypeInfo bool) *graph.Node {
 
 	case ExpressionTypeFunctionCall:
 		out = graph.NewNode("function")
-		out.AddField(expr.FunctionCall.Name, "")
 		for i := range expr.FunctionCall.Arguments {
 			out.AddChild(fmt.Sprintf("arg_%d", i), DescribeExpr(expr.FunctionCall.Arguments[i], withTypeInfo))
 		}

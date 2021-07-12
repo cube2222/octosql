@@ -356,29 +356,36 @@ func ParseJoinTableExpression(expr *sqlparser.JoinTableExpr) (logical.Node, erro
 		return nil, errors.Errorf("invalid join expression: %v", expr.Join)
 	}
 
-	var predicate logical.Expression = logical.NewConstant(octosql.NewBoolean(true))
-	if expr.Condition.On != nil {
-		predicate, err = ParseExpression(expr.Condition.On)
-		if err != nil {
-			return nil, errors.Wrap(err, "couldn't parse ON predicate in join")
+	var node logical.Node
+	if expr.Strategy == sqlparser.LookupJoinStrategy {
+		switch expr.Join {
+		case sqlparser.LeftJoinStr, sqlparser.RightJoinStr:
+			panic("implement me")
+		case sqlparser.JoinStr:
+			node = logical.NewLateralJoin(source, joined)
+		default:
+			return nil, errors.Errorf("invalid join expression: %v", expr.Join)
+		}
+	} else {
+		switch expr.Join {
+		case sqlparser.LeftJoinStr, sqlparser.RightJoinStr:
+			panic("implement me")
+		case sqlparser.JoinStr:
+			node = logical.NewJoin(source, joined)
+		default:
+			return nil, errors.Errorf("invalid join expression: %v", expr.Join)
 		}
 	}
 
-	strategy := logical.JoinStrategyUndefined
-	if expr.Strategy == sqlparser.LookupJoinStrategy {
-		strategy = logical.JoinStrategyLookup
-	} else if expr.Strategy == sqlparser.StreamJoinStrategy {
-		strategy = logical.JoinStrategyStream
+	if expr.Condition.On != nil {
+		predicate, err := ParseExpression(expr.Condition.On)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't parse ON predicate in join")
+		}
+		node = logical.NewFilter(predicate, node)
 	}
 
-	switch expr.Join {
-	case sqlparser.LeftJoinStr, sqlparser.RightJoinStr:
-		return logical.NewJoin(source, joined, predicate, strategy, logical.JoinTypeLeft), nil
-	case sqlparser.JoinStr:
-		return logical.NewJoin(source, joined, predicate, strategy, logical.JoinTypeInner), nil
-	default:
-		return nil, errors.Errorf("invalid join expression: %v", expr.Join)
-	}
+	return node, nil
 }
 
 func ParseTableValuedFunction(expr *sqlparser.TableValuedFunction) (logical.Node, error) {

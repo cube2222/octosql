@@ -223,7 +223,7 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 	for i, expr := range keyExprs {
 		value, err := expr.Evaluate(ctx)
 		if err != nil {
-			return fmt.Errorf("couldn't evaluate %d stream join left key expression: %w", i, err)
+			return fmt.Errorf("couldn't evaluate %d stream join key expression: %w", i, err)
 		}
 		key[i] = value
 	}

@@ -21,6 +21,7 @@ var ArrayOverloads = []physical.AggregateDescriptor{
 	},
 }
 
+// TODO: Elements should be sorted as they come, not sorted by value in a BTree.
 type Array struct {
 	items *btree.BTree
 }

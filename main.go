@@ -165,7 +165,7 @@ func main() {
 			outputOptions.Limit,
 			physicalPlan.Schema,
 			batch.NewTableFormatter,
-			false,
+			true,
 		)
 	}
 

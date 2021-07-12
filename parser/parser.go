@@ -59,13 +59,17 @@ func ParseSelect(statement *sqlparser.Select, topmost bool) (logical.Node, *Outp
 		outputOptions = &OutputOptions{}
 	}
 
-	if len(statement.From) != 1 {
-		return nil, nil, errors.Errorf("currently only one expression in from supported, got %v", len(statement.From))
+	root, err = ParseTableExpression(statement.From[len(statement.From)-1])
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "couldn't parse FROM expression")
 	}
 
-	root, err = ParseTableExpression(statement.From[0])
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "couldn't parse from expression")
+	for i := len(statement.From) - 2; i >= 0; i-- {
+		next, err := ParseTableExpression(statement.From[i])
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "couldn't parse FROM expression with index %d", i)
+		}
+		root = logical.NewJoin(root, next)
 	}
 
 	// We want to have normal expressions first, star expressions later

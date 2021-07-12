@@ -48,18 +48,18 @@ func DescribeNode(node Node, withTypeInfo bool) *graph.Node {
 
 	case NodeTypeStreamJoin:
 		out = graph.NewNode("join")
-		out.AddChild("left", DescribeNode(node.StreamJoin.Left, withTypeInfo))
 		out.AddChild("right", DescribeNode(node.StreamJoin.Right, withTypeInfo))
-		out.AddChild("left_key", DescribeExpr(Expression{
-			ExpressionType: ExpressionTypeTuple,
-			Tuple: &Tuple{
-				Arguments: node.StreamJoin.LeftKey,
-			},
-		}, withTypeInfo))
+		out.AddChild("left", DescribeNode(node.StreamJoin.Left, withTypeInfo))
 		out.AddChild("right_key", DescribeExpr(Expression{
 			ExpressionType: ExpressionTypeTuple,
 			Tuple: &Tuple{
 				Arguments: node.StreamJoin.RightKey,
+			},
+		}, withTypeInfo))
+		out.AddChild("left_key", DescribeExpr(Expression{
+			ExpressionType: ExpressionTypeTuple,
+			Tuple: &Tuple{
+				Arguments: node.StreamJoin.LeftKey,
 			},
 		}, withTypeInfo))
 

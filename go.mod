@@ -3,6 +3,7 @@ module github.com/cube2222/octosql
 go 1.15
 
 require (
+	github.com/awalterschulze/gographviz v2.0.3+incompatible
 	github.com/bradleyjkemp/memviz v0.2.3
 	github.com/cockroachdb/apd v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1
@@ -21,6 +22,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/segmentio/encoding v0.2.7
 	github.com/shopspring/decimal v1.2.0 // indirect
+	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	github.com/stretchr/testify v1.7.0
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad // indirect
 	golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3

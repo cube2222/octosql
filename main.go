@@ -2,11 +2,15 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"os"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/skratchdot/open-golang/open"
 
 	"github.com/cube2222/octosql/aggregates"
 	"github.com/cube2222/octosql/config"
@@ -16,6 +20,7 @@ import (
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/execution/nodes"
 	"github.com/cube2222/octosql/functions"
+	"github.com/cube2222/octosql/helpers/graph"
 	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/optimizer"
 	"github.com/cube2222/octosql/outputs/batch"
@@ -27,6 +32,11 @@ import (
 )
 
 func main() {
+	describe := flag.Bool("describe", false, "")
+	if err := flag.CommandLine.Parse(os.Args[2:]); err != nil {
+		log.Fatal(err)
+	}
+
 	databaseCreators := map[string]func(ctx context.Context, configUntyped config.DatabaseSpecificConfig) (physical.Database, error){
 		"postgres": postgres.Creator,
 	}
@@ -95,6 +105,29 @@ func main() {
 	start := time.Now()
 	physicalPlan = optimizer.Optimize(physicalPlan)
 	log.Printf("time for optimisation: %s", time.Since(start))
+
+	if *describe {
+		file, err := os.CreateTemp(os.TempDir(), "octosql-describe-*.png")
+		if err != nil {
+			log.Fatal(err)
+		}
+		os.WriteFile("describe.txt", []byte(graph.Show(physical.DescribeNode(physicalPlan)).String()), os.ModePerm)
+		cmd := exec.Command("dot", "-Tpng")
+		cmd.Stdin = strings.NewReader(graph.Show(physical.DescribeNode(physicalPlan)).String())
+		cmd.Stdout = file
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			log.Fatal("couldn't render graph: ", err)
+		}
+		if err := file.Close(); err != nil {
+			log.Fatal("couldn't close temporary file: ", err)
+		}
+		if err := open.Start(file.Name()); err != nil {
+			log.Fatal("couldn't open graph: ", err)
+		}
+		return
+	}
+
 	executionPlan, err := physicalPlan.Materialize(
 		context.Background(),
 		env,

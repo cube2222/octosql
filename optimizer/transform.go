@@ -66,6 +66,7 @@ func (t *Transformers) TransformNode(node Node) Node {
 				Aggregates:           aggregates,
 				AggregateExpressions: aggregateExpressions,
 				Key:                  key,
+				KeyEventTimeIndex:    node.GroupBy.KeyEventTimeIndex,
 				Trigger:              node.GroupBy.Trigger,
 			},
 		}

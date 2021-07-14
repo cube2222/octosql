@@ -102,7 +102,7 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 				// TODO: Handle more types.
 			}
 		}
-		if err := produce(ProduceFromExecutionContext(ctx), NewRecord(recordValues, false)); err != nil {
+		if err := produce(ProduceFromExecutionContext(ctx), NewRecord(recordValues, false, time.Time{})); err != nil {
 			return fmt.Errorf("couldn't produce record: %w", err)
 		}
 	}

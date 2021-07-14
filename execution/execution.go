@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"math"
 	"strings"
 	"time"
 
@@ -51,13 +52,15 @@ func ProduceFromExecutionContext(ctx ExecutionContext) ProduceContext {
 type Record struct {
 	Values     []octosql.Value
 	Retraction bool
+	EventTime  time.Time
 }
 
 // Functional options?
-func NewRecord(values []octosql.Value, retraction bool) Record {
+func NewRecord(values []octosql.Value, retraction bool, eventTime time.Time) Record {
 	return Record{
 		Values:     values,
 		Retraction: retraction,
+		EventTime:  eventTime,
 	}
 }
 
@@ -92,3 +95,5 @@ type MetadataMessageType int
 const (
 	MetadataMessageTypeWatermark MetadataMessageType = iota
 )
+
+var WatermarkMaxValue = (&time.Time{}).Add(time.Duration(math.MaxInt64))

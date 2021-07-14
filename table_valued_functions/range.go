@@ -3,6 +3,7 @@ package table_valued_functions
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
@@ -80,7 +81,7 @@ func (r *rangeNode) Run(ctx execution.ExecutionContext, produce execution.Produc
 	for i := start.Int; i < end.Int; i++ {
 		if err := produce(
 			execution.ProduceFromExecutionContext(ctx),
-			execution.NewRecord([]octosql.Value{octosql.NewInt(i)}, false),
+			execution.NewRecord([]octosql.Value{octosql.NewInt(i)}, false, time.Time{}),
 		); err != nil {
 			return fmt.Errorf("couldn't produce record: %w", err)
 		}

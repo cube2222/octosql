@@ -3,6 +3,7 @@ package slicedb
 import (
 	"fmt"
 	"reflect"
+	"time"
 
 	. "github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
@@ -17,7 +18,7 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 	for i := 0; i < tableValue.Len(); i++ {
 		value := getValueFromReflectValue(tableValue.Index(i))
 
-		if err := produce(ProduceFromExecutionContext(ctx), NewRecord(value.Struct, false)); err != nil {
+		if err := produce(ProduceFromExecutionContext(ctx), NewRecord(value.Struct, false, time.Time{})); err != nil {
 			return fmt.Errorf("couldn't produce record: %w", err)
 		}
 	}

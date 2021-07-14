@@ -33,8 +33,26 @@ type streamJoinItem struct {
 type streamJoinSubitem struct {
 	// Record value
 	GroupKey
+	// Event time
+	EventTime time.Time
 	// Record count
 	count int
+}
+
+func (subItem *streamJoinSubitem) Less(than btree.Item) bool {
+	thanTyped, ok := than.(*streamJoinSubitem)
+	if !ok {
+		panic(fmt.Sprintf("invalid *streamJoinSubitem comparison: %T", than))
+	}
+
+	// TODO: We could optimize this by using the underlying Compare of GroupKey, instead of doing two-way comparisons.
+	if less := subItem.GroupKey.Less(thanTyped.GroupKey); less {
+		return less
+	} else if greater := thanTyped.GroupKey.Less(subItem.GroupKey); greater {
+		return false
+	}
+
+	return subItem.EventTime.Before(thanTyped.EventTime)
 }
 
 func (s *StreamJoin) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
@@ -249,7 +267,7 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 			var subitemTyped *streamJoinSubitem
 
 			if subitem == nil {
-				subitemTyped = &streamJoinSubitem{GroupKey: record.Values}
+				subitemTyped = &streamJoinSubitem{GroupKey: record.Values, EventTime: record.EventTime}
 				itemTyped.values.ReplaceOrInsert(subitemTyped)
 			} else {
 				var ok bool
@@ -299,6 +317,11 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 			for i := 0; i < subitemTyped.count; i++ {
 				outputValues := make([]octosql.Value, len(record.Values)+len(subitemTyped.GroupKey))
 
+				eventTime := record.EventTime
+				if subitemTyped.EventTime.After(eventTime) {
+					eventTime = subitemTyped.EventTime
+				}
+
 				if amLeft {
 					copy(outputValues, record.Values)
 					copy(outputValues[len(record.Values):], subitemTyped.GroupKey)
@@ -307,7 +330,7 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 					copy(outputValues[len(subitemTyped.GroupKey):], record.Values)
 				}
 
-				if err := produce(ProduceFromExecutionContext(ctx), NewRecord(outputValues, record.Retraction)); err != nil {
+				if err := produce(ProduceFromExecutionContext(ctx), NewRecord(outputValues, record.Retraction, eventTime)); err != nil {
 					outErr = fmt.Errorf("couldn't produce: %w", err)
 					return false
 				}

@@ -2,6 +2,7 @@ package nodes
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/google/btree"
 
@@ -115,7 +116,7 @@ func produceOrderByItems(ctx ProduceContext, recordCounts *btree.BTree, produce 
 			panic(fmt.Sprintf("invalid order by item: %v", item))
 		}
 		for i := 0; i < itemTyped.Count; i++ {
-			if err := produce(ctx, NewRecord(itemTyped.Values, false)); err != nil {
+			if err := produce(ctx, NewRecord(itemTyped.Values, false, time.Time{})); err != nil {
 				outErr = err
 				return false
 			}

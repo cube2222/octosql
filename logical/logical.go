@@ -78,6 +78,14 @@ func NewVariable(name string) *Variable {
 }
 
 func (v *Variable) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
+	if v.name == "sys.event_time" {
+		return physical.Expression{
+			Type:            octosql.Time,
+			ExpressionType:  physical.ExpressionTypeRecordEventTime,
+			RecordEventTime: &physical.RecordEventTime{},
+		}
+	}
+
 	isLevel0 := true
 	for varCtx := env.VariableContext; varCtx != nil; varCtx = varCtx.Parent {
 		for _, field := range varCtx.Fields {

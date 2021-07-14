@@ -26,14 +26,16 @@ func (ctx ExecutionContext) WithRecord(record Record) ExecutionContext {
 }
 
 type VariableContext struct {
-	Parent *VariableContext
-	Values []octosql.Value
+	Parent    *VariableContext
+	Values    []octosql.Value
+	EventTime time.Time
 }
 
 func (varCtx *VariableContext) WithRecord(record Record) *VariableContext {
 	return &VariableContext{
-		Parent: varCtx,
-		Values: record.Values,
+		Parent:    varCtx,
+		Values:    record.Values,
+		EventTime: record.EventTime,
 	}
 }
 

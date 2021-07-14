@@ -45,6 +45,17 @@ func (c *Constant) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 	return c.value, nil
 }
 
+type RecordEventTime struct {
+}
+
+func NewRecordEventTime() *RecordEventTime {
+	return &RecordEventTime{}
+}
+
+func (c *RecordEventTime) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
+	return octosql.NewTime(ctx.VariableContext.EventTime), nil
+}
+
 type TypeAssertion struct {
 	expected octosql.Type
 	expr     Expression

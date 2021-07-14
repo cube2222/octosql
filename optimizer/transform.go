@@ -222,6 +222,12 @@ func (t *Transformers) TransformExpr(expr Expression) Expression {
 				Value: expr.Constant.Value,
 			},
 		}
+	case ExpressionTypeRecordEventTime:
+		out = Expression{
+			Type:            expr.Type,
+			ExpressionType:  expr.ExpressionType,
+			RecordEventTime: &RecordEventTime{},
+		}
 	case ExpressionTypeFunctionCall:
 		arguments := make([]Expression, len(expr.FunctionCall.Arguments))
 		for i := range expr.FunctionCall.Arguments {

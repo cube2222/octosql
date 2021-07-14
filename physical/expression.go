@@ -16,6 +16,7 @@ type Expression struct {
 	// Only one of the below may be non-null.
 	Variable        *Variable
 	Constant        *Constant
+	RecordEventTime *RecordEventTime
 	FunctionCall    *FunctionCall
 	And             *And
 	Or              *Or
@@ -30,6 +31,7 @@ type ExpressionType int
 const (
 	ExpressionTypeVariable ExpressionType = iota
 	ExpressionTypeConstant
+	ExpressionTypeRecordEventTime
 	ExpressionTypeFunctionCall
 	ExpressionTypeAnd
 	ExpressionTypeOr
@@ -46,6 +48,9 @@ type Variable struct {
 
 type Constant struct {
 	Value octosql.Value
+}
+
+type RecordEventTime struct {
 }
 
 type FunctionCall struct {
@@ -98,6 +103,8 @@ func (expr *Expression) Materialize(ctx context.Context, env Environment) (execu
 
 	case ExpressionTypeConstant:
 		return execution.NewConstant(expr.Constant.Value), nil
+	case ExpressionTypeRecordEventTime:
+		return execution.NewRecordEventTime(), nil
 	case ExpressionTypeFunctionCall:
 		expressions := make([]execution.Expression, len(expr.FunctionCall.Arguments))
 		for i := range expr.FunctionCall.Arguments {
@@ -227,6 +234,8 @@ func (expr Expression) variablesUsed(acc map[string]struct{}) {
 		acc[expr.Variable.Name] = struct{}{}
 		return
 	case ExpressionTypeConstant:
+		return
+	case ExpressionTypeRecordEventTime:
 		return
 	case ExpressionTypeFunctionCall:
 		for _, arg := range expr.FunctionCall.Arguments {

@@ -5,7 +5,7 @@ import (
 	. "github.com/cube2222/octosql/physical"
 )
 
-func PushDownPredicatesToDatasource(node Node) (Node, bool) {
+func PushDownFilterPredicatesToDatasource(node Node) (Node, bool) {
 	changed := false
 	t := Transformers{
 		NodeTransformer: func(node Node) Node {

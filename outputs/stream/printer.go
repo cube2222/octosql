@@ -23,7 +23,7 @@ type OutputPrinter struct {
 
 func NewOutputPrinter(source Node, format Format) *OutputPrinter {
 	return &OutputPrinter{
-		source: source,
+		source: &InternallyConsistentOutputStreamWrapper{source},
 		format: format,
 	}
 }

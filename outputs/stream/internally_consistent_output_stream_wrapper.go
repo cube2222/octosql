@@ -2,6 +2,7 @@ package stream
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	. "github.com/cube2222/octosql/execution"
@@ -30,6 +31,21 @@ func (node *InternallyConsistentOutputStreamWrapper) Run(ctx ExecutionContext, p
 				crossedOut[i] = true
 			}
 		}
+
+		lastIndex := -1
+		for i := range pending {
+			if !crossedOut[i] && pending[i].Retraction {
+				lastIndex = i
+			}
+		}
+		if lastIndex == -1 {
+			log.Printf("last retraction: nil")
+		} else {
+			log.Printf("last retraction: %s", pending[lastIndex])
+		}
+		/*
+			Ideowo ostatni rekord z danym timestampem to powinien być rekord, który miał po obu stronach ten timestamp, jeśli źródła są te same.
+		*/
 
 	pendingLoop:
 		for i := range pending {

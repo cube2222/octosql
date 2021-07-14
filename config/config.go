@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/yaml.v3"
@@ -53,6 +54,11 @@ func (d *DatabaseConfig) UnmarshalYAML(value *yaml.Node) error {
 func Read() (*Config, error) {
 	data, err := ioutil.ReadFile("octosql.yaml")
 	if err != nil {
+		if os.IsNotExist(err) {
+			return &Config{
+				Databases: nil,
+			}, nil
+		}
 		return nil, fmt.Errorf("couldn't read config file: %w", err)
 	}
 

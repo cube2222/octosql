@@ -89,6 +89,7 @@ type maxDifferenceWatermarkGenerator struct {
 
 func (m *maxDifferenceWatermarkGenerator) Run(ctx execution.ExecutionContext, produce execution.ProduceFn, metaSend execution.MetaSendFn) error {
 	maxValue := time.Time{}
+	curWatermark := time.Time{}
 
 	maxDifference, err := m.maxDifference.Evaluate(ctx)
 	if err != nil {
@@ -96,17 +97,20 @@ func (m *maxDifferenceWatermarkGenerator) Run(ctx execution.ExecutionContext, pr
 	}
 
 	if err := m.source.Run(ctx, func(ctx execution.ProduceContext, record execution.Record) error {
-		if err := produce(ctx, record); err != nil {
-			return fmt.Errorf("couldn't produce record")
+		if record.Values[m.timeFieldIndex].Time.After(curWatermark) {
+			if err := produce(ctx, record); err != nil {
+				return fmt.Errorf("couldn't produce record")
+			}
 		}
 
 		if curTimeValue := record.Values[m.timeFieldIndex].Time; curTimeValue.After(maxValue) {
 			maxValue = curTimeValue
+			curWatermark = curTimeValue.Add(-maxDifference.Duration)
 
 			// TODO: Think about adding granularity here. (so i.e. only have second resolution)
 			if err := metaSend(ctx, execution.MetadataMessage{
 				Type:      execution.MetadataMessageTypeWatermark,
-				Watermark: curTimeValue.Add(-maxDifference.Duration),
+				Watermark: curWatermark,
 			}); err != nil {
 				return fmt.Errorf("couldn't send updated watermark")
 			}

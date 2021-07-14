@@ -103,7 +103,7 @@ func (o *OrderBy) Run(execCtx ExecutionContext, produce ProduceFn, metaSend Meta
 	)
 
 	if err := produceOrderByItems(ProduceFromExecutionContext(execCtx), recordCounts, produce); err != nil {
-		return fmt.Errorf("couldn't produce ordered items")
+		return fmt.Errorf("couldn't produce ordered items: %w", err)
 	}
 	return nil
 }

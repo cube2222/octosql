@@ -138,7 +138,7 @@ func (t *tumble) Run(ctx execution.ExecutionContext, produce execution.ProduceFn
 		record.Values = append(record.Values, octosql.NewTime(windowStart), octosql.NewTime(windowEnd))
 
 		if err := produce(ctx, record); err != nil {
-			return fmt.Errorf("couldn't produce record")
+			return fmt.Errorf("couldn't produce record: %w", err)
 		}
 
 		return nil

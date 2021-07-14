@@ -245,7 +245,7 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 		}
 
 		{
-			subitem := itemTyped.values.Get(key)
+			subitem := itemTyped.values.Get(GroupKey(record.Values))
 			var subitemTyped *streamJoinSubitem
 
 			if subitem == nil {

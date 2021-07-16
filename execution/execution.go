@@ -49,6 +49,12 @@ func ProduceFromExecutionContext(ctx ExecutionContext) ProduceContext {
 	}
 }
 
+func ProduceFnApplyContext(fn ProduceFn, ctx ProduceContext) func(record Record) error {
+	return func(record Record) error {
+		return fn(ctx, record)
+	}
+}
+
 type Record struct {
 	Values     []octosql.Value
 	Retraction bool

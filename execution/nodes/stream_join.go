@@ -121,6 +121,9 @@ func (s *StreamJoin) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaS
 
 	var leftWatermark, rightWatermark, minWatermark time.Time
 
+	leftRecordBuffer := NewRecordEventTimeBuffer()
+	rightRecordBuffer := NewRecordEventTimeBuffer()
+
 receiveLoop:
 	for {
 		select {
@@ -143,6 +146,18 @@ receiveLoop:
 				}
 				if min.After(minWatermark) {
 					minWatermark = min
+
+					if err := leftRecordBuffer.Emit(minWatermark, func(record Record) error {
+						if err := s.receiveRecord(ctx, produce, leftRecords, rightRecords, true, record); err != nil {
+							// TODO: Fix goroutine leak.
+							return fmt.Errorf("couldn't process record from left: %w", err)
+						}
+						return nil
+
+					}); err != nil {
+						return err
+					}
+
 					if err := metaSend(ProduceFromExecutionContext(ctx), MetadataMessage{
 						Type:      MetadataMessageTypeWatermark,
 						Watermark: minWatermark,
@@ -153,10 +168,9 @@ receiveLoop:
 
 				continue
 			}
-			if err := s.receiveRecord(ctx, produce, leftRecords, rightRecords, true, msg.record); err != nil {
-				// TODO: Fix goroutine leak.
-				return fmt.Errorf("couldn't consume record from left: %w", err)
-			}
+			leftRecordBuffer.AddRecord(msg.record)
+			// TODO: Add backpressure
+
 		case msg, ok := <-rightMessages:
 			if !ok {
 				leftDone = false
@@ -176,6 +190,18 @@ receiveLoop:
 				}
 				if min.After(minWatermark) {
 					minWatermark = min
+
+					if err := rightRecordBuffer.Emit(minWatermark, func(record Record) error {
+						if err := s.receiveRecord(ctx, produce, rightRecords, leftRecords, false, record); err != nil {
+							// TODO: Fix goroutine leak.
+							return fmt.Errorf("couldn't process record from right: %w", err)
+						}
+						return nil
+
+					}); err != nil {
+						return err
+					}
+
 					if err := metaSend(ProduceFromExecutionContext(ctx), MetadataMessage{
 						Type:      MetadataMessageTypeWatermark,
 						Watermark: minWatermark,
@@ -186,10 +212,8 @@ receiveLoop:
 
 				continue
 			}
-			if err := s.receiveRecord(ctx, produce, rightRecords, leftRecords, false, msg.record); err != nil {
-				// TODO: Fix goroutine leak.
-				return fmt.Errorf("couldn't consume record from right: %w", err)
-			}
+			rightRecordBuffer.AddRecord(msg.record)
+			// TODO: Add backpressure
 		}
 	}
 

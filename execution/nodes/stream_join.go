@@ -321,6 +321,7 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 				if subitemTyped.EventTime.After(eventTime) {
 					eventTime = subitemTyped.EventTime
 				}
+				// TODO: We probably also want the event time in the columns to be equal to this. Think about this.
 
 				if amLeft {
 					copy(outputValues, record.Values)

@@ -157,23 +157,11 @@ func (g *GroupBy) trigger(produceCtx ProduceContext, aggregates, previouslySentV
 
 	for _, key := range toTrigger {
 		// Get values and produce, retracting previous values.
+		newValueEventTime := curEventTime
+		var outputValues []octosql.Value
 		{
-			item := previouslySentValues.Delete(key)
-			if item != nil {
-				itemTyped, ok := item.(*previouslySentValuesItem)
-				if !ok {
-					// TODO: Check performance cost of those panics.
-					panic(fmt.Sprintf("invalid previously sent item: %v", item))
-				}
+			// Get new record to send
 
-				if err := produce(produceCtx, NewRecord(itemTyped.Values, true, itemTyped.EventTime)); err != nil {
-					return fmt.Errorf("couldn't produce: %w", err)
-				}
-
-				previouslySentValues.Delete(key)
-			}
-		}
-		{
 			item := aggregates.Get(key)
 			if item != nil {
 				itemTyped, ok := item.(*aggregatesItem)
@@ -182,7 +170,7 @@ func (g *GroupBy) trigger(produceCtx ProduceContext, aggregates, previouslySentV
 					panic(fmt.Sprintf("invalid aggregates item: %v", item))
 				}
 
-				outputValues := make([]octosql.Value, len(key)+len(g.aggregateExprs))
+				outputValues = make([]octosql.Value, len(key)+len(g.aggregateExprs))
 				copy(outputValues, key)
 
 				for i := range itemTyped.Aggregates {
@@ -193,19 +181,42 @@ func (g *GroupBy) trigger(produceCtx ProduceContext, aggregates, previouslySentV
 					}
 				}
 
-				eventTime := curEventTime
+				// If the new record has a custom Event Time, then we use that for it and the possible corresponding retraction.
 				if g.keyEventTimeIndex != -1 {
-					eventTime = outputValues[g.keyEventTimeIndex].Time
+					newValueEventTime = outputValues[g.keyEventTimeIndex].Time
+				}
+			}
+		}
+		{
+			// Send possible retraction
+
+			item := previouslySentValues.Delete(key)
+			if item != nil {
+				itemTyped, ok := item.(*previouslySentValuesItem)
+				if !ok {
+					// TODO: Check performance cost of those panics.
+					panic(fmt.Sprintf("invalid previously sent item: %v", item))
 				}
 
-				if err := produce(produceCtx, NewRecord(outputValues, false, eventTime)); err != nil {
+				if err := produce(produceCtx, NewRecord(itemTyped.Values, true, newValueEventTime)); err != nil {
+					return fmt.Errorf("couldn't produce: %w", err)
+				}
+
+				previouslySentValues.Delete(key)
+			}
+		}
+		{
+			// Send possible new value
+
+			if outputValues != nil {
+				if err := produce(produceCtx, NewRecord(outputValues, false, newValueEventTime)); err != nil {
 					return fmt.Errorf("couldn't produce: %w", err)
 				}
 
 				previouslySentValues.ReplaceOrInsert(&previouslySentValuesItem{
 					GroupKey:  key,
 					Values:    outputValues,
-					EventTime: eventTime,
+					EventTime: newValueEventTime,
 				})
 			}
 		}

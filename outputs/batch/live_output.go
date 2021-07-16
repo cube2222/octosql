@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"sync"
 	"time"
 
 	"github.com/google/btree"
@@ -83,53 +82,7 @@ func (item *outputItem) Less(than btree.Item) bool {
 func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 	recordCounts := btree.New(BTreeDefaultDegree)
 	watermark := time.Time{}
-	mutex := sync.Mutex{}
-	done := make(chan struct{})
 	liveWriter := uilive.New()
-
-	wg := sync.WaitGroup{}
-	if o.live {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			ticker := time.Tick(time.Second / 4)
-			for {
-				select {
-				case <-ticker:
-					var buf bytes.Buffer
-
-					format := o.format(&buf)
-					format.SetSchema(o.schema)
-
-					i := 0
-					mutex.Lock()
-					recordCounts.Ascend(func(item btree.Item) bool {
-						if o.limit > 0 && i == o.limit {
-							return false
-						}
-						i++
-
-						itemTyped := item.(*outputItem)
-						for i := 0; i < itemTyped.Count; i++ {
-							format.Write(itemTyped.Values)
-						}
-						return true
-					})
-					watermark := watermark
-					mutex.Unlock()
-
-					format.Close()
-
-					fmt.Fprintf(&buf, "watermark: %s\n", watermark.Format(time.RFC3339Nano))
-
-					buf.WriteTo(liveWriter)
-					liveWriter.Flush()
-				case <-done:
-					return
-				}
-			}
-		}()
-	}
 
 	if err := o.source.Run(
 		execCtx,
@@ -143,7 +96,6 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 				key[i] = keyValue
 			}
 
-			mutex.Lock()
 			item := recordCounts.Get(&outputItem{Key: key, Values: record.Values, DirectionMultipliers: o.directionMultipliers})
 			var itemTyped *outputItem
 			if item == nil {
@@ -173,21 +125,41 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 			} else {
 				recordCounts.Delete(itemTyped)
 			}
-			mutex.Unlock()
 			return nil
 		},
 		func(ctx ProduceContext, msg MetadataMessage) error {
-			mutex.Lock()
 			watermark = msg.Watermark
-			mutex.Unlock()
+			var buf bytes.Buffer
+
+			format := o.format(&buf)
+			format.SetSchema(o.schema)
+
+			i := 0
+			recordCounts.Ascend(func(item btree.Item) bool {
+				if o.limit > 0 && i == o.limit {
+					return false
+				}
+				i++
+
+				itemTyped := item.(*outputItem)
+				for i := 0; i < itemTyped.Count; i++ {
+					format.Write(itemTyped.Values)
+				}
+				return true
+			})
+			watermark := watermark
+
+			format.Close()
+
+			fmt.Fprintf(&buf, "watermark: %s\n", watermark.Format(time.RFC3339Nano))
+
+			buf.WriteTo(liveWriter)
+			liveWriter.Flush()
 			return nil
 		},
 	); err != nil {
 		return err
 	}
-
-	close(done)
-	wg.Wait()
 
 	var buf bytes.Buffer
 	format := o.format(&buf)

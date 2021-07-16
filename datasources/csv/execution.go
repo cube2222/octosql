@@ -72,7 +72,7 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 			values[i] = octosql.NewString(str)
 		}
 
-		if err := produce(ProduceFromExecutionContext(ctx), NewRecord(values, false)); err != nil {
+		if err := produce(ProduceFromExecutionContext(ctx), NewRecord(values, false, time.Time{})); err != nil {
 			return fmt.Errorf("couldn't produce record: %w", err)
 		}
 	}

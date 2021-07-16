@@ -33,8 +33,8 @@ type streamJoinItem struct {
 type streamJoinSubitem struct {
 	// Record value
 	GroupKey
-	// Record count
-	count int
+	// Record event times
+	EventTimes []time.Time
 }
 
 func (s *StreamJoin) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
@@ -103,6 +103,35 @@ func (s *StreamJoin) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaS
 
 	var leftWatermark, rightWatermark, minWatermark time.Time
 
+	leftRecordBuffer := NewRecordEventTimeBuffer()
+	rightRecordBuffer := NewRecordEventTimeBuffer()
+
+	processRecordsUpTo := func(ctx ExecutionContext, watermark time.Time) error {
+		if err := leftRecordBuffer.Emit(watermark, func(record Record) error {
+			if err := s.receiveRecord(ctx, produce, leftRecords, rightRecords, true, record); err != nil {
+				// TODO: Fix goroutine leak.
+				return fmt.Errorf("couldn't process record from left: %w", err)
+			}
+			return nil
+
+		}); err != nil {
+			return err
+		}
+
+		if err := rightRecordBuffer.Emit(watermark, func(record Record) error {
+			if err := s.receiveRecord(ctx, produce, rightRecords, leftRecords, false, record); err != nil {
+				// TODO: Fix goroutine leak.
+				return fmt.Errorf("couldn't process record from right: %w", err)
+			}
+			return nil
+
+		}); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
 receiveLoop:
 	for {
 		select {
@@ -125,6 +154,11 @@ receiveLoop:
 				}
 				if min.After(minWatermark) {
 					minWatermark = min
+
+					if err := processRecordsUpTo(ctx, minWatermark); err != nil {
+						return err
+					}
+
 					if err := metaSend(ProduceFromExecutionContext(ctx), MetadataMessage{
 						Type:      MetadataMessageTypeWatermark,
 						Watermark: minWatermark,
@@ -135,10 +169,9 @@ receiveLoop:
 
 				continue
 			}
-			if err := s.receiveRecord(ctx, produce, leftRecords, rightRecords, true, msg.record); err != nil {
-				// TODO: Fix goroutine leak.
-				return fmt.Errorf("couldn't consume record from left: %w", err)
-			}
+			leftRecordBuffer.AddRecord(msg.record)
+			// TODO: Add backpressure
+
 		case msg, ok := <-rightMessages:
 			if !ok {
 				leftDone = false
@@ -158,6 +191,11 @@ receiveLoop:
 				}
 				if min.After(minWatermark) {
 					minWatermark = min
+
+					if err := processRecordsUpTo(ctx, minWatermark); err != nil {
+						return err
+					}
+
 					if err := metaSend(ProduceFromExecutionContext(ctx), MetadataMessage{
 						Type:      MetadataMessageTypeWatermark,
 						Watermark: minWatermark,
@@ -168,18 +206,25 @@ receiveLoop:
 
 				continue
 			}
-			if err := s.receiveRecord(ctx, produce, rightRecords, leftRecords, false, msg.record); err != nil {
-				// TODO: Fix goroutine leak.
-				return fmt.Errorf("couldn't consume record from right: %w", err)
-			}
+			rightRecordBuffer.AddRecord(msg.record)
+			// TODO: Add backpressure
 		}
 	}
 
 	var openChannel chan chanMessage
+	var recordBuffer *RecordEventTimeBuffer
 	if !leftDone {
 		openChannel = leftMessages
+		recordBuffer = leftRecordBuffer
+		minWatermark = leftWatermark
 	} else {
 		openChannel = rightMessages
+		recordBuffer = rightRecordBuffer
+		minWatermark = rightWatermark
+	}
+
+	if err := processRecordsUpTo(ctx, minWatermark); err != nil {
+		return err
 	}
 
 	for msg := range openChannel {
@@ -187,23 +232,21 @@ receiveLoop:
 			return msg.err
 		}
 		if msg.metadata {
+			if err := processRecordsUpTo(ctx, msg.metadataMessage.Watermark); err != nil {
+				return err
+			}
+
 			if err := metaSend(ProduceFromExecutionContext(ctx), msg.metadataMessage); err != nil {
 				return fmt.Errorf("couldn't send metadata: %w", err)
 			}
 			continue
 		}
 
-		if !leftDone {
-			if err := s.receiveRecord(ctx, produce, leftRecords, rightRecords, true, msg.record); err != nil {
-				// TODO: Fix goroutine leak.
-				return fmt.Errorf("couldn't consume record from left: %w", err)
-			}
-		} else {
-			if err := s.receiveRecord(ctx, produce, rightRecords, leftRecords, false, msg.record); err != nil {
-				// TODO: Fix goroutine leak.
-				return fmt.Errorf("couldn't consume record from left: %w", err)
-			}
-		}
+		recordBuffer.AddRecord(msg.record)
+	}
+
+	if err := processRecordsUpTo(ctx, WatermarkMaxValue); err != nil {
+		return err
 	}
 
 	return nil
@@ -245,7 +288,7 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 		}
 
 		{
-			subitem := itemTyped.values.Get(GroupKey(record.Values))
+			subitem := itemTyped.values.Get(&streamJoinSubitem{GroupKey: record.Values})
 			var subitemTyped *streamJoinSubitem
 
 			if subitem == nil {
@@ -259,11 +302,11 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 				}
 			}
 			if !record.Retraction {
-				subitemTyped.count++
+				subitemTyped.EventTimes = append(subitemTyped.EventTimes, record.EventTime)
 			} else {
-				subitemTyped.count--
+				subitemTyped.EventTimes = subitemTyped.EventTimes[1:]
 			}
-			if subitemTyped.count == 0 {
+			if len(subitemTyped.EventTimes) == 0 {
 				itemTyped.values.Delete(subitemTyped)
 			}
 		}
@@ -296,8 +339,14 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 				panic(fmt.Sprintf("invalid stream join subitem: %v", subitem))
 			}
 
-			for i := 0; i < subitemTyped.count; i++ {
+			for i := 0; i < len(subitemTyped.EventTimes); i++ {
 				outputValues := make([]octosql.Value, len(record.Values)+len(subitemTyped.GroupKey))
+
+				eventTime := record.EventTime
+				if subitemTyped.EventTimes[i].After(eventTime) {
+					eventTime = subitemTyped.EventTimes[i]
+				}
+				// TODO: We probably also want the event time in the columns to be equal to this. Think about this.
 
 				if amLeft {
 					copy(outputValues, record.Values)
@@ -307,7 +356,7 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 					copy(outputValues[len(subitemTyped.GroupKey):], record.Values)
 				}
 
-				if err := produce(ProduceFromExecutionContext(ctx), NewRecord(outputValues, record.Retraction)); err != nil {
+				if err := produce(ProduceFromExecutionContext(ctx), NewRecord(outputValues, record.Retraction, eventTime)); err != nil {
 					outErr = fmt.Errorf("couldn't produce: %w", err)
 					return false
 				}

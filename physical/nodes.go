@@ -81,7 +81,9 @@ type GroupBy struct {
 	Aggregates           []Aggregate
 	AggregateExpressions []Expression
 	Key                  []Expression
-	Trigger              Trigger
+	// Either index to Key, or -1, if none.
+	KeyEventTimeIndex int
+	Trigger           Trigger
 }
 
 type Aggregate struct {
@@ -214,7 +216,7 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (execution.N
 		}
 		trigger := node.GroupBy.Trigger.Materialize(ctx, env)
 
-		return nodes.NewGroupBy(aggregates, expressions, key, source, trigger), nil
+		return nodes.NewGroupBy(aggregates, expressions, key, node.GroupBy.KeyEventTimeIndex, source, trigger), nil
 	case NodeTypeStreamJoin:
 		left, err := node.StreamJoin.Left.Materialize(ctx, env)
 		if err != nil {

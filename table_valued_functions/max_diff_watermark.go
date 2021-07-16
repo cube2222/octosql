@@ -98,8 +98,9 @@ func (m *maxDifferenceWatermarkGenerator) Run(ctx execution.ExecutionContext, pr
 
 	if err := m.source.Run(ctx, func(ctx execution.ProduceContext, record execution.Record) error {
 		if record.Values[m.timeFieldIndex].Time.After(curWatermark) {
+			record.EventTime = record.Values[m.timeFieldIndex].Time
 			if err := produce(ctx, record); err != nil {
-				return fmt.Errorf("couldn't produce record")
+				return fmt.Errorf("couldn't produce record: %w", err)
 			}
 		}
 

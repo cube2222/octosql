@@ -79,7 +79,7 @@ func NewGroupBy(source Node, key []Expression, keyNames []string, expressions []
 func (node *GroupBy) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
 	source := node.source.Typecheck(ctx, env, logicalEnv)
 
-	keyTimeIndex := -1
+	keyEventTimeIndex := -1
 
 	key := make([]physical.Expression, len(node.key))
 	for i := range node.key {
@@ -88,7 +88,7 @@ func (node *GroupBy) Typecheck(ctx context.Context, env physical.Environment, lo
 			key[i].ExpressionType == physical.ExpressionTypeVariable &&
 			physical.VariableNameMatchesField(key[i].Variable.Name, source.Schema.Fields[source.Schema.TimeField].Name) {
 
-			keyTimeIndex = i
+			keyEventTimeIndex = i
 		}
 	}
 
@@ -159,7 +159,7 @@ aggregateLoop:
 
 	triggers := make([]physical.Trigger, len(node.triggers))
 	for i := range node.triggers {
-		triggers[i] = node.triggers[i].Typecheck(ctx, env, logicalEnv, keyTimeIndex)
+		triggers[i] = node.triggers[i].Typecheck(ctx, env, logicalEnv, keyEventTimeIndex)
 	}
 	var trigger physical.Trigger
 	if len(triggers) == 0 {
@@ -193,13 +193,14 @@ aggregateLoop:
 	}
 
 	return physical.Node{
-		Schema:   physical.NewSchema(schemaFields, keyTimeIndex),
+		Schema:   physical.NewSchema(schemaFields, keyEventTimeIndex),
 		NodeType: physical.NodeTypeGroupBy,
 		GroupBy: &physical.GroupBy{
 			Source:               source,
 			Aggregates:           aggregates,
 			AggregateExpressions: expressions,
 			Key:                  key,
+			KeyEventTimeIndex:    keyEventTimeIndex,
 			Trigger:              trigger,
 		},
 	}

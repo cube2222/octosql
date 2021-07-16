@@ -31,7 +31,7 @@ func (s *LookupJoin) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaS
 
 			retraction := (sourceRecord.Retraction || joinedRecord.Retraction) && !(sourceRecord.Retraction && joinedRecord.Retraction)
 
-			if err := produce(ProduceFromExecutionContext(ctx), NewRecord(outputValues, retraction)); err != nil {
+			if err := produce(ProduceFromExecutionContext(ctx), NewRecord(outputValues, retraction, sourceRecord.EventTime)); err != nil {
 				return fmt.Errorf("couldn't produce: %w", err)
 			}
 

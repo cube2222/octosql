@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"math"
 	"strings"
 	"time"
 
@@ -48,16 +49,24 @@ func ProduceFromExecutionContext(ctx ExecutionContext) ProduceContext {
 	}
 }
 
+func ProduceFnApplyContext(fn ProduceFn, ctx ProduceContext) func(record Record) error {
+	return func(record Record) error {
+		return fn(ctx, record)
+	}
+}
+
 type Record struct {
 	Values     []octosql.Value
 	Retraction bool
+	EventTime  time.Time
 }
 
 // Functional options?
-func NewRecord(values []octosql.Value, retraction bool) Record {
+func NewRecord(values []octosql.Value, retraction bool, eventTime time.Time) Record {
 	return Record{
 		Values:     values,
 		Retraction: retraction,
+		EventTime:  eventTime,
 	}
 }
 
@@ -69,6 +78,7 @@ func (record Record) String() string {
 	} else {
 		builder.WriteString("-")
 	}
+	builder.WriteString(record.EventTime.Format(time.RFC3339))
 	builder.WriteString("| ")
 	for i := range record.Values {
 		builder.WriteString(record.Values[i].String())
@@ -92,3 +102,5 @@ type MetadataMessageType int
 const (
 	MetadataMessageTypeWatermark MetadataMessageType = iota
 )
+
+var WatermarkMaxValue = time.Unix(0, math.MaxInt64)

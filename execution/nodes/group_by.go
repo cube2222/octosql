@@ -2,6 +2,7 @@ package nodes
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/google/btree"
 
@@ -13,6 +14,7 @@ type GroupBy struct {
 	aggregatePrototypes []func() Aggregate
 	aggregateExprs      []Expression
 	keyExprs            []Expression
+	keyEventTimeIndex   int
 	source              Node
 	triggerPrototype    func() Trigger
 }
@@ -21,6 +23,7 @@ func NewGroupBy(
 	aggregatePrototypes []func() Aggregate,
 	aggregateExprs []Expression,
 	keyExprs []Expression,
+	keyEventTimeIndex int,
 	source Node,
 	triggerPrototype func() Trigger,
 ) *GroupBy {
@@ -28,8 +31,11 @@ func NewGroupBy(
 		aggregatePrototypes: aggregatePrototypes,
 		aggregateExprs:      aggregateExprs,
 		keyExprs:            keyExprs,
-		source:              source,
-		triggerPrototype:    triggerPrototype,
+		keyEventTimeIndex:   keyEventTimeIndex,
+		source: &EventTimeBuffer{
+			source: source,
+		},
+		triggerPrototype: triggerPrototype,
 	}
 }
 
@@ -48,13 +54,15 @@ type aggregatesItem struct {
 
 type previouslySentValuesItem struct {
 	GroupKey
-	Values []octosql.Value
+	Values    []octosql.Value
+	EventTime time.Time
 }
 
 func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
 	aggregates := btree.New(BTreeDefaultDegree)
 	previouslySentValues := btree.New(BTreeDefaultDegree)
 	trigger := g.triggerPrototype()
+	currentWatermark := time.Time{}
 
 	if err := g.source.Run(ctx, func(produceCtx ProduceContext, record Record) error {
 		ctx := ctx.WithRecord(record)
@@ -119,7 +127,7 @@ func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSend
 			trigger.KeyReceived(key)
 		}
 
-		if err := g.trigger(ProduceFromExecutionContext(ctx), aggregates, previouslySentValues, trigger, produce); err != nil {
+		if err := g.trigger(ProduceFromExecutionContext(ctx), aggregates, previouslySentValues, trigger, record.EventTime, produce); err != nil {
 			return fmt.Errorf("couldn't trigger keys on end of stream")
 		}
 
@@ -127,7 +135,8 @@ func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSend
 	}, func(ctx ProduceContext, msg MetadataMessage) error {
 		if msg.Type == MetadataMessageTypeWatermark {
 			trigger.WatermarkReceived(msg.Watermark)
-			if err := g.trigger(ctx, aggregates, previouslySentValues, trigger, produce); err != nil {
+			currentWatermark = msg.Watermark
+			if err := g.trigger(ctx, aggregates, previouslySentValues, trigger, msg.Watermark, produce); err != nil {
 				return fmt.Errorf("couldn't trigger keys on watermark")
 			}
 		}
@@ -137,35 +146,24 @@ func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSend
 	}
 
 	trigger.EndOfStreamReached()
-	if err := g.trigger(ProduceFromExecutionContext(ctx), aggregates, previouslySentValues, trigger, produce); err != nil {
+	// TODO: What should be put here as the event time? WatermarkMaxValue kind of makes sense. But on the other hand, if this is then i.e. StreamJoin'ed with something then it would make everything MaxValue. But only if this is Batch. If it's grouping by event time then the event times will be correct.
+	if err := g.trigger(ProduceFromExecutionContext(ctx), aggregates, previouslySentValues, trigger, WatermarkMaxValue, produce); err != nil {
 		return fmt.Errorf("couldn't trigger keys on end of stream")
 	}
 
 	return nil
 }
 
-func (g *GroupBy) trigger(produceCtx ProduceContext, aggregates, previouslySentValues *btree.BTree, trigger Trigger, produce ProduceFn) error {
+func (g *GroupBy) trigger(produceCtx ProduceContext, aggregates, previouslySentValues *btree.BTree, trigger Trigger, curEventTime time.Time, produce ProduceFn) error {
 	toTrigger := trigger.Poll()
 
 	for _, key := range toTrigger {
 		// Get values and produce, retracting previous values.
+		newValueEventTime := curEventTime
+		var outputValues []octosql.Value
 		{
-			item := previouslySentValues.Delete(key)
-			if item != nil {
-				itemTyped, ok := item.(*previouslySentValuesItem)
-				if !ok {
-					// TODO: Check performance cost of those panics.
-					panic(fmt.Sprintf("invalid previously sent item: %v", item))
-				}
+			// Get new record to send
 
-				if err := produce(produceCtx, NewRecord(itemTyped.Values, true)); err != nil {
-					return fmt.Errorf("couldn't produce: %w", err)
-				}
-
-				previouslySentValues.Delete(key)
-			}
-		}
-		{
 			item := aggregates.Get(key)
 			if item != nil {
 				itemTyped, ok := item.(*aggregatesItem)
@@ -174,7 +172,7 @@ func (g *GroupBy) trigger(produceCtx ProduceContext, aggregates, previouslySentV
 					panic(fmt.Sprintf("invalid aggregates item: %v", item))
 				}
 
-				outputValues := make([]octosql.Value, len(key)+len(g.aggregateExprs))
+				outputValues = make([]octosql.Value, len(key)+len(g.aggregateExprs))
 				copy(outputValues, key)
 
 				for i := range itemTyped.Aggregates {
@@ -185,13 +183,42 @@ func (g *GroupBy) trigger(produceCtx ProduceContext, aggregates, previouslySentV
 					}
 				}
 
-				if err := produce(produceCtx, NewRecord(outputValues, false)); err != nil {
+				// If the new record has a custom Event Time, then we use that for it and the possible corresponding retraction.
+				if g.keyEventTimeIndex != -1 && newValueEventTime.After(outputValues[g.keyEventTimeIndex].Time) {
+					newValueEventTime = outputValues[g.keyEventTimeIndex].Time
+				}
+			}
+		}
+		{
+			// Send possible retraction
+
+			item := previouslySentValues.Delete(key)
+			if item != nil {
+				itemTyped, ok := item.(*previouslySentValuesItem)
+				if !ok {
+					// TODO: Check performance cost of those panics.
+					panic(fmt.Sprintf("invalid previously sent item: %v", item))
+				}
+
+				if err := produce(produceCtx, NewRecord(itemTyped.Values, true, newValueEventTime)); err != nil {
+					return fmt.Errorf("couldn't produce: %w", err)
+				}
+
+				previouslySentValues.Delete(key)
+			}
+		}
+		{
+			// Send possible new value
+
+			if outputValues != nil {
+				if err := produce(produceCtx, NewRecord(outputValues, false, newValueEventTime)); err != nil {
 					return fmt.Errorf("couldn't produce: %w", err)
 				}
 
 				previouslySentValues.ReplaceOrInsert(&previouslySentValuesItem{
-					GroupKey: key,
-					Values:   outputValues,
+					GroupKey:  key,
+					Values:    outputValues,
+					EventTime: newValueEventTime,
 				})
 			}
 		}

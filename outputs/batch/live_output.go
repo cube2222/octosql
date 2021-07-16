@@ -165,6 +165,9 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 			} else {
 				itemTyped.Count--
 			}
+			if itemTyped.Count < 0 {
+				panic("received retraction before value")
+			}
 			if itemTyped.Count > 0 {
 				recordCounts.ReplaceOrInsert(itemTyped)
 			} else {

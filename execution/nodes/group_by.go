@@ -32,8 +32,10 @@ func NewGroupBy(
 		aggregateExprs:      aggregateExprs,
 		keyExprs:            keyExprs,
 		keyEventTimeIndex:   keyEventTimeIndex,
-		source:              source,
-		triggerPrototype:    triggerPrototype,
+		source: &EventTimeBuffer{
+			source: source,
+		},
+		triggerPrototype: triggerPrototype,
 	}
 }
 

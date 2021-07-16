@@ -33,26 +33,8 @@ type streamJoinItem struct {
 type streamJoinSubitem struct {
 	// Record value
 	GroupKey
-	// Event time
-	EventTime time.Time
-	// Record count
-	count int
-}
-
-func (subItem *streamJoinSubitem) Less(than btree.Item) bool {
-	thanTyped, ok := than.(*streamJoinSubitem)
-	if !ok {
-		panic(fmt.Sprintf("invalid *streamJoinSubitem comparison: %T", than))
-	}
-
-	// TODO: We could optimize this by using the underlying Compare of GroupKey, instead of doing two-way comparisons.
-	if less := subItem.GroupKey.Less(thanTyped.GroupKey); less {
-		return less
-	} else if greater := thanTyped.GroupKey.Less(subItem.GroupKey); greater {
-		return false
-	}
-
-	return subItem.EventTime.Before(thanTyped.EventTime)
+	// Record event times
+	EventTimes []time.Time
 }
 
 func (s *StreamJoin) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
@@ -306,11 +288,11 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 		}
 
 		{
-			subitem := itemTyped.values.Get(key)
+			subitem := itemTyped.values.Get(&streamJoinSubitem{GroupKey: record.Values})
 			var subitemTyped *streamJoinSubitem
 
 			if subitem == nil {
-				subitemTyped = &streamJoinSubitem{GroupKey: record.Values, EventTime: record.EventTime}
+				subitemTyped = &streamJoinSubitem{GroupKey: record.Values}
 				itemTyped.values.ReplaceOrInsert(subitemTyped)
 			} else {
 				var ok bool
@@ -320,11 +302,11 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 				}
 			}
 			if !record.Retraction {
-				subitemTyped.count++
+				subitemTyped.EventTimes = append(subitemTyped.EventTimes, record.EventTime)
 			} else {
-				subitemTyped.count--
+				subitemTyped.EventTimes = subitemTyped.EventTimes[1:]
 			}
-			if subitemTyped.count == 0 {
+			if len(subitemTyped.EventTimes) == 0 {
 				itemTyped.values.Delete(subitemTyped)
 			}
 		}
@@ -357,12 +339,12 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 				panic(fmt.Sprintf("invalid stream join subitem: %v", subitem))
 			}
 
-			for i := 0; i < subitemTyped.count; i++ {
+			for i := 0; i < len(subitemTyped.EventTimes); i++ {
 				outputValues := make([]octosql.Value, len(record.Values)+len(subitemTyped.GroupKey))
 
 				eventTime := record.EventTime
-				if subitemTyped.EventTime.After(eventTime) {
-					eventTime = subitemTyped.EventTime
+				if subitemTyped.EventTimes[i].After(eventTime) {
+					eventTime = subitemTyped.EventTimes[i]
 				}
 				// TODO: We probably also want the event time in the columns to be equal to this. Think about this.
 

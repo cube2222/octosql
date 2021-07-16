@@ -58,6 +58,7 @@ func (b *RecordEventTimeBuffer) Emit(watermark time.Time, produce func(record Re
 				return err
 			}
 		}
+		min = b.tree.Min()
 	}
 	return nil
 }

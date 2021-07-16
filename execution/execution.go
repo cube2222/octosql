@@ -78,6 +78,7 @@ func (record Record) String() string {
 	} else {
 		builder.WriteString("-")
 	}
+	builder.WriteString(record.EventTime.Format(time.RFC3339))
 	builder.WriteString("| ")
 	for i := range record.Values {
 		builder.WriteString(record.Values[i].String())
@@ -102,4 +103,4 @@ const (
 	MetadataMessageTypeWatermark MetadataMessageType = iota
 )
 
-var WatermarkMaxValue = (&time.Time{}).Add(time.Duration(math.MaxInt64))
+var WatermarkMaxValue = time.Unix(0, math.MaxInt64)

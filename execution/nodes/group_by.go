@@ -184,7 +184,7 @@ func (g *GroupBy) trigger(produceCtx ProduceContext, aggregates, previouslySentV
 				}
 
 				// If the new record has a custom Event Time, then we use that for it and the possible corresponding retraction.
-				if g.keyEventTimeIndex != -1 {
+				if g.keyEventTimeIndex != -1 && newValueEventTime.After(outputValues[g.keyEventTimeIndex].Time) {
 					newValueEventTime = outputValues[g.keyEventTimeIndex].Time
 				}
 			}

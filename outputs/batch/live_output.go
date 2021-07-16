@@ -83,6 +83,7 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 	recordCounts := btree.New(BTreeDefaultDegree)
 	watermark := time.Time{}
 	liveWriter := uilive.New()
+	lastUpdate := time.Now()
 
 	if err := o.source.Run(
 		execCtx,
@@ -129,32 +130,36 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 		},
 		func(ctx ProduceContext, msg MetadataMessage) error {
 			watermark = msg.Watermark
-			var buf bytes.Buffer
 
-			format := o.format(&buf)
-			format.SetSchema(o.schema)
+			// Print table
+			if time.Since(lastUpdate) > time.Second/4 {
+				lastUpdate = time.Now()
+				var buf bytes.Buffer
 
-			i := 0
-			recordCounts.Ascend(func(item btree.Item) bool {
-				if o.limit > 0 && i == o.limit {
-					return false
-				}
-				i++
+				format := o.format(&buf)
+				format.SetSchema(o.schema)
 
-				itemTyped := item.(*outputItem)
-				for i := 0; i < itemTyped.Count; i++ {
-					format.Write(itemTyped.Values)
-				}
-				return true
-			})
-			watermark := watermark
+				i := 0
+				recordCounts.Ascend(func(item btree.Item) bool {
+					if o.limit > 0 && i == o.limit {
+						return false
+					}
+					i++
 
-			format.Close()
+					itemTyped := item.(*outputItem)
+					for i := 0; i < itemTyped.Count; i++ {
+						format.Write(itemTyped.Values)
+					}
+					return true
+				})
 
-			fmt.Fprintf(&buf, "watermark: %s\n", watermark.Format(time.RFC3339Nano))
+				format.Close()
 
-			buf.WriteTo(liveWriter)
-			liveWriter.Flush()
+				fmt.Fprintf(&buf, "watermark: %s\n", watermark.Format(time.RFC3339Nano))
+
+				buf.WriteTo(liveWriter)
+				liveWriter.Flush()
+			}
 			return nil
 		},
 	); err != nil {

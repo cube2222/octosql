@@ -15,12 +15,6 @@ import (
 	"github.com/cube2222/octosql/physical"
 )
 
-// Live table
-// Batch table (same, but only print at the end)
-// Batch CSV
-// Batch JSON
-// JSON stream
-
 type Format interface {
 	SetSchema(physical.Schema)
 	Write([]octosql.Value) error

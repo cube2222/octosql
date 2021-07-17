@@ -20,6 +20,11 @@ func (e *EventTimeBuffer) Run(ctx ExecutionContext, produce ProduceFn, metaSend 
 	if err := e.source.Run(
 		ctx,
 		func(ctx ProduceContext, record Record) error {
+			if record.EventTime.IsZero() {
+				// If the event time is zero, don't buffer, there's no point.
+				// There won't be any record with an event time less than zero.
+				return produce(ctx, record)
+			}
 			records.AddRecord(record)
 			return nil
 		},

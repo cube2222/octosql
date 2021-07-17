@@ -169,7 +169,16 @@ receiveLoop:
 
 				continue
 			}
-			leftRecordBuffer.AddRecord(msg.record)
+			if msg.record.EventTime.IsZero() {
+				// If the event time is zero, don't buffer, there's no point.
+				// There won't be any record with an event time less than zero.
+				if err := s.receiveRecord(ctx, produce, leftRecords, rightRecords, true, msg.record); err != nil {
+					// TODO: Fix goroutine leak.
+					return fmt.Errorf("couldn't process record from left: %w", err)
+				}
+			} else {
+				leftRecordBuffer.AddRecord(msg.record)
+			}
 			// TODO: Add backpressure
 
 		case msg, ok := <-rightMessages:
@@ -206,21 +215,35 @@ receiveLoop:
 
 				continue
 			}
-			rightRecordBuffer.AddRecord(msg.record)
+			if msg.record.EventTime.IsZero() {
+				// If the event time is zero, don't buffer, there's no point.
+				// There won't be any record with an event time less than zero.
+				if err := s.receiveRecord(ctx, produce, rightRecords, leftRecords, false, msg.record); err != nil {
+					// TODO: Fix goroutine leak.
+					return fmt.Errorf("couldn't process record from right: %w", err)
+				}
+			} else {
+				rightRecordBuffer.AddRecord(msg.record)
+			}
 			// TODO: Add backpressure
 		}
 	}
 
 	var openChannel chan chanMessage
 	var recordBuffer *RecordEventTimeBuffer
+	var myRecords, otherRecords *btree.BTree
 	if !leftDone {
 		openChannel = leftMessages
 		recordBuffer = leftRecordBuffer
 		minWatermark = leftWatermark
+		myRecords = leftRecords
+		otherRecords = rightRecords
 	} else {
 		openChannel = rightMessages
 		recordBuffer = rightRecordBuffer
 		minWatermark = rightWatermark
+		myRecords = rightRecords
+		otherRecords = leftRecords
 	}
 
 	if err := processRecordsUpTo(ctx, minWatermark); err != nil {
@@ -242,7 +265,16 @@ receiveLoop:
 			continue
 		}
 
-		recordBuffer.AddRecord(msg.record)
+		if msg.record.EventTime.IsZero() {
+			// If the event time is zero, don't buffer, there's no point.
+			// There won't be any record with an event time less than zero.
+			if err := s.receiveRecord(ctx, produce, myRecords, otherRecords, !leftDone, msg.record); err != nil {
+				// TODO: Fix goroutine leak.
+				return fmt.Errorf("couldn't process record: %w", err)
+			}
+		} else {
+			recordBuffer.AddRecord(msg.record)
+		}
 	}
 
 	if err := processRecordsUpTo(ctx, WatermarkMaxValue); err != nil {

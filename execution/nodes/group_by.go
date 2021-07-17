@@ -128,7 +128,7 @@ func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSend
 		}
 
 		if err := g.trigger(ProduceFromExecutionContext(ctx), aggregates, previouslySentValues, trigger, record.EventTime, produce); err != nil {
-			return fmt.Errorf("couldn't trigger keys on end of stream")
+			return fmt.Errorf("couldn't trigger keys on record receive")
 		}
 
 		return nil

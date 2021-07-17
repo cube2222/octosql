@@ -126,7 +126,7 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 			watermark = msg.Watermark
 
 			// Print table
-			if time.Since(lastUpdate) > time.Second/4 {
+			if o.live && time.Since(lastUpdate) > time.Second/4 {
 				lastUpdate = time.Now()
 				var buf bytes.Buffer
 

@@ -2,6 +2,8 @@
 =======
 OctoSQL is a query tool that allows you to join, analyse and transform data from multiple databases, streaming sources and file formats using SQL.
 
+**OctoSQL is currently being rewritten on the [redesign](https://github.com/cube2222/octosql/tree/redesign) branch.**
+
 [![CircleCI](https://circleci.com/gh/cube2222/octosql.svg?style=shield)](https://circleci.com/gh/cube2222/octosql)
 [![GoDoc](https://godoc.org/github.com/cube2222/octosql?status.svg)](https://godoc.org/github.com/cube2222/octosql)
 [![Gitter](https://badges.gitter.im/octosql/general.svg)](https://gitter.im/octosql/general?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)

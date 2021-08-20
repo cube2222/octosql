@@ -5,74 +5,89 @@ import (
 	"fmt"
 
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
 
-var Tumble = []physical.TableValuedFunctionDescriptor{
+var Tumble = []logical.TableValuedFunctionDescriptor{
 	{
-		Arguments: map[string]physical.TableValuedFunctionArgumentMatcher{
+		Arguments: map[string]logical.TableValuedFunctionArgumentMatcher{
 			"source": {
 				Required:                               true,
 				TableValuedFunctionArgumentMatcherType: physical.TableValuedFunctionArgumentTypeTable,
-				Table:                                  &physical.TableValuedFunctionArgumentMatcherTable{},
+				Table:                                  &logical.TableValuedFunctionArgumentMatcherTable{},
 			},
 			"window_length": {
 				Required:                               true,
 				TableValuedFunctionArgumentMatcherType: physical.TableValuedFunctionArgumentTypeExpression,
-				Expression: &physical.TableValuedFunctionArgumentMatcherExpression{
+				Expression: &logical.TableValuedFunctionArgumentMatcherExpression{
 					Type: octosql.Duration,
 				},
 			},
 			"time_field": {
 				Required:                               false,
 				TableValuedFunctionArgumentMatcherType: physical.TableValuedFunctionArgumentTypeDescriptor,
-				Descriptor:                             &physical.TableValuedFunctionArgumentMatcherDescriptor{},
+				Descriptor:                             &logical.TableValuedFunctionArgumentMatcherDescriptor{},
 			},
 			"offset": {
 				Required:                               false,
 				TableValuedFunctionArgumentMatcherType: physical.TableValuedFunctionArgumentTypeExpression,
-				Expression: &physical.TableValuedFunctionArgumentMatcherExpression{
+				Expression: &logical.TableValuedFunctionArgumentMatcherExpression{
 					Type: octosql.Duration,
 				},
 			},
 		},
-		OutputSchema: func(ctx context.Context, env physical.Environment, args map[string]physical.TableValuedFunctionArgument) (physical.Schema, error) {
+		OutputSchema: func(ctx context.Context, env physical.Environment, logicalEnv logical.Environment, args map[string]physical.TableValuedFunctionArgument) (physical.Schema, map[string]string, error) {
 			source := args["source"].Table.Table
-			if timeField, ok := args["time_field"]; ok {
+			if timeFieldDescriptor, ok := args["time_field"]; ok {
+				timeField, ok := logical.GetUniqueNameMatchingVariable(args["source"].Table.Mapping, timeFieldDescriptor.Descriptor.Descriptor)
+				if !ok {
+					return physical.Schema{}, nil, fmt.Errorf("no %s field in source stream", args["time_field"].Descriptor.Descriptor)
+				}
 				found := false
 				for _, field := range source.Schema.Fields {
-					if !physical.VariableNameMatchesField(timeField.Descriptor.Descriptor, field.Name) {
+					if field.Name != timeField {
 						continue
 					}
 					if field.Type.TypeID != octosql.TypeIDTime {
-						return physical.Schema{}, fmt.Errorf("time_field must reference Time typed field, is %s", field.Type.String())
+						return physical.Schema{}, nil, fmt.Errorf("time_field must reference Time typed field, is %s", field.Type.String())
 					}
 					found = true
 					break
 				}
 				if !found {
-					return physical.Schema{}, fmt.Errorf("no %s field in source stream", timeField.Descriptor.Descriptor)
+					return physical.Schema{}, nil, fmt.Errorf("no %s field in source stream", timeField)
 				}
 			} else {
 				if source.Schema.TimeField == -1 {
-					return physical.Schema{}, fmt.Errorf("the source table has no implicit watermarked time field, time_field must be specified explicitly")
+					return physical.Schema{}, nil, fmt.Errorf("the source table has no implicit watermarked time field, time_field must be specified explicitly")
 				}
+			}
+			outMapping := make(map[string]string)
+			for k, v := range args["source"].Table.Mapping {
+				outMapping[k] = v
 			}
 			outFields := make([]physical.SchemaField, len(source.Schema.Fields)+2)
 			copy(outFields, source.Schema.Fields)
+
+			uniqueWindowStart := logicalEnv.GetUnique("window_start")
+			outMapping["window_start"] = uniqueWindowStart
 			outFields[len(source.Schema.Fields)] = physical.SchemaField{
-				Name: "window_start",
+				Name: uniqueWindowStart,
 				Type: octosql.Time,
 			}
+
+			uniqueWindowEnd := logicalEnv.GetUnique("window_end")
+			outMapping["window_end"] = uniqueWindowEnd
 			outFields[len(source.Schema.Fields)+1] = physical.SchemaField{
-				Name: "window_end",
+				Name: uniqueWindowEnd,
 				Type: octosql.Time,
 			}
 			return physical.Schema{
 				Fields:    outFields,
 				TimeField: len(source.Schema.Fields) + 1,
-			}, nil
+			}, outMapping, nil
 		},
 		Materialize: func(ctx context.Context, env physical.Environment, args map[string]physical.TableValuedFunctionArgument) (execution.Node, error) {
 			source, err := args["source"].Table.Table.Materialize(ctx, env)
@@ -84,9 +99,10 @@ var Tumble = []physical.TableValuedFunctionDescriptor{
 				return nil, fmt.Errorf("couldn't materialize window_length: %w", err)
 			}
 			var timeFieldIndex int
-			if timeField, ok := args["time_field"]; ok {
+			if timeFieldDescriptor, ok := args["time_field"]; ok {
+				timeField, _ := logical.GetUniqueNameMatchingVariable(args["source"].Table.Mapping, timeFieldDescriptor.Descriptor.Descriptor)
 				for i, field := range args["source"].Table.Table.Schema.Fields {
-					if physical.VariableNameMatchesField(timeField.Descriptor.Descriptor, field.Name) {
+					if field.Name == timeField {
 						timeFieldIndex = i
 						break
 					}

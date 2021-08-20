@@ -157,7 +157,8 @@ func (t *Transformers) TransformNode(node Node) Node {
 				arguments[name] = TableValuedFunctionArgument{
 					TableValuedFunctionArgumentType: arg.TableValuedFunctionArgumentType,
 					Table: &TableValuedFunctionArgumentTable{
-						Table: t.TransformNode(arg.Table.Table),
+						Table:   t.TransformNode(arg.Table.Table),
+						Mapping: arg.Table.Mapping,
 					},
 				}
 			case TableValuedFunctionArgumentTypeDescriptor:

@@ -19,7 +19,7 @@ func PushDownFilterPredicatesToDatasource(node Node) (Node, bool) {
 			filterPredicates := node.Filter.Predicate.SplitByAnd()
 			alreadyPushedDown := node.Filter.Source.Datasource.Predicates
 
-			newFilterPredicates, newPushedDownPredicates, curChanged := node.Filter.Source.Datasource.DatasourceImplementation.PushDownPredicates(filterPredicates, alreadyPushedDown)
+			newFilterPredicates, newPushedDownPredicates, curChanged := node.Filter.Source.Datasource.PushDownPredicates(filterPredicates, alreadyPushedDown)
 			if !curChanged {
 				return node
 			}

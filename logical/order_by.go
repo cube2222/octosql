@@ -39,12 +39,12 @@ func NewOrderBy(keyExprs []Expression, directions []OrderDirection, source Node)
 	}
 }
 
-func (node *OrderBy) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
-	source := node.source.Typecheck(ctx, env, logicalEnv)
+func (node *OrderBy) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) (physical.Node, map[string]string) {
+	source, mapping := node.source.Typecheck(ctx, env, logicalEnv)
 
 	keyExprs := make([]physical.Expression, len(node.keyExprs))
 	for i := range node.keyExprs {
-		keyExprs[i] = node.keyExprs[i].Typecheck(ctx, env.WithRecordSchema(source.Schema), logicalEnv)
+		keyExprs[i] = node.keyExprs[i].Typecheck(ctx, env.WithRecordSchema(source.Schema), logicalEnv.WithRecordUniqueVariableNames(mapping))
 	}
 
 	directionMultipliers := DirectionsToMultipliers(node.directions)
@@ -57,5 +57,5 @@ func (node *OrderBy) Typecheck(ctx context.Context, env physical.Environment, lo
 			Key:                  keyExprs,
 			DirectionMultipliers: directionMultipliers,
 		},
-	}
+	}, mapping
 }

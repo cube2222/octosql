@@ -11,12 +11,11 @@ import (
 )
 
 type Environment struct {
-	Aggregates           map[string][]AggregateDescriptor
-	Datasources          *DatasourceRepository
-	Functions            map[string][]FunctionDescriptor
-	PhysicalConfig       map[string]interface{}
-	TableValuedFunctions map[string][]TableValuedFunctionDescriptor
-	VariableContext      *VariableContext
+	Aggregates      map[string][]AggregateDescriptor
+	Datasources     *DatasourceRepository
+	Functions       map[string][]FunctionDescriptor
+	PhysicalConfig  map[string]interface{}
+	VariableContext *VariableContext
 }
 
 func (env Environment) WithRecordSchema(schema Schema) Environment {
@@ -87,7 +86,7 @@ func (dr *DatasourceRepository) GetDatasource(ctx context.Context, name string) 
 type DatasourceImplementation interface {
 	Schema() (Schema, error)
 	Materialize(ctx context.Context, env Environment, pushedDownPredicates []Expression) (execution.Node, error)
-	PushDownPredicates(newPredicates, pushedDownPredicates []Expression) (rejected []Expression, pushedDown []Expression, changed bool)
+	PushDownPredicates(newPredicates, pushedDownPredicates []Expression, uniqueToColname map[string]string) (rejected, pushedDown []Expression, changed bool)
 	// TODO: Function checking for push-down
 }
 
@@ -97,33 +96,4 @@ type FunctionDescriptor struct {
 	TypeFn        func([]octosql.Type) (octosql.Type, bool)
 	Strict        bool
 	Function      func([]octosql.Value) (octosql.Value, error)
-}
-
-type TableValuedFunctionDescriptor struct {
-	Arguments map[string]TableValuedFunctionArgumentMatcher
-	// Here we can check the inputs.
-	OutputSchema func(context.Context, Environment, map[string]TableValuedFunctionArgument) (Schema, error)
-	Materialize  func(context.Context, Environment, map[string]TableValuedFunctionArgument) (execution.Node, error)
-}
-
-type TableValuedFunctionArgumentMatcher struct {
-	Required                               bool
-	TableValuedFunctionArgumentMatcherType TableValuedFunctionArgumentType
-	// Only one of the below may be non-null.
-	Expression *TableValuedFunctionArgumentMatcherExpression
-	Table      *TableValuedFunctionArgumentMatcherTable
-	Descriptor *TableValuedFunctionArgumentMatcherDescriptor
-}
-
-type TableValuedFunctionArgumentMatcherExpression struct {
-	Type octosql.Type
-}
-
-type TableValuedFunctionArgumentMatcherTable struct {
-}
-
-type TableValuedFunctionArgumentMatcherDescriptor struct {
-}
-
-type State struct {
 }

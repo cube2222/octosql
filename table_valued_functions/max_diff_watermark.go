@@ -5,53 +5,60 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
 
-var MaxDiffWatermark = []physical.TableValuedFunctionDescriptor{
+var MaxDiffWatermark = []logical.TableValuedFunctionDescriptor{
 	{
-		Arguments: map[string]physical.TableValuedFunctionArgumentMatcher{
+		Arguments: map[string]logical.TableValuedFunctionArgumentMatcher{
 			"source": {
 				Required:                               true,
 				TableValuedFunctionArgumentMatcherType: physical.TableValuedFunctionArgumentTypeTable,
-				Table:                                  &physical.TableValuedFunctionArgumentMatcherTable{},
+				Table:                                  &logical.TableValuedFunctionArgumentMatcherTable{},
 			},
 			"max_diff": {
 				Required:                               true,
 				TableValuedFunctionArgumentMatcherType: physical.TableValuedFunctionArgumentTypeExpression,
-				Expression: &physical.TableValuedFunctionArgumentMatcherExpression{
+				Expression: &logical.TableValuedFunctionArgumentMatcherExpression{
 					Type: octosql.Duration,
 				},
 			},
 			"time_field": {
 				Required:                               true,
 				TableValuedFunctionArgumentMatcherType: physical.TableValuedFunctionArgumentTypeDescriptor,
-				Descriptor:                             &physical.TableValuedFunctionArgumentMatcherDescriptor{},
+				Descriptor:                             &logical.TableValuedFunctionArgumentMatcherDescriptor{},
 			},
 		},
-		OutputSchema: func(ctx context.Context, env physical.Environment, args map[string]physical.TableValuedFunctionArgument) (physical.Schema, error) {
+		OutputSchema: func(ctx context.Context, env physical.Environment, logicalEnv logical.Environment, args map[string]physical.TableValuedFunctionArgument) (physical.Schema, map[string]string, error) {
 			source := args["source"].Table.Table
-			timeField := args["time_field"].Descriptor.Descriptor
+			timeField, ok := logical.GetUniqueNameMatchingVariable(args["source"].Table.Mapping, args["time_field"].Descriptor.Descriptor)
+			if !ok {
+				return physical.Schema{}, nil, fmt.Errorf("no %s field in source stream", args["time_field"].Descriptor.Descriptor)
+			}
 			timeFieldIndex := -1
 			for i, field := range source.Schema.Fields {
-				if !physical.VariableNameMatchesField(timeField, field.Name) {
+				if timeField != field.Name {
 					continue
 				}
 				if field.Type.TypeID != octosql.TypeIDTime {
-					return physical.Schema{}, fmt.Errorf("time_field must reference Time typed field, is %s", field.Type.String())
+					return physical.Schema{}, nil, fmt.Errorf("time_field must reference field with type Time, is %s", field.Type.String())
 				}
 				timeFieldIndex = i
 				break
 			}
 			if timeFieldIndex == -1 {
-				return physical.Schema{}, fmt.Errorf("no %s field in source stream", timeField)
+				return physical.Schema{}, nil, fmt.Errorf("no %s field in source stream", timeField)
 			}
+			spew.Dump(args["source"].Table.Mapping)
 			return physical.Schema{
 				Fields:    source.Schema.Fields,
 				TimeField: timeFieldIndex,
-			}, nil
+			}, args["source"].Table.Mapping, nil
 		},
 		Materialize: func(ctx context.Context, env physical.Environment, args map[string]physical.TableValuedFunctionArgument) (execution.Node, error) {
 			source, err := args["source"].Table.Table.Materialize(ctx, env)
@@ -63,10 +70,10 @@ var MaxDiffWatermark = []physical.TableValuedFunctionDescriptor{
 				return nil, fmt.Errorf("couldn't materialize max_diff: %w", err)
 			}
 
-			timeField := args["time_field"].Descriptor.Descriptor
+			timeField, _ := logical.GetUniqueNameMatchingVariable(args["source"].Table.Mapping, args["time_field"].Descriptor.Descriptor)
 			timeFieldIndex := -1
 			for i, field := range args["source"].Table.Table.Schema.Fields {
-				if physical.VariableNameMatchesField(timeField, field.Name) {
+				if timeField == field.Name {
 					timeFieldIndex = i
 					break
 				}

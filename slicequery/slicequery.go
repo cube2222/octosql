@@ -78,7 +78,7 @@ func Query(ctx context.Context, tables map[string]interface{}, query string, onE
 				err = fmt.Errorf("typecheck error: %s", msg)
 			}
 		}()
-		physicalPlan = logicalPlan.Typecheck(
+		physicalPlan, _ = logicalPlan.Typecheck(
 			context.Background(),
 			env,
 			logical.Environment{

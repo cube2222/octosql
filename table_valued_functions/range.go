@@ -6,42 +6,48 @@ import (
 	"time"
 
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
 
-var Range = []physical.TableValuedFunctionDescriptor{
+var Range = []logical.TableValuedFunctionDescriptor{
 	{
-		Arguments: map[string]physical.TableValuedFunctionArgumentMatcher{
+		Arguments: map[string]logical.TableValuedFunctionArgumentMatcher{
 			"start": {
 				Required:                               true,
 				TableValuedFunctionArgumentMatcherType: physical.TableValuedFunctionArgumentTypeExpression,
-				Expression: &physical.TableValuedFunctionArgumentMatcherExpression{
+				Expression: &logical.TableValuedFunctionArgumentMatcherExpression{
 					Type: octosql.Int,
 				},
 			},
 			"up_to": {
 				Required:                               true,
 				TableValuedFunctionArgumentMatcherType: physical.TableValuedFunctionArgumentTypeExpression,
-				Expression: &physical.TableValuedFunctionArgumentMatcherExpression{
+				Expression: &logical.TableValuedFunctionArgumentMatcherExpression{
 					Type: octosql.Int,
 				},
 			},
 		},
 		OutputSchema: func(
 			ctx context.Context,
-			environment physical.Environment,
+			env physical.Environment,
+			logicalEnv logical.Environment,
 			args map[string]physical.TableValuedFunctionArgument,
-		) (physical.Schema, error) {
+		) (physical.Schema, map[string]string, error) {
+			unique := logicalEnv.GetUnique("i")
+
 			return physical.Schema{
-				Fields: []physical.SchemaField{
-					{
-						Name: "i",
-						Type: octosql.Int,
+					Fields: []physical.SchemaField{
+						{
+							Name: unique,
+							Type: octosql.Int,
+						},
 					},
-				},
-				TimeField: -1,
-			}, nil
+					TimeField: -1,
+				}, map[string]string{
+					"i": unique,
+				}, nil
 		},
 		Materialize: func(
 			ctx context.Context,

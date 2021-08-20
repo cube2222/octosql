@@ -64,7 +64,17 @@ const (
 type Datasource struct {
 	Name                     string
 	DatasourceImplementation DatasourceImplementation
+	VariableMapping          map[string]string
 	Predicates               []Expression
+}
+
+func (node *Datasource) PushDownPredicates(newPredicates, pushedDownPredicates []Expression) (rejected []Expression, pushedDown []Expression, changed bool) {
+	uniqueToColname := make(map[string]string)
+	for k, v := range node.VariableMapping {
+		uniqueToColname[v] = k
+	}
+
+	return node.DatasourceImplementation.PushDownPredicates(newPredicates, pushedDownPredicates, uniqueToColname)
 }
 
 type Distinct struct {
@@ -157,11 +167,16 @@ type TableValuedFunctionArgumentExpression struct {
 }
 
 type TableValuedFunctionArgumentTable struct {
-	Table Node
+	Table   Node
+	Mapping map[string]string // This is ugly, but it's the easiest way to go about this.
 }
 
 type TableValuedFunctionArgumentDescriptor struct {
 	Descriptor string
+}
+
+type TableValuedFunctionDescriptor struct {
+	Materialize func(context.Context, Environment, map[string]TableValuedFunctionArgument) (execution.Node, error)
 }
 
 type Unnest struct {

@@ -20,15 +20,29 @@ func NewWith(cteNames []string, cteNodes []Node, source Node) *With {
 	}
 }
 
-func (node *With) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
-	newCTEs := make(map[string]physical.Node)
+func (node *With) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) (physical.Node, map[string]string) {
+	newCTEs := make(map[string]CommonTableExpression)
 	for k, v := range logicalEnv.CommonTableExpressions {
 		newCTEs[k] = v
 	}
 
 	for i := range node.cteNodes {
-		newCTEs[node.cteNames[i]] = node.cteNodes[i].Typecheck(ctx, env, Environment{CommonTableExpressions: newCTEs})
+		cte, mapping := node.cteNodes[i].Typecheck(ctx, env, Environment{
+			CommonTableExpressions: newCTEs,
+			TableValuedFunctions:   logicalEnv.TableValuedFunctions,
+			UniqueVariableNames:    logicalEnv.UniqueVariableNames,
+			UniqueNameGenerator:    logicalEnv.UniqueNameGenerator,
+		})
+		newCTEs[node.cteNames[i]] = CommonTableExpression{
+			Node:                  cte,
+			UniqueVariableMapping: mapping,
+		}
 	}
 
-	return node.source.Typecheck(ctx, env, Environment{CommonTableExpressions: newCTEs})
+	return node.source.Typecheck(ctx, env, Environment{
+		CommonTableExpressions: newCTEs,
+		TableValuedFunctions:   logicalEnv.TableValuedFunctions,
+		UniqueVariableNames:    logicalEnv.UniqueVariableNames,
+		UniqueNameGenerator:    logicalEnv.UniqueNameGenerator,
+	})
 }

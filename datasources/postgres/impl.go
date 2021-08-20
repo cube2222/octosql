@@ -138,7 +138,7 @@ func predicateToSQL(builder *strings.Builder, placeholderExpressions *[]physical
 	builder.WriteString(") ")
 }
 
-func (impl *impl) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression) (rejected []physical.Expression, newPushedDown []physical.Expression, changed bool) {
+func (impl *impl) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression, uniqueToColname map[string]string) (rejected []physical.Expression, newPushedDown []physical.Expression, changed bool) {
 	newPushedDown = make([]physical.Expression, len(pushedDownPredicates))
 	copy(newPushedDown, pushedDownPredicates)
 	for _, pred := range newPredicates {

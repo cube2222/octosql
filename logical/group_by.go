@@ -76,14 +76,14 @@ func NewGroupBy(source Node, key []Expression, keyNames []string, expressions []
 	return &GroupBy{source: source, key: key, keyNames: keyNames, expressions: expressions, aggregates: aggregates, aggregateNames: aggregateNames, triggers: triggers}
 }
 
-func (node *GroupBy) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
-	source := node.source.Typecheck(ctx, env, logicalEnv)
+func (node *GroupBy) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) (physical.Node, map[string]string) {
+	source, mapping := node.source.Typecheck(ctx, env, logicalEnv)
 
 	keyEventTimeIndex := -1
 
 	key := make([]physical.Expression, len(node.key))
 	for i := range node.key {
-		key[i] = node.key[i].Typecheck(ctx, env.WithRecordSchema(source.Schema), logicalEnv)
+		key[i] = node.key[i].Typecheck(ctx, env.WithRecordSchema(source.Schema), logicalEnv.WithRecordUniqueVariableNames(mapping))
 		if source.Schema.TimeField != -1 &&
 			key[i].ExpressionType == physical.ExpressionTypeVariable &&
 			physical.VariableNameMatchesField(key[i].Variable.Name, source.Schema.Fields[source.Schema.TimeField].Name) {
@@ -94,7 +94,7 @@ func (node *GroupBy) Typecheck(ctx context.Context, env physical.Environment, lo
 
 	expressions := make([]physical.Expression, len(node.expressions))
 	for i := range node.expressions {
-		expressions[i] = node.expressions[i].Typecheck(ctx, env.WithRecordSchema(source.Schema), logicalEnv)
+		expressions[i] = node.expressions[i].Typecheck(ctx, env.WithRecordSchema(source.Schema), logicalEnv.WithRecordUniqueVariableNames(mapping))
 	}
 
 	aggregates := make([]physical.Aggregate, len(node.aggregates))
@@ -159,7 +159,7 @@ aggregateLoop:
 
 	triggers := make([]physical.Trigger, len(node.triggers))
 	for i := range node.triggers {
-		triggers[i] = node.triggers[i].Typecheck(ctx, env, logicalEnv, keyEventTimeIndex)
+		triggers[i] = node.triggers[i].Typecheck(ctx, env, logicalEnv.WithRecordUniqueVariableNames(mapping), keyEventTimeIndex)
 	}
 	var trigger physical.Trigger
 	if len(triggers) == 0 {
@@ -179,15 +179,20 @@ aggregateLoop:
 	}
 
 	schemaFields := make([]physical.SchemaField, len(key)+len(aggregates))
+	outMapping := make(map[string]string)
 	for i := range key {
+		unique := logicalEnv.GetUnique(node.keyNames[i])
+		outMapping[node.keyNames[i]] = unique
 		schemaFields[i] = physical.SchemaField{
-			Name: node.keyNames[i],
+			Name: unique,
 			Type: key[i].Type,
 		}
 	}
 	for i := range aggregates {
+		unique := logicalEnv.GetUnique(node.aggregateNames[i])
+		outMapping[node.aggregateNames[i]] = unique
 		schemaFields[len(key)+i] = physical.SchemaField{
-			Name: node.aggregateNames[i],
+			Name: unique,
 			Type: aggregates[i].OutputType,
 		}
 	}
@@ -203,5 +208,5 @@ aggregateLoop:
 			KeyEventTimeIndex:    keyEventTimeIndex,
 			Trigger:              trigger,
 		},
-	}
+	}, outMapping
 }

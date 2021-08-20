@@ -9,12 +9,76 @@ import (
 )
 
 type Environment struct {
-	CommonTableExpressions map[string]physical.Node
+	CommonTableExpressions map[string]CommonTableExpression
+	TableValuedFunctions   map[string][]TableValuedFunctionDescriptor
+	UniqueVariableNames    *VariableMapping
+	UniqueNameGenerator    map[string]int
+}
+
+func (env *Environment) GetUnique(name string) string {
+	index := env.UniqueNameGenerator[name]
+	env.UniqueNameGenerator[name] = index + 1
+	return fmt.Sprintf("%s_%d", name, index)
+}
+
+type CommonTableExpression struct {
+	Node                  physical.Node
+	UniqueVariableMapping map[string]string
+}
+
+func (env *Environment) WithRecordUniqueVariableNames(record map[string]string) Environment {
+	return Environment{
+		CommonTableExpressions: env.CommonTableExpressions,
+		TableValuedFunctions:   env.TableValuedFunctions,
+		UniqueVariableNames:    env.UniqueVariableNames.WithRecordMapping(record),
+		UniqueNameGenerator:    env.UniqueNameGenerator,
+	}
+}
+
+type VariableMapping struct {
+	Parent  *VariableMapping
+	Mapping map[string]string
+}
+
+func (mapping *VariableMapping) WithRecordMapping(record map[string]string) *VariableMapping {
+	return &VariableMapping{
+		Parent:  mapping,
+		Mapping: record,
+	}
+}
+
+func (mapping *VariableMapping) GetUniqueName(name string) (string, bool) {
+	if mapping == nil {
+		return "", false
+	}
+	unique, ok := GetUniqueNameMatchingVariable(mapping.Mapping, name)
+	if ok {
+		return unique, true
+	}
+
+	return mapping.Parent.GetUniqueName(name)
+}
+
+func GetUniqueNameMatchingVariable(mapping map[string]string, name string) (string, bool) {
+	for original, unique := range mapping {
+		if physical.VariableNameMatchesField(name, original) {
+			return unique, true
+		}
+	}
+	return "", false
+}
+
+func ReverseMapping(mapping map[string]string) map[string]string {
+	out := make(map[string]string)
+	for k, v := range mapping {
+		out[v] = k
+	}
+	return out
 }
 
 type Node interface {
 	// Typechecking panics on error, because it will never be handled in a different way than being bubbled up to the top.
-	Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node
+	Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) (physical.Node, map[string]string)
 }
 
 type DataSource struct {
@@ -25,9 +89,9 @@ func NewDataSource(name string) *DataSource {
 	return &DataSource{name: name}
 }
 
-func (ds *DataSource) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
-	if node, ok := logicalEnv.CommonTableExpressions[ds.name]; ok {
-		return node
+func (ds *DataSource) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) (physical.Node, map[string]string) {
+	if cte, ok := logicalEnv.CommonTableExpressions[ds.name]; ok {
+		return cte.Node, cte.UniqueVariableMapping
 	}
 
 	datasource, err := env.Datasources.GetDatasource(ctx, ds.name)
@@ -38,14 +102,22 @@ func (ds *DataSource) Typecheck(ctx context.Context, env physical.Environment, l
 	if err != nil {
 		panic(fmt.Errorf("couldn't get datasource schema: %v", err))
 	}
+	outMapping := make(map[string]string)
+	for i := range schema.Fields {
+		name := schema.Fields[i].Name
+		unique := logicalEnv.GetUnique(name)
+		outMapping[name] = unique
+		schema.Fields[i].Name = unique
+	}
 	return physical.Node{
 		Schema:   schema,
 		NodeType: physical.NodeTypeDatasource,
 		Datasource: &physical.Datasource{
 			Name:                     ds.name,
 			DatasourceImplementation: datasource,
+			VariableMapping:          outMapping,
 		},
-	}
+	}, outMapping
 }
 
 type Expression interface {
@@ -78,15 +150,20 @@ func NewVariable(name string) *Variable {
 }
 
 func (v *Variable) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
+	uniqueName, ok := logicalEnv.UniqueVariableNames.GetUniqueName(v.name)
+	if !ok {
+		panic(fmt.Errorf("unknown variable: '%s'", v.name))
+	}
+
 	isLevel0 := true
 	for varCtx := env.VariableContext; varCtx != nil; varCtx = varCtx.Parent {
 		for _, field := range varCtx.Fields {
-			if physical.VariableNameMatchesField(v.name, field.Name) {
+			if field.Name == uniqueName {
 				return physical.Expression{
 					Type:           field.Type,
 					ExpressionType: physical.ExpressionTypeVariable,
 					Variable: &physical.Variable{
-						Name:     v.name,
+						Name:     uniqueName,
 						IsLevel0: isLevel0,
 					},
 				}
@@ -95,7 +172,7 @@ func (v *Variable) Typecheck(ctx context.Context, env physical.Environment, logi
 		isLevel0 = false
 	}
 	// TODO: Expression typecheck errors should contain context. (position in input SQL)
-	panic(fmt.Errorf("unknown variable: '%s'", v.name))
+	panic(fmt.Errorf("unknown variable: '%s'", uniqueName))
 }
 
 func (v *Variable) FieldName() string {
@@ -209,7 +286,9 @@ func NewQueryExpression(node Node) *QueryExpression {
 }
 
 func (ne *QueryExpression) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
-	source := ne.node.Typecheck(ctx, env, logicalEnv)
+	source, mapping := ne.node.Typecheck(ctx, env, logicalEnv)
+	reverseMapping := ReverseMapping(mapping)
+
 	var elementType octosql.Type
 	if len(source.Schema.Fields) == 1 {
 		elementType = source.Schema.Fields[0].Type
@@ -217,7 +296,7 @@ func (ne *QueryExpression) Typecheck(ctx context.Context, env physical.Environme
 		structFields := make([]octosql.StructField, len(source.Schema.Fields))
 		for i := range source.Schema.Fields {
 			structFields[i] = octosql.StructField{
-				Name: source.Schema.Fields[i].Name,
+				Name: reverseMapping[source.Schema.Fields[i].Name],
 				Type: source.Schema.Fields[i].Type,
 			}
 		}

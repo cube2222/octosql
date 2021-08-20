@@ -16,12 +16,12 @@ func NewFilter(predicate Expression, child Node) *Filter {
 	return &Filter{predicate: predicate, source: child}
 }
 
-func (node *Filter) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
-	source := node.source.Typecheck(ctx, env, logicalEnv)
+func (node *Filter) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) (physical.Node, map[string]string) {
+	source, mapping := node.source.Typecheck(ctx, env, logicalEnv)
 	predicate := TypecheckExpression(
 		ctx,
 		env.WithRecordSchema(source.Schema),
-		logicalEnv,
+		logicalEnv.WithRecordUniqueVariableNames(mapping),
 		octosql.Boolean,
 		node.predicate,
 	)
@@ -33,5 +33,5 @@ func (node *Filter) Typecheck(ctx context.Context, env physical.Environment, log
 			Source:    source,
 			Predicate: predicate,
 		},
-	}
+	}, mapping
 }

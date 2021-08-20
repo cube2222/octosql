@@ -21,8 +21,9 @@ func NewMap(expressions []Expression, aliases []string, starQualifiers []string,
 	return &Map{expressions: expressions, aliases: aliases, starQualifier: starQualifiers, isStar: isStar, source: child}
 }
 
-func (node *Map) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
-	source := node.source.Typecheck(ctx, env, logicalEnv)
+func (node *Map) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) (physical.Node, map[string]string) {
+	source, mapping := node.source.Typecheck(ctx, env, logicalEnv)
+	reverseMapping := ReverseMapping(mapping)
 
 	var expressions []physical.Expression
 	var aliases []*string
@@ -40,7 +41,7 @@ func (node *Map) Typecheck(ctx context.Context, env physical.Environment, logica
 			}
 			unnests = append(unnests, unnestLevel)
 
-			expressions = append(expressions, curExpression.Typecheck(ctx, env.WithRecordSchema(source.Schema), logicalEnv))
+			expressions = append(expressions, curExpression.Typecheck(ctx, env.WithRecordSchema(source.Schema), logicalEnv.WithRecordUniqueVariableNames(mapping)))
 			if node.aliases[i] != "" {
 				aliases = append(aliases, &node.aliases[i])
 			} else {
@@ -69,12 +70,13 @@ func (node *Map) Typecheck(ctx context.Context, env physical.Environment, logica
 
 	existingFields := make(map[string]int)
 	outFields := make([]physical.SchemaField, len(expressions))
+	outMapping := make(map[string]string)
 	for i := range expressions {
 		var name string
 		if aliases[i] != nil {
 			name = *aliases[i]
 		} else if expressions[i].ExpressionType == physical.ExpressionTypeVariable {
-			name = expressions[i].Variable.Name
+			name = reverseMapping[expressions[i].Variable.Name]
 		} else {
 			name = fmt.Sprintf("col_%d", i)
 		}
@@ -84,8 +86,11 @@ func (node *Map) Typecheck(ctx context.Context, env physical.Environment, logica
 			name = fmt.Sprintf("%s_%d", name, existingCount)
 		}
 		existingFields[name] = existingCount + 1
+
+		unique := logicalEnv.GetUnique(name)
+		outMapping[name] = unique
 		outFields[i] = physical.SchemaField{
-			Name: name,
+			Name: unique,
 			Type: expressions[i].Type,
 		}
 	}
@@ -142,5 +147,5 @@ func (node *Map) Typecheck(ctx context.Context, env physical.Environment, logica
 		}
 	}
 
-	return outputNode
+	return outputNode, outMapping
 }

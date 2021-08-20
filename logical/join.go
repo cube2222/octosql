@@ -34,9 +34,15 @@ func NewJoin(left, right Node) *Join {
 	}
 }
 
-func (node *Join) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
-	left := node.left.Typecheck(ctx, env, logicalEnv)
-	right := node.right.Typecheck(ctx, env, logicalEnv)
+func (node *Join) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) (physical.Node, map[string]string) {
+	left, leftMapping := node.left.Typecheck(ctx, env, logicalEnv)
+	right, rightMapping := node.right.Typecheck(ctx, env, logicalEnv)
+
+	for k, v := range leftMapping {
+		// Put all mapped variables into one map.
+		// Left mapping takes precedence. Duplicates get overwritten.
+		rightMapping[k] = v
+	}
 
 	return physical.Node{
 		Schema: physical.Schema{
@@ -48,7 +54,7 @@ func (node *Join) Typecheck(ctx context.Context, env physical.Environment, logic
 			Left:  left,
 			Right: right,
 		},
-	}
+	}, rightMapping
 }
 
 // func usesVariablesFromLeftOrRight(left, right physical.Schema, variables []string) (usesLeft bool, usesRight bool) {
@@ -86,7 +92,7 @@ func NewLateralJoin(left, right Node) *LateralJoin {
 	}
 }
 
-func (node *LateralJoin) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
+func (node *LateralJoin) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) (physical.Node, map[string]string) {
 	panic("implement me")
 }
 

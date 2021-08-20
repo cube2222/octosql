@@ -14,8 +14,8 @@ func NewDistinct(source Node) *Distinct {
 	return &Distinct{source: source}
 }
 
-func (node *Distinct) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
-	source := node.source.Typecheck(ctx, env, logicalEnv)
+func (node *Distinct) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) (physical.Node, map[string]string) {
+	source, mapping := node.source.Typecheck(ctx, env, logicalEnv)
 
 	return physical.Node{
 		Schema:   source.Schema,
@@ -23,5 +23,5 @@ func (node *Distinct) Typecheck(ctx context.Context, env physical.Environment, l
 		Distinct: &physical.Distinct{
 			Source: source,
 		},
-	}
+	}, mapping
 }

@@ -85,20 +85,23 @@ func main() {
 				"csv":  csv.Creator,
 			},
 		},
-		TableValuedFunctions: map[string][]physical.TableValuedFunctionDescriptor{
-			"max_diff_watermark": table_valued_functions.MaxDiffWatermark,
-			"tumble":             table_valued_functions.Tumble,
-			"range":              table_valued_functions.Range,
-		},
 		PhysicalConfig:  nil,
 		VariableContext: nil,
 	}
 	// TODO: Wrap panics into errors in subfunction.
-	physicalPlan := logicalPlan.Typecheck(
+	tableValuedFunctions := map[string][]logical.TableValuedFunctionDescriptor{
+		"max_diff_watermark": table_valued_functions.MaxDiffWatermark,
+		"tumble":             table_valued_functions.Tumble,
+		"range":              table_valued_functions.Range,
+	}
+	uniqueNameGenerator := map[string]int{}
+	physicalPlan, mapping := logicalPlan.Typecheck(
 		context.Background(),
 		env,
 		logical.Environment{
-			CommonTableExpressions: map[string]physical.Node{},
+			CommonTableExpressions: map[string]logical.CommonTableExpression{},
+			TableValuedFunctions:   tableValuedFunctions,
+			UniqueNameGenerator:    uniqueNameGenerator,
 		},
 	)
 	spew.Dump(physicalPlan.Schema)
@@ -140,7 +143,14 @@ func main() {
 
 	orderByExpressions := make([]execution.Expression, len(outputOptions.OrderByExpressions))
 	for i := range outputOptions.OrderByExpressions {
-		physicalExpr := outputOptions.OrderByExpressions[i].Typecheck(context.Background(), env.WithRecordSchema(physicalPlan.Schema), logical.Environment{})
+		physicalExpr := outputOptions.OrderByExpressions[i].Typecheck(context.Background(), env.WithRecordSchema(physicalPlan.Schema), logical.Environment{
+			CommonTableExpressions: map[string]logical.CommonTableExpression{},
+			TableValuedFunctions:   tableValuedFunctions,
+			UniqueVariableNames: &logical.VariableMapping{
+				Mapping: mapping,
+			},
+			UniqueNameGenerator: uniqueNameGenerator,
+		})
 		execExpr, err := physicalExpr.Materialize(context.Background(), env.WithRecordSchema(physicalPlan.Schema))
 		if err != nil {
 			log.Fatalf("couldn't materialize output order by expression with index %d: %v", i, err)

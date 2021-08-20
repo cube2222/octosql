@@ -5,9 +5,36 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
+
+type TableValuedFunctionDescriptor struct {
+	Arguments map[string]TableValuedFunctionArgumentMatcher
+	// Here we can check the inputs.
+	OutputSchema func(context.Context, physical.Environment, Environment, map[string]physical.TableValuedFunctionArgument) (physical.Schema, map[string]string, error)
+	Materialize  func(context.Context, physical.Environment, map[string]physical.TableValuedFunctionArgument) (execution.Node, error)
+}
+
+type TableValuedFunctionArgumentMatcher struct {
+	Required                               bool
+	TableValuedFunctionArgumentMatcherType physical.TableValuedFunctionArgumentType
+	// Only one of the below may be non-null.
+	Expression *TableValuedFunctionArgumentMatcherExpression
+	Table      *TableValuedFunctionArgumentMatcherTable
+	Descriptor *TableValuedFunctionArgumentMatcherDescriptor
+}
+
+type TableValuedFunctionArgumentMatcherExpression struct {
+	Type octosql.Type
+}
+
+type TableValuedFunctionArgumentMatcherTable struct {
+}
+
+type TableValuedFunctionArgumentMatcherDescriptor struct {
+}
 
 type TableValuedFunctionArgumentValue interface {
 	iTableValuedFunctionArgumentValue()
@@ -44,10 +71,12 @@ func NewTableValuedFunctionArgumentValueTable(source Node) *TableValuedFunctionA
 }
 
 func (arg *TableValuedFunctionArgumentValueTable) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.TableValuedFunctionArgument {
+	node, mapping := arg.source.Typecheck(ctx, env, logicalEnv)
 	return physical.TableValuedFunctionArgument{
 		TableValuedFunctionArgumentType: physical.TableValuedFunctionArgumentTypeTable,
 		Table: &physical.TableValuedFunctionArgumentTable{
-			Table: arg.source.Typecheck(ctx, env, logicalEnv),
+			Table:   node,
+			Mapping: mapping,
 		},
 	}
 }
@@ -78,12 +107,12 @@ func NewTableValuedFunction(name string, arguments map[string]TableValuedFunctio
 	return &TableValuedFunction{name: name, arguments: arguments}
 }
 
-func (node *TableValuedFunction) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {
+func (node *TableValuedFunction) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) (physical.Node, map[string]string) {
 	arguments := map[string]physical.TableValuedFunctionArgument{}
 	for k, v := range node.arguments {
 		arguments[k] = v.Typecheck(ctx, env, logicalEnv)
 	}
-	descriptors := env.TableValuedFunctions[node.name]
+	descriptors := logicalEnv.TableValuedFunctions[node.name]
 descriptorLoop:
 	for _, descriptor := range descriptors {
 		for name, arg := range descriptor.Arguments {
@@ -110,7 +139,7 @@ descriptorLoop:
 			case physical.TableValuedFunctionArgumentTypeDescriptor:
 			}
 		}
-		outSchema, err := descriptor.OutputSchema(ctx, env, arguments)
+		outSchema, outputMapping, err := descriptor.OutputSchema(ctx, env, logicalEnv, arguments)
 		if err != nil {
 			panic(err)
 		}
@@ -118,11 +147,13 @@ descriptorLoop:
 			Schema:   outSchema,
 			NodeType: physical.NodeTypeTableValuedFunction,
 			TableValuedFunction: &physical.TableValuedFunction{
-				Name:               node.name,
-				Arguments:          arguments,
-				FunctionDescriptor: descriptor,
+				Name:      node.name,
+				Arguments: arguments,
+				FunctionDescriptor: physical.TableValuedFunctionDescriptor{
+					Materialize: descriptor.Materialize,
+				},
 			},
-		}
+		}, outputMapping
 	}
 descriptorLoop2:
 	for _, descriptor := range descriptors {
@@ -150,7 +181,7 @@ descriptorLoop2:
 			case physical.TableValuedFunctionArgumentTypeDescriptor:
 			}
 		}
-		outSchema, err := descriptor.OutputSchema(ctx, env, arguments)
+		outSchema, outputMapping, err := descriptor.OutputSchema(ctx, env, logicalEnv, arguments)
 		if err != nil {
 			panic(err)
 		}
@@ -158,11 +189,13 @@ descriptorLoop2:
 			Schema:   outSchema,
 			NodeType: physical.NodeTypeTableValuedFunction,
 			TableValuedFunction: &physical.TableValuedFunction{
-				Name:               node.name,
-				Arguments:          arguments,
-				FunctionDescriptor: descriptor,
+				Name:      node.name,
+				Arguments: arguments,
+				FunctionDescriptor: physical.TableValuedFunctionDescriptor{
+					Materialize: descriptor.Materialize,
+				},
 			},
-		}
+		}, outputMapping
 	}
 	var argNames []string
 	for k, v := range arguments {

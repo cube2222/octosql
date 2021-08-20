@@ -33,6 +33,13 @@ var MaxDiffWatermark = []logical.TableValuedFunctionDescriptor{
 				TableValuedFunctionArgumentMatcherType: physical.TableValuedFunctionArgumentTypeDescriptor,
 				Descriptor:                             &logical.TableValuedFunctionArgumentMatcherDescriptor{},
 			},
+			"resolution": {
+				Required:                               false,
+				TableValuedFunctionArgumentMatcherType: physical.TableValuedFunctionArgumentTypeExpression,
+				Expression: &logical.TableValuedFunctionArgumentMatcherExpression{
+					Type: octosql.Duration,
+				},
+			},
 		},
 		OutputSchema: func(ctx context.Context, env physical.Environment, logicalEnv logical.Environment, args map[string]physical.TableValuedFunctionArgument) (physical.Schema, map[string]string, error) {
 			source := args["source"].Table.Table
@@ -78,10 +85,18 @@ var MaxDiffWatermark = []logical.TableValuedFunctionDescriptor{
 					break
 				}
 			}
+			var resolution execution.Expression = execution.NewConstant(octosql.NewDuration(time.Second))
+			if arg, ok := args["resolution"]; ok {
+				resolution, err = arg.Expression.Expression.Materialize(ctx, env)
+				if err != nil {
+					return nil, fmt.Errorf("couldn't materialize resolution: %w", err)
+				}
+			}
 
 			return &maxDifferenceWatermarkGenerator{
 				source:         source,
 				maxDifference:  maxDifference,
+				resolution:     resolution,
 				timeFieldIndex: timeFieldIndex,
 			}, nil
 		},
@@ -91,6 +106,7 @@ var MaxDiffWatermark = []logical.TableValuedFunctionDescriptor{
 type maxDifferenceWatermarkGenerator struct {
 	source         execution.Node
 	maxDifference  execution.Expression
+	resolution     execution.Expression
 	timeFieldIndex int
 }
 
@@ -102,6 +118,10 @@ func (m *maxDifferenceWatermarkGenerator) Run(ctx execution.ExecutionContext, pr
 	if err != nil {
 		return fmt.Errorf("couldn't evaluate max_diff: %w", err)
 	}
+	resolution, err := m.resolution.Evaluate(ctx)
+	if err != nil {
+		return fmt.Errorf("couldn't evaluate resolution: %w", err)
+	}
 
 	if err := m.source.Run(ctx, func(ctx execution.ProduceContext, record execution.Record) error {
 		if record.Values[m.timeFieldIndex].Time.After(curWatermark) {
@@ -111,11 +131,12 @@ func (m *maxDifferenceWatermarkGenerator) Run(ctx execution.ExecutionContext, pr
 			}
 		}
 
-		if curTimeValue := record.Values[m.timeFieldIndex].Time; curTimeValue.After(maxValue) {
-			maxValue = curTimeValue
-			curWatermark = curTimeValue.Add(-maxDifference.Duration)
+		curTimeValueRoundedDown := time.Unix(0, record.Values[m.timeFieldIndex].Time.UnixNano()/int64(resolution.Duration)*int64(resolution.Duration))
 
-			// TODO: Think about adding granularity here. (so i.e. only have second resolution)
+		if curTimeValueRoundedDown.After(maxValue) {
+			maxValue = curTimeValueRoundedDown
+			curWatermark = curTimeValueRoundedDown.Add(-maxDifference.Duration)
+
 			if err := metaSend(ctx, execution.MetadataMessage{
 				Type:      execution.MetadataMessageTypeWatermark,
 				Watermark: curWatermark,

@@ -59,7 +59,7 @@ func (n *NativeFormat) WriteRecord(record Record) error {
 }
 
 func (n *NativeFormat) WriteMeta(message MetadataMessage) error {
-	fmt.Fprintf(os.Stdout, "watermark: %s\n", message.Watermark)
+	fmt.Fprintf(os.Stdout, "{~%s}\n", message.Watermark)
 	return nil
 }
 

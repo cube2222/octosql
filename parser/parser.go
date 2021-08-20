@@ -117,7 +117,7 @@ func ParseSelect(statement *sqlparser.Select, topmost bool) (logical.Node, *Outp
 						continue selectExprLoop
 					}
 				}
-				return nil, nil, errors.Errorf("non-aggregate %d expression in grouping must be part of group by key", i)
+				return nil, nil, errors.Errorf("non-aggregate expression with index %d in grouping must be part of group by key", i)
 			}
 			return nil, nil, errors.Errorf("couldn't parse expression as aggregate nor expression: %s %s", err, exprErr)
 		}
@@ -203,7 +203,10 @@ func ParseSelect(statement *sqlparser.Select, topmost bool) (logical.Node, *Outp
 			}
 		}
 
-		root = logical.NewMap(expressions, aliases, starQualifiers, isStar, root)
+		if !(len(expressions) == 1 && isStar[0] && starQualifiers[0] == "") {
+			// Only create a map node if this is not 'SELECT * FROM xyz'
+			root = logical.NewMap(expressions, aliases, starQualifiers, isStar, root)
+		}
 	}
 
 	if statement.OrderBy != nil {

@@ -102,15 +102,18 @@ func (ds *DataSource) Typecheck(ctx context.Context, env physical.Environment, l
 	if err != nil {
 		panic(fmt.Errorf("couldn't get datasource schema: %v", err))
 	}
+
 	outMapping := make(map[string]string)
-	for i := range schema.Fields {
-		name := schema.Fields[i].Name
+	newSchemaFields := make([]physical.SchemaField, len(schema.Fields))
+	copy(newSchemaFields, schema.Fields)
+	for i := range newSchemaFields {
+		name := newSchemaFields[i].Name
 		unique := logicalEnv.GetUnique(name)
 		outMapping[name] = unique
-		schema.Fields[i].Name = unique
+		newSchemaFields[i].Name = unique
 	}
 	return physical.Node{
-		Schema:   schema,
+		Schema:   physical.NewSchema(newSchemaFields, schema.TimeField),
 		NodeType: physical.NodeTypeDatasource,
 		Datasource: &physical.Datasource{
 			Name:                     ds.name,

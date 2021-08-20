@@ -163,6 +163,17 @@ func main() {
 		Run(execCtx execution.ExecutionContext) error
 	}
 
+	outFields := make([]physical.SchemaField, len(physicalPlan.Schema.Fields))
+	copy(outFields, physicalPlan.Schema.Fields)
+	outSchema := physical.Schema{
+		Fields:    outFields,
+		TimeField: physicalPlan.Schema.TimeField,
+	}
+	reverseMapping := logical.ReverseMapping(mapping)
+	for i := range outFields {
+		outFields[i].Name = reverseMapping[outFields[i].Name]
+	}
+
 	switch os.Getenv("OCTOSQL_OUTPUT") {
 	case "live_table":
 		sink = batch.NewOutputPrinter(
@@ -170,7 +181,7 @@ func main() {
 			orderByExpressions,
 			logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
 			outputOptions.Limit,
-			physicalPlan.Schema,
+			outSchema,
 			batch.NewTableFormatter,
 			true,
 		)
@@ -180,7 +191,7 @@ func main() {
 			orderByExpressions,
 			logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
 			outputOptions.Limit,
-			physicalPlan.Schema,
+			outSchema,
 			batch.NewTableFormatter,
 			false,
 		)
@@ -198,7 +209,7 @@ func main() {
 
 		sink = stream.NewOutputPrinter(
 			executionPlan,
-			stream.NewNativeFormat(physicalPlan.Schema),
+			stream.NewNativeFormat(outSchema),
 		)
 	default:
 		sink = batch.NewOutputPrinter(
@@ -206,7 +217,7 @@ func main() {
 			orderByExpressions,
 			logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
 			outputOptions.Limit,
-			physicalPlan.Schema,
+			outSchema,
 			batch.NewTableFormatter,
 			true,
 		)

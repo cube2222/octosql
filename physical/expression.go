@@ -87,7 +87,7 @@ func (expr *Expression) Materialize(ctx context.Context, env Environment) (execu
 	ctxLoop:
 		for varCtx := env.VariableContext; varCtx != nil; varCtx = varCtx.Parent {
 			for i, field := range varCtx.Fields {
-				if VariableNameMatchesField(expr.Variable.Name, field.Name) {
+				if field.Name == expr.Variable.Name {
 					index = i
 					break ctxLoop
 				}

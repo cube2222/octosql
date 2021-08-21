@@ -12,22 +12,25 @@ import (
 )
 
 var MaxDiffWatermark = logical.TableValuedFunctionDescription{
-	TypecheckArguments: func(ctx context.Context, env physical.Environment, logicalEnv logical.Environment, args map[string]logical.TableValuedFunctionArgumentValue) map[string]logical.TableValuedFunctionArgumentTypecheckedArgument {
-		outArgs := make(map[string]logical.TableValuedFunctionArgumentTypecheckedArgument)
+	TypecheckArguments: func(ctx context.Context, env physical.Environment, logicalEnv logical.Environment, args map[string]logical.TableValuedFunctionArgumentValue) map[string]logical.TableValuedFunctionTypecheckedArgument {
+		outArgs := make(map[string]logical.TableValuedFunctionTypecheckedArgument)
 
-		source, mapping := args["source"].(*logical.TableValuedFunctionArgumentValueTable).Typecheck(ctx, env, logicalEnv)
-		outArgs["source"] = logical.TableValuedFunctionArgumentTypecheckedArgument{Mapping: mapping, Argument: source}
+		source, mapping := args["source"].(*logical.TableValuedFunctionArgumentValueTable).
+			Typecheck(ctx, env, logicalEnv)
+		outArgs["source"] = logical.TableValuedFunctionTypecheckedArgument{Mapping: mapping, Argument: source}
 
-		exprLogicalEnv := logicalEnv.WithRecordUniqueVariableNames(mapping)
-		outArgs["max_diff"] = logical.TableValuedFunctionArgumentTypecheckedArgument{
-			Argument: args["max_diff"].(*logical.TableValuedFunctionArgumentValueExpression).Typecheck(ctx, env, exprLogicalEnv),
+		outArgs["max_diff"] = logical.TableValuedFunctionTypecheckedArgument{
+			Argument: args["max_diff"].(*logical.TableValuedFunctionArgumentValueExpression).
+				Typecheck(ctx, env, logicalEnv),
 		}
-		outArgs["time_field"] = logical.TableValuedFunctionArgumentTypecheckedArgument{
-			Argument: args["time_field"].(*logical.TableValuedFunctionArgumentValueDescriptor).Typecheck(ctx, env, exprLogicalEnv),
+		outArgs["time_field"] = logical.TableValuedFunctionTypecheckedArgument{
+			Argument: args["time_field"].(*logical.TableValuedFunctionArgumentValueDescriptor).
+				Typecheck(ctx, env, logicalEnv.WithRecordUniqueVariableNames(mapping)),
 		}
 		if _, ok := args["resolution"]; ok {
-			outArgs["resolution"] = logical.TableValuedFunctionArgumentTypecheckedArgument{
-				Argument: args["resolution"].(*logical.TableValuedFunctionArgumentValueExpression).Typecheck(ctx, env, exprLogicalEnv),
+			outArgs["resolution"] = logical.TableValuedFunctionTypecheckedArgument{
+				Argument: args["resolution"].(*logical.TableValuedFunctionArgumentValueExpression).
+					Typecheck(ctx, env, logicalEnv),
 			}
 		}
 
@@ -61,7 +64,7 @@ var MaxDiffWatermark = logical.TableValuedFunctionDescription{
 					},
 				},
 			},
-			OutputSchema: func(ctx context.Context, env physical.Environment, logicalEnv logical.Environment, args map[string]logical.TableValuedFunctionArgumentTypecheckedArgument) (physical.Schema, map[string]string, error) {
+			OutputSchema: func(ctx context.Context, env physical.Environment, logicalEnv logical.Environment, args map[string]logical.TableValuedFunctionTypecheckedArgument) (physical.Schema, map[string]string, error) {
 				source := args["source"].Argument.Table.Table
 				timeField := args["time_field"].Argument.Descriptor.Descriptor
 				timeFieldIndex := -1

@@ -11,11 +11,11 @@ import (
 )
 
 type TableValuedFunctionDescription struct {
-	TypecheckArguments func(context.Context, physical.Environment, Environment, map[string]TableValuedFunctionArgumentValue) map[string]TableValuedFunctionArgumentTypecheckedArgument
+	TypecheckArguments func(context.Context, physical.Environment, Environment, map[string]TableValuedFunctionArgumentValue) map[string]TableValuedFunctionTypecheckedArgument
 	Descriptors        []TableValuedFunctionDescriptor
 }
 
-type TableValuedFunctionArgumentTypecheckedArgument struct {
+type TableValuedFunctionTypecheckedArgument struct {
 	Mapping  map[string]string
 	Argument physical.TableValuedFunctionArgument
 }
@@ -23,7 +23,7 @@ type TableValuedFunctionArgumentTypecheckedArgument struct {
 type TableValuedFunctionDescriptor struct {
 	Arguments map[string]TableValuedFunctionArgumentMatcher
 	// Here we can check the inputs.
-	OutputSchema func(context.Context, physical.Environment, Environment, map[string]TableValuedFunctionArgumentTypecheckedArgument) (physical.Schema, map[string]string, error)
+	OutputSchema func(context.Context, physical.Environment, Environment, map[string]TableValuedFunctionTypecheckedArgument) (physical.Schema, map[string]string, error)
 	Materialize  func(context.Context, physical.Environment, map[string]physical.TableValuedFunctionArgument) (execution.Node, error)
 }
 

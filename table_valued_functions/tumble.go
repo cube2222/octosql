@@ -11,8 +11,31 @@ import (
 )
 
 var Tumble = logical.TableValuedFunctionDescription{
-	TypecheckArguments: func(ctx context.Context, environment physical.Environment, environment2 logical.Environment, m map[string]logical.TableValuedFunctionArgumentValue) map[string]physical.TableValuedFunctionArgument {
-		panic("aaa")
+	TypecheckArguments: func(ctx context.Context, env physical.Environment, logicalEnv logical.Environment, args map[string]logical.TableValuedFunctionArgumentValue) map[string]logical.TableValuedFunctionTypecheckedArgument {
+		outArgs := make(map[string]logical.TableValuedFunctionTypecheckedArgument)
+
+		source, mapping := args["source"].(*logical.TableValuedFunctionArgumentValueTable).
+			Typecheck(ctx, env, logicalEnv)
+		outArgs["source"] = logical.TableValuedFunctionTypecheckedArgument{Mapping: mapping, Argument: source}
+
+		outArgs["window_length"] = logical.TableValuedFunctionTypecheckedArgument{
+			Argument: args["window_length"].(*logical.TableValuedFunctionArgumentValueExpression).
+				Typecheck(ctx, env, logicalEnv),
+		}
+		if _, ok := args["time_field"]; ok {
+			outArgs["time_field"] = logical.TableValuedFunctionTypecheckedArgument{
+				Argument: args["time_field"].(*logical.TableValuedFunctionArgumentValueDescriptor).
+					Typecheck(ctx, env, logicalEnv.WithRecordUniqueVariableNames(mapping)),
+			}
+		}
+		if _, ok := args["offset"]; ok {
+			outArgs["offset"] = logical.TableValuedFunctionTypecheckedArgument{
+				Argument: args["offset"].(*logical.TableValuedFunctionArgumentValueExpression).
+					Typecheck(ctx, env, logicalEnv),
+			}
+		}
+
+		return outArgs
 	},
 	Descriptors: []logical.TableValuedFunctionDescriptor{
 		{
@@ -42,13 +65,10 @@ var Tumble = logical.TableValuedFunctionDescription{
 					},
 				},
 			},
-			OutputSchema: func(ctx context.Context, env physical.Environment, logicalEnv logical.Environment, args map[string]physical.TableValuedFunctionArgument) (physical.Schema, map[string]string, error) {
-				source := args["source"].Table.Table
+			OutputSchema: func(ctx context.Context, env physical.Environment, logicalEnv logical.Environment, args map[string]logical.TableValuedFunctionTypecheckedArgument) (physical.Schema, map[string]string, error) {
+				source := args["source"].Argument.Table.Table
 				if timeFieldDescriptor, ok := args["time_field"]; ok {
-					timeField, ok := logical.GetUniqueNameMatchingVariable(args["source"].Table.Mapping, timeFieldDescriptor.Descriptor.Descriptor)
-					if !ok {
-						return physical.Schema{}, nil, fmt.Errorf("no %s field in source stream", args["time_field"].Descriptor.Descriptor)
-					}
+					timeField := timeFieldDescriptor.Argument.Descriptor.Descriptor
 					found := false
 					for _, field := range source.Schema.Fields {
 						if field.Name != timeField {
@@ -69,7 +89,7 @@ var Tumble = logical.TableValuedFunctionDescription{
 					}
 				}
 				outMapping := make(map[string]string)
-				for k, v := range args["source"].Table.Mapping {
+				for k, v := range args["source"].Mapping {
 					outMapping[k] = v
 				}
 				outFields := make([]physical.SchemaField, len(source.Schema.Fields)+2)
@@ -104,7 +124,7 @@ var Tumble = logical.TableValuedFunctionDescription{
 				}
 				var timeFieldIndex int
 				if timeFieldDescriptor, ok := args["time_field"]; ok {
-					timeField, _ := logical.GetUniqueNameMatchingVariable(args["source"].Table.Mapping, timeFieldDescriptor.Descriptor.Descriptor)
+					timeField := timeFieldDescriptor.Descriptor.Descriptor
 					for i, field := range args["source"].Table.Table.Schema.Fields {
 						if field.Name == timeField {
 							timeFieldIndex = i

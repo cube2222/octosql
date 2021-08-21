@@ -12,8 +12,15 @@ import (
 )
 
 var Range = logical.TableValuedFunctionDescription{
-	TypecheckArguments: func(ctx context.Context, environment physical.Environment, environment2 logical.Environment, m map[string]logical.TableValuedFunctionArgumentValue) map[string]physical.TableValuedFunctionArgument {
-		panic("aaa")
+	TypecheckArguments: func(ctx context.Context, env physical.Environment, logicalEnv logical.Environment, args map[string]logical.TableValuedFunctionArgumentValue) map[string]logical.TableValuedFunctionTypecheckedArgument {
+		outArgs := make(map[string]logical.TableValuedFunctionTypecheckedArgument)
+		outArgs["start"] = logical.TableValuedFunctionTypecheckedArgument{
+			Argument: args["start"].(*logical.TableValuedFunctionArgumentValueExpression).Typecheck(ctx, env, logicalEnv),
+		}
+		outArgs["up_to"] = logical.TableValuedFunctionTypecheckedArgument{
+			Argument: args["up_to"].(*logical.TableValuedFunctionArgumentValueExpression).Typecheck(ctx, env, logicalEnv),
+		}
+		return outArgs
 	},
 	Descriptors: []logical.TableValuedFunctionDescriptor{
 		{
@@ -37,7 +44,7 @@ var Range = logical.TableValuedFunctionDescription{
 				ctx context.Context,
 				env physical.Environment,
 				logicalEnv logical.Environment,
-				args map[string]physical.TableValuedFunctionArgument,
+				args map[string]logical.TableValuedFunctionTypecheckedArgument,
 			) (physical.Schema, map[string]string, error) {
 				unique := logicalEnv.GetUnique("i")
 

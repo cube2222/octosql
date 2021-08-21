@@ -167,8 +167,7 @@ type TableValuedFunctionArgumentExpression struct {
 }
 
 type TableValuedFunctionArgumentTable struct {
-	Table   Node
-	Mapping map[string]string // This is ugly, but it's the easiest way to go about this.
+	Table Node
 }
 
 type TableValuedFunctionArgumentDescriptor struct {

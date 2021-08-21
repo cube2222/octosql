@@ -10,7 +10,7 @@ import (
 
 type Environment struct {
 	CommonTableExpressions map[string]CommonTableExpression
-	TableValuedFunctions   map[string][]TableValuedFunctionDescriptor
+	TableValuedFunctions   map[string]TableValuedFunctionDescription
 	UniqueVariableNames    *VariableMapping
 	UniqueNameGenerator    map[string]int
 }

@@ -10,10 +10,20 @@ import (
 	"github.com/cube2222/octosql/physical"
 )
 
+type TableValuedFunctionDescription struct {
+	TypecheckArguments func(context.Context, physical.Environment, Environment, map[string]TableValuedFunctionArgumentValue) map[string]TableValuedFunctionArgumentTypecheckedArgument
+	Descriptors        []TableValuedFunctionDescriptor
+}
+
+type TableValuedFunctionArgumentTypecheckedArgument struct {
+	Mapping  map[string]string
+	Argument physical.TableValuedFunctionArgument
+}
+
 type TableValuedFunctionDescriptor struct {
 	Arguments map[string]TableValuedFunctionArgumentMatcher
 	// Here we can check the inputs.
-	OutputSchema func(context.Context, physical.Environment, Environment, map[string]physical.TableValuedFunctionArgument) (physical.Schema, map[string]string, error)
+	OutputSchema func(context.Context, physical.Environment, Environment, map[string]TableValuedFunctionArgumentTypecheckedArgument) (physical.Schema, map[string]string, error)
 	Materialize  func(context.Context, physical.Environment, map[string]physical.TableValuedFunctionArgument) (execution.Node, error)
 }
 
@@ -38,7 +48,6 @@ type TableValuedFunctionArgumentMatcherDescriptor struct {
 
 type TableValuedFunctionArgumentValue interface {
 	iTableValuedFunctionArgumentValue()
-	Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.TableValuedFunctionArgument
 }
 
 func (*TableValuedFunctionArgumentValueExpression) iTableValuedFunctionArgumentValue() {}
@@ -70,15 +79,14 @@ func NewTableValuedFunctionArgumentValueTable(source Node) *TableValuedFunctionA
 	return &TableValuedFunctionArgumentValueTable{source: source}
 }
 
-func (arg *TableValuedFunctionArgumentValueTable) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.TableValuedFunctionArgument {
+func (arg *TableValuedFunctionArgumentValueTable) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) (physical.TableValuedFunctionArgument, map[string]string) {
 	node, mapping := arg.source.Typecheck(ctx, env, logicalEnv)
 	return physical.TableValuedFunctionArgument{
 		TableValuedFunctionArgumentType: physical.TableValuedFunctionArgumentTypeTable,
 		Table: &physical.TableValuedFunctionArgumentTable{
-			Table:   node,
-			Mapping: mapping,
+			Table: node,
 		},
-	}
+	}, mapping
 }
 
 type TableValuedFunctionArgumentValueDescriptor struct {
@@ -90,10 +98,14 @@ func NewTableValuedFunctionArgumentValueDescriptor(descriptor string) *TableValu
 }
 
 func (arg *TableValuedFunctionArgumentValueDescriptor) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.TableValuedFunctionArgument {
+	unique, ok := logicalEnv.UniqueVariableNames.GetUniqueName(arg.descriptor)
+	if !ok {
+		panic(fmt.Errorf("no %s field in source stream", arg.descriptor))
+	}
 	return physical.TableValuedFunctionArgument{
 		TableValuedFunctionArgumentType: physical.TableValuedFunctionArgumentTypeDescriptor,
 		Descriptor: &physical.TableValuedFunctionArgumentDescriptor{
-			Descriptor: arg.descriptor,
+			Descriptor: unique,
 		},
 	}
 }
@@ -108,13 +120,20 @@ func NewTableValuedFunction(name string, arguments map[string]TableValuedFunctio
 }
 
 func (node *TableValuedFunction) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) (physical.Node, map[string]string) {
-	arguments := map[string]physical.TableValuedFunctionArgument{}
-	for k, v := range node.arguments {
-		arguments[k] = v.Typecheck(ctx, env, logicalEnv)
+	description := logicalEnv.TableValuedFunctions[node.name]
+
+	// TODO: First check if required arguments are present. Without checking their type.
+	// Just check if the "kind" is right. So table, descriptor, expression.
+
+	arguments := description.TypecheckArguments(ctx, env, logicalEnv, node.arguments)
+
+	physicalArguments := make(map[string]physical.TableValuedFunctionArgument)
+	for k, v := range arguments {
+		physicalArguments[k] = v.Argument
 	}
-	descriptors := logicalEnv.TableValuedFunctions[node.name]
+
 descriptorLoop:
-	for _, descriptor := range descriptors {
+	for _, descriptor := range description.Descriptors {
 		for name, arg := range descriptor.Arguments {
 			if arg.Required {
 				if _, ok := arguments[name]; !ok {
@@ -127,12 +146,12 @@ descriptorLoop:
 			if !ok {
 				continue descriptorLoop
 			}
-			if arg.TableValuedFunctionArgumentType != matcher.TableValuedFunctionArgumentMatcherType {
+			if arg.Argument.TableValuedFunctionArgumentType != matcher.TableValuedFunctionArgumentMatcherType {
 				continue descriptorLoop
 			}
-			switch arg.TableValuedFunctionArgumentType {
+			switch arg.Argument.TableValuedFunctionArgumentType {
 			case physical.TableValuedFunctionArgumentTypeExpression:
-				if rel := arg.Expression.Expression.Type.Is(matcher.Expression.Type); rel < octosql.TypeRelationIs {
+				if rel := arg.Argument.Expression.Expression.Type.Is(matcher.Expression.Type); rel < octosql.TypeRelationIs {
 					continue descriptorLoop
 				}
 			case physical.TableValuedFunctionArgumentTypeTable:
@@ -148,7 +167,7 @@ descriptorLoop:
 			NodeType: physical.NodeTypeTableValuedFunction,
 			TableValuedFunction: &physical.TableValuedFunction{
 				Name:      node.name,
-				Arguments: arguments,
+				Arguments: physicalArguments,
 				FunctionDescriptor: physical.TableValuedFunctionDescriptor{
 					Materialize: descriptor.Materialize,
 				},
@@ -156,7 +175,7 @@ descriptorLoop:
 		}, outputMapping
 	}
 descriptorLoop2:
-	for _, descriptor := range descriptors {
+	for _, descriptor := range description.Descriptors {
 		for name, arg := range descriptor.Arguments {
 			if arg.Required {
 				if _, ok := arguments[name]; !ok {
@@ -169,12 +188,12 @@ descriptorLoop2:
 			if !ok {
 				continue descriptorLoop2
 			}
-			if arg.TableValuedFunctionArgumentType != matcher.TableValuedFunctionArgumentMatcherType {
+			if arg.Argument.TableValuedFunctionArgumentType != matcher.TableValuedFunctionArgumentMatcherType {
 				continue descriptorLoop2
 			}
-			switch arg.TableValuedFunctionArgumentType {
+			switch arg.Argument.TableValuedFunctionArgumentType {
 			case physical.TableValuedFunctionArgumentTypeExpression:
-				if rel := arg.Expression.Expression.Type.Is(matcher.Expression.Type); rel < octosql.TypeRelationMaybe {
+				if rel := arg.Argument.Expression.Expression.Type.Is(matcher.Expression.Type); rel < octosql.TypeRelationMaybe {
 					continue descriptorLoop2
 				}
 			case physical.TableValuedFunctionArgumentTypeTable:
@@ -190,7 +209,7 @@ descriptorLoop2:
 			NodeType: physical.NodeTypeTableValuedFunction,
 			TableValuedFunction: &physical.TableValuedFunction{
 				Name:      node.name,
-				Arguments: arguments,
+				Arguments: physicalArguments,
 				FunctionDescriptor: physical.TableValuedFunctionDescriptor{
 					Materialize: descriptor.Materialize,
 				},
@@ -198,7 +217,7 @@ descriptorLoop2:
 		}, outputMapping
 	}
 	var argNames []string
-	for k, v := range arguments {
+	for k, v := range physicalArguments {
 		argNames = append(argNames, fmt.Sprintf("%s=>%s", k, v.String()))
 	}
 	// TODO: Print available overloads.

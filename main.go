@@ -89,7 +89,7 @@ func main() {
 		VariableContext: nil,
 	}
 	// TODO: Wrap panics into errors in subfunction.
-	tableValuedFunctions := map[string][]logical.TableValuedFunctionDescriptor{
+	tableValuedFunctions := map[string]logical.TableValuedFunctionDescription{
 		"max_diff_watermark": table_valued_functions.MaxDiffWatermark,
 		"tumble":             table_valued_functions.Tumble,
 		"range":              table_valued_functions.Range,

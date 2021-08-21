@@ -5,100 +5,117 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
 
-var MaxDiffWatermark = []logical.TableValuedFunctionDescriptor{
-	{
-		Arguments: map[string]logical.TableValuedFunctionArgumentMatcher{
-			"source": {
-				Required:                               true,
-				TableValuedFunctionArgumentMatcherType: physical.TableValuedFunctionArgumentTypeTable,
-				Table:                                  &logical.TableValuedFunctionArgumentMatcherTable{},
-			},
-			"max_diff": {
-				Required:                               true,
-				TableValuedFunctionArgumentMatcherType: physical.TableValuedFunctionArgumentTypeExpression,
-				Expression: &logical.TableValuedFunctionArgumentMatcherExpression{
-					Type: octosql.Duration,
-				},
-			},
-			"time_field": {
-				Required:                               true,
-				TableValuedFunctionArgumentMatcherType: physical.TableValuedFunctionArgumentTypeDescriptor,
-				Descriptor:                             &logical.TableValuedFunctionArgumentMatcherDescriptor{},
-			},
-			"resolution": {
-				Required:                               false,
-				TableValuedFunctionArgumentMatcherType: physical.TableValuedFunctionArgumentTypeExpression,
-				Expression: &logical.TableValuedFunctionArgumentMatcherExpression{
-					Type: octosql.Duration,
-				},
-			},
-		},
-		OutputSchema: func(ctx context.Context, env physical.Environment, logicalEnv logical.Environment, args map[string]physical.TableValuedFunctionArgument) (physical.Schema, map[string]string, error) {
-			source := args["source"].Table.Table
-			timeField, ok := logical.GetUniqueNameMatchingVariable(args["source"].Table.Mapping, args["time_field"].Descriptor.Descriptor)
-			if !ok {
-				return physical.Schema{}, nil, fmt.Errorf("no %s field in source stream", args["time_field"].Descriptor.Descriptor)
-			}
-			timeFieldIndex := -1
-			for i, field := range source.Schema.Fields {
-				if timeField != field.Name {
-					continue
-				}
-				if field.Type.TypeID != octosql.TypeIDTime {
-					return physical.Schema{}, nil, fmt.Errorf("time_field must reference field with type Time, is %s", field.Type.String())
-				}
-				timeFieldIndex = i
-				break
-			}
-			if timeFieldIndex == -1 {
-				return physical.Schema{}, nil, fmt.Errorf("no %s field in source stream", timeField)
-			}
-			spew.Dump(args["source"].Table.Mapping)
-			return physical.Schema{
-				Fields:    source.Schema.Fields,
-				TimeField: timeFieldIndex,
-			}, args["source"].Table.Mapping, nil
-		},
-		Materialize: func(ctx context.Context, env physical.Environment, args map[string]physical.TableValuedFunctionArgument) (execution.Node, error) {
-			source, err := args["source"].Table.Table.Materialize(ctx, env)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't materialize source table: %w", err)
-			}
-			maxDifference, err := args["max_diff"].Expression.Expression.Materialize(ctx, env)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't materialize max_diff: %w", err)
-			}
+var MaxDiffWatermark = logical.TableValuedFunctionDescription{
+	TypecheckArguments: func(ctx context.Context, env physical.Environment, logicalEnv logical.Environment, args map[string]logical.TableValuedFunctionArgumentValue) map[string]logical.TableValuedFunctionArgumentTypecheckedArgument {
+		outArgs := make(map[string]logical.TableValuedFunctionArgumentTypecheckedArgument)
 
-			timeField, _ := logical.GetUniqueNameMatchingVariable(args["source"].Table.Mapping, args["time_field"].Descriptor.Descriptor)
-			timeFieldIndex := -1
-			for i, field := range args["source"].Table.Table.Schema.Fields {
-				if timeField == field.Name {
+		source, mapping := args["source"].(*logical.TableValuedFunctionArgumentValueTable).Typecheck(ctx, env, logicalEnv)
+		outArgs["source"] = logical.TableValuedFunctionArgumentTypecheckedArgument{Mapping: mapping, Argument: source}
+
+		exprLogicalEnv := logicalEnv.WithRecordUniqueVariableNames(mapping)
+		outArgs["max_diff"] = logical.TableValuedFunctionArgumentTypecheckedArgument{
+			Argument: args["max_diff"].(*logical.TableValuedFunctionArgumentValueExpression).Typecheck(ctx, env, exprLogicalEnv),
+		}
+		outArgs["time_field"] = logical.TableValuedFunctionArgumentTypecheckedArgument{
+			Argument: args["time_field"].(*logical.TableValuedFunctionArgumentValueDescriptor).Typecheck(ctx, env, exprLogicalEnv),
+		}
+		if _, ok := args["resolution"]; ok {
+			outArgs["resolution"] = logical.TableValuedFunctionArgumentTypecheckedArgument{
+				Argument: args["resolution"].(*logical.TableValuedFunctionArgumentValueExpression).Typecheck(ctx, env, exprLogicalEnv),
+			}
+		}
+
+		return outArgs
+	},
+	Descriptors: []logical.TableValuedFunctionDescriptor{
+		{
+			Arguments: map[string]logical.TableValuedFunctionArgumentMatcher{
+				"source": {
+					Required:                               true,
+					TableValuedFunctionArgumentMatcherType: physical.TableValuedFunctionArgumentTypeTable,
+					Table:                                  &logical.TableValuedFunctionArgumentMatcherTable{},
+				},
+				"max_diff": {
+					Required:                               true,
+					TableValuedFunctionArgumentMatcherType: physical.TableValuedFunctionArgumentTypeExpression,
+					Expression: &logical.TableValuedFunctionArgumentMatcherExpression{
+						Type: octosql.Duration,
+					},
+				},
+				"time_field": {
+					Required:                               true,
+					TableValuedFunctionArgumentMatcherType: physical.TableValuedFunctionArgumentTypeDescriptor,
+					Descriptor:                             &logical.TableValuedFunctionArgumentMatcherDescriptor{},
+				},
+				"resolution": {
+					Required:                               false,
+					TableValuedFunctionArgumentMatcherType: physical.TableValuedFunctionArgumentTypeExpression,
+					Expression: &logical.TableValuedFunctionArgumentMatcherExpression{
+						Type: octosql.Duration,
+					},
+				},
+			},
+			OutputSchema: func(ctx context.Context, env physical.Environment, logicalEnv logical.Environment, args map[string]logical.TableValuedFunctionArgumentTypecheckedArgument) (physical.Schema, map[string]string, error) {
+				source := args["source"].Argument.Table.Table
+				timeField := args["time_field"].Argument.Descriptor.Descriptor
+				timeFieldIndex := -1
+				for i, field := range source.Schema.Fields {
+					if timeField != field.Name {
+						continue
+					}
+					if field.Type.TypeID != octosql.TypeIDTime {
+						return physical.Schema{}, nil, fmt.Errorf("time_field must reference field with type Time, is %s", field.Type.String())
+					}
 					timeFieldIndex = i
 					break
 				}
-			}
-			var resolution execution.Expression = execution.NewConstant(octosql.NewDuration(time.Second))
-			if arg, ok := args["resolution"]; ok {
-				resolution, err = arg.Expression.Expression.Materialize(ctx, env)
-				if err != nil {
-					return nil, fmt.Errorf("couldn't materialize resolution: %w", err)
+				if timeFieldIndex == -1 {
+					return physical.Schema{}, nil, fmt.Errorf("no %s field in source stream", timeField)
 				}
-			}
+				return physical.Schema{
+					Fields:    source.Schema.Fields,
+					TimeField: timeFieldIndex,
+				}, args["source"].Mapping, nil
+			},
+			Materialize: func(ctx context.Context, env physical.Environment, args map[string]physical.TableValuedFunctionArgument) (execution.Node, error) {
+				source, err := args["source"].Table.Table.Materialize(ctx, env)
+				if err != nil {
+					return nil, fmt.Errorf("couldn't materialize source table: %w", err)
+				}
+				maxDifference, err := args["max_diff"].Expression.Expression.Materialize(ctx, env)
+				if err != nil {
+					return nil, fmt.Errorf("couldn't materialize max_diff: %w", err)
+				}
 
-			return &maxDifferenceWatermarkGenerator{
-				source:         source,
-				maxDifference:  maxDifference,
-				resolution:     resolution,
-				timeFieldIndex: timeFieldIndex,
-			}, nil
+				timeField := args["time_field"].Descriptor.Descriptor
+				timeFieldIndex := -1
+				for i, field := range args["source"].Table.Table.Schema.Fields {
+					if timeField == field.Name {
+						timeFieldIndex = i
+						break
+					}
+				}
+				var resolution execution.Expression = execution.NewConstant(octosql.NewDuration(time.Second))
+				if arg, ok := args["resolution"]; ok {
+					resolution, err = arg.Expression.Expression.Materialize(ctx, env)
+					if err != nil {
+						return nil, fmt.Errorf("couldn't materialize resolution: %w", err)
+					}
+				}
+
+				return &maxDifferenceWatermarkGenerator{
+					source:         source,
+					maxDifference:  maxDifference,
+					resolution:     resolution,
+					timeFieldIndex: timeFieldIndex,
+				}, nil
+			},
 		},
 	},
 }

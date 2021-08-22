@@ -122,8 +122,55 @@ func NewTableValuedFunction(name string, arguments map[string]TableValuedFunctio
 func (node *TableValuedFunction) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) (physical.Node, map[string]string) {
 	description := logicalEnv.TableValuedFunctions[node.name]
 
-	// TODO: First check if required arguments are present. Without checking their type.
-	// Just check if the "kind" is right. So table, descriptor, expression.
+	ok := false
+argumentKindLoop:
+	for _, descriptor := range description.Descriptors {
+		for name, arg := range descriptor.Arguments {
+			if arg.Required {
+				if _, ok := node.arguments[name]; !ok {
+					continue argumentKindLoop
+				}
+			}
+			if argValue, ok := node.arguments[name]; ok {
+				switch arg.TableValuedFunctionArgumentMatcherType {
+				case physical.TableValuedFunctionArgumentTypeExpression:
+					if _, ok := argValue.(*TableValuedFunctionArgumentValueExpression); !ok {
+						continue argumentKindLoop
+					}
+				case physical.TableValuedFunctionArgumentTypeTable:
+					if _, ok := argValue.(*TableValuedFunctionArgumentValueTable); !ok {
+						continue argumentKindLoop
+					}
+				case physical.TableValuedFunctionArgumentTypeDescriptor:
+					if _, ok := argValue.(*TableValuedFunctionArgumentValueDescriptor); !ok {
+						continue argumentKindLoop
+					}
+				}
+			}
+		}
+		ok = true
+		break
+	}
+
+	if !ok {
+		var argNames []string
+		for k, v := range node.arguments {
+			var argKind string
+			switch v.(type) {
+			case *TableValuedFunctionArgumentValueExpression:
+				argKind = "Expression"
+			case *TableValuedFunctionArgumentValueTable:
+				argKind = "Table"
+			case *TableValuedFunctionArgumentValueDescriptor:
+				argKind = "Descriptor"
+			default:
+				argKind = "Unknown"
+			}
+			argNames = append(argNames, fmt.Sprintf("%s=>%s", k, argKind))
+		}
+		// TODO: Print available overloads.
+		panic(fmt.Sprintf("unknown table valued function: %s(%s)", node.name, strings.Join(argNames, ", ")))
+	}
 
 	arguments := description.TypecheckArguments(ctx, env, logicalEnv, node.arguments)
 

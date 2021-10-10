@@ -22,6 +22,6 @@ func (impl *impl) Materialize(ctx context.Context, env physical.Environment, pus
 	}, nil
 }
 
-func (impl *impl) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression, uniqueToColname map[string]string) (rejected, pushedDown []physical.Expression, changed bool) {
+func (impl *impl) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression) (rejected, pushedDown []physical.Expression, changed bool) {
 	return newPredicates, []physical.Expression{}, false
 }

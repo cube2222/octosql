@@ -74,7 +74,22 @@ func (node *Datasource) PushDownPredicates(newPredicates, pushedDownPredicates [
 		uniqueToColname[v] = k
 	}
 
-	return node.DatasourceImplementation.PushDownPredicates(newPredicates, pushedDownPredicates, uniqueToColname)
+	newPredicatesOriginalNames := renameExpressionSliceVariables(uniqueToColname, newPredicates)
+	pushedDownPredicatesOriginalNames := renameExpressionSliceVariables(uniqueToColname, pushedDownPredicates)
+
+	rejectedOriginalNames, pushedDownOriginalNames, changed := node.DatasourceImplementation.PushDownPredicates(newPredicatesOriginalNames, pushedDownPredicatesOriginalNames)
+
+	rejected = renameExpressionSliceVariables(node.VariableMapping, rejectedOriginalNames)
+	pushedDown = renameExpressionSliceVariables(node.VariableMapping, pushedDownOriginalNames)
+	return rejected, pushedDown, changed
+}
+
+func renameExpressionSliceVariables(oldToNew map[string]string, exprs []Expression) []Expression {
+	out := make([]Expression, len(exprs))
+	for i := range exprs {
+		out[i] = RenameVariablesExpr(oldToNew, exprs[i])
+	}
+	return out
 }
 
 type Distinct struct {
@@ -186,7 +201,13 @@ type Unnest struct {
 func (node *Node) Materialize(ctx context.Context, env Environment) (execution.Node, error) {
 	switch node.NodeType {
 	case NodeTypeDatasource:
-		return node.Datasource.DatasourceImplementation.Materialize(ctx, env, node.Datasource.Predicates)
+		uniqueToColname := make(map[string]string)
+		for k, v := range node.Datasource.VariableMapping {
+			uniqueToColname[v] = k
+		}
+		predicatesOriginalNames := renameExpressionSliceVariables(uniqueToColname, node.Datasource.Predicates)
+
+		return node.Datasource.DatasourceImplementation.Materialize(ctx, env, predicatesOriginalNames)
 	case NodeTypeDistinct:
 		source, err := node.Distinct.Source.Materialize(ctx, env)
 		if err != nil {

@@ -25,28 +25,34 @@ func PushDownFilterPredicatesToDatasource(node Node) (Node, bool) {
 			}
 			changed = true
 
-			return Node{
-				Schema:   node.Schema,
-				NodeType: NodeTypeFilter,
-				Filter: &Filter{
-					Predicate: Expression{
-						Type:           octosql.Boolean,
-						ExpressionType: ExpressionTypeAnd,
-						And: &And{
-							Arguments: newFilterPredicates,
-						},
-					},
-					Source: Node{
-						Schema:   node.Filter.Source.Schema,
-						NodeType: NodeTypeDatasource,
-						Datasource: &Datasource{
-							Name:                     node.Filter.Source.Datasource.Name,
-							DatasourceImplementation: node.Filter.Source.Datasource.DatasourceImplementation,
-							Predicates:               newPushedDownPredicates,
-						},
-					},
+			out := Node{
+				Schema:   node.Filter.Source.Schema,
+				NodeType: NodeTypeDatasource,
+				Datasource: &Datasource{
+					Name:                     node.Filter.Source.Datasource.Name,
+					DatasourceImplementation: node.Filter.Source.Datasource.DatasourceImplementation,
+					Predicates:               newPushedDownPredicates,
+					VariableMapping:          node.Filter.Source.Datasource.VariableMapping,
 				},
 			}
+			if len(newFilterPredicates) > 0 {
+				out = Node{
+					Schema:   node.Schema,
+					NodeType: NodeTypeFilter,
+					Filter: &Filter{
+						Predicate: Expression{
+							Type:           octosql.Boolean,
+							ExpressionType: ExpressionTypeAnd,
+							And: &And{
+								Arguments: newFilterPredicates,
+							},
+						},
+						Source: out,
+					},
+				}
+			}
+
+			return out
 		},
 	}
 	output := t.TransformNode(node)

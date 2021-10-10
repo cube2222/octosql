@@ -1,8 +1,4 @@
-package optimizer
-
-import (
-	. "github.com/cube2222/octosql/physical"
-)
+package physical
 
 type Transformers struct {
 	NodeTransformer       func(node Node) Node
@@ -25,6 +21,7 @@ func (t *Transformers) TransformNode(node Node) Node {
 				Name:                     node.Datasource.Name,
 				DatasourceImplementation: node.Datasource.DatasourceImplementation,
 				Predicates:               pushedDownPredicates,
+				VariableMapping:          node.Datasource.VariableMapping,
 			},
 		}
 	case NodeTypeDistinct:

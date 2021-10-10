@@ -137,7 +137,7 @@ func getOctoSQLType(typename string) octosql.Type {
 	switch typename {
 	case "int", "int2", "int4", "int8":
 		return octosql.Int
-	case "text", "character", "varchar":
+	case "text", "character", "varchar", "bpchar":
 		return octosql.String
 	case "real", "numeric", "float4", "float8":
 		return octosql.Float

@@ -9,7 +9,6 @@ import (
 
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
-	"github.com/cube2222/octosql/optimizer"
 	"github.com/cube2222/octosql/physical"
 )
 
@@ -126,9 +125,9 @@ func predicateToSQL(builder *strings.Builder, placeholderExpressions *[]physical
 			}
 		}
 	case physical.ExpressionTypeOr:
-		for i := range expression.And.Arguments {
-			predicateToSQL(builder, placeholderExpressions, expression.And.Arguments[i])
-			if i != len(expression.And.Arguments)-1 {
+		for i := range expression.Or.Arguments {
+			predicateToSQL(builder, placeholderExpressions, expression.Or.Arguments[i])
+			if i != len(expression.Or.Arguments)-1 {
 				builder.WriteString(" OR ")
 			}
 		}
@@ -138,12 +137,12 @@ func predicateToSQL(builder *strings.Builder, placeholderExpressions *[]physical
 	builder.WriteString(") ")
 }
 
-func (impl *impl) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression, uniqueToColname map[string]string) (rejected []physical.Expression, newPushedDown []physical.Expression, changed bool) {
+func (impl *impl) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression) (rejected, newPushedDown []physical.Expression, changed bool) {
 	newPushedDown = make([]physical.Expression, len(pushedDownPredicates))
 	copy(newPushedDown, pushedDownPredicates)
 	for _, pred := range newPredicates {
 		isOk := true
-		predicateChecker := optimizer.Transformers{
+		predicateChecker := physical.Transformers{
 			ExpressionTransformer: func(expr physical.Expression) physical.Expression {
 				if !containsRecordVariables(expr) {
 					switch expr.Type.TypeID {
@@ -190,7 +189,7 @@ func (impl *impl) PushDownPredicates(newPredicates, pushedDownPredicates []physi
 
 func containsRecordVariables(expr physical.Expression) bool {
 	contains := false
-	checker := optimizer.Transformers{
+	checker := physical.Transformers{
 		ExpressionTransformer: func(expr physical.Expression) physical.Expression {
 			switch expr.ExpressionType {
 			case physical.ExpressionTypeVariable:

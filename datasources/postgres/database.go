@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/jackc/pgx"
@@ -34,7 +35,7 @@ func (t *testLogger) Log(level pgx.LogLevel, msg string, data map[string]interfa
 }
 
 func connect(config *Config) (*pgx.ConnPool, error) {
-	db, err := pgx.NewConnPool(pgx.ConnPoolConfig{
+	pgxConfig := pgx.ConnPoolConfig{
 		ConnConfig: pgx.ConnConfig{
 			Host:      config.Host,
 			Port:      uint16(config.Port),
@@ -42,10 +43,13 @@ func connect(config *Config) (*pgx.ConnPool, error) {
 			Database:  config.Database,
 			Password:  config.Password,
 			TLSConfig: nil,
-			// Logger:    &testLogger{},
 		},
 		MaxConnections: 128,
-	})
+	}
+	if os.Getenv("OCTOSQL_POSTGRES_QUERY_LOGGING") == "1" {
+		pgxConfig.ConnConfig.Logger = &testLogger{}
+	}
+	db, err := pgx.NewConnPool(pgxConfig)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't open database: %w", err)
 	}

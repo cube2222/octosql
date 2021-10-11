@@ -93,7 +93,27 @@ func NewLateralJoin(left, right Node) *LateralJoin {
 }
 
 func (node *LateralJoin) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) (physical.Node, map[string]string) {
-	panic("implement me")
+	// TODO: This should currently fail when the joined stream has a time field / is endless.
+	left, leftMapping := node.left.Typecheck(ctx, env, logicalEnv)
+	right, rightMapping := node.right.Typecheck(ctx, env.WithRecordSchema(left.Schema), logicalEnv.WithRecordUniqueVariableNames(leftMapping))
+
+	for k, v := range leftMapping {
+		// Put all mapped variables into one map.
+		// Left mapping takes precedence. Duplicates get overwritten.
+		rightMapping[k] = v
+	}
+
+	return physical.Node{
+		Schema: physical.Schema{
+			Fields:    append(left.Schema.Fields[:len(left.Schema.Fields):len(left.Schema.Fields)], right.Schema.Fields[:len(right.Schema.Fields):len(right.Schema.Fields)]...),
+			TimeField: left.Schema.TimeField,
+		},
+		NodeType: physical.NodeTypeLookupJoin,
+		LookupJoin: &physical.LookupJoin{
+			Source: left,
+			Joined: right,
+		},
+	}, rightMapping
 }
 
 // func (node *Join) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Node {

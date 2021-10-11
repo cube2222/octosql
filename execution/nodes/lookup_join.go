@@ -20,6 +20,8 @@ func NewLookupJoin(source, joined Node) *LookupJoin {
 
 func (s *LookupJoin) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
 	// TODO: Add parallelism here.
+
+	// TODO: Maybe this should be fully parallel with no ordering guarantees and maybe a parallelism limit (semaphore). This way it would kinda work when the joined stream has a time field.
 	if err := s.source.Run(ctx, func(produceCtx ProduceContext, sourceRecord Record) error {
 		ctx := ctx.WithRecord(sourceRecord)
 

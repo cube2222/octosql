@@ -7,7 +7,8 @@ import (
 var defaultOptimizationRules = []func(Node) (output Node, changed bool){
 	PushDownFilterUnderRequalifier,
 	PushDownFilterPredicatesToDatasource,
-	PushDownFilterPredicatesIntoJoinBranch,
+	PushDownFilterPredicatesIntoLookupJoinBranch,
+	PushDownFilterPredicatesIntoStreamJoinBranch,
 	PushDownFilterPredicatesIntoStreamJoinKey,
 	MergeFilters,
 }

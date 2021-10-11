@@ -5,7 +5,7 @@ import (
 	. "github.com/cube2222/octosql/physical"
 )
 
-func PushDownFilterPredicatesIntoJoinBranch(node Node) (Node, bool) {
+func PushDownFilterPredicatesIntoStreamJoinBranch(node Node) (Node, bool) {
 	changed := false
 	t := Transformers{
 		NodeTransformer: func(node Node) Node {

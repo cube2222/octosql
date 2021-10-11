@@ -33,6 +33,7 @@ import (
 
 func main() {
 	describe := flag.Int("describe", 0, "")
+	optimize := flag.Bool("optimize", true, "")
 	if err := flag.CommandLine.Parse(os.Args[2:]); err != nil {
 		log.Fatal(err)
 	}
@@ -106,8 +107,10 @@ func main() {
 	)
 	spew.Dump(physicalPlan.Schema)
 	start := time.Now()
-	physicalPlan = optimizer.Optimize(physicalPlan)
-	log.Printf("time for optimisation: %s", time.Since(start))
+	if *optimize {
+		physicalPlan = optimizer.Optimize(physicalPlan)
+		log.Printf("time for optimisation: %s", time.Since(start))
+	}
 
 	if *describe >= 1 {
 		file, err := os.CreateTemp(os.TempDir(), "octosql-describe-*.png")

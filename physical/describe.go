@@ -11,13 +11,18 @@ func DescribeNode(node Node, withTypeInfo bool) *graph.Node {
 	var out *graph.Node
 	switch node.NodeType {
 	case NodeTypeDatasource:
+		uniqueToColname := make(map[string]string)
+		for k, v := range node.Datasource.VariableMapping {
+			uniqueToColname[v] = k
+		}
+
 		out = graph.NewNode(node.Datasource.Name)
 		if len(node.Datasource.Predicates) > 0 {
 			out.AddChild("predicate", DescribeExpr(Expression{
 				Type:           octosql.Boolean,
 				ExpressionType: ExpressionTypeAnd,
 				And: &And{
-					Arguments: node.Datasource.Predicates,
+					Arguments: renameExpressionSliceVariables(uniqueToColname, node.Datasource.Predicates),
 				},
 			}, withTypeInfo))
 		}

@@ -12,11 +12,13 @@ import (
 )
 
 type Database struct {
-	tables map[string]physical.DatasourceImplementation
+	tables  map[string]physical.DatasourceImplementation
+	schemas map[string]physical.Schema
 }
 
 func NewDatabase(tables map[string]interface{}) (*Database, error) {
 	tableDescriptors := map[string]physical.DatasourceImplementation{}
+	schemas := map[string]physical.Schema{}
 	for name, table := range tables {
 		if reflect.TypeOf(table).Kind() != reflect.Slice {
 			return nil, fmt.Errorf("table %s is not a slice, is: %T", name, table)
@@ -52,11 +54,11 @@ func NewDatabase(tables map[string]interface{}) (*Database, error) {
 			}
 		}
 		tableDescriptors[name] = &impl{
-			schema: physical.Schema{
-				Fields:    fields,
-				TimeField: -1,
-			},
 			values: table,
+		}
+		schemas[name] = physical.Schema{
+			Fields:    fields,
+			TimeField: -1,
 		}
 	}
 
@@ -124,10 +126,10 @@ func (d *Database) ListTables(ctx context.Context) ([]string, error) {
 	panic("implement me")
 }
 
-func (d *Database) GetTable(ctx context.Context, name string) (physical.DatasourceImplementation, error) {
+func (d *Database) GetTable(ctx context.Context, name string) (physical.DatasourceImplementation, physical.Schema, error) {
 	table, ok := d.tables[name]
 	if !ok {
-		return nil, fmt.Errorf("unknown table")
+		return nil, physical.Schema{}, fmt.Errorf("unknown table")
 	}
-	return table, nil
+	return table, d.schemas[name], nil
 }

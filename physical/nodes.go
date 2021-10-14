@@ -129,7 +129,6 @@ type LookupJoin struct {
 type Map struct {
 	Source      Node
 	Expressions []Expression
-	Aliases     []*string
 }
 
 type OrderBy struct {
@@ -207,7 +206,16 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (execution.N
 		}
 		predicatesOriginalNames := renameExpressionSliceVariables(uniqueToColname, node.Datasource.Predicates)
 
-		return node.Datasource.DatasourceImplementation.Materialize(ctx, env, predicatesOriginalNames)
+		fieldsOriginalNames := make([]SchemaField, len(node.Schema.Fields))
+		for i := range node.Schema.Fields {
+			fieldsOriginalNames[i] = SchemaField{
+				Name: uniqueToColname[node.Schema.Fields[i].Name],
+				Type: node.Schema.Fields[i].Type,
+			}
+		}
+		schemaOriginalNames := NewSchema(fieldsOriginalNames, node.Schema.TimeField)
+
+		return node.Datasource.DatasourceImplementation.Materialize(ctx, env, schemaOriginalNames, predicatesOriginalNames)
 	case NodeTypeDistinct:
 		source, err := node.Distinct.Source.Materialize(ctx, env)
 		if err != nil {

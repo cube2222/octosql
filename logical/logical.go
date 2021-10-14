@@ -94,13 +94,9 @@ func (ds *DataSource) Typecheck(ctx context.Context, env physical.Environment, l
 		return cte.Node, cte.UniqueVariableMapping
 	}
 
-	datasource, err := env.Datasources.GetDatasource(ctx, ds.name)
+	datasource, schema, err := env.Datasources.GetDatasource(ctx, ds.name)
 	if err != nil {
 		panic(fmt.Errorf("couldn't create datasource: %v", err))
-	}
-	schema, err := datasource.Schema()
-	if err != nil {
-		panic(fmt.Errorf("couldn't get datasource schema: %v", err))
 	}
 
 	outMapping := make(map[string]string)

@@ -14,23 +14,18 @@ import (
 
 type impl struct {
 	config *Config
-	schema physical.Schema
 	table  string
 }
 
-func (impl *impl) Schema() (physical.Schema, error) {
-	return impl.schema, nil
-}
-
-func (impl *impl) Materialize(ctx context.Context, env physical.Environment, pushedDownPredicates []physical.Expression) (execution.Node, error) {
+func (impl *impl) Materialize(ctx context.Context, env physical.Environment, schema physical.Schema, pushedDownPredicates []physical.Expression) (execution.Node, error) {
 	// Prepare statement
 	db, err := connect(impl.config)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't connect to database: %w", err)
 	}
-	fields := make([]string, len(impl.schema.Fields))
-	for index := range impl.schema.Fields {
-		fields[index] = impl.schema.Fields[index].Name
+	fields := make([]string, len(schema.Fields))
+	for index := range schema.Fields {
+		fields[index] = schema.Fields[index].Name
 	}
 
 	predicateSQL, placeholderExpressions := predicatesToSQL(pushedDownPredicates)
@@ -49,7 +44,7 @@ func (impl *impl) Materialize(ctx context.Context, env physical.Environment, pus
 	}
 
 	return &DatasourceExecuting{
-		fields:           impl.schema.Fields,
+		fields:           schema.Fields,
 		table:            impl.table,
 		placeholderExprs: executionPlaceholderExprs,
 		db:               db,

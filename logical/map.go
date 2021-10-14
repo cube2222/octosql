@@ -114,7 +114,6 @@ func (node *Map) Typecheck(ctx context.Context, env physical.Environment, logica
 		Map: &physical.Map{
 			Source:      source,
 			Expressions: expressions,
-			Aliases:     aliases,
 		},
 	}
 

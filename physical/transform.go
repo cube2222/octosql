@@ -101,8 +101,6 @@ func (t *Transformers) TransformNode(node Node) Node {
 		for i := range node.Map.Expressions {
 			expressions[i] = t.TransformExpr(node.Map.Expressions[i])
 		}
-		aliases := make([]*string, len(node.Map.Aliases))
-		copy(aliases, node.Map.Aliases)
 
 		out = Node{
 			Schema:   node.Schema,
@@ -110,7 +108,6 @@ func (t *Transformers) TransformNode(node Node) Node {
 			Map: &Map{
 				Source:      t.TransformNode(node.Map.Source),
 				Expressions: expressions,
-				Aliases:     aliases,
 			},
 		}
 	case NodeTypeOrderBy:

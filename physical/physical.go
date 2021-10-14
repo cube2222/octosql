@@ -49,15 +49,15 @@ type DatasourceRepository struct {
 	// skonfigurowanych baz danych.
 	Databases       map[string]Database
 	DefaultDatabase string
-	FileHandlers    map[string]func(name string) (DatasourceImplementation, error)
+	FileHandlers    map[string]func(name string) (DatasourceImplementation, Schema, error)
 }
 
 type Database interface {
 	ListTables(ctx context.Context) ([]string, error)
-	GetTable(ctx context.Context, name string) (DatasourceImplementation, error)
+	GetTable(ctx context.Context, name string) (DatasourceImplementation, Schema, error)
 }
 
-func (dr *DatasourceRepository) GetDatasource(ctx context.Context, name string) (DatasourceImplementation, error) {
+func (dr *DatasourceRepository) GetDatasource(ctx context.Context, name string) (DatasourceImplementation, Schema, error) {
 	// TODO: Special name.json handling. Best would be even 'path/to/file.json', but maybe achieve that using a function.
 	// Should maybe be file.`path/to/file.json`?
 	if strings.HasSuffix(name, ".json") {
@@ -70,7 +70,7 @@ func (dr *DatasourceRepository) GetDatasource(ctx context.Context, name string) 
 		dbName := name[:index]
 		db, ok := dr.Databases[dbName]
 		if !ok {
-			return nil, fmt.Errorf("no such database: %s, as in %s", dbName, name)
+			return nil, Schema{}, fmt.Errorf("no such database: %s, as in %s", dbName, name)
 		}
 
 		return db.GetTable(ctx, name[index+1:])
@@ -80,12 +80,11 @@ func (dr *DatasourceRepository) GetDatasource(ctx context.Context, name string) 
 		return db.GetTable(ctx, name)
 	}
 	// TODO: If there is no dot, iterate over all tables in all datasources.
-	return nil, fmt.Errorf("unknown datasource: %s", name)
+	return nil, Schema{}, fmt.Errorf("unknown datasource: %s", name)
 }
 
 type DatasourceImplementation interface {
-	Schema() (Schema, error)
-	Materialize(ctx context.Context, env Environment, pushedDownPredicates []Expression) (execution.Node, error)
+	Materialize(ctx context.Context, env Environment, schema Schema, pushedDownPredicates []Expression) (execution.Node, error)
 	PushDownPredicates(newPredicates, pushedDownPredicates []Expression) (rejected, pushedDown []Expression, changed bool)
 }
 

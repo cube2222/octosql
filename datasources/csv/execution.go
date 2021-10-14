@@ -26,14 +26,27 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 	}
 	defer f.Close()
 
+	usedColumns := map[string]bool{}
+	for i := range d.fields {
+		usedColumns[d.fields[i].Name] = true
+	}
+
 	decoder := csv.NewReader(bufio.NewReaderSize(f, 4096*1024))
 	decoder.Comma = ','
 	decoder.ReuseRecord = true
-	_, err = decoder.Read()
+	columnNames, err := decoder.Read()
 	if err != nil {
 		return fmt.Errorf("couldn't decode csv header row: %w", err)
 	}
 
+	indicesToRead := make([]int, 0)
+	for i := range columnNames {
+		if usedColumns[columnNames[i]] {
+			indicesToRead = append(indicesToRead, i)
+		}
+	}
+
+	// TODO: Fix CSV with limited schema pushed down.
 	for {
 		row, err := decoder.Read()
 		if err == io.EOF {
@@ -42,9 +55,9 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 			return fmt.Errorf("couldn't decode message: %w", err)
 		}
 
-		values := make([]octosql.Value, len(d.fields))
-		for i := range row {
-			str := row[i]
+		values := make([]octosql.Value, len(indicesToRead))
+		for i, columnIndex := range indicesToRead {
+			str := row[columnIndex]
 			integer, err := strconv.ParseInt(str, 10, 64)
 			if err == nil {
 				values[i] = octosql.NewInt(int(integer))

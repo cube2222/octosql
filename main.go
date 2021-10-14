@@ -81,7 +81,7 @@ func main() {
 		Functions: functions.FunctionMap(),
 		Datasources: &physical.DatasourceRepository{
 			Databases: databases,
-			FileHandlers: map[string]func(name string) (physical.DatasourceImplementation, error){
+			FileHandlers: map[string]func(name string) (physical.DatasourceImplementation, physical.Schema, error){
 				"json": json.Creator,
 				"csv":  csv.Creator,
 			},

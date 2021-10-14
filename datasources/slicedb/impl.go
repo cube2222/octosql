@@ -8,7 +8,6 @@ import (
 )
 
 type impl struct {
-	schema physical.Schema
 	values interface{}
 }
 
@@ -16,7 +15,7 @@ func (impl *impl) Schema() (physical.Schema, error) {
 	return impl.schema, nil
 }
 
-func (impl *impl) Materialize(ctx context.Context, env physical.Environment, pushedDownPredicates []physical.Expression) (execution.Node, error) {
+func (impl *impl) Materialize(ctx context.Context, env physical.Environment, schema physical.Schema, pushedDownPredicates []physical.Expression) (execution.Node, error) {
 	return &DatasourceExecuting{
 		values: impl.values,
 	}, nil

@@ -14,10 +14,10 @@ import (
 	"github.com/cube2222/octosql/physical"
 )
 
-func Creator(name string) (physical.DatasourceImplementation, error) {
+func Creator(name string) (physical.DatasourceImplementation, physical.Schema, error) {
 	f, err := os.Open(name)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't open file: %w", err)
+		return nil, physical.Schema{}, fmt.Errorf("couldn't open file: %w", err)
 	}
 	defer f.Close()
 
@@ -26,7 +26,7 @@ func Creator(name string) (physical.DatasourceImplementation, error) {
 	decoder.ReuseRecord = true
 	row, err := decoder.Read()
 	if err != nil {
-		return nil, fmt.Errorf("couldn't decode csv header row: %w", err)
+		return nil, physical.Schema{}, fmt.Errorf("couldn't decode csv header row: %w", err)
 	}
 	fieldNames := make([]string, len(row))
 	copy(fieldNames, row)
@@ -38,7 +38,7 @@ func Creator(name string) (physical.DatasourceImplementation, error) {
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			return nil, fmt.Errorf("couldn't decode message: %w", err)
+			return nil, physical.Schema{}, fmt.Errorf("couldn't decode message: %w", err)
 		}
 
 		for i := range row {
@@ -105,24 +105,20 @@ func Creator(name string) (physical.DatasourceImplementation, error) {
 	}
 
 	return &impl{
-		path:   name,
-		schema: physical.NewSchema(schemaFields, -1),
-	}, nil
+			path: name,
+		},
+		physical.NewSchema(schemaFields, -1),
+		nil
 }
 
 type impl struct {
-	path   string
-	schema physical.Schema
+	path string
 }
 
-func (i *impl) Schema() (physical.Schema, error) {
-	return i.schema, nil
-}
-
-func (i *impl) Materialize(ctx context.Context, env physical.Environment, pushedDownPredicates []physical.Expression) (execution.Node, error) {
+func (i *impl) Materialize(ctx context.Context, env physical.Environment, schema physical.Schema, pushedDownPredicates []physical.Expression) (execution.Node, error) {
 	return &DatasourceExecuting{
 		path:   i.path,
-		fields: i.schema.Fields,
+		fields: schema.Fields,
 	}, nil
 }
 

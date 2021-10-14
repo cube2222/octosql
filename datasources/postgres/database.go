@@ -84,22 +84,22 @@ func (d *Database) ListTables(ctx context.Context) ([]string, error) {
 	panic("implement me")
 }
 
-func (d *Database) GetTable(ctx context.Context, name string) (physical.DatasourceImplementation, error) {
+func (d *Database) GetTable(ctx context.Context, name string) (physical.DatasourceImplementation, physical.Schema, error) {
 	db, err := connect(d.Config)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't connect to database: %w", err)
+		return nil, physical.Schema{}, fmt.Errorf("couldn't connect to database: %w", err)
 	}
 
 	rows, err := db.QueryEx(ctx, "SELECT column_name, udt_name, is_nullable FROM information_schema.columns WHERE table_name = $1 ORDER BY ordinal_position", nil, name)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't describe table: %w", err)
+		return nil, physical.Schema{}, fmt.Errorf("couldn't describe table: %w", err)
 	}
 
 	var descriptions [][]string
 	for rows.Next() {
 		desc := make([]string, 3)
 		if err := rows.Scan(&desc[0], &desc[1], &desc[2]); err != nil {
-			return nil, fmt.Errorf("couldn't scan table description: %w", err)
+			return nil, physical.Schema{}, fmt.Errorf("couldn't scan table description: %w", err)
 		}
 		descriptions = append(descriptions, desc)
 	}
@@ -117,13 +117,14 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 	}
 
 	return &impl{
-		config: d.Config,
-		schema: physical.Schema{
+			config: d.Config,
+			table:  name,
+		},
+		physical.Schema{
 			Fields:    fields,
 			TimeField: -1,
 		},
-		table: name,
-	}, nil
+		nil
 }
 
 func getOctoSQLType(typename string) octosql.Type {

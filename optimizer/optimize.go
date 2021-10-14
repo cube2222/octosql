@@ -11,6 +11,7 @@ var defaultOptimizationRules = []func(Node) (output Node, changed bool){
 	PushDownFilterPredicatesIntoStreamJoinBranch,
 	PushDownFilterPredicatesIntoStreamJoinKey,
 	RemoveUnusedMapFields,
+	RemoveUnusedGroupByNonKeyFields,
 	RemoveUnusedDatasourceFields,
 	MergeFilters,
 }

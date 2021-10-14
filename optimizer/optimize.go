@@ -5,14 +5,14 @@ import (
 )
 
 var defaultOptimizationRules = []func(Node) (output Node, changed bool){
-	// PushDownFilterUnderRequalifier,
-	// PushDownFilterPredicatesToDatasource,
-	// PushDownFilterPredicatesIntoLookupJoinBranch,
-	// PushDownFilterPredicatesIntoStreamJoinBranch,
-	// PushDownFilterPredicatesIntoStreamJoinKey,
+	PushDownFilterUnderRequalifier,
+	PushDownFilterPredicatesToDatasource,
+	PushDownFilterPredicatesIntoLookupJoinBranch,
+	PushDownFilterPredicatesIntoStreamJoinBranch,
+	PushDownFilterPredicatesIntoStreamJoinKey,
 	RemoveUnusedMapFields,
 	RemoveUnusedDatasourceFields,
-	// MergeFilters,
+	MergeFilters,
 }
 
 func Optimize(node Node) Node {

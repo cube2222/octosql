@@ -52,11 +52,18 @@ func isUsed(field string, node Node) bool {
 
 	usageChecker := Transformers{
 		ExpressionTransformer: func(expr Expression) Expression {
-			if expr.ExpressionType != ExpressionTypeVariable {
-				return expr
-			}
-			if expr.Variable.Name == field {
-				used = true
+			switch expr.ExpressionType {
+			case ExpressionTypeVariable:
+				if expr.Variable.Name == field {
+					used = true
+				}
+			case ExpressionTypeQueryExpression:
+				// Top-level of query expression is used.
+				for i := range expr.QueryExpression.Source.Schema.Fields {
+					if expr.QueryExpression.Source.Schema.Fields[i].Name == field {
+						used = true
+					}
+				}
 			}
 
 			return expr

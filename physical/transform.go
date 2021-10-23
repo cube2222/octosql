@@ -262,7 +262,7 @@ func (t *Transformers) TransformExpr(expr Expression) Expression {
 			Type:           expr.Type,
 			ExpressionType: expr.ExpressionType,
 			QueryExpression: &QueryExpression{
-				Source: expr.QueryExpression.Source,
+				Source: t.TransformNode(expr.QueryExpression.Source),
 			},
 		}
 	case ExpressionTypeCoalesce:

@@ -41,6 +41,8 @@ func getNonTimeFieldMapFields(node Node) []string {
 }
 
 func isUsed(field string, node Node) bool {
+	// TODO: If something got pushed down to a datasource, then it shouldn't count here.
+
 	// Check if it's an output field. If it is, then it's printed, so it's used.
 	for i := range node.Schema.Fields {
 		if node.Schema.Fields[i].Name == field {

@@ -11,6 +11,7 @@ func RemoveUnusedMapFields(node Node) (Node, bool) {
 	for i := range fields {
 		if !isUsed(fields[i], node) {
 			node = removeMapField(fields[i], node)
+			node = removeFieldFromPassers(fields[i], node)
 			changed = true
 		}
 	}
@@ -109,6 +110,30 @@ func removeMapField(field string, node Node) Node {
 
 			node.Schema.Fields = append(node.Schema.Fields[:index], node.Schema.Fields[index+1:]...)
 			node.Map.Expressions = append(node.Map.Expressions[:index], node.Map.Expressions[index+1:]...)
+			if node.Schema.TimeField > index {
+				node.Schema.TimeField--
+			}
+
+			return node
+		},
+	}
+	return fieldRemover.TransformNode(node)
+}
+
+func removeFieldFromPassers(field string, node Node) Node {
+	fieldRemover := Transformers{
+		NodeTransformer: func(node Node) Node {
+			index := -1
+			for i := range node.Schema.Fields {
+				if node.Schema.Fields[i].Name == field {
+					index = i
+				}
+			}
+			if index == -1 {
+				return node
+			}
+
+			node.Schema.Fields = append(node.Schema.Fields[:index], node.Schema.Fields[index+1:]...)
 			if node.Schema.TimeField > index {
 				node.Schema.TimeField--
 			}

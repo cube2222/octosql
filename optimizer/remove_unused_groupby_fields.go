@@ -11,6 +11,7 @@ func RemoveUnusedGroupByNonKeyFields(node Node) (Node, bool) {
 	for i := range fields {
 		if !isUsed(fields[i], node) {
 			node = removeGroupByField(fields[i], node)
+			node = removeFieldFromPassers(fields[i], node)
 			changed = true
 		}
 	}

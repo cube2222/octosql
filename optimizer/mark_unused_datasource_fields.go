@@ -11,6 +11,7 @@ func RemoveUnusedDatasourceFields(node Node) (Node, bool) {
 	for i := range fields {
 		if !isUsed(fields[i], node) {
 			node = removeUnusedDatasourceField(fields[i], node)
+			node = removeFieldFromPassers(fields[i], node)
 			changed = true
 		}
 	}

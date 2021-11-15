@@ -147,11 +147,7 @@ func (expr *Expression) Materialize(ctx context.Context, env Environment) (execu
 		}
 
 		if !singleColumn {
-			fieldNames := make([]string, len(expr.QueryExpression.Source.Schema.Fields))
-			for i := range expr.QueryExpression.Source.Schema.Fields {
-				fieldNames[i] = expr.QueryExpression.Source.Schema.Fields[i].Name
-			}
-			return execution.NewMultiColumnQueryExpression(source, fieldNames), nil
+			return execution.NewMultiColumnQueryExpression(source), nil
 		} else {
 			return execution.NewSingleColumnQueryExpression(source), nil
 		}

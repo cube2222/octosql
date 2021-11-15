@@ -63,7 +63,10 @@ func (c *TypeAssertion) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 		return octosql.ZeroValue, err
 	}
 
-	if value.Type.Is(c.expected) != octosql.TypeRelationIs {
+	if c.expected.TypeID == octosql.TypeIDStruct {
+		return octosql.ZeroValue, fmt.Errorf("type assertions for structures aren't yet supported")
+	}
+	if value.Type().Is(c.expected) != octosql.TypeRelationIs {
 		return octosql.ZeroValue, fmt.Errorf("invalid type: %s, expected: %s", value.Type, c.expected)
 	}
 
@@ -94,7 +97,7 @@ func (c *FunctionCall) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 		argValues[i] = value
 	}
 	for _, index := range c.nullCheckIndices {
-		if argValues[index].Type.TypeID == octosql.TypeIDNull {
+		if argValues[index].TypeID == octosql.TypeIDNull {
 			return octosql.NewNull(), nil
 		}
 	}
@@ -123,7 +126,7 @@ func (c *And) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 		if err != nil {
 			return octosql.ZeroValue, fmt.Errorf("couldn't evaluate %d AND argument: %w", i, err)
 		}
-		if value.Type.TypeID == octosql.TypeIDNull {
+		if value.TypeID == octosql.TypeIDNull {
 			nullEncountered = true
 			continue
 		}
@@ -158,7 +161,7 @@ func (c *Or) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 		if value.Boolean {
 			return value, nil
 		}
-		if value.Type.TypeID == octosql.TypeIDNull {
+		if value.TypeID == octosql.TypeIDNull {
 			nullEncountered = true
 		}
 	}
@@ -196,14 +199,12 @@ func (e *SingleColumnQueryExpression) Evaluate(ctx ExecutionContext) (octosql.Va
 }
 
 type MultiColumnQueryExpression struct {
-	source     Node
-	fieldNames []string
+	source Node
 }
 
-func NewMultiColumnQueryExpression(source Node, fieldNames []string) *MultiColumnQueryExpression {
+func NewMultiColumnQueryExpression(source Node) *MultiColumnQueryExpression {
 	return &MultiColumnQueryExpression{
-		source:     source,
-		fieldNames: fieldNames,
+		source: source,
 	}
 }
 
@@ -216,7 +217,7 @@ func (e *MultiColumnQueryExpression) Evaluate(ctx ExecutionContext) (octosql.Val
 			if record.Retraction {
 				return fmt.Errorf("query expression currently can't handle retractions")
 			}
-			values = append(values, octosql.NewStruct(e.fieldNames, record.Values))
+			values = append(values, octosql.NewStruct(record.Values))
 			return nil
 		},
 		func(ctx ProduceContext, msg MetadataMessage) error { return nil },
@@ -240,7 +241,7 @@ func (c *Coalesce) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 		if err != nil {
 			return octosql.ZeroValue, fmt.Errorf("couldn't evaluate %d OR argument: %w", i, err)
 		}
-		if value.Type.TypeID != octosql.TypeIDNull {
+		if value.TypeID != octosql.TypeIDNull {
 			return value, nil
 		}
 	}

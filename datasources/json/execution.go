@@ -74,11 +74,7 @@ func getOctoSQLValue(t octosql.Type, value interface{}) octosql.Value {
 		for i, field := range t.Struct.Fields {
 			values[i] = getOctoSQLValue(field.Type, value[field.Name])
 		}
-		names := make([]string, len(t.Struct.Fields))
-		for i := range t.Struct.Fields {
-			names[i] = t.Struct.Fields[i].Name
-		}
-		return octosql.NewStruct(names, values)
+		return octosql.NewStruct(values)
 	case []interface{}:
 		elements := make([]octosql.Value, len(value))
 		for i := range elements {

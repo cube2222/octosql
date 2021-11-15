@@ -100,7 +100,8 @@ func (t Type) Is(other Type) TypeRelation {
 		if other.TypeID != TypeIDList {
 			return TypeRelationIsnt
 		}
-		if t.List.Element.Is(*other.List.Element) < TypeRelationIs {
+		if other.List.Element == nil && t.List.Element != nil ||
+			t.List.Element != nil && t.List.Element.Is(*other.List.Element) < TypeRelationIs {
 			return TypeRelationIsnt
 		}
 		return TypeRelationIs
@@ -188,14 +189,14 @@ func (t Type) String() string {
 }
 
 var (
-	Null     Type = Type{TypeID: TypeIDNull}
-	Int      Type = Type{TypeID: TypeIDInt}
-	Float    Type = Type{TypeID: TypeIDFloat}
-	Boolean  Type = Type{TypeID: TypeIDBoolean}
-	String   Type = Type{TypeID: TypeIDString}
-	Time     Type = Type{TypeID: TypeIDTime}
-	Duration Type = Type{TypeID: TypeIDDuration}
-	Any      Type = Type{TypeID: TypeIDAny}
+	Null     = Type{TypeID: TypeIDNull}
+	Int      = Type{TypeID: TypeIDInt}
+	Float    = Type{TypeID: TypeIDFloat}
+	Boolean  = Type{TypeID: TypeIDBoolean}
+	String   = Type{TypeID: TypeIDString}
+	Time     = Type{TypeID: TypeIDTime}
+	Duration = Type{TypeID: TypeIDDuration}
+	Any      = Type{TypeID: TypeIDAny}
 )
 
 func TypeSum(t1, t2 Type) Type {
@@ -206,6 +207,7 @@ func TypeSum(t1, t2 Type) Type {
 	if t2.Is(t1) == TypeRelationIs {
 		return t1
 	}
+	// TODO: Lists should probably be the same. No, we can actually easily check lists at runtime by checking their actual element types. Empty list fits into anything.
 	if t1.TypeID == TypeIDStruct && t2.TypeID == TypeIDStruct {
 		// TODO: Nullable struct + Nullable struct should also work. Overall, it should try to match if there are multiple struct alternatives.
 		// Sum of structs is a struct. We operate on the fields.

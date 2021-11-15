@@ -112,7 +112,7 @@ func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSend
 					return fmt.Errorf("couldn't evaluate %d aggregate expression: %w", i, err)
 				}
 
-				if aggregateInput.Type.TypeID != octosql.TypeIDNull {
+				if aggregateInput.TypeID != octosql.TypeIDNull {
 					if !record.Retraction {
 						itemTyped.AggregatedSetSize[i]++
 					} else {

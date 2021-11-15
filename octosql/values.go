@@ -9,7 +9,7 @@ import (
 var ZeroValue = Value{}
 
 type Value struct {
-	Type     Type
+	TypeID   TypeID
 	Int      int
 	Float    float64
 	Boolean  bool
@@ -23,98 +23,81 @@ type Value struct {
 
 func NewNull() Value {
 	return Value{
-		Type: Type{TypeID: TypeIDNull},
+		TypeID: TypeIDNull,
 	}
 }
 
 func NewInt(value int) Value {
 	return Value{
-		Type: Type{TypeID: TypeIDInt},
-		Int:  value,
+		TypeID: TypeIDInt,
+		Int:    value,
 	}
 }
 
 func NewFloat(value float64) Value {
 	return Value{
-		Type:  Type{TypeID: TypeIDFloat},
-		Float: value,
+		TypeID: TypeIDFloat,
+		Float:  value,
 	}
 }
 
 func NewBoolean(value bool) Value {
 	return Value{
-		Type:    Type{TypeID: TypeIDBoolean},
+		TypeID:  TypeIDBoolean,
 		Boolean: value,
 	}
 }
 
 func NewString(value string) Value {
 	return Value{
-		Type: Type{TypeID: TypeIDString},
-		Str:  value,
+		TypeID: TypeIDString,
+		Str:    value,
 	}
 }
 
 func NewTime(value time.Time) Value {
 	return Value{
-		Type: Type{TypeID: TypeIDTime},
-		Time: value,
+		TypeID: TypeIDTime,
+		Time:   value,
 	}
 }
 
 func NewDuration(value time.Duration) Value {
 	return Value{
-		Type:     Type{TypeID: TypeIDDuration},
+		TypeID:   TypeIDDuration,
 		Duration: value,
 	}
 }
 
 func NewList(value []Value) Value {
-	var t *Type
-	if len(value) > 0 {
-		curT := value[0].Type
-		t = &curT
-	}
 	return Value{
-		Type: Type{TypeID: TypeIDList, List: struct{ Element *Type }{Element: t}},
-		List: value,
+		TypeID: TypeIDList,
+		List:   value,
 	}
 }
 
-func NewStruct(names []string, value []Value) Value {
-	// Fixme performance.
-	fieldTypes := make([]StructField, len(value))
-	for i := range value {
-		fieldTypes[i] = StructField{
-			Name: names[i],
-			Type: value[i].Type,
-		}
-	}
+func NewStruct(value []Value) Value {
 	return Value{
-		Type:   Type{TypeID: TypeIDStruct, Struct: struct{ Fields []StructField }{Fields: fieldTypes}},
+		TypeID: TypeIDStruct,
 		Struct: value,
 	}
 }
 
 func NewTuple(values []Value) Value {
-	types := make([]Type, len(values))
-	for i := range values {
-		types[i] = values[i].Type
-	}
 	return Value{
-		Type:  Type{TypeID: TypeIDTuple, Tuple: struct{ Elements []Type }{Elements: types}},
-		Tuple: values,
+		TypeID: TypeIDTuple,
+		Tuple:  values,
 	}
 }
 
 func (value Value) Compare(other Value) int {
 	// Tuples compare positionally with structs.
 	// TODO: Think about if this really is a great idea.
-	if value.Type.TypeID == TypeIDTuple && other.Type.TypeID == TypeIDStruct ||
-		other.Type.TypeID == TypeIDTuple && value.Type.TypeID == TypeIDStruct {
+	if value.TypeID == TypeIDTuple && other.TypeID == TypeIDStruct ||
+		other.TypeID == TypeIDTuple && value.TypeID == TypeIDStruct {
 		var tuple, structure Value
 		multiplier := 1
-		if value.Type.TypeID == TypeIDTuple && other.Type.TypeID == TypeIDStruct {
+		if value.TypeID == TypeIDTuple && other.TypeID == TypeIDStruct {
 			tuple = value
 			structure = other
 		} else {
@@ -145,15 +128,15 @@ func (value Value) Compare(other Value) int {
 
 	// The runtime types may be different for a union.
 	// The concrete instance type will be present.
-	if value.Type.TypeID != other.Type.TypeID {
-		if value.Type.TypeID < other.Type.TypeID {
+	if value.TypeID != other.TypeID {
+		if value.TypeID < other.TypeID {
 			return -1
 		} else {
 			return 1
 		}
 	}
 
-	switch value.Type.TypeID {
+	switch value.TypeID {
 	case TypeIDNull:
 		return 0
 
@@ -287,6 +270,51 @@ func (value Value) Compare(other Value) int {
 	}
 }
 
+func (value Value) Type() Type {
+	switch value.TypeID {
+	case TypeIDList:
+		var element *Type
+		for i := range value.List {
+			if element == nil {
+				t := value.List[i].Type()
+				element = &t
+			} else {
+				t := TypeSum(*element, value.List[i].Type())
+				element = &t
+			}
+		}
+		return Type{
+			TypeID: TypeIDList,
+			List:   struct{ Element *Type }{Element: element},
+		}
+
+	case TypeIDStruct:
+		// TODO: A type registry and a reference to a struct type would be useful here for field names.
+		fields := make([]StructField, len(value.Struct))
+		for i := range value.Tuple {
+			fields[i].Type = value.Struct[i].Type()
+		}
+		return Type{
+			TypeID: TypeIDStruct,
+			Struct: struct{ Fields []StructField }{Fields: fields},
+		}
+
+	case TypeIDTuple:
+		elements := make([]Type, len(value.Tuple))
+		for i := range value.Tuple {
+			elements[i] = value.Tuple[i].Type()
+		}
+		return Type{
+			TypeID: TypeIDTuple,
+			Tuple:  struct{ Elements []Type }{Elements: elements},
+		}
+	}
+
+	return Type{
+		TypeID: value.TypeID,
+	}
+}
+
 func (value Value) String() string {
 	builder := &strings.Builder{}
 	value.append(builder)
@@ -294,7 +322,7 @@ func (value Value) String() string {
 }
 
 func (value Value) append(builder *strings.Builder) {
-	switch value.Type.TypeID {
+	switch value.TypeID {
 	case TypeIDNull:
 		builder.WriteString("<null>")
 
@@ -329,8 +357,9 @@ func (value Value) append(builder *strings.Builder) {
 	case TypeIDStruct:
 		builder.WriteString("{ ")
 		for i, v := range value.Struct {
-			builder.WriteString(value.Type.Struct.Fields[i].Name)
-			builder.WriteString(": ")
+			// TODO: This method should receive type information for proper name display.
+			// builder.WriteString(value.Type.Struct.Fields[i].Name)
+			// builder.WriteString(": ")
 			v.append(builder)
 			if i != len(value.Struct)-1 {
 				builder.WriteString(", ")
@@ -356,7 +385,8 @@ func (value Value) append(builder *strings.Builder) {
 }
 
 func (value Value) ToRawGoValue() interface{} {
-	switch value.Type.TypeID {
+	// TODO: Add complex types.
+	switch value.TypeID {
 	case TypeIDNull:
 		return nil
 	case TypeIDInt:

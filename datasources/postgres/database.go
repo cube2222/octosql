@@ -103,6 +103,9 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 		}
 		descriptions = append(descriptions, desc)
 	}
+	if len(descriptions) == 0 {
+		return nil, physical.Schema{}, fmt.Errorf("table %s does not exist", name)
+	}
 
 	fields := make([]physical.SchemaField, len(descriptions))
 	for i := range descriptions {

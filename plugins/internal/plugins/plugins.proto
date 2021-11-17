@@ -1,0 +1,99 @@
+syntax = "proto3";
+package plugins;
+
+option go_package = "github.com/cube2222/octosql/plugins/internal/plugins";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+message TableContext {
+    string table_name = 1;
+}
+
+service Datasource {
+    rpc GetTable(GetTableRequest) returns (GetTableResponse);
+    rpc PushDownPredicates(PushDownPredicatesRequest) returns (PushDownPredicatesResponse);
+    rpc Run (RunRequest) returns (stream Message);
+}
+
+message GetTableRequest {
+    TableContext table_context = 1;
+}
+
+message GetTableResponse {
+    Schema schema = 1;
+}
+
+message PushDownPredicatesRequest {
+    // TODO: Add schema? Maybe TableWithSchemaContext? Or PhysicalTableContext?
+
+    TableContext table_context = 1;
+    // []Expression JSONs, not performance sensitive.
+    bytes new_predicates = 2;
+    bytes pushed_down_predicates = 3;
+}
+
+message PushDownPredicatesResponse {
+    // []Expression JSONs, not performance sensitive.
+    bytes rejected = 1;
+    bytes pushed_down = 2;
+    bool changed = 3;
+}
+
+message RunRequest {
+    // TODO: Should this include the variables stack?
+    // Potential value leaking to untrusted plugins, but is that a big risk factor?
+    // Also, we already leak by pushing down data sources.
+    // However, as an optimization, might be good.
+    // Maybe we can take a look at variables we've pushed down and only provide values for them.
+}
+
+message Message {
+    Record record = 1;
+    MetadataMessage metadata = 2;
+}
+
+message Record {
+    repeated Value values = 1;
+    bool retraction = 2;
+    google.protobuf.Timestamp event_time = 3;
+}
+
+message MetadataMessage {
+
+}
+
+message Value {
+    int32 type_id = 1;
+    int64 int = 2;
+    double float = 3;
+    bool boolean = 4;
+    string str = 5;
+	google.protobuf.Timestamp time = 6;
+    google.protobuf.Duration duration = 7;
+    repeated Value list = 8;
+    repeated Value struct = 9;
+    repeated Value tuple = 10;
+}
+
+message Schema {
+    repeated SchemaField fields = 1;
+    int32 time_field = 2;
+}
+
+message SchemaField {
+    string name = 1;
+    Type type = 2;
+}
+
+message Type {
+    int32 type_id = 1;
+    Type list = 2;
+    repeated StructField struct = 3;
+    repeated Type tuple = 4;
+    repeated Type union = 5;
+}
+
+message StructField {
+    string name = 1;
+    Type type = 2;
+}

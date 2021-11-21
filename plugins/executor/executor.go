@@ -16,10 +16,11 @@ import (
 )
 
 type PluginExecutor struct {
+	runningConns   []*grpc.ClientConn
 	runningPlugins []*exec.Cmd
 }
 
-func (e *PluginExecutor) RunPlugin(ctx context.Context) (*Database, error) {
+func (e *PluginExecutor) RunPlugin(ctx context.Context, name string) (*Database, error) {
 	tmpDir, err := os.MkdirTemp("./plugins/tmp", "octosql-")
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create tempdir: %w", err)
@@ -27,11 +28,21 @@ func (e *PluginExecutor) RunPlugin(ctx context.Context) (*Database, error) {
 
 	socketLocation := filepath.Join(tmpDir, "root.sock")
 	log.Printf("plugin socket: %s", socketLocation)
+	absolute, err := filepath.Abs(socketLocation)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't get absolute path to plugin socket: %w", err)
+	}
+	log.Printf("absolute plugin socket: %s", absolute)
 
-	cmd := exec.CommandContext(ctx, "plugins/plugin/plugin", socketLocation)
+	cmd := exec.CommandContext(ctx, "plugins/plugin/plugin", absolute)
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("couldn't start plugin: %w", err)
 	}
+	// cmd.Stdout = text.NewIndentWriter(os.Stdout, []byte(fmt.Sprintf("[%s] ", name)))
+	// cmd.Stderr = text.NewIndentWriter(os.Stderr, []byte(fmt.Sprintf("[%s] ", name)))
+	// TODO: Doesn't work.
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
 	e.runningPlugins = append(e.runningPlugins, cmd)
 
@@ -54,18 +65,33 @@ func (e *PluginExecutor) RunPlugin(ctx context.Context) (*Database, error) {
 	}
 
 	conn, err := grpc.Dial(
-		fmt.Sprintf("unix://%s", socketLocation),
+		fmt.Sprintf("unix://%s", absolute),
 		grpc.WithBlock(),
 		grpc.WithInsecure(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't connect to plugin: %w", err)
 	}
+	e.runningConns = append(e.runningConns, conn)
 	cli := plugins.NewDatasourceClient(conn)
 
 	return &Database{
 		cli: cli,
 	}, nil
+}
+
+func (e *PluginExecutor) Close() error {
+	for i := range e.runningConns {
+		if err := e.runningConns[i].Close(); err != nil {
+			return fmt.Errorf("couldn't close connection: %w", err)
+		}
+	}
+	for i := range e.runningPlugins {
+		if err := e.runningPlugins[i].Process.Kill(); err != nil {
+			return fmt.Errorf("couldn't close process: %w", err)
+		}
+	}
+	return nil
 }
 
 type Database struct {

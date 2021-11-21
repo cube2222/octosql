@@ -35,6 +35,20 @@ func NativeRecordToProto(record execution.Record) *Record {
 	}
 }
 
+func (x *MetadataMessage) ToNativeMetadataMessage() execution.MetadataMessage {
+	return execution.MetadataMessage{
+		Type:      execution.MetadataMessageType(x.MessageType),
+		Watermark: x.Watermark.AsTime(),
+	}
+}
+
+func NativeMetadataMessageToProto(msg execution.MetadataMessage) *MetadataMessage {
+	return &MetadataMessage{
+		MessageType: int32(msg.Type),
+		Watermark:   timestamppb.New(msg.Watermark),
+	}
+}
+
 func NativeValueToProto(value octosql.Value) *Value {
 	out := &Value{
 		TypeId: int32(value.TypeID),

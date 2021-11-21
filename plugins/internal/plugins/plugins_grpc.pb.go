@@ -171,3 +171,116 @@ var Datasource_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "plugins.proto",
 }
+
+// ExecutionDatasourceClient is the client API for ExecutionDatasource service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type ExecutionDatasourceClient interface {
+	Run(ctx context.Context, in *RunRequest, opts ...grpc.CallOption) (ExecutionDatasource_RunClient, error)
+}
+
+type executionDatasourceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewExecutionDatasourceClient(cc grpc.ClientConnInterface) ExecutionDatasourceClient {
+	return &executionDatasourceClient{cc}
+}
+
+func (c *executionDatasourceClient) Run(ctx context.Context, in *RunRequest, opts ...grpc.CallOption) (ExecutionDatasource_RunClient, error) {
+	stream, err := c.cc.NewStream(ctx, &ExecutionDatasource_ServiceDesc.Streams[0], "/plugins.ExecutionDatasource/Run", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &executionDatasourceRunClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type ExecutionDatasource_RunClient interface {
+	Recv() (*RunResponseMessage, error)
+	grpc.ClientStream
+}
+
+type executionDatasourceRunClient struct {
+	grpc.ClientStream
+}
+
+func (x *executionDatasourceRunClient) Recv() (*RunResponseMessage, error) {
+	m := new(RunResponseMessage)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// ExecutionDatasourceServer is the server API for ExecutionDatasource service.
+// All implementations must embed UnimplementedExecutionDatasourceServer
+// for forward compatibility
+type ExecutionDatasourceServer interface {
+	Run(*RunRequest, ExecutionDatasource_RunServer) error
+	mustEmbedUnimplementedExecutionDatasourceServer()
+}
+
+// UnimplementedExecutionDatasourceServer must be embedded to have forward compatible implementations.
+type UnimplementedExecutionDatasourceServer struct {
+}
+
+func (UnimplementedExecutionDatasourceServer) Run(*RunRequest, ExecutionDatasource_RunServer) error {
+	return status.Errorf(codes.Unimplemented, "method Run not implemented")
+}
+func (UnimplementedExecutionDatasourceServer) mustEmbedUnimplementedExecutionDatasourceServer() {}
+
+// UnsafeExecutionDatasourceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ExecutionDatasourceServer will
+// result in compilation errors.
+type UnsafeExecutionDatasourceServer interface {
+	mustEmbedUnimplementedExecutionDatasourceServer()
+}
+
+func RegisterExecutionDatasourceServer(s grpc.ServiceRegistrar, srv ExecutionDatasourceServer) {
+	s.RegisterService(&ExecutionDatasource_ServiceDesc, srv)
+}
+
+func _ExecutionDatasource_Run_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(RunRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ExecutionDatasourceServer).Run(m, &executionDatasourceRunServer{stream})
+}
+
+type ExecutionDatasource_RunServer interface {
+	Send(*RunResponseMessage) error
+	grpc.ServerStream
+}
+
+type executionDatasourceRunServer struct {
+	grpc.ServerStream
+}
+
+func (x *executionDatasourceRunServer) Send(m *RunResponseMessage) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+// ExecutionDatasource_ServiceDesc is the grpc.ServiceDesc for ExecutionDatasource service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var ExecutionDatasource_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "plugins.ExecutionDatasource",
+	HandlerType: (*ExecutionDatasourceServer)(nil),
+	Methods:     []grpc.MethodDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "Run",
+			Handler:       _ExecutionDatasource_Run_Handler,
+			ServerStreams: true,
+		},
+	},
+	Metadata: "plugins.proto",
+}

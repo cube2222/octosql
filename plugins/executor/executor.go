@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 
+	"github.com/kr/text"
 	"google.golang.org/grpc"
 
 	"github.com/cube2222/octosql/execution"
@@ -36,14 +38,11 @@ func (e *PluginExecutor) RunPlugin(ctx context.Context, name string) (*Database,
 	log.Printf("absolute plugin socket: %s", absolute)
 
 	cmd := exec.CommandContext(ctx, "plugins/plugin/plugin", absolute)
+	cmd.Stdout = text.NewIndentWriter(os.Stdout, []byte(fmt.Sprintf("[plugin][%s] ", name)))
+	cmd.Stderr = text.NewIndentWriter(os.Stderr, []byte(fmt.Sprintf("[plugin][%s] ", name)))
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("couldn't start plugin: %w", err)
 	}
-	// cmd.Stdout = text.NewIndentWriter(os.Stdout, []byte(fmt.Sprintf("[%s] ", name)))
-	// cmd.Stderr = text.NewIndentWriter(os.Stderr, []byte(fmt.Sprintf("[%s] ", name)))
-	// TODO: Doesn't work.
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
 
 	e.runningPlugins = append(e.runningPlugins, cmd)
 
@@ -126,10 +125,6 @@ type PhysicalDatasource struct {
 	table string
 }
 
-func (p *PhysicalDatasource) Materialize(ctx context.Context, env physical.Environment, schema physical.Schema, pushedDownPredicates []physical.Expression) (execution.Node, error) {
-	panic("implement me")
-}
-
 func (p *PhysicalDatasource) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression) (rejected, pushedDown []physical.Expression, changed bool) {
 	newPredicatesBytes, err := json.Marshal(&newPredicates)
 	if err != nil {
@@ -159,4 +154,80 @@ func (p *PhysicalDatasource) PushDownPredicates(newPredicates, pushedDownPredica
 		panic(fmt.Errorf("couldn't unmarshal pushed down predicates from JSON: %w", err))
 	}
 	return outRejected, outPushedDown, res.Changed
+}
+
+func (p *PhysicalDatasource) Materialize(ctx context.Context, env physical.Environment, schema physical.Schema, pushedDownPredicates []physical.Expression) (execution.Node, error) {
+	pushedDownPredicatesBytes, err := json.Marshal(&pushedDownPredicates)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't marshal pushed down predicates to JSON: %w", err)
+	}
+	res, err := p.cli.Materialize(ctx, &plugins.MaterializeRequest{
+		TableContext: &plugins.TableContext{
+			TableName: p.table,
+		},
+		Schema:               plugins.NativeSchemaToProto(schema),
+		PushedDownPredicates: pushedDownPredicatesBytes,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("couldn't materialize plugin datasource: %w", err)
+	}
+
+	// TODO: Change to fsnotify.
+	for {
+		_, err := os.Stat(res.SocketPath)
+		if os.IsNotExist(err) {
+			continue
+		} else if err != nil {
+			return nil, fmt.Errorf("couldn't check if executing plugin socket exists: %w", err)
+		}
+		break
+	}
+
+	conn, err := grpc.Dial(
+		fmt.Sprintf("unix://%s", res.SocketPath),
+		grpc.WithBlock(),
+		grpc.WithInsecure(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't connect to executing plugin: %w", err)
+	}
+	cli := plugins.NewExecutionDatasourceClient(conn)
+
+	return &ExecutionDatasource{
+		cli: cli,
+	}, nil
+}
+
+type ExecutionDatasource struct {
+	cli plugins.ExecutionDatasourceClient
+}
+
+func (e *ExecutionDatasource) Run(ctx execution.ExecutionContext, produce execution.ProduceFn, metaSend execution.MetaSendFn) error {
+	msgStream, err := e.cli.Run(
+		ctx.Context,
+		&plugins.RunRequest{},
+	)
+	if err != nil {
+		return fmt.Errorf("couldn't get message stream from plugin: %w", err)
+	}
+	produceCtx := execution.ProduceFromExecutionContext(ctx)
+	for {
+		msg, err := msgStream.Recv()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return fmt.Errorf("couldn't get next message from plugin message stream: %w", err)
+		}
+		if msg.Record != nil {
+			if err := produce(produceCtx, msg.Record.ToNativeRecord()); err != nil {
+				// TODO: Now we can't bubble up the error back to the plugin, which is different than with other streams. Is this a problem?
+				return fmt.Errorf("couldn't produce record: %w", err)
+			}
+		} else {
+			if err := metaSend(produceCtx, msg.Metadata.ToNativeMetadataMessage()); err != nil {
+				return fmt.Errorf("couldn't produce metadata message: %w", err)
+			}
+		}
+	}
+	return nil
 }

@@ -20,6 +20,7 @@ require (
 	github.com/lib/pq v1.9.0 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/mitchellh/mapstructure v1.4.1
+	github.com/oklog/ulid/v2 v2.0.2 // indirect
 	github.com/olekukonko/tablewriter v0.0.4
 	github.com/pkg/errors v0.9.1
 	github.com/segmentio/encoding v0.2.7

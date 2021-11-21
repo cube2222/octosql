@@ -10,10 +10,9 @@ message TableContext {
 }
 
 service Datasource {
-    rpc GetTable(GetTableRequest) returns (GetTableResponse);
-    rpc PushDownPredicates(PushDownPredicatesRequest) returns (PushDownPredicatesResponse);
-    rpc Materialize(MaterializeRequest) returns (MaterializeResponse);
-    // rpc Run (RunRequest) returns (stream Message);
+    rpc GetTable (GetTableRequest) returns (GetTableResponse);
+    rpc PushDownPredicates (PushDownPredicatesRequest) returns (PushDownPredicatesResponse);
+    rpc Materialize (MaterializeRequest) returns (MaterializeResponse);
 }
 
 message GetTableRequest {
@@ -41,11 +40,18 @@ message PushDownPredicatesResponse {
 }
 
 message MaterializeRequest {
-
+    TableContext table_context = 1;
+    // TODO: Variable context.
+    Schema schema = 2;
+    bytes pushed_down_predicates = 3;
 }
 
 message MaterializeResponse {
+    string socket_path = 1;
+}
 
+service ExecutionDatasource {
+    rpc Run (RunRequest) returns (stream RunResponseMessage);
 }
 
 message RunRequest {
@@ -54,9 +60,10 @@ message RunRequest {
     // Also, we already leak by pushing down data sources.
     // However, as an optimization, might be good.
     // Maybe we can take a look at variables we've pushed down and only provide values for them.
+    // TODO: Variable context.
 }
 
-message Message {
+message RunResponseMessage {
     Record record = 1;
     MetadataMessage metadata = 2;
 }
@@ -68,7 +75,8 @@ message Record {
 }
 
 message MetadataMessage {
-
+    int32 message_type = 1;
+    google.protobuf.Timestamp watermark = 2;
 }
 
 message Value {
@@ -77,7 +85,7 @@ message Value {
     double float = 3;
     bool boolean = 4;
     string str = 5;
-	google.protobuf.Timestamp time = 6;
+    google.protobuf.Timestamp time = 6;
     google.protobuf.Duration duration = 7;
     repeated Value list = 8; // TODO: These should have their own messages.
     repeated Value struct = 9;

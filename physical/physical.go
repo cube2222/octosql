@@ -10,6 +10,7 @@ import (
 	"github.com/cube2222/octosql/octosql"
 )
 
+// TODO: There should be a seperate MaterializationContext.
 type Environment struct {
 	Aggregates      map[string][]AggregateDescriptor
 	Datasources     *DatasourceRepository

@@ -126,6 +126,7 @@ type ExecutionServer struct {
 }
 
 func (e *ExecutionServer) Run(request *plugins.RunRequest, stream plugins.ExecutionDatasource_RunServer) error {
+	// TODO: Maybe run this asynchronously here, like in JOIN? This way the serialization overhead will be separate from what's underneath.
 	if err := e.node.Run(
 		execution.ExecutionContext{
 			// TODO: Pass through proto.
@@ -228,7 +229,7 @@ func (d *dbMock) GetTable(ctx context.Context, name string) (physical.Datasource
 // I każdy ze swoim unix socketem.
 
 func main() {
-	debug.SetGCPercent(800)
+	debug.SetGCPercent(1000)
 	log.Printf("I'm on!")
 
 	log.Printf("Listening on %s", os.Args[1])

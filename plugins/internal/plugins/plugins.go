@@ -236,3 +236,41 @@ func (x *Type) ToNativeType() octosql.Type {
 	}
 	return out
 }
+
+func NativePhysicalVariableContextToProto(c *physical.VariableContext) *PhysicalVariableContext {
+	frames := make([]*PhysicalVariableContextFrame, 0)
+	for c != nil {
+		fields := make([]*SchemaField, len(c.Fields))
+		for i := range c.Fields {
+			fields[i] = &SchemaField{
+				Name: c.Fields[i].Name,
+				Type: NativeTypeToProto(c.Fields[i].Type),
+			}
+		}
+		frames = append(frames, &PhysicalVariableContextFrame{
+			Fields: fields,
+		})
+		c = c.Parent
+	}
+	return &PhysicalVariableContext{
+		Frames: frames,
+	}
+}
+
+func (x *PhysicalVariableContext) ToNativePhysicalVariableContext() *physical.VariableContext {
+	var out *physical.VariableContext
+	for i := len(x.Frames) - 1; i >= 0; i-- {
+		fields := make([]physical.SchemaField, len(x.Frames[i].Fields))
+		for j := range x.Frames[i].Fields {
+			fields[j] = physical.SchemaField{
+				Name: x.Frames[i].Fields[j].Name,
+				Type: x.Frames[i].Fields[j].Type.ToNativeType(),
+			}
+		}
+		out = &physical.VariableContext{
+			Fields: fields,
+			Parent: out,
+		}
+	}
+	return out
+}

@@ -41,9 +41,9 @@ message PushDownPredicatesResponse {
 
 message MaterializeRequest {
     TableContext table_context = 1;
-    // TODO: Variable context.
     Schema schema = 2;
     bytes pushed_down_predicates = 3;
+    PhysicalVariableContext variable_context = 4;
 }
 
 message MaterializeResponse {
@@ -113,4 +113,12 @@ message Type {
 message StructField {
     string name = 1;
     Type type = 2;
+}
+
+message PhysicalVariableContext {
+    repeated PhysicalVariableContextFrame frames = 1;
+}
+
+message PhysicalVariableContextFrame {
+    repeated SchemaField fields = 1;
 }

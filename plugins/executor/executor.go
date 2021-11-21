@@ -167,6 +167,7 @@ func (p *PhysicalDatasource) Materialize(ctx context.Context, env physical.Envir
 		},
 		Schema:               plugins.NativeSchemaToProto(schema),
 		PushedDownPredicates: pushedDownPredicatesBytes,
+		VariableContext:      plugins.NativePhysicalVariableContextToProto(env.VariableContext),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("couldn't materialize plugin datasource: %w", err)

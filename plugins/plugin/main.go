@@ -85,7 +85,7 @@ func (s *Server) Materialize(ctx context.Context, request *plugins.MaterializeRe
 	node, err := impl.Materialize(
 		ctx,
 		physical.Environment{
-			VariableContext: &physical.VariableContext{},
+			VariableContext: request.VariableContext.ToNativePhysicalVariableContext(),
 		},
 		request.Schema.ToNativeSchema(),
 		pushedDownPredicates,

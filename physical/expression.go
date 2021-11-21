@@ -51,7 +51,7 @@ type Constant struct {
 type FunctionCall struct {
 	Name               string
 	Arguments          []Expression
-	FunctionDescriptor FunctionDescriptor
+	FunctionDescriptor FunctionDescriptor `json:"-"`
 }
 
 type And struct {

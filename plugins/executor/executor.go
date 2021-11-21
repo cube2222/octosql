@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -130,5 +131,32 @@ func (p *PhysicalDatasource) Materialize(ctx context.Context, env physical.Envir
 }
 
 func (p *PhysicalDatasource) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression) (rejected, pushedDown []physical.Expression, changed bool) {
-	panic("implement me")
+	newPredicatesBytes, err := json.Marshal(&newPredicates)
+	if err != nil {
+		panic(fmt.Errorf("couldn't marshal new predicates to JSON: %w", err))
+	}
+	// TODO: Filter out predicates with subqueries.
+	// TODO: In the future, if the subquery doesn't depend on the record, we could precalculate it and pass it down as a variable.
+	pushedDownPredicatesBytes, err := json.Marshal(&pushedDownPredicates)
+	if err != nil {
+		panic(fmt.Errorf("couldn't marshal pushed down predicates to JSON: %w", err))
+	}
+	res, err := p.cli.PushDownPredicates(context.Background(), &plugins.PushDownPredicatesRequest{
+		TableContext: &plugins.TableContext{
+			TableName: p.table,
+		},
+		NewPredicates:        newPredicatesBytes,
+		PushedDownPredicates: pushedDownPredicatesBytes,
+	})
+	if err != nil {
+		panic(fmt.Errorf("couldn't push down predicates to plugin: %w", err))
+	}
+	var outRejected, outPushedDown []physical.Expression
+	if err := json.Unmarshal(res.Rejected, &outRejected); err != nil {
+		panic(fmt.Errorf("couldn't unmarshal rejected predicates from JSON: %w", err))
+	}
+	if err := json.Unmarshal(res.PushedDown, &outPushedDown); err != nil {
+		panic(fmt.Errorf("couldn't unmarshal pushed down predicates from JSON: %w", err))
+	}
+	return outRejected, outPushedDown, res.Changed
 }

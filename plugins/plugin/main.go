@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/oklog/ulid/v2"
 	"google.golang.org/grpc"
 
@@ -80,7 +79,6 @@ func (s *Server) Materialize(ctx context.Context, request *plugins.MaterializeRe
 		return nil, fmt.Errorf("couldn't unmarshal pushed down predicates: %w", err)
 	}
 	// TODO: Repopulate function descriptors in pushed down predicates.
-	log.Printf("Received schema: %s", spew.Sdump(request.Schema))
 
 	node, err := impl.Materialize(
 		ctx,

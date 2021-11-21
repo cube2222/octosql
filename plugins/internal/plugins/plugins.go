@@ -134,6 +134,20 @@ func NativeSchemaToProto(schema physical.Schema) *Schema {
 	}
 }
 
+func (x *Schema) ToNativeSchema() physical.Schema {
+	fields := make([]physical.SchemaField, len(x.Fields))
+	for i := range x.Fields {
+		fields[i] = physical.SchemaField{
+			Name: x.Fields[i].Name,
+			Type: x.Fields[i].Type.ToNativeType(),
+		}
+	}
+	return physical.Schema{
+		Fields:    fields,
+		TimeField: int(x.TimeField),
+	}
+}
+
 func NativeTypeToProto(t octosql.Type) *Type {
 	out := &Type{
 		TypeId: int32(t.TypeID),
@@ -167,6 +181,44 @@ func NativeTypeToProto(t octosql.Type) *Type {
 		out.Union = elements
 	default:
 		panic(fmt.Sprintf("invalid type to proto: %v %v", t.TypeID, t))
+	}
+	return out
+}
+
+func (x *Type) ToNativeType() octosql.Type {
+	out := octosql.Type{
+		TypeID: octosql.TypeID(x.TypeId),
+	}
+	switch octosql.TypeID(x.TypeId) {
+	case octosql.TypeIDNull, octosql.TypeIDInt, octosql.TypeIDFloat, octosql.TypeIDBoolean, octosql.TypeIDString, octosql.TypeIDTime, octosql.TypeIDDuration, octosql.TypeIDAny:
+	case octosql.TypeIDList:
+		if x.List != nil {
+			t := x.List.ToNativeType()
+			out.List.Element = &t
+		}
+	case octosql.TypeIDStruct:
+		elements := make([]octosql.StructField, len(x.Struct))
+		for i := range x.Struct {
+			elements[i] = octosql.StructField{
+				Name: x.Struct[i].Name,
+				Type: x.Struct[i].Type.ToNativeType(),
+			}
+		}
+		out.Struct.Fields = elements
+	case octosql.TypeIDTuple:
+		elements := make([]octosql.Type, len(x.Tuple))
+		for i := range x.Tuple {
+			elements[i] = x.Tuple[i].ToNativeType()
+		}
+		out.Tuple.Elements = elements
+	case octosql.TypeIDUnion:
+		elements := make([]octosql.Type, len(x.Union))
+		for i := range x.Union {
+			elements[i] = x.Union[i].ToNativeType()
+		}
+		out.Union.Alternatives = elements
+	default:
+		panic(fmt.Sprintf("invalid proto to type: %v %v", x.TypeId, x))
 	}
 	return out
 }

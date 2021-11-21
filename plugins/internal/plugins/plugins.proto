@@ -79,7 +79,7 @@ message Value {
     string str = 5;
 	google.protobuf.Timestamp time = 6;
     google.protobuf.Duration duration = 7;
-    repeated Value list = 8;
+    repeated Value list = 8; // TODO: These should have their own messages.
     repeated Value struct = 9;
     repeated Value tuple = 10;
 }

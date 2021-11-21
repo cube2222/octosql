@@ -206,7 +206,9 @@ type ExecutionDatasource struct {
 func (e *ExecutionDatasource) Run(ctx execution.ExecutionContext, produce execution.ProduceFn, metaSend execution.MetaSendFn) error {
 	msgStream, err := e.cli.Run(
 		ctx.Context,
-		&plugins.RunRequest{},
+		&plugins.RunRequest{
+			VariableContext: plugins.NativeExecutionVariableContextToProto(ctx.VariableContext),
+		},
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't get message stream from plugin: %w", err)

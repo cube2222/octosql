@@ -129,7 +129,8 @@ func (e *ExecutionServer) Run(request *plugins.RunRequest, stream plugins.Execut
 	// TODO: Maybe run this asynchronously here, like in JOIN? This way the serialization overhead will be separate from what's underneath.
 	if err := e.node.Run(
 		execution.ExecutionContext{
-			// TODO: Pass through proto.
+			Context:         stream.Context(),
+			VariableContext: request.VariableContext.ToNativeExecutionVariableContext(),
 		},
 		func(ctx execution.ProduceContext, record execution.Record) error {
 			if err := stream.Send(&plugins.RunResponseMessage{

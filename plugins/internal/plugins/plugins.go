@@ -274,3 +274,35 @@ func (x *PhysicalVariableContext) ToNativePhysicalVariableContext() *physical.Va
 	}
 	return out
 }
+
+func NativeExecutionVariableContextToProto(c *execution.VariableContext) *ExecutionVariableContext {
+	frames := make([]*ExecutionVariableContextFrame, 0)
+	for c != nil {
+		values := make([]*Value, len(c.Values))
+		for i := range c.Values {
+			values[i] = NativeValueToProto(c.Values[i])
+		}
+		frames = append(frames, &ExecutionVariableContextFrame{
+			Values: values,
+		})
+		c = c.Parent
+	}
+	return &ExecutionVariableContext{
+		Frames: frames,
+	}
+}
+
+func (x *ExecutionVariableContext) ToNativeExecutionVariableContext() *execution.VariableContext {
+	var out *execution.VariableContext
+	for i := len(x.Frames) - 1; i >= 0; i-- {
+		values := make([]octosql.Value, len(x.Frames[i].Values))
+		for j := range x.Frames[i].Values {
+			values[j] = x.Frames[i].Values[j].ToNativeValue()
+		}
+		out = &execution.VariableContext{
+			Values: values,
+			Parent: out,
+		}
+	}
+	return out
+}

@@ -55,12 +55,7 @@ service ExecutionDatasource {
 }
 
 message RunRequest {
-    // TODO: Should this include the variables stack?
-    // Potential value leaking to untrusted plugins, but is that a big risk factor?
-    // Also, we already leak by pushing down data sources.
-    // However, as an optimization, might be good.
-    // Maybe we can take a look at variables we've pushed down and only provide values for them.
-    // TODO: Variable context.
+    ExecutionVariableContext variable_context = 4;
 }
 
 message RunResponseMessage {
@@ -121,4 +116,12 @@ message PhysicalVariableContext {
 
 message PhysicalVariableContextFrame {
     repeated SchemaField fields = 1;
+}
+
+message ExecutionVariableContext {
+    repeated ExecutionVariableContextFrame frames = 1;
+}
+
+message ExecutionVariableContextFrame {
+    repeated Value values = 1;
 }

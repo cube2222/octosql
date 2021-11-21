@@ -2,9 +2,11 @@ package plugins
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
@@ -61,6 +63,33 @@ func TestPhysicalVariableContext(t *testing.T) {
 	}
 
 	outC := NativePhysicalVariableContextToProto(c).ToNativePhysicalVariableContext()
+
+	assert.Equal(t, c, outC)
+}
+
+func TestExecutionVariableContext(t *testing.T) {
+	c := &execution.VariableContext{
+		Values: []octosql.Value{
+			octosql.NewString("test1"),
+			octosql.NewInt(42),
+			octosql.NewBoolean(true),
+		},
+		Parent: &execution.VariableContext{
+			Values: []octosql.Value{
+				octosql.NewDuration(time.Second * 3),
+				octosql.NewBoolean(false),
+			},
+			Parent: &execution.VariableContext{
+				Values: []octosql.Value{
+					octosql.NewString("test2"),
+					octosql.NewNull(),
+				},
+				Parent: nil,
+			},
+		},
+	}
+
+	outC := NativeExecutionVariableContextToProto(c).ToNativeExecutionVariableContext()
 
 	assert.Equal(t, c, outC)
 }

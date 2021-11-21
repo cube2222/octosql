@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"runtime/debug"
+	"sync"
 
 	"google.golang.org/grpc"
 
@@ -61,11 +63,7 @@ func (s *Server) PushDownPredicates(ctx context.Context, request *plugins.PushDo
 	}, nil
 }
 
-func (s *Server) Run(request *plugins.RunRequest, server plugins.Datasource_RunServer) error {
-	panic("implement me")
-}
-
-func (s *Server) mustEmbedUnimplementedDatasourceServer() {
+func (*Server) Materialize(context.Context, *plugins.MaterializeRequest) (*plugins.MaterializeResponse, error) {
 	panic("implement me")
 }
 
@@ -98,19 +96,29 @@ func (d *dbMock) GetTable(ctx context.Context, name string) (physical.Datasource
 }
 
 func main() {
-	s := grpc.NewServer()
-	plugins.RegisterDatasourceServer(s, &Server{
-		database: &dbMock{},
-	})
 	debug.SetGCPercent(800)
 
-	lis, err := net.Listen("unix", "/Users/jakub/Projects/OctoSQL/octosql/plugins/test/test.sock")
+	lis, err := net.Listen("unix", os.Args[1])
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer lis.Close()
 
-	if err := s.Serve(lis); err != nil {
-		log.Fatal(err)
+	s := grpc.NewServer()
+
+	server := &Server{
+		database: &dbMock{},
 	}
+
+	plugins.RegisterDatasourceServer(s, server)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := s.Serve(lis); err != nil {
+			log.Fatal(err)
+		}
+	}()
+	wg.Wait()
 }

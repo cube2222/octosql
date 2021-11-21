@@ -20,7 +20,7 @@ const _ = grpc.SupportPackageIsVersion7
 type DatasourceClient interface {
 	GetTable(ctx context.Context, in *GetTableRequest, opts ...grpc.CallOption) (*GetTableResponse, error)
 	PushDownPredicates(ctx context.Context, in *PushDownPredicatesRequest, opts ...grpc.CallOption) (*PushDownPredicatesResponse, error)
-	Run(ctx context.Context, in *RunRequest, opts ...grpc.CallOption) (Datasource_RunClient, error)
+	Materialize(ctx context.Context, in *MaterializeRequest, opts ...grpc.CallOption) (*MaterializeResponse, error)
 }
 
 type datasourceClient struct {
@@ -49,36 +49,13 @@ func (c *datasourceClient) PushDownPredicates(ctx context.Context, in *PushDownP
 	return out, nil
 }
 
-func (c *datasourceClient) Run(ctx context.Context, in *RunRequest, opts ...grpc.CallOption) (Datasource_RunClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Datasource_ServiceDesc.Streams[0], "/plugins.Datasource/Run", opts...)
+func (c *datasourceClient) Materialize(ctx context.Context, in *MaterializeRequest, opts ...grpc.CallOption) (*MaterializeResponse, error) {
+	out := new(MaterializeResponse)
+	err := c.cc.Invoke(ctx, "/plugins.Datasource/Materialize", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &datasourceRunClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-type Datasource_RunClient interface {
-	Recv() (*Message, error)
-	grpc.ClientStream
-}
-
-type datasourceRunClient struct {
-	grpc.ClientStream
-}
-
-func (x *datasourceRunClient) Recv() (*Message, error) {
-	m := new(Message)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
+	return out, nil
 }
 
 // DatasourceServer is the server API for Datasource service.
@@ -87,7 +64,7 @@ func (x *datasourceRunClient) Recv() (*Message, error) {
 type DatasourceServer interface {
 	GetTable(context.Context, *GetTableRequest) (*GetTableResponse, error)
 	PushDownPredicates(context.Context, *PushDownPredicatesRequest) (*PushDownPredicatesResponse, error)
-	Run(*RunRequest, Datasource_RunServer) error
+	Materialize(context.Context, *MaterializeRequest) (*MaterializeResponse, error)
 	mustEmbedUnimplementedDatasourceServer()
 }
 
@@ -101,8 +78,8 @@ func (UnimplementedDatasourceServer) GetTable(context.Context, *GetTableRequest)
 func (UnimplementedDatasourceServer) PushDownPredicates(context.Context, *PushDownPredicatesRequest) (*PushDownPredicatesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PushDownPredicates not implemented")
 }
-func (UnimplementedDatasourceServer) Run(*RunRequest, Datasource_RunServer) error {
-	return status.Errorf(codes.Unimplemented, "method Run not implemented")
+func (UnimplementedDatasourceServer) Materialize(context.Context, *MaterializeRequest) (*MaterializeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Materialize not implemented")
 }
 func (UnimplementedDatasourceServer) mustEmbedUnimplementedDatasourceServer() {}
 
@@ -153,25 +130,22 @@ func _Datasource_PushDownPredicates_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Datasource_Run_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(RunRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
+func _Datasource_Materialize_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MaterializeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
 	}
-	return srv.(DatasourceServer).Run(m, &datasourceRunServer{stream})
-}
-
-type Datasource_RunServer interface {
-	Send(*Message) error
-	grpc.ServerStream
-}
-
-type datasourceRunServer struct {
-	grpc.ServerStream
-}
-
-func (x *datasourceRunServer) Send(m *Message) error {
-	return x.ServerStream.SendMsg(m)
+	if interceptor == nil {
+		return srv.(DatasourceServer).Materialize(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/plugins.Datasource/Materialize",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DatasourceServer).Materialize(ctx, req.(*MaterializeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 // Datasource_ServiceDesc is the grpc.ServiceDesc for Datasource service.
@@ -189,13 +163,11 @@ var Datasource_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "PushDownPredicates",
 			Handler:    _Datasource_PushDownPredicates_Handler,
 		},
-	},
-	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "Run",
-			Handler:       _Datasource_Run_Handler,
-			ServerStreams: true,
+			MethodName: "Materialize",
+			Handler:    _Datasource_Materialize_Handler,
 		},
 	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "plugins.proto",
 }

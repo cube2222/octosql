@@ -12,7 +12,8 @@ message TableContext {
 service Datasource {
     rpc GetTable(GetTableRequest) returns (GetTableResponse);
     rpc PushDownPredicates(PushDownPredicatesRequest) returns (PushDownPredicatesResponse);
-    rpc Run (RunRequest) returns (stream Message);
+    rpc Materialize(MaterializeRequest) returns (MaterializeResponse);
+    // rpc Run (RunRequest) returns (stream Message);
 }
 
 message GetTableRequest {
@@ -37,6 +38,14 @@ message PushDownPredicatesResponse {
     bytes rejected = 1;
     bytes pushed_down = 2;
     bool changed = 3;
+}
+
+message MaterializeRequest {
+
+}
+
+message MaterializeResponse {
+
 }
 
 message RunRequest {

@@ -165,7 +165,16 @@ type PhysicalDatasource struct {
 }
 
 func (p *PhysicalDatasource) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression) (rejected, pushedDown []physical.Expression, changed bool) {
-	newPredicatesBytes, err := json.Marshal(&newPredicates)
+	var newPredicatesSerializable, newPredicatesNotSerializable []physical.Expression
+	for i := range newPredicates {
+		if !containsSubquery(newPredicates[i]) {
+			newPredicatesSerializable = append(newPredicatesSerializable, newPredicates[i])
+		} else {
+			newPredicatesNotSerializable = append(newPredicatesNotSerializable, newPredicates[i])
+		}
+	}
+
+	newPredicatesBytes, err := json.Marshal(&newPredicatesSerializable)
 	if err != nil {
 		panic(fmt.Errorf("couldn't marshal new predicates to JSON: %w", err))
 	}
@@ -192,7 +201,19 @@ func (p *PhysicalDatasource) PushDownPredicates(newPredicates, pushedDownPredica
 	if err := json.Unmarshal(res.PushedDown, &outPushedDown); err != nil {
 		panic(fmt.Errorf("couldn't unmarshal pushed down predicates from JSON: %w", err))
 	}
-	return outRejected, outPushedDown, res.Changed
+	return append(outRejected, newPredicatesNotSerializable...), outPushedDown, res.Changed
+}
+
+func containsSubquery(expr physical.Expression) (out bool) {
+	(&physical.Transformers{
+		ExpressionTransformer: func(expr physical.Expression) physical.Expression {
+			if expr.ExpressionType == physical.ExpressionTypeQueryExpression {
+				out = true
+			}
+			return expr
+		},
+	}).TransformExpr(expr)
+	return
 }
 
 func (p *PhysicalDatasource) Materialize(ctx context.Context, env physical.Environment, schema physical.Schema, pushedDownPredicates []physical.Expression) (execution.Node, error) {

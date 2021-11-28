@@ -12,13 +12,11 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/skratchdot/open-golang/open"
-	"gopkg.in/yaml.v3"
 
 	"github.com/cube2222/octosql/aggregates"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/datasources/csv"
 	"github.com/cube2222/octosql/datasources/json"
-	"github.com/cube2222/octosql/datasources/postgres"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/execution/nodes"
 	"github.com/cube2222/octosql/functions"
@@ -31,6 +29,7 @@ import (
 	"github.com/cube2222/octosql/parser/sqlparser"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/plugins/executor"
+	"github.com/cube2222/octosql/plugins/manager"
 	"github.com/cube2222/octosql/table_valued_functions"
 )
 
@@ -43,24 +42,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	pluginExecutor := executor.PluginExecutor{}
+	pluginManager := manager.PluginManager{}
+
+	pluginExecutor := executor.PluginExecutor{
+		Manager: &pluginManager,
+	}
 	defer func() {
 		if err := pluginExecutor.Close(); err != nil {
 			log.Fatal(err)
 		}
 	}()
-
-	databaseCreators := map[string]func(ctx context.Context, configUntyped yaml.Node) (physical.Database, error){
-		"postgres": postgres.Creator,
-		"myplugin": func(ctx context.Context, configUntyped yaml.Node) (physical.Database, error) {
-			// TODO: The creator can run the plugin executable here on demand.
-			db, err := pluginExecutor.RunPlugin(context.Background(), "myplugin", configUntyped)
-			if err != nil {
-				log.Fatal(err)
-			}
-			return db, nil
-		},
-	}
 
 	cfg, err := config.Read()
 	if err != nil {
@@ -70,9 +61,9 @@ func main() {
 	databases := make(map[string]physical.Database)
 	for _, dbConfig := range cfg.Databases {
 		// TODO: Creation should be lazy, on-demand. Only create databases which will actually be used.
-		db, err := databaseCreators[dbConfig.Type](context.Background(), dbConfig.Config)
+		db, err := pluginExecutor.RunPlugin(context.Background(), dbConfig.Type, dbConfig.Name, dbConfig.Config)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("Error running %s plugin %s: %s", dbConfig.Type, dbConfig.Name, err)
 		}
 		databases[dbConfig.Name] = db
 		// TODO: What about databases which don't need a config?

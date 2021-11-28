@@ -1,4 +1,4 @@
-package postgres
+package main
 
 import (
 	"encoding/base64"

@@ -1,4 +1,4 @@
-package postgres
+package main
 
 import (
 	"context"
@@ -9,10 +9,10 @@ import (
 
 	"github.com/jackc/pgx"
 	_ "github.com/jackc/pgx/stdlib"
-	"gopkg.in/yaml.v3"
 
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
+	"github.com/cube2222/octosql/plugins/plugin"
 )
 
 type Config struct {
@@ -56,24 +56,11 @@ func connect(config *Config) (*pgx.ConnPool, error) {
 	return db, nil
 }
 
-// This should then store creators as my-postgres.table-name
-func Creator(ctx context.Context, configUntyped yaml.Node) (physical.Database, error) {
+func Creator(ctx context.Context, configUntyped plugin.ConfigDecoder) (physical.Database, error) {
 	var cfg Config
 	if err := configUntyped.Decode(&cfg); err != nil {
 		return nil, err
 	}
-	// db, err := connect(&cfg)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("couldn't connect to database: %w", err)
-	// }
-	// conn, err := db.Acquire()
-	// if err != nil {
-	// 	return nil, fmt.Errorf("couldn't acquire connection from pool: %w", err)
-	// }
-	// if err := conn.Ping(ctx); err != nil {
-	// 	return nil, fmt.Errorf("couldn't ping database: %w", err)
-	// }
-	// db.Release(conn)
 	return &Database{
 		Config: &cfg,
 	}, nil

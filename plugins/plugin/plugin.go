@@ -20,14 +20,14 @@ import (
 	"github.com/cube2222/octosql/plugins/internal/plugins"
 )
 
-type Server struct {
+type physicalServer struct {
 	plugins.UnimplementedDatasourceServer
 	database  physical.Database
 	socketDir string
 	wg        *sync.WaitGroup
 }
 
-func (s *Server) GetTable(ctx context.Context, request *plugins.GetTableRequest) (*plugins.GetTableResponse, error) {
+func (s *physicalServer) GetTable(ctx context.Context, request *plugins.GetTableRequest) (*plugins.GetTableResponse, error) {
 	_, schema, err := s.database.GetTable(ctx, request.TableContext.TableName)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get table: %w", err)
@@ -37,7 +37,7 @@ func (s *Server) GetTable(ctx context.Context, request *plugins.GetTableRequest)
 	}, nil
 }
 
-func (s *Server) PushDownPredicates(ctx context.Context, request *plugins.PushDownPredicatesRequest) (*plugins.PushDownPredicatesResponse, error) {
+func (s *physicalServer) PushDownPredicates(ctx context.Context, request *plugins.PushDownPredicatesRequest) (*plugins.PushDownPredicatesResponse, error) {
 	impl, _, err := s.database.GetTable(ctx, request.TableContext.TableName)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get table: %w", err)
@@ -66,7 +66,7 @@ func (s *Server) PushDownPredicates(ctx context.Context, request *plugins.PushDo
 	}, nil
 }
 
-func (s *Server) Materialize(ctx context.Context, request *plugins.MaterializeRequest) (*plugins.MaterializeResponse, error) {
+func (s *physicalServer) Materialize(ctx context.Context, request *plugins.MaterializeRequest) (*plugins.MaterializeResponse, error) {
 	impl, _, err := s.database.GetTable(ctx, request.TableContext.TableName)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get table: %w", err)
@@ -96,7 +96,7 @@ func (s *Server) Materialize(ctx context.Context, request *plugins.MaterializeRe
 	if err != nil {
 		log.Fatal(err)
 	}
-	execServer := &ExecutionServer{
+	execServer := &executionServer{
 		node: node,
 	}
 	s.wg.Add(1)
@@ -114,13 +114,13 @@ func (s *Server) Materialize(ctx context.Context, request *plugins.MaterializeRe
 	return &plugins.MaterializeResponse{SocketPath: socketPath}, nil
 }
 
-type ExecutionServer struct {
+type executionServer struct {
 	plugins.UnimplementedExecutionDatasourceServer
 
 	node execution.Node
 }
 
-func (e *ExecutionServer) Run(request *plugins.RunRequest, stream plugins.ExecutionDatasource_RunServer) error {
+func (e *executionServer) Run(request *plugins.RunRequest, stream plugins.ExecutionDatasource_RunServer) error {
 	// TODO: Maybe run this asynchronously here, like in JOIN? This way the serialization overhead will be separate from what's underneath.
 	if err := e.node.Run(
 		execution.ExecutionContext{
@@ -178,7 +178,7 @@ func Run(dbCreator func(ctx context.Context, configDecoder ConfigDecoder) (physi
 	s := grpc.NewServer()
 
 	var wg sync.WaitGroup
-	server := &Server{
+	server := &physicalServer{
 		database:  db,
 		socketDir: filepath.Dir(os.Args[1]),
 		wg:        &wg,

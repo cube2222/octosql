@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync/atomic"
 
 	"github.com/kr/text"
 	"google.golang.org/grpc"
@@ -43,12 +43,10 @@ func (e *PluginExecutor) RunPlugin(ctx context.Context, pluginType, databaseName
 	}
 
 	socketLocation := filepath.Join(tmpDir, "root.sock")
-	log.Printf("plugin socket: %s", socketLocation)
 	absolute, err := filepath.Abs(socketLocation)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get absolute path to plugin socket: %w", err)
 	}
-	log.Printf("absolute plugin socket: %s", absolute)
 
 	input, err := json.Marshal(&plugins.PluginInput{
 		Config: config,
@@ -80,9 +78,22 @@ func (e *PluginExecutor) RunPlugin(ctx context.Context, pluginType, databaseName
 	// watcher.Add(tmpDir)
 	// defer watcher.Close()
 
+	var done int64
+	var cmdOutErr error
+
+	go func() {
+		if err := cmd.Wait(); err != nil {
+			cmdOutErr = err
+			atomic.CompareAndSwapInt64(&done, 0, 1)
+		}
+	}()
+
 	for {
 		_, err := os.Stat(socketLocation)
 		if os.IsNotExist(err) {
+			if value := atomic.LoadInt64(&done); value == 1 {
+				return nil, fmt.Errorf("plugin exited prematurely, error: %s", cmdOutErr)
+			}
 			continue
 		} else if err != nil {
 			return nil, fmt.Errorf("couldn't check if plugin socket exists: %w", err)

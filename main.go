@@ -6,11 +6,13 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"runtime/debug"
 	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/skratchdot/open-golang/open"
+	"gopkg.in/yaml.v3"
 
 	"github.com/cube2222/octosql/aggregates"
 	"github.com/cube2222/octosql/config"
@@ -28,21 +30,38 @@ import (
 	"github.com/cube2222/octosql/parser"
 	"github.com/cube2222/octosql/parser/sqlparser"
 	"github.com/cube2222/octosql/physical"
+	"github.com/cube2222/octosql/plugins/executor"
 	"github.com/cube2222/octosql/table_valued_functions"
 )
 
 func main() {
+	debug.SetGCPercent(1000)
+
 	describe := flag.Int("describe", 0, "")
 	optimize := flag.Bool("optimize", true, "")
 	if err := flag.CommandLine.Parse(os.Args[2:]); err != nil {
 		log.Fatal(err)
 	}
 
-	databaseCreators := map[string]func(ctx context.Context, configUntyped config.DatabaseSpecificConfig) (physical.Database, error){
+	pluginExecutor := executor.PluginExecutor{}
+	defer func() {
+		if err := pluginExecutor.Close(); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	databaseCreators := map[string]func(ctx context.Context, configUntyped yaml.Node) (physical.Database, error){
 		"postgres": postgres.Creator,
+		"myplugin": func(ctx context.Context, configUntyped yaml.Node) (physical.Database, error) {
+			// TODO: The creator can run the plugin executable here on demand.
+			db, err := pluginExecutor.RunPlugin(context.Background(), "myplugin", configUntyped)
+			if err != nil {
+				log.Fatal(err)
+			}
+			return db, nil
+		},
 	}
 
-	config.RegisterDatabaseType("postgres", func() config.DatabaseSpecificConfig { return &postgres.Config{} })
 	cfg, err := config.Read()
 	if err != nil {
 		log.Fatal(err)
@@ -50,11 +69,15 @@ func main() {
 
 	databases := make(map[string]physical.Database)
 	for _, dbConfig := range cfg.Databases {
+		// TODO: Creation should be lazy, on-demand. Only create databases which will actually be used.
 		db, err := databaseCreators[dbConfig.Type](context.Background(), dbConfig.Config)
 		if err != nil {
 			log.Fatal(err)
 		}
 		databases[dbConfig.Name] = db
+		// TODO: What about databases which don't need a config?
+		//  This should probably also iterate over plugins and create some default databases for them.
+		//  Like `ps aux` plugin.
 	}
 
 	statement, err := sqlparser.Parse(os.Args[1])

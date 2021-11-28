@@ -1,4 +1,4 @@
-package main
+package plugin
 
 import (
 	"context"
@@ -11,13 +11,11 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"sync"
-	"time"
 
 	"github.com/oklog/ulid/v2"
 	"google.golang.org/grpc"
 
 	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/plugins/internal/plugins"
 )
@@ -27,7 +25,6 @@ type Server struct {
 	database  physical.Database
 	socketDir string
 	wg        *sync.WaitGroup
-	// TODO: Possible datasource implementation cache, table_name -> impl
 }
 
 func (s *Server) GetTable(ctx context.Context, request *plugins.GetTableRequest) (*plugins.GetTableResponse, error) {
@@ -153,85 +150,25 @@ func (e *ExecutionServer) Run(request *plugins.RunRequest, stream plugins.Execut
 	return nil
 }
 
-type dbMock struct {
+type ConfigDecoder interface {
+	Decode(interface{}) error
 }
 
-func (d *dbMock) Run(ctx execution.ExecutionContext, produce execution.ProduceFn, metaSend execution.MetaSendFn) error {
-	record := execution.NewRecord(
-		[]octosql.Value{
-			octosql.NewInt(42),
-			octosql.NewString("Kuba"),
-			octosql.NewString("Warsaw"),
-			octosql.NewInt(3),
-			octosql.NewNull(),
-			octosql.NewDuration(time.Second * 1000),
-			octosql.NewTime(time.Now()),
-		},
-		false,
-		time.Time{},
-	)
-	for i := 0; i < 10; i++ {
-		if err := produce(execution.ProduceFromExecutionContext(ctx), record); err != nil {
-			return fmt.Errorf("couldn't produce record: %w", err)
-		}
-	}
-	return nil
-}
-
-func (d *dbMock) Materialize(ctx context.Context, env physical.Environment, schema physical.Schema, pushedDownPredicates []physical.Expression) (execution.Node, error) {
-	return &dbMock{}, nil
-}
-
-func (d *dbMock) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression) (rejected, pushedDown []physical.Expression, changed bool) {
-	return newPredicates, pushedDownPredicates, false
-}
-
-func (d *dbMock) ListTables(ctx context.Context) ([]string, error) {
-	return []string{"table1", "table2"}, nil
-}
-
-func (d *dbMock) GetTable(ctx context.Context, name string) (physical.DatasourceImplementation, physical.Schema, error) {
-	return d, physical.NewSchema([]physical.SchemaField{
-		{
-			Name: "age1",
-			Type: octosql.Int,
-		},
-		{
-			Name: "name1",
-			Type: octosql.String,
-		},
-		{
-			Name: "name2",
-			Type: octosql.String,
-		},
-		{
-			Name: "age2",
-			Type: octosql.TypeSum(octosql.Int, octosql.String),
-		},
-		{
-			Name: "name3",
-			Type: octosql.TypeSum(octosql.String, octosql.Null),
-		},
-		{
-			Name: "some_duration",
-			Type: octosql.Duration,
-		},
-		{
-			Name: "now",
-			Type: octosql.Time,
-		},
-	}, -1), nil
-}
-
-// TODO: A może robić dodatkowy serwer per execution.Node i mieć tłumaczenie o wiele bardziej 1-1?
-// To czyni wszystko bardziej stateful, ale w końcu optymalizujemy pod lokalne działanie, więc whatever.
-// I każdy ze swoim unix socketem.
-
-func main() {
+func Run(dbCreator func(ctx context.Context, configDecoder ConfigDecoder) (physical.Database, error)) {
 	debug.SetGCPercent(1000)
-	log.Printf("I'm on!")
+	log.Printf("Plugin started.")
 
-	log.Printf("Listening on %s", os.Args[1])
+	var input plugins.PluginInput
+	if err := json.NewDecoder(os.Stdin).Decode(&input); err != nil {
+		log.Fatal("couldn't decode plugin input from JSON: ", err)
+	}
+
+	db, err := dbCreator(context.Background(), &input.Config)
+	if err != nil {
+		log.Fatal("couldn't create database: ", err)
+	}
+
+	log.Printf("Listening on %s...", os.Args[1])
 	lis, err := net.Listen("unix", os.Args[1])
 	if err != nil {
 		log.Fatal(err)
@@ -242,7 +179,7 @@ func main() {
 
 	var wg sync.WaitGroup
 	server := &Server{
-		database:  &dbMock{},
+		database:  db,
 		socketDir: filepath.Dir(os.Args[1]),
 		wg:        &wg,
 	}
@@ -258,5 +195,5 @@ func main() {
 	}()
 	wg.Wait()
 
-	log.Printf("I'm gone!")
+	log.Printf("Plugin shut down.")
 }

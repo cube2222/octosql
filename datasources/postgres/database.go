@@ -9,8 +9,8 @@ import (
 
 	"github.com/jackc/pgx"
 	_ "github.com/jackc/pgx/stdlib"
+	"gopkg.in/yaml.v3"
 
-	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
@@ -57,22 +57,25 @@ func connect(config *Config) (*pgx.ConnPool, error) {
 }
 
 // This should then store creators as my-postgres.table-name
-func Creator(ctx context.Context, configUntyped config.DatabaseSpecificConfig) (physical.Database, error) {
-	cfg := configUntyped.(*Config)
-	db, err := connect(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't connect to database: %w", err)
+func Creator(ctx context.Context, configUntyped yaml.Node) (physical.Database, error) {
+	var cfg Config
+	if err := configUntyped.Decode(&cfg); err != nil {
+		return nil, err
 	}
-	conn, err := db.Acquire()
-	if err != nil {
-		return nil, fmt.Errorf("couldn't acquire connection from pool: %w", err)
-	}
-	if err := conn.Ping(ctx); err != nil {
-		return nil, fmt.Errorf("couldn't ping database: %w", err)
-	}
-	db.Release(conn)
+	// db, err := connect(&cfg)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("couldn't connect to database: %w", err)
+	// }
+	// conn, err := db.Acquire()
+	// if err != nil {
+	// 	return nil, fmt.Errorf("couldn't acquire connection from pool: %w", err)
+	// }
+	// if err := conn.Ping(ctx); err != nil {
+	// 	return nil, fmt.Errorf("couldn't ping database: %w", err)
+	// }
+	// db.Release(conn)
 	return &Database{
-		Config: cfg,
+		Config: &cfg,
 	}, nil
 }
 

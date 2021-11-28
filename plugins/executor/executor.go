@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -11,7 +12,9 @@ import (
 	"path/filepath"
 
 	"github.com/kr/text"
+	"github.com/pkg/errors"
 	"google.golang.org/grpc"
+	"gopkg.in/yaml.v3"
 
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
@@ -23,7 +26,7 @@ type PluginExecutor struct {
 	runningPlugins []*exec.Cmd
 }
 
-func (e *PluginExecutor) RunPlugin(ctx context.Context, name string) (*Database, error) {
+func (e *PluginExecutor) RunPlugin(ctx context.Context, name string, config yaml.Node) (*Database, error) {
 	tmpDir, err := os.MkdirTemp("./plugins/tmp", "octosql-")
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create tempdir: %w", err)
@@ -37,7 +40,15 @@ func (e *PluginExecutor) RunPlugin(ctx context.Context, name string) (*Database,
 	}
 	log.Printf("absolute plugin socket: %s", absolute)
 
+	input, err := json.Marshal(&plugins.PluginInput{
+		Config: config,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't encode plugin input to JSON")
+	}
+
 	cmd := exec.CommandContext(ctx, "plugins/plugin/plugin", absolute)
+	cmd.Stdin = bytes.NewReader(input)
 	cmd.Stdout = text.NewIndentWriter(os.Stdout, []byte(fmt.Sprintf("[plugin][%s] ", name)))
 	cmd.Stderr = text.NewIndentWriter(os.Stderr, []byte(fmt.Sprintf("[plugin][%s] ", name)))
 	if err := cmd.Start(); err != nil {

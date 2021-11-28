@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync/atomic"
+	"time"
 
 	"github.com/kr/text"
 	"google.golang.org/grpc"
@@ -94,6 +95,7 @@ func (e *PluginExecutor) RunPlugin(ctx context.Context, pluginType, databaseName
 			if value := atomic.LoadInt64(&done); value == 1 {
 				return nil, fmt.Errorf("plugin exited prematurely, error: %s", cmdOutErr)
 			}
+			time.Sleep(time.Millisecond)
 			continue
 		} else if err != nil {
 			return nil, fmt.Errorf("couldn't check if plugin socket exists: %w", err)

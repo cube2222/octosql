@@ -67,7 +67,7 @@ func (c *TypeAssertion) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 		return octosql.ZeroValue, fmt.Errorf("type assertions for structures aren't yet supported")
 	}
 	if value.Type().Is(c.expected) != octosql.TypeRelationIs {
-		return octosql.ZeroValue, fmt.Errorf("invalid type: %s, expected: %s", value.Type, c.expected)
+		return octosql.ZeroValue, fmt.Errorf("invalid type: %s, expected: %s", value.Type(), c.expected)
 	}
 
 	return value, nil

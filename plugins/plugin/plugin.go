@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/functions"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/plugins/internal/plugins"
 )
@@ -49,7 +50,20 @@ func (s *physicalServer) PushDownPredicates(ctx context.Context, request *plugin
 	if err := json.Unmarshal(request.PushedDownPredicates, &pushedDownPredicates); err != nil {
 		return nil, fmt.Errorf("couldn't unmarshal pushed down predicates: %w", err)
 	}
-	rejected, newPushedDown, changed := impl.PushDownPredicates(newPredicates, pushedDownPredicates)
+
+	var knownFunctionsNewPredicates, unknownFunctionsNewPredicates []physical.Expression
+	for i := range newPredicates {
+		_, ok := repopulateFunctions(newPredicates[i])
+		if !ok {
+			unknownFunctionsNewPredicates = append(unknownFunctionsNewPredicates, newPredicates[i])
+			continue
+		}
+		knownFunctionsNewPredicates = append(knownFunctionsNewPredicates, newPredicates[i])
+	}
+
+	rejected, newPushedDown, changed := impl.PushDownPredicates(knownFunctionsNewPredicates, pushedDownPredicates)
+	rejected = append(rejected, unknownFunctionsNewPredicates...)
+
 	rejectedData, err := json.Marshal(&rejected)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal rejected predicates: %w", err)
@@ -75,7 +89,13 @@ func (s *physicalServer) Materialize(ctx context.Context, request *plugins.Mater
 	if err := json.Unmarshal(request.PushedDownPredicates, &pushedDownPredicates); err != nil {
 		return nil, fmt.Errorf("couldn't unmarshal pushed down predicates: %w", err)
 	}
-	// TODO: Repopulate function descriptors in pushed down predicates.
+	for i := range pushedDownPredicates {
+		var ok bool
+		pushedDownPredicates[i], ok = repopulateFunctions(pushedDownPredicates[i])
+		if !ok {
+			return nil, fmt.Errorf("received unknown function through predicate pushdown during materialization, this is a bug")
+		}
+	}
 
 	node, err := impl.Materialize(
 		ctx,
@@ -112,6 +132,53 @@ func (s *physicalServer) Materialize(ctx context.Context, request *plugins.Mater
 	}()
 
 	return &plugins.MaterializeResponse{SocketPath: socketPath}, nil
+}
+
+func repopulateFunctions(expr physical.Expression) (physical.Expression, bool) {
+	funcMap := functions.FunctionMap()
+
+	outOk := true
+	out := (&physical.Transformers{
+		ExpressionTransformer: func(expr physical.Expression) physical.Expression {
+			if expr.ExpressionType != physical.ExpressionTypeFunctionCall {
+				return expr
+			}
+			receivedDescriptor := expr.FunctionCall.FunctionDescriptor
+
+			descriptors, ok := funcMap[expr.FunctionCall.Name]
+			if !ok {
+				log.Printf("Unknown function, rejecting predicate: %s", expr.FunctionCall.Name)
+				outOk = false
+				return expr
+			}
+
+		descriptorLoop:
+			for _, descriptor := range descriptors {
+				if len(descriptor.ArgumentTypes) != len(receivedDescriptor.ArgumentTypes) {
+					continue descriptorLoop
+				}
+				if descriptor.Strict != receivedDescriptor.Strict {
+					continue descriptorLoop
+				}
+				if !descriptor.OutputType.Equals(receivedDescriptor.OutputType) {
+					continue descriptorLoop
+				}
+				for j := range descriptor.ArgumentTypes {
+					if !descriptor.ArgumentTypes[j].Equals(receivedDescriptor.ArgumentTypes[j]) {
+						continue descriptorLoop
+					}
+				}
+				expr.FunctionCall.FunctionDescriptor.TypeFn = descriptor.TypeFn
+				expr.FunctionCall.FunctionDescriptor.Function = descriptor.Function
+				return expr
+			}
+
+			log.Printf("Unknown function signature, rejecting predicate: %s", expr.FunctionCall.Name)
+			ok = false
+			return expr
+		},
+	}).TransformExpr(expr)
+	return out, outOk
 }
 
 type executionServer struct {

@@ -59,8 +59,14 @@ const (
 	TypeRelationIs
 )
 
+func (t Type) Equals(other Type) bool {
+	if t.Is(other) == TypeRelationIs && other.Is(t) == TypeRelationIs {
+		return true
+	}
+	return false
+}
+
 func (t Type) Is(other Type) TypeRelation {
-	// TODO: Implement me
 	if other.TypeID == TypeIDAny {
 		return TypeRelationIs
 	}

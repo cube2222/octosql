@@ -92,7 +92,7 @@ type DatasourceImplementation interface {
 type FunctionDescriptor struct {
 	ArgumentTypes []octosql.Type
 	OutputType    octosql.Type
-	TypeFn        func([]octosql.Type) (octosql.Type, bool)
+	TypeFn        func([]octosql.Type) (octosql.Type, bool) `json:"-"`
 	Strict        bool
-	Function      func([]octosql.Value) (octosql.Value, error)
+	Function      func([]octosql.Value) (octosql.Value, error) `json:"-"`
 }

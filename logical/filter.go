@@ -22,7 +22,7 @@ func (node *Filter) Typecheck(ctx context.Context, env physical.Environment, log
 		ctx,
 		env.WithRecordSchema(source.Schema),
 		logicalEnv.WithRecordUniqueVariableNames(mapping),
-		octosql.Boolean,
+		octosql.TypeSum(octosql.Boolean, octosql.Null),
 		node.predicate,
 	)
 

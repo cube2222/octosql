@@ -173,12 +173,12 @@ func (p *PhysicalDatasource) PushDownPredicates(newPredicates, pushedDownPredica
 			newPredicatesNotSerializable = append(newPredicatesNotSerializable, newPredicates[i])
 		}
 	}
+	// TODO: In the future, if the subquery doesn't depend on the record, we could precalculate it and pass it down as a variable.
 
 	newPredicatesBytes, err := json.Marshal(&newPredicatesSerializable)
 	if err != nil {
 		panic(fmt.Errorf("couldn't marshal new predicates to JSON: %w", err))
 	}
-	// TODO: In the future, if the subquery doesn't depend on the record, we could precalculate it and pass it down as a variable.
 	pushedDownPredicatesBytes, err := json.Marshal(&pushedDownPredicates)
 	if err != nil {
 		panic(fmt.Errorf("couldn't marshal pushed down predicates to JSON: %w", err))

@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -58,14 +60,22 @@ func main() {
 		log.Fatal(err)
 	}
 
-	databases := make(map[string]physical.Database)
+	databases := make(map[string]func() (physical.Database, error))
 	for _, dbConfig := range cfg.Databases {
-		// TODO: Creation should be lazy, on-demand. Only create databases which will actually be used.
-		db, err := pluginExecutor.RunPlugin(context.Background(), dbConfig.Type, dbConfig.Name, dbConfig.Config)
-		if err != nil {
-			log.Fatalf("Error running %s plugin %s: %s", dbConfig.Type, dbConfig.Name, err)
+		once := sync.Once{}
+		curDbConfig := dbConfig
+		var db physical.Database
+		var err error
+
+		databases[curDbConfig.Name] = func() (physical.Database, error) {
+			once.Do(func() {
+				db, err = pluginExecutor.RunPlugin(context.Background(), curDbConfig.Type, curDbConfig.Name, curDbConfig.Config)
+			})
+			if err != nil {
+				return nil, fmt.Errorf("couldn't run %s plugin %s: %w", curDbConfig.Type, curDbConfig.Name, err)
+			}
+			return db, nil
 		}
-		databases[dbConfig.Name] = db
 		// TODO: What about databases which don't need a config?
 		//  This should probably also iterate over plugins and create some default databases for them.
 		//  Like `ps aux` plugin.

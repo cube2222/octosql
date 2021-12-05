@@ -130,6 +130,7 @@ func (e *PluginExecutor) Close() error {
 			return fmt.Errorf("couldn't close process: %w", err)
 		}
 	}
+	// TODO: Clean up directories.
 	return nil
 }
 

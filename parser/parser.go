@@ -82,6 +82,8 @@ func ParseSelect(statement *sqlparser.Select, topmost bool) (logical.Node, *Outp
 		root = logical.NewFilter(filterFormula, root)
 	}
 
+	// TODO: This should actually check if one of the expressions has an aggregate, and if so, do the group by code.
+	//   If there is no key in such a case, just fill in 1 automatically.
 	if len(statement.GroupBy) > 0 {
 		key := make([]logical.Expression, len(statement.GroupBy))
 		for i := range statement.GroupBy {

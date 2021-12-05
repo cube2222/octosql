@@ -14,6 +14,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/skratchdot/open-golang/open"
+	"gopkg.in/yaml.v3"
 
 	"github.com/cube2222/octosql/aggregates"
 	"github.com/cube2222/octosql/config"
@@ -34,6 +35,14 @@ import (
 	"github.com/cube2222/octosql/plugins/manager"
 	"github.com/cube2222/octosql/table_valued_functions"
 )
+
+var emptyYamlNode = func() yaml.Node {
+	var out yaml.Node
+	if err := yaml.Unmarshal([]byte("{}"), &out); err != nil {
+		log.Fatal("[BUG] Couldn't create empty yaml node: ", err)
+	}
+	return out
+}()
 
 func main() {
 	debug.SetGCPercent(1000)
@@ -79,6 +88,31 @@ func main() {
 		// TODO: What about databases which don't need a config?
 		//  This should probably also iterate over plugins and create some default databases for them.
 		//  Like `ps aux` plugin.
+	}
+
+	plugins, err := pluginManager.List()
+	if err != nil {
+		log.Fatal("Couldn't list plugins: ", err)
+	}
+	for _, metadata := range plugins {
+		if _, ok := databases[metadata.Name]; ok {
+			continue
+		}
+		curMetadata := metadata
+
+		once := sync.Once{}
+		var db physical.Database
+		var err error
+
+		databases[curMetadata.Name] = func() (physical.Database, error) {
+			once.Do(func() {
+				db, err = pluginExecutor.RunPlugin(context.Background(), curMetadata.Name, curMetadata.Name, emptyYamlNode)
+			})
+			if err != nil {
+				return nil, fmt.Errorf("couldn't run default plugin %s database: %w", curMetadata.Name, err)
+			}
+			return db, nil
+		}
 	}
 
 	statement, err := sqlparser.Parse(os.Args[1])

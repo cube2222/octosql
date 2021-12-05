@@ -8,6 +8,7 @@ import (
 
 var ZeroValue = Value{}
 
+// Value represents a single row value. The zero value of it is conveniently NULL.
 type Value struct {
 	TypeID   TypeID
 	Int      int

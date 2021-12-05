@@ -50,6 +50,9 @@ type aggregatesItem struct {
 
 	// AggregatedSetSize omits NULL inputs.
 	AggregatedSetSize []int
+
+	// OverallRecordCount counts all records minus retractions.
+	OverallRecordCount int
 }
 
 type previouslySentValuesItem struct {
@@ -106,6 +109,11 @@ func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSend
 				}
 			}
 
+			if !record.Retraction {
+				itemTyped.OverallRecordCount++
+			} else {
+				itemTyped.OverallRecordCount--
+			}
 			for i, expr := range g.aggregateExprs {
 				aggregateInput, err := expr.Evaluate(ctx)
 				if err != nil {
@@ -122,7 +130,10 @@ func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSend
 				}
 			}
 
-			// TODO: Delete entry if deletable.
+			if itemTyped.OverallRecordCount == 0 {
+				aggregates.Delete(itemTyped)
+				// TODO: Also delete from triggers somehow? But have to force a retraction in that case.
+			}
 
 			trigger.KeyReceived(key)
 		}

@@ -156,7 +156,6 @@ func (c *WatermarkTrigger) Poll() []GroupKey {
 			}
 
 			c.outputKeysSlice = append(c.outputKeysSlice, itemTyped.GroupKey)
-			c.timeKeys.Delete(item)
 
 			return true
 		})
@@ -170,6 +169,12 @@ func (c *WatermarkTrigger) Poll() []GroupKey {
 			c.outputKeysSlice = append(c.outputKeysSlice, itemTyped.GroupKey)
 
 			return true
+		})
+	}
+	for i := range c.outputKeysSlice {
+		c.timeKeys.Delete(watermarkTriggerKey{
+			Time:     c.outputKeysSlice[i][c.timeFieldKeyIndex].Time,
+			GroupKey: c.outputKeysSlice[i],
 		})
 	}
 	return c.outputKeysSlice

@@ -152,6 +152,7 @@ func main() {
 		"max_diff_watermark": table_valued_functions.MaxDiffWatermark,
 		"tumble":             table_valued_functions.Tumble,
 		"range":              table_valued_functions.Range,
+		"poll":               table_valued_functions.Poll,
 	}
 	uniqueNameGenerator := map[string]int{}
 	physicalPlan, mapping := logicalPlan.Typecheck(

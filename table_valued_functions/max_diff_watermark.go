@@ -161,7 +161,7 @@ func (m *maxDifferenceWatermarkGenerator) Run(ctx execution.ExecutionContext, pr
 				Type:      execution.MetadataMessageTypeWatermark,
 				Watermark: curWatermark,
 			}); err != nil {
-				return fmt.Errorf("couldn't send updated watermark")
+				return fmt.Errorf("couldn't send updated watermark: %w", err)
 			}
 		}
 

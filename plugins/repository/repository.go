@@ -8,7 +8,6 @@ import (
 	"os"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/Masterminds/semver"
 )
@@ -75,16 +74,20 @@ type Repository struct {
 }
 
 type Plugin struct {
-	Name        string
-	Description string
-	ManifestURL string
-	Website     string
-	License     string
+	Name string `json:"name"`
+
+	// Description is a *short* description of the plugin.
+	Description  string `json:"description"`
+	ManifestURL  string `json:"manifest_url"`
+	Website      string `json:"website"`
+	ContactEmail string `json:"contact_email"`
+	License      string `json:"license"`
 }
 
 type Manifest struct {
-	BinaryDownloadURLPattern string
-	Versions                 []Version
+	BinaryDownloadURLPattern string    `json:"binary_download_url_pattern"`
+	ReadmeURL                string    `json:"readme_url"`
+	Versions                 []Version `json:"versions"`
 }
 
 func (m *Manifest) GetBinaryDownloadURL(version semver.Version) string {
@@ -96,7 +99,5 @@ func (m *Manifest) GetBinaryDownloadURL(version semver.Version) string {
 }
 
 type Version struct {
-	Number      semver.Version
-	ReleaseDate time.Weekday
-	Description string
+	Number semver.Version `json:"number"`
 }

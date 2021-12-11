@@ -2,5 +2,14 @@
   "name": "Official OctoSQL Plugin Repository",
   "description": "The official place to publish and look for OctoSQL plugins.",
   "prefix": "",
-  "plugins": []
+  "plugins": [
+    {
+      "name": "random_data",
+      "description": "Generates random data for testing.",
+      "manifest_url": "https://raw.githubusercontent.com/cube2222/octosql-plugin-random_data/main/octosql_manifest.json",
+      "website": "https://github.com/cube2222/octosql-plugin-random_data",
+      "contact_email": "jakub.wit.martin+octosql@gmail.com",
+      "license": "Mozilla Public License Version 2.0"
+    }
+  ]
 }

@@ -16,7 +16,9 @@ type PluginMetadata struct {
 
 func (m *PluginManager) ListInstalledPlugins() ([]PluginMetadata, error) {
 	pluginDirectories, err := os.ReadDir(getPluginDir())
-	if err != nil {
+	if os.IsNotExist(err) {
+		return []PluginMetadata{}, nil
+	} else if err != nil {
 		return nil, fmt.Errorf("couldn't list plugins directory: %w", err)
 	}
 

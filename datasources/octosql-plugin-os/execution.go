@@ -45,8 +45,8 @@ func (d *processesExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSe
 		values := make([]octosql.Value, len(d.fields))
 		var memoryInfo *process.MemoryInfoStat
 		var memoryInfoRead bool
-		for j, fields := range d.fields {
-			switch fields.Name {
+		for j, field := range d.fields {
+			switch field.Name {
 			case "pid":
 				values[j] = octosql.NewInt(int(processes[i].Pid))
 			case "ppid":

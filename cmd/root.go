@@ -21,6 +21,7 @@ import (
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/datasources/csv"
 	"github.com/cube2222/octosql/datasources/json"
+	"github.com/cube2222/octosql/datasources/plugins"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/execution/nodes"
 	"github.com/cube2222/octosql/functions"
@@ -34,6 +35,7 @@ import (
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/plugins/executor"
 	"github.com/cube2222/octosql/plugins/manager"
+	"github.com/cube2222/octosql/plugins/repository"
 	"github.com/cube2222/octosql/table_valued_functions"
 )
 
@@ -60,10 +62,10 @@ var rootCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 
-		pluginManager := manager.PluginManager{}
+		pluginManager := &manager.PluginManager{}
 
 		pluginExecutor := executor.PluginExecutor{
-			Manager: &pluginManager,
+			Manager: pluginManager,
 		}
 		defer func() {
 			if err := pluginExecutor.Close(); err != nil {
@@ -91,6 +93,20 @@ var rootCmd = &cobra.Command{
 					return nil, fmt.Errorf("couldn't run %s plugin %s: %w", curDbConfig.Type, curDbConfig.Name, err)
 				}
 				return db, nil
+			}
+		}
+		{
+			once := sync.Once{}
+			var repositories []repository.Repository
+			var err error
+			databases["plugins"] = func() (physical.Database, error) {
+				once.Do(func() {
+					repositories, err = repository.GetRepositories(context.Background())
+				})
+				if err != nil {
+					return nil, fmt.Errorf("couldn't get repositories: %w", err)
+				}
+				return plugins.Creator(context.Background(), pluginManager, repositories)
 			}
 		}
 

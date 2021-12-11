@@ -37,8 +37,8 @@ func GetRepositories(ctx context.Context) ([]Repository, error) {
 		if err != nil {
 			return nil, fmt.Errorf("couldn't get additional repository from '%s': %w", additionalPluginRepositoryURLs[i], err)
 		}
-		if repository.Prefix == "" {
-			return nil, fmt.Errorf("repository from '%s' doesn't have a prefix, additional repositories must have prefixes", additionalPluginRepositoryURLs[i])
+		if repository.Slug == "" {
+			return nil, fmt.Errorf("repository from '%s' doesn't have a slug", additionalPluginRepositoryURLs[i])
 		}
 		additionalRepositories[i] = repository
 	}
@@ -67,10 +67,10 @@ func getRepository(ctx context.Context, url string) (Repository, error) {
 }
 
 type Repository struct {
-	Name        string
-	Description string
-	Prefix      string
-	Plugins     []Plugin
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Slug        string   `json:"slug"`
+	Plugins     []Plugin `json:"plugins"`
 }
 
 type Plugin struct {

@@ -189,7 +189,7 @@ type TableFormatter struct {
 
 func NewTableFormatter(w io.Writer) Format {
 	table := tablewriter.NewWriter(w)
-	table.SetColWidth(64)
+	table.SetColWidth(24)
 	table.SetRowLine(false)
 
 	return &TableFormatter{

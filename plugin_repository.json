@@ -1,7 +1,7 @@
 {
   "name": "Official OctoSQL Plugin Repository",
   "description": "The official place to publish and look for OctoSQL plugins.",
-  "prefix": "",
+  "slug": "core",
   "plugins": [
     {
       "name": "random_data",

@@ -126,6 +126,11 @@ func (m *PluginManager) Install(ctx context.Context, name string) error {
 	url := manifest.GetBinaryDownloadURL(version.Number)
 
 	newPluginDir := filepath.Join(getPluginDir(), fmt.Sprintf("octosql-plugin-%s", name))
+
+	if err := os.RemoveAll(newPluginDir); err != nil {
+		return fmt.Errorf("couldn't remove old plugin directory: %w", err)
+	}
+
 	if err := os.MkdirAll(newPluginDir, os.ModePerm); err != nil {
 		return fmt.Errorf("couldn't create plugins directory: %w", err)
 	}

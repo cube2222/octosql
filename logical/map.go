@@ -50,7 +50,7 @@ func (node *Map) Typecheck(ctx context.Context, env physical.Environment, logica
 		} else {
 			for _, field := range source.Schema.Fields {
 				if qualifier := node.starQualifier[i]; qualifier != "" {
-					if !strings.HasPrefix(field.Name, qualifier+".") { // TODO: Is the additional dot required?
+					if !strings.HasPrefix(reverseMapping[field.Name], qualifier+".") {
 						continue
 					}
 				}

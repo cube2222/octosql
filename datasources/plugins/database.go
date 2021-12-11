@@ -121,6 +121,7 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 				},
 			},
 			nil
+		// TODO: Add installed_plugins
 	}
 	return nil, physical.Schema{}, fmt.Errorf("unknown table: %s", name)
 }

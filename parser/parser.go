@@ -187,7 +187,7 @@ func ParseSelect(statement *sqlparser.Select, topmost bool) (logical.Node, *Outp
 
 		for i := range statement.SelectExprs {
 			if starExpr, ok := statement.SelectExprs[i].(*sqlparser.StarExpr); ok {
-				starQualifiers[i] = starExpr.TableName.Qualifier.String()
+				starQualifiers[i] = starExpr.TableName.Name.String()
 				isStar[i] = true
 
 				continue

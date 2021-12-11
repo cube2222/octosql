@@ -119,5 +119,5 @@ func (m *Manifest) GetBinaryDownloadURL(version semver.Version) string {
 }
 
 type Version struct {
-	Number semver.Version `json:"number"`
+	Number *semver.Version `json:"number"`
 }

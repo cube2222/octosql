@@ -56,6 +56,9 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		debug.SetGCPercent(1000)
 
+		// --describe => print the schema
+		// --explain 1/2 => print the plan
+
 		describe := flag.Int("describe", 0, "")
 		optimize := flag.Bool("optimize", true, "")
 		if err := flag.CommandLine.Parse(os.Args[2:]); err != nil {

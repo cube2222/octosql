@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/Masterminds/semver"
@@ -40,6 +41,7 @@ func GetRepositories(ctx context.Context) ([]Repository, error) {
 		if repository.Slug == "" {
 			return nil, fmt.Errorf("repository from '%s' doesn't have a slug", additionalPluginRepositoryURLs[i])
 		}
+		// TODO: Check for duplicate slugs.
 		additionalRepositories[i] = repository
 	}
 
@@ -86,8 +88,10 @@ type Plugin struct {
 }
 
 type Manifest struct {
-	BinaryDownloadURLPattern string    `json:"binary_download_url_pattern"`
-	Versions                 []Version `json:"versions"`
+	BinaryDownloadURLPattern string `json:"binary_download_url_pattern"`
+
+	// Version are sorted descending.
+	Versions []Version `json:"versions"`
 }
 
 func GetManifest(ctx context.Context, url string) (Manifest, error) {
@@ -106,11 +110,29 @@ func GetManifest(ctx context.Context, url string) (Manifest, error) {
 	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
 		return Manifest{}, fmt.Errorf("couldn't decode plugin manifest: %w", err)
 	}
+	out.Versions = append(out.Versions,
+		Version{
+			Number: semver.MustParse("0.1.0-pre1"),
+		},
+		Version{
+			Number: semver.MustParse("0.1.0-pre2"),
+		},
+		Version{
+			Number: semver.MustParse("0.0.1-pre2"),
+		},
+		Version{
+			Number: semver.MustParse("0.0.1"),
+		},
+	)
+
+	sort.Slice(out.Versions, func(i, j int) bool {
+		return out.Versions[i].Number.GreaterThan(out.Versions[j].Number)
+	})
 
 	return out, nil
 }
 
-func (m *Manifest) GetBinaryDownloadURL(version semver.Version) string {
+func (m *Manifest) GetBinaryDownloadURL(version *semver.Version) string {
 	return strings.NewReplacer(
 		"{{os}}", runtime.GOOS,
 		"{{arch}}", runtime.GOARCH,

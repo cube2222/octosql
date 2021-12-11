@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -50,20 +49,14 @@ var emptyYamlNode = func() yaml.Node {
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "octosql",
-	Args:  cobra.ArbitraryArgs,
+	Args:  cobra.ExactArgs(1),
 	Short: "",
 	Long:  ``,
+	Example: `octosql "SELECT * FROM myfile.json"
+octosql "SELECT * FROM ` + "`mydir/myfile.json`" + `
+octosql "SELECT * FROM plugins.plugins"`,
 	Run: func(cmd *cobra.Command, args []string) {
 		debug.SetGCPercent(1000)
-
-		// --describe => print the schema
-		// --explain 1/2 => print the plan
-
-		describe := flag.Int("describe", 0, "")
-		optimize := flag.Bool("optimize", true, "")
-		if err := flag.CommandLine.Parse(os.Args[2:]); err != nil {
-			log.Fatal(err)
-		}
 
 		pluginManager := &manager.PluginManager{}
 
@@ -189,19 +182,19 @@ var rootCmd = &cobra.Command{
 		)
 		spew.Dump(physicalPlan.Schema)
 		start := time.Now()
-		if *optimize {
+		if optimize {
 			physicalPlan = optimizer.Optimize(physicalPlan)
 			log.Printf("time for optimisation: %s", time.Since(start))
 		}
 
-		if *describe >= 1 {
+		if explain >= 1 {
 			file, err := os.CreateTemp(os.TempDir(), "octosql-describe-*.png")
 			if err != nil {
 				log.Fatal(err)
 			}
 			os.WriteFile("describe.txt", []byte(graph.Show(physical.DescribeNode(physicalPlan, true)).String()), os.ModePerm)
 			cmd := exec.Command("dot", "-Tpng")
-			cmd.Stdin = strings.NewReader(graph.Show(physical.DescribeNode(physicalPlan, *describe >= 2)).String())
+			cmd.Stdin = strings.NewReader(graph.Show(physical.DescribeNode(physicalPlan, explain >= 2)).String())
 			cmd.Stdout = file
 			cmd.Stderr = os.Stderr
 			if err := cmd.Run(); err != nil {
@@ -319,20 +312,16 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	cobra.CheckErr(rootCmd.Execute())
 }
 
+var describe bool
+var explain int
+var optimize bool
+
 func init() {
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.octosql.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.Flags().BoolVar(&describe, "describe", false, "Describe query output schema.")
+	rootCmd.Flags().IntVar(&explain, "explain", 0, "Describe query output schema.")
+	rootCmd.Flags().BoolVar(&optimize, "optimize", true, "Whether OctoSQL should optimize the query.")
 }

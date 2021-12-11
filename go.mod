@@ -3,6 +3,7 @@ module github.com/cube2222/octosql
 go 1.15
 
 require (
+	github.com/Masterminds/semver v1.5.0
 	github.com/awalterschulze/gographviz v2.0.3+incompatible
 	github.com/bradleyjkemp/memviz v0.2.3
 	github.com/cockroachdb/apd v1.1.0 // indirect

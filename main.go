@@ -90,7 +90,7 @@ func main() {
 		//  Like `ps aux` plugin.
 	}
 
-	plugins, err := pluginManager.List()
+	plugins, err := pluginManager.ListInstalledPlugins()
 	if err != nil {
 		log.Fatal("Couldn't list plugins: ", err)
 	}

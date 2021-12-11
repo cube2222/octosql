@@ -22,7 +22,7 @@ import (
 )
 
 type Manager interface {
-	GetBinaryPath(name string) (string, error)
+	GetPluginBinaryPath(name string) (string, error)
 }
 
 type PluginExecutor struct {
@@ -56,7 +56,7 @@ func (e *PluginExecutor) RunPlugin(ctx context.Context, pluginType, databaseName
 		return nil, fmt.Errorf("couldn't encode plugin input to JSON: %w", err)
 	}
 
-	binaryPath, err := e.Manager.GetBinaryPath(pluginType)
+	binaryPath, err := e.Manager.GetPluginBinaryPath(pluginType)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't find binary location for plugin %s: %w", pluginType, err)
 	}

@@ -14,7 +14,7 @@ type PluginMetadata struct {
 	Name string
 }
 
-func (m *PluginManager) List() ([]PluginMetadata, error) {
+func (m *PluginManager) ListInstalledPlugins() ([]PluginMetadata, error) {
 	pluginDirectories, err := os.ReadDir(getPluginDir())
 	if err != nil {
 		return nil, fmt.Errorf("couldn't list plugins directory: %w", err)
@@ -30,7 +30,7 @@ func (m *PluginManager) List() ([]PluginMetadata, error) {
 	return out, nil
 }
 
-func (m *PluginManager) GetBinaryPath(name string) (string, error) {
+func (m *PluginManager) GetPluginBinaryPath(name string) (string, error) {
 	fullName := fmt.Sprintf("octosql-plugin-%s", name)
 
 	return filepath.Join(getPluginDir(), fullName, fullName), nil

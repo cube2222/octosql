@@ -67,6 +67,10 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 						Type: octosql.String,
 					},
 					{
+						Name: "readme_url",
+						Type: octosql.String,
+					},
+					{
 						Name: "repo_slug",
 						Type: octosql.String,
 					},
@@ -90,6 +94,28 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 					},
 					{
 						Name: "description",
+						Type: octosql.String,
+					},
+				},
+			},
+			nil
+	case "versions":
+		return &versionsPhysical{
+				repositories: d.Repositories,
+			},
+			physical.Schema{
+				TimeField: -1,
+				Fields: []physical.SchemaField{
+					{
+						Name: "version",
+						Type: octosql.String,
+					},
+					{
+						Name: "prerelease",
+						Type: octosql.Boolean,
+					},
+					{
+						Name: "plugin_name",
 						Type: octosql.String,
 					},
 				},

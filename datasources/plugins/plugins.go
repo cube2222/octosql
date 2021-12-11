@@ -47,6 +47,8 @@ func (d *pluginsExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend
 					values[i] = octosql.NewString(plugin.ContactEmail)
 				case "license":
 					values[i] = octosql.NewString(plugin.License)
+				case "readme_url":
+					values[i] = octosql.NewString(plugin.ReadmeURL)
 				case "repo_slug":
 					values[i] = octosql.NewString(repo.Slug)
 				}

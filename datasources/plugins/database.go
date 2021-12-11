@@ -40,7 +40,7 @@ func (d *Database) ListTables(ctx context.Context) ([]string, error) {
 func (d *Database) GetTable(ctx context.Context, name string) (physical.DatasourceImplementation, physical.Schema, error) {
 	switch name {
 	case "plugins":
-		return &datasourceImpl{
+		return &pluginsPhysical{
 				repositories: d.Repositories,
 			},
 			physical.Schema{
@@ -68,6 +68,28 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 					},
 					{
 						Name: "repo_slug",
+						Type: octosql.String,
+					},
+				},
+			},
+			nil
+	case "repositories":
+		return &repositoriesPhysical{
+				repositories: d.Repositories,
+			},
+			physical.Schema{
+				TimeField: -1,
+				Fields: []physical.SchemaField{
+					{
+						Name: "slug",
+						Type: octosql.String,
+					},
+					{
+						Name: "name",
+						Type: octosql.String,
+					},
+					{
+						Name: "description",
 						Type: octosql.String,
 					},
 				},

@@ -1,6 +1,6 @@
 {
-  "name": "Official OctoSQL Plugin Repository",
-  "description": "The official place to publish and look for OctoSQL plugins.",
+  "name": "Core OctoSQL Plugin Repository",
+  "description": "The official place to publish and look for open-source OctoSQL plugins.",
   "slug": "core",
   "plugins": [
     {

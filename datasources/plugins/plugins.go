@@ -11,27 +11,27 @@ import (
 	"github.com/cube2222/octosql/plugins/repository"
 )
 
-type datasourceImpl struct {
+type pluginsPhysical struct {
 	repositories []repository.Repository
 }
 
-func (i *datasourceImpl) Materialize(ctx context.Context, env physical.Environment, schema physical.Schema, pushedDownPredicates []physical.Expression) (Node, error) {
-	return &datasourceExecuting{
+func (i *pluginsPhysical) Materialize(ctx context.Context, env physical.Environment, schema physical.Schema, pushedDownPredicates []physical.Expression) (Node, error) {
+	return &pluginsExecuting{
 		repositories: i.repositories,
 		fields:       schema.Fields,
 	}, nil
 }
 
-func (i *datasourceImpl) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression) (rejected, pushedDown []physical.Expression, changed bool) {
+func (i *pluginsPhysical) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression) (rejected, pushedDown []physical.Expression, changed bool) {
 	return newPredicates, []physical.Expression{}, false
 }
 
-type datasourceExecuting struct {
+type pluginsExecuting struct {
 	repositories []repository.Repository
 	fields       []physical.SchemaField
 }
 
-func (d *datasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
+func (d *pluginsExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
 	for _, repo := range d.repositories {
 		for _, plugin := range repo.Plugins {
 			values := make([]octosql.Value, len(d.fields))

@@ -135,13 +135,13 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 
 				i := 0
 				recordCounts.Ascend(func(item btree.Item) bool {
-					if o.limit > 0 && i == o.limit {
-						return false
-					}
-					i++
-
 					itemTyped := item.(*outputItem)
-					for i := 0; i < itemTyped.Count; i++ {
+					for j := 0; j < itemTyped.Count; j++ {
+						if o.limit > 0 && i == o.limit {
+							return false
+						}
+						i++
+
 						format.Write(itemTyped.Values)
 					}
 					return true
@@ -165,13 +165,13 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 	format.SetSchema(o.schema)
 	i := 0
 	recordCounts.Ascend(func(item btree.Item) bool {
-		if o.limit > 0 && i == o.limit {
-			return false
-		}
-		i++
-
 		itemTyped := item.(*outputItem)
-		for i := 0; i < itemTyped.Count; i++ {
+		for j := 0; j < itemTyped.Count; j++ {
+			if o.limit > 0 && i == o.limit {
+				return false
+			}
+			i++
+
 			format.Write(itemTyped.Values)
 		}
 		return true

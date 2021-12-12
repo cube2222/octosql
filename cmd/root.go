@@ -9,9 +9,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
-	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/skratchdot/open-golang/open"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -180,76 +178,87 @@ octosql "SELECT * FROM plugins.plugins"`,
 				UniqueNameGenerator:    uniqueNameGenerator,
 			},
 		)
-		spew.Dump(physicalPlan.Schema)
-		start := time.Now()
-		if optimize {
-			physicalPlan = optimizer.Optimize(physicalPlan)
-			log.Printf("time for optimisation: %s", time.Since(start))
-		}
+		reverseMapping := logical.ReverseMapping(mapping)
 
-		if explain >= 1 {
-			file, err := os.CreateTemp(os.TempDir(), "octosql-describe-*.png")
+		var executionPlan execution.Node
+		var orderByExpressions []execution.Expression
+		var outSchema physical.Schema
+		if describe {
+			for i := range physicalPlan.Schema.Fields {
+				physicalPlan.Schema.Fields[i].Name = reverseMapping[physicalPlan.Schema.Fields[i].Name]
+			}
+			executionPlan = &DescribeNode{
+				Schema: physicalPlan.Schema,
+			}
+			outSchema = DescribeNodeSchema
+			outputOptions.Limit = 0
+			outputOptions.OrderByExpressions = nil
+			outputOptions.OrderByDirections = nil
+		} else {
+			if optimize {
+				physicalPlan = optimizer.Optimize(physicalPlan)
+			}
+
+			if explain >= 1 {
+				file, err := os.CreateTemp(os.TempDir(), "octosql-describe-*.png")
+				if err != nil {
+					log.Fatal(err)
+				}
+				os.WriteFile("describe.txt", []byte(graph.Show(physical.DescribeNode(physicalPlan, true)).String()), os.ModePerm)
+				cmd := exec.Command("dot", "-Tpng")
+				cmd.Stdin = strings.NewReader(graph.Show(physical.DescribeNode(physicalPlan, explain >= 2)).String())
+				cmd.Stdout = file
+				cmd.Stderr = os.Stderr
+				if err := cmd.Run(); err != nil {
+					log.Fatal("couldn't render graph: ", err)
+				}
+				if err := file.Close(); err != nil {
+					log.Fatal("couldn't close temporary file: ", err)
+				}
+				if err := open.Start(file.Name()); err != nil {
+					log.Fatal("couldn't open graph: ", err)
+				}
+				return
+			}
+
+			executionPlan, err = physicalPlan.Materialize(
+				context.Background(),
+				env,
+			)
 			if err != nil {
 				log.Fatal(err)
 			}
-			os.WriteFile("describe.txt", []byte(graph.Show(physical.DescribeNode(physicalPlan, true)).String()), os.ModePerm)
-			cmd := exec.Command("dot", "-Tpng")
-			cmd.Stdin = strings.NewReader(graph.Show(physical.DescribeNode(physicalPlan, explain >= 2)).String())
-			cmd.Stdout = file
-			cmd.Stderr = os.Stderr
-			if err := cmd.Run(); err != nil {
-				log.Fatal("couldn't render graph: ", err)
-			}
-			if err := file.Close(); err != nil {
-				log.Fatal("couldn't close temporary file: ", err)
-			}
-			if err := open.Start(file.Name()); err != nil {
-				log.Fatal("couldn't open graph: ", err)
-			}
-			return
-		}
 
-		executionPlan, err := physicalPlan.Materialize(
-			context.Background(),
-			env,
-		)
-		if err != nil {
-			log.Fatal(err)
-		}
-		// TODO: Each setup costs us a DESCRIBE, so caching is really a must. Specifically, caching of a materialized plan.
-		log.Printf("time to materialization: %s", time.Since(start))
-
-		orderByExpressions := make([]execution.Expression, len(outputOptions.OrderByExpressions))
-		for i := range outputOptions.OrderByExpressions {
-			physicalExpr := outputOptions.OrderByExpressions[i].Typecheck(context.Background(), env.WithRecordSchema(physicalPlan.Schema), logical.Environment{
-				CommonTableExpressions: map[string]logical.CommonTableExpression{},
-				TableValuedFunctions:   tableValuedFunctions,
-				UniqueVariableNames: &logical.VariableMapping{
-					Mapping: mapping,
-				},
-				UniqueNameGenerator: uniqueNameGenerator,
-			})
-			execExpr, err := physicalExpr.Materialize(context.Background(), env.WithRecordSchema(physicalPlan.Schema))
-			if err != nil {
-				log.Fatalf("couldn't materialize output order by expression with index %d: %v", i, err)
+			orderByExpressions := make([]execution.Expression, len(outputOptions.OrderByExpressions))
+			for i := range outputOptions.OrderByExpressions {
+				physicalExpr := outputOptions.OrderByExpressions[i].Typecheck(context.Background(), env.WithRecordSchema(physicalPlan.Schema), logical.Environment{
+					CommonTableExpressions: map[string]logical.CommonTableExpression{},
+					TableValuedFunctions:   tableValuedFunctions,
+					UniqueVariableNames: &logical.VariableMapping{
+						Mapping: mapping,
+					},
+					UniqueNameGenerator: uniqueNameGenerator,
+				})
+				execExpr, err := physicalExpr.Materialize(context.Background(), env.WithRecordSchema(physicalPlan.Schema))
+				if err != nil {
+					log.Fatalf("couldn't materialize output order by expression with index %d: %v", i, err)
+				}
+				orderByExpressions[i] = execExpr
 			}
-			orderByExpressions[i] = execExpr
+
+			outFields := make([]physical.SchemaField, len(physicalPlan.Schema.Fields))
+			copy(outFields, physicalPlan.Schema.Fields)
+			outSchema = physical.Schema{
+				Fields:    outFields,
+				TimeField: physicalPlan.Schema.TimeField,
+			}
+			for i := range outFields {
+				outFields[i].Name = reverseMapping[outFields[i].Name]
+			}
 		}
-		orderByDirections := logical.DirectionsToMultipliers(outputOptions.OrderByDirections)
 
 		var sink interface {
 			Run(execCtx execution.ExecutionContext) error
-		}
-
-		outFields := make([]physical.SchemaField, len(physicalPlan.Schema.Fields))
-		copy(outFields, physicalPlan.Schema.Fields)
-		outSchema := physical.Schema{
-			Fields:    outFields,
-			TimeField: physicalPlan.Schema.TimeField,
-		}
-		reverseMapping := logical.ReverseMapping(mapping)
-		for i := range outFields {
-			outFields[i].Name = reverseMapping[outFields[i].Name]
 		}
 
 		switch os.Getenv("OCTOSQL_OUTPUT") {
@@ -278,7 +287,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 				executionPlan = nodes.NewBatchOrderBy(
 					executionPlan,
 					orderByExpressions,
-					orderByDirections,
+					logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
 				)
 			}
 			if outputOptions.Limit > 0 {

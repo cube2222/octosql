@@ -79,6 +79,12 @@ func (m *PluginManager) Install(ctx context.Context, name string) error {
 		name = name[i+1:]
 	}
 
+	if versionRequirement == nil {
+		fmt.Printf("Downloading %s/%s@latest...\n", repoSlug, name)
+	} else {
+		fmt.Printf("Downloading %s/%s@%s...\n", repoSlug, name, versionRequirement)
+	}
+
 	var repo *repository.Repository
 	for _, curRepo := range m.Repositories {
 		if curRepo.Slug == repoSlug {

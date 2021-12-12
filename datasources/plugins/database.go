@@ -137,23 +137,29 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 						Type: octosql.String,
 					},
 					{
-						Name: "description",
+						Name: "repo_slug",
+						Type: octosql.String,
+					},
+				},
+			},
+			nil
+	case "installed_versions":
+		return &installedVersionsPhysical{
+				manager: d.Manager,
+			},
+			physical.Schema{
+				TimeField: -1,
+				Fields: []physical.SchemaField{
+					{
+						Name: "version",
 						Type: octosql.String,
 					},
 					{
-						Name: "website",
-						Type: octosql.String,
+						Name: "prerelease",
+						Type: octosql.Boolean,
 					},
 					{
-						Name: "contact_email",
-						Type: octosql.String,
-					},
-					{
-						Name: "license",
-						Type: octosql.String,
-					},
-					{
-						Name: "readme_url",
+						Name: "plugin_name",
 						Type: octosql.String,
 					},
 					{
@@ -163,7 +169,6 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 				},
 			},
 			nil
-		// TODO: Add installed_versions
 	}
 	return nil, physical.Schema{}, fmt.Errorf("unknown table: %s", name)
 }

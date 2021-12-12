@@ -88,7 +88,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 				cfg.Databases[i].Version = config.NewYamlUnmarshallableVersionConstraint(constraint)
 			}
 			for _, plugin := range installedPlugins {
-				if plugin.Name != cfg.Databases[i].Type {
+				if plugin.Reference != cfg.Databases[i].Type {
 					continue
 				}
 				for _, version := range plugin.Versions {
@@ -135,7 +135,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 		}
 
 		for _, metadata := range installedPlugins {
-			if _, ok := databases[metadata.Name.Name]; ok {
+			if _, ok := databases[metadata.Reference.Name]; ok {
 				continue
 			}
 			curMetadata := metadata
@@ -144,12 +144,12 @@ octosql "SELECT * FROM plugins.plugins"`,
 			var db physical.Database
 			var err error
 
-			databases[curMetadata.Name.Name] = func() (physical.Database, error) {
+			databases[curMetadata.Reference.Name] = func() (physical.Database, error) {
 				once.Do(func() {
-					db, err = pluginExecutor.RunPlugin(context.Background(), curMetadata.Name, curMetadata.Name.Name, metadata.Versions[0].Number, emptyYamlNode)
+					db, err = pluginExecutor.RunPlugin(context.Background(), curMetadata.Reference, curMetadata.Reference.Name, metadata.Versions[0].Number, emptyYamlNode)
 				})
 				if err != nil {
-					return nil, fmt.Errorf("couldn't run default plugin %s database: %w", curMetadata.Name, err)
+					return nil, fmt.Errorf("couldn't run default plugin %s database: %w", curMetadata.Reference, err)
 				}
 				return db, nil
 			}

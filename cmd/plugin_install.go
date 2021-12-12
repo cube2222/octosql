@@ -53,7 +53,7 @@ var pluginInstallCmd = &cobra.Command{
 				cfg.Databases[i].Version = config.NewYamlUnmarshallableVersionConstraint(constraint)
 			}
 			for _, plugin := range installedPlugins {
-				if plugin.Name != cfg.Databases[i].Type {
+				if plugin.Reference != cfg.Databases[i].Type {
 					continue
 				}
 				for _, version := range plugin.Versions {

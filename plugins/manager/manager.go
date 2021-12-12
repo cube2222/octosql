@@ -23,8 +23,8 @@ type PluginManager struct {
 }
 
 type PluginMetadata struct {
-	Name     config.PluginReference
-	Versions []Version
+	Reference config.PluginReference
+	Versions  []Version
 }
 
 type Version struct {
@@ -52,7 +52,7 @@ func (m *PluginManager) ListInstalledPlugins() ([]PluginMetadata, error) {
 		for i, dir := range pluginDirectories {
 			firstDashIndex := strings.LastIndex(dir.Name(), "-")
 			secondDashIndex := firstDashIndex + 1 + strings.LastIndex(dir.Name()[firstDashIndex+1:], "-")
-			curOut[i].Name = config.PluginReference{
+			curOut[i].Reference = config.PluginReference{
 				Name:       dir.Name()[secondDashIndex+1:],
 				Repository: repoDirName.Name(),
 			}
@@ -68,7 +68,7 @@ func (m *PluginManager) ListInstalledPlugins() ([]PluginMetadata, error) {
 			for j, version := range pluginVersions {
 				versionNumber, err := semver.NewVersion(version.Name())
 				if err != nil {
-					return nil, fmt.Errorf("couldn't parse plugin '%s' version number '%s': %w", curOut[i].Name.String(), version.Name(), err)
+					return nil, fmt.Errorf("couldn't parse plugin '%s' version number '%s': %w", curOut[i].Reference.String(), version.Name(), err)
 				}
 				curOut[i].Versions[j] = Version{Number: versionNumber}
 			}

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/Masterminds/semver"
@@ -20,7 +21,12 @@ type PluginManager struct {
 }
 
 type PluginMetadata struct {
-	Name string
+	Name     string
+	Versions []Version
+}
+
+type Version struct {
+	Number *semver.Version
 }
 
 func (m *PluginManager) ListInstalledPlugins() ([]PluginMetadata, error) {
@@ -38,13 +44,40 @@ func (m *PluginManager) ListInstalledPlugins() ([]PluginMetadata, error) {
 		out[i].Name = dir.Name()[secondDashIndex+1:]
 	}
 
+	for i := range out {
+		curPluginDir := filepath.Join(getPluginDir(), pluginDirectories[i].Name())
+		pluginVersions, err := os.ReadDir(curPluginDir)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't list plugin directory: %w", err)
+		}
+		out[i].Versions = make([]Version, len(pluginVersions))
+		for j, version := range pluginVersions {
+			versionNumber, err := semver.NewVersion(version.Name())
+			if err != nil {
+				return nil, fmt.Errorf("couldn't parse plugin '%s' version number '%s': %w", pluginDirectories[i].Name(), version.Name(), err)
+			}
+			out[i].Versions[j] = Version{Number: versionNumber}
+		}
+		sort.Slice(out[i].Versions, func(j, k int) bool {
+			return out[i].Versions[j].Number.GreaterThan(out[i].Versions[k].Number)
+		})
+	}
+
 	return out, nil
 }
 
-func (m *PluginManager) GetPluginBinaryPath(name string) (string, error) {
+func (m *PluginManager) GetPluginBinaryPath(name string, version *semver.Version) (string, error) {
 	fullName := fmt.Sprintf("octosql-plugin-%s", name)
 
-	return filepath.Join(getPluginDir(), fullName, fullName), nil
+	binaryPath := filepath.Join(getPluginDir(), fullName, version.String(), fullName)
+
+	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
+		return "", fmt.Errorf("plugin '%s' version '%s' is not installed", name, version.String())
+	} else if err != nil {
+		return "", fmt.Errorf("couldn't check if plugin '%s' version '%s' is installed: %w", name, version.String(), err)
+	}
+
+	return binaryPath, nil
 }
 
 func getPluginDir() string {
@@ -77,12 +110,6 @@ func (m *PluginManager) Install(ctx context.Context, name string) error {
 	if i := strings.Index(name, "/"); i != -1 {
 		repoSlug = name[:i]
 		name = name[i+1:]
-	}
-
-	if versionRequirement == nil {
-		fmt.Printf("Downloading %s/%s@latest...\n", repoSlug, name)
-	} else {
-		fmt.Printf("Downloading %s/%s@%s...\n", repoSlug, name, versionRequirement)
 	}
 
 	var repo *repository.Repository
@@ -129,9 +156,11 @@ func (m *PluginManager) Install(ctx context.Context, name string) error {
 		return fmt.Errorf("version not found")
 	}
 
+	fmt.Printf("Downloading %s/%s@%s...\n", repoSlug, name, version.Number)
+
 	url := manifest.GetBinaryDownloadURL(version.Number)
 
-	newPluginDir := filepath.Join(getPluginDir(), fmt.Sprintf("octosql-plugin-%s", name))
+	newPluginDir := filepath.Join(getPluginDir(), fmt.Sprintf("octosql-plugin-%s", name), version.Number.String())
 
 	if err := os.RemoveAll(newPluginDir); err != nil {
 		return fmt.Errorf("couldn't remove old plugin directory: %w", err)

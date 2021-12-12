@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Masterminds/semver"
 	"github.com/kr/text"
 	"google.golang.org/grpc"
 	"gopkg.in/yaml.v3"
@@ -22,7 +23,7 @@ import (
 )
 
 type Manager interface {
-	GetPluginBinaryPath(name string) (string, error)
+	GetPluginBinaryPath(name string, version *semver.Version) (string, error)
 }
 
 type PluginExecutor struct {
@@ -30,15 +31,16 @@ type PluginExecutor struct {
 
 	runningConns   []*grpc.ClientConn
 	runningPlugins []*exec.Cmd
+	tmpDirs        []string
 }
 
-func (e *PluginExecutor) RunPlugin(ctx context.Context, pluginType, databaseName string, config yaml.Node) (*Database, error) {
+func (e *PluginExecutor) RunPlugin(ctx context.Context, pluginName, databaseName string, version *semver.Version, config yaml.Node) (*Database, error) {
 	tmpRootDir := "/Users/jakub/.octosql/tmp/plugins"
 	if err := os.MkdirAll(tmpRootDir, os.ModePerm); err != nil {
 		return nil, fmt.Errorf("couldn't create tmp directory %s: %w", tmpRootDir, err)
 	}
 
-	tmpDir, err := os.MkdirTemp(tmpRootDir, fmt.Sprintf("%s", pluginType))
+	tmpDir, err := os.MkdirTemp(tmpRootDir, fmt.Sprintf("%s", pluginName))
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create tempdir: %w", err)
 	}
@@ -56,28 +58,21 @@ func (e *PluginExecutor) RunPlugin(ctx context.Context, pluginType, databaseName
 		return nil, fmt.Errorf("couldn't encode plugin input to JSON: %w", err)
 	}
 
-	binaryPath, err := e.Manager.GetPluginBinaryPath(pluginType)
+	binaryPath, err := e.Manager.GetPluginBinaryPath(pluginName, version)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't find binary location for plugin %s: %w", pluginType, err)
+		return nil, fmt.Errorf("couldn't find binary location for plugin %s: %w", pluginName, err)
 	}
 
 	cmd := exec.CommandContext(ctx, binaryPath, absolute)
 	cmd.Stdin = bytes.NewReader(input)
-	cmd.Stdout = text.NewIndentWriter(os.Stdout, []byte(fmt.Sprintf("[plugin][%s][%s] ", pluginType, databaseName)))
-	cmd.Stderr = text.NewIndentWriter(os.Stderr, []byte(fmt.Sprintf("[plugin][%s][%s] ", pluginType, databaseName)))
+	cmd.Stdout = text.NewIndentWriter(os.Stdout, []byte(fmt.Sprintf("[plugin][%s][%s] ", pluginName, databaseName)))
+	cmd.Stderr = text.NewIndentWriter(os.Stderr, []byte(fmt.Sprintf("[plugin][%s][%s] ", pluginName, databaseName)))
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("couldn't start plugin: %w", err)
 	}
 
 	e.runningPlugins = append(e.runningPlugins, cmd)
-
-	// TODO: Now we will do polling for the socket, change to fsnotify later.
-	// watcher, err := fsnotify.NewWatcher()
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// watcher.Add(tmpDir)
-	// defer watcher.Close()
+	e.tmpDirs = append(e.tmpDirs, tmpDir)
 
 	var done int64
 	var cmdOutErr error
@@ -130,7 +125,11 @@ func (e *PluginExecutor) Close() error {
 			return fmt.Errorf("couldn't close process: %w", err)
 		}
 	}
-	// TODO: Clean up directories.
+	for i := range e.tmpDirs {
+		if err := os.RemoveAll(e.tmpDirs[i]); err != nil {
+			return fmt.Errorf("couldn't remove temporary directory '%s': %w", e.tmpDirs[i], err)
+		}
+	}
 	return nil
 }
 

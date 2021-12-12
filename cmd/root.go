@@ -72,6 +72,26 @@ octosql "SELECT * FROM plugins.plugins"`,
 			log.Fatal(err)
 		}
 
+		installedPlugins, err := pluginManager.ListInstalledPlugins()
+		if err != nil {
+			log.Fatal("Couldn't list installed plugins: ", err)
+		}
+
+		// Fill in implicit plugin versions.
+		for i := range cfg.Databases {
+			if cfg.Databases[i].Version == nil {
+				for _, plugin := range installedPlugins {
+					if plugin.Name != cfg.Databases[i].Type {
+						continue
+					}
+					cfg.Databases[i].Version = config.NewYamlUnmarshallableVersion(plugin.Versions[0].Number)
+				}
+				if cfg.Databases[i].Version == nil {
+					log.Fatalf("Plugin '%s' used in configuration is not instaled.", cfg.Databases[i].Type)
+				}
+			}
+		}
+
 		databases := make(map[string]func() (physical.Database, error))
 		for _, dbConfig := range cfg.Databases {
 			once := sync.Once{}
@@ -81,7 +101,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 
 			databases[curDbConfig.Name] = func() (physical.Database, error) {
 				once.Do(func() {
-					db, err = pluginExecutor.RunPlugin(context.Background(), curDbConfig.Type, curDbConfig.Name, curDbConfig.Config)
+					db, err = pluginExecutor.RunPlugin(context.Background(), curDbConfig.Type, curDbConfig.Name, curDbConfig.Version.Raw(), curDbConfig.Config)
 				})
 				if err != nil {
 					return nil, fmt.Errorf("couldn't run %s plugin %s: %w", curDbConfig.Type, curDbConfig.Name, err)
@@ -104,11 +124,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 			}
 		}
 
-		plugins, err := pluginManager.ListInstalledPlugins()
-		if err != nil {
-			log.Fatal("Couldn't list plugins: ", err)
-		}
-		for _, metadata := range plugins {
+		for _, metadata := range installedPlugins {
 			if _, ok := databases[metadata.Name]; ok {
 				continue
 			}
@@ -120,7 +136,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 
 			databases[curMetadata.Name] = func() (physical.Database, error) {
 				once.Do(func() {
-					db, err = pluginExecutor.RunPlugin(context.Background(), curMetadata.Name, curMetadata.Name, emptyYamlNode)
+					db, err = pluginExecutor.RunPlugin(context.Background(), curMetadata.Name, curMetadata.Name, metadata.Versions[0].Number, emptyYamlNode)
 				})
 				if err != nil {
 					return nil, fmt.Errorf("couldn't run default plugin %s database: %w", curMetadata.Name, err)

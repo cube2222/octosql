@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/Masterminds/semver"
 	"gopkg.in/yaml.v3"
 )
 
@@ -12,10 +13,30 @@ type Config struct {
 	Databases []DatabaseConfig `yaml:"databases"`
 }
 
+type YamlUnmarshallableVersion semver.Version
+
+func (version *YamlUnmarshallableVersion) UnmarshalText(text []byte) error {
+	v, err := semver.NewVersion(string(text))
+	if err != nil {
+		return err
+	}
+	*version = YamlUnmarshallableVersion(*v)
+	return nil
+}
+
+func (version *YamlUnmarshallableVersion) Raw() *semver.Version {
+	return (*semver.Version)(version)
+}
+
+func NewYamlUnmarshallableVersion(v *semver.Version) *YamlUnmarshallableVersion {
+	return (*YamlUnmarshallableVersion)(v)
+}
+
 type DatabaseConfig struct {
-	Name   string    `yaml:"name"`
-	Type   string    `yaml:"type"`
-	Config yaml.Node `yaml:"config"`
+	Name    string                     `yaml:"name"`
+	Type    string                     `yaml:"type"`
+	Version *YamlUnmarshallableVersion `yaml:"version"`
+	Config  yaml.Node                  `yaml:"config"`
 }
 
 func Read() (*Config, error) {

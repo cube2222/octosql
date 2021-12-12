@@ -118,6 +118,10 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 						Name: "plugin_name",
 						Type: octosql.String,
 					},
+					{
+						Name: "repo_slug",
+						Type: octosql.String,
+					},
 				},
 			},
 			nil

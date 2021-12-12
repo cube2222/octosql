@@ -110,20 +110,6 @@ func GetManifest(ctx context.Context, url string) (Manifest, error) {
 	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
 		return Manifest{}, fmt.Errorf("couldn't decode plugin manifest: %w", err)
 	}
-	out.Versions = append(out.Versions,
-		Version{
-			Number: semver.MustParse("0.1.0-pre1"),
-		},
-		Version{
-			Number: semver.MustParse("0.1.0-pre2"),
-		},
-		Version{
-			Number: semver.MustParse("0.0.1-pre2"),
-		},
-		Version{
-			Number: semver.MustParse("0.0.1"),
-		},
-	)
 
 	sort.Slice(out.Versions, func(i, j int) bool {
 		return out.Versions[i].Number.GreaterThan(out.Versions[j].Number)

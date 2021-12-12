@@ -104,6 +104,8 @@ func (d *versionsExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSen
 						values[i] = octosql.NewBoolean(version.Number.Prerelease() != "")
 					case "plugin_name":
 						values[i] = octosql.NewString(plugin.Name)
+					case "repo_slug":
+						values[i] = octosql.NewString(repo.Slug)
 					}
 				}
 

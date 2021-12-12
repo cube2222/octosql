@@ -17,13 +17,14 @@ import (
 	"google.golang.org/grpc"
 	"gopkg.in/yaml.v3"
 
+	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/plugins/internal/plugins"
 )
 
 type Manager interface {
-	GetPluginBinaryPath(name string, version *semver.Version) (string, error)
+	GetPluginBinaryPath(name config.PluginReference, version *semver.Version) (string, error)
 }
 
 type PluginExecutor struct {
@@ -34,13 +35,13 @@ type PluginExecutor struct {
 	tmpDirs        []string
 }
 
-func (e *PluginExecutor) RunPlugin(ctx context.Context, pluginName, databaseName string, version *semver.Version, config yaml.Node) (*Database, error) {
+func (e *PluginExecutor) RunPlugin(ctx context.Context, pluginRef config.PluginReference, databaseName string, version *semver.Version, config yaml.Node) (*Database, error) {
 	tmpRootDir := "/Users/jakub/.octosql/tmp/plugins"
 	if err := os.MkdirAll(tmpRootDir, os.ModePerm); err != nil {
 		return nil, fmt.Errorf("couldn't create tmp directory %s: %w", tmpRootDir, err)
 	}
 
-	tmpDir, err := os.MkdirTemp(tmpRootDir, fmt.Sprintf("%s", pluginName))
+	tmpDir, err := os.MkdirTemp(tmpRootDir, pluginRef.Repository+"$"+pluginRef.Name)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create tempdir: %w", err)
 	}
@@ -58,15 +59,15 @@ func (e *PluginExecutor) RunPlugin(ctx context.Context, pluginName, databaseName
 		return nil, fmt.Errorf("couldn't encode plugin input to JSON: %w", err)
 	}
 
-	binaryPath, err := e.Manager.GetPluginBinaryPath(pluginName, version)
+	binaryPath, err := e.Manager.GetPluginBinaryPath(pluginRef, version)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't find binary location for plugin %s: %w", pluginName, err)
+		return nil, fmt.Errorf("couldn't find binary location for plugin %s: %w", pluginRef.String(), err)
 	}
 
 	cmd := exec.CommandContext(ctx, binaryPath, absolute)
 	cmd.Stdin = bytes.NewReader(input)
-	cmd.Stdout = text.NewIndentWriter(os.Stdout, []byte(fmt.Sprintf("[plugin][%s][%s] ", pluginName, databaseName)))
-	cmd.Stderr = text.NewIndentWriter(os.Stderr, []byte(fmt.Sprintf("[plugin][%s][%s] ", pluginName, databaseName)))
+	cmd.Stdout = text.NewIndentWriter(os.Stdout, []byte(fmt.Sprintf("[plugin][%s][%s] ", pluginRef.String(), databaseName)))
+	cmd.Stderr = text.NewIndentWriter(os.Stderr, []byte(fmt.Sprintf("[plugin][%s][%s] ", pluginRef.String(), databaseName)))
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("couldn't start plugin: %w", err)
 	}

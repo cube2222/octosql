@@ -42,7 +42,9 @@ func (d *installedPluginsExecuting) Run(ctx ExecutionContext, produce ProduceFn,
 		for i, field := range d.fields {
 			switch field.Name {
 			case "name":
-				values[i] = octosql.NewString(plugin.Name)
+				values[i] = octosql.NewString(plugin.Name.Name)
+			case "repo_slug":
+				values[i] = octosql.NewString(plugin.Name.Repository)
 			}
 		}
 

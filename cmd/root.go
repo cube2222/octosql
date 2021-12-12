@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/Masterminds/semver"
 	"github.com/skratchdot/open-golang/open"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -77,19 +78,28 @@ octosql "SELECT * FROM plugins.plugins"`,
 			log.Fatal("Couldn't list installed plugins: ", err)
 		}
 
-		// Fill in implicit plugin versions.
+		resolvedVersions := map[string]*semver.Version{}
+
+		// Fill in plugin versions.
+	dbLoop:
 		for i := range cfg.Databases {
 			if cfg.Databases[i].Version == nil {
-				for _, plugin := range installedPlugins {
-					if plugin.Name != cfg.Databases[i].Type {
-						continue
-					}
-					cfg.Databases[i].Version = config.NewYamlUnmarshallableVersion(plugin.Versions[0].Number)
-				}
-				if cfg.Databases[i].Version == nil {
-					log.Fatalf("Plugin '%s' used in configuration is not instaled.", cfg.Databases[i].Type)
-				}
+				constraint, _ := semver.NewConstraint("*")
+				cfg.Databases[i].Version = config.NewYamlUnmarshallableVersionConstraint(constraint)
 			}
+			for _, plugin := range installedPlugins {
+				if plugin.Name != cfg.Databases[i].Type {
+					continue
+				}
+				for _, version := range plugin.Versions {
+					if cfg.Databases[i].Version.Raw().Check(version.Number) {
+						resolvedVersions[cfg.Databases[i].Name] = version.Number
+						continue dbLoop
+					}
+				}
+				break
+			}
+			log.Fatalf("Database '%s' plugin '%s' used in configuration is not instaled with the required version.", cfg.Databases[i].Name, cfg.Databases[i].Type.String())
 		}
 
 		databases := make(map[string]func() (physical.Database, error))
@@ -101,7 +111,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 
 			databases[curDbConfig.Name] = func() (physical.Database, error) {
 				once.Do(func() {
-					db, err = pluginExecutor.RunPlugin(context.Background(), curDbConfig.Type, curDbConfig.Name, curDbConfig.Version.Raw(), curDbConfig.Config)
+					db, err = pluginExecutor.RunPlugin(context.Background(), curDbConfig.Type, curDbConfig.Name, resolvedVersions[curDbConfig.Name], curDbConfig.Config)
 				})
 				if err != nil {
 					return nil, fmt.Errorf("couldn't run %s plugin %s: %w", curDbConfig.Type, curDbConfig.Name, err)
@@ -125,7 +135,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 		}
 
 		for _, metadata := range installedPlugins {
-			if _, ok := databases[metadata.Name]; ok {
+			if _, ok := databases[metadata.Name.Name]; ok {
 				continue
 			}
 			curMetadata := metadata
@@ -134,9 +144,9 @@ octosql "SELECT * FROM plugins.plugins"`,
 			var db physical.Database
 			var err error
 
-			databases[curMetadata.Name] = func() (physical.Database, error) {
+			databases[curMetadata.Name.Name] = func() (physical.Database, error) {
 				once.Do(func() {
-					db, err = pluginExecutor.RunPlugin(context.Background(), curMetadata.Name, curMetadata.Name, metadata.Versions[0].Number, emptyYamlNode)
+					db, err = pluginExecutor.RunPlugin(context.Background(), curMetadata.Name, curMetadata.Name.Name, metadata.Versions[0].Number, emptyYamlNode)
 				})
 				if err != nil {
 					return nil, fmt.Errorf("couldn't run default plugin %s database: %w", curMetadata.Name, err)

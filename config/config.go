@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/Masterminds/semver"
 	"gopkg.in/yaml.v3"
@@ -13,30 +14,11 @@ type Config struct {
 	Databases []DatabaseConfig `yaml:"databases"`
 }
 
-type YamlUnmarshallableVersion semver.Version
-
-func (version *YamlUnmarshallableVersion) UnmarshalText(text []byte) error {
-	v, err := semver.NewVersion(string(text))
-	if err != nil {
-		return err
-	}
-	*version = YamlUnmarshallableVersion(*v)
-	return nil
-}
-
-func (version *YamlUnmarshallableVersion) Raw() *semver.Version {
-	return (*semver.Version)(version)
-}
-
-func NewYamlUnmarshallableVersion(v *semver.Version) *YamlUnmarshallableVersion {
-	return (*YamlUnmarshallableVersion)(v)
-}
-
 type DatabaseConfig struct {
-	Name    string                     `yaml:"name"`
-	Type    string                     `yaml:"type"`
-	Version *YamlUnmarshallableVersion `yaml:"version"`
-	Config  yaml.Node                  `yaml:"config"`
+	Name    string                               `yaml:"name"`
+	Type    PluginReference                      `yaml:"type"`
+	Version *YamlUnmarshallableVersionConstraint `yaml:"version"`
+	Config  yaml.Node                            `yaml:"config"`
 }
 
 func Read() (*Config, error) {
@@ -56,4 +38,43 @@ func Read() (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+type YamlUnmarshallableVersionConstraint semver.Constraints
+
+func (constraint *YamlUnmarshallableVersionConstraint) UnmarshalText(text []byte) error {
+	v, err := semver.NewConstraint(string(text))
+	if err != nil {
+		return err
+	}
+	*constraint = YamlUnmarshallableVersionConstraint(*v)
+	return nil
+}
+
+func (constraint *YamlUnmarshallableVersionConstraint) Raw() *semver.Constraints {
+	return (*semver.Constraints)(constraint)
+}
+
+func NewYamlUnmarshallableVersionConstraint(v *semver.Constraints) *YamlUnmarshallableVersionConstraint {
+	return (*YamlUnmarshallableVersionConstraint)(v)
+}
+
+type PluginReference struct {
+	Name       string
+	Repository string
+}
+
+func (r *PluginReference) UnmarshalText(text []byte) error {
+	if i := strings.Index(string(text), "/"); i > 0 {
+		r.Repository = string(text[:i])
+		r.Name = string(text[i+1:])
+	} else {
+		r.Name = string(text)
+		r.Repository = "core"
+	}
+	return nil
+}
+
+func (r *PluginReference) String() string {
+	return fmt.Sprintf("%s/%s", r.Repository, r.Name)
 }

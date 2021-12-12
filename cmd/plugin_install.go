@@ -3,9 +3,12 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"log"
 
+	"github.com/Masterminds/semver"
 	"github.com/spf13/cobra"
 
+	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/plugins/manager"
 	"github.com/cube2222/octosql/plugins/repository"
 )
@@ -24,7 +27,47 @@ var pluginInstallCmd = &cobra.Command{
 			Repositories: repositories,
 		}
 
-		return pluginManager.Install(context.Background(), args[0])
+		if len(args) > 0 {
+			for _, arg := range args {
+				if err := pluginManager.Install(context.Background(), arg, nil); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+
+		cfg, err := config.Read()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+	dbLoop:
+		for i := range cfg.Databases {
+			installedPlugins, err := pluginManager.ListInstalledPlugins()
+			if err != nil {
+				return fmt.Errorf("couldn't list installed plugins: %w", err)
+			}
+
+			if cfg.Databases[i].Version == nil {
+				constraint, _ := semver.NewConstraint("*")
+				cfg.Databases[i].Version = config.NewYamlUnmarshallableVersionConstraint(constraint)
+			}
+			for _, plugin := range installedPlugins {
+				if plugin.Name != cfg.Databases[i].Type {
+					continue
+				}
+				for _, version := range plugin.Versions {
+					if cfg.Databases[i].Version.Raw().Check(version.Number) {
+						continue dbLoop
+					}
+				}
+			}
+			if err := pluginManager.Install(context.Background(), cfg.Databases[i].Type.String(), cfg.Databases[i].Version.Raw()); err != nil {
+				return err
+			}
+		}
+
+		return nil
 	},
 }
 

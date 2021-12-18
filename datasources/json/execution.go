@@ -38,7 +38,7 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 
 		values := make([]octosql.Value, len(d.fields))
 		for i := range values {
-			values[i] = getOctoSQLValue(d.fields[i].Type, msg[d.fields[i].Name])
+			values[i], _ = getOctoSQLValue(d.fields[i].Type, msg[d.fields[i].Name])
 		}
 
 		if err := produce(ProduceFromExecutionContext(ctx), NewRecord(values, false, time.Time{})); err != nil {
@@ -47,46 +47,85 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 	}
 }
 
-func getOctoSQLValue(t octosql.Type, value interface{}) octosql.Value {
-	switch value := value.(type) {
-	case int:
-		return octosql.NewInt(value)
-	case bool:
-		return octosql.NewBoolean(value)
-	case float64:
-		return octosql.NewFloat(value)
-	case string:
-		// TODO: this should happen based on the schema only.
-		if t.Is(octosql.Time) >= octosql.TypeRelationMaybe {
-			if t, err := time.Parse(time.RFC3339Nano, value); err == nil {
-				return octosql.NewTime(t)
-			} else {
-				return octosql.NewString(value)
+func getOctoSQLValue(t octosql.Type, value interface{}) (out octosql.Value, ok bool) {
+typeSwitch:
+	switch t.TypeID {
+	case octosql.TypeIDNull:
+		if value == nil {
+			return octosql.NewNull(), true
+		}
+	case octosql.TypeIDInt:
+		if value, ok := value.(int); ok {
+			return octosql.NewInt(value), true
+		}
+	case octosql.TypeIDFloat:
+		if value, ok := value.(float64); ok {
+			return octosql.NewFloat(value), true
+		}
+	case octosql.TypeIDBoolean:
+		if value, ok := value.(bool); ok {
+			return octosql.NewBoolean(value), true
+		}
+	case octosql.TypeIDString:
+		if value, ok := value.(string); ok {
+			return octosql.NewString(value), true
+		}
+	case octosql.TypeIDTime:
+		if value, ok := value.(string); ok {
+			if parsed, err := time.Parse(time.RFC3339Nano, value); err == nil {
+				return octosql.NewTime(parsed), true
 			}
 		}
-		return octosql.NewString(value)
-	case time.Time:
-		return octosql.NewTime(value)
-	case map[string]interface{}:
-		// TODO: This won't work if we have structs with varying fields.
-		// We have to look at the type and base the names on that.
-		values := make([]octosql.Value, len(t.Struct.Fields))
-		for i, field := range t.Struct.Fields {
-			values[i] = getOctoSQLValue(field.Type, value[field.Name])
+	case octosql.TypeIDDuration:
+		if value, ok := value.(string); ok {
+			if parsed, err := time.ParseDuration(value); err == nil {
+				return octosql.NewDuration(parsed), true
+			}
 		}
-		return octosql.NewStruct(values)
-	case []interface{}:
-		elements := make([]octosql.Value, len(value))
-		for i := range elements {
-			// TODO: This will not work for only empty lists.
-			// TODO: This will also not work for T1 | List<T2>, same for the structs above actually.
-			// TODO: Types just shouldn't be discriminated unions.
-			elements[i] = getOctoSQLValue(*t.List.Element, value[i])
+	case octosql.TypeIDList:
+		if value, ok := value.([]interface{}); ok {
+			elements := make([]octosql.Value, len(value))
+			for i := range elements {
+				curElement, curOk := getOctoSQLValue(*t.List.Element, value[i])
+				if !curOk {
+					break typeSwitch
+				}
+				elements[i] = curElement
+			}
+			return octosql.NewList(elements), true
 		}
-		return octosql.NewList(elements)
-	case nil:
-		return octosql.NewNull()
+	case octosql.TypeIDStruct:
+		if value, ok := value.(map[string]interface{}); ok {
+			values := make([]octosql.Value, len(t.Struct.Fields))
+			for i, field := range t.Struct.Fields {
+				curValue, curOk := getOctoSQLValue(field.Type, value[field.Name])
+				if !curOk {
+					break typeSwitch
+				}
+				values[i] = curValue
+			}
+			return octosql.NewStruct(values), true
+		}
+	case octosql.TypeIDTuple:
+		if value, ok := value.([]interface{}); ok {
+			elements := make([]octosql.Value, len(value))
+			for i := range elements {
+				curElement, curOk := getOctoSQLValue(t.Tuple.Elements[i], value[i])
+				if !curOk {
+					break typeSwitch
+				}
+				elements[i] = curElement
+			}
+			return octosql.NewList(elements), true
+		}
+	case octosql.TypeIDUnion:
+		for _, alternative := range t.Union.Alternatives {
+			v, ok := getOctoSQLValue(alternative, value)
+			if ok {
+				return v, true
+			}
+		}
 	}
 
-	panic(fmt.Sprintf("unexhaustive json input value match: %T %+v", value, value))
+	return octosql.ZeroValue, false
 }

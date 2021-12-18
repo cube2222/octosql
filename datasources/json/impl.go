@@ -36,7 +36,7 @@ func Creator(name string) (physical.DatasourceImplementation, physical.Schema, e
 		}
 
 		for k := range msg {
-			if t, ok := fields[k]; !ok {
+			if t, ok := fields[k]; ok {
 				fields[k] = octosql.TypeSum(t, getOctoSQLType(msg[k]))
 			} else {
 				fields[k] = getOctoSQLType(msg[k])
@@ -106,7 +106,6 @@ func getOctoSQLType(value interface{}) octosql.Type {
 				elementType = &t
 			}
 		}
-		// TODO: Ticking time bomb, because we don't currently handle the case where this is null, because the list is empty.
 		return octosql.Type{
 			TypeID: octosql.TypeIDList,
 			List: struct {

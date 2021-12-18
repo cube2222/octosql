@@ -19,7 +19,7 @@ const (
 	TypeIDStruct
 	TypeIDTuple
 	TypeIDUnion
-	TypeIDAny
+	TypeIDAny // TODO: Remove this type?
 )
 
 type Type struct {

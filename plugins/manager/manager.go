@@ -13,6 +13,7 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/mholt/archiver"
+	"github.com/mitchellh/go-homedir"
 
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/plugins/repository"
@@ -98,10 +99,15 @@ func (m *PluginManager) GetPluginBinaryPath(ref config.PluginReference, version 
 
 func getPluginDir() string {
 	out, ok := os.LookupEnv("OCTOSQL_PLUGIN_DIR")
-	if !ok {
-		out = "~/.octosql/plugins"
+	if ok {
+		return out
 	}
-	return out
+
+	dir, err := homedir.Dir()
+	if err != nil {
+		log.Fatalf("couldn't get user home directory: %s", err)
+	}
+	return filepath.Join(dir, ".octosql/plugins")
 }
 
 func (m *PluginManager) Install(ctx context.Context, name string, constraint *semver.Constraints) error {

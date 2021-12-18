@@ -65,7 +65,6 @@ func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSend
 	aggregates := btree.New(BTreeDefaultDegree)
 	previouslySentValues := btree.New(BTreeDefaultDegree)
 	trigger := g.triggerPrototype()
-	currentWatermark := time.Time{}
 
 	if err := g.source.Run(ctx, func(produceCtx ProduceContext, record Record) error {
 		ctx := ctx.WithRecord(record)
@@ -146,7 +145,6 @@ func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSend
 	}, func(ctx ProduceContext, msg MetadataMessage) error {
 		if msg.Type == MetadataMessageTypeWatermark {
 			trigger.WatermarkReceived(msg.Watermark)
-			currentWatermark = msg.Watermark
 			if err := g.trigger(ctx, aggregates, previouslySentValues, trigger, msg.Watermark, produce); err != nil {
 				return fmt.Errorf("couldn't trigger keys on watermark")
 			}

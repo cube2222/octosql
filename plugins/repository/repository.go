@@ -4,14 +4,25 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
 
 	"github.com/Masterminds/semver"
+	"github.com/mitchellh/go-homedir"
 )
+
+var repositoriesDir = func() string {
+	dir, err := homedir.Dir()
+	if err != nil {
+		log.Fatalf("couldn't get user home directory: %s", err)
+	}
+	return filepath.Join(dir, ".octosql/repositories")
+}()
 
 var officialPluginRepositoryURL = func() string {
 	if url, ok := os.LookupEnv("OCTOSQL_PLUGIN_REPOSITORY_OFFICIAL_URL"); ok {
@@ -20,17 +31,64 @@ var officialPluginRepositoryURL = func() string {
 	return "https://raw.githubusercontent.com/cube2222/octosql/master/plugin_repository.json"
 }()
 
-var additionalPluginRepositoryURLs = func() []string {
-	if urls, ok := os.LookupEnv("OCTOSQL_PLUGIN_REPOSITORY_ADDITIONAL_URLS"); ok {
-		return strings.Split(urls, ",")
+type RepositoryEntry struct {
+	URL string `json:"url"`
+}
+
+func getAdditionalPluginRepositoryURLs() ([]string, error) {
+	entries, err := os.ReadDir(repositoriesDir)
+	if os.IsNotExist(err) {
+		return nil, nil
+	} else if err != nil {
+		return nil, fmt.Errorf("couldn't read plugin repositories directory: %w", err)
 	}
-	return []string{}
-}()
+
+	out := make([]string, len(entries))
+	for i := range entries {
+		data, err := os.ReadFile(filepath.Join(repositoriesDir, entries[i].Name()))
+		if err != nil {
+			return nil, fmt.Errorf("couldn't read plugin repository file: %w", err)
+		}
+		var entry RepositoryEntry
+		if err := json.Unmarshal(data, &entry); err != nil {
+			return nil, fmt.Errorf("couldn't decode plugin repository file: %w", err)
+		}
+		out[i] = entry.URL
+	}
+
+	return out, nil
+}
+
+func AddRepository(ctx context.Context, url string) error {
+	repo, err := GetRepository(ctx, url)
+	if err != nil {
+		return fmt.Errorf("couldn't get repository: %w", err)
+	}
+	entry := RepositoryEntry{
+		URL: url,
+	}
+	data, err := json.Marshal(entry)
+	if err != nil {
+		return fmt.Errorf("couldn't encode repository entry: %w", err)
+	}
+	if err := os.MkdirAll(repositoriesDir, 0755); err != nil {
+		return fmt.Errorf("couldn't create plugin repositories directory: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(repositoriesDir, repo.Slug), data, 0644); err != nil {
+		return fmt.Errorf("couldn't write repository entry: %w", err)
+	}
+
+	return nil
+}
 
 func GetRepositories(ctx context.Context) ([]Repository, error) {
 	officialRepository, err := GetRepository(ctx, officialPluginRepositoryURL)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get official repository: %w", err)
+	}
+	additionalPluginRepositoryURLs, err := getAdditionalPluginRepositoryURLs()
+	if err != nil {
+		return nil, fmt.Errorf("couldn't get addional repository URLs: %w", err)
 	}
 	additionalRepositories := make([]Repository, len(additionalPluginRepositoryURLs))
 	for i := range additionalPluginRepositoryURLs {

@@ -22,6 +22,7 @@ require (
 	github.com/lib/pq v1.9.0 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/mholt/archiver v3.1.1+incompatible
+	github.com/mitchellh/go-homedir v1.0.0
 	github.com/nwaples/rardecode v1.1.2 // indirect
 	github.com/oklog/ulid/v2 v2.0.2
 	github.com/olekukonko/tablewriter v0.0.4

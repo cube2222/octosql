@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"runtime/debug"
@@ -40,10 +39,15 @@ import (
 var emptyYamlNode = func() yaml.Node {
 	var out yaml.Node
 	if err := yaml.Unmarshal([]byte("{}"), &out); err != nil {
-		log.Fatal("[BUG] Couldn't create empty yaml node: ", err)
+		fatalf("[BUG] Couldn't create empty yaml node: %s", err)
 	}
 	return out
 }()
+
+func fatalf(format string, args ...interface{}) {
+	fmt.Printf(format+"\n", args...)
+	os.Exit(1)
+}
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -64,18 +68,18 @@ octosql "SELECT * FROM plugins.plugins"`,
 		}
 		defer func() {
 			if err := pluginExecutor.Close(); err != nil {
-				log.Fatal(err)
+				fatalf("couldn't close plugin executor: %s", err)
 			}
 		}()
 
 		cfg, err := config.Read()
 		if err != nil {
-			log.Fatal(err)
+			fatalf("couldn't read config: %s", err)
 		}
 
 		installedPlugins, err := pluginManager.ListInstalledPlugins()
 		if err != nil {
-			log.Fatal("Couldn't list installed plugins: ", err)
+			fatalf("Couldn't list installed plugins: %s", err)
 		}
 
 		resolvedVersions := map[string]*semver.Version{}
@@ -99,7 +103,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 				}
 				break
 			}
-			log.Fatalf("Database '%s' plugin '%s' used in configuration is not instaled with the required version.", cfg.Databases[i].Name, cfg.Databases[i].Type.String())
+			fatalf("Database '%s' plugin '%s' used in configuration is not instaled with the required version.", cfg.Databases[i].Name, cfg.Databases[i].Type.String())
 		}
 
 		databases := make(map[string]func() (physical.Database, error))
@@ -157,11 +161,11 @@ octosql "SELECT * FROM plugins.plugins"`,
 
 		statement, err := sqlparser.Parse(args[0])
 		if err != nil {
-			log.Fatal(err)
+			fatalf("couldn't parse query: %s", err)
 		}
 		logicalPlan, outputOptions, err := parser.ParseNode(statement.(sqlparser.SelectStatement), true)
 		if err != nil {
-			log.Fatal(err)
+			fatalf("couldn't parse query: %s", err)
 		}
 		env := physical.Environment{
 			Aggregates: map[string][]physical.AggregateDescriptor{
@@ -187,7 +191,6 @@ octosql "SELECT * FROM plugins.plugins"`,
 			PhysicalConfig:  nil,
 			VariableContext: nil,
 		}
-		// TODO: Wrap panics into errors in subfunction.
 		tableValuedFunctions := map[string]logical.TableValuedFunctionDescription{
 			"max_diff_watermark": table_valued_functions.MaxDiffWatermark,
 			"tumble":             table_valued_functions.Tumble,
@@ -195,15 +198,25 @@ octosql "SELECT * FROM plugins.plugins"`,
 			"poll":               table_valued_functions.Poll,
 		}
 		uniqueNameGenerator := map[string]int{}
-		physicalPlan, mapping := logicalPlan.Typecheck(
-			context.Background(),
-			env,
-			logical.Environment{
-				CommonTableExpressions: map[string]logical.CommonTableExpression{},
-				TableValuedFunctions:   tableValuedFunctions,
-				UniqueNameGenerator:    uniqueNameGenerator,
-			},
-		)
+		var physicalPlan physical.Node
+		var mapping map[string]string
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					fmt.Printf("typecheck error: %s\n", r)
+					os.Exit(1)
+				}
+			}()
+			physicalPlan, mapping = logicalPlan.Typecheck(
+				context.Background(),
+				env,
+				logical.Environment{
+					CommonTableExpressions: map[string]logical.CommonTableExpression{},
+					TableValuedFunctions:   tableValuedFunctions,
+					UniqueNameGenerator:    uniqueNameGenerator,
+				},
+			)
+		}()
 		reverseMapping := logical.ReverseMapping(mapping)
 
 		var executionPlan execution.Node
@@ -228,7 +241,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 			if explain >= 1 {
 				file, err := os.CreateTemp(os.TempDir(), "octosql-describe-*.png")
 				if err != nil {
-					log.Fatal(err)
+					fatalf("couldn't create temporary file: %s", err)
 				}
 				os.WriteFile("describe.txt", []byte(graph.Show(physical.DescribeNode(physicalPlan, true)).String()), os.ModePerm)
 				cmd := exec.Command("dot", "-Tpng")
@@ -236,13 +249,13 @@ octosql "SELECT * FROM plugins.plugins"`,
 				cmd.Stdout = file
 				cmd.Stderr = os.Stderr
 				if err := cmd.Run(); err != nil {
-					log.Fatal("couldn't render graph: ", err)
+					fatalf("couldn't render graph: %s", err)
 				}
 				if err := file.Close(); err != nil {
-					log.Fatal("couldn't close temporary file: ", err)
+					fatalf("couldn't close temporary file: %s", err)
 				}
 				if err := open.Start(file.Name()); err != nil {
-					log.Fatal("couldn't open graph: ", err)
+					fatalf("couldn't open graph: %s", err)
 				}
 				return
 			}
@@ -252,7 +265,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 				env,
 			)
 			if err != nil {
-				log.Fatal(err)
+				fatalf("couldn't materialize physical plan: %s", err)
 			}
 
 			orderByExpressions := make([]execution.Expression, len(outputOptions.OrderByExpressions))
@@ -267,7 +280,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 				})
 				execExpr, err := physicalExpr.Materialize(context.Background(), env.WithRecordSchema(physicalPlan.Schema))
 				if err != nil {
-					log.Fatalf("couldn't materialize output order by expression with index %d: %v", i, err)
+					fatalf("couldn't materialize output order by expression with index %d: %v", i, err)
 				}
 				orderByExpressions[i] = execExpr
 			}
@@ -317,7 +330,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 				)
 			}
 			if outputOptions.Limit > 0 {
-				log.Fatal("LIMIT clause not supported with stream output.")
+				fatalf("LIMIT clause not supported with stream output.")
 			}
 
 			sink = stream.NewOutputPrinter(
@@ -342,7 +355,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 				VariableContext: nil,
 			},
 		); err != nil {
-			log.Fatal(err)
+			fatalf("couldn't run query: %s", err)
 		}
 	},
 }

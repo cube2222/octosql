@@ -48,7 +48,6 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 }
 
 func getOctoSQLValue(t octosql.Type, value interface{}) (out octosql.Value, ok bool) {
-typeSwitch:
 	switch t.TypeID {
 	case octosql.TypeIDNull:
 		if value == nil {
@@ -85,38 +84,35 @@ typeSwitch:
 	case octosql.TypeIDList:
 		if value, ok := value.([]interface{}); ok {
 			elements := make([]octosql.Value, len(value))
+			outOk := true
 			for i := range elements {
 				curElement, curOk := getOctoSQLValue(*t.List.Element, value[i])
-				if !curOk {
-					break typeSwitch
-				}
 				elements[i] = curElement
+				outOk = outOk && curOk
 			}
-			return octosql.NewList(elements), true
+			return octosql.NewList(elements), outOk
 		}
 	case octosql.TypeIDStruct:
 		if value, ok := value.(map[string]interface{}); ok {
 			values := make([]octosql.Value, len(t.Struct.Fields))
+			outOk := true
 			for i, field := range t.Struct.Fields {
 				curValue, curOk := getOctoSQLValue(field.Type, value[field.Name])
-				if !curOk {
-					break typeSwitch
-				}
 				values[i] = curValue
+				outOk = outOk && curOk
 			}
-			return octosql.NewStruct(values), true
+			return octosql.NewStruct(values), outOk
 		}
 	case octosql.TypeIDTuple:
 		if value, ok := value.([]interface{}); ok {
 			elements := make([]octosql.Value, len(value))
+			outOk := true
 			for i := range elements {
 				curElement, curOk := getOctoSQLValue(t.Tuple.Elements[i], value[i])
-				if !curOk {
-					break typeSwitch
-				}
 				elements[i] = curElement
+				outOk = outOk && curOk
 			}
-			return octosql.NewList(elements), true
+			return octosql.NewList(elements), outOk
 		}
 	case octosql.TypeIDUnion:
 		for _, alternative := range t.Union.Alternatives {

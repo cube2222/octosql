@@ -315,11 +315,11 @@ func ParseAliasedTableExpression(expr *sqlparser.AliasedTableExpr) (logical.Node
 		if !subExpr.Qualifier.IsEmpty() {
 			name = fmt.Sprintf("%s.%s", subExpr.Qualifier.String(), name)
 		}
-		var out logical.Node = logical.NewDataSource(name)
+		var alias string
 		if !expr.As.IsEmpty() {
-			out = logical.NewRequalifier(expr.As.String(), out)
+			alias = expr.As.String()
 		} else {
-			alias := strings.TrimSuffix(name, ".json")
+			alias = strings.TrimSuffix(name, ".json")
 			alias = strings.TrimSuffix(alias, ".csv")
 			if index := strings.Index(alias, "."); index != -1 {
 				alias = alias[index+1:]
@@ -327,8 +327,8 @@ func ParseAliasedTableExpression(expr *sqlparser.AliasedTableExpr) (logical.Node
 			if index := strings.LastIndex(alias, "/"); index != -1 {
 				alias = alias[index+1:]
 			}
-			out = logical.NewRequalifier(alias, out)
 		}
+		var out logical.Node = logical.NewDataSource(name, alias)
 		return out, nil
 
 	case *sqlparser.Subquery:

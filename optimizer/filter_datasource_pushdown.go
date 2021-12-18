@@ -30,6 +30,7 @@ func PushDownFilterPredicatesToDatasource(node Node) (Node, bool) {
 				NodeType: NodeTypeDatasource,
 				Datasource: &Datasource{
 					Name:                     node.Filter.Source.Datasource.Name,
+					Alias:                    node.Filter.Source.Datasource.Alias,
 					DatasourceImplementation: node.Filter.Source.Datasource.DatasourceImplementation,
 					Predicates:               newPushedDownPredicates,
 					VariableMapping:          node.Filter.Source.Datasource.VariableMapping,

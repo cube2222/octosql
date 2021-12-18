@@ -62,7 +62,7 @@ const (
 )
 
 type Datasource struct {
-	Name                     string
+	Name, Alias              string
 	DatasourceImplementation DatasourceImplementation
 	VariableMapping          map[string]string
 	Predicates               []Expression
@@ -71,7 +71,7 @@ type Datasource struct {
 func (node *Datasource) PushDownPredicates(newPredicates, pushedDownPredicates []Expression) (rejected []Expression, pushedDown []Expression, changed bool) {
 	uniqueToColname := make(map[string]string)
 	for k, v := range node.VariableMapping {
-		uniqueToColname[v] = k
+		uniqueToColname[v] = k[len(node.Alias)+1:]
 	}
 
 	newPredicatesOriginalNames := renameExpressionSliceVariables(uniqueToColname, newPredicates)
@@ -202,7 +202,7 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (execution.N
 	case NodeTypeDatasource:
 		uniqueToColname := make(map[string]string)
 		for k, v := range node.Datasource.VariableMapping {
-			uniqueToColname[v] = k
+			uniqueToColname[v] = k[len(node.Datasource.Alias)+1:]
 		}
 		predicatesOriginalNames := renameExpressionSliceVariables(uniqueToColname, node.Datasource.Predicates)
 

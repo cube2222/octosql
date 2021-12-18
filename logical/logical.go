@@ -82,11 +82,11 @@ type Node interface {
 }
 
 type DataSource struct {
-	name string
+	name, alias string
 }
 
-func NewDataSource(name string) *DataSource {
-	return &DataSource{name: name}
+func NewDataSource(name, alias string) *DataSource {
+	return &DataSource{name: name, alias: alias}
 }
 
 func (ds *DataSource) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) (physical.Node, map[string]string) {
@@ -103,6 +103,9 @@ func (ds *DataSource) Typecheck(ctx context.Context, env physical.Environment, l
 	newSchemaFields := make([]physical.SchemaField, len(schema.Fields))
 	copy(newSchemaFields, schema.Fields)
 	for i := range newSchemaFields {
+		newSchemaFields[i].Name = ds.alias + "." + newSchemaFields[i].Name
+	}
+	for i := range newSchemaFields {
 		name := newSchemaFields[i].Name
 		unique := logicalEnv.GetUnique(name)
 		outMapping[name] = unique
@@ -113,6 +116,7 @@ func (ds *DataSource) Typecheck(ctx context.Context, env physical.Environment, l
 		NodeType: physical.NodeTypeDatasource,
 		Datasource: &physical.Datasource{
 			Name:                     ds.name,
+			Alias:                    ds.alias,
 			DatasourceImplementation: datasource,
 			VariableMapping:          outMapping,
 		},

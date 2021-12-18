@@ -187,8 +187,7 @@ func VariableNameMatchesField(varName, fieldName string) bool {
 	if varName == fieldName {
 		return true
 	}
-	if !strings.Contains(varName, ".") &&
-		strings.Contains(fieldName, ".") &&
+	if strings.Count(varName, ".") == strings.Count(fieldName, ".")-1 &&
 		fieldName[strings.Index(fieldName, ".")+1:] == varName {
 		return true
 	}

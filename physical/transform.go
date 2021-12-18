@@ -19,6 +19,7 @@ func (t *Transformers) TransformNode(node Node) Node {
 			NodeType: node.NodeType,
 			Datasource: &Datasource{
 				Name:                     node.Datasource.Name,
+				Alias:                    node.Datasource.Alias,
 				DatasourceImplementation: node.Datasource.DatasourceImplementation,
 				Predicates:               pushedDownPredicates,
 				VariableMapping:          node.Datasource.VariableMapping,

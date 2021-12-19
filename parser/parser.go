@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/cube2222/octosql/aggregates"
 	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/parser/sqlparser"
@@ -82,9 +83,15 @@ func ParseSelect(statement *sqlparser.Select, topmost bool) (logical.Node, *Outp
 		root = logical.NewFilter(filterFormula, root)
 	}
 
-	// TODO: This should actually check if one of the expressions has an aggregate, and if so, do the group by code.
-	//   If there is no key in such a case, just fill in 1 automatically.
-	if len(statement.GroupBy) > 0 {
+	isGroupBy := false
+	for i := range statement.SelectExprs {
+		if aliasedExpr, ok := statement.SelectExprs[i].(*sqlparser.AliasedExpr); ok {
+			if isAggregateExpression(aliasedExpr.Expr) {
+				isGroupBy = true
+			}
+		}
+	}
+	if isGroupBy {
 		key := make([]logical.Expression, len(statement.GroupBy))
 		for i := range statement.GroupBy {
 			key[i], err = ParseExpression(statement.GroupBy[i])
@@ -701,6 +708,21 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 	default:
 		return nil, errors.Errorf("unsupported expression %+v of type %v", expr, reflect.TypeOf(expr))
 	}
+}
+
+func isAggregateExpression(expr sqlparser.Expr) bool {
+	switch expr := expr.(type) {
+	case *sqlparser.FuncExpr:
+		functionName := strings.ToLower(expr.Name.String())
+
+		if _, ok := aggregates.Aggregates[functionName]; ok {
+			return true
+		}
+
+	case *sqlparser.ParenExpr:
+		return isAggregateExpression(expr.Expr)
+	}
+	return false
 }
 
 func ParseInfixOperator(left, right sqlparser.Expr, operator string) (logical.Expression, error) {

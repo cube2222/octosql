@@ -159,29 +159,9 @@ octosql "SELECT * FROM plugins.plugins"`,
 				return db, nil
 			}
 		}
-
-		statement, err := sqlparser.Parse(args[0])
-		if err != nil {
-			fatalf("couldn't parse query: %s", err)
-		}
-		logicalPlan, outputOptions, err := parser.ParseNode(statement.(sqlparser.SelectStatement), true)
-		if err != nil {
-			fatalf("couldn't parse query: %s", err)
-		}
 		env := physical.Environment{
-			Aggregates: map[string][]physical.AggregateDescriptor{
-				"array_agg":          aggregates.ArrayOverloads,
-				"array_agg_distinct": aggregates.DistinctAggregateOverloads(aggregates.ArrayOverloads),
-				"count":              aggregates.CountOverloads,
-				"count_distinct":     aggregates.DistinctAggregateOverloads(aggregates.CountOverloads),
-				"sum":                aggregates.SumOverloads,
-				"sum_distinct":       aggregates.DistinctAggregateOverloads(aggregates.SumOverloads),
-				"avg":                aggregates.AverageOverloads,
-				"avg_distinct":       aggregates.DistinctAggregateOverloads(aggregates.AverageOverloads),
-				"max":                aggregates.MaxOverloads,
-				"min":                aggregates.MinOverloads,
-			},
-			Functions: functions.FunctionMap(),
+			Aggregates: aggregates.Aggregates,
+			Functions:  functions.FunctionMap(),
 			Datasources: &physical.DatasourceRepository{
 				Databases: databases,
 				FileHandlers: map[string]func(name string) (physical.DatasourceImplementation, physical.Schema, error){
@@ -191,6 +171,14 @@ octosql "SELECT * FROM plugins.plugins"`,
 			},
 			PhysicalConfig:  nil,
 			VariableContext: nil,
+		}
+		statement, err := sqlparser.Parse(args[0])
+		if err != nil {
+			fatalf("couldn't parse query: %s", err)
+		}
+		logicalPlan, outputOptions, err := parser.ParseNode(statement.(sqlparser.SelectStatement), true)
+		if err != nil {
+			fatalf("couldn't parse query: %s", err)
 		}
 		tableValuedFunctions := map[string]logical.TableValuedFunctionDescription{
 			"max_diff_watermark": table_valued_functions.MaxDiffWatermark,

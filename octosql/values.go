@@ -271,6 +271,13 @@ func (value Value) Compare(other Value) int {
 	}
 }
 
+func (value Value) Equal(other Value) bool {
+	if value.TypeID == TypeIDNull && other.TypeID == TypeIDNull {
+		return false
+	}
+	return value.Compare(other) == 0
+}
+
 func (value Value) Type() Type {
 	switch value.TypeID {
 	case TypeIDList:

@@ -29,9 +29,10 @@ func (impl *impl) Materialize(ctx context.Context, env physical.Environment, sch
 	}
 
 	predicateSQL, placeholderExpressions := predicatesToSQL(pushedDownPredicates)
-	stmt, err := db.PrepareEx(ctx, uuid.Must(uuid.NewV4()).String(), fmt.Sprintf("SELECT %s FROM %s WHERE %s", strings.Join(fields, ", "), impl.table, predicateSQL), nil)
+	sql := fmt.Sprintf("SELECT %s FROM %s WHERE %s", strings.Join(fields, ", "), impl.table, predicateSQL)
+	stmt, err := db.PrepareEx(ctx, uuid.Must(uuid.NewV4()).String(), sql, nil)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't prepare statement: %w", err)
+		return nil, fmt.Errorf("couldn't prepare statement '%s': %w", sql, err)
 	}
 
 	executionPlaceholderExprs := make([]execution.Expression, len(placeholderExpressions))
@@ -80,7 +81,7 @@ func predicateToSQL(builder *strings.Builder, placeholderExpressions *[]physical
 	// If the expression doesn't contain record variables and is of a proper type, we can evaluate it in memory.
 	// This handles constants and non-record variables.
 
-	// TODO: Check variables types when pushing down.
+	// TODO: Check variable types when pushing down.
 	if !containsRecordVariables(expression) {
 		switch expression.Type.TypeID {
 		case octosql.TypeIDNull, octosql.TypeIDInt, octosql.TypeIDFloat,
@@ -105,7 +106,7 @@ func predicateToSQL(builder *strings.Builder, placeholderExpressions *[]physical
 		panic("constant expression slipped through on pushdown")
 	case physical.ExpressionTypeFunctionCall:
 		switch expression.FunctionCall.Name {
-		case ">", ">=", "=", "<=", "<": // Operators
+		case ">", ">=", "=", "<=", "<", "in", "not in": // Operators
 			predicateToSQL(builder, placeholderExpressions, expression.FunctionCall.Arguments[0])
 			builder.WriteString(expression.FunctionCall.Name)
 			predicateToSQL(builder, placeholderExpressions, expression.FunctionCall.Arguments[1])
@@ -124,6 +125,13 @@ func predicateToSQL(builder *strings.Builder, placeholderExpressions *[]physical
 			predicateToSQL(builder, placeholderExpressions, expression.Or.Arguments[i])
 			if i != len(expression.Or.Arguments)-1 {
 				builder.WriteString(" OR ")
+			}
+		}
+	case physical.ExpressionTypeTuple:
+		for i := range expression.Tuple.Arguments {
+			predicateToSQL(builder, placeholderExpressions, expression.Tuple.Arguments[i])
+			if i != len(expression.Tuple.Arguments)-1 {
+				builder.WriteString(" , ")
 			}
 		}
 	default:
@@ -159,12 +167,13 @@ func (impl *impl) PushDownPredicates(newPredicates, pushedDownPredicates []physi
 					isOk = false
 				case physical.ExpressionTypeFunctionCall:
 					switch expr.FunctionCall.Name {
-					case ">", ">=", "=", "<", "<=":
+					case ">", ">=", "=", "<", "<=", "in", "not in":
 					default:
 						isOk = false
 					}
 				case physical.ExpressionTypeAnd:
 				case physical.ExpressionTypeOr:
+				case physical.ExpressionTypeTuple:
 				default:
 					isOk = false
 				}

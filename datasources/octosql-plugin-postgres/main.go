@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/cube2222/octosql/plugins/plugin"
+	"github.com/cube2222/octosql/plugins"
 )
 
 func main() {
-	plugin.Run(Creator)
+	plugins.Run(Creator)
 }

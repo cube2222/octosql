@@ -8,10 +8,10 @@ import (
 
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
-	"github.com/cube2222/octosql/plugins/plugin"
+	"github.com/cube2222/octosql/plugins"
 )
 
-func Creator(ctx context.Context, configUntyped plugin.ConfigDecoder) (physical.Database, error) {
+func Creator(ctx context.Context, configUntyped plugins.ConfigDecoder) (physical.Database, error) {
 	return &Database{}, nil
 }
 

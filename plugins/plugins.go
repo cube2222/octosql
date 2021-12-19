@@ -1,4 +1,4 @@
-package plugin
+package plugins
 
 import (
 	"context"
@@ -132,6 +132,12 @@ func (s *physicalServer) Materialize(ctx context.Context, request *plugins.Mater
 	}()
 
 	return &plugins.MaterializeResponse{SocketPath: socketPath}, nil
+}
+
+func (s *physicalServer) Metadata(context.Context, *plugins.MetadataRequest) (*plugins.MetadataResponse, error) {
+	return &plugins.MetadataResponse{
+		ApiLevel: plugins.APILevel,
+	}, nil
 }
 
 func repopulateFunctions(expr physical.Expression) (physical.Expression, bool) {

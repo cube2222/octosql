@@ -12,7 +12,7 @@ import (
 
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
-	"github.com/cube2222/octosql/plugins/plugin"
+	"github.com/cube2222/octosql/plugins"
 )
 
 type Config struct {
@@ -56,7 +56,7 @@ func connect(config *Config) (*pgx.ConnPool, error) {
 	return db, nil
 }
 
-func Creator(ctx context.Context, configUntyped plugin.ConfigDecoder) (physical.Database, error) {
+func Creator(ctx context.Context, configUntyped plugins.ConfigDecoder) (physical.Database, error) {
 	var cfg Config
 	if err := configUntyped.Decode(&cfg); err != nil {
 		return nil, err

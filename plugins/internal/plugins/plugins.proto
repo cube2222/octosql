@@ -13,6 +13,7 @@ service Datasource {
     rpc GetTable (GetTableRequest) returns (GetTableResponse);
     rpc PushDownPredicates (PushDownPredicatesRequest) returns (PushDownPredicatesResponse);
     rpc Materialize (MaterializeRequest) returns (MaterializeResponse);
+    rpc Metadata (MetadataRequest) returns (MetadataResponse);
 }
 
 message GetTableRequest {
@@ -48,6 +49,12 @@ message MaterializeRequest {
 
 message MaterializeResponse {
     string socket_path = 1;
+}
+
+message MetadataRequest {}
+
+message MetadataResponse {
+    int64 api_level = 1;
 }
 
 service ExecutionDatasource {

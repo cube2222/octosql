@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -125,9 +126,14 @@ func GetRepository(ctx context.Context, url string) (Repository, error) {
 	}
 	defer res.Body.Close()
 
+	data, err := io.ReadAll(res.Body)
+	if err != nil {
+		return Repository{}, fmt.Errorf("couldn't read plugin repository contents: %w", err)
+	}
+
 	var out Repository
-	if err := json.NewDecoder(res.Body).Decode(&out); err != nil {
-		return Repository{}, fmt.Errorf("couldn't decode plugin repository contents: %w", err)
+	if err := json.Unmarshal(data, &out); err != nil {
+		return Repository{}, fmt.Errorf("couldn't decode plugin repository contents '%s': %w", string(data), err)
 	}
 
 	return out, nil

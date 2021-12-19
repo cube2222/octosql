@@ -11,6 +11,8 @@ import (
 	"github.com/cube2222/octosql/physical"
 )
 
+const APILevel = 1
+
 func (x *Record) ToNativeRecord() execution.Record {
 	values := make([]octosql.Value, len(x.Values))
 	for i := range x.Values {

@@ -110,6 +110,14 @@ func (e *PluginExecutor) RunPlugin(ctx context.Context, pluginRef config.PluginR
 	e.runningConns = append(e.runningConns, conn)
 	cli := plugins.NewDatasourceClient(conn)
 
+	res, err := cli.Metadata(ctx, &plugins.MetadataRequest{})
+	if err != nil {
+		return nil, fmt.Errorf("couldn't get metadata from plugin: %w", err)
+	}
+	if res.ApiLevel < plugins.APILevel {
+		return nil, fmt.Errorf("plugin API Level is %d, lower than current %d, this means the plugin was built for an older version of OctoSQL and is not supported anymore - please try installing a newer version", res.ApiLevel, plugins.APILevel)
+	}
+
 	return &Database{
 		cli: cli,
 	}, nil

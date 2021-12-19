@@ -21,6 +21,7 @@ type DatasourceClient interface {
 	GetTable(ctx context.Context, in *GetTableRequest, opts ...grpc.CallOption) (*GetTableResponse, error)
 	PushDownPredicates(ctx context.Context, in *PushDownPredicatesRequest, opts ...grpc.CallOption) (*PushDownPredicatesResponse, error)
 	Materialize(ctx context.Context, in *MaterializeRequest, opts ...grpc.CallOption) (*MaterializeResponse, error)
+	Metadata(ctx context.Context, in *MetadataRequest, opts ...grpc.CallOption) (*MetadataResponse, error)
 }
 
 type datasourceClient struct {
@@ -58,6 +59,15 @@ func (c *datasourceClient) Materialize(ctx context.Context, in *MaterializeReque
 	return out, nil
 }
 
+func (c *datasourceClient) Metadata(ctx context.Context, in *MetadataRequest, opts ...grpc.CallOption) (*MetadataResponse, error) {
+	out := new(MetadataResponse)
+	err := c.cc.Invoke(ctx, "/plugins.Datasource/Metadata", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DatasourceServer is the server API for Datasource service.
 // All implementations must embed UnimplementedDatasourceServer
 // for forward compatibility
@@ -65,6 +75,7 @@ type DatasourceServer interface {
 	GetTable(context.Context, *GetTableRequest) (*GetTableResponse, error)
 	PushDownPredicates(context.Context, *PushDownPredicatesRequest) (*PushDownPredicatesResponse, error)
 	Materialize(context.Context, *MaterializeRequest) (*MaterializeResponse, error)
+	Metadata(context.Context, *MetadataRequest) (*MetadataResponse, error)
 	mustEmbedUnimplementedDatasourceServer()
 }
 
@@ -80,6 +91,9 @@ func (UnimplementedDatasourceServer) PushDownPredicates(context.Context, *PushDo
 }
 func (UnimplementedDatasourceServer) Materialize(context.Context, *MaterializeRequest) (*MaterializeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Materialize not implemented")
+}
+func (UnimplementedDatasourceServer) Metadata(context.Context, *MetadataRequest) (*MetadataResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Metadata not implemented")
 }
 func (UnimplementedDatasourceServer) mustEmbedUnimplementedDatasourceServer() {}
 
@@ -148,6 +162,24 @@ func _Datasource_Materialize_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Datasource_Metadata_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MetadataRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DatasourceServer).Metadata(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/plugins.Datasource/Metadata",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DatasourceServer).Metadata(ctx, req.(*MetadataRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Datasource_ServiceDesc is the grpc.ServiceDesc for Datasource service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -166,6 +198,10 @@ var Datasource_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Materialize",
 			Handler:    _Datasource_Materialize_Handler,
+		},
+		{
+			MethodName: "Metadata",
+			Handler:    _Datasource_Metadata_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

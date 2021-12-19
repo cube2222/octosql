@@ -39,6 +39,30 @@ const (
 	ExpressionTypeTypeAssertion
 )
 
+func (t ExpressionType) String() string {
+	switch t {
+	case ExpressionTypeVariable:
+		return "variable"
+	case ExpressionTypeConstant:
+		return "constant"
+	case ExpressionTypeFunctionCall:
+		return "function_call"
+	case ExpressionTypeAnd:
+		return "and"
+	case ExpressionTypeOr:
+		return "or"
+	case ExpressionTypeQueryExpression:
+		return "query_expression"
+	case ExpressionTypeCoalesce:
+		return "coalesce"
+	case ExpressionTypeTuple:
+		return "tuple"
+	case ExpressionTypeTypeAssertion:
+		return "type_assertion"
+	}
+	return "unknown"
+}
+
 type Variable struct {
 	Name     string
 	IsLevel0 bool

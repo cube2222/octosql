@@ -61,6 +61,34 @@ const (
 	NodeTypeUnnest
 )
 
+func (t NodeType) String() string {
+	switch t {
+	case NodeTypeDatasource:
+		return "datasource"
+	case NodeTypeDistinct:
+		return "distinct"
+	case NodeTypeFilter:
+		return "filter"
+	case NodeTypeGroupBy:
+		return "group_by"
+	case NodeTypeLookupJoin:
+		return "lookup_join"
+	case NodeTypeStreamJoin:
+		return "stream_join"
+	case NodeTypeMap:
+		return "map"
+	case NodeTypeOrderBy:
+		return "order_by"
+	case NodeTypeRequalifier:
+		return "requalifier"
+	case NodeTypeTableValuedFunction:
+		return "table_valued_function"
+	case NodeTypeUnnest:
+		return "unnest"
+	}
+	return "unknown"
+}
+
 type Datasource struct {
 	Name, Alias              string
 	DatasourceImplementation DatasourceImplementation

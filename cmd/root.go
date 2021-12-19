@@ -34,6 +34,7 @@ import (
 	"github.com/cube2222/octosql/plugins/manager"
 	"github.com/cube2222/octosql/plugins/repository"
 	"github.com/cube2222/octosql/table_valued_functions"
+	"github.com/cube2222/octosql/telemetry"
 )
 
 var emptyYamlNode = func() yaml.Node {
@@ -118,7 +119,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 					db, err = pluginExecutor.RunPlugin(context.Background(), curDbConfig.Type, curDbConfig.Name, resolvedVersions[curDbConfig.Name], curDbConfig.Config)
 				})
 				if err != nil {
-					return nil, fmt.Errorf("couldn't run %s plugin %s: %w", curDbConfig.Type, curDbConfig.Name, err)
+					return nil, fmt.Errorf("couldn't run %s plugin %s: %w", curDbConfig.Type.String(), curDbConfig.Name, err)
 				}
 				return db, nil
 			}
@@ -219,10 +220,14 @@ octosql "SELECT * FROM plugins.plugins"`,
 		}()
 		reverseMapping := logical.ReverseMapping(mapping)
 
+		queryTelemetry := telemetry.GetQueryTelemetryData(physicalPlan, installedPlugins)
+
 		var executionPlan execution.Node
 		var orderByExpressions []execution.Expression
 		var outSchema physical.Schema
 		if describe {
+			telemetry.SendTelemetry(context.Background(), "describe", queryTelemetry)
+
 			for i := range physicalPlan.Schema.Fields {
 				physicalPlan.Schema.Fields[i].Name = reverseMapping[physicalPlan.Schema.Fields[i].Name]
 			}
@@ -234,6 +239,8 @@ octosql "SELECT * FROM plugins.plugins"`,
 			outputOptions.OrderByExpressions = nil
 			outputOptions.OrderByDirections = nil
 		} else {
+			telemetry.SendTelemetry(context.Background(), "query", queryTelemetry)
+
 			if optimize {
 				physicalPlan = optimizer.Optimize(physicalPlan)
 			}

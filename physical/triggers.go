@@ -24,6 +24,20 @@ const (
 	TriggerTypeMulti
 )
 
+func (t TriggerType) String() string {
+	switch t {
+	case TriggerTypeCounting:
+		return "counting"
+	case TriggerTypeEndOfStream:
+		return "end_of_stream"
+	case TriggerTypeWatermark:
+		return "watermark"
+	case TriggerTypeMulti:
+		return "multi"
+	}
+	return "unknown"
+}
+
 type CountingTrigger struct {
 	TriggerAfter uint
 }

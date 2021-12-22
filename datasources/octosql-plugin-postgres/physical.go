@@ -110,6 +110,9 @@ func predicateToSQL(builder *strings.Builder, placeholderExpressions *[]physical
 			predicateToSQL(builder, placeholderExpressions, expression.FunctionCall.Arguments[0])
 			builder.WriteString(expression.FunctionCall.Name)
 			predicateToSQL(builder, placeholderExpressions, expression.FunctionCall.Arguments[1])
+		case "is null", "is not null":
+			predicateToSQL(builder, placeholderExpressions, expression.FunctionCall.Arguments[0])
+			builder.WriteString(expression.FunctionCall.Name)
 		default:
 			panic("invalid pushed down predicate function")
 		}
@@ -167,7 +170,7 @@ func (impl *impl) PushDownPredicates(newPredicates, pushedDownPredicates []physi
 					isOk = false
 				case physical.ExpressionTypeFunctionCall:
 					switch expr.FunctionCall.Name {
-					case ">", ">=", "=", "<", "<=", "in", "not in":
+					case ">", ">=", "=", "<", "<=", "in", "not in", "is null", "is not null":
 					default:
 						isOk = false
 					}

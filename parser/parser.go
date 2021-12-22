@@ -704,6 +704,23 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 		return ParseInfixComparison(expr.Left, expr.Right, expr.Operator)
 	case *sqlparser.ParenExpr:
 		return ParseExpression(expr.Expr)
+	case *sqlparser.IsExpr:
+		arg, err := ParseExpression(expr.Expr)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't parse left child expression")
+		}
+
+		var funcName string
+		switch expr.Operator {
+		case sqlparser.IsNullStr:
+			funcName = "is null"
+		case sqlparser.IsNotNullStr:
+			funcName = "is not null"
+		default:
+			return nil, errors.Errorf("unsupported IS operator: %s", expr.Operator)
+		}
+
+		return logical.NewFunctionExpression(funcName, []logical.Expression{arg}), nil
 
 	default:
 		return nil, errors.Errorf("unsupported expression %+v of type %v", expr, reflect.TypeOf(expr))

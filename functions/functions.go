@@ -70,7 +70,6 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 				OutputType:    octosql.Boolean,
 				Strict:        true,
 				Function: func(values []octosql.Value) (octosql.Value, error) {
-					// TODO: Null should probably not equal Null.
 					return octosql.NewBoolean(values[0].Compare(values[1]) >= 0), nil
 				},
 			},
@@ -82,8 +81,33 @@ func FunctionMap() map[string][]physical.FunctionDescriptor {
 				OutputType:    octosql.Boolean,
 				Strict:        true,
 				Function: func(values []octosql.Value) (octosql.Value, error) {
-					// TODO: Null should probably not equal Null.
 					return octosql.NewBoolean(values[0].Compare(values[1]) > 0), nil
+				},
+			},
+		},
+		"is null": {
+			{
+				ArgumentTypes: []octosql.Type{octosql.Any},
+				OutputType:    octosql.Boolean,
+				Strict:        false,
+				Function: func(values []octosql.Value) (octosql.Value, error) {
+					if values[0].TypeID == octosql.TypeIDNull {
+						return octosql.NewBoolean(true), nil
+					}
+					return octosql.NewBoolean(false), nil
+				},
+			},
+		},
+		"is not null": {
+			{
+				ArgumentTypes: []octosql.Type{octosql.Any},
+				OutputType:    octosql.Boolean,
+				Strict:        false,
+				Function: func(values []octosql.Value) (octosql.Value, error) {
+					if values[0].TypeID == octosql.TypeIDNull {
+						return octosql.NewBoolean(false), nil
+					}
+					return octosql.NewBoolean(true), nil
 				},
 			},
 		},

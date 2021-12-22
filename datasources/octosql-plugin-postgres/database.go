@@ -99,7 +99,10 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 
 	fields := make([]physical.SchemaField, len(descriptions))
 	for i := range descriptions {
-		t := getOctoSQLType(descriptions[i][1])
+		t, ok := getOctoSQLType(descriptions[i][1])
+		if !ok {
+			continue
+		}
 		if descriptions[i][2] == "YES" {
 			t = octosql.TypeSum(t, octosql.Null)
 		}
@@ -120,40 +123,42 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 		nil
 }
 
-func getOctoSQLType(typename string) octosql.Type {
+func getOctoSQLType(typename string) (octosql.Type, bool) {
 	if strings.HasPrefix(typename, "_") {
-		elementType := getOctoSQLType(typename[1:])
+		elementType, ok := getOctoSQLType(typename[1:])
+		if !ok {
+			return octosql.Type{}, false
+		}
 
 		return octosql.Type{
 			TypeID: octosql.TypeIDList,
 			List: struct {
 				Element *octosql.Type
 			}{Element: &elementType},
-		}
+		}, true
 	}
 
 	switch typename {
 	case "int", "int2", "int4", "int8":
-		return octosql.Int
+		return octosql.Int, true
 	case "text", "character", "varchar", "bpchar":
-		return octosql.String
+		return octosql.String, true
 	case "real", "numeric", "float4", "float8":
-		return octosql.Float
+		return octosql.Float, true
 	case "bool", "boolean":
-		return octosql.Boolean
+		return octosql.Boolean, true
 	case "timestamptz", "timestamp", "timetz", "time":
-		return octosql.Time
+		return octosql.Time, true
 	case "jsonb":
 		// TODO: Handle me better.
-		return octosql.String
+		return octosql.String, true
 	case "bytea":
 		// TODO: Handle me better.
-		return octosql.String
+		return octosql.String, true
 	default:
-		log.Fatalf("unsupported postgres field type: %s", typename)
-		return octosql.Null
+		log.Printf("unsupported postgres field type '%s' - ignoring column", typename)
+		return octosql.Null, false
 
-		// TODO: Support time.
 		// TODO: Support more types.
 	}
 }

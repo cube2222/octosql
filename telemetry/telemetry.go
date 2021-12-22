@@ -39,12 +39,7 @@ type event struct {
 
 func SendTelemetry(ctx context.Context, eventType string, data interface{}) {
 	if err := sendTelemetry(ctx, eventType, data); err != nil {
-		f, openErr := os.OpenFile(filepath.Join(telemetryDir, "error.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
-		if openErr != nil {
-			return
-		}
-		defer f.Close()
-		fmt.Fprintf(f, "couldn't send telemetry: %s\n", err)
+		log.Printf("couldn't send telemetry: %s", err)
 	}
 }
 

@@ -19,6 +19,7 @@ import (
 
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/logs"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/plugins/internal/plugins"
 )
@@ -66,8 +67,8 @@ func (e *PluginExecutor) RunPlugin(ctx context.Context, pluginRef config.PluginR
 
 	cmd := exec.CommandContext(ctx, binaryPath, absolute)
 	cmd.Stdin = bytes.NewReader(input)
-	cmd.Stdout = text.NewIndentWriter(os.Stdout, []byte(fmt.Sprintf("[plugin][%s][%s] ", pluginRef.String(), databaseName)))
-	cmd.Stderr = text.NewIndentWriter(os.Stderr, []byte(fmt.Sprintf("[plugin][%s][%s] ", pluginRef.String(), databaseName)))
+	cmd.Stdout = text.NewIndentWriter(logs.Output, []byte(fmt.Sprintf("[plugin][%s][%s] ", pluginRef.String(), databaseName)))
+	cmd.Stderr = text.NewIndentWriter(logs.Output, []byte(fmt.Sprintf("[plugin][%s][%s] ", pluginRef.String(), databaseName)))
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("couldn't start plugin: %w", err)
 	}

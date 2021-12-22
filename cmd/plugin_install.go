@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/Masterminds/semver"
 	"github.com/spf13/cobra"
@@ -38,7 +37,7 @@ var pluginInstallCmd = &cobra.Command{
 
 		cfg, err := config.Read()
 		if err != nil {
-			log.Fatal(err)
+			return fmt.Errorf("couldn't read config: %w", err)
 		}
 
 	dbLoop:

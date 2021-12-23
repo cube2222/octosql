@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -15,8 +14,9 @@ var pluginRepositoryAddCmd = &cobra.Command{
 	Short: "",
 	Long:  ``,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := cmd.Context()
 		for _, arg := range args {
-			if err := repository.AddRepository(context.Background(), arg); err != nil {
+			if err := repository.AddRepository(ctx, arg); err != nil {
 				return fmt.Errorf("couldn't add repository '%s': %s", arg, err)
 			}
 		}

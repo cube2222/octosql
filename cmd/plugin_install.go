@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/Masterminds/semver"
@@ -18,7 +17,8 @@ var pluginInstallCmd = &cobra.Command{
 	Short: "",
 	Long:  ``,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		repositories, err := repository.GetRepositories(context.Background())
+		ctx := cmd.Context()
+		repositories, err := repository.GetRepositories(ctx)
 		if err != nil {
 			return fmt.Errorf("couldn't get repositories: %w", err)
 		}
@@ -28,7 +28,7 @@ var pluginInstallCmd = &cobra.Command{
 
 		if len(args) > 0 {
 			for _, arg := range args {
-				if err := pluginManager.Install(context.Background(), arg, nil); err != nil {
+				if err := pluginManager.Install(ctx, arg, nil); err != nil {
 					return err
 				}
 			}
@@ -61,7 +61,7 @@ var pluginInstallCmd = &cobra.Command{
 					}
 				}
 			}
-			if err := pluginManager.Install(context.Background(), cfg.Databases[i].Type.String(), cfg.Databases[i].Version.Raw()); err != nil {
+			if err := pluginManager.Install(ctx, cfg.Databases[i].Type.String(), cfg.Databases[i].Version.Raw()); err != nil {
 				return err
 			}
 		}

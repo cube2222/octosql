@@ -57,6 +57,7 @@ octosql "SELECT * FROM ` + "`mydir/myfile.json`" + `
 octosql "SELECT * FROM plugins.plugins"`,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (outErr error) {
+		ctx := cmd.Context()
 		debug.SetGCPercent(1000)
 
 		pluginManager := &manager.PluginManager{}
@@ -115,7 +116,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 
 			databases[curDbConfig.Name] = func() (physical.Database, error) {
 				once.Do(func() {
-					db, err = pluginExecutor.RunPlugin(context.Background(), curDbConfig.Type, curDbConfig.Name, resolvedVersions[curDbConfig.Name], curDbConfig.Config)
+					db, err = pluginExecutor.RunPlugin(ctx, curDbConfig.Type, curDbConfig.Name, resolvedVersions[curDbConfig.Name], curDbConfig.Config)
 				})
 				if err != nil {
 					return nil, fmt.Errorf("couldn't run %s plugin %s: %w", curDbConfig.Type.String(), curDbConfig.Name, err)
@@ -129,12 +130,12 @@ octosql "SELECT * FROM plugins.plugins"`,
 			var err error
 			databases["plugins"] = func() (physical.Database, error) {
 				once.Do(func() {
-					repositories, err = repository.GetRepositories(context.Background())
+					repositories, err = repository.GetRepositories(ctx)
 				})
 				if err != nil {
 					return nil, fmt.Errorf("couldn't get repositories: %w", err)
 				}
-				return plugins.Creator(context.Background(), pluginManager, repositories)
+				return plugins.Creator(ctx, pluginManager, repositories)
 			}
 		}
 
@@ -150,7 +151,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 
 			databases[curMetadata.Reference.Name] = func() (physical.Database, error) {
 				once.Do(func() {
-					db, err = pluginExecutor.RunPlugin(context.Background(), curMetadata.Reference, curMetadata.Reference.Name, metadata.Versions[0].Number, emptyYamlNode)
+					db, err = pluginExecutor.RunPlugin(ctx, curMetadata.Reference, curMetadata.Reference.Name, metadata.Versions[0].Number, emptyYamlNode)
 				})
 				if err != nil {
 					return nil, fmt.Errorf("couldn't run default plugin %s database: %w", curMetadata.Reference, err)
@@ -187,7 +188,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 		}
 		uniqueNameGenerator := map[string]int{}
 		physicalPlan, mapping, err := typecheckNode(
-			context.Background(),
+			ctx,
 			logicalPlan,
 			env,
 			logical.Environment{
@@ -207,7 +208,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 		var orderByExpressions []execution.Expression
 		var outSchema physical.Schema
 		if describe {
-			telemetry.SendTelemetry(context.Background(), "describe", queryTelemetry)
+			telemetry.SendTelemetry(ctx, "describe", queryTelemetry)
 
 			for i := range physicalPlan.Schema.Fields {
 				physicalPlan.Schema.Fields[i].Name = reverseMapping[physicalPlan.Schema.Fields[i].Name]
@@ -220,7 +221,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 			outputOptions.OrderByExpressions = nil
 			outputOptions.OrderByDirections = nil
 		} else {
-			telemetry.SendTelemetry(context.Background(), "query", queryTelemetry)
+			telemetry.SendTelemetry(ctx, "query", queryTelemetry)
 
 			if optimize {
 				physicalPlan = optimizer.Optimize(physicalPlan)
@@ -249,7 +250,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 			}
 
 			executionPlan, err = physicalPlan.Materialize(
-				context.Background(),
+				ctx,
 				env,
 			)
 			if err != nil {
@@ -258,7 +259,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 
 			orderByExpressions := make([]execution.Expression, len(outputOptions.OrderByExpressions))
 			for i := range outputOptions.OrderByExpressions {
-				physicalExpr, err := typecheckExpr(context.Background(), outputOptions.OrderByExpressions[i], env.WithRecordSchema(physicalPlan.Schema), logical.Environment{
+				physicalExpr, err := typecheckExpr(ctx, outputOptions.OrderByExpressions[i], env.WithRecordSchema(physicalPlan.Schema), logical.Environment{
 					CommonTableExpressions: map[string]logical.CommonTableExpression{},
 					TableValuedFunctions:   tableValuedFunctions,
 					UniqueVariableNames: &logical.VariableMapping{
@@ -269,7 +270,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 				if err != nil {
 					return fmt.Errorf("couldn't typecheck order by expression with index %d: %w", i, err)
 				}
-				execExpr, err := physicalExpr.Materialize(context.Background(), env.WithRecordSchema(physicalPlan.Schema))
+				execExpr, err := physicalExpr.Materialize(ctx, env.WithRecordSchema(physicalPlan.Schema))
 				if err != nil {
 					return fmt.Errorf("couldn't materialize output order by expression with index %d: %v", i, err)
 				}
@@ -342,7 +343,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 
 		if err := sink.Run(
 			execution.ExecutionContext{
-				Context:         context.Background(),
+				Context:         ctx,
 				VariableContext: nil,
 			},
 		); err != nil {
@@ -352,8 +353,8 @@ octosql "SELECT * FROM plugins.plugins"`,
 	},
 }
 
-func Execute() {
-	cobra.CheckErr(rootCmd.Execute())
+func Execute(ctx context.Context) {
+	cobra.CheckErr(rootCmd.ExecuteContext(ctx))
 }
 
 var describe bool

@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sync/atomic"
 	"time"
 
 	"github.com/Masterminds/semver"
@@ -34,6 +33,7 @@ type PluginExecutor struct {
 	runningConns   []*grpc.ClientConn
 	runningPlugins []*exec.Cmd
 	tmpDirs        []string
+	done           []chan error
 }
 
 func (e *PluginExecutor) RunPlugin(ctx context.Context, pluginRef config.PluginReference, databaseName string, version *semver.Version, config yaml.Node) (*Database, error) {
@@ -75,22 +75,24 @@ func (e *PluginExecutor) RunPlugin(ctx context.Context, pluginRef config.PluginR
 
 	e.runningPlugins = append(e.runningPlugins, cmd)
 	e.tmpDirs = append(e.tmpDirs, tmpDir)
+	e.done = append(e.done, make(chan error, 1))
 
-	var done int64
-	var cmdOutErr error
-
-	go func() {
+	go func(i int) {
 		if err := cmd.Wait(); err != nil {
-			cmdOutErr = err
-			atomic.CompareAndSwapInt64(&done, 0, 1)
+			e.done[i] <- err
 		}
-	}()
+	}(len(e.done) - 1)
 
 	for {
 		_, err := os.Stat(socketLocation)
 		if os.IsNotExist(err) {
-			if value := atomic.LoadInt64(&done); value == 1 {
+			select {
+			case cmdOutErr := <-e.done[len(e.done)-1]:
+				e.runningPlugins = e.runningPlugins[:len(e.runningPlugins)-1]
+				e.tmpDirs = e.tmpDirs[:len(e.tmpDirs)-1]
+				e.done = e.done[:len(e.done)-1]
 				return nil, fmt.Errorf("plugin exited prematurely, error: %s", cmdOutErr)
+			default:
 			}
 			time.Sleep(time.Millisecond)
 			continue
@@ -100,7 +102,8 @@ func (e *PluginExecutor) RunPlugin(ctx context.Context, pluginRef config.PluginR
 		break
 	}
 
-	conn, err := grpc.Dial(
+	conn, err := grpc.DialContext(
+		ctx,
 		fmt.Sprintf("unix://%s", absolute),
 		grpc.WithBlock(),
 		grpc.WithInsecure(),
@@ -120,6 +123,7 @@ func (e *PluginExecutor) RunPlugin(ctx context.Context, pluginRef config.PluginR
 	}
 
 	return &Database{
+		ctx: ctx,
 		cli: cli,
 	}, nil
 }
@@ -135,6 +139,9 @@ func (e *PluginExecutor) Close() error {
 			return fmt.Errorf("couldn't close process: %w", err)
 		}
 	}
+	for i := range e.done {
+		<-e.done[i]
+	}
 	for i := range e.tmpDirs {
 		if err := os.RemoveAll(e.tmpDirs[i]); err != nil {
 			return fmt.Errorf("couldn't remove temporary directory '%s': %w", e.tmpDirs[i], err)
@@ -144,6 +151,7 @@ func (e *PluginExecutor) Close() error {
 }
 
 type Database struct {
+	ctx context.Context
 	cli plugins.DatasourceClient
 }
 
@@ -162,6 +170,7 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 	}
 
 	return &PhysicalDatasource{
+			ctx:   d.ctx,
 			cli:   d.cli,
 			table: name,
 		},
@@ -170,6 +179,7 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 }
 
 type PhysicalDatasource struct {
+	ctx   context.Context
 	cli   plugins.DatasourceClient
 	table string
 }
@@ -193,7 +203,7 @@ func (p *PhysicalDatasource) PushDownPredicates(newPredicates, pushedDownPredica
 	if err != nil {
 		panic(fmt.Errorf("couldn't marshal pushed down predicates to JSON: %w", err))
 	}
-	res, err := p.cli.PushDownPredicates(context.Background(), &plugins.PushDownPredicatesRequest{
+	res, err := p.cli.PushDownPredicates(p.ctx, &plugins.PushDownPredicatesRequest{
 		TableContext: &plugins.TableContext{
 			TableName: p.table,
 		},

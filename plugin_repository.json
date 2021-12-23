@@ -4,12 +4,31 @@
   "slug": "core",
   "plugins": [
     {
+      "name": "mysql",
+      "description": "Add support for querying MySQL databases.",
+      "website": "https://github.com/cube2222/octosql-plugin-mysql",
+      "contact_email": "jakub.wit.martin+octosql@gmail.com",
+      "license": "Mozilla Public License Version 2.0",
+      "readme_url": "https://raw.githubusercontent.com/cube2222/octosql-plugin-mysql/main/README.md",
+      "manifest_url": "https://raw.githubusercontent.com/cube2222/octosql-plugin-mysql/main/octosql_manifest.json"
+    },
+    {
+      "name": "postgres",
+      "description": "Add support for querying PostgreSQL databases.",
+      "website": "https://github.com/cube2222/octosql-plugin-postgres",
+      "contact_email": "jakub.wit.martin+octosql@gmail.com",
+      "license": "Mozilla Public License Version 2.0",
+      "readme_url": "https://raw.githubusercontent.com/cube2222/octosql-plugin-postgres/main/README.md",
+      "manifest_url": "https://raw.githubusercontent.com/cube2222/octosql-plugin-postgres/main/octosql_manifest.json"
+    },
+    {
       "name": "random_data",
       "description": "Generates random data for testing.",
       "website": "https://github.com/cube2222/octosql-plugin-random_data",
       "contact_email": "jakub.wit.martin+octosql@gmail.com",
       "license": "Mozilla Public License Version 2.0",
       "readme_url": "https://raw.githubusercontent.com/cube2222/octosql-plugin-random_data/main/README.md",
-      "manifest_url": "https://raw.githubusercontent.com/cube2222/octosql-plugin-random_data/main/octosql_manifest.json"}
+      "manifest_url": "https://raw.githubusercontent.com/cube2222/octosql-plugin-random_data/main/octosql_manifest.json"
+    }
   ]
 }

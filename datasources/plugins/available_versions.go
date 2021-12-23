@@ -11,11 +11,11 @@ import (
 	"github.com/cube2222/octosql/plugins/repository"
 )
 
-type versionsPhysical struct {
+type availableVersionsPhysical struct {
 	repositories []repository.Repository
 }
 
-func (i *versionsPhysical) Materialize(ctx context.Context, env physical.Environment, schema physical.Schema, pushedDownPredicates []physical.Expression) (Node, error) {
+func (i *availableVersionsPhysical) Materialize(ctx context.Context, env physical.Environment, schema physical.Schema, pushedDownPredicates []physical.Expression) (Node, error) {
 	if len(pushedDownPredicates) == 0 {
 		return nil, fmt.Errorf("versions table requires you to filter by the plugin_name - either specify it directly or use a LOOKUP JOIN")
 	}
@@ -34,14 +34,14 @@ func (i *versionsPhysical) Materialize(ctx context.Context, env physical.Environ
 		return nil, fmt.Errorf("couldn't materialize plugin_name expression: %w", err)
 	}
 
-	return &versionsExecuting{
+	return &availableVersionsExecuting{
 		repositories:         i.repositories,
 		fields:               schema.Fields,
 		pluginNameExpression: pluginNameExpressionExecuting,
 	}, nil
 }
 
-func (i *versionsPhysical) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression) (rejected, pushedDown []physical.Expression, changed bool) {
+func (i *availableVersionsPhysical) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression) (rejected, pushedDown []physical.Expression, changed bool) {
 	if len(pushedDownPredicates) > 0 {
 		return newPredicates, pushedDownPredicates, false
 	}
@@ -70,14 +70,14 @@ func (i *versionsPhysical) PushDownPredicates(newPredicates, pushedDownPredicate
 	return newPredicates, pushedDownPredicates, false
 }
 
-type versionsExecuting struct {
+type availableVersionsExecuting struct {
 	repositories []repository.Repository
 	fields       []physical.SchemaField
 
 	pluginNameExpression Expression
 }
 
-func (d *versionsExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
+func (d *availableVersionsExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
 	pluginName, err := d.pluginNameExpression.Evaluate(ctx)
 	if err != nil {
 		return fmt.Errorf("couldn't evaluate plugin_name expression: %w", err)

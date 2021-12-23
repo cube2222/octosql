@@ -102,7 +102,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 				}
 				break
 			}
-			return fmt.Errorf("database '%s' plugin '%s' used in configuration is not instaled with the required version", cfg.Databases[i].Name, cfg.Databases[i].Type.String())
+			return fmt.Errorf("database '%s' plugin '%s' used in configuration is not installed with the required version - run `octosql plugin install` to install all missing plugins", cfg.Databases[i].Name, cfg.Databases[i].Type.String())
 		}
 
 		databases := make(map[string]func() (physical.Database, error))

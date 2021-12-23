@@ -5,12 +5,12 @@ go 1.15
 require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/awalterschulze/gographviz v2.0.3+incompatible
-	github.com/bradleyjkemp/memviz v0.2.3
 	github.com/cockroachdb/apd v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgraph-io/ristretto v0.0.3
 	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/frankban/quicktest v1.14.0 // indirect
+	github.com/go-sql-driver/mysql v1.6.0
 	github.com/gofrs/uuid v4.0.0+incompatible
 	github.com/golang/protobuf v1.5.2
 	github.com/golang/snappy v0.0.4 // indirect
@@ -39,8 +39,7 @@ require (
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad // indirect
-	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2 // indirect
 	golang.org/x/sys v0.0.0-20211113001501-0c823b97ae02 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20211112145013-271947fe86fd // indirect

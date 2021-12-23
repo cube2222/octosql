@@ -22,7 +22,7 @@ type DatabaseConfig struct {
 }
 
 func Read() (*Config, error) {
-	data, err := ioutil.ReadFile("octosql.yaml")
+	data, err := ioutil.ReadFile("octosql.yml")
 	if err != nil {
 		if os.IsNotExist(err) {
 			return &Config{

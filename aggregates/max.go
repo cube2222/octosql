@@ -27,6 +27,11 @@ var MaxOverloads = []physical.AggregateDescriptor{
 		OutputType:   octosql.Duration,
 		Prototype:    NewMaxPrototype(),
 	},
+	{
+		ArgumentType: octosql.Time,
+		OutputType:   octosql.Time,
+		Prototype:    NewMaxPrototype(),
+	},
 }
 
 type Max struct {

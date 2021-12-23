@@ -58,28 +58,36 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 		values := make([]octosql.Value, len(indicesToRead))
 		for i, columnIndex := range indicesToRead {
 			str := row[columnIndex]
-			integer, err := strconv.ParseInt(str, 10, 64)
-			if err == nil {
-				values[i] = octosql.NewInt(int(integer))
-				continue
+			if octosql.Int.Is(d.fields[i].Type) == octosql.TypeRelationIs {
+				integer, err := strconv.ParseInt(str, 10, 64)
+				if err == nil {
+					values[i] = octosql.NewInt(int(integer))
+					continue
+				}
 			}
 
-			float, err := strconv.ParseFloat(str, 64)
-			if err == nil {
-				values[i] = octosql.NewFloat(float)
-				continue
+			if octosql.Float.Is(d.fields[i].Type) == octosql.TypeRelationIs {
+				float, err := strconv.ParseFloat(str, 64)
+				if err == nil {
+					values[i] = octosql.NewFloat(float)
+					continue
+				}
 			}
 
-			b, err := strconv.ParseBool(str)
-			if err == nil {
-				values[i] = octosql.NewBoolean(b)
-				continue
+			if octosql.Boolean.Is(d.fields[i].Type) == octosql.TypeRelationIs {
+				b, err := strconv.ParseBool(str)
+				if err == nil {
+					values[i] = octosql.NewBoolean(b)
+					continue
+				}
 			}
 
-			t, err := time.Parse(time.RFC3339Nano, str)
-			if err == nil {
-				values[i] = octosql.NewTime(t)
-				continue
+			if octosql.Time.Is(d.fields[i].Type) == octosql.TypeRelationIs {
+				t, err := time.Parse(time.RFC3339Nano, str)
+				if err == nil {
+					values[i] = octosql.NewTime(t)
+					continue
+				}
 			}
 
 			values[i] = octosql.NewString(str)

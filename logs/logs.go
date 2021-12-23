@@ -15,6 +15,9 @@ func init() {
 	if err != nil {
 		log.Fatalf("couldn't get user home directory: %s", err)
 	}
+	if err := os.MkdirAll(filepath.Join(dir, ".octosql"), 0755); err != nil {
+		log.Fatalf("couldn't create ~/.octosql home directory: %s", err)
+	}
 	path := filepath.Join(dir, ".octosql/logs.txt")
 	f, err := os.Create(path)
 	if err != nil {

@@ -97,7 +97,7 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 		return nil, physical.Schema{}, fmt.Errorf("table %s does not exist", name)
 	}
 
-	fields := make([]physical.SchemaField, len(descriptions))
+	fields := make([]physical.SchemaField, 0, len(descriptions))
 	for i := range descriptions {
 		t, ok := getOctoSQLType(descriptions[i][1])
 		if !ok {
@@ -106,10 +106,10 @@ func (d *Database) GetTable(ctx context.Context, name string) (physical.Datasour
 		if descriptions[i][2] == "YES" {
 			t = octosql.TypeSum(t, octosql.Null)
 		}
-		fields[i] = physical.SchemaField{
+		fields = append(fields, physical.SchemaField{
 			Name: descriptions[i][0],
 			Type: t,
-		}
+		})
 	}
 
 	return &impl{

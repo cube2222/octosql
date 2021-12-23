@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 
@@ -15,6 +16,9 @@ func main() {
 	go func() {
 		<-signals
 		cancel()
+		<-signals
+		fmt.Println("Force stopped without cleanup.")
+		os.Exit(1)
 	}()
 
 	cmd.Execute(ctx)

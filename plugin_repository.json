@@ -5,7 +5,7 @@
   "plugins": [
     {
       "name": "mysql",
-      "description": "Add support for querying MySQL databases.",
+      "description": "Adds support for querying MySQL databases.",
       "website": "https://github.com/cube2222/octosql-plugin-mysql",
       "contact_email": "jakub.wit.martin+octosql@gmail.com",
       "license": "Mozilla Public License Version 2.0",
@@ -14,7 +14,7 @@
     },
     {
       "name": "postgres",
-      "description": "Add support for querying PostgreSQL databases.",
+      "description": "Adds support for querying PostgreSQL databases.",
       "website": "https://github.com/cube2222/octosql-plugin-postgres",
       "contact_email": "jakub.wit.martin+octosql@gmail.com",
       "license": "Mozilla Public License Version 2.0",

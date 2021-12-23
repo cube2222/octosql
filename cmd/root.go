@@ -56,7 +56,7 @@ var rootCmd = &cobra.Command{
 octosql "SELECT * FROM ` + "`mydir/myfile.json`" + `
 octosql "SELECT * FROM plugins.plugins"`,
 	SilenceErrors: true,
-	RunE: func(cmd *cobra.Command, args []string) (outErr error) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 		debug.SetGCPercent(1000)
 
@@ -67,9 +67,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 		}
 		defer func() {
 			if err := pluginExecutor.Close(); err != nil {
-				if outErr == nil {
-					outErr = fmt.Errorf("couldn't close plugin executor: %w", err)
-				}
+				log.Printf("couldn't close plugin executor: %s", err)
 			}
 		}()
 
@@ -246,7 +244,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 				if err := open.Start(file.Name()); err != nil {
 					return fmt.Errorf("couldn't open graph: %w", err)
 				}
-				return
+				return nil
 			}
 
 			executionPlan, err = physicalPlan.Materialize(

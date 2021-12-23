@@ -135,7 +135,7 @@ func (e *PluginExecutor) Close() error {
 		}
 	}
 	for i := range e.runningPlugins {
-		if err := e.runningPlugins[i].Process.Kill(); err != nil {
+		if err := e.runningPlugins[i].Process.Kill(); err != nil && err != os.ErrProcessDone {
 			return fmt.Errorf("couldn't close process: %w", err)
 		}
 	}

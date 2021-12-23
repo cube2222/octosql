@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime/debug"
 	"sync"
@@ -228,6 +229,14 @@ type ConfigDecoder interface {
 }
 
 func Run(dbCreator func(ctx context.Context, configDecoder ConfigDecoder) (physical.Database, error)) {
+	ctx, cancel := context.WithCancel(context.Background())
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt)
+	go func() {
+		<-signals
+		cancel()
+	}()
+
 	debug.SetGCPercent(1000)
 	log.Printf("Plugin started.")
 
@@ -236,7 +245,7 @@ func Run(dbCreator func(ctx context.Context, configDecoder ConfigDecoder) (physi
 		log.Fatal("couldn't decode plugin input from JSON: ", err)
 	}
 
-	db, err := dbCreator(context.Background(), &input.Config)
+	db, err := dbCreator(ctx, &input.Config)
 	if err != nil {
 		log.Fatal("couldn't create database: ", err)
 	}

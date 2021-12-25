@@ -255,7 +255,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 				return fmt.Errorf("couldn't materialize physical plan: %w", err)
 			}
 
-			orderByExpressions := make([]execution.Expression, len(outputOptions.OrderByExpressions))
+			orderByExpressions = make([]execution.Expression, len(outputOptions.OrderByExpressions))
 			for i := range outputOptions.OrderByExpressions {
 				physicalExpr, err := typecheckExpr(ctx, outputOptions.OrderByExpressions[i], env.WithRecordSchema(physicalPlan.Schema), logical.Environment{
 					CommonTableExpressions: map[string]logical.CommonTableExpression{},

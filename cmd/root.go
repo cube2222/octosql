@@ -230,9 +230,8 @@ octosql "SELECT * FROM plugins.plugins"`,
 				if err != nil {
 					return fmt.Errorf("couldn't create temporary file: %w", err)
 				}
-				os.WriteFile("describe.txt", []byte(graph.Show(physical.DescribeNode(physicalPlan, true)).String()), os.ModePerm)
 				cmd := exec.Command("dot", "-Tpng")
-				cmd.Stdin = strings.NewReader(graph.Show(physical.DescribeNode(physicalPlan, explain >= 2)).String())
+				cmd.Stdin = strings.NewReader(graph.Show(physical.ExplainNode(physicalPlan, explain >= 2)).String())
 				cmd.Stdout = file
 				cmd.Stderr = os.Stderr
 				if err := cmd.Run(); err != nil {

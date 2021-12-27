@@ -2,6 +2,7 @@ package physical
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/cube2222/octosql/helpers/graph"
 	"github.com/cube2222/octosql/octosql"
@@ -22,7 +23,7 @@ func DescribeNode(node Node, withTypeInfo bool) *graph.Node {
 				Type:           octosql.Boolean,
 				ExpressionType: ExpressionTypeAnd,
 				And: &And{
-					Arguments: renameExpressionSliceVariables(uniqueToColname, node.Datasource.Predicates),
+					Arguments: renameExpressionSliceRecordVariables(uniqueToColname, node.Datasource.Predicates),
 				},
 			}, withTypeInfo))
 		}
@@ -135,7 +136,7 @@ func DescribeNode(node Node, withTypeInfo bool) *graph.Node {
 			if i == node.Schema.TimeField {
 				name = "*" + name
 			}
-			typeNode.AddField(node.Schema.Fields[i].Name, node.Schema.Fields[i].Type.String())
+			typeNode.AddField(node.Schema.Fields[i].Name, strings.ReplaceAll(node.Schema.Fields[i].Type.String(), "|", `\|`))
 		}
 		typeNode.AddChild("", out)
 		out = typeNode
@@ -205,7 +206,7 @@ func DescribeExpr(expr Expression, withTypeInfo bool) *graph.Node {
 	}
 
 	if withTypeInfo {
-		typeNode := graph.NewNode(expr.Type.String())
+		typeNode := graph.NewNode(strings.ReplaceAll(expr.Type.String(), "|", `\|`))
 		typeNode.AddChild("", out)
 		out = typeNode
 	}

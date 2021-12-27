@@ -3,6 +3,7 @@ package physical
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/execution/nodes"
@@ -98,26 +99,43 @@ type Datasource struct {
 
 func (node *Datasource) PushDownPredicates(newPredicates, pushedDownPredicates []Expression) (rejected []Expression, pushedDown []Expression, changed bool) {
 	uniqueToColname := make(map[string]string)
+	colnameToUnique := make(map[string]string)
 	for k, v := range node.VariableMapping {
-		uniqueToColname[v] = k[len(node.Alias)+1:]
+		trimmed := strings.TrimPrefix(k, node.Alias+".")
+		uniqueToColname[v] = trimmed
+		colnameToUnique[trimmed] = v
 	}
 
-	newPredicatesOriginalNames := renameExpressionSliceVariables(uniqueToColname, newPredicates)
-	pushedDownPredicatesOriginalNames := renameExpressionSliceVariables(uniqueToColname, pushedDownPredicates)
+	newPredicatesOriginalNames := renameExpressionSliceRecordVariables(uniqueToColname, newPredicates)
+	pushedDownPredicatesOriginalNames := renameExpressionSliceRecordVariables(uniqueToColname, pushedDownPredicates)
 
 	rejectedOriginalNames, pushedDownOriginalNames, changed := node.DatasourceImplementation.PushDownPredicates(newPredicatesOriginalNames, pushedDownPredicatesOriginalNames)
 
-	rejected = renameExpressionSliceVariables(node.VariableMapping, rejectedOriginalNames)
-	pushedDown = renameExpressionSliceVariables(node.VariableMapping, pushedDownOriginalNames)
+	rejected = renameExpressionSliceRecordVariables(node.VariableMapping, rejectedOriginalNames)
+	pushedDown = renameExpressionSliceRecordVariables(node.VariableMapping, pushedDownOriginalNames)
 	return rejected, pushedDown, changed
 }
 
-func renameExpressionSliceVariables(oldToNew map[string]string, exprs []Expression) []Expression {
+func renameExpressionSliceRecordVariables(oldToNew map[string]string, exprs []Expression) []Expression {
 	out := make([]Expression, len(exprs))
 	for i := range exprs {
-		out[i] = RenameVariablesExpr(oldToNew, exprs[i])
+		out[i] = renameRecordVariablesExpr(oldToNew, exprs[i])
 	}
 	return out
+}
+
+func renameRecordVariablesExpr(oldToNew map[string]string, expr Expression) Expression {
+	t := Transformers{
+		ExpressionTransformer: func(expr Expression) Expression {
+			if expr.ExpressionType == ExpressionTypeVariable && expr.Variable.IsLevel0 {
+				if newName, ok := oldToNew[expr.Variable.Name]; ok {
+					expr.Variable.Name = newName
+				}
+			}
+			return expr
+		},
+	}
+	return t.TransformExpr(expr)
 }
 
 type Distinct struct {
@@ -230,9 +248,9 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (execution.N
 	case NodeTypeDatasource:
 		uniqueToColname := make(map[string]string)
 		for k, v := range node.Datasource.VariableMapping {
-			uniqueToColname[v] = k[len(node.Datasource.Alias)+1:]
+			uniqueToColname[v] = strings.TrimPrefix(k, node.Datasource.Alias+".")
 		}
-		predicatesOriginalNames := renameExpressionSliceVariables(uniqueToColname, node.Datasource.Predicates)
+		predicatesOriginalNames := renameExpressionSliceRecordVariables(uniqueToColname, node.Datasource.Predicates)
 
 		fieldsOriginalNames := make([]SchemaField, len(node.Schema.Fields))
 		for i := range node.Schema.Fields {

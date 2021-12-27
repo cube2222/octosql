@@ -575,7 +575,8 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 				return tkn.scanNumber(true)
 			}
 			if tkn.lastChar == '/' {
-				return tkn.scanIdentifier([]byte{byte(ch), byte(tkn.lastChar)}, false)
+				tkn.next()
+				return tkn.scanIdentifier([]byte("./"), false)
 			}
 			return int(ch), nil
 		case ':':

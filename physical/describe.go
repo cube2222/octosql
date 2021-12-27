@@ -195,6 +195,11 @@ func DescribeExpr(expr Expression, withTypeInfo bool) *graph.Node {
 		out.AddField("type", expr.TypeAssertion.TargetType.String())
 		out.AddChild("value", DescribeExpr(expr.TypeAssertion.Expression, withTypeInfo))
 
+	case ExpressionTypeCast:
+		out = graph.NewNode("cast")
+		out.AddField("type", expr.Cast.TargetType.String())
+		out.AddChild("value", DescribeExpr(expr.Cast.Expression, withTypeInfo))
+
 	default:
 		panic("unexhaustive expression type match")
 	}

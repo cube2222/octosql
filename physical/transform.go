@@ -301,6 +301,15 @@ func (t *Transformers) TransformExpr(expr Expression) Expression {
 				TargetType: expr.TypeAssertion.TargetType,
 			},
 		}
+	case ExpressionTypeCast:
+		out = Expression{
+			Type:           expr.Type,
+			ExpressionType: expr.ExpressionType,
+			Cast: &Cast{
+				Expression: t.TransformExpr(expr.Cast.Expression),
+				TargetType: expr.Cast.TargetType,
+			},
+		}
 	default:
 		panic("unexhaustive expression type match")
 	}

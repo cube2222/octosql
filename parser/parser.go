@@ -455,17 +455,12 @@ func ParseAggregate(expr sqlparser.Expr) (string, logical.Expression, error) {
 	switch expr := expr.(type) {
 	case *sqlparser.FuncExpr:
 		curAggregate := strings.ToLower(expr.Name.String())
-		// _, ok := logical.AggregateFunctions[curAggregate]
-		// if !ok {
-		// 	return "", nil, errors.Wrapf(ErrNotAggregate, "aggregate not found: %v", expr.Name)
-		// }
-
 		if expr.Distinct {
 			curAggregate = fmt.Sprintf("%v_distinct", curAggregate)
-			// _, ok := logical.AggregateFunctions[curAggregate]
-			// if !ok {
-			// 	return "", nil, errors.Errorf("aggregate %v can't be used with distinct", expr.Name)
-			// }
+		}
+		_, ok := aggregates.Aggregates[curAggregate]
+		if !ok {
+			return "", nil, errors.Wrapf(ErrNotAggregate, "aggregate not found: %v", expr.Name)
 		}
 
 		var parsedArg logical.Expression
@@ -721,9 +716,72 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 		}
 
 		return logical.NewFunctionExpression(funcName, []logical.Expression{arg}), nil
+	case *sqlparser.ConvertExpr:
+		arg, err := ParseExpression(expr.Expr)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't parse expression being cast")
+		}
+		targetType, err := ParseType(expr.Type)
+		if err != nil {
+			return nil, errors.Wrap(err, "couldn't parse type to cast to")
+		}
 
+		return logical.NewCast(arg, targetType), nil
 	default:
 		return nil, errors.Errorf("unsupported expression %+v of type %v", expr, reflect.TypeOf(expr))
+	}
+}
+
+func ParseType(t sqlparser.ConvertType) (octosql.Type, error) {
+	switch t := t.(type) {
+	case *sqlparser.ConvertTypeList:
+		element, err := ParseType(t.Element)
+		if err != nil {
+			return octosql.Type{}, errors.Wrap(err, "couldn't parse element type of list type")
+		}
+
+		return octosql.Type{
+			TypeID: octosql.TypeIDList,
+			List:   struct{ Element *octosql.Type }{Element: &element},
+		}, nil
+	case *sqlparser.ConvertTypeObject:
+		fields := make([]octosql.StructField, len(t.Fields))
+		for i := range t.Fields {
+			fieldType, err := ParseType(t.Fields[i].Type)
+			if err != nil {
+				return octosql.Type{}, errors.Wrapf(err, "couldn't parse field '%s' type of object type", t.Fields[i].Name)
+			}
+			fields[i] = octosql.StructField{
+				Name: t.Fields[i].Name,
+				Type: fieldType,
+			}
+		}
+
+		return octosql.Type{
+			TypeID: octosql.TypeIDStruct,
+			Struct: struct{ Fields []octosql.StructField }{Fields: fields},
+		}, nil
+	case *sqlparser.ConvertTypeSimple:
+		switch tName := strings.ToLower(t.Name); tName {
+		case "null":
+			return octosql.Null, nil
+		case "int":
+			return octosql.Int, nil
+		case "float":
+			return octosql.Float, nil
+		case "boolean":
+			return octosql.Boolean, nil
+		case "string":
+			return octosql.String, nil
+		case "time":
+			return octosql.Time, nil
+		case "duration":
+			return octosql.Duration, nil
+		default:
+			return octosql.Type{}, errors.Errorf("unknown type: %s", tName)
+		}
+	default:
+		return octosql.Type{}, errors.Errorf("unsupported type %+v of type %v", t, reflect.TypeOf(t))
 	}
 }
 

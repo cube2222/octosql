@@ -523,8 +523,6 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 		return tkn.scanIdentifier([]byte{byte(ch)}, isDbSystemVariable)
 	case isDigit(ch):
 		return tkn.scanNumber(false)
-	case ch == ':':
-		return tkn.scanBindVar()
 	case ch == ';':
 		if tkn.multi {
 			// In multi mode, ';' is treated as EOF. So, we don't advance.
@@ -540,6 +538,8 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 		tkn.next()
 		switch ch {
 		case '[', ']':
+			return int(ch), nil
+		case '{', '}':
 			return int(ch), nil
 		case '=', ',', '(', ')', '+', '*', '%', '^':
 			if tkn.lastChar == '>' {
@@ -576,6 +576,12 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 			}
 			if tkn.lastChar == '/' {
 				return tkn.scanIdentifier([]byte{byte(ch), byte(tkn.lastChar)}, false)
+			}
+			return int(ch), nil
+		case ':':
+			if tkn.lastChar == ':' {
+				tkn.next()
+				return LIST_ARG, nil
 			}
 			return int(ch), nil
 		case '/':

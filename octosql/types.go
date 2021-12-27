@@ -166,6 +166,9 @@ func (t Type) String() string {
 	case TypeIDDuration:
 		return "Duration"
 	case TypeIDList:
+		if t.List.Element == nil {
+			return "[]"
+		}
 		return fmt.Sprintf("[%s]", *t.List.Element)
 	case TypeIDStruct:
 		fieldStrings := make([]string, len(t.Struct.Fields))

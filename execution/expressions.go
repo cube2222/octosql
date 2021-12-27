@@ -73,6 +73,34 @@ func (c *TypeAssertion) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 	return value, nil
 }
 
+type Cast struct {
+	targetType octosql.Type
+	expr       Expression
+}
+
+func NewCast(targetType octosql.Type, expr Expression) *Cast {
+	return &Cast{
+		targetType: targetType,
+		expr:       expr,
+	}
+}
+
+func (c *Cast) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
+	value, err := c.expr.Evaluate(ctx)
+	if err != nil {
+		return octosql.ZeroValue, fmt.Errorf("couldn't evaluate cast argument: %w", err)
+	}
+
+	if c.targetType.TypeID == octosql.TypeIDStruct {
+		return octosql.ZeroValue, fmt.Errorf("type assertions for structures aren't yet supported")
+	}
+	if value.Type().Is(c.targetType) != octosql.TypeRelationIs {
+		return octosql.NewNull(), nil
+	}
+
+	return value, nil
+}
+
 type FunctionCall struct {
 	function         func([]octosql.Value) (octosql.Value, error)
 	args             []Expression

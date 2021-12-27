@@ -23,6 +23,7 @@ type Expression struct {
 	Coalesce        *Coalesce
 	Tuple           *Tuple
 	TypeAssertion   *TypeAssertion
+	Cast            *Cast
 }
 
 type ExpressionType int
@@ -37,6 +38,7 @@ const (
 	ExpressionTypeCoalesce
 	ExpressionTypeTuple
 	ExpressionTypeTypeAssertion
+	ExpressionTypeCast
 )
 
 func (t ExpressionType) String() string {
@@ -59,6 +61,8 @@ func (t ExpressionType) String() string {
 		return "tuple"
 	case ExpressionTypeTypeAssertion:
 		return "type_assertion"
+	case ExpressionTypeCast:
+		return "cast"
 	}
 	return "unknown"
 }
@@ -99,6 +103,11 @@ type Tuple struct {
 }
 
 type TypeAssertion struct {
+	Expression Expression
+	TargetType octosql.Type
+}
+
+type Cast struct {
 	Expression Expression
 	TargetType octosql.Type
 }
@@ -202,6 +211,13 @@ func (expr *Expression) Materialize(ctx context.Context, env Environment) (execu
 		}
 
 		return execution.NewTypeAssertion(expr.TypeAssertion.TargetType, expression), nil
+	case ExpressionTypeCast:
+		expression, err := expr.Cast.Expression.Materialize(ctx, env)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't materialize cast expression: %w", err)
+		}
+
+		return execution.NewCast(expr.Cast.TargetType, expression), nil
 	}
 
 	panic("unexhaustive expression type match")
@@ -264,6 +280,9 @@ func (expr Expression) variablesUsed(acc map[string]struct{}) {
 		return
 	case ExpressionTypeTypeAssertion:
 		expr.TypeAssertion.Expression.variablesUsed(acc)
+		return
+	case ExpressionTypeCast:
+		expr.Cast.Expression.variablesUsed(acc)
 		return
 	}
 

@@ -3320,7 +3320,7 @@ func (node *SubstrExpr) walkSubtree(visit Visit) error {
 // or it's equivalent CAST(expr AS type). Both are rewritten to the former.
 type ConvertExpr struct {
 	Expr Expr
-	Type *ConvertType
+	Type ConvertType
 }
 
 // Format formats the node.
@@ -3368,38 +3368,95 @@ func (node *ConvertUsingExpr) replace(from, to Expr) bool {
 	return replaceExprs(from, to, &node.Expr)
 }
 
-// ConvertType represents the type in call to CONVERT(expr, type)
-type ConvertType struct {
-	Type     string
-	Length   *SQLVal
-	Scale    *SQLVal
-	Operator string
-	Charset  string
+type ConvertType interface {
+	iConvertType()
+	SQLNode
 }
 
-// this string is "character set" and this comment is required
-const (
-	CharacterSetStr = " character set"
-	CharsetStr      = "charset"
-)
+func (*ConvertTypeSimple) iConvertType() {}
+func (*ConvertTypeList) iConvertType()   {}
+func (*ConvertTypeObject) iConvertType() {}
+
+type ConvertTypeSimple struct {
+	Name string
+}
 
 // Format formats the node.
-func (node *ConvertType) Format(buf *TrackedBuffer) {
-	buf.Myprintf("%s", node.Type)
-	if node.Length != nil {
-		buf.Myprintf("(%v", node.Length)
-		if node.Scale != nil {
-			buf.Myprintf(", %v", node.Scale)
-		}
-		buf.Myprintf(")")
-	}
-	if node.Charset != "" {
-		buf.Myprintf("%s %s", node.Operator, node.Charset)
-	}
+func (node *ConvertTypeSimple) Format(buf *TrackedBuffer) {
+	buf.Myprintf("%s", node.Name)
 }
 
-func (node *ConvertType) walkSubtree(visit Visit) error {
+func (node *ConvertTypeSimple) walkSubtree(visit Visit) error {
 	return nil
+}
+
+type ConvertTypeList struct {
+	Element ConvertType
+}
+
+// Format formats the node.
+func (node *ConvertTypeList) Format(buf *TrackedBuffer) {
+	buf.Myprintf("[%s]", node.Element)
+}
+
+func (node *ConvertTypeList) walkSubtree(visit Visit) error {
+	if node == nil {
+		return nil
+	}
+	return Walk(
+		visit,
+		node.Element,
+	)
+}
+
+type ConvertTypeObject struct {
+	Fields []*ConvertTypeObjectField
+}
+
+// Format formats the Object.
+func (node *ConvertTypeObject) Format(buf *TrackedBuffer) {
+	buf.Myprintf("{")
+	for i := range node.Fields {
+		buf.Myprintf("%s", node.Fields[i])
+		if i != len(node.Fields)-1 {
+			buf.Myprintf(", ")
+		}
+	}
+	buf.Myprintf("}")
+}
+
+func (node *ConvertTypeObject) walkSubtree(visit Visit) error {
+	if node == nil {
+		return nil
+	}
+	nodes := make([]SQLNode, len(node.Fields))
+	for i := range node.Fields {
+		nodes[i] = node.Fields[i]
+	}
+	return Walk(
+		visit,
+		nodes...,
+	)
+}
+
+type ConvertTypeObjectField struct {
+	Name string
+	Type ConvertType
+}
+
+// Format formats the node.
+func (node *ConvertTypeObjectField) Format(buf *TrackedBuffer) {
+	buf.Myprintf("%s: %s", node.Name, node.Type)
+}
+
+func (node *ConvertTypeObjectField) walkSubtree(visit Visit) error {
+	if node == nil {
+		return nil
+	}
+	return Walk(
+		visit,
+		node.Type,
+	)
 }
 
 // MatchExpr represents a call to the MATCH function

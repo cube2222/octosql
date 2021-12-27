@@ -105,7 +105,9 @@ func skipToEnd(yylex interface{}) {
   setExpr       *SetExpr
   colIdent      ColIdent
   tableIdent    TableIdent
-  convertType   *ConvertType
+  convertType   ConvertType
+  convertTypeObjectFields  []*ConvertTypeObjectField
+  convertTypeObjectField   *ConvertTypeObjectField
   aliasedTableName *AliasedTableExpr
   TableSpec  *TableSpec
   columnType    ColumnType
@@ -296,6 +298,8 @@ func skipToEnd(yylex interface{}) {
 %type <str> charset
 %type <str> set_session_or_global show_session_or_global
 %type <convertType> convert_type
+%type <convertTypeObjectFields> convert_type_object_fields convert_type_object_fields_opt
+%type <convertTypeObjectField> convert_type_object_field
 %type <columnType> column_type
 %type <columnType> int_type decimal_type numeric_type time_type char_type spatial_type
 %type <sqlVal> length_opt column_comment_opt
@@ -1513,10 +1517,6 @@ show_statement:
     $$ = &Show{Type: string($2) + " " + string($3)}
   }
 /* SHOW CHARACTER SET and SHOW CHARSET are equivalent */
-| SHOW CHARACTER SET ddl_skip_to_end
-  {
-    $$ = &Show{Type: CharsetStr}
-  }
 | SHOW CHARSET ddl_skip_to_end
   {
     $$ = &Show{Type: string($2)}
@@ -2551,6 +2551,10 @@ value_expression:
   {
     $$ = &BinaryExpr{Left: $1, Operator: ArrayElement, Right: $3}
   }
+| value_expression LIST_ARG convert_type
+  {
+    $$ = &ConvertExpr{Expr: $1, Type: $3}
+  }
 
 /*
   Regular function calls without special token or syntax, guaranteed to not
@@ -2781,59 +2785,50 @@ charset:
 }
 
 convert_type:
-  BINARY length_opt
+  ID
   {
-    $$ = &ConvertType{Type: string($1), Length: $2}
+    $$ = &ConvertTypeSimple{Name: string($1)}
   }
-| CHAR length_opt charset_opt
+| non_reserved_keyword
   {
-    $$ = &ConvertType{Type: string($1), Length: $2, Charset: $3, Operator: CharacterSetStr}
+    $$ = &ConvertTypeSimple{Name: string($1)}
   }
-| CHAR length_opt ID
+| '[' convert_type ']'
   {
-    $$ = &ConvertType{Type: string($1), Length: $2, Charset: string($3)}
+    $$ = &ConvertTypeList{Element: $2}
   }
-| DATE
+| '{' convert_type_object_fields_opt '}'
   {
-    $$ = &ConvertType{Type: string($1)}
+    $$ = &ConvertTypeObject{Fields: $2}
   }
-| DATETIME length_opt
+
+convert_type_object_fields_opt:
   {
-    $$ = &ConvertType{Type: string($1), Length: $2}
+    $$ = nil
   }
-| DECIMAL decimal_length_opt
+| convert_type_object_fields
   {
-    $$ = &ConvertType{Type: string($1)}
-    $$.Length = $2.Length
-    $$.Scale = $2.Scale
+    $$ = $1
   }
-| JSON
+
+convert_type_object_fields:
+  convert_type_object_field
   {
-    $$ = &ConvertType{Type: string($1)}
+    $$ = []*ConvertTypeObjectField{$1}
   }
-| NCHAR length_opt
+| convert_type_object_field ',' convert_type_object_fields
   {
-    $$ = &ConvertType{Type: string($1), Length: $2}
+    $$ = append([]*ConvertTypeObjectField{$1}, $3...)
   }
-| SIGNED
+
+convert_type_object_field:
+  ID ':' convert_type
   {
-    $$ = &ConvertType{Type: string($1)}
+    $$ = &ConvertTypeObjectField{Name: string($1), Type: $3}
   }
-| SIGNED INTEGER
+| non_reserved_keyword ':' convert_type
   {
-    $$ = &ConvertType{Type: string($1)}
-  }
-| TIME length_opt
-  {
-    $$ = &ConvertType{Type: string($1), Length: $2}
-  }
-| UNSIGNED
-  {
-    $$ = &ConvertType{Type: string($1)}
-  }
-| UNSIGNED INTEGER
-  {
-    $$ = &ConvertType{Type: string($1)}
+    $$ = &ConvertTypeObjectField{Name: string($1), Type: $3}
   }
 
 expression_opt:

@@ -347,6 +347,32 @@ func (c *Coalesce) Typecheck(ctx context.Context, env physical.Environment, logi
 	}
 }
 
+type Cast struct {
+	arg        Expression
+	targetType octosql.Type
+}
+
+func NewCast(arg Expression, targetType octosql.Type) *Cast {
+	return &Cast{arg: arg, targetType: targetType}
+}
+
+func (c *Cast) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
+	expr := c.arg.Typecheck(ctx, env, logicalEnv)
+
+	if rel := c.targetType.Is(expr.Type); rel != octosql.TypeRelationIs {
+		panic(fmt.Errorf("typecast target type '%s' isn't a subtype of the expression type '%s'", c.targetType.String(), expr.Type.String()))
+	}
+
+	return physical.Expression{
+		Type:           octosql.TypeSum(c.targetType, octosql.Null),
+		ExpressionType: physical.ExpressionTypeCast,
+		Cast: &physical.Cast{
+			Expression: expr,
+			TargetType: c.targetType,
+		},
+	}
+}
+
 func TypecheckExpression(ctx context.Context, env physical.Environment, logicalEnv Environment, expected octosql.Type, expression Expression) physical.Expression {
 	expr := expression.Typecheck(ctx, env, logicalEnv)
 	rel := expr.Type.Is(expected)

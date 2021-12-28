@@ -289,7 +289,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 			Run(execCtx execution.ExecutionContext) error
 		}
 
-		switch os.Getenv("OCTOSQL_OUTPUT") {
+		switch output {
 		case "live_table":
 			sink = batch.NewOutputPrinter(
 				executionPlan,
@@ -310,6 +310,16 @@ octosql "SELECT * FROM plugins.plugins"`,
 				batch.NewTableFormatter,
 				false,
 			)
+		case "csv":
+			sink = batch.NewOutputPrinter(
+				executionPlan,
+				orderByExpressions,
+				logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
+				outputOptions.Limit,
+				outSchema,
+				batch.NewCSVFormatter,
+				false,
+			)
 		case "stream_native":
 			if len(orderByExpressions) > 0 {
 				executionPlan = nodes.NewBatchOrderBy(
@@ -327,15 +337,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 				stream.NewNativeFormat(outSchema),
 			)
 		default:
-			sink = batch.NewOutputPrinter(
-				executionPlan,
-				orderByExpressions,
-				logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
-				outputOptions.Limit,
-				outSchema,
-				batch.NewTableFormatter,
-				true,
-			)
+			return fmt.Errorf("invalid output format: '%s'", output)
 		}
 
 		if err := sink.Run(
@@ -357,11 +359,13 @@ func Execute(ctx context.Context) {
 var describe bool
 var explain int
 var optimize bool
+var output string
 
 func init() {
 	rootCmd.Flags().BoolVar(&describe, "describe", false, "Describe query output schema.")
 	rootCmd.Flags().IntVar(&explain, "explain", 0, "Describe query output schema.")
 	rootCmd.Flags().BoolVar(&optimize, "optimize", true, "Whether OctoSQL should optimize the query.")
+	rootCmd.Flags().StringVar(&output, "output", "live_table", "Output format to use. Available options are live_table, batch_table, csv and stream_native.")
 }
 
 func typecheckNode(ctx context.Context, node logical.Node, env physical.Environment, logicalEnv logical.Environment) (_ physical.Node, _ map[string]string, outErr error) {

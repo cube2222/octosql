@@ -18,6 +18,7 @@ import (
 	"github.com/cube2222/octosql/aggregates"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/datasources/csv"
+	"github.com/cube2222/octosql/datasources/docs"
 	"github.com/cube2222/octosql/datasources/json"
 	"github.com/cube2222/octosql/datasources/plugins"
 	"github.com/cube2222/octosql/execution"
@@ -135,6 +136,9 @@ octosql "SELECT * FROM plugins.plugins"`,
 				}
 				return plugins.Creator(ctx, pluginManager, repositories)
 			}
+		}
+		databases["docs"] = func() (physical.Database, error) {
+			return docs.Creator(ctx)
 		}
 
 		for _, metadata := range installedPlugins {

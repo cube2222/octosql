@@ -92,41 +92,6 @@ func NewTuple(values []Value) Value {
 }
 
 func (value Value) Compare(other Value) int {
-	// Tuples compare positionally with structs.
-	// TODO: Think about if this really is a great idea.
-	if value.TypeID == TypeIDTuple && other.TypeID == TypeIDStruct ||
-		other.TypeID == TypeIDTuple && value.TypeID == TypeIDStruct {
-		var tuple, structure Value
-		multiplier := 1
-		if value.TypeID == TypeIDTuple && other.TypeID == TypeIDStruct {
-			tuple = value
-			structure = other
-		} else {
-			tuple = other
-			structure = value
-			multiplier = -1
-		}
-
-		maxLen := len(tuple.Tuple)
-		if len(structure.Struct) > maxLen {
-			maxLen = len(structure.Struct)
-		}
-
-		for i := 0; i < maxLen; i++ {
-			if i == len(tuple.Tuple) {
-				return -1 * multiplier
-			} else if i == len(structure.Struct) {
-				return 1 * multiplier
-			}
-
-			if comp := tuple.Tuple[i].Compare(structure.Struct[i]); comp != 0 {
-				return comp * multiplier
-			}
-		}
-
-		return 0
-	}
-
 	// The runtime types may be different for a union.
 	// The concrete instance type will be present.
 	if value.TypeID != other.TypeID {

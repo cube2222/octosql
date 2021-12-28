@@ -13,12 +13,6 @@ import (
 	"github.com/cube2222/octosql/physical"
 )
 
-var tableInternalNames = map[string]string{
-	"addresses": "address/random_address",
-	"companies": "company/random_company",
-	"users":     "users/random_user",
-}
-
 func Creator(ctx context.Context, manager *manager.PluginManager, repos []repository.Repository) (physical.Database, error) {
 	return &Database{
 		Manager:      manager,
@@ -33,7 +27,11 @@ type Database struct {
 
 func (d *Database) ListTables(ctx context.Context) ([]string, error) {
 	return []string{
-		"plugins",
+		"available_plugins",
+		"repositories",
+		"available_versions",
+		"installed_plugins",
+		"installed_versions",
 	}, nil
 }
 

@@ -32,7 +32,7 @@ func (fe *FunctionExpression) Typecheck(ctx context.Context, env physical.Enviro
 
 	descriptors := env.Functions[fe.Name]
 descriptorLoop:
-	for _, descriptor := range descriptors {
+	for _, descriptor := range descriptors.Descriptors {
 		if descriptor.TypeFn != nil {
 			ts := make([]octosql.Type, len(arguments))
 			for i := range arguments {
@@ -74,7 +74,7 @@ descriptorLoop:
 	}
 	if !found {
 	descriptorLoop2:
-		for _, descriptor := range descriptors {
+		for _, descriptor := range descriptors.Descriptors {
 			if len(arguments) != len(descriptor.ArgumentTypes) {
 				continue
 			}

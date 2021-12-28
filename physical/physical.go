@@ -14,7 +14,7 @@ import (
 type Environment struct {
 	Aggregates      map[string][]AggregateDescriptor
 	Datasources     *DatasourceRepository
-	Functions       map[string][]FunctionDescriptor
+	Functions       map[string]FunctionDetails
 	PhysicalConfig  map[string]interface{}
 	VariableContext *VariableContext
 }
@@ -98,6 +98,11 @@ func (dr *DatasourceRepository) GetDatasource(ctx context.Context, name string) 
 type DatasourceImplementation interface {
 	Materialize(ctx context.Context, env Environment, schema Schema, pushedDownPredicates []Expression) (execution.Node, error)
 	PushDownPredicates(newPredicates, pushedDownPredicates []Expression) (rejected, pushedDown []Expression, changed bool)
+}
+
+type FunctionDetails struct {
+	Description string
+	Descriptors []FunctionDescriptor
 }
 
 type FunctionDescriptor struct {

@@ -30,9 +30,9 @@ func (fe *FunctionExpression) Typecheck(ctx context.Context, env physical.Enviro
 	var out physical.Expression
 	var found bool
 
-	descriptors := env.Functions[fe.Name]
+	details := env.Functions[fe.Name]
 descriptorLoop:
-	for _, descriptor := range descriptors.Descriptors {
+	for _, descriptor := range details.Descriptors {
 		if descriptor.TypeFn != nil {
 			ts := make([]octosql.Type, len(arguments))
 			for i := range arguments {
@@ -74,7 +74,7 @@ descriptorLoop:
 	}
 	if !found {
 	descriptorLoop2:
-		for _, descriptor := range descriptors.Descriptors {
+		for _, descriptor := range details.Descriptors {
 			if len(arguments) != len(descriptor.ArgumentTypes) {
 				continue
 			}

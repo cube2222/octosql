@@ -25,6 +25,46 @@ func (d *Database) ListTables(ctx context.Context) ([]string, error) {
 
 func (d *Database) GetTable(ctx context.Context, name string) (physical.DatasourceImplementation, physical.Schema, error) {
 	switch name {
+	case "aggregates":
+		return &aggregatesPhysical{},
+			physical.Schema{
+				TimeField: -1,
+				Fields: []physical.SchemaField{
+					{
+						Name: "name",
+						Type: octosql.String,
+					},
+					{
+						Name: "description",
+						Type: octosql.String,
+					},
+				},
+			},
+			nil
+	case "aggregate_signatures":
+		return &aggregateSignaturesPhysical{},
+			physical.Schema{
+				TimeField: -1,
+				Fields: []physical.SchemaField{
+					{
+						Name: "name",
+						Type: octosql.String,
+					},
+					{
+						Name: "argument_type",
+						Type: octosql.String,
+					},
+					{
+						Name: "output_type",
+						Type: octosql.String,
+					},
+					{
+						Name: "simple_signature",
+						Type: octosql.Boolean,
+					},
+				},
+			},
+			nil
 	case "functions":
 		return &functionsPhysical{},
 			physical.Schema{

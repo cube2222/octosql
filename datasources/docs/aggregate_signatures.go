@@ -6,31 +6,31 @@ import (
 	"sort"
 	"time"
 
+	"github.com/cube2222/octosql/aggregates"
 	. "github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/functions"
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
 
-type functionSignaturesPhysical struct {
+type aggregateSignaturesPhysical struct {
 }
 
-func (i *functionSignaturesPhysical) Materialize(ctx context.Context, env physical.Environment, schema physical.Schema, pushedDownPredicates []physical.Expression) (Node, error) {
-	return &functionSignaturesExecuting{
+func (i *aggregateSignaturesPhysical) Materialize(ctx context.Context, env physical.Environment, schema physical.Schema, pushedDownPredicates []physical.Expression) (Node, error) {
+	return &aggregateSignaturesExecuting{
 		fields: schema.Fields,
 	}, nil
 }
 
-func (i *functionSignaturesPhysical) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression) (rejected, pushedDown []physical.Expression, changed bool) {
+func (i *aggregateSignaturesPhysical) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression) (rejected, pushedDown []physical.Expression, changed bool) {
 	return newPredicates, []physical.Expression{}, false
 }
 
-type functionSignaturesExecuting struct {
+type aggregateSignaturesExecuting struct {
 	fields []physical.SchemaField
 }
 
-func (d *functionSignaturesExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
-	fs := functions.FunctionMap()
+func (d *aggregateSignaturesExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
+	fs := aggregates.Aggregates
 
 	output := make([][]octosql.Value, 0)
 	for name, details := range fs {
@@ -38,21 +38,15 @@ func (d *functionSignaturesExecuting) Run(ctx ExecutionContext, produce ProduceF
 			continue
 		}
 		for _, descriptor := range details.Descriptors {
-			parts := make([]octosql.Value, len(descriptor.ArgumentTypes))
-			for i := range descriptor.ArgumentTypes {
-				parts[i] = octosql.NewString(descriptor.ArgumentTypes[i].String())
-			}
 			row := make([]octosql.Value, len(d.fields))
 			for i, field := range d.fields {
 				switch field.Name {
 				case "name":
 					row[i] = octosql.NewString(name)
-				case "argument_types":
-					row[i] = octosql.NewList(parts)
+				case "argument_type":
+					row[i] = octosql.NewString(descriptor.ArgumentType.String())
 				case "output_type":
 					row[i] = octosql.NewString(descriptor.OutputType.String())
-				case "strict":
-					row[i] = octosql.NewBoolean(descriptor.Strict)
 				case "simple_signature":
 					row[i] = octosql.NewBoolean(descriptor.TypeFn == nil)
 				}

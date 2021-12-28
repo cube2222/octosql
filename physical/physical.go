@@ -12,7 +12,7 @@ import (
 
 // TODO: There should be a seperate MaterializationContext.
 type Environment struct {
-	Aggregates      map[string][]AggregateDescriptor
+	Aggregates      map[string]AggregateDetails
 	Datasources     *DatasourceRepository
 	Functions       map[string]FunctionDetails
 	PhysicalConfig  map[string]interface{}
@@ -35,6 +35,11 @@ func (varCtx *VariableContext) WithRecordSchema(schema Schema) *VariableContext 
 		Parent: varCtx,
 		Fields: schema.Fields,
 	}
+}
+
+type AggregateDetails struct {
+	Description string
+	Descriptors []AggregateDescriptor
 }
 
 type AggregateDescriptor struct {

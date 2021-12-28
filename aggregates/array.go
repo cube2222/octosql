@@ -11,7 +11,6 @@ import (
 	"github.com/cube2222/octosql/physical"
 )
 
-// TODO: Type variables or dynamic type description.
 var ArrayOverloads = []physical.AggregateDescriptor{
 	{
 		TypeFn: func(t octosql.Type) (octosql.Type, bool) {

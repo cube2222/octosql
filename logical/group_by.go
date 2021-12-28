@@ -100,8 +100,8 @@ func (node *GroupBy) Typecheck(ctx context.Context, env physical.Environment, lo
 	aggregates := make([]physical.Aggregate, len(node.aggregates))
 aggregateLoop:
 	for i, aggname := range node.aggregates {
-		descriptors := env.Aggregates[aggname]
-		for _, descriptor := range descriptors {
+		details := env.Aggregates[aggname]
+		for _, descriptor := range details.Descriptors {
 			if descriptor.TypeFn != nil {
 				if outputType, ok := descriptor.TypeFn(expressions[i].Type); ok {
 					if octosql.Null.Is(expressions[i].Type) == octosql.TypeRelationIs {
@@ -129,7 +129,7 @@ aggregateLoop:
 				continue aggregateLoop
 			}
 		}
-		for _, descriptor := range descriptors {
+		for _, descriptor := range details.Descriptors {
 			if expressions[i].Type.Is(octosql.TypeSum(descriptor.ArgumentType, octosql.Null)) == octosql.TypeRelationMaybe {
 				assertedExprType := *octosql.TypeIntersection(octosql.TypeSum(descriptor.ArgumentType, octosql.Null), expressions[i].Type)
 				expressions[i] = physical.Expression{

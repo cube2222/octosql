@@ -828,7 +828,8 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					Function: func(values []octosql.Value) (octosql.Value, error) {
 						n, err := strconv.Atoi(values[0].Str)
 						if err != nil {
-							return octosql.Value{}, fmt.Errorf("couldn't parse string '%s' as int: %s", values[0].Str, err)
+							log.Printf("couldn't parse string '%s' as int: %s", values[0].Str, err)
+							return octosql.NewNull(), nil
 						}
 						return octosql.NewInt(n), nil
 					},
@@ -871,7 +872,8 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					Function: func(values []octosql.Value) (octosql.Value, error) {
 						n, err := strconv.ParseFloat(values[0].Str, 64)
 						if err != nil {
-							return octosql.Value{}, fmt.Errorf("couldn't parse string '%s' as float: %s", values[0].Str, err)
+							log.Printf("couldn't parse string '%s' as float: %s", values[0].Str, err)
+							return octosql.NewNull(), nil
 						}
 						return octosql.NewFloat(n), nil
 					},
@@ -882,6 +884,19 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					Strict:        true,
 					Function: func(values []octosql.Value) (octosql.Value, error) {
 						return octosql.NewFloat(float64(values[0].Duration)), nil
+					},
+				},
+			},
+		},
+		"string": {
+			Description: "Converts the argument to a string.",
+			Descriptors: []physical.FunctionDescriptor{
+				{
+					ArgumentTypes: []octosql.Type{octosql.Any},
+					OutputType:    octosql.String,
+					Strict:        false,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						return octosql.NewString(values[0].String()), nil
 					},
 				},
 			},

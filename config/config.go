@@ -3,12 +3,23 @@ package config
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/Masterminds/semver"
+	"github.com/mitchellh/go-homedir"
 	"gopkg.in/yaml.v3"
 )
+
+var octosqlHomeDir = func() string {
+	dir, err := homedir.Dir()
+	if err != nil {
+		log.Fatalf("couldn't get user home directory: %s", err)
+	}
+	return filepath.Join(dir, ".octosql")
+}()
 
 type Config struct {
 	Databases []DatabaseConfig `yaml:"databases"`
@@ -22,7 +33,7 @@ type DatabaseConfig struct {
 }
 
 func Read() (*Config, error) {
-	data, err := ioutil.ReadFile("octosql.yml")
+	data, err := ioutil.ReadFile(filepath.Join(octosqlHomeDir, "octosql.yml"))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return &Config{

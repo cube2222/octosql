@@ -152,7 +152,7 @@ func repopulateFunctions(expr physical.Expression) (physical.Expression, bool) {
 			}
 			receivedDescriptor := expr.FunctionCall.FunctionDescriptor
 
-			descriptors, ok := funcMap[expr.FunctionCall.Name]
+			details, ok := funcMap[expr.FunctionCall.Name]
 			if !ok {
 				log.Printf("Unknown function, rejecting predicate: %s", expr.FunctionCall.Name)
 				outOk = false
@@ -160,7 +160,7 @@ func repopulateFunctions(expr physical.Expression) (physical.Expression, bool) {
 			}
 
 		descriptorLoop:
-			for _, descriptor := range descriptors {
+			for _, descriptor := range details.Descriptors {
 				if len(descriptor.ArgumentTypes) != len(receivedDescriptor.ArgumentTypes) {
 					continue descriptorLoop
 				}

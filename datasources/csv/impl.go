@@ -48,7 +48,7 @@ func Creator(name string) (physical.DatasourceImplementation, physical.Schema, e
 				if !filled[i] {
 					fields[i] = octosql.Int
 					filled[i] = true
-				} else {
+				} else if !fields[i].Equals(octosql.Float) {
 					fields[i] = octosql.TypeSum(fields[i], octosql.Int)
 				}
 				continue
@@ -59,6 +59,8 @@ func Creator(name string) (physical.DatasourceImplementation, physical.Schema, e
 				if !filled[i] {
 					fields[i] = octosql.Float
 					filled[i] = true
+				} else if fields[i].Equals(octosql.Int) {
+					fields[i] = octosql.Float
 				} else {
 					fields[i] = octosql.TypeSum(fields[i], octosql.Float)
 				}

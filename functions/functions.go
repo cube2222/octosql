@@ -20,11 +20,17 @@ func FunctionMap() map[string]physical.FunctionDetails {
 		// Comparisons
 		"<": {
 			Descriptors: []physical.FunctionDescriptor{
-				// TODO: Specializations for concrete primitive types.
 				{
-					ArgumentTypes: []octosql.Type{octosql.Any, octosql.Any},
-					OutputType:    octosql.Boolean,
-					Strict:        true,
+					TypeFn: func(types []octosql.Type) (octosql.Type, bool) {
+						if len(types) != 2 {
+							return octosql.Type{}, false
+						}
+						if !types[0].Equals(types[1]) {
+							return octosql.Type{}, false
+						}
+						return octosql.Boolean, true
+					},
+					Strict: true,
 					Function: func(values []octosql.Value) (octosql.Value, error) {
 						return octosql.NewBoolean(values[0].Compare(values[1]) < 0), nil
 					},
@@ -33,11 +39,17 @@ func FunctionMap() map[string]physical.FunctionDetails {
 		},
 		"<=": {
 			Descriptors: []physical.FunctionDescriptor{
-				// TODO: Specializations for concrete primitive types.
 				{
-					ArgumentTypes: []octosql.Type{octosql.Any, octosql.Any},
-					OutputType:    octosql.Boolean,
-					Strict:        true,
+					TypeFn: func(types []octosql.Type) (octosql.Type, bool) {
+						if len(types) != 2 {
+							return octosql.Type{}, false
+						}
+						if !types[0].Equals(types[1]) {
+							return octosql.Type{}, false
+						}
+						return octosql.Boolean, true
+					},
+					Strict: true,
 					Function: func(values []octosql.Value) (octosql.Value, error) {
 						return octosql.NewBoolean(values[0].Compare(values[1]) <= 0), nil
 					},
@@ -72,11 +84,17 @@ func FunctionMap() map[string]physical.FunctionDetails {
 		},
 		">=": {
 			Descriptors: []physical.FunctionDescriptor{
-				// TODO: Specializations for concrete primitive types.
 				{
-					ArgumentTypes: []octosql.Type{octosql.Any, octosql.Any},
-					OutputType:    octosql.Boolean,
-					Strict:        true,
+					TypeFn: func(types []octosql.Type) (octosql.Type, bool) {
+						if len(types) != 2 {
+							return octosql.Type{}, false
+						}
+						if !types[0].Equals(types[1]) {
+							return octosql.Type{}, false
+						}
+						return octosql.Boolean, true
+					},
+					Strict: true,
 					Function: func(values []octosql.Value) (octosql.Value, error) {
 						return octosql.NewBoolean(values[0].Compare(values[1]) >= 0), nil
 					},
@@ -85,11 +103,17 @@ func FunctionMap() map[string]physical.FunctionDetails {
 		},
 		">": {
 			Descriptors: []physical.FunctionDescriptor{
-				// TODO: Specializations for concrete primitive types.
 				{
-					ArgumentTypes: []octosql.Type{octosql.Any, octosql.Any},
-					OutputType:    octosql.Boolean,
-					Strict:        true,
+					TypeFn: func(types []octosql.Type) (octosql.Type, bool) {
+						if len(types) != 2 {
+							return octosql.Type{}, false
+						}
+						if !types[0].Equals(types[1]) {
+							return octosql.Type{}, false
+						}
+						return octosql.Boolean, true
+					},
+					Strict: true,
 					Function: func(values []octosql.Value) (octosql.Value, error) {
 						return octosql.NewBoolean(values[0].Compare(values[1]) > 0), nil
 					},

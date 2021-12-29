@@ -230,7 +230,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 			}
 
 			if explain >= 1 {
-				file, err := os.CreateTemp(os.TempDir(), "octosql-describe-*.png")
+				file, err := os.CreateTemp(os.TempDir(), "octosql-explain-*.png")
 				if err != nil {
 					return fmt.Errorf("couldn't create temporary file: %w", err)
 				}

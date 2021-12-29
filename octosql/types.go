@@ -60,10 +60,7 @@ const (
 )
 
 func (t Type) Equals(other Type) bool {
-	if t.Is(other) == TypeRelationIs && other.Is(t) == TypeRelationIs {
-		return true
-	}
-	return false
+	return t.Is(other) == TypeRelationIs && other.Is(t) == TypeRelationIs
 }
 
 func (t Type) Is(other Type) TypeRelation {

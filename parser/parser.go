@@ -513,6 +513,9 @@ func ParseTrigger(trigger sqlparser.Trigger) (logical.Trigger, error) {
 
 	case *sqlparser.WatermarkTrigger:
 		return logical.NewWatermarkTrigger(), nil
+
+	case *sqlparser.EndOfStreamTrigger:
+		return logical.NewEndOfStreamTrigger(), nil
 	}
 
 	return nil, errors.Errorf("invalid trigger type: %v", trigger)

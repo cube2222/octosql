@@ -153,7 +153,7 @@ func skipToEnd(yylex interface{}) {
 %left <bytes> OR
 %left <bytes> AND
 %right <bytes> NOT '!'
-%left <bytes> BETWEEN CASE WHEN THEN ELSE END
+%left <bytes> BETWEEN CASE WHEN THEN ELSE END OF
 %left <bytes> '=' '<' '>' LE GE NE NULL_SAFE_EQUAL IS LIKE REGEXP IN RIGHTARROW
 %left <bytes> '|'
 %left <bytes> '&'
@@ -3037,28 +3037,32 @@ trigger_opt:
   }
 
 trigger_list:
-	trigger
-	{
-		$$ = []Trigger{$1}
-	}
+  trigger
+  {
+    $$ = []Trigger{$1}
+  }
 | trigger_list ',' trigger
-	{
-		$$ = append($1, $3)
-	}
+  {
+    $$ = append($1, $3)
+  }
 
 trigger:
-	ON WATERMARK
-	{
-		$$ = &WatermarkTrigger{}
-	}
+  ON WATERMARK
+  {
+    $$ = &WatermarkTrigger{}
+  }
+|  ON END OF STREAM
+  {
+    $$ = &EndOfStreamTrigger{}
+  }
 | AFTER DELAY expression
-	{
-		$$ = &DelayTrigger{Delay: $3}
-	}
+  {
+    $$ = &DelayTrigger{Delay: $3}
+  }
 | COUNTING expression
-	{
-		$$ = &CountingTrigger{Count: $2}
-	}
+  {
+    $$ = &CountingTrigger{Count: $2}
+  }
 
 // insert_data expands all combinations into a single rule.
 // This avoids a shift/reduce conflict while encountering the
@@ -3500,6 +3504,7 @@ non_reserved_keyword:
 | NCHAR
 | NO
 | NUMERIC
+| OF
 | OFFSET
 | ONLY
 | OPTIMIZE

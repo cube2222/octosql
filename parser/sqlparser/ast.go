@@ -3726,18 +3726,30 @@ type Trigger interface {
 	iTrigger()
 }
 
-func (w *WatermarkTrigger) iTrigger() {}
-func (w *DelayTrigger) iTrigger()     {}
-func (w *CountingTrigger) iTrigger()  {}
+func (w *WatermarkTrigger) iTrigger()   {}
+func (w *EndOfStreamTrigger) iTrigger() {}
+func (w *DelayTrigger) iTrigger()       {}
+func (w *CountingTrigger) iTrigger()    {}
 
 type WatermarkTrigger struct {
 }
 
 func (w *WatermarkTrigger) Format(buf *TrackedBuffer) {
-	buf.Myprintf("WATERMARK")
+	buf.Myprintf("ON WATERMARK")
 }
 
 func (w *WatermarkTrigger) walkSubtree(visit Visit) error {
+	return nil
+}
+
+type EndOfStreamTrigger struct {
+}
+
+func (w *EndOfStreamTrigger) Format(buf *TrackedBuffer) {
+	buf.Myprintf("ON WATERMARK")
+}
+
+func (w *EndOfStreamTrigger) walkSubtree(visit Visit) error {
 	return nil
 }
 
@@ -3758,7 +3770,7 @@ type CountingTrigger struct {
 }
 
 func (w *CountingTrigger) Format(buf *TrackedBuffer) {
-	buf.Myprintf("COUNT %v", w.Count)
+	buf.Myprintf("COUNTING %v", w.Count)
 }
 
 func (w *CountingTrigger) walkSubtree(visit Visit) error {

@@ -60,6 +60,20 @@ func (w *WatermarkTrigger) Typecheck(ctx context.Context, env physical.Environme
 	}
 }
 
+type EndOfStreamTrigger struct {
+}
+
+func NewEndOfStreamTrigger() *EndOfStreamTrigger {
+	return &EndOfStreamTrigger{}
+}
+
+func (w *EndOfStreamTrigger) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment, keyTimeIndex int) physical.Trigger {
+	return physical.Trigger{
+		TriggerType:        physical.TriggerTypeEndOfStream,
+		EndOfStreamTrigger: &physical.EndOfStreamTrigger{},
+	}
+}
+
 type GroupBy struct {
 	source   Node
 	key      []Expression

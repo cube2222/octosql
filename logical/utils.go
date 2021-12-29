@@ -293,14 +293,6 @@ func EqualExpressions(expr1, expr2 Expression) bool {
 			return true
 		}
 
-	// case *QueryExpression:
-	// 	if expr2, ok := expr2.(*QueryExpression); ok {
-	// 		if err := EqualNodes(expr1.node, expr2.node); err != nil {
-	// 			return errors.Wrap(err, "nodes not equal")
-	// 		}
-	// 		return nil
-	// 	}
-
 	case *FunctionExpression:
 		if expr2, ok := expr2.(*FunctionExpression); ok {
 			if expr1.Name != expr2.Name {
@@ -316,6 +308,28 @@ func EqualExpressions(expr1, expr2 Expression) bool {
 			}
 			return true
 		}
+
+	case *Cast:
+		if expr2, ok := expr2.(*Cast); ok {
+			if !expr1.targetType.Equals(expr2.targetType) {
+				return false
+			}
+			return EqualExpressions(expr1.arg, expr2.arg)
+		}
+
+	case *Coalesce:
+		if expr2, ok := expr2.(*Coalesce); ok {
+			if len(expr1.args) != len(expr2.args) {
+				return false
+			}
+			for i := range expr1.args {
+				if !EqualExpressions(expr1.args[i], expr2.args[i]) {
+					return false
+				}
+			}
+			return true
+		}
+
 	}
 	return false
 }

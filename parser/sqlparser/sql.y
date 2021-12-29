@@ -2005,10 +2005,10 @@ table_valued_function_argument_value:
   {
     $$ = &TableDescriptorTableValuedFunctionArgumentValue{Table: $3}
   }
-|   DESCRIPTOR openb column_name closeb
-    {
-      $$ = &FieldDescriptorTableValuedFunctionArgumentValue{Field: $3}
-    }
+| DESCRIPTOR openb column_name closeb
+  {
+    $$ = &FieldDescriptorTableValuedFunctionArgumentValue{Field: $3}
+  }
 
 column_list:
   sql_id
@@ -3366,7 +3366,6 @@ reserved_keyword:
 | DIV
 | DROP
 | ELSE
-| END
 | ESCAPE
 | EXISTS
 | EXPLAIN
@@ -3470,6 +3469,7 @@ non_reserved_keyword:
 | DOUBLE
 | DUPLICATE
 | ENGINES
+| END
 | ENUM
 | EXPANSION
 | FLOAT_TYPE

@@ -17,8 +17,8 @@ var Range = logical.TableValuedFunctionDescription{
 		outArgs["start"] = logical.TableValuedFunctionTypecheckedArgument{
 			Argument: args["start"].(*logical.TableValuedFunctionArgumentValueExpression).Typecheck(ctx, env, logicalEnv),
 		}
-		outArgs["up_to"] = logical.TableValuedFunctionTypecheckedArgument{
-			Argument: args["up_to"].(*logical.TableValuedFunctionArgumentValueExpression).Typecheck(ctx, env, logicalEnv),
+		outArgs["end"] = logical.TableValuedFunctionTypecheckedArgument{
+			Argument: args["end"].(*logical.TableValuedFunctionArgumentValueExpression).Typecheck(ctx, env, logicalEnv),
 		}
 		return outArgs
 	},
@@ -32,7 +32,7 @@ var Range = logical.TableValuedFunctionDescription{
 						Type: octosql.Int,
 					},
 				},
-				"up_to": {
+				"end": {
 					Required:                               true,
 					TableValuedFunctionArgumentMatcherType: physical.TableValuedFunctionArgumentTypeExpression,
 					Expression: &logical.TableValuedFunctionArgumentMatcherExpression{
@@ -69,7 +69,7 @@ var Range = logical.TableValuedFunctionDescription{
 				if err != nil {
 					return nil, fmt.Errorf("couldn't materialize start: %w", err)
 				}
-				end, err := args["up_to"].Expression.Expression.Materialize(ctx, environment)
+				end, err := args["end"].Expression.Expression.Materialize(ctx, environment)
 				if err != nil {
 					return nil, fmt.Errorf("couldn't materialize end: %w", err)
 				}

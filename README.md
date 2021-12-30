@@ -144,7 +144,7 @@ echo "databases:
       port: 5432
       database: postgres
       user: postgres
-      password: mypassword" > octosql.yml
+      password: mypassword" > ~/.octosql/octosql.yml
 ~> octosql "SELECT * FROM mydb.customers" --describe
 +--------------------------+-----------------+------------+
 |           name           |      type       | time_field |

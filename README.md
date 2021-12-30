@@ -6,6 +6,7 @@ OctoSQL is predominantly a CLI tool which lets you query a plethora of databases
 At the same time it's an easily extensible full-blown dataflow engine, and you can use it to add a SQL interface to your own applications.
 
 [![GitHub](https://shields.io/github/workflow/status/cube2222/octosql/Unit%20Tests/main)](https://github.com/cube2222/octosql/actions/workflows/test.yml?query=branch%3Amain)
+[![Go Report Card](https://goreportcard.com/badge/github.com/cube2222/octosql)](https://goreportcard.com/report/github.com/cube2222/octosql)
 [![GoDoc](https://godoc.org/github.com/cube2222/octosql?status.svg)](https://godoc.org/github.com/cube2222/octosql)
 [![License](https://shields.io/github/license/cube2222/octosql)](LICENSE)
 [![Latest Version](https://shields.io/github/v/release/cube2222/octosql?display_name=tag&sort=semver)](https://github.com/cube2222/octosql/releases)

@@ -10,3 +10,15 @@ builds:
     goarch:
       - amd64
       - arm64
+brews:
+  - name: octosql
+    tap:
+      owner: "cube2222"
+      name: "homebrew-octosql"
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/cube2222/octosql
+    description: "OctoSQL is a query tool that allows you to join, analyse and transform data from multiple databases and file formats using SQL."
+    license: "MPL-2.0"
+    dependencies:
+      - name: graphviz

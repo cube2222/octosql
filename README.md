@@ -1,411 +1,347 @@
 ![OctoSQL](images/octosql.svg)OctoSQL
 =======
-OctoSQL is a query tool that allows you to join, analyse and transform data from multiple databases, streaming sources and file formats using SQL.
 
-**OctoSQL is currently being rewritten on the [redesign](https://github.com/cube2222/octosql/tree/redesign) branch.**
+OctoSQL is predominantly a CLI tool which lets you query a plethora of databases and file formats using SQL through a unified interface, even do JOINs between them. (Ever needed to join a JSON file with a PostgreSQL table? OctoSQL can help you with that.)
 
-[![CircleCI](https://circleci.com/gh/cube2222/octosql.svg?style=shield)](https://circleci.com/gh/cube2222/octosql)
+At the same time it's an easily extensible full-blown dataflow engine, and you can use it to add a SQL interface to your own applications.
+
+[![GitHub](https://shields.io/github/workflow/status/cube2222/octosql/Unit%20Tests/main)](https://github.com/cube2222/octosql/actions/workflows/test.yml?query=branch%3Amain)
 [![GoDoc](https://godoc.org/github.com/cube2222/octosql?status.svg)](https://godoc.org/github.com/cube2222/octosql)
+[![License](https://shields.io/github/license/cube2222/octosql)](LICENSE)
+[![Latest Version](https://shields.io/github/v/release/cube2222/octosql?display_name=tag&sort=semver)](https://github.com/cube2222/octosql/releases)
 [![Gitter](https://badges.gitter.im/octosql/general.svg)](https://gitter.im/octosql/general?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
-
-## Problems OctoSQL Solves
-- You need to join / analyze data from multiple datasources.
-    - Think of enriching an Excel file by joining it with a PostgreSQL database.
-- You need stream aggregates over time, with live output updates.
-    - Think of a live-updated leaderboard with cat images based on a "like" event stream.
-- You need aggregate streams per time window, with live output updates.
-    - Think of a unique user count per hour, per country live summary.
 
 ![Demo](images/octosql-demo.gif)
 
-## Table of Contents
-- [What is OctoSQL?](#what-is-octosql)
-- [Installation](#installation)
-- [Quickstart](#quickstart)
-- [Temporal SQL Features](#temporal-sql-features)
-    - [Watermarks](#watermarks)
-    - [Triggers](#triggers)
-    - [Retractions](#retractions)
-    - [Example](#example)
-- [Durability](#durability)
-- [Configuration](#configuration)
-    - [JSON](#json)
-    - [CSV](#csv)
-    - [Excel](#excel)
-    - [Parquet](#parquet)
-    - [PostgreSQL](#postgresql)
-    - [MySQL](#mysql)
-    - [Redis](#redis)
-    - [Kafka](#kafka)
-- [Documentation](#documentation)
-- [Architecture](#architecture)
-- [Datasource Pushdown Operations](#datasource-pushdown-operations)
-- [Roadmap](#roadmap)
+## Usage
 
-## What is OctoSQL?
-OctoSQL is a SQL query engine which allows you to write standard SQL queries on data stored in multiple SQL databases, NoSQL databases, streaming sources and files in various formats trying to push down as much of the work as possible to the source databases, not transferring unnecessary data.
+```bash
+octosql "SELECT * FROM ./myfile.json"
+octosql "SELECT * FROM ./myfile.json" --describe  # Show the schema of the file.
+octosql "SELECT invoices.id, address, amount
+         FROM invoices.csv JOIN db.customers ON invoices.customer_id = customers.id
+         ORDER BY amount DESC"
+octosql "SELECT customer_id, SUM(amount)
+         FROM invoices.csv
+         GROUP BY customer_id"
+```
 
-OctoSQL does that by creating an internal representation of your query and later translating parts of it into the query languages or APIs of the source databases. Whenever a datasource doesn't support a given operation, OctoSQL will execute it in memory, so you don't have to worry about the specifics of the underlying datasources.
+OctoSQL supports JSON and CSV files out of the box, but you can additionally install plugins to add support for other databases.
+```bash
+octosql "SELECT * FROM plugins.available_plugins"
+octosql plugin install postgres
+echo "databases:
+  - name: mydb
+    type: postgres
+    config:
+      host: localhost
+      port: 5443
+      database: mydb
+      user: postgres
+      password: postgres" > octosql.yml
+octosql "SELECT * FROM mydb.users" --describe
+octosql "SELECT * FROM mydb.users"
+```
 
-OctoSQL also includes temporal SQL extensions, to operate ergonomically on streams and respect their event-time (not the current system-time when the records are being processed).
+You can specify the output format using the `--output` flag. Available values for it are `live_table`, `batch_table`, `csv` and `stream_native`.
 
-With OctoSQL you don't need O(n) client tools or a large data analysis system deployment. Everything's contained in a single binary.
-
-### Why the name?
-OctoSQL stems from Octopus SQL.
-
-Octopus, because octopi have many arms, so they can grasp and manipulate multiple objects, like OctoSQL is able to handle multiple datasources simultaneously.
+The documentation about available aggregates and functions is contained within OctoSQL itself. It's in the `aggregates`, `aggregate_signatures`, `functions` and `function_signatures` tables in the `docs` database.
+```bash
+octosql "SELECT * FROM docs.functions fs"
++------------------+----------------------------------------+
+|     fs.name      |             fs.description             |
++------------------+----------------------------------------+
+| 'abs'            | 'Returns absolute value                |
+|                  | of argument.'                          |
+| 'ceil'           | 'Returns ceiling of                    |
+|                  | argument.'                             |
+| ...              | ...                                    |
++------------------+----------------------------------------+
+```
 
 ## Installation
-Either download the binary for your operating system (Linux, OS X and Windows are supported) from the [Releases page](https://github.com/cube2222/octosql/releases), or install using the go command line tool:
+
+You can install OctoSQL using Homebrew on MacOS or Linux:
 ```bash
-GO111MODULE=on go get -u github.com/cube2222/octosql/cmd/octosql
+brew install cube2222/octosql/octosql
+```
+After running it for the first time on MacOS you'll have to go into Preferences -> Security and Privacy -> Allow OctoSQL, as with any app that's not notarized.
+
+You can also download the binary for your operating system directly from the [Releases page](https://github.com/cube2222/octosql/releases), or install using the go command line tool:
+```bash
+go install -u github.com/cube2222/octosql
 ```
 
-## Quickstart
-Let's say we have a csv file with cats, and a redis database with people (potential cat owners). Now we want to get a list of cities with the number of distinct cat names in them and the cumulative number of cat lives (as each cat has up to 9 lives left).
+## Plugins
 
-First, create a configuration file ([Configuration Syntax](#configuration))
-For example:
-```yaml
-dataSources:
-  - name: cats
-    type: csv
+Only support for CSV and JSON files is built-in into OctoSQL. To use other databases - like PostgreSQL or MySQL - you need to install a plugin. Installing plugins is very easy. The following command installs the latest version of the PostgreSQL plugin:
+```bash
+octosql plugin install postgres
+```
+Plugins are grouped into repositories, and potentially have many versions available. The above uses the default **core** repository and tries to install the latest version. So if 0.42.0 was the latest version, the above would be equivalent to:
+```bash
+octosql plugin install core/postgres@0.42.0
+```
+
+Browsing available and installed plugins is possible through OctoSQL itself, behind a SQL interface. The available tables are: `plugins.repositories`, `plugins.available_plugins`, `plugins.available_versions`, `plugins.installed_plugins`, `plugins.installed_versions`.
+
+```bash
+~> octosql "SELECT name, description FROM plugins.available_plugins LIMIT 2"
++------------------------+-------------------------------+
+| available_plugins.name | available_plugins.description |
++------------------------+-------------------------------+
+| 'postgres'             | 'Adds support for             |
+|                        | querying PostgreSQL           |
+|                        | databases.'                   |
+| 'random_data'          | 'Generates random data        |
+|                        | for testing.'                 |
++------------------------+-------------------------------+
+~> octosql "SELECT plugin_name, version FROM plugins.available_versions WHERE plugin_name='random_data'"
++--------------------------------+----------------------------+
+| available_versions.plugin_name | available_versions.version |
++--------------------------------+----------------------------+
+| 'random_data'                  | '0.1.0'                    |
+| 'random_data'                  | '0.1.1'                    |
+| 'random_data'                  | '0.2.0'                    |
++--------------------------------+----------------------------+
+```
+
+Some plugins, like the `random_data` plugin, can be used without any additional configuration:
+```bash
+~> octosql plugin install random_data
+Downloading core/random_data@0.2.0...
+~> octosql "SELECT * FROM random_data.users" --describe
++---------------------------------+--------------------------+------------+
+|              name               |           type           | time_field |
++---------------------------------+--------------------------+------------+
+| 'users.avatar'                  | 'String'                 | false      |
+| 'users.credit_card'             | '{cc_number: String}'    | false      |
+| 'users.date_of_birth'           | 'String'                 | false      |
+| 'users.email'                   | 'String'                 | false      |
+| 'users.first_name'              | 'String'                 | false      |
+| 'users.last_name'               | 'String'                 | false      |
+| ...                             | ...                      | ...        |
++---------------------------------+--------------------------+------------+
+~> octosql "SELECT first_name, last_name, date_of_birth FROM random_data.users LIMIT 3"
++------------------+-----------------+---------------------+
+| users.first_name | users.last_name | users.date_of_birth |
++------------------+-----------------+---------------------+
+| 'Alethea'        | 'Kuvalis'       | '1997-01-07'        |
+| 'Ambrose'        | 'Spencer'       | '1979-04-18'        |
+| 'Antione'        | 'Hodkiewicz'    | '1980-03-04'        |
++------------------+-----------------+---------------------+
+```
+
+Others, like the `postgres` plugin, require additional configuration. The configuration file is located at `~/.octosql/octosql.yml`. You can find the available configuration settings for a plugin in its own documentation.
+```bash
+~> octosql plugin install postgres
+Downloading core/postgres@0.1.0...
+echo "databases:
+  - name: mydb
+    type: postgres
     config:
-      path: "~/Documents/cats.csv"
-  - name: people
-    type: redis
-    config:
-      address: "localhost:6379"
-      password: ""
-      databaseIndex: 0
-      databaseKeyName: "id"
+      host: localhost
+      port: 5432
+      database: postgres
+      user: postgres
+      password: mypassword" > octosql.yml
+~> octosql "SELECT * FROM mydb.customers" --describe
++--------------------------+-----------------+------------+
+|           name           |      type       | time_field |
++--------------------------+-----------------+------------+
+| 'customers.email'        | 'String'        | false      |
+| 'customers.first_name'   | 'String'        | false      |
+| 'customers.id'           | 'Int'           | false      |
+| 'customers.last_name'    | 'String'        | false      |
+| 'customers.phone_number' | 'String | NULL' | false      |
++--------------------------+-----------------+------------+
+~> octosql "SELECT COUNT(*) FROM mydb.customers"
++-------+
+| count |
++-------+
+|   183 |
++-------+
 ```
 
-Then, set the **OCTOSQL_CONFIG** environment variable to point to the configuration file.
+In order to create your own plugins, see examples of existing plugins:
+- [MySQL](https://github.com/cube2222/octosql-plugin-mysql)
+- [PostgreSQL](https://github.com/cube2222/octosql-plugin-postgres)
+- [Random Data](https://github.com/cube2222/octosql-plugin-random_data)
+
+To test plugins while developing locally, put the plugin binary into `~/.octosql/plugins/core/octosql-plugin-<plugin name>/0.1.0/octosql-plugin-<plugin name>`. That's the location where OctoSQL will be looking for it.
+
+## Troubleshooting
+OctoSQL writes logs to `~/.octosql/logs.txt`, which is the place to look for any errors or issues during execution. Only logs of the most recent execution are kept.
+
+## Advanced Features
+
+### The Type System
+
+OctoSQL is statically typed. That means that queries are verified, typechecked, and optimized based on the schemas of the tables and types of any values used in the query.
+
+Most of the type system is straight-forward and intuitive, similar to what you'd find in other SQL dialects, even though the types have names which are closer to common programming languages, not SQL databases - in OctoSQL you'll find `String`'s, not `varchar`'s.
+
+However, OctoSQL also supports **union types**, which means that a value might be one of multiple types. For example, you might have a dataset where a column is usually a Float, but occasionally also a String with the Float inside. Thus, the type of the column would be `Float | String`.
+
+Moreover, `NULL` is its own type, which means that a nullable `Int` column would be represented as `Int | NULL` in OctoSQL.
+
+There's a few helper features to handle this union types in OctoSQL.
+
+First, whenever a type, i.e. `String | Int`, is used in a place where a subtype, i.e. `Int`, is expected, OctoSQL will add a dynamic runtime check which will fail execution only if a `String` value actually ever reaches that place.
+
+Second, you can use type assertions to get a value only if it's of a certain type and otherwise evaluate to `NULL`. The syntax for that is `value::type`. So for example we might have a column `age` of type `String | Int` and would like to get its value only if it's an Int. We can write `age::Int` to express that.
+
+Third, there's a bunch of conversion functions which can help you turn types into other types. For example, the `int` function is able to turn values of many types, including strings, to integers. You could use it like this: `int(age_string)`.
+
+Fourth, and final, there's the `COALESCE` operator which accepts an arbitrary number of arguments and returns the first non-null one. It works very well with what's described in the previous two paragraphs. This way, if you have an `age` column of type `String | Int` and would like to clean it up, you can write `COALESCE(age::int, int(age::string), 0)`. This would return the value of `age` as-is if it's an `Int`, try to parse it if it's a `String`, and just evaluate to `0` if that fails.
+
+### Explaining Query Plans
+
+You can use the `--explain` flag to get a visual explanation of the query plan. Setting it to 1 gives you a query plan but without type and schema information, setting it to 2 includes those too. For the visualization to work you need to have the graphviz dot command installed.
+
+For example, running:
 ```bash
-export OCTOSQL_CONFIG=~/octosql.yaml
+octosql "SELECT email, COUNT(*) as invoice_count
+         FROM invoices.csv JOIN mydb.customers ON invoices.customer_id = customers.id
+         WHERE first_name <= 'D'
+         GROUP BY email
+         ORDER BY invoice_count DESC" --explain 1
 ```
-You can also use the --config command line argument.
+will produce the following output:
+![Explain](images/octosql-explain.png)
 
-Finally, query to your hearts desire:
-```bash
-octosql "SELECT p.city, FIRST(c.name), COUNT(DISTINCT c.name) cats, SUM(c.livesleft) catlives
-FROM cats c JOIN people p ON c.ownerid = p.id
-GROUP BY p.city
-ORDER BY catlives DESC
-LIMIT 9"
-```
-Example output:
-```
-+---------+--------------+------+----------+
-| p.city  | c.name_first | cats | catlives |
-+---------+--------------+------+----------+
-| Warren  | Zoey         |   68 |      570 |
-| Gadsden | Snickers     |   52 |      388 |
-| Staples | Harley       |   54 |      383 |
-| Buxton  | Lucky        |   45 |      373 |
-| Bethany | Princess     |   46 |      366 |
-| Noxen   | Sheba        |   49 |      361 |
-| Yorklyn | Scooter      |   45 |      359 |
-| Tuttle  | Toby         |   57 |      356 |
-| Ada     | Jasmine      |   49 |      351 |
-+---------+--------------+------+----------+
-```
-You can choose between live-table batch-table live-csv batch-csv stream-json output formats. (The live-* types will update the terminal view repeatedly every second, the batch-* ones will write the output once before exiting, the stream-* ones will print records whenever they are available)
+Here we can see that the `first_name <= 'D'` predicate has been pushed down to the `mydb.customers` table query.
 
-## Temporal SQL Features
-OctoSQL features temporal SQL extensions inspired by the paper [One SQL to Rule Them All](https://arxiv.org/abs/1905.12133).
+### Dataflow
 
-### Introduction
-Often when you're working with streams of events, you'd like to use the time dimension somehow:
-- Calculate average values for a day sliced by hours.
-- Get unique user counts per day.
-- and others
+OctoSQL is a dataflow engine. In practice that means it can execute a query and then update it based on changes in the inputs. The way this works in practice is by using retractions, each record sent internally has a `retraction` flag dictating whether it's an `undo` or not.
 
-All those examples have one thing in common: The time value of an event is crucial for correctness.
+This also means that OctoSQL can work very well with endless streams of data, or display partial results before calculating the full query.
 
-A naive system could just use the current clock time whenever it receives an event. The correctness of this approach however, degrades quickly in the face of network problems, delivery delays, clock skew.
+In order to handle that well, OctoSQL contains the concept of record event times and watermarks. Each Record can have an Event Time (the time when it originally happened). Watermarks (special metadata records) are used to signal the timestamp that will be the lower bound for all future records. I.e. if you have a watermark of `2021-12-13T00:11:03Z` then all future records will have an event time that is past that timestamp. This let's us understand which Records cannot be retracted anymore, and is very useful when grouping by time windows.
 
-This can be solved by using a value from the event as its time value. A new problem arises though: how do I know that I've received all events up to time X and can publish results for a given hour. You never know if there isn't somewhere a delayed event which should be factored in.
+OctoSQL is also internally consistent as defined by [this article](https://www.scattered-thoughts.net/writing/internal-consistency-in-streaming-systems/). This means that the live output at any given time will be a correct output for a common time-prefix of all the inputs. If you're using the `stream-native` output, this guarantee is satisfied whenever a watermark is emitted. (you can treat watermarks as atomic transactions as far as the output is concerned)
 
-This is where watermarks come into play.
+That means, that if you have two input streams, and one input stream is a few minutes behind the other, so for example its watermark value is `2021-12-13T00:11:03Z` and the watermark of the other one is `2021-12-13T00:11:07Z`, then the output of OctoSQL at that time will be a correct output based on all events up to `2021-12-13T00:11:03Z` from both streams. The records in the second stream between `2021-12-13T00:11:03Z` and `2021-12-13T00:11:07Z` will be buffered until the first stream catches up.
 
-### Watermarks
+For `GROUP BY` queries you can specify when you want to udpate the output using the `TRIGGER` clause: `SELECT ... FROM ... GROUP BY ... TRIGGER COUNTING 300, ON WATERMARK, ON END OF STREAM`. You can use the Counting Trigger and/or the Watermark Trigger and/or the End Of Stream Trigger; it defaults to the End Of Stream trigger.
 
-Watermarks are a heuristic which try to approximate the "current time" when processing events. Said differently: When I receive a watermark for 12:00 I can be sure enough I've received all events of interest up to 12:00.
+The Watermark Trigger sends values for keys whenever the Watermark rises above the Event Time of the key. The Counting Trigger sends values every time a given number of records arrive for a key. The End Of Stream Trigger sends values for all keys when the stream is over.
 
-To achieve this, they are generated at streaming sources and propagate downstream through the whole processing pipeline.
-
-The generation of watermarks usually relies on heuristics which provide satisfactory results for our given use case. OctoSQL currently contains the following watermark generators:
-- Maximum difference watermark generator (with an `offset` argument)
-
-  With an offset of 10 seconds, this generator says: When I've received an event for 12:00:00, then I'm sure I won't receive any event older than 11:59:50.
-- Percentile watermark generator (with a `percentile` argument)
-
-  With a percentile of 99.5, it will look at a specified number of recent events, and generate a watermark so that 99.5% of those events are after the watermark (not yet triggered), and the remaining 0.5% are before it. This way we set the watermark so that only a fraction of the recently seen events is potentially ignored as being late.
-
-Watermark generators are specified using table valued functions and are documented in [the wiki](https://github.com/cube2222/octosql/wiki/Table-Valued-Functions-Documentation).
-
-### Triggers
-Another matter is triggering of keys in aggregations.
-Sometimes you'd like to only see the value for a given key (hour) when you know it's done, but othertimes you'd like to see partial results (how's the unique user count going this hour).
-
-That's where you can use triggers. Triggers allow you to specify when a given aggregate (or join window for that matter) is emitted or updated. OctoSQL contains multiple triggers:
-- Watermark Trigger
-
-  This is the most straightforward trigger. It emits a value whenever the watermark for a given key (or the end of the stream) is reached. So basically the "show me when it's done".
-- Counting Trigger (with a `count` argument)
-
-  This trigger will emit a value for a key every time it receives `count` records with this key. The count is reset whenever the key is triggered.
-- Delay Trigger (with a `delay` argument)
-
-  This trigger will emit a value for a key whenever the key has been inactive for the `delay` period.
-
-You can use multiple triggers simultaneously. (Show me the current sum every 10 received events, but also the final value after having received the watermark.)
-
-### Retractions
-A key can be triggered multiple times with partial results. How do we know a given record is a retriggering of some key, and not a new unrelated record?
-
-OctoSQL solves this problem using a dataflow-like architecture. This means whenever a new value is sent for a key, a retraction is send for the old value. In practice this means every update is accompanied by the old record with an `undo` flag set.
-
-This can be visible when using a stream-* output format with partial results.
-
-### Example
-Now we can see how it all fits together. In this example we have an events file, which contains records about points being scored in a game by multiple teams.
+We can take a look at an example query which simulates a stream using a JSON file:
 ```sql
 WITH
-      with_watermark AS (SELECT *
-                         FROM max_diff_watermark(source=>TABLE(events),
-                                                 offset=>INTERVAL 5 SECONDS,
-                                                 time_field=>DESCRIPTOR(time)) e),
-      with_tumble AS (SELECT *
-                      FROM tumble(source=>TABLE(with_watermark),
-                                  time_field=>DESCRIPTOR(e.time),
-                                  window_length=> INTERVAL 1 MINUTE,
-                                  offset => INTERVAL 0 SECONDS) e),
-      counts_per_team AS (SELECT e.window_end, e.team, COUNT(*) as goals
-                          FROM with_tumble e
-                          GROUP BY e.window_end, e.team TRIGGER COUNTING 100, ON WATERMARK)
-SELECT *
-FROM counts_per_team cpt
-ORDER BY cpt.window_end DESC, cpt.goals ASC, cpt.team DESC
+  with_watermark AS (SELECT *
+                     FROM max_diff_watermark(source=>TABLE(clicks.json),
+                                              max_diff=>INTERVAL 5 SECONDS,
+                                              time_field=>DESCRIPTOR(time), resolution=>INTERVAL 10 SECONDS) c),
+  with_tumble AS (SELECT *
+                  FROM tumble(source=>TABLE(with_watermark),
+                              window_length=>INTERVAL 1 MINUTE,
+                              offset=>INTERVAL 0 SECONDS) c),
+  counts_per_user AS (SELECT window_end, user_id, COUNT(*) as clicks
+                      FROM with_tumble
+                      GROUP BY window_end, user_id, TRIGGER ON WATERMARK, COUNTING 500)
+SELECT window_end, user_id, clicks
+FROM counts_per_user
+```
+It uses [Table Valued Functions](#table-valued-functions) extensively.
+
+First we create a stream of clicks with Watermarks that lag the latest Event Time seen so far in a Record by 5 seconds. Then organize records into tumbling one-minute windows - each Record gets a new `window_end` field that indicates the end of the window the Record belongs to and becomes its new Event Time. Finally, we group the clicks by user and time window, emitting the count every 500 Records per key, and after we get the Watermark for the window. As you can see on the demo below, for each window we'll get intermediate results and the full result when the Watermark arrives.
+
+![Demo](images/octosql-demo-dataflow.gif)
+
+### Table Valued Functions
+
+OctoSQL supports Table Valued Functions, which are functions that return a stream of Records as their output.
+The following functions are available:
+- range: constructs a sequence of integers
+  - arguments
+    - start: expression - required - inclusive start of range
+    - end: expression - required - exclusive end of range
+- poll: polls a finite subquery periodically, emitting the current contents of the table
+  - arguments
+    - source: table - required - finite table to poll
+    - poll_interval: expression - optional - interval between polls
+- tumble: assigns records to tumbling windows
+  - arguments
+    - source: table - required - source table
+    - window_length: expression - required - length of the window as an interval
+    - time_field: descriptor - optional - field to use as the Event Time for the windows
+    - offset: expression - optional - offset of the window relative to the beginning of the epoch
+- max_diff_watermark: passes the Records forward as-is, while updating their Event Time field to be the field referenced by the `time_field` argument, and sending Watermarks such that the Watermarks are `max_diff` interval before the latest seen Record Event Time
+  - arguments
+    - source: table - required - source table
+    - max_diff: expression - required - difference between the latest Event Time and the Watermark
+    - time_field: descriptor - required - field to use as the Event Time
+    - resolution: expression - optional - resolution of the Watermarks
+
+Table valued functions must be aliased when used:
+```sql
+SELECT * FROM range(start=>1, end=>10) r
 ```
 
-We use common table expressions to break the query up into multiple stages.
+You can specify table arguments using the TABLE(...) operator and field descriptors using the DESCRIPTOR(...) operator. An example query using both of these types of arguments is shown in the [Dataflow section](#dataflow).
 
-First we create the *with_watermark* intermediate table/stream. Here we use the table valued function `max_diff_watermark` to add watermarks to the events table - with an offset of 5 seconds based on the *time* record field.
-
-Then we use this intermediate table to create the *with_tumble* table, where we use the *tumble* table valued function to add a window_start and window_end field to each record, based on the record's *time* field. This assigns the records to 1 minute long windows.
-
-Next we create the *counts_per_team* table, which groups the records by their window end and team.
-
-Finally, we order those results by window end, goal count and team.
-
-## Durability
-OctoSQL in its current design is based on on-disk transactional storage.
-
-All state is saved this way. All interactions with datasources are designed so that no records get duplicated in the face of errors or application restarts.
-
-You can also kill the OctoSQL process and start it again with the same query and storage-directory (command line argument), it will start where it left off.
-
-By default, OctoSQL will create a temporary directory for the state and delete it after termination.
-
-## Configuration
-The configuration file has the following form
-```yaml
-dataSources:
-  - name: <table_name_in_octosql>
-    type: <datasource_type>
-    config:
-      <datasource_specific_key>: <datasource_specific_value>
-      <datasource_specific_key>: <datasource_specific_value>
-      ...
-  - name: <table_name_in_octosql>
-    type: <datasource_type>
-    config:
-      <datasource_specific_key>: <datasource_specific_value>
-      <datasource_specific_key>: <datasource_specific_value>
-      ...
-    ...
-physical:
-  physical_plan_option: <value>
+The TABLE operator can be used to specify both a simple table name or another table valued function:
+```sql
+SELECT * FROM poll(source=>TABLE(range(start=>1,end=>10) r)) r
+```
+or even a whole subquery, but then you have to use another set of braces:
+```sql
+SELECT * FROM poll(source=>TABLE((SELECT * FROM range(start=>1,end=>10) r) r)) r
 ```
 
-Available OctoSQL-wide configuration options are:
-- physical
-    - groupByParallelism: The parallelism of group by's and distinct queries. Will default to the CPU core count of your machine.
-    - streamJoinParallelism: The parallelism of streaming joins. Will default to the CPU core count of your machine.
-- execution
-    - lookupJoinPrefetchCount: The count of simultaneously processed records in a lookup join.
+### Join Types
 
-### Supported Datasources
-#### JSON
-JSON file in one of the following forms:
-- one record per line, no commas
-- JSON list of records
-##### options:
-- path - path to file containing the data, **required**
-- arrayFormat - if the JSON list of records format should be used, **optional**: defaults to `false`
-- batchSize - number of records extracted from json file in one storage transaction, **optional**: defaults to `1000`
+OctoSQL supports two Join strategies: Stream Join and Lookup Join.
 
----
-#### CSV
-CSV file separated using commas.\
-The file may or may not have column names as it's first row.
-##### options:
-- path - path to file containing the data, **required**
-- headerRow - whether the first row of the CSV file contains column names or not, **optional**: defaults to `true`
-- separator - columns separator, **optional**: defaults to `","`
-- batchSize - number of records extracted from csv file in one storage transaction, **optional**: defaults to `1000`
+One bit of nomenclature before moving forward: watermarked streams are streams that have an Event Time field, emit Watermarks, and are possibly infinite.
 
----
-#### Excel
-A single table in an Excel spreadsheet.\
-The table may or may not have column names as it's first row.\
-The table can be in any sheet, and start at any point, but it cannot
-contain spaces between columns nor spaces between rows.
-##### options:
-- path - path to file, **required**
-- headerRow - does the first row contain column names, **optional**: defaults to `true`
-- sheet - name of the sheet in which data is stored, **optional**: defaults to `"Sheet1"`
-- rootCell - name of cell (i.e "A3", "BA14") which is the leftmost cell of the first, **optional**: defaults to `"A1"`
-- timeColumns - a list of columns to parse as datetime values with second precision
-  row, **optional**: defaults to `[]`
-- batchSize - number of records extracted from excel file in one storage transaction, **optional**: defaults to `1000`
+#### Stream Join
+A Stream Join reads both input streams while storing all Records in memory, matching them by the key, and emitting them as they are processed.
 
-___
-#### Parquet
-A single Parquet file.\
-Nested repeated elements are *not supported*. Otherwise repeated xor nested elements *are supported*.\
-Currently *unsupported* logical types, they will get parsed as the underlying primitive type:\
-&nbsp;&nbsp;&nbsp;&nbsp; \- ENUM \
-&nbsp;&nbsp;&nbsp;&nbsp; \- TIME with NANOS precision \
-&nbsp;&nbsp;&nbsp;&nbsp; \- TIMESTAMP with NANOS precision (both UTC and non-UTC) \
-&nbsp;&nbsp;&nbsp;&nbsp; \- INTERVAL \
-&nbsp;&nbsp;&nbsp;&nbsp; \- MAP
-##### options
-- path - path to file, **required**
-- batchSize - number of records extracted from parquet file in one storage transaction, **optional**: defaults to `1000`
+It supports watermarked streams on both sides and the output Watermark will be set to the minimum of both input stream Watermarks in that case. Records newer than the minimum of the input Watermarks will be buffered, not processed, thus guaranteeing [internal consistency](https://www.scattered-thoughts.net/writing/internal-consistency-in-streaming-systems/).
 
----
-#### PostgreSQL
-Single PostgreSQL database table.
-##### options:
-- address - address including port number, **optional**: defaults to `localhost:5432`
-- user - **required**
-- password - **required**
-- databaseName - **required**
-- tableName - **required**
-- batchSize - number of records extracted from PostgreSQL database in one storage transaction, **optional**: defaults to `1000`
+Records with an event time of zero are never buffered.
 
----
-#### MySQL
-Single MySQL database table.
-##### options:
-- address - address including port number, **optional**: defaults to `localhost:3306`
-- user - **required**
-- password - **required**
-- databaseName - **required**
-- tableName - **required**
-- batchSize - number of records extracted from MySQL database in one storage transaction, **optional**: defaults to `1000`
+If you only have one watermarked input stream, then its watermarks will be used, and the other stream will be read fully before emitting any output Records.
 
----
-#### Redis
-Redis database with the given index. Currently only hashes are supported.
-##### options:
-- address - address including port number, **optional**: defaults to `localhost:6379`
-- password - **optional**: defaults to `""`
-- databaseIndex - index number of Redis database, **optional**: defaults to `0`
-- databaseKeyName - column name of Redis key in OctoSQL records, **optional**: defaults to `"key"`
-- batchSize - number of records extracted from Redis database in one storage transaction, **optional**: defaults to `1000`
+If none of the input streams is watermarked, then the Records will be processed without buffering. 
 
-___
-#### Kafka
-Multi-partition kafka topic.
-##### **optional**
-- brokers - list of broker addresses (separately hosts and ports) used to connect to the kafka cluster, **optional**: defaults to `["localhost:9092"]`
-- topic - name of topic to read messages from, **required**
-- partitions - topic partition count, **optional**: defaults to `1`
-- startOffset - offset from which the first batch of messages will be read, **optional**: defaults to `-1`
-- batchSize - number of records extracted from Kafka in one storage transaction, **optional**: defaults to `1`
-- json - should the messages be decoded as JSON, **optional**: defaults to `false`
+The Stream Join is the default join type, but can also be used by explicitly specifying the `STREAM JOIN` operator.
 
-## Documentation
-Documentation for the available functions: https://github.com/cube2222/octosql/wiki/Function-Documentation
+#### Lookup Join
+A Lookup Joins reads Records from the left input (which can be watermarked) and for each Record gets the relevant Records from the right side (which can't be watermarked). Thus, the right side will be evaluated once per left-side Record. 
 
-Documentation for the available aggregates: https://github.com/cube2222/octosql/wiki/Aggregate-Documentation
+This also gives OctoSQL more room for optimization, as it can push the Join predicate down to the right-side input, possibly reading only a small subset of the whole right-side input. This is very useful when the left-side input is very small, i.e., a CSV file with a few rows, the right-side input is huge, i.e., a PostgreSQL table with millions of rows, and you expect each left-side Record to be matched with just a few right-side Records. You can make sure this optimization succeeded by using the `--explain` flag and checking whether the predicates are pushed under the right-side input datasource.
 
-Documentation for the available triggers: https://github.com/cube2222/octosql/wiki/Trigger-Documentation
+The Lookup Join can be used by explicitly specifying the `LOOKUP JOIN` operator.
 
-Documentation for the available table valued functions: https://github.com/cube2222/octosql/wiki/Table-Valued-Functions-Documentation
+## Benchmarks
 
-The SQL dialect documentation: TODO ;) in short though:
+The benchmarks were run on a 2021 MacBook Pro 16 / M1 Max / 32 GB / 1 TB. All binaries are native ARM binaries compiled for Apple Silicon.
 
-Available SQL constructs: Select, Where, Order By, Group By, Offset, Limit, Left Join, Right Join, Inner Join, Distinct, Union, Union All, Subqueries, Operators, Table Valued Functions, Trigger, Common Table Expressions.
+The benchmark script can be found [here](benchmarks/benchmarks.sh).
 
-Available SQL types: Int, Float, String, Bool, Time, Duration, Tuple (array), Object (e.g. JSON)
+It runs the `SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi.csv GROUP BY passenger_count` query against the well-known NYC Yellow Taxi Trip Dataset. Specifically, the CSV file from April 2021 is used. It's a 200MB CSV file with ~2 million rows, 18 columns, and mostly numerical values.
 
-### Describe
-You can describe the current plan in graphviz format using the -describe flag, like this:
-```bash
-octosql "..." --describe | dot -Tpng > output.png
-```
+| Command | Mean [s] | Min [s] | Max [s] |    Relative |
+|:---|---:|---:|---:|------------:|
+| `octosql "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi.csv GROUP BY passenger_count"` | 3.173 ± 0.006 | 3.164 | 3.184 | 1.00 |
+| `q -d ',' -H "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi.csv GROUP BY passenger_count"` | 15.897 ± 0.031 | 15.858 | 15.931 | 5.01 |
+| `q -d ',' -H -C readwrite "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi.csv GROUP BY passenger_count"` | 1.561 ± 0.015 | 1.551 | 1.603 |        0.49 |
+| `textql -header -sql "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi GROUP BY passenger_count" taxi.csv` | 15.206 ± 0.053 | 15.120 | 15.290 | 4.80 |
+| `datafusion-cli -f datafusion_commands.txt` | 3.007 ± 0.008 | 2.992 | 3.022 | 0.95 |
 
-## Architecture
-An OctoSQL invocation gets processed in multiple phases.
+Here we can see that OctoSQL is fairly good performance wise.
 
-### SQL AST
-First, the SQL query gets parsed into an abstract syntax tree. This phase only rules out syntax errors.
+q with caching beats OctoSQL by a factor of 2, but that's because caching means data loading from CSV is omitted, and the optimized SQLite format is used directly.
 
-### Logical Plan
-The SQL AST gets converted into a logical query plan. This plan is still mostly a syntactic validation. It's the most naive possible translation of the SQL query. However, this plan already has more of a map-filter-reduce form.
+Non-cached q and textql are considerably slower, most probably because they have to parse the whole CSV file to put it into SQLite and only then query it. OctoSQL runs queries directly on the CSV file, so it's able to use its optimizer to avoid loading columns which aren't used in the query.
 
-If you wanted to add a new query language to OctoSQL, the only problem you'd have to solve is translating it to this logical plan.
+DataFusion is around the same performance as OctoSQL for this query. This doesn't reveal though what is apparent when using the datafusion-cli REPL, which is that DataFusion spends 2.7 seconds analyzing and inferring the schema, and then queries only take 0.3 seconds each. Which means that running repeat queries in DataFusion is ridiculously fast in comparison to all other tools.
 
-### Physical Plan
-The logical plan gets converted into a physical plan. This conversion finds any semantic errors in the query. If this phase is reached, then the input is correct and OctoSQL will be able execute it.
+## Contributing
 
-This phase already understands the specifics of the underlying datasources. So it's here where the optimizer will iteratively transform the plan, pushing computation nodes down to the datasources, and deduplicating unnecessary parts.
-
-The optimizer uses a pattern matching approach, where it has rules for matching parts of the physical plan tree and how those patterns can be restructured into a more efficient version. The rules are meant to be as simple as possible and make the smallest possible changes. For example, pushing filters under maps, if they don't use any mapped variables. This way, the optimizer just keeps on iterating on the whole tree, until it can't change anything anymore. (each iteration tries to apply each rule in each possible place in the tree) This ensures that the plan reaches a local performance minimum, and the rules should be structured so that this local minimum is equal - or close to - the global minimum. (i.e. one optimization, shouldn't make another - much more useful one - impossible)
-
-Here is an example diagram of an optimized physical plan:
-![Physical Plan](images/physical.png)
-
-### Execution Plan
-The physical plan gets materialized into an execution plan. This phase has to be able to connect to the actual datasources. It may initialize connections, open files, etc.
-
-### Stream
-Starting the execution plan creates a stream, which underneath may hold more streams, or parts of the execution plan to create streams in the future. This stream works in a pull based model.
-
-## Datasource Pushdown Operations
-|Datasource	|Equality	|In	| \> < <= >=	|
-|---	|---	|---	|---	|
-|MySQL	|supported	|supported	|supported	|
-|PostgreSQL	|supported	|supported	|supported	|
-|Redis	|supported	|supported	|scan	|
-|Kafka	|scan	|scan	|scan	|
-|Parquet	|scan	|scan	|scan	|
-|JSON	|scan	|scan	|scan	|
-|CSV	|scan	|scan	|scan	|
-
-Where `scan` means that the whole table needs to be scanned for each access.
-
-## Telemetry
-OctoSQL sends application telemetry on each run to help us gauge user interest and feature use. This way we know somebody uses our software, feel our work is actually useful and can prioritize features based on actual usefulness.
-
-You can turn it off (though please don't) by setting the **OCTOSQL_TELEMETRY** environment variable to 0. Telemetry is also fully printed in the output log of OctoSQL, if you want to see what precisely is being sent.
-
-## Roadmap
-- Additional Datasources.
-- SQL Constructs:
-    - JSON Query
-    - HAVING, ALL, ANY
-- Push down functions, aggregates to databases that support them.
-- An in-memory index to save values of subqueries and save on rescanning tables which don't support a given operation, so as not to recalculate them each time.
-- Runtime statistics
-- Server mode
-- Querying a json or csv table from standard input.
-- Integration test suite
-- Tuple splitter, returning the row for each tuple element, with the given element instead of the tuple.
+OctoSQL doesn't accept external contributions to its source code right now, but you can raise issues or develop external plugins for database types you'd like OctoSQL to support. Create a Pull Request to add a plugin to the core plugins repository (which is contained in the plugin_repository.json file). You can find more details in the [Plugins section](#plugins)

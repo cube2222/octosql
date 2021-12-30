@@ -39,6 +39,8 @@ import (
 	"github.com/cube2222/octosql/telemetry"
 )
 
+var VERSION = "dev"
+
 var emptyYamlNode = func() yaml.Node {
 	var out yaml.Node
 	if err := yaml.Unmarshal([]byte("{}"), &out); err != nil {
@@ -49,14 +51,15 @@ var emptyYamlNode = func() yaml.Node {
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "octosql",
+	Use:   "octosql <query>",
 	Args:  cobra.ExactArgs(1),
 	Short: "",
 	Long:  ``,
 	Example: `octosql "SELECT * FROM myfile.json"
-octosql "SELECT * FROM ` + "`mydir/myfile.json`" + `
+octosql "SELECT * FROM mydir/myfile.csv"
 octosql "SELECT * FROM plugins.plugins"`,
 	SilenceErrors: true,
+	Version:       VERSION,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 		debug.SetGCPercent(1000)
@@ -210,7 +213,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 		var orderByExpressions []execution.Expression
 		var outSchema physical.Schema
 		if describe {
-			telemetry.SendTelemetry(ctx, "describe", queryTelemetry)
+			telemetry.SendTelemetry(ctx, VERSION, "describe", queryTelemetry)
 
 			for i := range physicalPlan.Schema.Fields {
 				physicalPlan.Schema.Fields[i].Name = reverseMapping[physicalPlan.Schema.Fields[i].Name]
@@ -223,7 +226,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 			outputOptions.OrderByExpressions = nil
 			outputOptions.OrderByDirections = nil
 		} else {
-			telemetry.SendTelemetry(ctx, "query", queryTelemetry)
+			telemetry.SendTelemetry(ctx, VERSION, "query", queryTelemetry)
 
 			if optimize {
 				physicalPlan = optimizer.Optimize(physicalPlan)

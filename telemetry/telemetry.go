@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"runtime/debug"
 	"time"
 
 	"github.com/mitchellh/go-homedir"
@@ -37,13 +36,13 @@ type event struct {
 	Data         interface{} `json:"data"`
 }
 
-func SendTelemetry(ctx context.Context, eventType string, data interface{}) {
-	if err := sendTelemetry(ctx, eventType, data); err != nil {
+func SendTelemetry(ctx context.Context, version, eventType string, data interface{}) {
+	if err := sendTelemetry(ctx, version, eventType, data); err != nil {
 		log.Printf("couldn't send telemetry: %s", err)
 	}
 }
 
-func sendTelemetry(ctx context.Context, eventType string, data interface{}) error {
+func sendTelemetry(ctx context.Context, version, eventType string, data interface{}) error {
 	deviceIDBytes, err := os.ReadFile(filepath.Join(telemetryDir, "device_id"))
 	if os.IsNotExist(err) {
 		fmt.Println(`OctoSQL sends anonymous usage statistics to help us guide the development of OctoSQL.
@@ -59,13 +58,6 @@ Please don't though, as it helps us a great deal.'`)
 	}
 	deviceID := string(deviceIDBytes)
 
-	var version string
-	info, ok := debug.ReadBuildInfo()
-	if ok {
-		version = info.Main.Version
-	} else {
-		version = "unknown"
-	}
 	payload := event{
 		DeviceID:     deviceID,
 		Type:         eventType,

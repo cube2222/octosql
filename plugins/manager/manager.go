@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -87,6 +88,9 @@ func (m *PluginManager) GetPluginBinaryPath(ref config.PluginReference, version 
 	fullName := fmt.Sprintf("octosql-plugin-%s", ref.Name)
 
 	binaryPath := filepath.Join(getPluginDir(), ref.Repository, fullName, version.String(), fullName)
+	if runtime.GOOS == "windows" {
+		binaryPath += ".exe"
+	}
 
 	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
 		return "", fmt.Errorf("plugin '%s' version '%s' is not installed", ref.String(), version.String())

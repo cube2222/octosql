@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -84,7 +85,7 @@ func (e *PluginExecutor) RunPlugin(ctx context.Context, pluginRef config.PluginR
 	}(len(e.done) - 1)
 
 	for {
-		_, err := os.Stat(socketLocation)
+		_, err := os.Lstat(socketLocation)
 		if os.IsNotExist(err) {
 			select {
 			case cmdOutErr := <-e.done[len(e.done)-1]:
@@ -104,9 +105,13 @@ func (e *PluginExecutor) RunPlugin(ctx context.Context, pluginRef config.PluginR
 
 	conn, err := grpc.DialContext(
 		ctx,
-		fmt.Sprintf("unix://%s", absolute),
+		fmt.Sprintf("unix:///%s", absolute),
 		grpc.WithBlock(),
 		grpc.WithInsecure(),
+		grpc.WithContextDialer(func(ctx context.Context, s string) (net.Conn, error) {
+			// This is necessary for sockets to properly work on Windows.
+			return (&net.Dialer{}).DialContext(ctx, "unix", absolute)
+		}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't connect to plugin: %w", err)
@@ -254,7 +259,7 @@ func (p *PhysicalDatasource) Materialize(ctx context.Context, env physical.Envir
 
 	// TODO: Change to fsnotify.
 	for {
-		_, err := os.Stat(res.SocketPath)
+		_, err := os.Lstat(res.SocketPath)
 		if os.IsNotExist(err) {
 			continue
 		} else if err != nil {
@@ -264,9 +269,13 @@ func (p *PhysicalDatasource) Materialize(ctx context.Context, env physical.Envir
 	}
 
 	conn, err := grpc.Dial(
-		fmt.Sprintf("unix://%s", res.SocketPath),
+		fmt.Sprintf("unix:///%s", res.SocketPath),
 		grpc.WithBlock(),
 		grpc.WithInsecure(),
+		grpc.WithContextDialer(func(ctx context.Context, s string) (net.Conn, error) {
+			// This is necessary for sockets to properly work on Windows.
+			return (&net.Dialer{}).DialContext(ctx, "unix", res.SocketPath)
+		}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't connect to executing plugin: %w", err)

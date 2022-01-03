@@ -156,7 +156,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 
 			databases[curMetadata.Reference.Name] = func() (physical.Database, error) {
 				once.Do(func() {
-					db, err = pluginExecutor.RunPlugin(ctx, curMetadata.Reference, curMetadata.Reference.Name, metadata.Versions[0].Number, emptyYamlNode)
+					db, err = pluginExecutor.RunPlugin(ctx, curMetadata.Reference, curMetadata.Reference.Name, curMetadata.Versions[0].Number, emptyYamlNode)
 				})
 				if err != nil {
 					return nil, fmt.Errorf("couldn't run default plugin %s database: %w", curMetadata.Reference, err)

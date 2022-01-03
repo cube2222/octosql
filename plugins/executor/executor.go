@@ -225,6 +225,20 @@ func (p *PhysicalDatasource) PushDownPredicates(newPredicates, pushedDownPredica
 	if err := json.Unmarshal(res.PushedDown, &outPushedDown); err != nil {
 		panic(fmt.Errorf("couldn't unmarshal pushed down predicates from JSON: %w", err))
 	}
+	for i := range outRejected {
+		var ok bool
+		outRejected[i], ok = plugins.RepopulatePhysicalExpressionFunctions(outRejected[i])
+		if !ok {
+			panic(fmt.Errorf("received unknown function from plugin, please check logs for more"))
+		}
+	}
+	for i := range outPushedDown {
+		var ok bool
+		outPushedDown[i], ok = plugins.RepopulatePhysicalExpressionFunctions(outPushedDown[i])
+		if !ok {
+			panic(fmt.Errorf("received unknown function from plugin, please check logs for more"))
+		}
+	}
 	return append(outRejected, newPredicatesNotSerializable...), outPushedDown, res.Changed
 }
 

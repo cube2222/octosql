@@ -111,8 +111,8 @@ func (node *Datasource) PushDownPredicates(newPredicates, pushedDownPredicates [
 
 	rejectedOriginalNames, pushedDownOriginalNames, changed := node.DatasourceImplementation.PushDownPredicates(newPredicatesOriginalNames, pushedDownPredicatesOriginalNames)
 
-	rejected = renameExpressionSliceRecordVariables(node.VariableMapping, rejectedOriginalNames)
-	pushedDown = renameExpressionSliceRecordVariables(node.VariableMapping, pushedDownOriginalNames)
+	rejected = renameExpressionSliceRecordVariables(colnameToUnique, rejectedOriginalNames)
+	pushedDown = renameExpressionSliceRecordVariables(colnameToUnique, pushedDownOriginalNames)
 	return rejected, pushedDown, changed
 }
 

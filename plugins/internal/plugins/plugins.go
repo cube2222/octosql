@@ -2,11 +2,13 @@ package plugins
 
 import (
 	"fmt"
+	"log"
 
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/functions"
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
@@ -307,4 +309,51 @@ func (x *ExecutionVariableContext) ToNativeExecutionVariableContext() *execution
 		}
 	}
 	return out
+}
+
+func RepopulatePhysicalExpressionFunctions(expr physical.Expression) (physical.Expression, bool) {
+	funcMap := functions.FunctionMap()
+
+	outOk := true
+	out := (&physical.Transformers{
+		ExpressionTransformer: func(expr physical.Expression) physical.Expression {
+			if expr.ExpressionType != physical.ExpressionTypeFunctionCall {
+				return expr
+			}
+			receivedDescriptor := expr.FunctionCall.FunctionDescriptor
+
+			details, ok := funcMap[expr.FunctionCall.Name]
+			if !ok {
+				log.Printf("Unknown function, rejecting predicate: %s", expr.FunctionCall.Name)
+				outOk = false
+				return expr
+			}
+
+		descriptorLoop:
+			for _, descriptor := range details.Descriptors {
+				if len(descriptor.ArgumentTypes) != len(receivedDescriptor.ArgumentTypes) {
+					continue descriptorLoop
+				}
+				if descriptor.Strict != receivedDescriptor.Strict {
+					continue descriptorLoop
+				}
+				if !descriptor.OutputType.Equals(receivedDescriptor.OutputType) {
+					continue descriptorLoop
+				}
+				for j := range descriptor.ArgumentTypes {
+					if !descriptor.ArgumentTypes[j].Equals(receivedDescriptor.ArgumentTypes[j]) {
+						continue descriptorLoop
+					}
+				}
+				expr.FunctionCall.FunctionDescriptor.TypeFn = descriptor.TypeFn
+				expr.FunctionCall.FunctionDescriptor.Function = descriptor.Function
+				return expr
+			}
+
+			log.Printf("Unknown function signature, rejecting predicate: %s", expr.FunctionCall.Name)
+			ok = false
+			return expr
+		},
+	}).TransformExpr(expr)
+	return out, outOk
 }

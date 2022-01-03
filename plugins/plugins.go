@@ -17,7 +17,6 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/functions"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/plugins/internal/plugins"
 )
@@ -54,7 +53,7 @@ func (s *physicalServer) PushDownPredicates(ctx context.Context, request *plugin
 
 	var knownFunctionsNewPredicates, unknownFunctionsNewPredicates []physical.Expression
 	for i := range newPredicates {
-		_, ok := repopulateFunctions(newPredicates[i])
+		_, ok := plugins.RepopulatePhysicalExpressionFunctions(newPredicates[i])
 		if !ok {
 			unknownFunctionsNewPredicates = append(unknownFunctionsNewPredicates, newPredicates[i])
 			continue
@@ -92,7 +91,7 @@ func (s *physicalServer) Materialize(ctx context.Context, request *plugins.Mater
 	}
 	for i := range pushedDownPredicates {
 		var ok bool
-		pushedDownPredicates[i], ok = repopulateFunctions(pushedDownPredicates[i])
+		pushedDownPredicates[i], ok = plugins.RepopulatePhysicalExpressionFunctions(pushedDownPredicates[i])
 		if !ok {
 			return nil, fmt.Errorf("received unknown function through predicate pushdown during materialization, this is a bug")
 		}
@@ -139,53 +138,6 @@ func (s *physicalServer) Metadata(context.Context, *plugins.MetadataRequest) (*p
 	return &plugins.MetadataResponse{
 		ApiLevel: plugins.APILevel,
 	}, nil
-}
-
-func repopulateFunctions(expr physical.Expression) (physical.Expression, bool) {
-	funcMap := functions.FunctionMap()
-
-	outOk := true
-	out := (&physical.Transformers{
-		ExpressionTransformer: func(expr physical.Expression) physical.Expression {
-			if expr.ExpressionType != physical.ExpressionTypeFunctionCall {
-				return expr
-			}
-			receivedDescriptor := expr.FunctionCall.FunctionDescriptor
-
-			details, ok := funcMap[expr.FunctionCall.Name]
-			if !ok {
-				log.Printf("Unknown function, rejecting predicate: %s", expr.FunctionCall.Name)
-				outOk = false
-				return expr
-			}
-
-		descriptorLoop:
-			for _, descriptor := range details.Descriptors {
-				if len(descriptor.ArgumentTypes) != len(receivedDescriptor.ArgumentTypes) {
-					continue descriptorLoop
-				}
-				if descriptor.Strict != receivedDescriptor.Strict {
-					continue descriptorLoop
-				}
-				if !descriptor.OutputType.Equals(receivedDescriptor.OutputType) {
-					continue descriptorLoop
-				}
-				for j := range descriptor.ArgumentTypes {
-					if !descriptor.ArgumentTypes[j].Equals(receivedDescriptor.ArgumentTypes[j]) {
-						continue descriptorLoop
-					}
-				}
-				expr.FunctionCall.FunctionDescriptor.TypeFn = descriptor.TypeFn
-				expr.FunctionCall.FunctionDescriptor.Function = descriptor.Function
-				return expr
-			}
-
-			log.Printf("Unknown function signature, rejecting predicate: %s", expr.FunctionCall.Name)
-			ok = false
-			return expr
-		},
-	}).TransformExpr(expr)
-	return out, outOk
 }
 
 type executionServer struct {

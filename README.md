@@ -288,7 +288,7 @@ The TABLE operator can be used to specify both a simple table name or another ta
 ```sql
 SELECT * FROM poll(source=>TABLE(range(start=>1,end=>10) r)) r
 ```
-or even a whole subquery, but then you have to use another set of braces:
+or even a whole subquery, but then you have to use another set of parentheses:
 ```sql
 SELECT * FROM poll(source=>TABLE((SELECT * FROM range(start=>1,end=>10) r) r)) r
 ```

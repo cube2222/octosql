@@ -37,8 +37,8 @@ type PluginExecutor struct {
 	done           []chan error
 }
 
-func (e *PluginExecutor) RunPlugin(ctx context.Context, pluginRef config.PluginReference, databaseName string, version *semver.Version, config yaml.Node) (*Database, error) {
-	tmpRootDir := "/Users/jakub/.octosql/tmp/plugins"
+func (e *PluginExecutor) RunPlugin(ctx context.Context, pluginRef config.PluginReference, databaseName string, version *semver.Version, dbConfig yaml.Node) (*Database, error) {
+	tmpRootDir := filepath.Join(config.OctoSQLHomeDir(), "tmp/plugins")
 	if err := os.MkdirAll(tmpRootDir, os.ModePerm); err != nil {
 		return nil, fmt.Errorf("couldn't create tmp directory %s: %w", tmpRootDir, err)
 	}
@@ -55,7 +55,7 @@ func (e *PluginExecutor) RunPlugin(ctx context.Context, pluginRef config.PluginR
 	}
 
 	input, err := json.Marshal(&plugins.PluginInput{
-		Config: config,
+		Config: dbConfig,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("couldn't encode plugin input to JSON: %w", err)

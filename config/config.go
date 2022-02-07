@@ -13,13 +13,17 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var octosqlHomeDir = func() string {
+var homeDir = func() string {
 	dir, err := homedir.Dir()
 	if err != nil {
 		log.Fatalf("couldn't get user home directory: %s", err)
 	}
-	return filepath.Join(dir, ".octosql")
+	return dir
 }()
+
+func OctoSQLHomeDir() string {
+	return filepath.Join(homeDir, ".octosql")
+}
 
 type Config struct {
 	Databases []DatabaseConfig `yaml:"databases"`
@@ -33,7 +37,7 @@ type DatabaseConfig struct {
 }
 
 func Read() (*Config, error) {
-	data, err := ioutil.ReadFile(filepath.Join(octosqlHomeDir, "octosql.yml"))
+	data, err := ioutil.ReadFile(filepath.Join(OctoSQLHomeDir(), "octosql.yml"))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return &Config{

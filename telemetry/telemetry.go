@@ -13,16 +13,13 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/mitchellh/go-homedir"
+	"github.com/cube2222/octosql/config"
 	"github.com/oklog/ulid/v2"
 )
 
 var telemetryDir = func() string {
-	dir, err := homedir.Dir()
-	if err != nil {
-		log.Fatalf("couldn't get user home directory: %s", err)
-	}
-	return filepath.Join(dir, ".octosql/telemetry")
+	dir := config.OctoSQLHomeDir()
+	return filepath.Join(dir, "telemetry")
 }()
 
 type event struct {

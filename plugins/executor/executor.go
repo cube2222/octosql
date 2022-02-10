@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/kr/text"
+	"github.com/mitchellh/go-homedir"
 	"google.golang.org/grpc"
 	"gopkg.in/yaml.v3"
 
@@ -23,6 +25,14 @@ import (
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/plugins/internal/plugins"
 )
+
+var tmpPluginsDir = func() string {
+	dir, err := homedir.Dir()
+	if err != nil {
+		log.Fatalf("couldn't get user home directory: %s", err)
+	}
+	return filepath.Join(dir, ".octosql/tmp/plugins")
+}()
 
 type Manager interface {
 	GetPluginBinaryPath(name config.PluginReference, version *semver.Version) (string, error)
@@ -38,12 +48,11 @@ type PluginExecutor struct {
 }
 
 func (e *PluginExecutor) RunPlugin(ctx context.Context, pluginRef config.PluginReference, databaseName string, version *semver.Version, config yaml.Node) (*Database, error) {
-	tmpRootDir := "/Users/jakub/.octosql/tmp/plugins"
-	if err := os.MkdirAll(tmpRootDir, os.ModePerm); err != nil {
-		return nil, fmt.Errorf("couldn't create tmp directory %s: %w", tmpRootDir, err)
+	if err := os.MkdirAll(tmpPluginsDir, os.ModePerm); err != nil {
+		return nil, fmt.Errorf("couldn't create tmp directory %s: %w", tmpPluginsDir, err)
 	}
 
-	tmpDir, err := os.MkdirTemp(tmpRootDir, pluginRef.Repository+"$"+pluginRef.Name)
+	tmpDir, err := os.MkdirTemp(tmpPluginsDir, pluginRef.Repository+"$"+pluginRef.Name)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create tempdir: %w", err)
 	}

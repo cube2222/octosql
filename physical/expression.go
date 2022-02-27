@@ -14,16 +14,17 @@ type Expression struct {
 
 	ExpressionType ExpressionType
 	// Only one of the below may be non-null.
-	Variable        *Variable
-	Constant        *Constant
-	FunctionCall    *FunctionCall
-	And             *And
-	Or              *Or
-	QueryExpression *QueryExpression
-	Coalesce        *Coalesce
-	Tuple           *Tuple
-	TypeAssertion   *TypeAssertion
-	Cast            *Cast
+	Variable          *Variable
+	Constant          *Constant
+	FunctionCall      *FunctionCall
+	And               *And
+	Or                *Or
+	QueryExpression   *QueryExpression
+	Coalesce          *Coalesce
+	Tuple             *Tuple
+	TypeAssertion     *TypeAssertion
+	Cast              *Cast
+	ObjectFieldAccess *ObjectFieldAccess
 }
 
 type ExpressionType int
@@ -39,6 +40,7 @@ const (
 	ExpressionTypeTuple
 	ExpressionTypeTypeAssertion
 	ExpressionTypeCast
+	ExpressionTypeObjectFieldAccess
 )
 
 func (t ExpressionType) String() string {
@@ -63,6 +65,8 @@ func (t ExpressionType) String() string {
 		return "type_assertion"
 	case ExpressionTypeCast:
 		return "cast"
+	case ExpressionTypeObjectFieldAccess:
+		return "object_field_access"
 	}
 	return "unknown"
 }
@@ -110,6 +114,11 @@ type TypeAssertion struct {
 type Cast struct {
 	Expression Expression
 	TargetType octosql.Type
+}
+
+type ObjectFieldAccess struct {
+	Object Expression
+	Field  string
 }
 
 func (expr *Expression) Materialize(ctx context.Context, env Environment) (execution.Expression, error) {
@@ -218,6 +227,21 @@ func (expr *Expression) Materialize(ctx context.Context, env Environment) (execu
 		}
 
 		return execution.NewCast(expr.Cast.TargetType, expression), nil
+	case ExpressionTypeObjectFieldAccess:
+		object, err := expr.ObjectFieldAccess.Object.Materialize(ctx, env)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't materialize object field access object: %w", err)
+		}
+
+		fieldIndex := 0
+		for i, field := range expr.ObjectFieldAccess.Object.Type.Struct.Fields {
+			if field.Name == expr.ObjectFieldAccess.Field {
+				fieldIndex = i
+				break
+			}
+		}
+
+		return execution.NewObjectFieldAccess(object, fieldIndex), nil
 	}
 
 	panic("unexhaustive expression type match")

@@ -392,3 +392,39 @@ func TypecheckExpression(ctx context.Context, env physical.Environment, logicalE
 
 	return expr
 }
+
+type ObjectFieldAccess struct {
+	object Expression
+	field  string
+}
+
+func NewObjectFieldAccess(object Expression, field string) *ObjectFieldAccess {
+	return &ObjectFieldAccess{object: object, field: field}
+}
+
+func (c *ObjectFieldAccess) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
+	expr := c.object.Typecheck(ctx, env, logicalEnv)
+
+	if expr.Type.TypeID != octosql.TypeIDStruct {
+		panic(fmt.Errorf("object field access on non-object expression of type '%s'", expr.Type))
+	}
+	fieldIndex := -1
+	for i := range expr.Type.Struct.Fields {
+		if expr.Type.Struct.Fields[i].Name == c.field {
+			fieldIndex = i
+			break
+		}
+	}
+	if fieldIndex == -1 {
+		panic(fmt.Errorf("object field access of field '%s' on object expression of type '%s' without that field", expr.Type, c.field))
+	}
+
+	return physical.Expression{
+		Type:           expr.Type.Struct.Fields[fieldIndex].Type,
+		ExpressionType: physical.ExpressionTypeObjectFieldAccess,
+		ObjectFieldAccess: &physical.ObjectFieldAccess{
+			Object: expr,
+			Field:  c.field,
+		},
+	}
+}

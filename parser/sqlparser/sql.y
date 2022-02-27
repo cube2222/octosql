@@ -2481,14 +2481,6 @@ value_expression:
   {
     $$ = &BinaryExpr{Left: $1, Operator: ShiftRightStr, Right: $3}
   }
-| column_name JSON_EXTRACT_OP value
-  {
-    $$ = &BinaryExpr{Left: $1, Operator: JSONExtractOp, Right: $3}
-  }
-| column_name JSON_UNQUOTE_EXTRACT_OP value
-  {
-    $$ = &BinaryExpr{Left: $1, Operator: JSONUnquoteExtractOp, Right: $3}
-  }
 | value_expression COLLATE charset
   {
     $$ = &CollateExpr{Expr: $1, Charset: $3}
@@ -2554,6 +2546,10 @@ value_expression:
 | value_expression LIST_ARG convert_type
   {
     $$ = &ConvertExpr{Expr: $1, Type: $3}
+  }
+| value_expression JSON_EXTRACT_OP sql_id
+  {
+    $$ = &ObjectFieldAccess{Object: $1, Field: $3}
   }
 
 /*

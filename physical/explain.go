@@ -201,6 +201,11 @@ func ExplainExpr(expr Expression, withTypeInfo bool) *graph.Node {
 		out.AddField("type", expr.Cast.TargetType.String())
 		out.AddChild("value", ExplainExpr(expr.Cast.Expression, withTypeInfo))
 
+	case ExpressionTypeObjectFieldAccess:
+		out = graph.NewNode("object field access")
+		out.AddChild("object", ExplainExpr(expr.ObjectFieldAccess.Object, withTypeInfo))
+		out.AddField("field", expr.ObjectFieldAccess.Field)
+
 	default:
 		panic("unexhaustive expression type match")
 	}

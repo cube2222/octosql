@@ -2354,6 +2354,7 @@ func (*ConvertUsingExpr) iExpr()  {}
 func (*MatchExpr) iExpr()         {}
 func (*GroupConcatExpr) iExpr()   {}
 func (*Default) iExpr()           {}
+func (*ObjectFieldAccess) iExpr() {}
 
 // ReplaceExpr finds the from expression from root
 // and replaces it with to. If from matches root,
@@ -2823,6 +2824,38 @@ func (node BoolVal) walkSubtree(visit Visit) error {
 }
 
 func (node BoolVal) replace(from, to Expr) bool {
+	return false
+}
+
+// ObjectFieldAccess represents an object field access.
+type ObjectFieldAccess struct {
+	// Metadata is not populated by the parser.
+	// It's a placeholder for analyzers to store
+	// additional data, typically info about which
+	// table or column this node references.
+	Metadata interface{}
+	Object   Expr
+	Field    ColIdent
+}
+
+// Format formats the node.
+func (node *ObjectFieldAccess) Format(buf *TrackedBuffer) {
+	buf.Myprintf("%v.", node.Object)
+	buf.Myprintf("%v", node.Field)
+}
+
+func (node *ObjectFieldAccess) walkSubtree(visit Visit) error {
+	if node == nil {
+		return nil
+	}
+	return Walk(
+		visit,
+		node.Object,
+		node.Field,
+	)
+}
+
+func (node *ObjectFieldAccess) replace(from, to Expr) bool {
 	return false
 }
 

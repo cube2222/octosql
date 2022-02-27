@@ -298,4 +298,25 @@ func (c *Tuple) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 	return octosql.NewTuple(values), nil
 }
 
+type ObjectFieldAccess struct {
+	object     Expression
+	fieldIndex int
+}
+
+func NewObjectFieldAccess(object Expression, fieldIndex int) *ObjectFieldAccess {
+	return &ObjectFieldAccess{
+		object:     object,
+		fieldIndex: fieldIndex,
+	}
+}
+
+func (c *ObjectFieldAccess) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
+	object, err := c.object.Evaluate(ctx)
+	if err != nil {
+		return octosql.ZeroValue, fmt.Errorf("couldn't evaluate object field access object: %w", err)
+	}
+
+	return object.Struct[c.fieldIndex], nil
+}
+
 // TODO: sys.undo should create an expression which reads the current retraction status.

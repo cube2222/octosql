@@ -310,6 +310,15 @@ func (t *Transformers) TransformExpr(expr Expression) Expression {
 				TargetType: expr.Cast.TargetType,
 			},
 		}
+	case ExpressionTypeObjectFieldAccess:
+		out = Expression{
+			Type:           expr.Type,
+			ExpressionType: expr.ExpressionType,
+			ObjectFieldAccess: &ObjectFieldAccess{
+				Object: t.TransformExpr(expr.ObjectFieldAccess.Object),
+				Field:  expr.ObjectFieldAccess.Field,
+			},
+		}
 	default:
 		panic("unexhaustive expression type match")
 	}

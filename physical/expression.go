@@ -202,7 +202,12 @@ func (expr *Expression) Materialize(ctx context.Context, env Environment) (execu
 			}
 			expressions[i] = expression
 		}
-		return execution.NewCoalesce(expressions), nil
+		sourceTypes := make([]octosql.Type, len(expr.Coalesce.Arguments))
+		for i := range expr.Coalesce.Arguments {
+			sourceTypes[i] = expr.Coalesce.Arguments[i].Type
+		}
+
+		return execution.NewCoalesce(expressions, execution.NewObjectLayoutFixer(expr.Type, sourceTypes)), nil
 	case ExpressionTypeTuple:
 		expressions := make([]execution.Expression, len(expr.Tuple.Arguments))
 		for i := range expr.Tuple.Arguments {

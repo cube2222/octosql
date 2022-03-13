@@ -253,13 +253,132 @@ func (e *MultiColumnQueryExpression) Evaluate(ctx ExecutionContext) (octosql.Val
 	return octosql.NewList(values), nil
 }
 
-type Coalesce struct {
-	args []Expression
+// TODO: Unit tests for layout fixer.
+type LayoutMapping struct {
+	Struct *struct {
+		SourceIndex   []int
+		SourceMapping []LayoutMapping
+	}
+	List *struct {
+		ElementMapping LayoutMapping
+	}
+	Tuple *struct {
+		ElementMapping []LayoutMapping
+	}
 }
 
-func NewCoalesce(args []Expression) *Coalesce {
+type ObjectLayoutFixer struct {
+	mappings []LayoutMapping
+}
+
+func NewObjectLayoutFixer(targetType octosql.Type, sourceTypes []octosql.Type) *ObjectLayoutFixer {
+	mappings := make([]LayoutMapping, len(sourceTypes))
+	for i := range sourceTypes {
+		mappings[i] = calculateMapping(targetType, sourceTypes[i])
+	}
+	return &ObjectLayoutFixer{
+		mappings: mappings,
+	}
+}
+
+func (f *ObjectLayoutFixer) FixLayout(index int, value octosql.Value) octosql.Value {
+	return f.fixLayout(f.mappings[index], value)
+}
+
+func (f *ObjectLayoutFixer) fixLayout(mapping LayoutMapping, value octosql.Value) octosql.Value {
+	switch value.TypeID {
+	case octosql.TypeIDStruct:
+		out := make([]octosql.Value, len(mapping.Struct.SourceIndex))
+		for i := range out {
+			if mapping.Struct.SourceIndex[i] != -1 {
+				out[i] = f.fixLayout(mapping.Struct.SourceMapping[i], value.Struct[mapping.Struct.SourceIndex[i]])
+			}
+		}
+		return octosql.NewStruct(out)
+	case octosql.TypeIDList:
+		out := make([]octosql.Value, len(value.List))
+		for i := range out {
+			out[i] = f.fixLayout(mapping.List.ElementMapping, value.List[i])
+		}
+		return octosql.NewList(out)
+	case octosql.TypeIDTuple:
+		out := make([]octosql.Value, len(value.Tuple))
+		for i := range out {
+			out[i] = f.fixLayout(mapping.Tuple.ElementMapping[i], value.List[i])
+		}
+		return octosql.NewTuple(out)
+	default:
+		// primitive type
+		return value
+	}
+	// TODO: Check if mapping is just the identity mapping. In that case we can omit the translation and set that part to LayoutMapping{} to be copied directly.
+}
+
+func calculateMapping(targetType, sourceType octosql.Type) LayoutMapping {
+	// TODO: Fixme, For now assuming type unions don't exist.
+	switch targetType.TypeID {
+	case octosql.TypeIDStruct:
+		sourceIndices := map[string]int{}
+		for i := range sourceType.Struct.Fields {
+			sourceIndices[sourceType.Struct.Fields[i].Name] = i
+		}
+
+		outIndices := make([]int, len(targetType.Struct.Fields))
+		outMappings := make([]LayoutMapping, len(targetType.Struct.Fields))
+		for i, field := range targetType.Struct.Fields {
+			sourceIndex, ok := sourceIndices[field.Name]
+			if !ok {
+				outIndices[i] = -1
+				continue
+			}
+			outIndices[i] = sourceIndex
+			outMappings[i] = calculateMapping(field.Type, sourceType.Struct.Fields[sourceIndex].Type)
+		}
+		return LayoutMapping{
+			Struct: &struct {
+				SourceIndex   []int
+				SourceMapping []LayoutMapping
+			}{
+				SourceIndex:   outIndices,
+				SourceMapping: outMappings,
+			},
+		}
+
+	case octosql.TypeIDList:
+		if targetType.List.Element == nil || sourceType.List.Element == nil {
+			return LayoutMapping{}
+		}
+		return LayoutMapping{
+			List: &struct {
+				ElementMapping LayoutMapping
+			}{
+				ElementMapping: calculateMapping(*targetType.List.Element, *sourceType.List.Element),
+			},
+		}
+
+	case octosql.TypeIDTuple:
+		mappings := make([]LayoutMapping, len(targetType.Tuple.Elements))
+		for i := range mappings {
+			mappings[i] = calculateMapping(targetType.Tuple.Elements[i], sourceType.Tuple.Elements[i])
+		}
+		return LayoutMapping{
+			Tuple: &struct{ ElementMapping []LayoutMapping }{ElementMapping: mappings},
+		}
+
+	default:
+		return LayoutMapping{}
+	}
+}
+
+type Coalesce struct {
+	args              []Expression
+	objectLayoutFixer *ObjectLayoutFixer
+}
+
+func NewCoalesce(args []Expression, objectLayoutFixer *ObjectLayoutFixer) *Coalesce {
 	return &Coalesce{
-		args: args,
+		args:              args,
+		objectLayoutFixer: objectLayoutFixer,
 	}
 }
 
@@ -270,7 +389,7 @@ func (c *Coalesce) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 			return octosql.ZeroValue, fmt.Errorf("couldn't evaluate %d OR argument: %w", i, err)
 		}
 		if value.TypeID != octosql.TypeIDNull {
-			return value, nil
+			return c.objectLayoutFixer.FixLayout(i, value), nil
 		}
 	}
 	return octosql.NewNull(), nil

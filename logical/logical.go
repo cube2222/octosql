@@ -416,7 +416,7 @@ func (c *ObjectFieldAccess) Typecheck(ctx context.Context, env physical.Environm
 		}
 	}
 	if fieldIndex == -1 {
-		panic(fmt.Errorf("object field access of field '%s' on object expression of type '%s' without that field", expr.Type, c.field))
+		panic(fmt.Errorf("object field access of field '%s' on object expression of type '%s' without that field", c.field, expr.Type))
 	}
 
 	return physical.Expression{

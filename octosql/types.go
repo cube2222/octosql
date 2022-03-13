@@ -2,6 +2,7 @@ package octosql
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -213,46 +214,52 @@ func TypeSum(t1, t2 Type) Type {
 	if t2.Is(t1) == TypeRelationIs {
 		return t1
 	}
-	// TODO: Lists should probably be the same. No, we can actually easily check lists at runtime by checking their actual element types. Empty list fits into anything.
+	// TODO: Lists should also be deep-merged.
 	if t1.TypeID == TypeIDStruct && t2.TypeID == TypeIDStruct {
 		// TODO: Nullable struct + Nullable struct should also work. Overall, it should try to match if there are multiple struct alternatives.
-		// Sum of structs is a struct. We operate on the fields.
-		// This only works if all non-overlapping fields are nullable.
-		outFields := make([]StructField, len(t1.Struct.Fields))
-		copy(outFields, t1.Struct.Fields)
-		matchedFields := make([]bool, len(t1.Struct.Fields))
+		// The sum of structs is a struct that's a deep merge of the original structs.
 
-	newFieldLoop:
-		for _, field := range t2.Struct.Fields {
-			for i, existing := range outFields {
-				if existing.Name == field.Name {
-					outFields[i].Type = TypeSum(existing.Type, field.Type)
-					matchedFields[i] = true
-					continue newFieldLoop
-				}
-			}
-			outFields = append(outFields, field)
-			matchedFields = append(matchedFields, false)
+		t1Fields := make(map[string]Type)
+		for i := range t1.Struct.Fields {
+			t1Fields[t1.Struct.Fields[i].Name] = t1.Struct.Fields[i].Type
 		}
-
-		nonNullableFieldsMatch := true
-		for i := range outFields {
-			if !matchedFields[i] && Null.Is(outFields[i].Type) < TypeRelationIs {
-				nonNullableFieldsMatch = false
+		t2Fields := make(map[string]Type)
+		for i := range t2.Struct.Fields {
+			t2Fields[t2.Struct.Fields[i].Name] = t2.Struct.Fields[i].Type
+		}
+		outFields := make(map[string]Type)
+		for name := range t1Fields {
+			if _, ok := t2Fields[name]; ok {
+				outFields[name] = TypeSum(t1Fields[name], t2Fields[name])
+			} else {
+				outFields[name] = TypeSum(t1Fields[name], Null)
 			}
 		}
-
-		if nonNullableFieldsMatch {
-			return Type{
-				TypeID: TypeIDStruct,
-				Struct: struct {
-					Fields []StructField
-				}{
-					Fields: outFields,
-				},
+		for name := range t2Fields {
+			if _, ok := t1Fields[name]; !ok {
+				outFields[name] = TypeSum(t2Fields[name], Null)
 			}
+		}
+
+		outFieldSlice := make([]StructField, 0, len(outFields))
+		for name, fieldType := range outFields {
+			outFieldSlice = append(outFieldSlice, StructField{Name: name, Type: fieldType})
+		}
+		sort.Slice(outFieldSlice, func(i, j int) bool {
+			return outFieldSlice[i].Name < outFieldSlice[j].Name
+		})
+
+		return Type{
+			TypeID: TypeIDStruct,
+			Struct: struct {
+				Fields []StructField
+			}{
+				Fields: outFieldSlice,
+			},
 		}
 	}
+	// TODO: This won't work well with structs. If we have a union and we're adding a struct, try to find an already existing struct.
+	// TODO: If we deep-merge both lists and structs, the union should not be a list of alternatives, because each TypeID can only be there once.
 	var alternatives []Type
 	addType := func(t Type) {
 		if t.Is(Type{

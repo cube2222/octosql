@@ -353,6 +353,42 @@ func FunctionMap() map[string]physical.FunctionDetails {
 				},
 			},
 		},
+		"%": {
+			Descriptors: []physical.FunctionDescriptor{
+				{
+					ArgumentTypes: []octosql.Type{octosql.Int, octosql.Int},
+					OutputType:    octosql.Int,
+					Strict:        true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						return octosql.NewInt(values[0].Int % values[1].Int), nil
+					},
+				},
+				{
+					ArgumentTypes: []octosql.Type{octosql.Float, octosql.Float},
+					OutputType:    octosql.Float,
+					Strict:        true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						return octosql.NewFloat(math.Mod(values[0].Float, values[1].Float)), nil
+					},
+				},
+				{
+					ArgumentTypes: []octosql.Type{octosql.Duration, octosql.Int},
+					OutputType:    octosql.Duration,
+					Strict:        true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						return octosql.NewDuration(values[0].Duration % time.Duration(values[1].Int)), nil
+					},
+				},
+				{
+					ArgumentTypes: []octosql.Type{octosql.Duration, octosql.Duration},
+					OutputType:    octosql.Float,
+					Strict:        true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						return octosql.NewFloat(math.Mod(float64(values[0].Duration), float64(values[1].Duration))), nil
+					},
+				},
+			},
+		},
 		// math
 		"abs": {
 			Description: "Returns absolute value of argument.",

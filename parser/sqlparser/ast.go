@@ -3424,12 +3424,11 @@ func (node *ConvertTypeSimple) walkSubtree(visit Visit) error {
 }
 
 type ConvertTypeList struct {
-	Element ConvertType
 }
 
 // Format formats the node.
 func (node *ConvertTypeList) Format(buf *TrackedBuffer) {
-	buf.Myprintf("[%s]", node.Element)
+	buf.Myprintf("[]")
 }
 
 func (node *ConvertTypeList) walkSubtree(visit Visit) error {
@@ -3438,57 +3437,23 @@ func (node *ConvertTypeList) walkSubtree(visit Visit) error {
 	}
 	return Walk(
 		visit,
-		node.Element,
 	)
 }
 
 type ConvertTypeObject struct {
-	Fields []*ConvertTypeObjectField
 }
 
 // Format formats the Object.
 func (node *ConvertTypeObject) Format(buf *TrackedBuffer) {
-	buf.Myprintf("{")
-	for i := range node.Fields {
-		buf.Myprintf("%s", node.Fields[i])
-		if i != len(node.Fields)-1 {
-			buf.Myprintf(", ")
-		}
-	}
-	buf.Myprintf("}")
+	buf.Myprintf("{}")
 }
 
 func (node *ConvertTypeObject) walkSubtree(visit Visit) error {
 	if node == nil {
 		return nil
 	}
-	nodes := make([]SQLNode, len(node.Fields))
-	for i := range node.Fields {
-		nodes[i] = node.Fields[i]
-	}
 	return Walk(
 		visit,
-		nodes...,
-	)
-}
-
-type ConvertTypeObjectField struct {
-	Name string
-	Type ConvertType
-}
-
-// Format formats the node.
-func (node *ConvertTypeObjectField) Format(buf *TrackedBuffer) {
-	buf.Myprintf("%s: %s", node.Name, node.Type)
-}
-
-func (node *ConvertTypeObjectField) walkSubtree(visit Visit) error {
-	if node == nil {
-		return nil
-	}
-	return Walk(
-		visit,
-		node.Type,
 	)
 }
 

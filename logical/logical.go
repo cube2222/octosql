@@ -348,27 +348,40 @@ func (c *Coalesce) Typecheck(ctx context.Context, env physical.Environment, logi
 }
 
 type Cast struct {
-	arg        Expression
-	targetType octosql.Type
+	arg          Expression
+	targetTypeID octosql.TypeID
 }
 
-func NewCast(arg Expression, targetType octosql.Type) *Cast {
-	return &Cast{arg: arg, targetType: targetType}
+func NewCast(arg Expression, targetTypeID octosql.TypeID) *Cast {
+	return &Cast{arg: arg, targetTypeID: targetTypeID}
 }
 
 func (c *Cast) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
 	expr := c.arg.Typecheck(ctx, env, logicalEnv)
 
-	if rel := c.targetType.Is(expr.Type); rel != octosql.TypeRelationIs {
-		panic(fmt.Errorf("typecast target type '%s' isn't a subtype of the expression type '%s'", c.targetType.String(), expr.Type.String()))
+	if expr.Type.TypeID != octosql.TypeIDUnion {
+		panic(fmt.Errorf("typecast of non-union type expression '%s'", expr.Type.String()))
+	}
+
+	var targetType octosql.Type
+	found := false
+	for _, alternative := range expr.Type.Union.Alternatives {
+		if alternative.TypeID == c.targetTypeID {
+			found = true
+			targetType = alternative
+			break
+		}
+	}
+	if !found {
+		panic(fmt.Errorf("typecast target type '%s' isn't an alternative of the expression union type '%s'", octosql.Type{TypeID: c.targetTypeID}.String(), expr.Type.String()))
 	}
 
 	return physical.Expression{
-		Type:           octosql.TypeSum(c.targetType, octosql.Null),
+		Type:           octosql.TypeSum(targetType, octosql.Null),
 		ExpressionType: physical.ExpressionTypeCast,
 		Cast: &physical.Cast{
-			Expression: expr,
-			TargetType: c.targetType,
+			Expression:   expr,
+			TargetTypeID: c.targetTypeID,
 		},
 	}
 }
@@ -405,12 +418,23 @@ func NewObjectFieldAccess(object Expression, field string) *ObjectFieldAccess {
 func (c *ObjectFieldAccess) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
 	expr := c.object.Typecheck(ctx, env, logicalEnv)
 
-	if expr.Type.TypeID != octosql.TypeIDStruct {
+	if expr.Type.TypeID != octosql.TypeIDStruct &&
+		// Nullable struct case.
+		!(expr.Type.TypeID == octosql.TypeIDUnion && len(expr.Type.Union.Alternatives) == 2 && expr.Type.Union.Alternatives[0].TypeID == octosql.TypeIDNull && expr.Type.Union.Alternatives[1].TypeID == octosql.TypeIDStruct) {
 		panic(fmt.Errorf("object field access on non-object expression of type '%s'", expr.Type))
 	}
+	var fields []octosql.StructField
+	var canBeNull bool
+	if expr.Type.TypeID == octosql.TypeIDStruct {
+		fields = expr.Type.Struct.Fields
+	} else {
+		fields = expr.Type.Union.Alternatives[1].Struct.Fields
+		canBeNull = true
+	}
+
 	fieldIndex := -1
-	for i := range expr.Type.Struct.Fields {
-		if expr.Type.Struct.Fields[i].Name == c.field {
+	for i := range fields {
+		if fields[i].Name == c.field {
 			fieldIndex = i
 			break
 		}
@@ -419,8 +443,13 @@ func (c *ObjectFieldAccess) Typecheck(ctx context.Context, env physical.Environm
 		panic(fmt.Errorf("object field access of field '%s' on object expression of type '%s' without that field", c.field, expr.Type))
 	}
 
+	outType := fields[fieldIndex].Type
+	if canBeNull {
+		outType = octosql.TypeSum(outType, octosql.Null)
+	}
+
 	return physical.Expression{
-		Type:           expr.Type.Struct.Fields[fieldIndex].Type,
+		Type:           outType,
 		ExpressionType: physical.ExpressionTypeObjectFieldAccess,
 		ObjectFieldAccess: &physical.ObjectFieldAccess{
 			Object: expr,

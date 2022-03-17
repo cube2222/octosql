@@ -112,8 +112,8 @@ type TypeAssertion struct {
 }
 
 type Cast struct {
-	Expression Expression
-	TargetType octosql.Type
+	Expression   Expression
+	TargetTypeID octosql.TypeID
 }
 
 type ObjectFieldAccess struct {
@@ -224,22 +224,28 @@ func (expr *Expression) Materialize(ctx context.Context, env Environment) (execu
 			return nil, fmt.Errorf("couldn't materialize type asserted expression: %w", err)
 		}
 
-		return execution.NewTypeAssertion(expr.TypeAssertion.TargetType, expression), nil
+		return execution.NewTypeAssertion(expr.TypeAssertion.TargetType.TypeID, expression), nil
 	case ExpressionTypeCast:
 		expression, err := expr.Cast.Expression.Materialize(ctx, env)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't materialize cast expression: %w", err)
 		}
 
-		return execution.NewCast(expr.Cast.TargetType, expression), nil
+		return execution.NewCast(expr.Cast.TargetTypeID, expression), nil
 	case ExpressionTypeObjectFieldAccess:
 		object, err := expr.ObjectFieldAccess.Object.Materialize(ctx, env)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't materialize object field access object: %w", err)
 		}
 
+		fields := expr.ObjectFieldAccess.Object.Type.Struct.Fields
+		if expr.ObjectFieldAccess.Object.Type.TypeID == octosql.TypeIDUnion {
+			// Nullable object case
+			fields = expr.ObjectFieldAccess.Object.Type.Union.Alternatives[1].Struct.Fields
+		}
+
 		fieldIndex := 0
-		for i, field := range expr.ObjectFieldAccess.Object.Type.Struct.Fields {
+		for i, field := range fields {
 			if field.Name == expr.ObjectFieldAccess.Field {
 				fieldIndex = i
 				break

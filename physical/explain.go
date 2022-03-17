@@ -198,7 +198,7 @@ func ExplainExpr(expr Expression, withTypeInfo bool) *graph.Node {
 
 	case ExpressionTypeCast:
 		out = graph.NewNode("cast")
-		out.AddField("type", expr.Cast.TargetType.String())
+		out.AddField("type", octosql.Type{TypeID: expr.Cast.TargetTypeID}.String())
 		out.AddChild("value", ExplainExpr(expr.Cast.Expression, withTypeInfo))
 
 	case ExpressionTypeObjectFieldAccess:

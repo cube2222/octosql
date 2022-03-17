@@ -746,56 +746,33 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 	}
 }
 
-func ParseType(t sqlparser.ConvertType) (octosql.Type, error) {
+func ParseType(t sqlparser.ConvertType) (octosql.TypeID, error) {
 	switch t := t.(type) {
 	case *sqlparser.ConvertTypeList:
-		element, err := ParseType(t.Element)
-		if err != nil {
-			return octosql.Type{}, errors.Wrap(err, "couldn't parse element type of list type")
-		}
-
-		return octosql.Type{
-			TypeID: octosql.TypeIDList,
-			List:   struct{ Element *octosql.Type }{Element: &element},
-		}, nil
+		return octosql.TypeIDList, nil
 	case *sqlparser.ConvertTypeObject:
-		fields := make([]octosql.StructField, len(t.Fields))
-		for i := range t.Fields {
-			fieldType, err := ParseType(t.Fields[i].Type)
-			if err != nil {
-				return octosql.Type{}, errors.Wrapf(err, "couldn't parse field '%s' type of object type", t.Fields[i].Name)
-			}
-			fields[i] = octosql.StructField{
-				Name: t.Fields[i].Name,
-				Type: fieldType,
-			}
-		}
-
-		return octosql.Type{
-			TypeID: octosql.TypeIDStruct,
-			Struct: struct{ Fields []octosql.StructField }{Fields: fields},
-		}, nil
+		return octosql.TypeIDStruct, nil
 	case *sqlparser.ConvertTypeSimple:
 		switch tName := strings.ToLower(t.Name); tName {
 		case "null":
-			return octosql.Null, nil
+			return octosql.TypeIDNull, nil
 		case "int":
-			return octosql.Int, nil
+			return octosql.TypeIDInt, nil
 		case "float":
-			return octosql.Float, nil
+			return octosql.TypeIDFloat, nil
 		case "boolean":
-			return octosql.Boolean, nil
+			return octosql.TypeIDBoolean, nil
 		case "string":
-			return octosql.String, nil
+			return octosql.TypeIDString, nil
 		case "time":
-			return octosql.Time, nil
+			return octosql.TypeIDTime, nil
 		case "duration":
-			return octosql.Duration, nil
+			return octosql.TypeIDDuration, nil
 		default:
-			return octosql.Type{}, errors.Errorf("unknown type: %s", tName)
+			return 0, errors.Errorf("unknown type: %s", tName)
 		}
 	default:
-		return octosql.Type{}, errors.Errorf("unsupported type %+v of type %v", t, reflect.TypeOf(t))
+		return 0, errors.Errorf("unsupported type %+v of type %v", t, reflect.TypeOf(t))
 	}
 }
 

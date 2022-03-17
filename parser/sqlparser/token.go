@@ -538,9 +538,21 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 	default:
 		tkn.next()
 		switch ch {
-		case '[', ']':
+		case '[':
+			if tkn.lastChar == ']' {
+				tkn.next()
+				return LIST_TYPE, nil
+			}
 			return int(ch), nil
-		case '{', '}':
+		case ']':
+			return int(ch), nil
+		case '{':
+			if tkn.lastChar == '}' {
+				tkn.next()
+				return OBJECT_TYPE, nil
+			}
+			return int(ch), nil
+		case '}':
 			return int(ch), nil
 		case '=', ',', '(', ')', '+', '*', '%', '^':
 			if tkn.lastChar == '>' {

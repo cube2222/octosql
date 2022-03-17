@@ -311,7 +311,7 @@ func EqualExpressions(expr1, expr2 Expression) bool {
 
 	case *Cast:
 		if expr2, ok := expr2.(*Cast); ok {
-			if !expr1.targetType.Equals(expr2.targetType) {
+			if expr1.targetTypeID != expr2.targetTypeID {
 				return false
 			}
 			return EqualExpressions(expr1.arg, expr2.arg)

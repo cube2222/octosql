@@ -23,6 +23,36 @@ const (
 	TypeIDAny // TODO: Remove this type?
 )
 
+func (t TypeID) String() string {
+	switch t {
+	case TypeIDNull:
+		return "Null"
+	case TypeIDInt:
+		return "Int"
+	case TypeIDFloat:
+		return "Float"
+	case TypeIDBoolean:
+		return "Boolean"
+	case TypeIDString:
+		return "String"
+	case TypeIDTime:
+		return "Time"
+	case TypeIDDuration:
+		return "Duration"
+	case TypeIDList:
+		return "List"
+	case TypeIDStruct:
+		return "Object"
+	case TypeIDTuple:
+		return "Tuple"
+	case TypeIDUnion:
+		return "Union"
+	case TypeIDAny:
+		return "Any"
+	}
+	return "Invalid"
+}
+
 type Type struct {
 	TypeID   TypeID
 	Null     struct{}
@@ -331,7 +361,7 @@ func TypeSum(t1, t2 Type) Type {
 		// If this TypeID is not yet here, append and normalize.
 		alternatives = append(alternatives, t2)
 		sort.Slice(alternatives, func(i, j int) bool {
-			return alternatives[i].TypeID < alternatives[i].TypeID
+			return alternatives[i].TypeID < alternatives[j].TypeID
 		})
 		return Type{
 			TypeID: TypeIDUnion,
@@ -342,7 +372,7 @@ func TypeSum(t1, t2 Type) Type {
 	// They are different TypeID's and none of them is a union. Return a union of them.
 	alternatives := []Type{t1, t2}
 	sort.Slice(alternatives, func(i, j int) bool {
-		return alternatives[i].TypeID < alternatives[i].TypeID
+		return alternatives[i].TypeID < alternatives[j].TypeID
 	})
 
 	return Type{

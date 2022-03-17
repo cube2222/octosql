@@ -306,8 +306,8 @@ func (t *Transformers) TransformExpr(expr Expression) Expression {
 			Type:           expr.Type,
 			ExpressionType: expr.ExpressionType,
 			Cast: &Cast{
-				Expression: t.TransformExpr(expr.Cast.Expression),
-				TargetType: expr.Cast.TargetType,
+				Expression:   t.TransformExpr(expr.Cast.Expression),
+				TargetTypeID: expr.Cast.TargetTypeID,
 			},
 		}
 	case ExpressionTypeObjectFieldAccess:

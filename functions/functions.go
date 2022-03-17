@@ -934,13 +934,25 @@ func FunctionMap() map[string]physical.FunctionDetails {
 						if len(ts) != 2 {
 							return octosql.Type{}, false
 						}
-						if ts[0].TypeID != octosql.TypeIDList {
-							return octosql.Type{}, false
-						}
 						if ts[1].TypeID != octosql.TypeIDInt {
 							return octosql.Type{}, false
 						}
-						return octosql.TypeSum(*ts[0].List.Element, octosql.Null), true
+						if ts[0].TypeID == octosql.TypeIDList {
+							outType := octosql.Null
+							if elType := ts[0].List.Element; elType != nil {
+								outType = *elType
+							}
+							return octosql.TypeSum(outType, octosql.Null), true
+						}
+						// Nullable list case.
+						if ts[0].TypeID == octosql.TypeIDUnion && len(ts[0].Union.Alternatives) == 2 && ts[0].Union.Alternatives[0].TypeID == octosql.TypeIDNull && ts[0].Union.Alternatives[1].TypeID == octosql.TypeIDList {
+							outType := octosql.Null
+							if elType := ts[0].Union.Alternatives[1].List.Element; elType != nil {
+								outType = *elType
+							}
+							return octosql.TypeSum(outType, octosql.Null), true
+						}
+						return octosql.Type{}, false
 					},
 					Strict: true,
 					Function: func(values []octosql.Value) (octosql.Value, error) {

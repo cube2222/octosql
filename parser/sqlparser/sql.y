@@ -106,8 +106,6 @@ func skipToEnd(yylex interface{}) {
   colIdent      ColIdent
   tableIdent    TableIdent
   convertType   ConvertType
-  convertTypeObjectFields  []*ConvertTypeObjectField
-  convertTypeObjectField   *ConvertTypeObjectField
   aliasedTableName *AliasedTableExpr
   TableSpec  *TableSpec
   columnType    ColumnType
@@ -143,7 +141,7 @@ func skipToEnd(yylex interface{}) {
 %left <bytes> JOIN STRAIGHT_JOIN LOOKUP LEFT RIGHT INNER OUTER CROSS NATURAL USE FORCE
 %left <bytes> ON USING
 %token <empty> '(' ',' ')'
-%token <bytes> ID HEX STRING INTEGRAL FLOAT HEXNUM VALUE_ARG LIST_ARG COMMENT COMMENT_KEYWORD BIT_LITERAL
+%token <bytes> ID HEX STRING INTEGRAL FLOAT HEXNUM VALUE_ARG LIST_ARG COMMENT COMMENT_KEYWORD BIT_LITERAL LIST_TYPE OBJECT_TYPE
 %token <bytes> NULL TRUE FALSE OFF
 
 // Precedence dictated by mysql. But the vitess grammar is simplified.
@@ -298,8 +296,6 @@ func skipToEnd(yylex interface{}) {
 %type <str> charset
 %type <str> set_session_or_global show_session_or_global
 %type <convertType> convert_type
-%type <convertTypeObjectFields> convert_type_object_fields convert_type_object_fields_opt
-%type <convertTypeObjectField> convert_type_object_field
 %type <columnType> column_type
 %type <columnType> int_type decimal_type numeric_type time_type char_type spatial_type
 %type <sqlVal> length_opt column_comment_opt
@@ -2789,42 +2785,13 @@ convert_type:
   {
     $$ = &ConvertTypeSimple{Name: string($1)}
   }
-| '[' convert_type ']'
+| LIST_TYPE
   {
-    $$ = &ConvertTypeList{Element: $2}
+    $$ = &ConvertTypeList{}
   }
-| '{' convert_type_object_fields_opt '}'
+| OBJECT_TYPE
   {
-    $$ = &ConvertTypeObject{Fields: $2}
-  }
-
-convert_type_object_fields_opt:
-  {
-    $$ = nil
-  }
-| convert_type_object_fields
-  {
-    $$ = $1
-  }
-
-convert_type_object_fields:
-  convert_type_object_field
-  {
-    $$ = []*ConvertTypeObjectField{$1}
-  }
-| convert_type_object_field ',' convert_type_object_fields
-  {
-    $$ = append([]*ConvertTypeObjectField{$1}, $3...)
-  }
-
-convert_type_object_field:
-  ID ':' convert_type
-  {
-    $$ = &ConvertTypeObjectField{Name: string($1), Type: $3}
-  }
-| non_reserved_keyword ':' convert_type
-  {
-    $$ = &ConvertTypeObjectField{Name: string($1), Type: $3}
+    $$ = &ConvertTypeObject{}
   }
 
 expression_opt:

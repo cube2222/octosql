@@ -46,14 +46,14 @@ func (c *Constant) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 }
 
 type TypeAssertion struct {
-	expected octosql.Type
-	expr     Expression
+	expectedTypeID octosql.TypeID
+	expr           Expression
 }
 
-func NewTypeAssertion(expected octosql.Type, expr Expression) *TypeAssertion {
+func NewTypeAssertion(expectedTypeID octosql.TypeID, expr Expression) *TypeAssertion {
 	return &TypeAssertion{
-		expected: expected,
-		expr:     expr,
+		expectedTypeID: expectedTypeID,
+		expr:           expr,
 	}
 }
 
@@ -63,25 +63,22 @@ func (c *TypeAssertion) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 		return octosql.ZeroValue, err
 	}
 
-	if c.expected.TypeID == octosql.TypeIDStruct {
-		return octosql.ZeroValue, fmt.Errorf("type assertions for structures aren't yet supported")
-	}
-	if value.Type().Is(c.expected) != octosql.TypeRelationIs {
-		return octosql.ZeroValue, fmt.Errorf("invalid type: %s, expected: %s", value.Type(), c.expected)
+	if value.TypeID != c.expectedTypeID {
+		return octosql.ZeroValue, fmt.Errorf("invalid type: %s, expected: %s", value.TypeID.String(), c.expectedTypeID.String())
 	}
 
 	return value, nil
 }
 
 type Cast struct {
-	targetType octosql.Type
-	expr       Expression
+	targetTypeID octosql.TypeID
+	expr         Expression
 }
 
-func NewCast(targetType octosql.Type, expr Expression) *Cast {
+func NewCast(targetTypeID octosql.TypeID, expr Expression) *Cast {
 	return &Cast{
-		targetType: targetType,
-		expr:       expr,
+		targetTypeID: targetTypeID,
+		expr:         expr,
 	}
 }
 
@@ -91,10 +88,7 @@ func (c *Cast) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 		return octosql.ZeroValue, fmt.Errorf("couldn't evaluate cast argument: %w", err)
 	}
 
-	if c.targetType.TypeID == octosql.TypeIDStruct {
-		return octosql.ZeroValue, fmt.Errorf("type assertions for structures aren't yet supported")
-	}
-	if value.Type().Is(c.targetType) != octosql.TypeRelationIs {
+	if value.TypeID != c.targetTypeID {
 		return octosql.NewNull(), nil
 	}
 
@@ -470,6 +464,9 @@ func (c *ObjectFieldAccess) Evaluate(ctx ExecutionContext) (octosql.Value, error
 	object, err := c.object.Evaluate(ctx)
 	if err != nil {
 		return octosql.ZeroValue, fmt.Errorf("couldn't evaluate object field access object: %w", err)
+	}
+	if object.TypeID == octosql.TypeIDNull {
+		return octosql.NewNull(), nil
 	}
 
 	return object.Struct[c.fieldIndex], nil

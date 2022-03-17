@@ -26,7 +26,6 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 	defer f.Close()
 
 	decoder := json.NewDecoder(f)
-	decoder.ZeroCopy()
 
 	for {
 		var msg map[string]interface{}

@@ -253,7 +253,6 @@ func (e *MultiColumnQueryExpression) Evaluate(ctx ExecutionContext) (octosql.Val
 	return octosql.NewList(values), nil
 }
 
-// TODO: Unit tests for layout fixer.
 type LayoutMapping struct {
 	Struct *struct {
 		SourceIndex   []int
@@ -311,11 +310,49 @@ func (f *ObjectLayoutFixer) fixLayout(mapping LayoutMapping, value octosql.Value
 		// primitive type
 		return value
 	}
-	// TODO: Check if mapping is just the identity mapping. In that case we can omit the translation and set that part to LayoutMapping{} to be copied directly.
+}
+
+func mergeMappings(m1, m2 LayoutMapping) LayoutMapping {
+	out := LayoutMapping{}
+	if m1.Struct != nil {
+		out.Struct = m1.Struct
+	}
+	if m2.Struct != nil {
+		out.Struct = m2.Struct
+	}
+	if m1.List != nil {
+		out.List = m1.List
+	}
+	if m2.List != nil {
+		out.List = m2.List
+	}
+	if m1.Tuple != nil {
+		out.Tuple = m1.Tuple
+	}
+	if m2.Tuple != nil {
+		out.Tuple = m2.Tuple
+	}
+	return out
 }
 
 func calculateMapping(targetType, sourceType octosql.Type) LayoutMapping {
-	// TODO: Fixme, For now assuming type unions don't exist.
+	if sourceType.TypeID == octosql.TypeIDUnion {
+		var out LayoutMapping
+		for i := range sourceType.Union.Alternatives {
+			out = mergeMappings(out, calculateMapping(targetType, sourceType.Union.Alternatives[i]))
+		}
+		return out
+	}
+
+	if targetType.TypeID == octosql.TypeIDUnion {
+		for i := range targetType.Union.Alternatives {
+			if targetType.Union.Alternatives[i].TypeID == sourceType.TypeID {
+				return calculateMapping(targetType.Union.Alternatives[i], sourceType)
+			}
+		}
+		panic("calculateMapping unreachable target Union alternative")
+	}
+
 	switch targetType.TypeID {
 	case octosql.TypeIDStruct:
 		sourceIndices := map[string]int{}

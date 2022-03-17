@@ -330,6 +330,14 @@ func EqualExpressions(expr1, expr2 Expression) bool {
 			return true
 		}
 
+	case *ObjectFieldAccess:
+		if expr2, ok := expr2.(*ObjectFieldAccess); ok {
+			if expr1.field != expr2.field {
+				return false
+			}
+			return EqualExpressions(expr1.object, expr2.object)
+		}
+
 	}
 	return false
 }

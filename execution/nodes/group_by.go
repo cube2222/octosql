@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/btree"
+	"github.com/tidwall/btree"
 
 	. "github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
@@ -62,8 +62,22 @@ type previouslySentValuesItem struct {
 }
 
 func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
-	aggregates := btree.New(BTreeDefaultDegree)
-	previouslySentValues := btree.New(BTreeDefaultDegree)
+	aggregates := btree.NewGenericOptions[*aggregatesItem](
+		func(a, b *aggregatesItem) bool {
+			return GroupKeyGenericLess(a.GroupKey, b.GroupKey)
+		},
+		btree.Options{
+			NoLocks: true,
+		},
+	)
+	previouslySentValues := btree.NewGenericOptions[*previouslySentValuesItem](
+		func(a, b *previouslySentValuesItem) bool {
+			return GroupKeyGenericLess(a.GroupKey, b.GroupKey)
+		},
+		btree.Options{
+			NoLocks: true,
+		},
+	)
 	trigger := g.triggerPrototype()
 
 	if err := g.source.Run(ctx, func(produceCtx ProduceContext, record Record) error {
@@ -88,30 +102,22 @@ func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSend
 		}
 
 		{
-			item := aggregates.Get(key)
-			var itemTyped *aggregatesItem
+			item, ok := aggregates.Get(&aggregatesItem{GroupKey: key})
 
-			if item == nil {
+			if !ok {
 				newAggregates := make([]Aggregate, len(g.aggregatePrototypes))
 				for i := range g.aggregatePrototypes {
 					newAggregates[i] = g.aggregatePrototypes[i]()
 				}
 
-				itemTyped = &aggregatesItem{GroupKey: key, Aggregates: newAggregates, AggregatedSetSize: make([]int, len(g.aggregatePrototypes))}
-				aggregates.ReplaceOrInsert(itemTyped)
-			} else {
-				var ok bool
-				itemTyped, ok = item.(*aggregatesItem)
-				if !ok {
-					// TODO: Check performance cost of those panics.
-					panic(fmt.Sprintf("invalid aggregates item: %v", item))
-				}
+				item = &aggregatesItem{GroupKey: key, Aggregates: newAggregates, AggregatedSetSize: make([]int, len(g.aggregatePrototypes))}
+				aggregates.Set(item)
 			}
 
 			if !record.Retraction {
-				itemTyped.OverallRecordCount++
+				item.OverallRecordCount++
 			} else {
-				itemTyped.OverallRecordCount--
+				item.OverallRecordCount--
 			}
 			for i, expr := range g.aggregateExprs {
 				aggregateInput, err := expr.Evaluate(ctx)
@@ -121,16 +127,16 @@ func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSend
 
 				if aggregateInput.TypeID != octosql.TypeIDNull {
 					if !record.Retraction {
-						itemTyped.AggregatedSetSize[i]++
+						item.AggregatedSetSize[i]++
 					} else {
-						itemTyped.AggregatedSetSize[i]--
+						item.AggregatedSetSize[i]--
 					}
-					itemTyped.Aggregates[i].Add(record.Retraction, aggregateInput)
+					item.Aggregates[i].Add(record.Retraction, aggregateInput)
 				}
 			}
 
-			if itemTyped.OverallRecordCount == 0 {
-				aggregates.Delete(itemTyped)
+			if item.OverallRecordCount == 0 {
+				aggregates.Delete(item)
 				// TODO: Also delete from triggers somehow? But have to force a retraction in that case.
 			}
 
@@ -163,7 +169,7 @@ func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSend
 	return nil
 }
 
-func (g *GroupBy) trigger(produceCtx ProduceContext, aggregates, previouslySentValues *btree.BTree, trigger Trigger, curEventTime time.Time, produce ProduceFn) error {
+func (g *GroupBy) trigger(produceCtx ProduceContext, aggregates *btree.Generic[*aggregatesItem], previouslySentValues *btree.Generic[*previouslySentValuesItem], trigger Trigger, curEventTime time.Time, produce ProduceFn) error {
 	toTrigger := trigger.Poll()
 
 	for _, key := range toTrigger {
@@ -173,20 +179,14 @@ func (g *GroupBy) trigger(produceCtx ProduceContext, aggregates, previouslySentV
 		{
 			// Get new record to send
 
-			item := aggregates.Get(key)
-			if item != nil {
-				itemTyped, ok := item.(*aggregatesItem)
-				if !ok {
-					// TODO: Check performance cost of those panics.
-					panic(fmt.Sprintf("invalid aggregates item: %v", item))
-				}
-
+			item, ok := aggregates.Get(&aggregatesItem{GroupKey: key})
+			if ok {
 				outputValues = make([]octosql.Value, len(key)+len(g.aggregateExprs))
 				copy(outputValues, key)
 
-				for i := range itemTyped.Aggregates {
-					if itemTyped.AggregatedSetSize[i] > 0 {
-						outputValues[len(key)+i] = itemTyped.Aggregates[i].Trigger()
+				for i := range item.Aggregates {
+					if item.AggregatedSetSize[i] > 0 {
+						outputValues[len(key)+i] = item.Aggregates[i].Trigger()
 					} else {
 						outputValues[len(key)+i] = octosql.NewNull()
 					}
@@ -201,19 +201,13 @@ func (g *GroupBy) trigger(produceCtx ProduceContext, aggregates, previouslySentV
 		{
 			// Send possible retraction
 
-			item := previouslySentValues.Delete(key)
-			if item != nil {
-				itemTyped, ok := item.(*previouslySentValuesItem)
-				if !ok {
-					// TODO: Check performance cost of those panics.
-					panic(fmt.Sprintf("invalid previously sent item: %v", item))
-				}
-
-				if err := produce(produceCtx, NewRecord(itemTyped.Values, true, newValueEventTime)); err != nil {
+			item, ok := previouslySentValues.Delete(&previouslySentValuesItem{GroupKey: key})
+			if ok {
+				if err := produce(produceCtx, NewRecord(item.Values, true, newValueEventTime)); err != nil {
 					return fmt.Errorf("couldn't produce: %w", err)
 				}
 
-				previouslySentValues.Delete(key)
+				previouslySentValues.Delete(item)
 			}
 		}
 		{
@@ -224,7 +218,7 @@ func (g *GroupBy) trigger(produceCtx ProduceContext, aggregates, previouslySentV
 					return fmt.Errorf("couldn't produce: %w", err)
 				}
 
-				previouslySentValues.ReplaceOrInsert(&previouslySentValuesItem{
+				previouslySentValues.Set(&previouslySentValuesItem{
 					GroupKey:  key,
 					Values:    outputValues,
 					EventTime: newValueEventTime,

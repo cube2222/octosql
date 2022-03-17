@@ -10,6 +10,27 @@ import (
 
 type GroupKey []octosql.Value
 
+func GroupKeyGenericLess(key, thanKey []octosql.Value) bool {
+	maxLen := len(key)
+	if len(thanKey) > maxLen {
+		maxLen = len(thanKey)
+	}
+
+	for i := 0; i < maxLen; i++ {
+		if i == len(key) {
+			return true
+		} else if i == len(thanKey) {
+			return false
+		}
+
+		if comp := key[i].Compare(thanKey[i]); comp != 0 {
+			return comp == -1
+		}
+	}
+
+	return false
+}
+
 type GroupKeyIface interface {
 	GetGroupKey() GroupKey
 }

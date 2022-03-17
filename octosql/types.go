@@ -214,10 +214,8 @@ func TypeSum(t1, t2 Type) Type {
 	if t2.Is(t1) == TypeRelationIs {
 		return t1
 	}
-	// TODO: Lists should also be deep-merged.
 	if t1.TypeID == TypeIDStruct && t2.TypeID == TypeIDStruct {
-		// TODO: Nullable struct + Nullable struct should also work. Overall, it should try to match if there are multiple struct alternatives.
-		// The sum of structs is a struct that's a deep merge of the original structs.
+		// Deep merge structs.
 
 		t1Fields := make(map[string]Type)
 		for i := range t1.Struct.Fields {
@@ -258,36 +256,95 @@ func TypeSum(t1, t2 Type) Type {
 			},
 		}
 	}
-	// TODO: This won't work well with structs. If we have a union and we're adding a struct, try to find an already existing struct.
-	// TODO: If we deep-merge both lists and structs, the union should not be a list of alternatives, because each TypeID can only be there once.
-	var alternatives []Type
-	addType := func(t Type) {
-		if t.Is(Type{
+	if t1.TypeID == TypeIDList && t2.TypeID == TypeIDList {
+		// Deep merge lists.
+
+		if t1.List.Element == nil {
+			return t2
+		}
+		if t2.List.Element == nil {
+			return t1
+		}
+		sum := TypeSum(*t1.List.Element, *t2.List.Element)
+		return Type{
+			TypeID: TypeIDList,
+			List: struct {
+				Element *Type
+			}{
+				Element: &sum,
+			},
+		}
+	}
+	if t1.TypeID == TypeIDTuple && t2.TypeID == TypeIDTuple {
+		// Deep merge tuples.
+
+		var longer, shorter []Type
+		if len(t1.Tuple.Elements) > len(t2.Tuple.Elements) {
+			longer = t1.Tuple.Elements
+			shorter = t2.Tuple.Elements
+		} else {
+			longer = t2.Tuple.Elements
+			shorter = t1.Tuple.Elements
+		}
+
+		elements := make([]Type, len(longer))
+		copy(elements, longer)
+		for i := range shorter {
+			elements[i] = TypeSum(elements[i], shorter[i])
+		}
+		for i := len(shorter); i < len(longer); i++ {
+			elements[i] = TypeSum(elements[i], Null)
+		}
+
+		return Type{
+			TypeID: TypeIDTuple,
+			Tuple:  struct{ Elements []Type }{Elements: elements},
+		}
+	}
+	if t1.TypeID == TypeIDUnion && t2.TypeID == TypeIDUnion {
+		out := Type{
+			TypeID: TypeIDUnion,
+			Union:  struct{ Alternatives []Type }{Alternatives: t1.Union.Alternatives},
+		}
+		for _, alternative := range t2.Union.Alternatives {
+			out = TypeSum(out, alternative)
+		}
+		return out
+	}
+	// If only one is a union, t1 shall be (for simplicity).
+	if t2.TypeID == TypeIDUnion {
+		return TypeSum(t2, t1)
+	}
+	if t1.TypeID == TypeIDUnion {
+		alternatives := make([]Type, len(t1.Union.Alternatives))
+		copy(alternatives, t1.Union.Alternatives)
+		for i := range alternatives {
+			// We only want each TypeID once in the union.
+			if alternatives[i].TypeID == t2.TypeID {
+				alternatives[i] = TypeSum(alternatives[i], t2)
+				return Type{
+					TypeID: TypeIDUnion,
+					Union:  struct{ Alternatives []Type }{Alternatives: alternatives},
+				}
+			}
+		}
+		// If this TypeID is not yet here, append and normalize.
+		alternatives = append(alternatives, t2)
+		sort.Slice(alternatives, func(i, j int) bool {
+			return alternatives[i].TypeID < alternatives[i].TypeID
+		})
+		return Type{
 			TypeID: TypeIDUnion,
 			Union:  struct{ Alternatives []Type }{Alternatives: alternatives},
-		}) != TypeRelationIs {
-			alternatives = append(alternatives, t)
 		}
 	}
-	if t1.TypeID != TypeIDUnion {
-		addType(t1)
-	} else {
-		for _, alternative := range t1.Union.Alternatives {
-			addType(alternative)
-		}
-	}
-	if t2.TypeID != TypeIDUnion {
-		addType(t2)
-	} else {
-		for _, alternative := range t2.Union.Alternatives {
-			addType(alternative)
-		}
-	}
-	// This could be even more normalized, by removing all alternative elements for which:
-	// alternatives[i].Is(Union{alternatives[..i] ++ alternatives[i+1..]})
-	if len(alternatives) == 1 {
-		return alternatives[0]
-	}
+
+	// They are different TypeID's and none of them is a union. Return a union of them.
+	alternatives := []Type{t1, t2}
+	sort.Slice(alternatives, func(i, j int) bool {
+		return alternatives[i].TypeID < alternatives[i].TypeID
+	})
+
 	return Type{
 		TypeID: TypeIDUnion,
 		Union:  struct{ Alternatives []Type }{Alternatives: alternatives},

@@ -26,6 +26,12 @@ func (fe *FunctionExpression) Typecheck(ctx context.Context, env physical.Enviro
 	for i := range fe.Arguments {
 		arguments[i] = fe.Arguments[i].Typecheck(ctx, env, logicalEnv)
 	}
+	argumentTypes := make([]octosql.Type, len(arguments))
+	nonNullableArgumentTypes := make([]octosql.Type, len(arguments))
+	for i := range arguments {
+		argumentTypes[i] = arguments[i].Type
+		nonNullableArgumentTypes[i] = octosql.NonNullable(arguments[i].Type)
+	}
 
 	var out physical.Expression
 	var found bool
@@ -33,13 +39,12 @@ func (fe *FunctionExpression) Typecheck(ctx context.Context, env physical.Enviro
 	details := env.Functions[fe.Name]
 descriptorLoop:
 	for _, descriptor := range details.Descriptors {
+		argTypes := argumentTypes
+		if descriptor.Strict {
+			argTypes = nonNullableArgumentTypes
+		}
 		if descriptor.TypeFn != nil {
-			ts := make([]octosql.Type, len(arguments))
-			for i := range arguments {
-				ts[i] = arguments[i].Type
-			}
-
-			if outputType, ok := descriptor.TypeFn(ts); ok {
+			if outputType, ok := descriptor.TypeFn(argTypes); ok {
 				found = true
 				out = physical.Expression{
 					Type:           outputType,
@@ -52,11 +57,11 @@ descriptorLoop:
 				}
 			}
 		} else {
-			if len(arguments) != len(descriptor.ArgumentTypes) {
+			if len(argTypes) != len(descriptor.ArgumentTypes) {
 				continue
 			}
-			for i := range arguments {
-				if arguments[i].Type.Is(descriptor.ArgumentTypes[i]) < octosql.TypeRelationIs {
+			for i := range argTypes {
+				if argTypes[i].Is(descriptor.ArgumentTypes[i]) < octosql.TypeRelationIs {
 					continue descriptorLoop
 				}
 			}
@@ -75,12 +80,16 @@ descriptorLoop:
 	if !found {
 	descriptorLoop2:
 		for _, descriptor := range details.Descriptors {
-			if len(arguments) != len(descriptor.ArgumentTypes) {
+			argTypes := argumentTypes
+			if descriptor.Strict {
+				argTypes = nonNullableArgumentTypes
+			}
+			if len(argTypes) != len(descriptor.ArgumentTypes) {
 				continue
 			}
-			isMaybe := make([]bool, len(arguments))
-			for i := range arguments {
-				if rel := arguments[i].Type.Is(descriptor.ArgumentTypes[i]); rel < octosql.TypeRelationMaybe {
+			isMaybe := make([]bool, len(argTypes))
+			for i := range argTypes {
+				if rel := argTypes[i].Is(descriptor.ArgumentTypes[i]); rel < octosql.TypeRelationMaybe {
 					continue descriptorLoop2
 				} else if rel == octosql.TypeRelationMaybe {
 					isMaybe[i] = true
@@ -88,16 +97,16 @@ descriptorLoop:
 			}
 			for i := range arguments {
 				if isMaybe[i] {
-					// If the function is strict, and the maybe is caused by nullability, we handle it later.
-					if descriptor.Strict && arguments[i].Type.Is(octosql.TypeSum(descriptor.ArgumentTypes[i], octosql.Null)) == octosql.TypeRelationIs {
-						continue
+					targetType := descriptor.ArgumentTypes[i]
+					if descriptor.Strict {
+						targetType = octosql.TypeSum(targetType, octosql.Null)
 					}
 					arguments[i] = physical.Expression{
 						ExpressionType: physical.ExpressionTypeTypeAssertion,
-						Type:           *octosql.TypeIntersection(descriptor.ArgumentTypes[i], arguments[i].Type),
+						Type:           *octosql.TypeIntersection(targetType, arguments[i].Type),
 						TypeAssertion: &physical.TypeAssertion{
 							Expression: arguments[i],
-							TargetType: descriptor.ArgumentTypes[i],
+							TargetType: targetType,
 						},
 					}
 				}

@@ -27,6 +27,9 @@ import (
 )
 
 var tmpPluginsDir = func() string {
+	if value, ok := os.LookupEnv("OCTOSQL_PLUGIN_TMP_DIR"); ok {
+		return value
+	}
 	dir, err := homedir.Dir()
 	if err != nil {
 		log.Fatalf("couldn't get user home directory: %s", err)

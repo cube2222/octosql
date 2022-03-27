@@ -224,7 +224,17 @@ func (expr *Expression) Materialize(ctx context.Context, env Environment) (execu
 			return nil, fmt.Errorf("couldn't materialize type asserted expression: %w", err)
 		}
 
-		return execution.NewTypeAssertion(expr.TypeAssertion.TargetType.TypeID, expression), nil
+		var expectedTypeIDs []octosql.TypeID
+		if expr.TypeAssertion.TargetType.TypeID != octosql.TypeIDUnion {
+			expectedTypeIDs = []octosql.TypeID{expr.TypeAssertion.TargetType.TypeID}
+		} else {
+			expectedTypeIDs = make([]octosql.TypeID, len(expr.TypeAssertion.TargetType.Union.Alternatives))
+			for i := range expr.TypeAssertion.TargetType.Union.Alternatives {
+				expectedTypeIDs[i] = expr.TypeAssertion.TargetType.Union.Alternatives[i].TypeID
+			}
+		}
+
+		return execution.NewTypeAssertion(expectedTypeIDs, expression, expr.TypeAssertion.TargetType.String()), nil
 	case ExpressionTypeCast:
 		expression, err := expr.Cast.Expression.Materialize(ctx, env)
 		if err != nil {

@@ -46,14 +46,16 @@ func (c *Constant) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 }
 
 type TypeAssertion struct {
-	expectedTypeID octosql.TypeID
-	expr           Expression
+	expectedTypeIDs  []octosql.TypeID
+	expectedTypeName string
+	expr             Expression
 }
 
-func NewTypeAssertion(expectedTypeID octosql.TypeID, expr Expression) *TypeAssertion {
+func NewTypeAssertion(expectedTypeID []octosql.TypeID, expr Expression, expectedTypeName string) *TypeAssertion {
 	return &TypeAssertion{
-		expectedTypeID: expectedTypeID,
-		expr:           expr,
+		expectedTypeIDs:  expectedTypeID,
+		expr:             expr,
+		expectedTypeName: expectedTypeName,
 	}
 }
 
@@ -63,9 +65,13 @@ func (c *TypeAssertion) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 		return octosql.ZeroValue, err
 	}
 
-	if value.TypeID != c.expectedTypeID {
-		return octosql.ZeroValue, fmt.Errorf("invalid type: %s, expected: %s", value.TypeID.String(), c.expectedTypeID.String())
+	for i := range c.expectedTypeIDs {
+		if value.TypeID == c.expectedTypeIDs[i] {
+			return value, nil
+		}
 	}
+
+	return octosql.ZeroValue, fmt.Errorf("invalid type: %s, expected: %s", value.TypeID.String(), c.expectedTypeName)
 
 	return value, nil
 }

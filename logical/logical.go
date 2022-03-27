@@ -386,6 +386,45 @@ func (c *Cast) Typecheck(ctx context.Context, env physical.Environment, logicalE
 	}
 }
 
+type ObjectFieldAccess struct {
+	object Expression
+	field  string
+}
+
+func NewObjectFieldAccess(object Expression, field string) *ObjectFieldAccess {
+	return &ObjectFieldAccess{object: object, field: field}
+}
+
+func (c *ObjectFieldAccess) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
+	expr := TypecheckPossiblyNullableStruct(ctx, env, logicalEnv, c.object)
+
+	nonNullableExprType := octosql.NonNullable(expr.Type)
+	fieldIndex := -1
+	for i, field := range nonNullableExprType.Struct.Fields {
+		if field.Name == c.field {
+			fieldIndex = i
+			break
+		}
+	}
+	if fieldIndex == -1 {
+		panic(fmt.Errorf("object field access of field '%s' on object expression of type '%s' without that field", c.field, expr.Type))
+	}
+
+	outType := nonNullableExprType.Struct.Fields[fieldIndex].Type
+	if expr.Type.TypeID != octosql.TypeIDStruct {
+		outType = octosql.TypeSum(outType, octosql.Null)
+	}
+
+	return physical.Expression{
+		Type:           outType,
+		ExpressionType: physical.ExpressionTypeObjectFieldAccess,
+		ObjectFieldAccess: &physical.ObjectFieldAccess{
+			Object: expr,
+			Field:  c.field,
+		},
+	}
+}
+
 func TypecheckExpression(ctx context.Context, env physical.Environment, logicalEnv Environment, expected octosql.Type, expression Expression) physical.Expression {
 	expr := expression.Typecheck(ctx, env, logicalEnv)
 	rel := expr.Type.Is(expected)
@@ -406,54 +445,39 @@ func TypecheckExpression(ctx context.Context, env physical.Environment, logicalE
 	return expr
 }
 
-type ObjectFieldAccess struct {
-	object Expression
-	field  string
-}
+func TypecheckPossiblyNullableStruct(ctx context.Context, env physical.Environment, logicalEnv Environment, expression Expression) physical.Expression {
+	expr := expression.Typecheck(ctx, env, logicalEnv)
+	nonNullableExprType := octosql.NonNullable(expr.Type)
 
-func NewObjectFieldAccess(object Expression, field string) *ObjectFieldAccess {
-	return &ObjectFieldAccess{object: object, field: field}
-}
-
-func (c *ObjectFieldAccess) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
-	expr := c.object.Typecheck(ctx, env, logicalEnv)
-
-	if expr.Type.TypeID != octosql.TypeIDStruct &&
-		// Nullable struct case.
-		!(expr.Type.TypeID == octosql.TypeIDUnion && len(expr.Type.Union.Alternatives) == 2 && expr.Type.Union.Alternatives[0].TypeID == octosql.TypeIDNull && expr.Type.Union.Alternatives[1].TypeID == octosql.TypeIDStruct) {
-		panic(fmt.Errorf("object field access on non-object expression of type '%s'", expr.Type))
+	if nonNullableExprType.TypeID == octosql.TypeIDStruct {
+		return expr
 	}
-	var fields []octosql.StructField
-	var canBeNull bool
-	if expr.Type.TypeID == octosql.TypeIDStruct {
-		fields = expr.Type.Struct.Fields
-	} else {
-		fields = expr.Type.Union.Alternatives[1].Struct.Fields
-		canBeNull = true
+	if nonNullableExprType.TypeID != octosql.TypeIDUnion {
+		panic(fmt.Errorf("expected object or union containing object, got %s", expr.Type))
 	}
-
-	fieldIndex := -1
-	for i := range fields {
-		if fields[i].Name == c.field {
-			fieldIndex = i
+	foundIndex := -1
+	for i := range nonNullableExprType.Union.Alternatives {
+		if nonNullableExprType.Union.Alternatives[i].TypeID == octosql.TypeIDStruct {
+			foundIndex = i
 			break
 		}
 	}
-	if fieldIndex == -1 {
-		panic(fmt.Errorf("object field access of field '%s' on object expression of type '%s' without that field", c.field, expr.Type))
+	if foundIndex == -1 {
+		panic(fmt.Errorf("expected object or union containing object, got %s", expr.Type))
 	}
-
-	outType := fields[fieldIndex].Type
-	if canBeNull {
-		outType = octosql.TypeSum(outType, octosql.Null)
+	targetType := octosql.Type{
+		TypeID: octosql.TypeIDUnion,
+		Union: struct{ Alternatives []octosql.Type }{Alternatives: []octosql.Type{
+			nonNullableExprType.Union.Alternatives[foundIndex],
+			octosql.Null,
+		}},
 	}
-
 	return physical.Expression{
-		Type:           outType,
-		ExpressionType: physical.ExpressionTypeObjectFieldAccess,
-		ObjectFieldAccess: &physical.ObjectFieldAccess{
-			Object: expr,
-			Field:  c.field,
+		Type:           targetType,
+		ExpressionType: physical.ExpressionTypeTypeAssertion,
+		TypeAssertion: &physical.TypeAssertion{
+			Expression: expr,
+			TargetType: targetType,
 		},
 	}
 }

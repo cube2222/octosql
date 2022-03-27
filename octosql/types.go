@@ -419,3 +419,24 @@ func (t Type) possiblePrimitiveTypes() []Type {
 		return []Type{t}
 	}
 }
+
+// NonNullable returns a type that is the same as the input type, but without nullability.
+// If the input type is just Null, then this returns Null as well.
+func NonNullable(t Type) Type {
+	if t.TypeID != TypeIDUnion {
+		return t
+	}
+	outAlternatives := make([]Type, 0, len(t.Union.Alternatives))
+	for _, alternative := range t.Union.Alternatives {
+		if alternative.TypeID != TypeIDNull {
+			outAlternatives = append(outAlternatives, alternative)
+		}
+	}
+	if len(outAlternatives) == 1 {
+		return outAlternatives[0]
+	}
+	return Type{
+		TypeID: TypeIDUnion,
+		Union:  struct{ Alternatives []Type }{Alternatives: outAlternatives},
+	}
+}

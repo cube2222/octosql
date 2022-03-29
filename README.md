@@ -327,24 +327,23 @@ The benchmark script can be found [here](benchmarks/benchmarks.sh).
 
 It runs the `SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi.csv GROUP BY passenger_count` query against the well-known NYC Yellow Taxi Trip Dataset. Specifically, the CSV file from April 2021 is used. It's a 200MB CSV file with ~2 million rows, 18 columns, and mostly numerical values.
 
-| Command | Mean [s] | Min [s] | Max [s] |    Relative |
-|:---|---:|---:|---:|------------:|
-| `octosql "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi.csv GROUP BY passenger_count"` | 3.181 ± 0.014 | 3.168 | 3.209 | 1.00 |
-| `q -d ',' -H "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi.csv GROUP BY passenger_count"` | 15.891 ± 0.024 | 15.858 | 15.927 | 4.99 |
-| `q -d ',' -H -C readwrite "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi.csv GROUP BY passenger_count"` | 1.563 ± 0.002 | 1.559 | 1.566 |        0.49 |
-| `textql -header -sql "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi GROUP BY passenger_count" taxi.csv` | 15.254 ± 0.050 | 15.168 | 15.317 | 4.78 |
-| `datafusion-cli -f datafusion_commands.txt` | 3.054 ± 0.027 | 3.013 | 3.097 | 0.96 |
-| `dsq taxi.csv "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM {} GROUP BY passenger_count"` | 60.681 ± 1.151 | 59.704 | 63.661 | 19.03 |
+| Command | Version |        Mean [s] | Min [s] | Max [s] |       Relative |
+|:---|--------:|----------------:|---:|---:|---------------:|
+| `octosql "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi.csv GROUP BY passenger_count"` |   0.5.0 |   2.782 ± 0.006 |    2.768 | 2.789 |           1.00 |
+| `q -d ',' -H "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi.csv GROUP BY passenger_count"` |   3.1.6 |  15.928 ± 0.034 |         15.882 | 15.992 |           5.72 |
+| `q -d ',' -H -C readwrite "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi.csv GROUP BY passenger_count"` |   3.1.6 |   1.565 ± 0.003 |           1.559 | 1.570 |           0.56 |
+| `textql -header -sql "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi GROUP BY passenger_count" taxi.csv` |   2.0.3 |  15.289 ± 0.035 |          15.234 | 15.345 |           5.49 |
+| `datafusion-cli -f datafusion_commands.txt` |   0.6.0 |   3.054 ± 0.027 |           3.013 | 3.097 |           1.10 |
+| `dsq taxi.csv "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM {} GROUP BY passenger_count"` |  0.10.0 |  20.071 ± 0.178 |          19.916 | 20.500 |           7.21 |
+| `spyql "SELECT passenger_count, count_agg(*), avg_agg(total_amount) FROM csv GROUP BY passenger_count" < taxi.csv` |   0.5.0 |  11.316 ± 0.065 |          11.227 | 11.453 |           4.06 |
 
 Here we can see that OctoSQL is fairly good performance wise.
 
 q with caching beats OctoSQL by a factor of 2, but that's because caching means data loading from CSV is omitted, and the optimized SQLite format is used directly.
 
-Non-cached q and textql are considerably slower, most probably because they have to parse the whole CSV file to put it into SQLite and only then query it. OctoSQL runs queries directly on the CSV file, so it's able to use its optimizer to avoid loading columns which aren't used in the query.
+Non-cached q and textql, dsq are considerably slower, most probably because they have to parse the whole CSV file to put it into SQLite and only then query it. OctoSQL runs queries directly on the CSV file, so it's able to use its optimizer to avoid loading columns which aren't used in the query.
 
 DataFusion is around the same performance as OctoSQL for this query. This doesn't reveal though what is apparent when using the datafusion-cli REPL, which is that DataFusion spends 2.7 seconds analyzing and inferring the schema, and then queries only take 0.3 seconds each. Which means that running repeat queries in DataFusion is ridiculously fast in comparison to all other tools.
-
-dsq is slower than the rest, but it's a fairly new project and it's author told me he didn't yet do any performance tuning, so it's bound to get faster soon. Architecturally it's similar to q and textql in that it uses SQLite as the query engine.
 
 ## Contributing
 

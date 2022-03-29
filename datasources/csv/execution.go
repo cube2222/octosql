@@ -58,6 +58,11 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 		values := make([]octosql.Value, len(indicesToRead))
 		for i, columnIndex := range indicesToRead {
 			str := row[columnIndex]
+			if str == "" {
+				values[i] = octosql.NewNull()
+				continue
+			}
+
 			if octosql.Int.Is(d.fields[i].Type) == octosql.TypeRelationIs {
 				integer, err := strconv.ParseInt(str, 10, 64)
 				if err == nil {

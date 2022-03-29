@@ -43,6 +43,16 @@ func Creator(name string) (physical.DatasourceImplementation, physical.Schema, e
 
 		for i := range row {
 			str := row[i]
+			if str == "" {
+				if !filled[i] {
+					fields[i] = octosql.Null
+					filled[i] = true
+				} else if !fields[i].Equals(octosql.Null) {
+					fields[i] = octosql.TypeSum(fields[i], octosql.Null)
+				}
+				continue
+			}
+
 			_, err := strconv.ParseInt(str, 10, 64)
 			if err == nil {
 				if !filled[i] {

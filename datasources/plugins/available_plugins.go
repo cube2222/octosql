@@ -39,14 +39,14 @@ func (d *availablePluginsExecuting) Run(ctx ExecutionContext, produce ProduceFn,
 				switch field.Name {
 				case "name":
 					values[i] = octosql.NewString(plugin.Name)
+				case "description":
+					values[i] = octosql.NewString(plugin.Description)
 				case "file_extensions":
 					list := make([]octosql.Value, len(plugin.FileExtensions))
 					for j, ext := range plugin.FileExtensions {
 						list[j] = octosql.NewString(ext)
 					}
 					values[i] = octosql.NewList(list)
-				case "description":
-					values[i] = octosql.NewString(plugin.Description)
 				case "website":
 					values[i] = octosql.NewString(plugin.Website)
 				case "contact_email":

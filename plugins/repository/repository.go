@@ -142,16 +142,16 @@ func GetRepository(ctx context.Context, url string) (Repository, error) {
 type Plugin struct {
 	Name string `json:"name"`
 
+	// Description is a *short* description of the plugin.
+	Description string `json:"description"`
+
 	// FileExtensions supported by the plugin.
 	FileExtensions []string `json:"file_extensions"`
-
-	// Description is a *short* description of the plugin.
-	Description  string `json:"description"`
-	Website      string `json:"website"`
-	ContactEmail string `json:"contact_email"`
-	License      string `json:"license"`
-	ReadmeURL    string `json:"readme_url"`
-	ManifestURL  string `json:"manifest_url"`
+	Website        string   `json:"website"`
+	ContactEmail   string   `json:"contact_email"`
+	License        string   `json:"license"`
+	ReadmeURL      string   `json:"readme_url"`
+	ManifestURL    string   `json:"manifest_url"`
 }
 
 type Manifest struct {

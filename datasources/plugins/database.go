@@ -49,15 +49,15 @@ func (d *Database) GetTable(ctx context.Context, name string, options map[string
 						Type: octosql.String,
 					},
 					{
+						Name: "description",
+						Type: octosql.String,
+					},
+					{
 						Name: "file_extensions",
 						Type: octosql.Type{
 							TypeID: octosql.TypeIDList,
 							List:   struct{ Element *octosql.Type }{Element: &octosql.String},
 						},
-					},
-					{
-						Name: "description",
-						Type: octosql.String,
 					},
 					{
 						Name: "website",

@@ -83,10 +83,11 @@ type Node interface {
 
 type DataSource struct {
 	name, alias string
+	options     map[string]string
 }
 
-func NewDataSource(name, alias string) *DataSource {
-	return &DataSource{name: name, alias: alias}
+func NewDataSource(name, alias string, options map[string]string) *DataSource {
+	return &DataSource{name: name, alias: alias, options: options}
 }
 
 func (ds *DataSource) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) (physical.Node, map[string]string) {
@@ -94,7 +95,7 @@ func (ds *DataSource) Typecheck(ctx context.Context, env physical.Environment, l
 		return cte.Node, cte.UniqueVariableMapping
 	}
 
-	datasource, schema, err := env.Datasources.GetDatasource(ctx, ds.name)
+	datasource, schema, err := env.Datasources.GetDatasource(ctx, ds.name, ds.options)
 	if err != nil {
 		panic(fmt.Errorf("couldn't create datasource: %v", err))
 	}

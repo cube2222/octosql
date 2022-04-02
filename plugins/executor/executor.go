@@ -176,29 +176,32 @@ func (d *Database) ListTables(ctx context.Context) ([]string, error) {
 	panic("implement me")
 }
 
-func (d *Database) GetTable(ctx context.Context, name string) (physical.DatasourceImplementation, physical.Schema, error) {
+func (d *Database) GetTable(ctx context.Context, name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error) {
+	tableContext := &plugins.TableContext{
+		TableName: name,
+		Options:   options,
+	}
+
 	res, err := d.cli.GetTable(ctx, &plugins.GetTableRequest{
-		TableContext: &plugins.TableContext{
-			TableName: name,
-		},
+		TableContext: tableContext,
 	})
 	if err != nil {
 		return nil, physical.Schema{}, fmt.Errorf("couldn't get table from plugin: %w", err)
 	}
 
 	return &PhysicalDatasource{
-			ctx:   d.ctx,
-			cli:   d.cli,
-			table: name,
+			ctx:          d.ctx,
+			cli:          d.cli,
+			tableContext: tableContext,
 		},
 		res.Schema.ToNativeSchema(),
 		nil
 }
 
 type PhysicalDatasource struct {
-	ctx   context.Context
-	cli   plugins.DatasourceClient
-	table string
+	ctx          context.Context
+	cli          plugins.DatasourceClient
+	tableContext *plugins.TableContext
 }
 
 func (p *PhysicalDatasource) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression) (rejected, pushedDown []physical.Expression, changed bool) {
@@ -221,9 +224,7 @@ func (p *PhysicalDatasource) PushDownPredicates(newPredicates, pushedDownPredica
 		panic(fmt.Errorf("couldn't marshal pushed down predicates to JSON: %w", err))
 	}
 	res, err := p.cli.PushDownPredicates(p.ctx, &plugins.PushDownPredicatesRequest{
-		TableContext: &plugins.TableContext{
-			TableName: p.table,
-		},
+		TableContext:         p.tableContext,
 		NewPredicates:        newPredicatesBytes,
 		PushedDownPredicates: pushedDownPredicatesBytes,
 	})
@@ -272,9 +273,7 @@ func (p *PhysicalDatasource) Materialize(ctx context.Context, env physical.Envir
 		return nil, fmt.Errorf("couldn't marshal pushed down predicates to JSON: %w", err)
 	}
 	res, err := p.cli.Materialize(ctx, &plugins.MaterializeRequest{
-		TableContext: &plugins.TableContext{
-			TableName: p.table,
-		},
+		TableContext:         p.tableContext,
 		Schema:               plugins.NativeSchemaToProto(schema),
 		PushedDownPredicates: pushedDownPredicatesBytes,
 		VariableContext:      plugins.NativePhysicalVariableContextToProto(env.VariableContext),

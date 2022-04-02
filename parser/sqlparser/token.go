@@ -707,9 +707,16 @@ func (tkn *Tokenizer) skipBlank() {
 func (tkn *Tokenizer) scanIdentifier(firstBytes []byte, isDbSystemVariable bool) (int, []byte) {
 	buffer := &bytes2.Buffer{}
 	buffer.Write(firstBytes)
-	for isLetter(tkn.lastChar) || isDigit(tkn.lastChar) || (isDbSystemVariable && isCarat(tkn.lastChar)) {
+
+	// Question mark means we have a list of options in a table name. The list of options looks like this:
+	// ./test.csv?header=false&someOption=42
+	questionMarkSeen := false
+	for isLetter(tkn.lastChar) || isDigit(tkn.lastChar) || tkn.lastChar == '?' || (isDbSystemVariable && isCarat(tkn.lastChar)) || (questionMarkSeen && (tkn.lastChar == '=' || tkn.lastChar == '&')) {
 		buffer.WriteByte(byte(tkn.lastChar))
 		tkn.next()
+		if tkn.lastChar == '?' {
+			questionMarkSeen = true
+		}
 	}
 	lowered := bytes.ToLower(buffer.Bytes())
 	loweredStr := string(lowered)

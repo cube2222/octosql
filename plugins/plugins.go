@@ -29,7 +29,7 @@ type physicalServer struct {
 }
 
 func (s *physicalServer) GetTable(ctx context.Context, request *plugins.GetTableRequest) (*plugins.GetTableResponse, error) {
-	_, schema, err := s.database.GetTable(ctx, request.TableContext.TableName)
+	_, schema, err := s.database.GetTable(ctx, request.TableContext.TableName, request.TableContext.Options)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get table: %w", err)
 	}
@@ -39,7 +39,7 @@ func (s *physicalServer) GetTable(ctx context.Context, request *plugins.GetTable
 }
 
 func (s *physicalServer) PushDownPredicates(ctx context.Context, request *plugins.PushDownPredicatesRequest) (*plugins.PushDownPredicatesResponse, error) {
-	impl, _, err := s.database.GetTable(ctx, request.TableContext.TableName)
+	impl, _, err := s.database.GetTable(ctx, request.TableContext.TableName, request.TableContext.Options)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get table: %w", err)
 	}
@@ -81,7 +81,7 @@ func (s *physicalServer) PushDownPredicates(ctx context.Context, request *plugin
 }
 
 func (s *physicalServer) Materialize(ctx context.Context, request *plugins.MaterializeRequest) (*plugins.MaterializeResponse, error) {
-	impl, _, err := s.database.GetTable(ctx, request.TableContext.TableName)
+	impl, _, err := s.database.GetTable(ctx, request.TableContext.TableName, request.TableContext.Options)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get table: %w", err)
 	}

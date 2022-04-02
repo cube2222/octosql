@@ -35,7 +35,7 @@ func (d *Database) ListTables(ctx context.Context) ([]string, error) {
 	}, nil
 }
 
-func (d *Database) GetTable(ctx context.Context, name string) (physical.DatasourceImplementation, physical.Schema, error) {
+func (d *Database) GetTable(ctx context.Context, name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error) {
 	switch name {
 	case "available_plugins":
 		return &availablePluginsPhysical{

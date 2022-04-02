@@ -322,6 +322,18 @@ func ParseAliasedTableExpression(expr *sqlparser.AliasedTableExpr) (logical.Node
 		if !subExpr.Qualifier.IsEmpty() {
 			name = fmt.Sprintf("%s.%s", subExpr.Qualifier.String(), name)
 		}
+		options := make(map[string]string)
+		if optionsStartIndex := strings.Index(name, "?"); optionsStartIndex != -1 {
+			optionsString := name[optionsStartIndex+1:]
+			name = name[:optionsStartIndex]
+			for i, option := range strings.Split(optionsString, "&") {
+				parts := strings.SplitN(option, "=", 2)
+				if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+					return nil, errors.Errorf("invalid option with index %d: %s", i, option)
+				}
+				options[parts[0]] = parts[1]
+			}
+		}
 		var alias string
 		if !expr.As.IsEmpty() {
 			alias = expr.As.String()
@@ -335,7 +347,7 @@ func ParseAliasedTableExpression(expr *sqlparser.AliasedTableExpr) (logical.Node
 				alias = alias[index+1:]
 			}
 		}
-		var out logical.Node = logical.NewDataSource(name, alias)
+		var out logical.Node = logical.NewDataSource(name, alias, options)
 		return out, nil
 
 	case *sqlparser.Subquery:

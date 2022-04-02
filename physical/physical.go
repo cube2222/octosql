@@ -55,22 +55,22 @@ type DatasourceRepository struct {
 	// skonfigurowanych baz danych.
 	Databases       map[string]func() (Database, error)
 	DefaultDatabase string
-	FileHandlers    map[string]func(name string) (DatasourceImplementation, Schema, error)
+	FileHandlers    map[string]func(name string, options map[string]string) (DatasourceImplementation, Schema, error)
 }
 
 type Database interface {
 	ListTables(ctx context.Context) ([]string, error)
-	GetTable(ctx context.Context, name string) (DatasourceImplementation, Schema, error)
+	GetTable(ctx context.Context, name string, options map[string]string) (DatasourceImplementation, Schema, error)
 }
 
-func (dr *DatasourceRepository) GetDatasource(ctx context.Context, name string) (DatasourceImplementation, Schema, error) {
+func (dr *DatasourceRepository) GetDatasource(ctx context.Context, name string, options map[string]string) (DatasourceImplementation, Schema, error) {
 	// TODO: Special name.json handling. Best would be even 'path/to/file.json', but maybe achieve that using a function.
 	// Should maybe be file.`path/to/file.json`?
 	if strings.HasSuffix(name, ".json") {
-		return dr.FileHandlers["json"](name)
+		return dr.FileHandlers["json"](name, options)
 	}
 	if strings.HasSuffix(name, ".csv") {
-		return dr.FileHandlers["csv"](name)
+		return dr.FileHandlers["csv"](name, options)
 	}
 	if index := strings.Index(name, "."); index != -1 {
 		dbName := name[:index]
@@ -83,7 +83,7 @@ func (dr *DatasourceRepository) GetDatasource(ctx context.Context, name string) 
 			return nil, Schema{}, fmt.Errorf("couldn't initialize database '%s': %w", dbName, err)
 		}
 
-		return db.GetTable(ctx, name[index+1:])
+		return db.GetTable(ctx, name[index+1:], options)
 	}
 
 	// TODO: If there is no dot, iterate over all tables in all datasources.
@@ -97,7 +97,7 @@ func (dr *DatasourceRepository) GetDatasource(ctx context.Context, name string) 
 		return nil, Schema{}, fmt.Errorf("couldn't initialize database '%s': %w", dr.DefaultDatabase, err)
 	}
 
-	return db.GetTable(ctx, name)
+	return db.GetTable(ctx, name, options)
 }
 
 type DatasourceImplementation interface {

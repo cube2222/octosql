@@ -15,7 +15,7 @@ import (
 	"github.com/cube2222/octosql/physical"
 )
 
-func Creator(name string) (physical.DatasourceImplementation, physical.Schema, error) {
+func Creator(name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error) {
 	f, err := os.Open(name)
 	if err != nil {
 		return nil, physical.Schema{}, fmt.Errorf("couldn't open file: %w", err)

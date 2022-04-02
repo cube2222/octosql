@@ -15,8 +15,10 @@ import (
 )
 
 type DatasourceExecuting struct {
-	path   string
-	fields []physical.SchemaField
+	path           string
+	fields         []physical.SchemaField
+	fileFieldNames []string
+	header         bool
 }
 
 func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
@@ -34,14 +36,16 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 	decoder := csv.NewReader(bufio.NewReaderSize(f, 4096*1024))
 	decoder.Comma = ','
 	decoder.ReuseRecord = true
-	columnNames, err := decoder.Read()
-	if err != nil {
-		return fmt.Errorf("couldn't decode csv header row: %w", err)
+	if d.header {
+		_, err := decoder.Read()
+		if err != nil {
+			return fmt.Errorf("couldn't decode csv header row: %w", err)
+		}
 	}
 
 	indicesToRead := make([]int, 0)
-	for i := range columnNames {
-		if usedColumns[columnNames[i]] {
+	for i := range d.fileFieldNames {
+		if usedColumns[d.fileFieldNames[i]] {
 			indicesToRead = append(indicesToRead, i)
 		}
 	}

@@ -10,7 +10,7 @@ import (
 
 var Output *os.File
 
-func init() {
+func InitializeFileLogger() {
 	dir, err := homedir.Dir()
 	if err != nil {
 		log.Fatalf("couldn't get user home directory: %s", err)

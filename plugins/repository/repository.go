@@ -142,6 +142,9 @@ func GetRepository(ctx context.Context, url string) (Repository, error) {
 type Plugin struct {
 	Name string `json:"name"`
 
+	// FileExtensions supported by the plugin.
+	FileExtensions []string `json:"file_extensions"`
+
 	// Description is a *short* description of the plugin.
 	Description  string `json:"description"`
 	Website      string `json:"website"`

@@ -236,5 +236,9 @@ func (m *PluginManager) Install(ctx context.Context, name string, constraint *se
 		return fmt.Errorf("couldn't remove plugin archive: %w", err)
 	}
 
+	if err := registerFileExtensions(plugin.Name, plugin.FileExtensions); err != nil {
+		return fmt.Errorf("couldn't register file extensions: %w", err)
+	}
+
 	return nil
 }

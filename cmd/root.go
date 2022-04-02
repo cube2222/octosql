@@ -26,6 +26,7 @@ import (
 	"github.com/cube2222/octosql/functions"
 	"github.com/cube2222/octosql/helpers/graph"
 	"github.com/cube2222/octosql/logical"
+	"github.com/cube2222/octosql/logs"
 	"github.com/cube2222/octosql/optimizer"
 	"github.com/cube2222/octosql/outputs/batch"
 	"github.com/cube2222/octosql/outputs/stream"
@@ -63,6 +64,8 @@ octosql "SELECT * FROM plugins.plugins"`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 		debug.SetGCPercent(1000)
+
+		logs.InitializeFileLogger()
 
 		pluginManager := &manager.PluginManager{}
 

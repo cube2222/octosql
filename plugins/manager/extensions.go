@@ -39,6 +39,9 @@ func registerFileExtensions(name string, extensions []string) error {
 func loadFileExtensionHandlers() (map[string]string, error) {
 	data, err := os.ReadFile(octosqlFileExtensionHandlersFile)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return map[string]string{}, nil
+		}
 		return nil, fmt.Errorf("couldn't read file extension handlers file: %w", err)
 	}
 	var handlers map[string]string

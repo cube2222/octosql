@@ -167,15 +167,31 @@ octosql "SELECT * FROM plugins.plugins"`,
 				return db, nil
 			}
 		}
+
+		fileExtensionHandlers, err := pluginManager.GetFileExtensionHandlers()
+		if err != nil {
+			return fmt.Errorf("couldn't get file extension handlers: %w", err)
+		}
+		fileHandlers := map[string]func(name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error){
+			"json": json.Creator,
+			"csv":  csv.Creator,
+		}
+		for ext, pluginName := range fileExtensionHandlers {
+			fileHandlers[ext] = func(name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error) {
+				db, err := databases[pluginName]()
+				if err != nil {
+					return nil, physical.Schema{}, fmt.Errorf("couldn't get plugin %s database for plugin extensions %s: %w", pluginName, ext, err)
+				}
+				return db.GetTable(ctx, name, options)
+			}
+		}
+
 		env := physical.Environment{
 			Aggregates: aggregates.Aggregates,
 			Functions:  functions.FunctionMap(),
 			Datasources: &physical.DatasourceRepository{
-				Databases: databases,
-				FileHandlers: map[string]func(name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error){
-					"json": json.Creator,
-					"csv":  csv.Creator,
-				},
+				Databases:    databases,
+				FileHandlers: fileHandlers,
 			},
 			PhysicalConfig:  nil,
 			VariableContext: nil,

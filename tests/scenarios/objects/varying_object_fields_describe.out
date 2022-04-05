@@ -1,0 +1,3 @@
+{+0001-01-01T00:00:00Z| 'test.field1', 'String', false |}
+{+0001-01-01T00:00:00Z| 'test.field2', 'Float', false |}
+{+0001-01-01T00:00:00Z| 'test.field3', '{field4: NULL | String; field5: Float | String; field6: NULL | String}', false |}

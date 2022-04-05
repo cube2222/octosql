@@ -1,0 +1,1 @@
+octosql "SELECT * FROM range(start => 1, end => 10) r" --output stream_native

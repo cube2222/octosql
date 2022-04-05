@@ -43,6 +43,9 @@ func SendTelemetry(ctx context.Context, version, eventType string, data interfac
 }
 
 func sendTelemetry(ctx context.Context, version, eventType string, data interface{}) error {
+	if os.Getenv("OCTOSQL_NO_TELEMETRY") == "1" {
+		return nil
+	}
 	deviceIDBytes, err := os.ReadFile(filepath.Join(telemetryDir, "device_id"))
 	if os.IsNotExist(err) {
 		fmt.Println(`OctoSQL sends anonymous usage statistics to help us guide the development of OctoSQL.
@@ -51,9 +54,6 @@ You can turn telemetry off by setting the environment variable OCTOSQL_NO_TELEME
 Please don't though, as it helps us a great deal.'`)
 		os.MkdirAll(telemetryDir, 0755)
 		os.WriteFile(filepath.Join(telemetryDir, "device_id"), []byte(ulid.MustNew(ulid.Now(), rand.Reader).String()), 0644)
-		return nil
-	}
-	if os.Getenv("OCTOSQL_NO_TELEMETRY") == "1" {
 		return nil
 	}
 	deviceID := string(deviceIDBytes)

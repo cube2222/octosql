@@ -50,7 +50,7 @@ func (node *OrderBy) Typecheck(ctx context.Context, env physical.Environment, lo
 	directionMultipliers := DirectionsToMultipliers(node.directions)
 
 	return physical.Node{
-		Schema:   source.Schema,
+		Schema:   physical.NewSchema(source.Schema.Fields, source.Schema.TimeField, physical.WithNoRetractions(true)),
 		NodeType: physical.NodeTypeOrderBy,
 		OrderBy: &physical.OrderBy{
 			Source:               source,

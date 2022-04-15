@@ -239,22 +239,27 @@ func ParseSelect(statement *sqlparser.Select, topmost bool) (logical.Node, *Outp
 
 	if statement.Limit != nil {
 		if !topmost {
+			limitExpr, err := ParseExpression(statement.Limit.Rowcount)
+			if err != nil {
+				return nil, nil, errors.Wrap(err, "couldn't parse limit")
+			}
+			root = logical.NewLimit(limitExpr, root)
 			return nil, nil, errors.Errorf("LIMIT in non-topmost expression not currently supported.")
-		}
+		} else {
+			l, ok := statement.Limit.Rowcount.(*sqlparser.SQLVal)
+			if !ok {
+				return nil, nil, errors.Errorf("LIMIT parameter must be constant, is: %+v", statement.Limit.Rowcount)
+			}
+			if l.Type != sqlparser.IntVal {
+				return nil, nil, errors.Errorf("LIMIT parameter must be Int constant, is: %+v", l.Type)
+			}
+			i, err := strconv.ParseInt(string(l.Val), 10, 64)
+			if err != nil {
+				return nil, nil, errors.Wrap(err, "LIMIT parameter must be Int constant, couldn't parse")
+			}
 
-		l, ok := statement.Limit.Rowcount.(*sqlparser.SQLVal)
-		if !ok {
-			return nil, nil, errors.Errorf("LIMIT parameter must be constant, is: %+v", statement.Limit.Rowcount)
+			outputOptions.Limit = int(i)
 		}
-		if l.Type != sqlparser.IntVal {
-			return nil, nil, errors.Errorf("LIMIT parameter must be Int constant, is: %+v", l.Type)
-		}
-		i, err := strconv.ParseInt(string(l.Val), 10, 64)
-		if err != nil {
-			return nil, nil, errors.Wrap(err, "LIMIT parameter must be Int constant, couldn't parse")
-		}
-
-		outputOptions.Limit = int(i)
 	}
 
 	return root, outputOptions, nil

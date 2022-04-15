@@ -1,4 +1,4 @@
-package batch
+package formats
 
 import (
 	"encoding/csv"
@@ -11,9 +11,10 @@ import (
 
 type CSVFormatter struct {
 	writer *csv.Writer
+	fields []physical.SchemaField
 }
 
-func NewCSVFormatter(w io.Writer) Format {
+func NewCSVFormatter(w io.Writer) *CSVFormatter {
 	writer := csv.NewWriter(w)
 
 	return &CSVFormatter{
@@ -22,6 +23,8 @@ func NewCSVFormatter(w io.Writer) Format {
 }
 
 func (t *CSVFormatter) SetSchema(schema physical.Schema) {
+	t.fields = schema.Fields
+
 	header := make([]string, len(schema.Fields))
 	for i := range schema.Fields {
 		header[i] = schema.Fields[i].Name
@@ -32,7 +35,7 @@ func (t *CSVFormatter) SetSchema(schema physical.Schema) {
 func (t *CSVFormatter) Write(values []octosql.Value) error {
 	row := make([]string, len(values))
 	for i := range values {
-		row[i] = fmt.Sprintf("%v", values[i].ToRawGoValue())
+		row[i] = fmt.Sprintf("%v", values[i].ToRawGoValue(t.fields[i].Type))
 	}
 	return t.writer.Write(row)
 }

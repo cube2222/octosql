@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -27,8 +28,11 @@ import (
 	"github.com/cube2222/octosql/helpers/graph"
 	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/logs"
+	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/optimizer"
 	"github.com/cube2222/octosql/outputs/batch"
+	"github.com/cube2222/octosql/outputs/eager"
+	"github.com/cube2222/octosql/outputs/formats"
 	"github.com/cube2222/octosql/outputs/stream"
 	"github.com/cube2222/octosql/parser"
 	"github.com/cube2222/octosql/parser/sqlparser"
@@ -226,6 +230,51 @@ octosql "SELECT * FROM plugins.plugins"`,
 		}
 		reverseMapping := logical.ReverseMapping(mapping)
 
+		physicalOrderByExpressions := make([]physical.Expression, len(outputOptions.OrderByExpressions))
+		for i := range outputOptions.OrderByExpressions {
+			physicalExpr, err := typecheckExpr(ctx, outputOptions.OrderByExpressions[i], env.WithRecordSchema(physicalPlan.Schema), logical.Environment{
+				CommonTableExpressions: map[string]logical.CommonTableExpression{},
+				TableValuedFunctions:   tableValuedFunctions,
+				UniqueVariableNames: &logical.VariableMapping{
+					Mapping: mapping,
+				},
+				UniqueNameGenerator: uniqueNameGenerator,
+			})
+			if err != nil {
+				return fmt.Errorf("couldn't typecheck order by expression with index %d: %w", i, err)
+			}
+			physicalOrderByExpressions[i] = physicalExpr
+		}
+		if physicalPlan.Schema.NoRetractions && len(physicalOrderByExpressions) > 0 {
+			physicalPlan = physical.Node{
+				Schema:   physicalPlan.Schema,
+				NodeType: physical.NodeTypeOrderBy,
+				OrderBy: &physical.OrderBy{
+					Source:               physicalPlan,
+					Key:                  physicalOrderByExpressions,
+					DirectionMultipliers: logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
+				},
+			}
+			physicalOrderByExpressions = nil
+		}
+		if physicalPlan.Schema.NoRetractions && len(physicalOrderByExpressions) == 0 {
+			physicalPlan = physical.Node{
+				Schema:   physicalPlan.Schema,
+				NodeType: physical.NodeTypeLimit,
+				Limit: &physical.Limit{
+					Source: physicalPlan,
+					Limit: physical.Expression{
+						Type:           octosql.Int,
+						ExpressionType: physical.ExpressionTypeConstant,
+						Constant: &physical.Constant{
+							Value: octosql.NewInt(outputOptions.Limit),
+						},
+					},
+				},
+			}
+			outputOptions.Limit = 0
+		}
+
 		queryTelemetry := telemetry.GetQueryTelemetryData(physicalPlan, installedPlugins)
 
 		var executionPlan execution.Node
@@ -281,18 +330,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 			}
 
 			orderByExpressions = make([]execution.Expression, len(outputOptions.OrderByExpressions))
-			for i := range outputOptions.OrderByExpressions {
-				physicalExpr, err := typecheckExpr(ctx, outputOptions.OrderByExpressions[i], env.WithRecordSchema(physicalPlan.Schema), logical.Environment{
-					CommonTableExpressions: map[string]logical.CommonTableExpression{},
-					TableValuedFunctions:   tableValuedFunctions,
-					UniqueVariableNames: &logical.VariableMapping{
-						Mapping: mapping,
-					},
-					UniqueNameGenerator: uniqueNameGenerator,
-				})
-				if err != nil {
-					return fmt.Errorf("couldn't typecheck order by expression with index %d: %w", i, err)
-				}
+			for i, physicalExpr := range physicalOrderByExpressions {
 				execExpr, err := physicalExpr.Materialize(ctx, env.WithRecordSchema(physicalPlan.Schema))
 				if err != nil {
 					return fmt.Errorf("couldn't materialize output order by expression with index %d: %v", i, err)
@@ -323,7 +361,9 @@ octosql "SELECT * FROM plugins.plugins"`,
 				logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
 				outputOptions.Limit,
 				outSchema,
-				batch.NewTableFormatter,
+				func(writer io.Writer) batch.Format {
+					return formats.NewTableFormatter(writer)
+				},
 				true,
 			)
 		case "batch_table":
@@ -333,19 +373,56 @@ octosql "SELECT * FROM plugins.plugins"`,
 				logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
 				outputOptions.Limit,
 				outSchema,
-				batch.NewTableFormatter,
+				func(writer io.Writer) batch.Format {
+					return formats.NewTableFormatter(writer)
+				},
 				false,
 			)
 		case "csv":
-			sink = batch.NewOutputPrinter(
-				executionPlan,
-				orderByExpressions,
-				logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
-				outputOptions.Limit,
-				outSchema,
-				batch.NewCSVFormatter,
-				false,
-			)
+			if !physicalPlan.Schema.NoRetractions {
+				sink = batch.NewOutputPrinter(
+					executionPlan,
+					orderByExpressions,
+					logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
+					outputOptions.Limit,
+					outSchema,
+					func(writer io.Writer) batch.Format {
+						return formats.NewCSVFormatter(writer)
+					},
+					false,
+				)
+			} else {
+				sink = eager.NewOutputPrinter(
+					executionPlan,
+					outSchema,
+					func(writer io.Writer) eager.Format {
+						return formats.NewCSVFormatter(writer)
+					},
+				)
+			}
+		case "json":
+			if !physicalPlan.Schema.NoRetractions {
+				sink = batch.NewOutputPrinter(
+					executionPlan,
+					orderByExpressions,
+					logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
+					outputOptions.Limit,
+					outSchema,
+					func(writer io.Writer) batch.Format {
+						return formats.NewJSONFormatter(writer)
+					},
+					false,
+				)
+			} else {
+				sink = eager.NewOutputPrinter(
+					executionPlan,
+					outSchema,
+					func(writer io.Writer) eager.Format {
+						return formats.NewJSONFormatter(writer)
+					},
+				)
+			}
+
 		case "stream_native":
 			if len(orderByExpressions) > 0 {
 				executionPlan = nodes.NewBatchOrderBy(
@@ -391,7 +468,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&describe, "describe", false, "Describe query output schema.")
 	rootCmd.Flags().IntVar(&explain, "explain", 0, "Describe query output schema.")
 	rootCmd.Flags().BoolVar(&optimize, "optimize", true, "Whether OctoSQL should optimize the query.")
-	rootCmd.Flags().StringVar(&output, "output", "live_table", "Output format to use. Available options are live_table, batch_table, csv and stream_native.")
+	rootCmd.Flags().StringVar(&output, "output", "live_table", "Output format to use. Available options are live_table, batch_table, csv, json and stream_native.")
 }
 
 func typecheckNode(ctx context.Context, node logical.Node, env physical.Environment, logicalEnv logical.Environment) (_ physical.Node, _ map[string]string, outErr error) {

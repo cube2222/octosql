@@ -120,10 +120,16 @@ func ExplainNode(node Node, withTypeInfo bool) *graph.Node {
 				panic(fmt.Sprintf("unrecognized table valued function argument type: %v", value.TableValuedFunctionArgumentType))
 			}
 		}
+
 	case NodeTypeUnnest:
 		out = graph.NewNode("unnest")
 		out.AddField("field", node.Unnest.Field)
 		out.AddChild("source", ExplainNode(node.Unnest.Source, withTypeInfo))
+
+	case NodeTypeLimit:
+		out = graph.NewNode("limit")
+		out.AddChild("limit", ExplainExpr(node.Limit.Limit, withTypeInfo))
+		out.AddChild("source", ExplainNode(node.Limit.Source, withTypeInfo))
 
 	default:
 		panic("unexhaustive node type match")

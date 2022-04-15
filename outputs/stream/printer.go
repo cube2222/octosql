@@ -11,6 +11,7 @@ import (
 )
 
 type Format interface {
+	SetSchema(physical.Schema)
 	WriteRecord(Record) error
 	WriteMeta(MetadataMessage) error
 	Close() error
@@ -61,6 +62,10 @@ func (n *NativeFormat) WriteRecord(record Record) error {
 func (n *NativeFormat) WriteMeta(message MetadataMessage) error {
 	fmt.Fprintf(os.Stdout, "{~%s}\n", message.Watermark)
 	return nil
+}
+
+func (n *NativeFormat) SetSchema(schema physical.Schema) {
+	n.schema = schema
 }
 
 func (n *NativeFormat) Close() error {

@@ -1,4 +1,4 @@
-package batch
+package formats
 
 import (
 	"io"
@@ -13,7 +13,7 @@ type TableFormatter struct {
 	table *tablewriter.Table
 }
 
-func NewTableFormatter(w io.Writer) Format {
+func NewTableFormatter(w io.Writer) *TableFormatter {
 	table := tablewriter.NewWriter(w)
 	table.SetColWidth(24)
 	table.SetRowLine(false)

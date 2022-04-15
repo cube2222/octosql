@@ -357,9 +357,9 @@ func (value Value) append(builder *strings.Builder) {
 	}
 }
 
-func (value Value) ToRawGoValue() interface{} {
+func (value Value) ToRawGoValue(t Type) interface{} {
 	// TODO: Add complex types.
-	switch value.TypeID {
+	switch t.TypeID {
 	case TypeIDNull:
 		return nil
 	case TypeIDInt:
@@ -374,6 +374,27 @@ func (value Value) ToRawGoValue() interface{} {
 		return value.Time
 	case TypeIDDuration:
 		return value.Duration
+	case TypeIDList:
+		if t.List.Element == nil {
+			return []interface{}{}
+		}
+		out := make([]interface{}, len(value.List))
+		for i := range value.List {
+			out[i] = value.List[i].ToRawGoValue(*t.List.Element)
+		}
+		return out
+	case TypeIDStruct:
+		out := make(map[string]interface{}, len(value.Struct))
+		for i := range value.Struct {
+			out[t.Struct.Fields[i].Name] = value.Struct[i].ToRawGoValue(t.Struct.Fields[i].Type)
+		}
+		return out
+	case TypeIDTuple:
+		out := make([]interface{}, len(value.Tuple))
+		for i := range value.Tuple {
+			out[i] = value.Tuple[i].ToRawGoValue(t.Tuple.Elements[i])
+		}
+		return out
 	default:
 		panic("invalid octosql.Value to get Raw Go value for")
 	}

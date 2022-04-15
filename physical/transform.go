@@ -185,6 +185,15 @@ func (t *Transformers) TransformNode(node Node) Node {
 				Field:  node.Unnest.Field,
 			},
 		}
+	case NodeTypeLimit:
+		out = Node{
+			Schema:   node.Schema,
+			NodeType: node.NodeType,
+			Limit: &Limit{
+				Source: t.TransformNode(node.Limit.Source),
+				Limit:  node.Limit.Limit,
+			},
+		}
 
 	default:
 		panic("unexhaustive node type match")

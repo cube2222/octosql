@@ -26,6 +26,7 @@ type Node struct {
 	Requalifier         *Requalifier
 	TableValuedFunction *TableValuedFunction
 	Unnest              *Unnest
+	Limit               *Limit
 }
 
 type Schema struct {
@@ -73,6 +74,7 @@ const (
 	NodeTypeRequalifier
 	NodeTypeTableValuedFunction
 	NodeTypeUnnest
+	NodeTypeLimit
 )
 
 func (t NodeType) String() string {
@@ -99,6 +101,8 @@ func (t NodeType) String() string {
 		return "table_valued_function"
 	case NodeTypeUnnest:
 		return "unnest"
+	case NodeTypeLimit:
+		return "limit"
 	}
 	return "unknown"
 }
@@ -254,6 +258,11 @@ type TableValuedFunctionDescriptor struct {
 type Unnest struct {
 	Source Node
 	Field  string
+}
+
+type Limit struct {
+	Source Node
+	Limit  Expression
 }
 
 func (node *Node) Materialize(ctx context.Context, env Environment) (execution.Node, error) {
@@ -412,6 +421,17 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (execution.N
 		}
 
 		return nodes.NewUnnest(source, index), nil
+
+	case NodeTypeLimit:
+		source, err := node.Limit.Source.Materialize(ctx, env)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't materialize limit source: %w", err)
+		}
+		limit, err := node.Limit.Limit.Materialize(ctx, env)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't materialize limit expression: %w", err)
+		}
+		return nodes.NewLimit(source, limit), nil
 	}
 
 	panic(fmt.Sprintf("unexhaustive node type match: %d", node.NodeType))

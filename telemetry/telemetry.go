@@ -51,7 +51,7 @@ func sendTelemetry(ctx context.Context, version, eventType string, data interfac
 		fmt.Println(`OctoSQL sends anonymous usage statistics to help us guide the development of OctoSQL.
 You can view the most recently sent usage events in the ~/.octosql/telemetry/recent directory.
 You can turn telemetry off by setting the environment variable OCTOSQL_NO_TELEMETRY to 1.
-Please don't though, as it helps us a great deal.'`)
+Please don't though, as it helps us a great deal.`)
 		os.MkdirAll(telemetryDir, 0755)
 		os.WriteFile(filepath.Join(telemetryDir, "device_id"), []byte(ulid.MustNew(ulid.Now(), rand.Reader).String()), 0644)
 		return nil

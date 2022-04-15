@@ -55,7 +55,8 @@ var Range = logical.TableValuedFunctionDescription{
 								Type: octosql.Int,
 							},
 						},
-						TimeField: -1,
+						TimeField:     -1,
+						NoRetractions: true,
 					}, map[string]string{
 						"i": unique,
 					}, nil

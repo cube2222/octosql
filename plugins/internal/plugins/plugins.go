@@ -147,8 +147,9 @@ func NativeSchemaToProto(schema physical.Schema) *Schema {
 		}
 	}
 	return &Schema{
-		Fields:    fields,
-		TimeField: int32(schema.TimeField),
+		Fields:        fields,
+		TimeField:     int32(schema.TimeField),
+		NoRetractions: schema.NoRetractions,
 	}
 }
 
@@ -161,8 +162,9 @@ func (x *Schema) ToNativeSchema() physical.Schema {
 		}
 	}
 	return physical.Schema{
-		Fields:    fields,
-		TimeField: int(x.TimeField),
+		Fields:        fields,
+		TimeField:     int(x.TimeField),
+		NoRetractions: x.NoRetractions,
 	}
 }
 

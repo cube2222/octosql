@@ -109,8 +109,9 @@ var Tumble = logical.TableValuedFunctionDescription{
 					Type: octosql.Time,
 				}
 				return physical.Schema{
-					Fields:    outFields,
-					TimeField: len(source.Schema.Fields) + 1,
+					Fields:        outFields,
+					TimeField:     len(source.Schema.Fields) + 1,
+					NoRetractions: source.Schema.NoRetractions,
 				}, outMapping, nil
 			},
 			Materialize: func(ctx context.Context, env physical.Environment, args map[string]physical.TableValuedFunctionArgument) (execution.Node, error) {

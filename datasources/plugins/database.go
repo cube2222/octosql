@@ -80,6 +80,7 @@ func (d *Database) GetTable(ctx context.Context, name string, options map[string
 						Type: octosql.String,
 					},
 				},
+				NoRetractions: true,
 			},
 			nil
 	case "repositories":
@@ -102,6 +103,7 @@ func (d *Database) GetTable(ctx context.Context, name string, options map[string
 						Type: octosql.String,
 					},
 				},
+				NoRetractions: true,
 			},
 			nil
 	case "available_versions":
@@ -128,6 +130,7 @@ func (d *Database) GetTable(ctx context.Context, name string, options map[string
 						Type: octosql.String,
 					},
 				},
+				NoRetractions: true,
 			},
 			nil
 	case "installed_plugins":
@@ -146,6 +149,7 @@ func (d *Database) GetTable(ctx context.Context, name string, options map[string
 						Type: octosql.String,
 					},
 				},
+				NoRetractions: true,
 			},
 			nil
 	case "installed_versions":
@@ -172,6 +176,7 @@ func (d *Database) GetTable(ctx context.Context, name string, options map[string
 						Type: octosql.String,
 					},
 				},
+				NoRetractions: true,
 			},
 			nil
 	}

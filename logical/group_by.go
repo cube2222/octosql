@@ -212,7 +212,7 @@ aggregateLoop:
 	}
 
 	return physical.Node{
-		Schema:   physical.NewSchema(schemaFields, keyEventTimeIndex),
+		Schema:   physical.NewSchema(schemaFields, keyEventTimeIndex, physical.WithNoRetractions(trigger.NoRetractions())),
 		NodeType: physical.NodeTypeGroupBy,
 		GroupBy: &physical.GroupBy{
 			Source:               source,

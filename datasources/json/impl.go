@@ -58,7 +58,7 @@ func Creator(name string, options map[string]string) (physical.DatasourceImpleme
 	return &impl{
 			path: name,
 		},
-		physical.NewSchema(schemaFields, -1),
+		physical.NewSchema(schemaFields, -1, physical.WithNoRetractions(true)),
 		nil
 }
 

@@ -109,7 +109,7 @@ func (node *Map) Typecheck(ctx context.Context, env physical.Environment, logica
 	}
 
 	outputNode := physical.Node{
-		Schema:   physical.NewSchema(outFields, outTimeFieldIndex),
+		Schema:   physical.NewSchema(outFields, outTimeFieldIndex, physical.WithNoRetractions(source.Schema.NoRetractions)),
 		NodeType: physical.NodeTypeMap,
 		Map: &physical.Map{
 			Source:      source,

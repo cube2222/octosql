@@ -82,8 +82,9 @@ var MaxDiffWatermark = logical.TableValuedFunctionDescription{
 					return physical.Schema{}, nil, fmt.Errorf("no %s field in source stream", timeField)
 				}
 				return physical.Schema{
-					Fields:    source.Schema.Fields,
-					TimeField: timeFieldIndex,
+					Fields:        source.Schema.Fields,
+					TimeField:     timeFieldIndex,
+					NoRetractions: source.Schema.NoRetractions,
 				}, args["source"].Mapping, nil
 			},
 			Materialize: func(ctx context.Context, env physical.Environment, args map[string]physical.TableValuedFunctionArgument) (execution.Node, error) {

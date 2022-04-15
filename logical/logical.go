@@ -113,7 +113,7 @@ func (ds *DataSource) Typecheck(ctx context.Context, env physical.Environment, l
 		newSchemaFields[i].Name = unique
 	}
 	return physical.Node{
-		Schema:   physical.NewSchema(newSchemaFields, schema.TimeField),
+		Schema:   physical.NewSchema(newSchemaFields, schema.TimeField, physical.WithNoRetractions(schema.NoRetractions)),
 		NodeType: physical.NodeTypeDatasource,
 		Datasource: &physical.Datasource{
 			Name:                     ds.name,

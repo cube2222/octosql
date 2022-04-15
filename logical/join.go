@@ -46,8 +46,9 @@ func (node *Join) Typecheck(ctx context.Context, env physical.Environment, logic
 
 	return physical.Node{
 		Schema: physical.Schema{
-			Fields:    append(left.Schema.Fields[:len(left.Schema.Fields):len(left.Schema.Fields)], right.Schema.Fields[:len(right.Schema.Fields):len(right.Schema.Fields)]...),
-			TimeField: left.Schema.TimeField,
+			Fields:        append(left.Schema.Fields[:len(left.Schema.Fields):len(left.Schema.Fields)], right.Schema.Fields[:len(right.Schema.Fields):len(right.Schema.Fields)]...),
+			TimeField:     left.Schema.TimeField,
+			NoRetractions: left.Schema.NoRetractions && right.Schema.NoRetractions,
 		},
 		NodeType: physical.NodeTypeStreamJoin,
 		StreamJoin: &physical.StreamJoin{

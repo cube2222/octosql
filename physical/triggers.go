@@ -71,3 +71,16 @@ func (t *Trigger) Materialize(ctx context.Context, env Environment) func() execu
 
 	panic("unexhaustive trigger type match")
 }
+
+// NoRetractions indicates whether the trigger can result in retractions of keys, or not.
+// In other words, if a single key can be triggered multiple times.
+func (t *Trigger) NoRetractions() bool {
+	switch t.TriggerType {
+	case TriggerTypeCounting, TriggerTypeMulti:
+		return false
+	case TriggerTypeEndOfStream, TriggerTypeWatermark:
+		return true
+	}
+
+	panic("unexhaustive trigger type match")
+}

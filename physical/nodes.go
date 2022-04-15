@@ -31,13 +31,26 @@ type Node struct {
 type Schema struct {
 	Fields []SchemaField
 	// TimeField is -1 if not present.
-	TimeField int
+	TimeField     int
+	NoRetractions bool
 }
 
-func NewSchema(fields []SchemaField, timeField int) Schema {
-	return Schema{
+type SchemaOption func(schema *Schema)
+
+func NewSchema(fields []SchemaField, timeField int, options ...SchemaOption) Schema {
+	out := Schema{
 		Fields:    fields,
 		TimeField: timeField,
+	}
+	for _, opt := range options {
+		opt(&out)
+	}
+	return out
+}
+
+func WithNoRetractions(noRetractions bool) func(schema *Schema) {
+	return func(schema *Schema) {
+		schema.NoRetractions = noRetractions
 	}
 }
 

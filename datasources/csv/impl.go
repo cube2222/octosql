@@ -143,7 +143,7 @@ func Creator(name string, options map[string]string) (physical.DatasourceImpleme
 			header:         header,
 			fileFieldNames: fieldNames,
 		},
-		physical.NewSchema(schemaFields, -1),
+		physical.NewSchema(schemaFields, -1, physical.WithNoRetractions(true)),
 		nil
 }
 

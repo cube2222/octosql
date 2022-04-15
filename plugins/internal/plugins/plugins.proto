@@ -98,6 +98,7 @@ message Value {
 message Schema {
     repeated SchemaField fields = 1;
     int32 time_field = 2;
+    bool no_retractions = 3;
 }
 
 message SchemaField {

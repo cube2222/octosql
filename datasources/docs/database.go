@@ -39,6 +39,7 @@ func (d *Database) GetTable(ctx context.Context, name string, options map[string
 						Type: octosql.String,
 					},
 				},
+				NoRetractions: true,
 			},
 			nil
 	case "aggregate_signatures":
@@ -63,6 +64,7 @@ func (d *Database) GetTable(ctx context.Context, name string, options map[string
 						Type: octosql.Boolean,
 					},
 				},
+				NoRetractions: true,
 			},
 			nil
 	case "functions":
@@ -79,6 +81,7 @@ func (d *Database) GetTable(ctx context.Context, name string, options map[string
 						Type: octosql.String,
 					},
 				},
+				NoRetractions: true,
 			},
 			nil
 	case "function_signatures":
@@ -110,6 +113,7 @@ func (d *Database) GetTable(ctx context.Context, name string, options map[string
 						Type: octosql.Boolean,
 					},
 				},
+				NoRetractions: true,
 			},
 			nil
 	}

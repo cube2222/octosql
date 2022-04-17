@@ -21,6 +21,7 @@ import (
 	"github.com/cube2222/octosql/datasources/csv"
 	"github.com/cube2222/octosql/datasources/docs"
 	"github.com/cube2222/octosql/datasources/json"
+	"github.com/cube2222/octosql/datasources/lines"
 	"github.com/cube2222/octosql/datasources/plugins"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/execution/nodes"
@@ -149,6 +150,9 @@ octosql "SELECT * FROM plugins.plugins"`,
 		}
 		databases["docs"] = func() (physical.Database, error) {
 			return docs.Creator(ctx)
+		}
+		databases["lines"] = func() (physical.Database, error) {
+			return lines.Creator(ctx)
 		}
 
 		for _, metadata := range installedPlugins {

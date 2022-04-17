@@ -53,9 +53,8 @@ type DatasourceRepository struct {
 	// TODO: A może jednak ten bardziej dynamiczny interfejs? Że database.<table> i wtedy sie resolvuje
 	// Bo inaczej będzie na start strasznie dużo rzeczy ładować niepotrzebnych dla wszystkich
 	// skonfigurowanych baz danych.
-	Databases       map[string]func() (Database, error)
-	DefaultDatabase string
-	FileHandlers    map[string]func(name string, options map[string]string) (DatasourceImplementation, Schema, error)
+	Databases    map[string]func() (Database, error)
+	FileHandlers map[string]func(name string, options map[string]string) (DatasourceImplementation, Schema, error)
 }
 
 type Database interface {
@@ -64,40 +63,26 @@ type Database interface {
 }
 
 func (dr *DatasourceRepository) GetDatasource(ctx context.Context, name string, options map[string]string) (DatasourceImplementation, Schema, error) {
-	// TODO: Special name.json handling. Best would be even 'path/to/file.json', but maybe achieve that using a function.
-	// Should maybe be file.`path/to/file.json`?
-	if strings.HasSuffix(name, ".json") {
-		return dr.FileHandlers["json"](name, options)
-	}
-	if strings.HasSuffix(name, ".csv") {
-		return dr.FileHandlers["csv"](name, options)
-	}
 	if index := strings.Index(name, "."); index != -1 {
 		dbName := name[:index]
 		dbConstructor, ok := dr.Databases[dbName]
-		if !ok {
-			return nil, Schema{}, fmt.Errorf("no such database: %s, as in %s", dbName, name)
+		if ok {
+			db, err := dbConstructor()
+			if err != nil {
+				return nil, Schema{}, fmt.Errorf("couldn't initialize database '%s': %w", dbName, err)
+			}
+
+			return db.GetTable(ctx, name[index+1:], options)
 		}
-		db, err := dbConstructor()
-		if err != nil {
-			return nil, Schema{}, fmt.Errorf("couldn't initialize database '%s': %w", dbName, err)
+	}
+	if index := strings.LastIndex(name, "."); index != -1 {
+		extension := name[index+1:]
+		if handler, ok := dr.FileHandlers[extension]; ok {
+			return handler(name, options)
 		}
-
-		return db.GetTable(ctx, name[index+1:], options)
 	}
 
-	// TODO: If there is no dot, iterate over all tables in all datasources.
-	//   Eh, that would be *really* expensive, as it would force-initialize all databases. How about no?
-	dbConstructor, ok := dr.Databases[dr.DefaultDatabase]
-	if !ok {
-		return nil, Schema{}, fmt.Errorf("unknown datasource: %s", name)
-	}
-	db, err := dbConstructor()
-	if err != nil {
-		return nil, Schema{}, fmt.Errorf("couldn't initialize database '%s': %w", dr.DefaultDatabase, err)
-	}
-
-	return db.GetTable(ctx, name, options)
+	return nil, Schema{}, fmt.Errorf("no such table: %s", name)
 }
 
 type DatasourceImplementation interface {

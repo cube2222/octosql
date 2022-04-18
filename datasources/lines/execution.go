@@ -1,12 +1,11 @@
 package lines
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"os"
 	"time"
-
-	"github.com/edsrzf/mmap-go"
 
 	. "github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
@@ -24,28 +23,35 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 		return fmt.Errorf("couldn't open file: %w", err)
 	}
 	defer f.Close()
-
-	data, err := mmap.Map(f, mmap.RDONLY, 0)
-	if err != nil {
-		return fmt.Errorf("couldn't memory map file: %w", err)
+	sc := bufio.NewScanner(f)
+	if d.separator != "\n" {
+		// Mostly copied from bufio.ScanLines.
+		sc.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
+			if atEOF && len(data) == 0 {
+				return 0, nil, nil
+			}
+			if i := bytes.Index(data, []byte(d.separator)); i >= 0 {
+				// We have a full separator-terminated line.
+				return i + 1, data[0:i], nil
+			}
+			// If we're at EOF, we have a final, non-terminated line. Return it.
+			if atEOF {
+				return len(data), data, nil
+			}
+			// Request more data.
+			return 0, nil, nil
+		})
 	}
 
-	curOffset := 0
 	line := 0
-	for {
-		endOfLineOffset := bytes.Index(data[curOffset:], []byte(d.separator))
-
+	for sc.Scan() {
 		values := make([]octosql.Value, len(d.fields))
 		for i := range d.fields {
 			switch d.fields[i].Name {
 			case "number":
 				values[i] = octosql.NewInt(line)
 			case "text":
-				if endOfLineOffset != -1 {
-					values[i] = octosql.NewString(string(data[curOffset : curOffset+endOfLineOffset]))
-				} else {
-					values[i] = octosql.NewString(string(data[curOffset:]))
-				}
+				values[i] = octosql.NewString(sc.Text())
 			}
 		}
 
@@ -53,10 +59,9 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 			return fmt.Errorf("couldn't produce record: %w", err)
 		}
 		line++
-		if endOfLineOffset == -1 {
-			break
-		}
-		curOffset = curOffset + endOfLineOffset + 1
+	}
+	if sc.Err() != nil {
+		return err
 	}
 	return nil
 }

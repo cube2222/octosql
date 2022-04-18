@@ -25,7 +25,8 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 	}
 	defer f.Close()
 
-	sc := bufio.NewScanner(f)
+	sc := bufio.NewScanner(bufio.NewReaderSize(f, 4096*1024))
+	sc.Buffer(nil, 1024*1024)
 
 	var p fastjson.Parser
 	for sc.Scan() {

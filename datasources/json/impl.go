@@ -24,7 +24,8 @@ func Creator(name string, options map[string]string) (physical.DatasourceImpleme
 
 	fields := make(map[string]octosql.Type)
 
-	sc := bufio.NewScanner(bufio.NewReaderSize(f, 4096*1024))
+	sc := bufio.NewScanner(f)
+	sc.Buffer(nil, 1024*1024)
 
 	var p fastjson.Parser
 	i := 0

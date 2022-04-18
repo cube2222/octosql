@@ -1,12 +1,12 @@
 package json
 
 import (
+	"bufio"
 	"fmt"
-	"io"
 	"os"
 	"time"
 
-	"github.com/segmentio/encoding/json"
+	"github.com/valyala/fastjson"
 
 	. "github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
@@ -25,93 +25,95 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 	}
 	defer f.Close()
 
-	decoder := json.NewDecoder(f)
+	sc := bufio.NewScanner(f)
 
-	for {
-		var msg map[string]interface{}
-		if err := decoder.Decode(&msg); err == io.EOF {
-			return nil
-		} else if err != nil {
-			return fmt.Errorf("couldn't decode message: %w", err)
+	var p fastjson.Parser
+	for sc.Scan() {
+		v, err := p.ParseBytes(sc.Bytes())
+		if err != nil {
+			return fmt.Errorf("couldn't parse json: %w", err)
+		}
+		if v.Type() != fastjson.TypeObject {
+			return fmt.Errorf("expected JSON object, got '%s'", sc.Text())
+		}
+		o, err := v.Object()
+		if err != nil {
+			return fmt.Errorf("expected JSON object, got '%s'", sc.Text())
 		}
 
 		values := make([]octosql.Value, len(d.fields))
 		for i := range values {
-			values[i], _ = getOctoSQLValue(d.fields[i].Type, msg[d.fields[i].Name])
+			values[i], _ = getOctoSQLValue(d.fields[i].Type, o.Get(d.fields[i].Name))
 		}
 
 		if err := produce(ProduceFromExecutionContext(ctx), NewRecord(values, false, time.Time{})); err != nil {
 			return fmt.Errorf("couldn't produce record: %w", err)
 		}
 	}
+	return sc.Err()
 }
 
-func getOctoSQLValue(t octosql.Type, value interface{}) (out octosql.Value, ok bool) {
+func getOctoSQLValue(t octosql.Type, value *fastjson.Value) (out octosql.Value, ok bool) {
+	if value == nil {
+		return octosql.NewNull(), t.TypeID == octosql.TypeIDNull
+	}
+
 	switch t.TypeID {
-	case octosql.TypeIDNull:
-		if value == nil {
-			return octosql.NewNull(), true
-		}
-	case octosql.TypeIDInt:
-		if value, ok := value.(int); ok {
-			return octosql.NewInt(value), true
-		}
 	case octosql.TypeIDFloat:
-		if value, ok := value.(float64); ok {
-			return octosql.NewFloat(value), true
+		if value.Type() == fastjson.TypeNumber {
+			v, _ := value.Float64()
+			return octosql.NewFloat(v), true
 		}
 	case octosql.TypeIDBoolean:
-		if value, ok := value.(bool); ok {
-			return octosql.NewBoolean(value), true
+		if value.Type() == fastjson.TypeTrue {
+			return octosql.NewBoolean(true), true
+		} else if value.Type() == fastjson.TypeFalse {
+			return octosql.NewBoolean(false), true
 		}
 	case octosql.TypeIDString:
-		if value, ok := value.(string); ok {
-			return octosql.NewString(value), true
+		if value.Type() == fastjson.TypeString {
+			v, _ := value.StringBytes()
+			return octosql.NewString(string(v)), true
 		}
 	case octosql.TypeIDTime:
-		if value, ok := value.(string); ok {
-			if parsed, err := time.Parse(time.RFC3339Nano, value); err == nil {
+		if value.Type() == fastjson.TypeString {
+			v, _ := value.StringBytes()
+			if parsed, err := time.Parse(time.RFC3339Nano, string(v)); err == nil {
 				return octosql.NewTime(parsed), true
 			}
 		}
 	case octosql.TypeIDDuration:
-		if value, ok := value.(string); ok {
-			if parsed, err := time.ParseDuration(value); err == nil {
+		if value.Type() == fastjson.TypeString {
+			v, _ := value.StringBytes()
+			if parsed, err := time.ParseDuration(string(v)); err == nil {
 				return octosql.NewDuration(parsed), true
 			}
 		}
 	case octosql.TypeIDList:
-		if value, ok := value.([]interface{}); ok {
-			elements := make([]octosql.Value, len(value))
+		if value.Type() == fastjson.TypeArray {
+			arr, _ := value.Array()
+			values := make([]octosql.Value, len(arr))
+
 			outOk := true
-			for i := range elements {
-				curElement, curOk := getOctoSQLValue(*t.List.Element, value[i])
-				elements[i] = curElement
+			for i := range arr {
+				curValue, curOk := getOctoSQLValue(*t.List.Element, arr[i])
+				values[i] = curValue
 				outOk = outOk && curOk
 			}
-			return octosql.NewList(elements), outOk
+			return octosql.NewList(values), outOk
 		}
 	case octosql.TypeIDStruct:
-		if value, ok := value.(map[string]interface{}); ok {
+		if value.Type() == fastjson.TypeObject {
+			obj, _ := value.Object()
 			values := make([]octosql.Value, len(t.Struct.Fields))
+
 			outOk := true
 			for i, field := range t.Struct.Fields {
-				curValue, curOk := getOctoSQLValue(field.Type, value[field.Name])
+				curValue, curOk := getOctoSQLValue(field.Type, obj.Get(field.Name))
 				values[i] = curValue
 				outOk = outOk && curOk
 			}
 			return octosql.NewStruct(values), outOk
-		}
-	case octosql.TypeIDTuple:
-		if value, ok := value.([]interface{}); ok {
-			elements := make([]octosql.Value, len(value))
-			outOk := true
-			for i := range elements {
-				curElement, curOk := getOctoSQLValue(t.Tuple.Elements[i], value[i])
-				elements[i] = curElement
-				outOk = outOk && curOk
-			}
-			return octosql.NewList(elements), outOk
 		}
 	case octosql.TypeIDUnion:
 		for _, alternative := range t.Union.Alternatives {

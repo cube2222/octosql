@@ -1,14 +1,14 @@
 package json
 
 import (
+	"bufio"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"sort"
 	"time"
 
-	"github.com/segmentio/encoding/json"
+	"github.com/valyala/fastjson"
 
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
@@ -22,26 +22,36 @@ func Creator(name string, options map[string]string) (physical.DatasourceImpleme
 	}
 	defer f.Close()
 
-	decoder := json.NewDecoder(f)
-	decoder.ZeroCopy()
-
 	fields := make(map[string]octosql.Type)
 
-	for i := 0; i < 10; i++ {
-		var msg map[string]interface{}
-		if err := decoder.Decode(&msg); err == io.EOF {
-			break
-		} else if err != nil {
-			return nil, physical.Schema{}, fmt.Errorf("couldn't decode message: %w", err)
+	sc := bufio.NewScanner(bufio.NewReaderSize(f, 4096*1024))
+
+	var p fastjson.Parser
+	i := 0
+	for sc.Scan() && i < 100 {
+		i++
+		v, err := p.ParseBytes(sc.Bytes())
+		if err != nil {
+			return nil, physical.Schema{}, fmt.Errorf("couldn't parse json: %w", err)
+		}
+		if v.Type() != fastjson.TypeObject {
+			return nil, physical.Schema{}, fmt.Errorf("expected JSON object, got '%s'", sc.Text())
+		}
+		o, err := v.Object()
+		if err != nil {
+			return nil, physical.Schema{}, fmt.Errorf("expected JSON object, got '%s'", sc.Text())
 		}
 
-		for k := range msg {
-			if t, ok := fields[k]; ok {
-				fields[k] = octosql.TypeSum(t, getOctoSQLType(msg[k]))
+		o.Visit(func(key []byte, v *fastjson.Value) {
+			if t, ok := fields[string(key)]; ok {
+				fields[string(key)] = octosql.TypeSum(t, getOctoSQLType(v))
 			} else {
-				fields[k] = getOctoSQLType(msg[k])
+				fields[string(key)] = getOctoSQLType(v)
 			}
-		}
+		})
+	}
+	if sc.Err() != nil {
+		return nil, physical.Schema{}, fmt.Errorf("couldn't scan lines: %w", sc.Err())
 	}
 
 	var schemaFields []physical.SchemaField
@@ -62,47 +72,46 @@ func Creator(name string, options map[string]string) (physical.DatasourceImpleme
 		nil
 }
 
-func getOctoSQLType(value interface{}) octosql.Type {
-	switch value := value.(type) {
-	case int:
-		return octosql.Int
-	case bool:
-		return octosql.Boolean
-	case float64:
-		return octosql.Float
-	case string:
-		if _, err := time.Parse(time.RFC3339Nano, value); err == nil {
+func getOctoSQLType(value *fastjson.Value) octosql.Type {
+	switch value.Type() {
+	case fastjson.TypeNull:
+		return octosql.Null
+	case fastjson.TypeString:
+		v, _ := value.StringBytes()
+		if _, err := time.Parse(time.RFC3339Nano, string(v)); err == nil {
 			return octosql.Time
 		} else {
 			return octosql.String
 		}
-	case time.Time:
-		return octosql.Time
-	case map[string]interface{}:
-		fieldNames := make([]string, 0, len(value))
-		for k := range value {
-			fieldNames = append(fieldNames, k)
-		}
-		sort.Strings(fieldNames)
-		fields := make([]octosql.StructField, len(value))
-		for i := range fieldNames {
-			fields[i] = octosql.StructField{
-				Name: fieldNames[i],
-				Type: getOctoSQLType(value[fieldNames[i]]),
-			}
-		}
+	case fastjson.TypeNumber:
+		return octosql.Float
+	case fastjson.TypeTrue, fastjson.TypeFalse:
+		return octosql.Boolean
+	case fastjson.TypeObject:
+		obj, _ := value.Object()
+		fields := make([]octosql.StructField, 0, obj.Len())
+		obj.Visit(func(key []byte, v *fastjson.Value) {
+			fields = append(fields, octosql.StructField{
+				Name: string(key),
+				Type: getOctoSQLType(v),
+			})
+		})
+		sort.Slice(fields, func(i, j int) bool {
+			return fields[i].Name < fields[j].Name
+		})
 		return octosql.Type{
 			TypeID: octosql.TypeIDStruct,
 			Struct: struct{ Fields []octosql.StructField }{Fields: fields},
 		}
-	case []interface{}:
+	case fastjson.TypeArray:
+		arr, _ := value.Array()
 		var elementType *octosql.Type
-		for i := range value {
+		for i := range arr {
 			if elementType != nil {
-				t := octosql.TypeSum(*elementType, getOctoSQLType(value[i]))
+				t := octosql.TypeSum(*elementType, getOctoSQLType(arr[i]))
 				elementType = &t
 			} else {
-				t := getOctoSQLType(value[i])
+				t := getOctoSQLType(arr[i])
 				elementType = &t
 			}
 		}
@@ -114,11 +123,9 @@ func getOctoSQLType(value interface{}) octosql.Type {
 				Element: elementType,
 			},
 		}
-	case nil:
-		return octosql.Null
 	}
 
-	panic(fmt.Sprintf("unexhaustive json input value match: %T %+v", value, value))
+	panic(fmt.Sprintf("unexhaustive json input value match: %s %+v", value.Type().String(), value))
 }
 
 type impl struct {

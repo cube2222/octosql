@@ -1,0 +1,2 @@
+{"field1": "value", "field2": 42, "field3": {"field4": "eulav", "field5": 24}, "field7": [42, 43, {"field8": "value8"}]}
+{"field1": "value", "field2": 42, "field3": {"field5": "eulav", "field6": "value"}}

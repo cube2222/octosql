@@ -157,7 +157,7 @@ func diffTest(testCase string, print bool) bool {
 	})
 	if stderrDiff != "" {
 		if print {
-			fmt.Println(stdoutDiff)
+			fmt.Println(stderrDiff)
 		}
 		diff = true
 	}

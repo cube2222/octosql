@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/valyala/fastjson/fastfloat"
+
 	. "github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
@@ -68,7 +70,7 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 			}
 
 			if octosql.Int.Is(d.fields[i].Type) == octosql.TypeRelationIs {
-				integer, err := strconv.ParseInt(str, 10, 64)
+				integer, err := fastfloat.ParseInt64(str)
 				if err == nil {
 					values[i] = octosql.NewInt(int(integer))
 					continue
@@ -76,7 +78,7 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 			}
 
 			if octosql.Float.Is(d.fields[i].Type) == octosql.TypeRelationIs {
-				float, err := strconv.ParseFloat(str, 64)
+				float, err := fastfloat.Parse(str)
 				if err == nil {
 					values[i] = octosql.NewFloat(float)
 					continue

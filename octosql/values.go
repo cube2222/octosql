@@ -134,8 +134,8 @@ func (value Value) Compare(other Value) int {
 		}
 
 	case TypeIDString:
-		left := strings.ToLower(value.Str)
-		right := strings.ToLower(other.Str)
+		left := value.Str
+		right := other.Str
 		if left < right {
 			return -1
 		} else if left > right {
@@ -359,7 +359,8 @@ func (value Value) append(builder *strings.Builder) {
 
 func (value Value) ToRawGoValue(t Type) interface{} {
 	// TODO: Add complex types.
-	switch t.TypeID {
+	// TODO: Fix union handling.
+	switch value.TypeID {
 	case TypeIDNull:
 		return nil
 	case TypeIDInt:
@@ -375,6 +376,7 @@ func (value Value) ToRawGoValue(t Type) interface{} {
 	case TypeIDDuration:
 		return value.Duration
 	case TypeIDList:
+		// TODO: Fix union handling.
 		if t.List.Element == nil {
 			return []interface{}{}
 		}
@@ -384,12 +386,14 @@ func (value Value) ToRawGoValue(t Type) interface{} {
 		}
 		return out
 	case TypeIDStruct:
+		// TODO: Fix union handling.
 		out := make(map[string]interface{}, len(value.Struct))
 		for i := range value.Struct {
 			out[t.Struct.Fields[i].Name] = value.Struct[i].ToRawGoValue(t.Struct.Fields[i].Type)
 		}
 		return out
 	case TypeIDTuple:
+		// TODO: Fix union handling.
 		out := make([]interface{}, len(value.Tuple))
 		for i := range value.Tuple {
 			out[i] = value.Tuple[i].ToRawGoValue(t.Tuple.Elements[i])

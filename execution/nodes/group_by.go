@@ -138,7 +138,7 @@ func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSend
 		}
 
 		if err := g.trigger(ProduceFromExecutionContext(ctx), aggregates, previouslySentValues, trigger, record.EventTime, produce); err != nil {
-			return fmt.Errorf("couldn't trigger keys on record receive")
+			return fmt.Errorf("couldn't trigger keys on record receive: %w", err)
 		}
 
 		return nil
@@ -146,7 +146,7 @@ func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSend
 		if msg.Type == MetadataMessageTypeWatermark {
 			trigger.WatermarkReceived(msg.Watermark)
 			if err := g.trigger(ctx, aggregates, previouslySentValues, trigger, msg.Watermark, produce); err != nil {
-				return fmt.Errorf("couldn't trigger keys on watermark")
+				return fmt.Errorf("couldn't trigger keys on watermark: %w", err)
 			}
 		}
 		return metaSend(ctx, msg)
@@ -157,7 +157,7 @@ func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSend
 	trigger.EndOfStreamReached()
 	// TODO: What should be put here as the event time? WatermarkMaxValue kind of makes sense. But on the other hand, if this is then i.e. StreamJoin'ed with something then it would make everything MaxValue. But only if this is Batch. If it's grouping by event time then the event times will be correct.
 	if err := g.trigger(ProduceFromExecutionContext(ctx), aggregates, previouslySentValues, trigger, WatermarkMaxValue, produce); err != nil {
-		return fmt.Errorf("couldn't trigger keys on end of stream")
+		return fmt.Errorf("couldn't trigger keys on end of stream: %w", err)
 	}
 
 	return nil

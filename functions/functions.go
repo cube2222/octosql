@@ -823,6 +823,19 @@ func FunctionMap() map[string]physical.FunctionDetails {
 				},
 			},
 		},
+		"time_to_unix": {
+			Description: "Converts time to unix timestamp.",
+			Descriptors: []physical.FunctionDescriptor{
+				{
+					ArgumentTypes: []octosql.Type{octosql.Time},
+					OutputType:    octosql.Int,
+					Strict:        true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						return octosql.NewInt(int(values[0].Time.Unix())), nil
+					},
+				},
+			},
+		},
 		// Conversions
 		"int": {
 			Description: "Converts the argument to an int.",

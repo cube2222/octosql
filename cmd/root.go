@@ -8,10 +8,12 @@ import (
 	"os"
 	"os/exec"
 	"runtime/debug"
+	"runtime/trace"
 	"strings"
 	"sync"
 
 	"github.com/Masterminds/semver"
+	"github.com/pkg/profile"
 	"github.com/skratchdot/open-golang/open"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -67,6 +69,14 @@ octosql "SELECT * FROM plugins.plugins"`,
 	SilenceErrors: true,
 	Version:       VERSION,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		switch prof {
+		case "cpu":
+			defer profile.Start(profile.CPUProfile, profile.ProfilePath(".")).Stop()
+		case "memory":
+			defer profile.Start(profile.MemProfile, profile.ProfilePath(".")).Stop()
+		case "trace":
+			defer profile.Start(profile.TraceProfile, profile.ProfilePath(".")).Stop()
+		}
 		ctx := cmd.Context()
 		debug.SetGCPercent(1000)
 
@@ -447,6 +457,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 			return fmt.Errorf("invalid output format: '%s'", output)
 		}
 
+		trace.Log(ctx, "octosql", "running query")
 		if err := sink.Run(
 			execution.ExecutionContext{
 				Context:         ctx,
@@ -467,12 +478,14 @@ var describe bool
 var explain int
 var optimize bool
 var output string
+var prof string
 
 func init() {
 	rootCmd.Flags().BoolVar(&describe, "describe", false, "Describe query output schema.")
 	rootCmd.Flags().IntVar(&explain, "explain", 0, "Describe query output schema.")
 	rootCmd.Flags().BoolVar(&optimize, "optimize", true, "Whether OctoSQL should optimize the query.")
 	rootCmd.Flags().StringVar(&output, "output", "live_table", "Output format to use. Available options are live_table, batch_table, csv, json and stream_native.")
+	rootCmd.Flags().StringVar(&prof, "profile", "", "Enable profiling of the given type: cpu, memory, trace.")
 }
 
 func typecheckNode(ctx context.Context, node logical.Node, env physical.Environment, logicalEnv logical.Environment) (_ physical.Node, _ map[string]string, outErr error) {

@@ -26,6 +26,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.4
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1
+	github.com/pkg/profile v1.6.0
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/segmentio/encoding v0.2.7
 	github.com/shopspring/decimal v1.2.0 // indirect

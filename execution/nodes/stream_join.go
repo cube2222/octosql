@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/btree"
+	tbtree "github.com/tidwall/btree"
 
 	. "github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
@@ -27,7 +27,7 @@ func NewStreamJoin(left, right Node, keyExprsLeft, keyExprsRight []Expression) *
 type streamJoinItem struct {
 	GroupKey
 	// Records for this key
-	values *btree.BTree
+	values *tbtree.Generic[*streamJoinSubitem]
 }
 
 type streamJoinSubitem struct {
@@ -96,8 +96,16 @@ func (s *StreamJoin) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaS
 		close(rightMessages)
 	}()
 
-	leftRecords := btree.New(BTreeDefaultDegree)
-	rightRecords := btree.New(BTreeDefaultDegree)
+	leftRecords := tbtree.NewGenericOptions[*streamJoinItem](func(a, b *streamJoinItem) bool {
+		return CompareValueSlices(a.GroupKey, b.GroupKey)
+	}, tbtree.Options{
+		NoLocks: true,
+	})
+	rightRecords := tbtree.NewGenericOptions[*streamJoinItem](func(a, b *streamJoinItem) bool {
+		return CompareValueSlices(a.GroupKey, b.GroupKey)
+	}, tbtree.Options{
+		NoLocks: true,
+	})
 
 	var leftDone bool
 
@@ -231,7 +239,7 @@ receiveLoop:
 
 	var openChannel chan chanMessage
 	var recordBuffer *RecordEventTimeBuffer
-	var otherRecords *btree.BTree
+	var otherRecords *tbtree.Generic[*streamJoinItem]
 	if !leftDone {
 		openChannel = leftMessages
 		recordBuffer = leftRecordBuffer
@@ -288,7 +296,7 @@ receiveLoop:
 	return nil
 }
 
-func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRecords, otherRecords *btree.BTree, amLeft bool, record Record, oneStreamRemains bool) error {
+func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRecords, otherRecords *tbtree.Generic[*streamJoinItem], amLeft bool, record Record, oneStreamRemains bool) error {
 	ctx = ctx.WithRecord(record)
 
 	var keyExprs []Expression
@@ -310,33 +318,21 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 	if !oneStreamRemains {
 		// Update count in my record tree
 		// If only one stream remains, we won't be using it anymore, so we don't need to update it.
-		item := myRecords.Get(key)
-		var itemTyped *streamJoinItem
+		itemTyped, ok := myRecords.Get(&streamJoinItem{GroupKey: key})
 
-		if item == nil {
-			itemTyped = &streamJoinItem{GroupKey: key, values: btree.New(BTreeDefaultDegree)}
-			myRecords.ReplaceOrInsert(itemTyped)
-		} else {
-			var ok bool
-			itemTyped, ok = item.(*streamJoinItem)
-			if !ok {
-				panic(fmt.Sprintf("invalid stream join item: %v", item))
-			}
+		if !ok {
+			itemTyped = &streamJoinItem{GroupKey: key, values: tbtree.NewGenericOptions(func(a, b *streamJoinSubitem) bool {
+				return CompareValueSlices(a.GroupKey, b.GroupKey)
+			}, tbtree.Options{NoLocks: true})}
+			myRecords.Set(itemTyped)
 		}
 
 		{
-			subitem := itemTyped.values.Get(&streamJoinSubitem{GroupKey: record.Values})
-			var subitemTyped *streamJoinSubitem
+			subitemTyped, ok := itemTyped.values.Get(&streamJoinSubitem{GroupKey: record.Values})
 
-			if subitem == nil {
+			if !ok {
 				subitemTyped = &streamJoinSubitem{GroupKey: record.Values}
-				itemTyped.values.ReplaceOrInsert(subitemTyped)
-			} else {
-				var ok bool
-				subitemTyped, ok = subitem.(*streamJoinSubitem)
-				if !ok {
-					panic(fmt.Sprintf("invalid stream join subitem: %v", subitem))
-				}
+				itemTyped.values.Set(subitemTyped)
 			}
 			if !record.Retraction {
 				subitemTyped.EventTimes = append(subitemTyped.EventTimes, record.EventTime)
@@ -355,27 +351,15 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 
 	// Trigger with all matching records from other record tree
 	{
-		item := otherRecords.Get(key)
-		var itemTyped *streamJoinItem
+		itemTyped, ok := otherRecords.Get(&streamJoinItem{GroupKey: key})
 
-		if item == nil {
+		if !ok {
 			// Nothing to trigger
 			return nil
-		} else {
-			var ok bool
-			itemTyped, ok = item.(*streamJoinItem)
-			if !ok {
-				panic(fmt.Sprintf("invalid stream join item: %v", item))
-			}
 		}
 
 		var outErr error
-		itemTyped.values.Ascend(func(subitem btree.Item) bool {
-			subitemTyped, ok := subitem.(*streamJoinSubitem)
-			if !ok {
-				panic(fmt.Sprintf("invalid stream join subitem: %v", subitem))
-			}
-
+		itemTyped.values.Scan(func(subitemTyped *streamJoinSubitem) bool {
 			for i := 0; i < len(subitemTyped.EventTimes); i++ {
 				outputValues := make([]octosql.Value, len(record.Values)+len(subitemTyped.GroupKey))
 
@@ -384,6 +368,7 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 					eventTime = subitemTyped.EventTimes[i]
 				}
 				// TODO: We probably also want the event time in the columns to be equal to this. Think about this.
+				// TODO: This should be the pairwise maximum of the event times, not the overall maximum.
 
 				if amLeft {
 					copy(outputValues, record.Values)

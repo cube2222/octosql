@@ -26,19 +26,23 @@ func (key GroupKey) Less(than btree.Item) bool {
 
 	thanKey := thanTyped.GetGroupKey()
 
+	return CompareValueSlices(key, thanKey)
+}
+
+func CompareValueSlices(key, than []octosql.Value) bool {
 	maxLen := len(key)
-	if len(thanKey) > maxLen {
-		maxLen = len(thanKey)
+	if len(than) > maxLen {
+		maxLen = len(than)
 	}
 
 	for i := 0; i < maxLen; i++ {
 		if i == len(key) {
 			return true
-		} else if i == len(thanKey) {
+		} else if i == len(than) {
 			return false
 		}
 
-		if comp := key[i].Compare(thanKey[i]); comp != 0 {
+		if comp := key[i].Compare(than[i]); comp != 0 {
 			return comp == -1
 		}
 	}

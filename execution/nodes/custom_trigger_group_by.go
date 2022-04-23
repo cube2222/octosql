@@ -10,7 +10,7 @@ import (
 	"github.com/cube2222/octosql/octosql"
 )
 
-type GroupBy struct {
+type CustomTriggerGroupBy struct {
 	aggregatePrototypes []func() Aggregate
 	aggregateExprs      []Expression
 	keyExprs            []Expression
@@ -19,15 +19,15 @@ type GroupBy struct {
 	triggerPrototype    func() Trigger
 }
 
-func NewGroupBy(
+func NewCustomTriggerGroupBy(
 	aggregatePrototypes []func() Aggregate,
 	aggregateExprs []Expression,
 	keyExprs []Expression,
 	keyEventTimeIndex int,
 	source Node,
 	triggerPrototype func() Trigger,
-) *GroupBy {
-	return &GroupBy{
+) *CustomTriggerGroupBy {
+	return &CustomTriggerGroupBy{
 		aggregatePrototypes: aggregatePrototypes,
 		aggregateExprs:      aggregateExprs,
 		keyExprs:            keyExprs,
@@ -61,7 +61,7 @@ type previouslySentValuesItem struct {
 	EventTime time.Time
 }
 
-func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
+func (g *CustomTriggerGroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
 	aggregates := btree.New(BTreeDefaultDegree)
 	previouslySentValues := btree.New(BTreeDefaultDegree)
 	trigger := g.triggerPrototype()
@@ -163,7 +163,7 @@ func (g *GroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSend
 	return nil
 }
 
-func (g *GroupBy) trigger(produceCtx ProduceContext, aggregates, previouslySentValues *btree.BTree, trigger Trigger, curEventTime time.Time, produce ProduceFn) error {
+func (g *CustomTriggerGroupBy) trigger(produceCtx ProduceContext, aggregates, previouslySentValues *btree.BTree, trigger Trigger, curEventTime time.Time, produce ProduceFn) error {
 	toTrigger := trigger.Poll()
 
 	for _, key := range toTrigger {
@@ -212,8 +212,6 @@ func (g *GroupBy) trigger(produceCtx ProduceContext, aggregates, previouslySentV
 				if err := produce(produceCtx, NewRecord(itemTyped.Values, true, newValueEventTime)); err != nil {
 					return fmt.Errorf("couldn't produce: %w", err)
 				}
-
-				previouslySentValues.Delete(key)
 			}
 		}
 		{

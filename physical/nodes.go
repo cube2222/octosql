@@ -325,9 +325,12 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (execution.N
 			}
 			expressions[i] = expr
 		}
+		if node.GroupBy.Trigger.TriggerType == TriggerTypeEndOfStream {
+			return nodes.NewSimpleGroupBy(aggregates, expressions, key, source), nil
+		}
 		trigger := node.GroupBy.Trigger.Materialize(ctx, env)
 
-		return nodes.NewGroupBy(aggregates, expressions, key, node.GroupBy.KeyEventTimeIndex, source, trigger), nil
+		return nodes.NewCustomTriggerGroupBy(aggregates, expressions, key, node.GroupBy.KeyEventTimeIndex, source, trigger), nil
 	case NodeTypeStreamJoin:
 		left, err := node.StreamJoin.Left.Materialize(ctx, env)
 		if err != nil {

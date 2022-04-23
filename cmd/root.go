@@ -73,7 +73,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 		case "cpu":
 			defer profile.Start(profile.CPUProfile, profile.ProfilePath(".")).Stop()
 		case "memory":
-			defer profile.Start(profile.MemProfile, profile.ProfilePath(".")).Stop()
+			defer profile.Start(profile.MemProfile, profile.MemProfileRate(4096*8), profile.ProfilePath(".")).Stop()
 		case "trace":
 			defer profile.Start(profile.TraceProfile, profile.ProfilePath(".")).Stop()
 		}

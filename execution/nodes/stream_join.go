@@ -108,7 +108,7 @@ func (s *StreamJoin) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaS
 
 	processRecordsUpTo := func(ctx ExecutionContext, watermark time.Time) error {
 		if err := leftRecordBuffer.Emit(watermark, func(record Record) error {
-			if err := s.receiveRecord(ctx, produce, leftRecords, rightRecords, true, record); err != nil {
+			if err := s.receiveRecord(ctx, produce, leftRecords, rightRecords, true, record, false); err != nil {
 				// TODO: Fix goroutine leak.
 				return fmt.Errorf("couldn't process record from left: %w", err)
 			}
@@ -119,7 +119,7 @@ func (s *StreamJoin) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaS
 		}
 
 		if err := rightRecordBuffer.Emit(watermark, func(record Record) error {
-			if err := s.receiveRecord(ctx, produce, rightRecords, leftRecords, false, record); err != nil {
+			if err := s.receiveRecord(ctx, produce, rightRecords, leftRecords, false, record, false); err != nil {
 				// TODO: Fix goroutine leak.
 				return fmt.Errorf("couldn't process record from right: %w", err)
 			}
@@ -172,7 +172,7 @@ receiveLoop:
 			if msg.record.EventTime.IsZero() {
 				// If the event time is zero, don't buffer, there's no point.
 				// There won't be any record with an event time less than zero.
-				if err := s.receiveRecord(ctx, produce, leftRecords, rightRecords, true, msg.record); err != nil {
+				if err := s.receiveRecord(ctx, produce, leftRecords, rightRecords, true, msg.record, false); err != nil {
 					// TODO: Fix goroutine leak.
 					return fmt.Errorf("couldn't process record from left: %w", err)
 				}
@@ -218,7 +218,7 @@ receiveLoop:
 			if msg.record.EventTime.IsZero() {
 				// If the event time is zero, don't buffer, there's no point.
 				// There won't be any record with an event time less than zero.
-				if err := s.receiveRecord(ctx, produce, rightRecords, leftRecords, false, msg.record); err != nil {
+				if err := s.receiveRecord(ctx, produce, rightRecords, leftRecords, false, msg.record, false); err != nil {
 					// TODO: Fix goroutine leak.
 					return fmt.Errorf("couldn't process record from right: %w", err)
 				}
@@ -231,19 +231,23 @@ receiveLoop:
 
 	var openChannel chan chanMessage
 	var recordBuffer *RecordEventTimeBuffer
-	var myRecords, otherRecords *btree.BTree
+	var otherRecords *btree.BTree
 	if !leftDone {
 		openChannel = leftMessages
 		recordBuffer = leftRecordBuffer
 		minWatermark = leftWatermark
-		myRecords = leftRecords
 		otherRecords = rightRecords
+
+		// We won't be using our tree anymore, let the GC take it.
+		leftRecords = nil
 	} else {
 		openChannel = rightMessages
 		recordBuffer = rightRecordBuffer
 		minWatermark = rightWatermark
-		myRecords = rightRecords
 		otherRecords = leftRecords
+
+		// We won't be using our tree anymore, let the GC take it.
+		rightRecords = nil
 	}
 
 	if err := processRecordsUpTo(ctx, minWatermark); err != nil {
@@ -268,7 +272,7 @@ receiveLoop:
 		if msg.record.EventTime.IsZero() {
 			// If the event time is zero, don't buffer, there's no point.
 			// There won't be any record with an event time less than zero.
-			if err := s.receiveRecord(ctx, produce, myRecords, otherRecords, !leftDone, msg.record); err != nil {
+			if err := s.receiveRecord(ctx, produce, nil, otherRecords, !leftDone, msg.record, true); err != nil {
 				// TODO: Fix goroutine leak.
 				return fmt.Errorf("couldn't process record: %w", err)
 			}
@@ -284,7 +288,7 @@ receiveLoop:
 	return nil
 }
 
-func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRecords, otherRecords *btree.BTree, amLeft bool, record Record) error {
+func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRecords, otherRecords *btree.BTree, amLeft bool, record Record, oneStreamRemains bool) error {
 	ctx = ctx.WithRecord(record)
 
 	var keyExprs []Expression
@@ -303,8 +307,9 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 		key[i] = value
 	}
 
-	// Update count in my record tree
-	{
+	if !oneStreamRemains {
+		// Update count in my record tree
+		// If only one stream remains, we won't be using it anymore, so we don't need to update it.
 		item := myRecords.Get(key)
 		var itemTyped *streamJoinItem
 

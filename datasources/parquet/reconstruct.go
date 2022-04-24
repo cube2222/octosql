@@ -8,6 +8,21 @@ import (
 	"github.com/cube2222/octosql/octosql"
 )
 
+// Based on the reconstructor code in "github.com/segmentio/parquet-go".
+// Copyright 2022 segment.io
+//
+//   Licensed under the Apache License, Version 2.0 (the "License");
+//   you may not use this file except in compliance with the License.
+//   You may obtain a copy of the License at
+//
+//       http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+
 // TODO: Ewentualnie spróbuj w sumie tego podejścia bottom-up gdzie z kolumn robisz większe kolumny i wartości większe wartości, bo to by mogło zadziałać.
 // Jak wiemy np. że mamy repeated contact w którym jest name i number, to robimy z tego nową kolumnę, w której mamy już struktury {name: x, number: y}
 // I ta nowa kolumna też dostaje nowe repetition levele.

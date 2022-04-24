@@ -24,6 +24,7 @@ import (
 	"github.com/cube2222/octosql/datasources/docs"
 	"github.com/cube2222/octosql/datasources/json"
 	"github.com/cube2222/octosql/datasources/lines"
+	"github.com/cube2222/octosql/datasources/parquet"
 	"github.com/cube2222/octosql/datasources/plugins"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/execution/nodes"
@@ -191,8 +192,9 @@ octosql "SELECT * FROM plugins.plugins"`,
 			return fmt.Errorf("couldn't get file extension handlers: %w", err)
 		}
 		fileHandlers := map[string]func(name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error){
-			"json": json.Creator,
-			"csv":  csv.Creator,
+			"csv":     csv.Creator,
+			"json":    json.Creator,
+			"parquet": parquet.Creator,
 		}
 		for ext, pluginName := range fileExtensionHandlers {
 			fileHandlers[ext] = func(name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error) {
@@ -489,11 +491,11 @@ func init() {
 }
 
 func typecheckNode(ctx context.Context, node logical.Node, env physical.Environment, logicalEnv logical.Environment) (_ physical.Node, _ map[string]string, outErr error) {
-	defer func() {
-		if r := recover(); r != nil {
-			outErr = fmt.Errorf("typecheck error: %s", r)
-		}
-	}()
+	// defer func() {
+	// 	if r := recover(); r != nil {
+	// 		outErr = fmt.Errorf("typecheck error: %s", r)
+	// 	}
+	// }()
 	physicalNode, mapping := node.Typecheck(
 		ctx,
 		env,

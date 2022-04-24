@@ -107,7 +107,7 @@ func executeCommand(command string) {
 		}
 	case command == "exit":
 		fmt.Println("Exiting.")
-		return
+		os.Exit(0)
 	default:
 		fmt.Println("Unknown command.")
 		fmt.Println("list <pattern>, run <pattern>, update <pattern>, exit")

@@ -343,8 +343,9 @@ func ParseAliasedTableExpression(expr *sqlparser.AliasedTableExpr) (logical.Node
 		if !expr.As.IsEmpty() {
 			alias = expr.As.String()
 		} else {
-			alias = strings.TrimSuffix(name, ".json")
 			alias = strings.TrimSuffix(alias, ".csv")
+			alias = strings.TrimSuffix(name, ".json")
+			alias = strings.TrimSuffix(name, ".parquet")
 			if index := strings.Index(alias, "."); index != -1 {
 				alias = alias[index+1:]
 			}

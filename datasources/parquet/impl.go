@@ -68,6 +68,8 @@ func getOctoSQLNode(node parquet.Node) (octosql.Type, bool) {
 			outType = octosql.Int
 		case parquet.Int64:
 			outType = octosql.Int
+		case parquet.Int96:
+			outType = octosql.String
 		case parquet.Float:
 			outType = octosql.Float
 		case parquet.Double:

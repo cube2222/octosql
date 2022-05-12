@@ -296,6 +296,8 @@ func assignValue(dst *octosql.Value, src parquet.Value) error {
 		*dst = octosql.NewInt(int(src.Int32()))
 	case parquet.Int64:
 		*dst = octosql.NewInt(int(src.Int64()))
+	case parquet.Int96:
+		*dst = octosql.NewString(src.Int96().String())
 	case parquet.Float:
 		*dst = octosql.NewFloat(float64(src.Float()))
 	case parquet.Double:

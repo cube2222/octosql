@@ -10,6 +10,8 @@ builds:
     goarch:
       - amd64
       - arm64
+    tags:
+      - purego
     ldflags:
       - "-s -w -X github.com/cube2222/octosql/cmd.VERSION={{.Version}}"
 brews:

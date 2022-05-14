@@ -3,7 +3,7 @@ package nodes
 import (
 	"fmt"
 
-	"github.com/google/btree"
+	"github.com/tidwall/btree"
 
 	. "github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
@@ -24,58 +24,46 @@ type distinctItem struct {
 	Count  int
 }
 
-func (item *distinctItem) Less(than btree.Item) bool {
-	thanTyped, ok := than.(*distinctItem)
-	if !ok {
-		panic(fmt.Sprintf("invalid distinct key comparison: %T", than))
-	}
-
-	for i := 0; i < len(item.Values); i++ {
-		if comp := item.Values[i].Compare(thanTyped.Values[i]); comp != 0 {
-			return comp == -1
-		}
-	}
-
-	return false
-}
-
 func (o *Distinct) Run(execCtx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
-	recordCounts := btree.New(BTreeDefaultDegree)
+	recordCounts := btree.NewGenericOptions(func(item, than *distinctItem) bool {
+		for i := 0; i < len(item.Values); i++ {
+			if comp := item.Values[i].Compare(than.Values[i]); comp != 0 {
+				return comp == -1
+			}
+		}
+
+		return false
+	}, btree.Options{
+		NoLocks: true,
+	})
 	o.source.Run(
 		execCtx,
 		func(ctx ProduceContext, record Record) error {
-			item := recordCounts.Get(&distinctItem{Values: record.Values})
-			var itemTyped *distinctItem
-			if item == nil {
-				itemTyped = &distinctItem{
+			item, ok := recordCounts.Get(&distinctItem{Values: record.Values})
+			if !ok {
+				item = &distinctItem{
 					Values: record.Values,
 					Count:  0,
 				}
-			} else {
-				var ok bool
-				itemTyped, ok = item.(*distinctItem)
-				if !ok {
-					panic(fmt.Sprintf("invalid order by item: %v", item))
-				}
 			}
 			if !record.Retraction {
-				itemTyped.Count++
+				item.Count++
 			} else {
-				itemTyped.Count--
+				item.Count--
 			}
-			if itemTyped.Count > 0 {
+			if item.Count > 0 {
 				// New record.
-				if !record.Retraction && itemTyped.Count == 1 {
+				if !record.Retraction && item.Count == 1 {
 					if err := produce(ctx, record); err != nil {
 						return fmt.Errorf("couldn't produce new record: %w", err)
 					}
+					recordCounts.Set(item)
 				}
-				recordCounts.ReplaceOrInsert(itemTyped)
 			} else {
 				if err := produce(ctx, record); err != nil {
 					return fmt.Errorf("couldn't retract record record: %w", err)
 				}
-				recordCounts.Delete(itemTyped)
+				recordCounts.Delete(item)
 			}
 			return nil
 		},

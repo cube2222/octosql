@@ -43,10 +43,12 @@ type distinctKey struct {
 }
 
 func (c *Distinct) Add(retraction bool, value octosql.Value) bool {
-	item, ok := c.items.Get(&distinctKey{value: value})
+	var hint btree.PathHint
+
+	item, ok := c.items.GetHint(&distinctKey{value: value}, &hint)
 	if !ok {
 		item = &distinctKey{value: value, count: 0}
-		c.items.Set(item)
+		c.items.SetHint(item, &hint)
 	}
 	if !retraction {
 		item.count++
@@ -56,7 +58,7 @@ func (c *Distinct) Add(retraction bool, value octosql.Value) bool {
 	if item.count == 1 && !retraction {
 		c.wrapped.Add(false, value)
 	} else if item.count == 0 {
-		c.items.Delete(item)
+		c.items.DeleteHint(item, &hint)
 		c.wrapped.Add(true, value)
 	}
 	return c.items.Len() == 0

@@ -114,27 +114,31 @@ func (s *StreamJoin) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaS
 	leftRecordBuffer := NewRecordEventTimeBuffer()
 	rightRecordBuffer := NewRecordEventTimeBuffer()
 
-	processRecordsUpTo := func(ctx ExecutionContext, watermark time.Time) error {
-		if err := leftRecordBuffer.Emit(watermark, func(record Record) error {
-			if err := s.receiveRecord(ctx, produce, leftRecords, rightRecords, true, record, false); err != nil {
-				// TODO: Fix goroutine leak.
-				return fmt.Errorf("couldn't process record from left: %w", err)
-			}
-			return nil
+	processRecordsUpTo := func(ctx ExecutionContext, watermark time.Time, oneStreamRemains bool) error {
+		if rightRecords != nil {
+			if err := leftRecordBuffer.Emit(watermark, func(record Record) error {
+				if err := s.receiveRecord(ctx, produce, leftRecords, rightRecords, true, record, oneStreamRemains); err != nil {
+					// TODO: Fix goroutine leak.
+					return fmt.Errorf("couldn't process record from left: %w", err)
+				}
+				return nil
 
-		}); err != nil {
-			return err
+			}); err != nil {
+				return err
+			}
 		}
 
-		if err := rightRecordBuffer.Emit(watermark, func(record Record) error {
-			if err := s.receiveRecord(ctx, produce, rightRecords, leftRecords, false, record, false); err != nil {
-				// TODO: Fix goroutine leak.
-				return fmt.Errorf("couldn't process record from right: %w", err)
-			}
-			return nil
+		if leftRecords != nil {
+			if err := rightRecordBuffer.Emit(watermark, func(record Record) error {
+				if err := s.receiveRecord(ctx, produce, rightRecords, leftRecords, false, record, oneStreamRemains); err != nil {
+					// TODO: Fix goroutine leak.
+					return fmt.Errorf("couldn't process record from right: %w", err)
+				}
+				return nil
 
-		}); err != nil {
-			return err
+			}); err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -163,7 +167,7 @@ receiveLoop:
 				if min.After(minWatermark) {
 					minWatermark = min
 
-					if err := processRecordsUpTo(ctx, minWatermark); err != nil {
+					if err := processRecordsUpTo(ctx, minWatermark, false); err != nil {
 						return err
 					}
 
@@ -209,7 +213,7 @@ receiveLoop:
 				if min.After(minWatermark) {
 					minWatermark = min
 
-					if err := processRecordsUpTo(ctx, minWatermark); err != nil {
+					if err := processRecordsUpTo(ctx, minWatermark, false); err != nil {
 						return err
 					}
 
@@ -238,28 +242,42 @@ receiveLoop:
 	}
 
 	var openChannel chan chanMessage
-	var recordBuffer *RecordEventTimeBuffer
-	var otherRecords *tbtree.Generic[*streamJoinItem]
+	var myRecordBuffer, otherRecordBuffer *RecordEventTimeBuffer
+	var myRecords, otherRecords *tbtree.Generic[*streamJoinItem]
+	oneStreamRemains := false
 	if !leftDone {
 		openChannel = leftMessages
-		recordBuffer = leftRecordBuffer
+		myRecords = leftRecords
+		myRecordBuffer = leftRecordBuffer
 		minWatermark = leftWatermark
 		otherRecords = rightRecords
-
-		// We won't be using our tree anymore, let the GC take it.
-		leftRecords = nil
+		otherRecordBuffer = rightRecordBuffer
 	} else {
 		openChannel = rightMessages
-		recordBuffer = rightRecordBuffer
+		myRecords = rightRecords
+		myRecordBuffer = rightRecordBuffer
 		minWatermark = rightWatermark
 		otherRecords = leftRecords
-
-		// We won't be using our tree anymore, let the GC take it.
-		rightRecords = nil
+		otherRecordBuffer = leftRecordBuffer
 	}
 
-	if err := processRecordsUpTo(ctx, minWatermark); err != nil {
+	if err := processRecordsUpTo(ctx, minWatermark, true); err != nil {
 		return err
+	}
+
+	markOneStreamRemains := func() {
+		oneStreamRemains = true
+		// We won't be using our tree anymore, let the GC take it.
+		myRecords = nil
+
+		if !leftDone {
+			leftRecords = nil
+		} else {
+			rightRecords = nil
+		}
+	}
+	if otherRecordBuffer.Empty() {
+		markOneStreamRemains()
 	}
 
 	for msg := range openChannel {
@@ -267,8 +285,12 @@ receiveLoop:
 			return msg.err
 		}
 		if msg.metadata {
-			if err := processRecordsUpTo(ctx, msg.metadataMessage.Watermark); err != nil {
+			if err := processRecordsUpTo(ctx, msg.metadataMessage.Watermark, oneStreamRemains); err != nil {
 				return err
+			}
+
+			if otherRecordBuffer.Empty() {
+				markOneStreamRemains()
 			}
 
 			if err := metaSend(ProduceFromExecutionContext(ctx), msg.metadataMessage); err != nil {
@@ -280,16 +302,16 @@ receiveLoop:
 		if msg.record.EventTime.IsZero() {
 			// If the event time is zero, don't buffer, there's no point.
 			// There won't be any record with an event time less than zero.
-			if err := s.receiveRecord(ctx, produce, nil, otherRecords, !leftDone, msg.record, true); err != nil {
+			if err := s.receiveRecord(ctx, produce, myRecords, otherRecords, !leftDone, msg.record, oneStreamRemains); err != nil {
 				// TODO: Fix goroutine leak.
 				return fmt.Errorf("couldn't process record: %w", err)
 			}
 		} else {
-			recordBuffer.AddRecord(msg.record)
+			myRecordBuffer.AddRecord(msg.record)
 		}
 	}
 
-	if err := processRecordsUpTo(ctx, WatermarkMaxValue); err != nil {
+	if err := processRecordsUpTo(ctx, WatermarkMaxValue, oneStreamRemains); err != nil {
 		return err
 	}
 

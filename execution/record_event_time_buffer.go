@@ -62,3 +62,7 @@ func (b *RecordEventTimeBuffer) Emit(watermark time.Time, produce func(record Re
 	}
 	return nil
 }
+
+func (b *RecordEventTimeBuffer) Empty() bool {
+	return b.tree.Len() == 0
+}

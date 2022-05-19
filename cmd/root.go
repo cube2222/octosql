@@ -345,7 +345,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 				return fmt.Errorf("couldn't materialize physical plan: %w", err)
 			}
 
-			orderByExpressions = make([]execution.Expression, len(outputOptions.OrderByExpressions))
+			orderByExpressions = make([]execution.Expression, len(physicalOrderByExpressions))
 			for i, physicalExpr := range physicalOrderByExpressions {
 				execExpr, err := physicalExpr.Materialize(ctx, env.WithRecordSchema(physicalPlan.Schema))
 				if err != nil {

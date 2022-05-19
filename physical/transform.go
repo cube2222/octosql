@@ -7,6 +7,15 @@ type Transformers struct {
 
 // TODO: This should probably push down and make available the environment.
 func (t *Transformers) TransformNode(node Node) Node {
+	schemaFields := make([]SchemaField, len(node.Schema.Fields))
+	copy(schemaFields, node.Schema.Fields)
+
+	schema := Schema{
+		Fields:        schemaFields,
+		TimeField:     node.Schema.TimeField,
+		NoRetractions: node.Schema.NoRetractions,
+	}
+
 	var out Node
 	switch node.NodeType {
 	case NodeTypeDatasource:
@@ -15,7 +24,7 @@ func (t *Transformers) TransformNode(node Node) Node {
 			pushedDownPredicates[i] = t.TransformExpr(node.Datasource.Predicates[i])
 		}
 		out = Node{
-			Schema:   node.Schema,
+			Schema:   schema,
 			NodeType: node.NodeType,
 			Datasource: &Datasource{
 				Name:                     node.Datasource.Name,
@@ -27,7 +36,7 @@ func (t *Transformers) TransformNode(node Node) Node {
 		}
 	case NodeTypeDistinct:
 		out = Node{
-			Schema:   node.Schema,
+			Schema:   schema,
 			NodeType: node.NodeType,
 			Distinct: &Distinct{
 				Source: t.TransformNode(node.Distinct.Source),
@@ -37,7 +46,7 @@ func (t *Transformers) TransformNode(node Node) Node {
 		// TODO: I think we'd like a function which automatically does type deduction again on each transformation?
 		// Naah, we can do that based on the currently executing transformation.
 		out = Node{
-			Schema:   node.Schema,
+			Schema:   schema,
 			NodeType: node.NodeType,
 			Filter: &Filter{
 				Source:    t.TransformNode(node.Filter.Source),
@@ -57,7 +66,7 @@ func (t *Transformers) TransformNode(node Node) Node {
 		}
 
 		out = Node{
-			Schema:   node.Schema,
+			Schema:   schema,
 			NodeType: node.NodeType,
 			GroupBy: &GroupBy{
 				Source:               t.TransformNode(node.GroupBy.Source),
@@ -79,7 +88,7 @@ func (t *Transformers) TransformNode(node Node) Node {
 		}
 
 		out = Node{
-			Schema:   node.Schema,
+			Schema:   schema,
 			NodeType: node.NodeType,
 			StreamJoin: &StreamJoin{
 				Left:     t.TransformNode(node.StreamJoin.Left),
@@ -90,7 +99,7 @@ func (t *Transformers) TransformNode(node Node) Node {
 		}
 	case NodeTypeLookupJoin:
 		out = Node{
-			Schema:   node.Schema,
+			Schema:   schema,
 			NodeType: node.NodeType,
 			LookupJoin: &LookupJoin{
 				Source: t.TransformNode(node.LookupJoin.Source),
@@ -104,7 +113,7 @@ func (t *Transformers) TransformNode(node Node) Node {
 		}
 
 		out = Node{
-			Schema:   node.Schema,
+			Schema:   schema,
 			NodeType: node.NodeType,
 			Map: &Map{
 				Source:      t.TransformNode(node.Map.Source),
@@ -120,7 +129,7 @@ func (t *Transformers) TransformNode(node Node) Node {
 		copy(directionMultipliers, node.OrderBy.DirectionMultipliers)
 
 		out = Node{
-			Schema:   node.Schema,
+			Schema:   schema,
 			NodeType: node.NodeType,
 			OrderBy: &OrderBy{
 				Source:               t.TransformNode(node.OrderBy.Source),
@@ -130,7 +139,7 @@ func (t *Transformers) TransformNode(node Node) Node {
 		}
 	case NodeTypeRequalifier:
 		out = Node{
-			Schema:   node.Schema,
+			Schema:   schema,
 			NodeType: node.NodeType,
 			Requalifier: &Requalifier{
 				Source:    t.TransformNode(node.Requalifier.Source),
@@ -168,7 +177,7 @@ func (t *Transformers) TransformNode(node Node) Node {
 		}
 
 		out = Node{
-			Schema:   node.Schema,
+			Schema:   schema,
 			NodeType: node.NodeType,
 			TableValuedFunction: &TableValuedFunction{
 				Name:               node.TableValuedFunction.Name,
@@ -178,7 +187,7 @@ func (t *Transformers) TransformNode(node Node) Node {
 		}
 	case NodeTypeUnnest:
 		out = Node{
-			Schema:   node.Schema,
+			Schema:   schema,
 			NodeType: node.NodeType,
 			Unnest: &Unnest{
 				Source: t.TransformNode(node.Unnest.Source),
@@ -187,7 +196,7 @@ func (t *Transformers) TransformNode(node Node) Node {
 		}
 	case NodeTypeLimit:
 		out = Node{
-			Schema:   node.Schema,
+			Schema:   schema,
 			NodeType: node.NodeType,
 			Limit: &Limit{
 				Source: t.TransformNode(node.Limit.Source),

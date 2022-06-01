@@ -26,3 +26,7 @@ func InitializeFileLogger() {
 	Output = f
 	log.SetOutput(Output)
 }
+
+func CloseLogger() {
+	Output.Close()
+}

@@ -82,6 +82,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 		debug.SetGCPercent(1000)
 
 		logs.InitializeFileLogger()
+		defer logs.CloseLogger()
 
 		pluginManager := &manager.PluginManager{}
 

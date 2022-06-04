@@ -196,6 +196,10 @@ Third, there's a bunch of conversion functions which can help you turn types int
 
 Fourth, and final, there's the `COALESCE` operator which accepts an arbitrary number of arguments and returns the first non-null one. It works very well with what's described in the previous two paragraphs. This way, if you have an `age` column of type `String | Int` and would like to clean it up, you can write `COALESCE(age::int, int(age::string), 0)`. This would return the value of `age` as-is if it's an `Int`, try to parse it if it's a `String`, and just evaluate to `0` if that fails.
 
+Additionally, you can work with objects and lists using the following syntax:
+- List access: `list[index]`
+- Object field access: `object->field`
+
 ### Explaining Query Plans
 
 You can use the `--explain` flag to get a visual explanation of the query plan. Setting it to 1 gives you a query plan but without type and schema information, setting it to 2 includes those too. For the visualization to work you need to have the graphviz dot command installed.

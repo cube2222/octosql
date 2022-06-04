@@ -27,7 +27,7 @@ octosql "SELECT customer_id, SUM(amount)
          GROUP BY customer_id"
 ```
 
-OctoSQL supports JSON and CSV files out of the box, but you can additionally install plugins to add support for other databases.
+OctoSQL supports JSON, CSV and Parquet files out of the box, but you can additionally install plugins to add support for other databases.
 ```bash
 octosql "SELECT * FROM plugins.available_plugins"
 octosql plugin install postgres

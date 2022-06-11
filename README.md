@@ -27,7 +27,7 @@ octosql "SELECT customer_id, SUM(amount)
          GROUP BY customer_id"
 ```
 
-OctoSQL supports JSON and CSV files out of the box, but you can additionally install plugins to add support for other databases.
+OctoSQL supports JSON, CSV and Parquet files out of the box, but you can additionally install plugins to add support for other databases.
 ```bash
 octosql "SELECT * FROM plugins.available_plugins"
 octosql plugin install postgres
@@ -195,6 +195,10 @@ Second, you can use type assertions to get a value only if it's of a certain typ
 Third, there's a bunch of conversion functions which can help you turn types into other types. For example, the `int` function is able to turn values of many types, including strings, to integers. You could use it like this: `int(age_string)`.
 
 Fourth, and final, there's the `COALESCE` operator which accepts an arbitrary number of arguments and returns the first non-null one. It works very well with what's described in the previous two paragraphs. This way, if you have an `age` column of type `String | Int` and would like to clean it up, you can write `COALESCE(age::int, int(age::string), 0)`. This would return the value of `age` as-is if it's an `Int`, try to parse it if it's a `String`, and just evaluate to `0` if that fails.
+
+Additionally, you can work with objects and lists using the following syntax:
+- List access: `list[index]`
+- Object field access: `object->field`
 
 ### Explaining Query Plans
 

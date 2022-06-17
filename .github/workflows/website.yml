@@ -17,6 +17,7 @@ jobs:
         with:
           node-version: 16.x
           cache: yarn
+          cache-dependency-path: website/package-lock.json
 
       - name: Install dependencies
         working-directory: ./website

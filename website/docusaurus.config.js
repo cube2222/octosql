@@ -133,6 +133,8 @@ const config = {
       "@easyops-cn/docusaurus-search-local",
       {
         hashed: true,
+        indexBlog: false,
+        explicitSearchResultPath: true,
       },
     ],
   ],

@@ -756,6 +756,23 @@ func FunctionMap() map[string]physical.FunctionDetails {
 				},
 			},
 		},
+		"position": {
+			Description: "Finds the first occurrence of the second argument in the first argument.",
+			Descriptors: []physical.FunctionDescriptor{
+				{
+					ArgumentTypes: []octosql.Type{octosql.String, octosql.String},
+					OutputType:    octosql.TypeSum(octosql.Int, octosql.Null),
+					Strict:        true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						i := strings.Index(values[0].Str, values[1].Str)
+						if i == -1 {
+							return octosql.NewNull(), nil
+						}
+						return octosql.NewInt(i), nil
+					},
+				},
+			},
+		},
 		"len": {
 			Description: "Returns the length of the string.",
 			Descriptors: []physical.FunctionDescriptor{

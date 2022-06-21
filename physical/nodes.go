@@ -27,6 +27,7 @@ type Node struct {
 	TableValuedFunction *TableValuedFunction
 	Unnest              *Unnest
 	Limit               *Limit
+	InMemoryRecords     *InMemoryRecords
 }
 
 type Schema struct {
@@ -75,6 +76,7 @@ const (
 	NodeTypeTableValuedFunction
 	NodeTypeUnnest
 	NodeTypeLimit
+	NodeTypeInMemoryRecords
 )
 
 func (t NodeType) String() string {
@@ -103,6 +105,8 @@ func (t NodeType) String() string {
 		return "unnest"
 	case NodeTypeLimit:
 		return "limit"
+	case NodeTypeInMemoryRecords:
+		return "in_memory_records"
 	}
 	return "unknown"
 }
@@ -263,6 +267,10 @@ type Unnest struct {
 type Limit struct {
 	Source Node
 	Limit  Expression
+}
+
+type InMemoryRecords struct {
+	Records []execution.Record
 }
 
 func (node *Node) Materialize(ctx context.Context, env Environment) (execution.Node, error) {
@@ -435,6 +443,9 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (execution.N
 			return nil, fmt.Errorf("couldn't materialize limit expression: %w", err)
 		}
 		return nodes.NewLimit(source, limit), nil
+
+	case NodeTypeInMemoryRecords:
+		return nodes.NewInMemoryRecords(node.InMemoryRecords.Records), nil
 	}
 
 	panic(fmt.Sprintf("unexhaustive node type match: %d", node.NodeType))

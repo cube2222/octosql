@@ -3,7 +3,9 @@ package logical
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
@@ -93,6 +95,29 @@ func NewDataSource(name, alias string, options map[string]string) *DataSource {
 func (ds *DataSource) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) (physical.Node, map[string]string) {
 	if cte, ok := logicalEnv.CommonTableExpressions[ds.name]; ok {
 		return cte.Node, cte.UniqueVariableMapping
+	}
+
+	if ds.name == "dual" {
+		uniqueDummy := logicalEnv.GetUnique("dummy")
+		return physical.Node{
+				Schema: physical.NewSchema(
+					[]physical.SchemaField{
+						{
+							Name: uniqueDummy,
+							Type: octosql.String,
+						},
+					},
+					-1,
+				),
+				NodeType: physical.NodeTypeInMemoryRecords,
+				InMemoryRecords: &physical.InMemoryRecords{
+					Records: []execution.Record{
+						execution.NewRecord([]octosql.Value{octosql.NewString("X")}, false, time.Time{}),
+					},
+				},
+			}, map[string]string{
+				"dummy": uniqueDummy,
+			}
 	}
 
 	datasource, schema, err := env.Datasources.GetDatasource(ctx, ds.name, ds.options)

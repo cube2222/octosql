@@ -1,0 +1,1 @@
+octosql "SELECT position('test', 'es'), position('test', ''), position('test', 'ex'), position('test', 'testt'), position('test', 'test')" --output stream_native

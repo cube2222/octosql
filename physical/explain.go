@@ -131,6 +131,9 @@ func ExplainNode(node Node, withTypeInfo bool) *graph.Node {
 		out.AddChild("limit", ExplainExpr(node.Limit.Limit, withTypeInfo))
 		out.AddChild("source", ExplainNode(node.Limit.Source, withTypeInfo))
 
+	case NodeTypeInMemoryRecords:
+		out = graph.NewNode("in_memory_records")
+
 	default:
 		panic("unexhaustive node type match")
 	}

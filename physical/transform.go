@@ -5,7 +5,6 @@ type Transformers struct {
 	ExpressionTransformer func(expr Expression) Expression
 }
 
-// TODO: This should probably push down and make available the environment.
 func (t *Transformers) TransformNode(node Node) Node {
 	schemaFields := make([]SchemaField, len(node.Schema.Fields))
 	copy(schemaFields, node.Schema.Fields)
@@ -43,8 +42,6 @@ func (t *Transformers) TransformNode(node Node) Node {
 			},
 		}
 	case NodeTypeFilter:
-		// TODO: I think we'd like a function which automatically does type deduction again on each transformation?
-		// Naah, we can do that based on the currently executing transformation.
 		out = Node{
 			Schema:   schema,
 			NodeType: node.NodeType,
@@ -200,7 +197,15 @@ func (t *Transformers) TransformNode(node Node) Node {
 			NodeType: node.NodeType,
 			Limit: &Limit{
 				Source: t.TransformNode(node.Limit.Source),
-				Limit:  node.Limit.Limit,
+				Limit:  t.TransformExpr(node.Limit.Limit),
+			},
+		}
+	case NodeTypeInMemoryRecords:
+		out = Node{
+			Schema:   schema,
+			NodeType: node.NodeType,
+			InMemoryRecords: &InMemoryRecords{
+				Records: node.InMemoryRecords.Records,
 			},
 		}
 

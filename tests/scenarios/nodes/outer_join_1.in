@@ -1,0 +1,3 @@
+octosql "SELECT * FROM range(start=>-10, end=>3) l
+                    OUTER JOIN range(start=>-2, end=>6) r ON l.i = r.i
+                    OUTER JOIN range(start=>-20, end=>20) rr ON l.i + r.i = rr.i"

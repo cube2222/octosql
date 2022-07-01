@@ -107,7 +107,7 @@ func (node *OuterJoin) Typecheck(ctx context.Context, env physical.Environment, 
 
 	outSchemaFields := append(left.Schema.Fields[:len(left.Schema.Fields):len(left.Schema.Fields)], right.Schema.Fields[:len(right.Schema.Fields):len(right.Schema.Fields)]...)
 	if node.isLeft {
-		for i := 0; i < len(left.Schema.Fields); i++ {
+		for i := len(left.Schema.Fields); i < len(outSchemaFields); i++ {
 			outSchemaFields[i] = physical.SchemaField{
 				Name: outSchemaFields[i].Name,
 				Type: octosql.TypeSum(outSchemaFields[i].Type, octosql.Null),
@@ -115,7 +115,7 @@ func (node *OuterJoin) Typecheck(ctx context.Context, env physical.Environment, 
 		}
 	}
 	if node.isRight {
-		for i := len(left.Schema.Fields); i < len(outSchemaFields); i++ {
+		for i := 0; i < len(left.Schema.Fields); i++ {
 			outSchemaFields[i] = physical.SchemaField{
 				Name: outSchemaFields[i].Name,
 				Type: octosql.TypeSum(outSchemaFields[i].Type, octosql.Null),

@@ -118,18 +118,18 @@ func ExplainNode(node Node, withTypeInfo bool) *graph.Node {
 
 	case NodeTypeOuterJoin:
 		out = graph.NewNode("outer join")
-		out.AddChild("right", ExplainNode(node.StreamJoin.Right, withTypeInfo))
-		out.AddChild("left", ExplainNode(node.StreamJoin.Left, withTypeInfo))
+		out.AddChild("right", ExplainNode(node.OuterJoin.Right, withTypeInfo))
+		out.AddChild("left", ExplainNode(node.OuterJoin.Left, withTypeInfo))
 		out.AddChild("right_key", ExplainExpr(Expression{
 			ExpressionType: ExpressionTypeTuple,
 			Tuple: &Tuple{
-				Arguments: node.StreamJoin.RightKey,
+				Arguments: node.OuterJoin.RightKey,
 			},
 		}, withTypeInfo))
 		out.AddChild("left_key", ExplainExpr(Expression{
 			ExpressionType: ExpressionTypeTuple,
 			Tuple: &Tuple{
-				Arguments: node.StreamJoin.LeftKey,
+				Arguments: node.OuterJoin.LeftKey,
 			},
 		}, withTypeInfo))
 		out.AddField("is_left_outer", fmt.Sprint(node.OuterJoin.IsLeft))

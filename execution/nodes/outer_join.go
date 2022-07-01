@@ -10,34 +10,27 @@ import (
 	"github.com/cube2222/octosql/octosql"
 )
 
-type StreamJoin struct {
-	left, right                 Node
-	keyExprsLeft, keyExprsRight []Expression
+type OuterJoin struct {
+	left, right                     Node
+	leftFieldCount, rightFieldCount int
+	keyExprsLeft, keyExprsRight     []Expression
+	isOuterLeft, isOuterRight       bool
 }
 
-func NewStreamJoin(left, right Node, keyExprsLeft, keyExprsRight []Expression) *StreamJoin {
-	return &StreamJoin{
-		left:          left,
-		right:         right,
-		keyExprsLeft:  keyExprsLeft,
-		keyExprsRight: keyExprsRight,
+func NewOuterJoin(left, right Node, leftFieldCount, rightFieldCount int, keyExprsLeft, keyExprsRight []Expression, isOuterLeft, isOuterRight bool) *OuterJoin {
+	return &OuterJoin{
+		left:            left,
+		right:           right,
+		leftFieldCount:  leftFieldCount,
+		rightFieldCount: rightFieldCount,
+		keyExprsLeft:    keyExprsLeft,
+		keyExprsRight:   keyExprsRight,
+		isOuterLeft:     isOuterLeft,
+		isOuterRight:    isOuterRight,
 	}
 }
 
-type streamJoinItem struct {
-	GroupKey
-	// Records for this key
-	values *tbtree.Generic[*streamJoinSubitem]
-}
-
-type streamJoinSubitem struct {
-	// Record value
-	GroupKey
-	// Record event times
-	EventTimes []time.Time
-}
-
-func (s *StreamJoin) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
+func (s *OuterJoin) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
 	type chanMessage struct {
 		metadata        bool
 		metadataMessage MetadataMessage
@@ -114,10 +107,10 @@ func (s *StreamJoin) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaS
 	leftRecordBuffer := NewRecordEventTimeBuffer()
 	rightRecordBuffer := NewRecordEventTimeBuffer()
 
-	processRecordsUpTo := func(ctx ExecutionContext, watermark time.Time, oneStreamRemains bool) error {
+	processRecordsUpTo := func(ctx ExecutionContext, watermark time.Time) error {
 		if rightRecords != nil {
 			if err := leftRecordBuffer.Emit(watermark, func(record Record) error {
-				if err := s.receiveRecord(ctx, produce, leftRecords, rightRecords, true, record, oneStreamRemains); err != nil {
+				if err := s.receiveRecord(ctx, produce, leftRecords, rightRecords, true, record); err != nil {
 					// TODO: Fix goroutine leak.
 					return fmt.Errorf("couldn't process record from left: %w", err)
 				}
@@ -130,7 +123,7 @@ func (s *StreamJoin) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaS
 
 		if leftRecords != nil {
 			if err := rightRecordBuffer.Emit(watermark, func(record Record) error {
-				if err := s.receiveRecord(ctx, produce, rightRecords, leftRecords, false, record, oneStreamRemains); err != nil {
+				if err := s.receiveRecord(ctx, produce, rightRecords, leftRecords, false, record); err != nil {
 					// TODO: Fix goroutine leak.
 					return fmt.Errorf("couldn't process record from right: %w", err)
 				}
@@ -167,7 +160,7 @@ receiveLoop:
 				if min.After(minWatermark) {
 					minWatermark = min
 
-					if err := processRecordsUpTo(ctx, minWatermark, false); err != nil {
+					if err := processRecordsUpTo(ctx, minWatermark); err != nil {
 						return err
 					}
 
@@ -184,7 +177,7 @@ receiveLoop:
 			if msg.record.EventTime.IsZero() {
 				// If the event time is zero, don't buffer, there's no point.
 				// There won't be any record with an event time less than zero.
-				if err := s.receiveRecord(ctx, produce, leftRecords, rightRecords, true, msg.record, false); err != nil {
+				if err := s.receiveRecord(ctx, produce, leftRecords, rightRecords, true, msg.record); err != nil {
 					// TODO: Fix goroutine leak.
 					return fmt.Errorf("couldn't process record from left: %w", err)
 				}
@@ -213,7 +206,7 @@ receiveLoop:
 				if min.After(minWatermark) {
 					minWatermark = min
 
-					if err := processRecordsUpTo(ctx, minWatermark, false); err != nil {
+					if err := processRecordsUpTo(ctx, minWatermark); err != nil {
 						return err
 					}
 
@@ -230,7 +223,7 @@ receiveLoop:
 			if msg.record.EventTime.IsZero() {
 				// If the event time is zero, don't buffer, there's no point.
 				// There won't be any record with an event time less than zero.
-				if err := s.receiveRecord(ctx, produce, rightRecords, leftRecords, false, msg.record, false); err != nil {
+				if err := s.receiveRecord(ctx, produce, rightRecords, leftRecords, false, msg.record); err != nil {
 					// TODO: Fix goroutine leak.
 					return fmt.Errorf("couldn't process record from right: %w", err)
 				}
@@ -242,42 +235,24 @@ receiveLoop:
 	}
 
 	var openChannel chan chanMessage
-	var myRecordBuffer, otherRecordBuffer *RecordEventTimeBuffer
+	var myRecordBuffer *RecordEventTimeBuffer
 	var myRecords, otherRecords *tbtree.Generic[*streamJoinItem]
-	oneStreamRemains := false
 	if !leftDone {
 		openChannel = leftMessages
 		myRecords = leftRecords
 		myRecordBuffer = leftRecordBuffer
 		minWatermark = leftWatermark
 		otherRecords = rightRecords
-		otherRecordBuffer = rightRecordBuffer
 	} else {
 		openChannel = rightMessages
 		myRecords = rightRecords
 		myRecordBuffer = rightRecordBuffer
 		minWatermark = rightWatermark
 		otherRecords = leftRecords
-		otherRecordBuffer = leftRecordBuffer
 	}
 
-	if err := processRecordsUpTo(ctx, minWatermark, true); err != nil {
+	if err := processRecordsUpTo(ctx, minWatermark); err != nil {
 		return err
-	}
-
-	markOneStreamRemains := func() {
-		oneStreamRemains = true
-		// We won't be using our tree anymore, let the GC take it.
-		myRecords = nil
-
-		if !leftDone {
-			leftRecords = nil
-		} else {
-			rightRecords = nil
-		}
-	}
-	if otherRecordBuffer.Empty() {
-		markOneStreamRemains()
 	}
 
 	for msg := range openChannel {
@@ -285,12 +260,8 @@ receiveLoop:
 			return msg.err
 		}
 		if msg.metadata {
-			if err := processRecordsUpTo(ctx, msg.metadataMessage.Watermark, oneStreamRemains); err != nil {
+			if err := processRecordsUpTo(ctx, msg.metadataMessage.Watermark); err != nil {
 				return err
-			}
-
-			if otherRecordBuffer.Empty() {
-				markOneStreamRemains()
 			}
 
 			if err := metaSend(ProduceFromExecutionContext(ctx), msg.metadataMessage); err != nil {
@@ -302,7 +273,7 @@ receiveLoop:
 		if msg.record.EventTime.IsZero() {
 			// If the event time is zero, don't buffer, there's no point.
 			// There won't be any record with an event time less than zero.
-			if err := s.receiveRecord(ctx, produce, myRecords, otherRecords, !leftDone, msg.record, oneStreamRemains); err != nil {
+			if err := s.receiveRecord(ctx, produce, myRecords, otherRecords, !leftDone, msg.record); err != nil {
 				return fmt.Errorf("couldn't process record: %w", err)
 			}
 		} else {
@@ -310,14 +281,14 @@ receiveLoop:
 		}
 	}
 
-	if err := processRecordsUpTo(ctx, WatermarkMaxValue, oneStreamRemains); err != nil {
+	if err := processRecordsUpTo(ctx, WatermarkMaxValue); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRecords, otherRecords *tbtree.Generic[*streamJoinItem], amLeft bool, record Record, oneStreamRemains bool) error {
+func (s *OuterJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRecords, otherRecords *tbtree.Generic[*streamJoinItem], amLeft bool, record Record) error {
 	ctx = ctx.WithRecord(record)
 
 	var keyExprs []Expression
@@ -336,9 +307,10 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 		key[i] = value
 	}
 
-	if !oneStreamRemains {
+	firstRecordForThatKeyOnThisSide := false
+	lastRetractionForThatKeyOnThisSide := false
+	{
 		// Update count in my record tree
-		// If only one stream remains, we won't be using it anymore, so we don't need to update it.
 		itemTyped, ok := myRecords.Get(&streamJoinItem{GroupKey: key})
 
 		if !ok {
@@ -346,6 +318,7 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 				return CompareValueSlices(a.GroupKey, b.GroupKey)
 			}, tbtree.Options{NoLocks: true})}
 			myRecords.Set(itemTyped)
+			firstRecordForThatKeyOnThisSide = true
 		}
 
 		{
@@ -368,6 +341,7 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 
 		if itemTyped.values.Len() == 0 {
 			myRecords.Delete(itemTyped)
+			lastRetractionForThatKeyOnThisSide = true
 		}
 	}
 
@@ -375,9 +349,52 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 	{
 		itemTyped, ok := otherRecords.Get(&streamJoinItem{GroupKey: key})
 
-		if !ok {
-			// Nothing to trigger
-			return nil
+		if !ok || itemTyped.values.Len() == 0 {
+			if s.isOuterLeft && amLeft {
+				// We're an outer join, so trigger record with nulls on other side.
+				outputValues := make([]octosql.Value, s.leftFieldCount+s.rightFieldCount)
+				copy(outputValues, record.Values)
+				if err := produce(ProduceFromExecutionContext(ctx), NewRecord(outputValues, record.Retraction, record.EventTime)); err != nil {
+					return fmt.Errorf("couldn't produce: %w", err)
+				}
+				return nil
+			} else if s.isOuterRight && !amLeft {
+				// We're an outer join, so trigger record with nulls on other side.
+				outputValues := make([]octosql.Value, s.leftFieldCount+s.rightFieldCount)
+				copy(outputValues[s.leftFieldCount:], record.Values)
+				if err := produce(ProduceFromExecutionContext(ctx), NewRecord(outputValues, record.Retraction, record.EventTime)); err != nil {
+					return fmt.Errorf("couldn't produce: %w", err)
+				}
+				return nil
+			} else {
+				// Nothing to trigger
+				return nil
+			}
+		}
+
+		if firstRecordForThatKeyOnThisSide && ((s.isOuterLeft && !amLeft) || (s.isOuterRight && amLeft)) {
+			// We need to send retractions for previous null records on the other side.
+			var outErr error
+			itemTyped.values.Scan(func(subitemTyped *streamJoinSubitem) bool {
+				for i := 0; i < len(subitemTyped.EventTimes); i++ {
+					outputValues := make([]octosql.Value, len(record.Values)+len(subitemTyped.GroupKey))
+					if amLeft {
+						copy(outputValues[len(record.Values):], subitemTyped.GroupKey)
+					} else {
+						copy(outputValues, subitemTyped.GroupKey)
+					}
+
+					if err := produce(ProduceFromExecutionContext(ctx), NewRecord(outputValues, true, subitemTyped.EventTimes[i])); err != nil {
+						outErr = fmt.Errorf("couldn't produce: %w", err)
+						return false
+					}
+				}
+
+				return true
+			})
+			if outErr != nil {
+				return outErr
+			}
 		}
 
 		var outErr error
@@ -410,6 +427,31 @@ func (s *StreamJoin) receiveRecord(ctx ExecutionContext, produce ProduceFn, myRe
 		})
 		if outErr != nil {
 			return outErr
+		}
+
+		if lastRetractionForThatKeyOnThisSide && ((s.isOuterLeft && !amLeft) || (s.isOuterRight && amLeft)) {
+			// We need to send null records on the other side.
+			var outErr error
+			itemTyped.values.Scan(func(subitemTyped *streamJoinSubitem) bool {
+				for i := 0; i < len(subitemTyped.EventTimes); i++ {
+					outputValues := make([]octosql.Value, len(record.Values)+len(subitemTyped.GroupKey))
+					if amLeft {
+						copy(outputValues[len(record.Values):], subitemTyped.GroupKey)
+					} else {
+						copy(outputValues, subitemTyped.GroupKey)
+					}
+
+					if err := produce(ProduceFromExecutionContext(ctx), NewRecord(outputValues, false, subitemTyped.EventTimes[i])); err != nil {
+						outErr = fmt.Errorf("couldn't produce: %w", err)
+						return false
+					}
+				}
+
+				return true
+			})
+			if outErr != nil {
+				return outErr
+			}
 		}
 	}
 

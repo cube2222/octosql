@@ -28,6 +28,7 @@ type Node struct {
 	Unnest              *Unnest
 	Limit               *Limit
 	InMemoryRecords     *InMemoryRecords
+	OuterJoin           *OuterJoin
 }
 
 type Schema struct {
@@ -77,6 +78,7 @@ const (
 	NodeTypeUnnest
 	NodeTypeLimit
 	NodeTypeInMemoryRecords
+	NodeTypeOuterJoin
 )
 
 func (t NodeType) String() string {
@@ -107,6 +109,8 @@ func (t NodeType) String() string {
 		return "limit"
 	case NodeTypeInMemoryRecords:
 		return "in_memory_records"
+	case NodeTypeOuterJoin:
+		return "outer_join"
 	}
 	return "unknown"
 }
@@ -271,6 +275,12 @@ type Limit struct {
 
 type InMemoryRecords struct {
 	Records []execution.Record
+}
+
+type OuterJoin struct {
+	Left, Right       Node
+	LeftKey, RightKey []Expression
+	IsLeft, IsRight   bool // Full Outer Join will have both true.
 }
 
 func (node *Node) Materialize(ctx context.Context, env Environment) (execution.Node, error) {
@@ -446,6 +456,35 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (execution.N
 
 	case NodeTypeInMemoryRecords:
 		return nodes.NewInMemoryRecords(node.InMemoryRecords.Records), nil
+
+	case NodeTypeOuterJoin:
+		left, err := node.OuterJoin.Left.Materialize(ctx, env)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't materialize left join source: %w", err)
+		}
+		right, err := node.OuterJoin.Right.Materialize(ctx, env)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't materialize right join source: %w", err)
+		}
+
+		leftKeyExprs := make([]execution.Expression, len(node.OuterJoin.LeftKey))
+		for i := range node.OuterJoin.LeftKey {
+			expr, err := node.OuterJoin.LeftKey[i].Materialize(ctx, env.WithRecordSchema(node.OuterJoin.Left.Schema))
+			if err != nil {
+				return nil, fmt.Errorf("couldn't materialize stream join left key expression with index %d: %w", i, err)
+			}
+			leftKeyExprs[i] = expr
+		}
+		rightKeyExprs := make([]execution.Expression, len(node.OuterJoin.RightKey))
+		for i := range node.OuterJoin.RightKey {
+			expr, err := node.OuterJoin.RightKey[i].Materialize(ctx, env.WithRecordSchema(node.OuterJoin.Right.Schema))
+			if err != nil {
+				return nil, fmt.Errorf("couldn't materialize stream join right key expression with index %d: %w", i, err)
+			}
+			rightKeyExprs[i] = expr
+		}
+
+		return nodes.NewOuterJoin(left, right, len(node.OuterJoin.Left.Schema.Fields), len(node.OuterJoin.Right.Schema.Fields), leftKeyExprs, rightKeyExprs, node.OuterJoin.IsLeft, node.OuterJoin.IsRight), nil
 	}
 
 	panic(fmt.Sprintf("unexhaustive node type match: %d", node.NodeType))

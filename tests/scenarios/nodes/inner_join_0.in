@@ -1,0 +1,1 @@
+octosql "SELECT * FROM range(start=>1, end=>10) l JOIN range(start=>-5, end=>5) r ON l.i > r.i"

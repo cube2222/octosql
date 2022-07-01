@@ -1,0 +1,26 @@
+Usage:
+  octosql <query> [flags]
+  octosql [command]
+
+Examples:
+octosql "SELECT * FROM myfile.json"
+octosql "SELECT * FROM mydir/myfile.csv"
+octosql "SELECT * FROM plugins.plugins"
+
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  help        Help about any command
+  plugin      
+
+Flags:
+      --describe         Describe query output schema.
+      --explain int      Describe query output schema.
+  -h, --help             help for octosql
+      --optimize         Whether OctoSQL should optimize the query. (default true)
+      --output string    Output format to use. Available options are live_table, batch_table, csv, json and stream_native. (default "live_table")
+      --profile string   Enable profiling of the given type: cpu, memory, trace.
+  -v, --version          version for octosql
+
+Use "octosql [command] --help" for more information about a command.
+
+Error: typecheck error: outer join predicate must be a conjunction of equalities

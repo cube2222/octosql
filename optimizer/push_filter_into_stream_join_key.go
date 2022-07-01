@@ -33,11 +33,11 @@ func PushDownFilterPredicatesIntoStreamJoinKey(node Node) (Node, bool) {
 				firstPart := filterPredicates[i].FunctionCall.Arguments[0]
 				secondPart := filterPredicates[i].FunctionCall.Arguments[1]
 				firstPartVariables := firstPart.VariablesUsed()
-				firstPartUsesLeftVariables := usesVariablesFromSchema(leftSchema, firstPartVariables)
-				firstPartUsesRightVariables := usesVariablesFromSchema(rightSchema, firstPartVariables)
+				firstPartUsesLeftVariables := UsesVariablesFromSchema(leftSchema, firstPartVariables)
+				firstPartUsesRightVariables := UsesVariablesFromSchema(rightSchema, firstPartVariables)
 				secondPartVariables := secondPart.VariablesUsed()
-				secondPartUsesLeftVariables := usesVariablesFromSchema(leftSchema, secondPartVariables)
-				secondPartUsesRightVariables := usesVariablesFromSchema(rightSchema, secondPartVariables)
+				secondPartUsesLeftVariables := UsesVariablesFromSchema(leftSchema, secondPartVariables)
+				secondPartUsesRightVariables := UsesVariablesFromSchema(rightSchema, secondPartVariables)
 
 				if firstPartUsesLeftVariables && !firstPartUsesRightVariables &&
 					!secondPartUsesLeftVariables && secondPartUsesRightVariables {

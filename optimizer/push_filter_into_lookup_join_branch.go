@@ -25,7 +25,7 @@ func PushDownFilterPredicatesIntoLookupJoinBranch(node Node) (Node, bool) {
 
 			for i := range filterPredicates {
 				variablesUsed := filterPredicates[i].VariablesUsed()
-				if !usesVariablesFromSchema(joinedSchema, variablesUsed) {
+				if !UsesVariablesFromSchema(joinedSchema, variablesUsed) {
 					pushedDownSource = append(pushedDownSource, filterPredicates[i])
 				} else {
 					pushedDownJoined = append(pushedDownJoined, filterPredicates[i])

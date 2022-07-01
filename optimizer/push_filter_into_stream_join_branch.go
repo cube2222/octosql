@@ -26,8 +26,8 @@ func PushDownFilterPredicatesIntoStreamJoinBranch(node Node) (Node, bool) {
 				// Clarification:
 				// If it doesn't use variables from any join branch,
 				// then it gets pushed down into both.
-				usesLeftBranch := usesVariablesFromSchema(leftSchema, variablesUsed)
-				usesRightBranch := usesVariablesFromSchema(rightSchema, variablesUsed)
+				usesLeftBranch := UsesVariablesFromSchema(leftSchema, variablesUsed)
+				usesRightBranch := UsesVariablesFromSchema(rightSchema, variablesUsed)
 				if !usesLeftBranch {
 					pushedDownRight = append(pushedDownRight, filterPredicates[i])
 				}
@@ -118,7 +118,7 @@ func PushDownFilterPredicatesIntoStreamJoinBranch(node Node) (Node, bool) {
 	}
 }
 
-func usesVariablesFromSchema(schema Schema, variables []string) bool {
+func UsesVariablesFromSchema(schema Schema, variables []string) bool {
 	for _, name := range variables {
 		for _, field := range schema.Fields {
 			if VariableNameMatchesField(name, field.Name) {

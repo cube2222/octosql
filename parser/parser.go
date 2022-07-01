@@ -70,7 +70,7 @@ func ParseSelect(statement *sqlparser.Select, topmost bool) (logical.Node, *Outp
 		if err != nil {
 			return nil, nil, errors.Wrapf(err, "couldn't parse FROM expression with index %d", i)
 		}
-		root = logical.NewJoin(root, next)
+		root = logical.NewStreamJoin(root, next)
 	}
 
 	// We want to have normal expressions first, star expressions later
@@ -378,45 +378,41 @@ func ParseJoinTableExpression(expr *sqlparser.JoinTableExpr) (logical.Node, erro
 		return nil, errors.Wrap(err, "couldn't parse join right table expression")
 	}
 
-	var source, joined logical.Node
-	switch expr.Join {
-	case sqlparser.LeftJoinStr, sqlparser.JoinStr:
-		source = leftTable
-		joined = rightTable
-	case sqlparser.RightJoinStr:
-		source = rightTable
-		joined = leftTable
-	default:
-		return nil, errors.Errorf("invalid join expression: %v", expr.Join)
-	}
-
-	var node logical.Node
-	if expr.Strategy == sqlparser.LookupJoinStrategy {
-		switch expr.Join {
-		case sqlparser.LeftJoinStr, sqlparser.RightJoinStr:
-			panic("implement me")
-		case sqlparser.JoinStr:
-			node = logical.NewLateralJoin(source, joined)
-		default:
-			return nil, errors.Errorf("invalid join expression: %v", expr.Join)
-		}
-	} else {
-		switch expr.Join {
-		case sqlparser.LeftJoinStr, sqlparser.RightJoinStr:
-			panic("implement me")
-		case sqlparser.JoinStr:
-			node = logical.NewJoin(source, joined)
-		default:
-			return nil, errors.Errorf("invalid join expression: %v", expr.Join)
-		}
-	}
-
+	var joinOn *logical.Expression
 	if expr.Condition.On != nil {
 		predicate, err := ParseExpression(expr.Condition.On)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't parse ON predicate in join")
 		}
-		node = logical.NewFilter(predicate, node)
+		joinOn = &predicate
+	}
+
+	var node logical.Node
+	if expr.Strategy == sqlparser.LookupJoinStrategy {
+		switch expr.Join {
+		case sqlparser.JoinStr:
+			node = logical.NewLookupJoin(leftTable, rightTable)
+			if joinOn != nil {
+				node = logical.NewFilter(*joinOn, node)
+			}
+		default:
+			return nil, errors.Errorf("invalid join expression: %v", expr.Join)
+		}
+	} else {
+		switch expr.Join {
+		case sqlparser.JoinStr:
+			node = logical.NewStreamJoin(leftTable, rightTable)
+			if joinOn != nil {
+				node = logical.NewFilter(*joinOn, node)
+			}
+		case sqlparser.LeftJoinStr, sqlparser.RightJoinStr, sqlparser.OuterJoinStr:
+			if joinOn == nil {
+				return nil, errors.Errorf("outer join without ON predicate")
+			}
+			node = logical.NewOuterJoin(leftTable, rightTable, *joinOn, expr.Join == sqlparser.LeftJoinStr || expr.Join == sqlparser.OuterJoinStr, expr.Join == sqlparser.RightJoinStr || expr.Join == sqlparser.OuterJoinStr)
+		default:
+			return nil, errors.Errorf("invalid join expression: %v", expr.Join)
+		}
 	}
 
 	return node, nil

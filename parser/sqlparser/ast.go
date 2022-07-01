@@ -2086,6 +2086,7 @@ const (
 	StraightJoinStr       = "straight_join"
 	LeftJoinStr           = "left join"
 	RightJoinStr          = "right join"
+	OuterJoinStr          = "outer join"
 	NaturalJoinStr        = "natural join"
 	NaturalLeftJoinStr    = "natural left join"
 	NaturalRightJoinStr   = "natural right join"

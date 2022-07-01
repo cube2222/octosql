@@ -2138,6 +2138,10 @@ outer_join:
   {
     $$ = RightJoinStr
   }
+| OUTER JOIN
+  {
+    $$ = OuterJoinStr
+  }
 
 natural_join:
  NATURAL JOIN

@@ -61,6 +61,7 @@ func executeCommand(command string) {
 	case regexp.MustCompile(`^list [^ ]+$`).FindStringSubmatch(command) != nil:
 		pattern := regexp.MustCompile(`^list ([^ ]+)$`).FindStringSubmatch(command)[1]
 		parsedPattern := strings.ReplaceAll(regexp.QuoteMeta(pattern), "\\*", "[^ ]+")
+		parsedPattern = fmt.Sprintf("^%s$", parsedPattern)
 		re := regexp.MustCompile(parsedPattern)
 		testCases := loadTestCases()
 		for _, testCase := range testCases {
@@ -72,6 +73,7 @@ func executeCommand(command string) {
 	case regexp.MustCompile(`^run [^ ]+$`).FindStringSubmatch(command) != nil:
 		pattern := regexp.MustCompile(`^run ([^ ]+)$`).FindStringSubmatch(command)[1]
 		parsedPattern := strings.ReplaceAll(regexp.QuoteMeta(pattern), "\\*", "[^ ]+")
+		parsedPattern = fmt.Sprintf("^%s$", parsedPattern)
 		re := regexp.MustCompile(parsedPattern)
 		testCases := loadTestCases()
 		for _, testCase := range testCases {
@@ -90,6 +92,7 @@ func executeCommand(command string) {
 	case regexp.MustCompile(`^update [^ ]+$`).FindStringSubmatch(command) != nil:
 		pattern := regexp.MustCompile(`^update ([^ ]+)$`).FindStringSubmatch(command)[1]
 		parsedPattern := strings.ReplaceAll(regexp.QuoteMeta(pattern), "\\*", "[^ ]+")
+		parsedPattern = fmt.Sprintf("^%s$", parsedPattern)
 		re := regexp.MustCompile(parsedPattern)
 		testCases := loadTestCases()
 		for _, testCase := range testCases {

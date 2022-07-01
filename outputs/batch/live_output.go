@@ -24,14 +24,14 @@ type OutputPrinter struct {
 	source               Node
 	keyExprs             []Expression
 	directionMultipliers []int
-	limit                int
+	limit                *int
 
 	schema physical.Schema
 	format func(io.Writer) Format
 	live   bool
 }
 
-func NewOutputPrinter(source Node, keyExprs []Expression, directionMultipliers []int, limit int, schema physical.Schema, format func(io.Writer) Format, live bool) *OutputPrinter {
+func NewOutputPrinter(source Node, keyExprs []Expression, directionMultipliers []int, limit *int, schema physical.Schema, format func(io.Writer) Format, live bool) *OutputPrinter {
 	return &OutputPrinter{
 		source:               source,
 		keyExprs:             keyExprs,
@@ -136,7 +136,7 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 				recordCounts.Ascend(func(item btree.Item) bool {
 					itemTyped := item.(*outputItem)
 					for j := 0; j < itemTyped.Count; j++ {
-						if o.limit > 0 && i == o.limit {
+						if o.limit != nil && i == *o.limit {
 							return false
 						}
 						i++
@@ -166,7 +166,7 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 	recordCounts.Ascend(func(item btree.Item) bool {
 		itemTyped := item.(*outputItem)
 		for j := 0; j < itemTyped.Count; j++ {
-			if o.limit > 0 && i == o.limit {
+			if o.limit != nil && i == *o.limit {
 				return false
 			}
 			i++

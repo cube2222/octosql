@@ -32,7 +32,6 @@ import (
 	"github.com/cube2222/octosql/helpers/graph"
 	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/logs"
-	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/optimizer"
 	"github.com/cube2222/octosql/outputs/batch"
 	"github.com/cube2222/octosql/outputs/eager"
@@ -221,7 +220,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 		if err != nil {
 			return fmt.Errorf("couldn't parse query: %w", err)
 		}
-		logicalPlan, outputOptions, err := parser.ParseNode(statement.(sqlparser.SelectStatement), true)
+		logicalPlan, outputOptions, err := parser.ParseNode(statement.(sqlparser.SelectStatement))
 		if err != nil {
 			return fmt.Errorf("couldn't parse query: %w", err)
 		}
@@ -262,40 +261,27 @@ octosql "SELECT * FROM plugins.plugins"`,
 			}
 			physicalOrderByExpressions[i] = physicalExpr
 		}
-		if physicalPlan.Schema.NoRetractions && len(physicalOrderByExpressions) > 0 {
-			physicalPlan = physical.Node{
-				Schema:   physicalPlan.Schema,
-				NodeType: physical.NodeTypeOrderBy,
-				OrderBy: &physical.OrderBy{
-					Source:               physicalPlan,
-					Key:                  physicalOrderByExpressions,
-					DirectionMultipliers: logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
+		var physicalLimitExpression *physical.Expression
+		if outputOptions.Limit != nil {
+			physicalExpr, err := typecheckExpr(ctx, *outputOptions.Limit, env.WithRecordSchema(physicalPlan.Schema), logical.Environment{
+				CommonTableExpressions: map[string]logical.CommonTableExpression{},
+				TableValuedFunctions:   tableValuedFunctions,
+				UniqueVariableNames: &logical.VariableMapping{
+					Mapping: mapping,
 				},
+				UniqueNameGenerator: uniqueNameGenerator,
+			})
+			if err != nil {
+				return fmt.Errorf("couldn't typecheck limit expression with index: %w", err)
 			}
-			physicalOrderByExpressions = nil
-		}
-		if physicalPlan.Schema.NoRetractions && len(physicalOrderByExpressions) == 0 {
-			physicalPlan = physical.Node{
-				Schema:   physicalPlan.Schema,
-				NodeType: physical.NodeTypeLimit,
-				Limit: &physical.Limit{
-					Source: physicalPlan,
-					Limit: physical.Expression{
-						Type:           octosql.Int,
-						ExpressionType: physical.ExpressionTypeConstant,
-						Constant: &physical.Constant{
-							Value: octosql.NewInt(outputOptions.Limit),
-						},
-					},
-				},
-			}
-			outputOptions.Limit = 0
+			physicalLimitExpression = &physicalExpr
 		}
 
 		queryTelemetry := telemetry.GetQueryTelemetryData(physicalPlan, installedPlugins)
 
 		var executionPlan execution.Node
 		var orderByExpressions []execution.Expression
+		var limitExpression *execution.Expression
 		var outSchema physical.Schema
 		if describe {
 			telemetry.SendTelemetry(ctx, VERSION, "describe", queryTelemetry)
@@ -307,9 +293,6 @@ octosql "SELECT * FROM plugins.plugins"`,
 				Schema: physicalPlan.Schema,
 			}
 			outSchema = DescribeNodeSchema
-			outputOptions.Limit = 0
-			outputOptions.OrderByExpressions = nil
-			outputOptions.OrderByDirections = nil
 		} else {
 			telemetry.SendTelemetry(ctx, VERSION, "query", queryTelemetry)
 
@@ -354,6 +337,13 @@ octosql "SELECT * FROM plugins.plugins"`,
 				}
 				orderByExpressions[i] = execExpr
 			}
+			if physicalLimitExpression != nil {
+				execExpr, err := physicalLimitExpression.Materialize(ctx, env.WithRecordSchema(physicalPlan.Schema))
+				if err != nil {
+					return fmt.Errorf("couldn't materialize output limit expression with index: %w", err)
+				}
+				limitExpression = &execExpr
+			}
 
 			outFields := make([]physical.SchemaField, len(physicalPlan.Schema.Fields))
 			copy(outFields, physicalPlan.Schema.Fields)
@@ -370,86 +360,66 @@ octosql "SELECT * FROM plugins.plugins"`,
 			Run(execCtx execution.ExecutionContext) error
 		}
 
+		execCtx := execution.ExecutionContext{
+			Context:         ctx,
+			VariableContext: nil,
+		}
+
 		switch output {
-		case "live_table":
-			sink = batch.NewOutputPrinter(
-				executionPlan,
-				orderByExpressions,
-				logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
-				outputOptions.Limit,
-				outSchema,
-				func(writer io.Writer) batch.Format {
-					return formats.NewTableFormatter(writer)
-				},
-				true,
-			)
-		case "batch_table":
-			sink = batch.NewOutputPrinter(
-				executionPlan,
-				orderByExpressions,
-				logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
-				outputOptions.Limit,
-				outSchema,
-				func(writer io.Writer) batch.Format {
-					return formats.NewTableFormatter(writer)
-				},
-				false,
-			)
-		case "csv":
-			if !physicalPlan.Schema.NoRetractions {
-				sink = batch.NewOutputPrinter(
-					executionPlan,
-					orderByExpressions,
-					logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
-					outputOptions.Limit,
-					outSchema,
-					func(writer io.Writer) batch.Format {
-						return formats.NewCSVFormatter(writer)
-					},
-					false,
-				)
-			} else {
-				sink = eager.NewOutputPrinter(
-					executionPlan,
-					outSchema,
-					func(writer io.Writer) eager.Format {
-						return formats.NewCSVFormatter(writer)
-					},
-				)
-			}
-		case "json":
-			if !physicalPlan.Schema.NoRetractions {
-				sink = batch.NewOutputPrinter(
-					executionPlan,
-					orderByExpressions,
-					logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
-					outputOptions.Limit,
-					outSchema,
-					func(writer io.Writer) batch.Format {
-						return formats.NewJSONFormatter(writer)
-					},
-					false,
-				)
-			} else {
-				sink = eager.NewOutputPrinter(
-					executionPlan,
-					outSchema,
-					func(writer io.Writer) eager.Format {
-						return formats.NewJSONFormatter(writer)
-					},
-				)
+		case "live_table", "batch_table":
+			var limit *int
+			if limitExpression != nil {
+				val, err := (*limitExpression).Evaluate(execCtx)
+				if err != nil {
+
+				}
+				if val.Int < 0 {
+					return fmt.Errorf("limit must be positive, got %d", val.Int)
+				}
+				limit = &val.Int
 			}
 
-		case "stream_native":
-			if len(orderByExpressions) > 0 {
-				executionPlan = nodes.NewBatchOrderBy(
-					executionPlan,
-					orderByExpressions,
-					logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
-				)
+			sink = batch.NewOutputPrinter(
+				executionPlan,
+				orderByExpressions,
+				logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
+				limit,
+				outSchema,
+				func(writer io.Writer) batch.Format {
+					return formats.NewTableFormatter(writer)
+				},
+				output == "live_table",
+			)
+		case "csv", "json":
+			if len(orderByExpressions) > 0 || (limitExpression != nil && !physicalPlan.Schema.NoRetractions) {
+				executionPlan = nodes.NewOrderSensitiveTransform(executionPlan, orderByExpressions, logical.DirectionsToMultipliers(outputOptions.OrderByDirections), limitExpression)
+			} else if limitExpression != nil {
+				executionPlan = nodes.NewLimit(executionPlan, *limitExpression)
 			}
-			if outputOptions.Limit > 0 {
-				return fmt.Errorf("LIMIT clause not supported with stream output")
+
+			var formatter func(writer io.Writer) eager.Format
+			switch output {
+			case "csv":
+				formatter = func(writer io.Writer) eager.Format {
+					return formats.NewCSVFormatter(writer)
+				}
+			case "json":
+				formatter = func(writer io.Writer) eager.Format {
+					return formats.NewJSONFormatter(writer)
+				}
+			}
+
+			sink = eager.NewOutputPrinter(
+				executionPlan,
+				outSchema,
+				formatter,
+			)
+
+		case "stream_native":
+			if len(orderByExpressions) > 0 || (limitExpression != nil && !physicalPlan.Schema.NoRetractions) {
+				executionPlan = nodes.NewOrderSensitiveTransform(executionPlan, orderByExpressions, logical.DirectionsToMultipliers(outputOptions.OrderByDirections), limitExpression)
+			} else if limitExpression != nil {
+				executionPlan = nodes.NewLimit(executionPlan, *limitExpression)
 			}
 
 			sink = stream.NewOutputPrinter(

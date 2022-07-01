@@ -117,23 +117,6 @@ func (t *Transformers) TransformNode(node Node) Node {
 				Expressions: expressions,
 			},
 		}
-	case NodeTypeOrderBy:
-		keyExprs := make([]Expression, len(node.OrderBy.Key))
-		for i := range node.OrderBy.Key {
-			keyExprs[i] = t.TransformExpr(node.OrderBy.Key[i])
-		}
-		directionMultipliers := make([]int, len(node.OrderBy.DirectionMultipliers))
-		copy(directionMultipliers, node.OrderBy.DirectionMultipliers)
-
-		out = Node{
-			Schema:   schema,
-			NodeType: node.NodeType,
-			OrderBy: &OrderBy{
-				Source:               t.TransformNode(node.OrderBy.Source),
-				Key:                  keyExprs,
-				DirectionMultipliers: directionMultipliers,
-			},
-		}
 	case NodeTypeRequalifier:
 		out = Node{
 			Schema:   schema,
@@ -191,15 +174,6 @@ func (t *Transformers) TransformNode(node Node) Node {
 				Field:  node.Unnest.Field,
 			},
 		}
-	case NodeTypeLimit:
-		out = Node{
-			Schema:   schema,
-			NodeType: node.NodeType,
-			Limit: &Limit{
-				Source: t.TransformNode(node.Limit.Source),
-				Limit:  t.TransformExpr(node.Limit.Limit),
-			},
-		}
 	case NodeTypeInMemoryRecords:
 		out = Node{
 			Schema:   schema,
@@ -231,6 +205,30 @@ func (t *Transformers) TransformNode(node Node) Node {
 			},
 		}
 
+	case NodeTypeOrderSensitiveTransform:
+		orderByKeyExprs := make([]Expression, len(node.OrderSensitiveTransform.OrderByKey))
+		for i := range node.OrderSensitiveTransform.OrderByKey {
+			orderByKeyExprs[i] = t.TransformExpr(node.OrderSensitiveTransform.OrderByKey[i])
+		}
+		orderByDirectionMultipliers := make([]int, len(node.OrderSensitiveTransform.OrderByDirectionMultipliers))
+		copy(orderByDirectionMultipliers, node.OrderSensitiveTransform.OrderByDirectionMultipliers)
+
+		var limit *Expression
+		if node.OrderSensitiveTransform.Limit != nil {
+			expr := t.TransformExpr(*node.OrderSensitiveTransform.Limit)
+			limit = &expr
+		}
+
+		out = Node{
+			Schema:   schema,
+			NodeType: node.NodeType,
+			OrderSensitiveTransform: &OrderSensitiveTransform{
+				Source:                      t.TransformNode(node.OrderSensitiveTransform.Source),
+				OrderByKey:                  orderByKeyExprs,
+				OrderByDirectionMultipliers: orderByDirectionMultipliers,
+				Limit:                       limit,
+			},
+		}
 	default:
 		panic("unexhaustive node type match")
 	}

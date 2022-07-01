@@ -83,19 +83,6 @@ func ExplainNode(node Node, withTypeInfo bool) *graph.Node {
 
 		out.AddChild("source", ExplainNode(node.Map.Source, withTypeInfo))
 
-	case NodeTypeOrderBy:
-		out = graph.NewNode("sort")
-
-		for i := range node.OrderBy.Key {
-			if node.OrderBy.DirectionMultipliers[i] == 1 {
-				out.AddChild("asc", ExplainExpr(node.OrderBy.Key[i], withTypeInfo))
-			} else {
-				out.AddChild("desc", ExplainExpr(node.OrderBy.Key[i], withTypeInfo))
-			}
-		}
-
-		out.AddChild("source", ExplainNode(node.OrderBy.Source, withTypeInfo))
-
 	case NodeTypeRequalifier:
 		out = graph.NewNode("requalifier")
 		out.AddField("new qualifier", node.Requalifier.Qualifier)
@@ -126,13 +113,46 @@ func ExplainNode(node Node, withTypeInfo bool) *graph.Node {
 		out.AddField("field", node.Unnest.Field)
 		out.AddChild("source", ExplainNode(node.Unnest.Source, withTypeInfo))
 
-	case NodeTypeLimit:
-		out = graph.NewNode("limit")
-		out.AddChild("limit", ExplainExpr(node.Limit.Limit, withTypeInfo))
-		out.AddChild("source", ExplainNode(node.Limit.Source, withTypeInfo))
-
 	case NodeTypeInMemoryRecords:
 		out = graph.NewNode("in_memory_records")
+
+	case NodeTypeOuterJoin:
+		out = graph.NewNode("outer join")
+		out.AddChild("right", ExplainNode(node.StreamJoin.Right, withTypeInfo))
+		out.AddChild("left", ExplainNode(node.StreamJoin.Left, withTypeInfo))
+		out.AddChild("right_key", ExplainExpr(Expression{
+			ExpressionType: ExpressionTypeTuple,
+			Tuple: &Tuple{
+				Arguments: node.StreamJoin.RightKey,
+			},
+		}, withTypeInfo))
+		out.AddChild("left_key", ExplainExpr(Expression{
+			ExpressionType: ExpressionTypeTuple,
+			Tuple: &Tuple{
+				Arguments: node.StreamJoin.LeftKey,
+			},
+		}, withTypeInfo))
+		out.AddField("is_left_outer", fmt.Sprint(node.OuterJoin.IsLeft))
+		out.AddField("is_right_outer", fmt.Sprint(node.OuterJoin.IsRight))
+
+	case NodeTypeOrderSensitiveTransform:
+		out = graph.NewNode("sort")
+		for i := range node.OrderSensitiveTransform.OrderByKey {
+			if node.OrderSensitiveTransform.OrderByDirectionMultipliers[i] == 1 {
+				out.AddChild("asc", ExplainExpr(node.OrderSensitiveTransform.OrderByKey[i], withTypeInfo))
+			} else {
+				out.AddChild("desc", ExplainExpr(node.OrderSensitiveTransform.OrderByKey[i], withTypeInfo))
+			}
+		}
+
+		out.AddChild("source", ExplainNode(node.OrderSensitiveTransform.Source, withTypeInfo))
+
+		if node.OrderSensitiveTransform.Limit != nil {
+			prev := out
+			out = graph.NewNode("limit")
+			out.AddChild("limit", ExplainExpr(*node.OrderSensitiveTransform.Limit, withTypeInfo))
+			out.AddChild("source", prev)
+		}
 
 	default:
 		panic("unexhaustive node type match")

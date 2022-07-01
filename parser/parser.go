@@ -47,18 +47,15 @@ import (
 // }
 
 type OutputOptions struct {
-	Limit              int
+	Limit              *logical.Expression
 	OrderByExpressions []logical.Expression
 	OrderByDirections  []logical.OrderDirection
 }
 
-func ParseSelect(statement *sqlparser.Select, topmost bool) (logical.Node, *OutputOptions, error) {
+func ParseSelect(statement *sqlparser.Select) (logical.Node, *OutputOptions, error) {
 	var err error
 	var root logical.Node
-	var outputOptions *OutputOptions
-	if topmost {
-		outputOptions = &OutputOptions{}
-	}
+	outputOptions := &OutputOptions{}
 
 	root, err = ParseTableExpression(statement.From[len(statement.From)-1])
 	if err != nil {
@@ -218,55 +215,33 @@ func ParseSelect(statement *sqlparser.Select, topmost bool) (logical.Node, *Outp
 		}
 	}
 
+	if len(statement.Distinct) > 0 {
+		root = logical.NewDistinct(root)
+	}
+
 	if statement.OrderBy != nil {
 		orderByExpressions, orderByDirections, err := parseOrderByExpressions(statement.OrderBy)
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "couldn't parse keys of order by")
 		}
 
-		if !topmost {
-			// TODO: Optimization which pushes order by into output printer. For live batch output.
-			root = logical.NewOrderBy(orderByExpressions, orderByDirections, root)
-		} else {
-			outputOptions.OrderByExpressions = orderByExpressions
-			outputOptions.OrderByDirections = orderByDirections
-		}
-	}
-
-	if len(statement.Distinct) > 0 {
-		root = logical.NewDistinct(root)
+		outputOptions.OrderByExpressions = orderByExpressions
+		outputOptions.OrderByDirections = orderByDirections
 	}
 
 	if statement.Limit != nil {
-		if !topmost {
-			limitExpr, err := ParseExpression(statement.Limit.Rowcount)
-			if err != nil {
-				return nil, nil, errors.Wrap(err, "couldn't parse limit")
-			}
-			root = logical.NewLimit(limitExpr, root)
-			return nil, nil, errors.Errorf("LIMIT in non-topmost expression not currently supported.")
-		} else {
-			l, ok := statement.Limit.Rowcount.(*sqlparser.SQLVal)
-			if !ok {
-				return nil, nil, errors.Errorf("LIMIT parameter must be constant, is: %+v", statement.Limit.Rowcount)
-			}
-			if l.Type != sqlparser.IntVal {
-				return nil, nil, errors.Errorf("LIMIT parameter must be Int constant, is: %+v", l.Type)
-			}
-			i, err := strconv.ParseInt(string(l.Val), 10, 64)
-			if err != nil {
-				return nil, nil, errors.Wrap(err, "LIMIT parameter must be Int constant, couldn't parse")
-			}
-
-			outputOptions.Limit = int(i)
+		limitExpr, err := ParseExpression(statement.Limit.Rowcount)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "couldn't parse limit")
 		}
+		outputOptions.Limit = &limitExpr
 	}
 
 	return root, outputOptions, nil
 }
 
-func ParseWith(statement *sqlparser.With, topmost bool) (logical.Node, *OutputOptions, error) {
-	source, outputOptions, err := ParseNode(statement.Select, topmost)
+func ParseWith(statement *sqlparser.With) (logical.Node, *OutputOptions, error) {
+	source, outputOptions, err := ParseNode(statement.Select)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't parse underlying select in WITH statement")
 	}
@@ -274,7 +249,7 @@ func ParseWith(statement *sqlparser.With, topmost bool) (logical.Node, *OutputOp
 	nodes := make([]logical.Node, len(statement.CommonTableExpressions))
 	names := make([]string, len(statement.CommonTableExpressions))
 	for i, cte := range statement.CommonTableExpressions {
-		node, _, err := ParseNode(cte.Select, false)
+		node, err := ParseNestedNode(cte.Select)
 		if err != nil {
 			return nil, nil, errors.Wrapf(err, "couldn't parse common table expression %s with index %d", cte.Name, i)
 		}
@@ -285,24 +260,35 @@ func ParseWith(statement *sqlparser.With, topmost bool) (logical.Node, *OutputOp
 	return logical.NewWith(names, nodes, source), outputOptions, nil
 }
 
-func ParseNode(statement sqlparser.SelectStatement, topmost bool) (logical.Node, *OutputOptions, error) {
+func ParseNode(statement sqlparser.SelectStatement) (logical.Node, *OutputOptions, error) {
 	switch statement := statement.(type) {
 	case *sqlparser.Select:
-		return ParseSelect(statement, topmost)
+		return ParseSelect(statement)
 
 	// case *sqlparser.Union:
 	// 	plan, err := ParseUnion(statement)
 	// 	return plan, &logical.OutputOptions{}, err
 
 	case *sqlparser.ParenSelect:
-		return ParseNode(statement.Select, topmost)
+		return ParseNode(statement.Select)
 
 	case *sqlparser.With:
-		return ParseWith(statement, topmost)
+		return ParseWith(statement)
 
 	default:
 		return nil, nil, errors.Errorf("unsupported select %+v of type %v", statement, reflect.TypeOf(statement))
 	}
+}
+
+func ParseNestedNode(statement sqlparser.SelectStatement) (logical.Node, error) {
+	node, outputOptions, err := ParseNode(statement)
+	if err != nil {
+		return nil, err
+	}
+	if len(outputOptions.OrderByExpressions) > 0 || outputOptions.Limit != nil {
+		node = logical.NewOrderSensitiveTransform(outputOptions.OrderByExpressions, outputOptions.OrderByDirections, outputOptions.Limit, node)
+	}
+	return node, nil
 }
 
 func ParseTableExpression(expr sqlparser.TableExpr) (logical.Node, error) {
@@ -357,7 +343,7 @@ func ParseAliasedTableExpression(expr *sqlparser.AliasedTableExpr) (logical.Node
 		return out, nil
 
 	case *sqlparser.Subquery:
-		subQuery, _, err := ParseNode(subExpr.Select, false)
+		subQuery, err := ParseNestedNode(subExpr.Select)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't parse subquery")
 		}
@@ -618,7 +604,7 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 			return nil, errors.Errorf("expected select statement in subquery, go %v %v",
 				expr.Select, reflect.TypeOf(expr.Select))
 		}
-		subquery, _, err := ParseNode(selectExpr, false)
+		subquery, err := ParseNestedNode(selectExpr)
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't parse select expression")
 		}

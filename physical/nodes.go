@@ -15,20 +15,19 @@ type Node struct {
 
 	NodeType NodeType
 	// Only one of the below may be non-null.
-	Datasource          *Datasource
-	Distinct            *Distinct
-	Filter              *Filter
-	GroupBy             *GroupBy
-	LookupJoin          *LookupJoin
-	StreamJoin          *StreamJoin
-	Map                 *Map
-	OrderBy             *OrderBy
-	Requalifier         *Requalifier
-	TableValuedFunction *TableValuedFunction
-	Unnest              *Unnest
-	Limit               *Limit
-	InMemoryRecords     *InMemoryRecords
-	OuterJoin           *OuterJoin
+	Datasource              *Datasource
+	Distinct                *Distinct
+	Filter                  *Filter
+	GroupBy                 *GroupBy
+	LookupJoin              *LookupJoin
+	StreamJoin              *StreamJoin
+	Map                     *Map
+	Requalifier             *Requalifier
+	TableValuedFunction     *TableValuedFunction
+	Unnest                  *Unnest
+	InMemoryRecords         *InMemoryRecords
+	OuterJoin               *OuterJoin
+	OrderSensitiveTransform *OrderSensitiveTransform
 }
 
 type Schema struct {
@@ -72,13 +71,14 @@ const (
 	NodeTypeLookupJoin
 	NodeTypeStreamJoin
 	NodeTypeMap
-	NodeTypeOrderBy
+	_
 	NodeTypeRequalifier
 	NodeTypeTableValuedFunction
 	NodeTypeUnnest
-	NodeTypeLimit
+	_
 	NodeTypeInMemoryRecords
 	NodeTypeOuterJoin
+	NodeTypeOrderSensitiveTransform
 )
 
 func (t NodeType) String() string {
@@ -97,20 +97,18 @@ func (t NodeType) String() string {
 		return "stream_join"
 	case NodeTypeMap:
 		return "map"
-	case NodeTypeOrderBy:
-		return "order_by"
 	case NodeTypeRequalifier:
 		return "requalifier"
 	case NodeTypeTableValuedFunction:
 		return "table_valued_function"
 	case NodeTypeUnnest:
 		return "unnest"
-	case NodeTypeLimit:
-		return "limit"
 	case NodeTypeInMemoryRecords:
 		return "in_memory_records"
 	case NodeTypeOuterJoin:
 		return "outer_join"
+	case NodeTypeOrderSensitiveTransform:
+		return "order_sensitive_transform"
 	}
 	return "unknown"
 }
@@ -202,12 +200,6 @@ type Map struct {
 	Expressions []Expression
 }
 
-type OrderBy struct {
-	Source               Node
-	Key                  []Expression
-	DirectionMultipliers []int
-}
-
 type Requalifier struct {
 	Source    Node
 	Qualifier string
@@ -268,11 +260,6 @@ type Unnest struct {
 	Field  string
 }
 
-type Limit struct {
-	Source Node
-	Limit  Expression
-}
-
 type InMemoryRecords struct {
 	Records []execution.Record
 }
@@ -281,6 +268,13 @@ type OuterJoin struct {
 	Left, Right       Node
 	LeftKey, RightKey []Expression
 	IsLeft, IsRight   bool // Full Outer Join will have both true.
+}
+
+type OrderSensitiveTransform struct {
+	Source                      Node
+	OrderByKey                  []Expression
+	OrderByDirectionMultipliers []int
+	Limit                       *Expression
 }
 
 func (node *Node) Materialize(ctx context.Context, env Environment) (execution.Node, error) {
@@ -403,20 +397,6 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (execution.N
 		}
 
 		return nodes.NewMap(source, expressions), nil
-	case NodeTypeOrderBy:
-		source, err := node.OrderBy.Source.Materialize(ctx, env)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't materialize order by source: %w", err)
-		}
-		keyExprs := make([]execution.Expression, len(node.OrderBy.Key))
-		for i := range node.OrderBy.Key {
-			expr, err := node.OrderBy.Key[i].Materialize(ctx, env.WithRecordSchema(node.OrderBy.Source.Schema))
-			if err != nil {
-				return nil, fmt.Errorf("couldn't materialize order by key with index %d: %w", i, err)
-			}
-			keyExprs[i] = expr
-		}
-		return nodes.NewBatchOrderBy(source, keyExprs, node.OrderBy.DirectionMultipliers), nil
 	case NodeTypeRequalifier:
 		return node.Requalifier.Source.Materialize(ctx, env)
 
@@ -442,17 +422,6 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (execution.N
 		}
 
 		return nodes.NewUnnest(source, index), nil
-
-	case NodeTypeLimit:
-		source, err := node.Limit.Source.Materialize(ctx, env)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't materialize limit source: %w", err)
-		}
-		limit, err := node.Limit.Limit.Materialize(ctx, env)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't materialize limit expression: %w", err)
-		}
-		return nodes.NewLimit(source, limit), nil
 
 	case NodeTypeInMemoryRecords:
 		return nodes.NewInMemoryRecords(node.InMemoryRecords.Records), nil
@@ -485,6 +454,39 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (execution.N
 		}
 
 		return nodes.NewOuterJoin(left, right, len(node.OuterJoin.Left.Schema.Fields), len(node.OuterJoin.Right.Schema.Fields), leftKeyExprs, rightKeyExprs, node.OuterJoin.IsLeft, node.OuterJoin.IsRight), nil
+
+	case NodeTypeOrderSensitiveTransform:
+		source, err := node.OrderSensitiveTransform.Source.Materialize(ctx, env)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't materialize order sensitive transform source: %w", err)
+		}
+		orderByKeyExprs := make([]execution.Expression, len(node.OrderSensitiveTransform.OrderByKey))
+		for i := range node.OrderSensitiveTransform.OrderByKey {
+			expr, err := node.OrderSensitiveTransform.OrderByKey[i].Materialize(ctx, env.WithRecordSchema(node.OrderSensitiveTransform.Source.Schema))
+			if err != nil {
+				return nil, fmt.Errorf("couldn't materialize order by key with index %d: %w", i, err)
+			}
+			orderByKeyExprs[i] = expr
+		}
+		var limit *execution.Expression
+		if node.OrderSensitiveTransform.Limit != nil {
+			expr, err := node.OrderSensitiveTransform.Limit.Materialize(ctx, env)
+			if err != nil {
+				return nil, fmt.Errorf("couldn't materialize limit expression: %w", err)
+			}
+			limit = &expr
+		}
+
+		if len(orderByKeyExprs) > 0 || (limit != nil && !node.OrderSensitiveTransform.Source.Schema.NoRetractions) {
+			return nodes.NewOrderSensitiveTransform(source, orderByKeyExprs, node.OrderSensitiveTransform.OrderByDirectionMultipliers, limit), nil
+		}
+
+		if limit != nil {
+			return nodes.NewLimit(source, *limit), nil
+		}
+
+		// Probably shouldn't happen...
+		return source, nil
 	}
 
 	panic(fmt.Sprintf("unexhaustive node type match: %d", node.NodeType))

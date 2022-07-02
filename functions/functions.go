@@ -430,7 +430,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 				},
 			},
 		},
-		"ln": {
+		"log": {
 			Description: "Returns the natural logarithm of the argument.",
 			Descriptors: []physical.FunctionDescriptor{
 				{
@@ -473,7 +473,6 @@ func FunctionMap() map[string]physical.FunctionDetails {
 		"not": {
 			Description: "Returns the negation of the argument.",
 			Descriptors: []physical.FunctionDescriptor{
-				// TODO: Specializations for concrete primitive types.
 				{
 					ArgumentTypes: []octosql.Type{octosql.Boolean},
 					OutputType:    octosql.Boolean,
@@ -503,7 +502,6 @@ func FunctionMap() map[string]physical.FunctionDetails {
 						}
 
 						return func(values []octosql.Value) (octosql.Value, error) {
-							// TODO: Optimize, cache compiled regexps.
 							const likeEscape = '\\'
 							const likeAny = '_'
 							const likeAll = '%'

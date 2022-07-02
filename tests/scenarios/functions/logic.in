@@ -1,0 +1,5 @@
+octosql "SELECT not(false), not(true),
+                true AND false, true AND true, false AND false, false AND true,
+                true OR false, true OR true, false OR false, false OR true,
+                true OR NULL, false OR NULL,
+                true AND NULL, false AND NULL"

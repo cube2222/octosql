@@ -1,0 +1,8 @@
+octosql "SELECT abs(42), abs(-42), abs(42.0), abs(-42.0),
+                sqrt(49.0),
+                ceil(42.0), ceil(42.5),
+                floor(42.0), floor(42.5),
+                log2(8.0),
+                log(9.0),
+                log10(100.0),
+                pow(2.0, 3.0)"

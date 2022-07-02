@@ -1,0 +1,12 @@
+octosql "SELECT 'test' LIKE '%es%' as line_1, 'test' LIKE 'es', 'test' LIKE 'tes%', 'test' LIKE '%est', 'test' LIKE 'es%', 'test' LIKE 't_st', 'test' LIKE 't_t',
+                'test' ~ '^te.*' as line_2, 'test' ~ '^tE.*', 'test' ~ 'te.*', 'test' ~ 'es', 'test' ~ '^es$',
+                'test' !~ '^te.*' as line_3, 'test' !~ '^tE.*', 'test' !~ 'te.*', 'test' !~ 'es', 'test' !~ '^es$',
+                'test' ~* '^te.*' as line_4, 'test' ~* '^tE.*', 'test' ~* 'te.*', 'test' ~* 'es', 'test' ~* '^es$',
+                'test' !~* '^te.*' as line_5, 'test' !~* '^tE.*', 'test' !~* 'te.*', 'test' !~* 'es', 'test' !~* '^es$',
+                upper('test') as line_6, upper('TEST'),
+                lower('test') as line_7, lower('TEST'),
+                reverse('test') as line_8,
+                substr('test', 1) as line_9, substr('test', 1, 2),
+                replace('test', 'es', 'ESS') as line_10,
+                position('test', 'es') as line_11, position('test', ''), position('test', 'ex'), position('test', 'testt'), position('test', 'test'),
+                len('test') as line_12"

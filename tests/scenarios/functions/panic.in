@@ -1,0 +1,1 @@
+octosql "SELECT panic('test')"

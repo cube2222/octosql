@@ -621,13 +621,19 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 				return tkn.scanCommentType1("--")
 			case '>':
 				tkn.next()
-				if tkn.lastChar == '>' {
+				switch tkn.lastChar {
+				case '>':
 					tkn.next()
 					return JSON_UNQUOTE_EXTRACT_OP, nil
+				case '*':
+					tkn.next()
+					return JSON_EXPLODE_OP, nil
+				default:
+					return JSON_EXTRACT_OP, nil
 				}
-				return JSON_EXTRACT_OP, nil
+			default:
+				return int(ch), nil
 			}
-			return int(ch), nil
 		case '<':
 			switch tkn.lastChar {
 			case '>':

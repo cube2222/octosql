@@ -182,18 +182,30 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, *OutputOptions, err
 		}
 
 		root = logical.NewGroupBy(root, key, keyFieldNames, aggregateExprs, nonKeyAggregates, aggregateFieldNames, triggers)
-		root = logical.NewMap(outputExprs, make([]string, len(outputExprs)), make([]string, len(outputExprs)), make([]bool, len(outputExprs)), root)
+		root = logical.NewMap(outputExprs, make([]string, len(outputExprs)), make([]string, len(outputExprs)), make([]bool, len(outputExprs)), nil, nil, root)
 	} else {
 		expressions := make([]logical.Expression, len(statement.SelectExprs))
 		starQualifiers := make([]string, len(statement.SelectExprs))
 		isStar := make([]bool, len(statement.SelectExprs))
+		objectExplosions := make([]logical.Expression, len(statement.SelectExprs))
+		isObjectExplosion := make([]bool, len(statement.SelectExprs))
 		aliases := make([]string, len(statement.SelectExprs))
 
 		for i := range statement.SelectExprs {
 			if starExpr, ok := statement.SelectExprs[i].(*sqlparser.StarExpr); ok {
 				starQualifiers[i] = starExpr.TableName.Name.String()
 				isStar[i] = true
+				continue
+			}
 
+			if objectExplosion, ok := statement.SelectExprs[i].(*sqlparser.ObjectExplode); ok {
+				expr, err := ParseExpression(objectExplosion.Object)
+				if err != nil {
+					return nil, nil, errors.Wrapf(err, "couldn't parse object explode expression with index %d", i)
+				}
+
+				objectExplosions[i] = expr
+				isObjectExplosion[i] = true
 				continue
 			}
 
@@ -211,7 +223,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, *OutputOptions, err
 
 		if !(len(expressions) == 1 && isStar[0] && starQualifiers[0] == "") {
 			// Only create a map node if this is not 'SELECT * FROM xyz'
-			root = logical.NewMap(expressions, aliases, starQualifiers, isStar, root)
+			root = logical.NewMap(expressions, aliases, starQualifiers, isStar, objectExplosions, isObjectExplosion, root)
 		}
 	}
 

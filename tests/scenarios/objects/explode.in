@@ -1,0 +1,1 @@
+octosql "SELECT field1, field3->* FROM fixtures/test.json" -o json

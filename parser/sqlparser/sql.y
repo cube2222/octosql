@@ -168,7 +168,7 @@ func skipToEnd(yylex interface{}) {
 // There is no need to define precedence for the JSON
 // operators because the syntax is restricted enough that
 // they don't cause conflicts.
-%token <empty> JSON_EXTRACT_OP JSON_UNQUOTE_EXTRACT_OP
+%token <empty> JSON_EXPLODE_OP JSON_EXTRACT_OP JSON_UNQUOTE_EXTRACT_OP
 
 // DDL Tokens
 %token <bytes> CREATE ALTER DROP RENAME ANALYZE ADD FLUSH
@@ -1888,6 +1888,10 @@ select_expression:
 | table_id '.' reserved_table_id '.' '*'
   {
     $$ = &StarExpr{TableName: TableName{Qualifier: $1, Name: $3}}
+  }
+| value_expression JSON_EXPLODE_OP
+  {
+    $$ = &ObjectExplode{Object: $1}
   }
 
 as_ci_opt:

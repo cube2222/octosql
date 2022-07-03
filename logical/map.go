@@ -10,15 +10,25 @@ import (
 )
 
 type Map struct {
-	expressions   []Expression
-	aliases       []string
-	starQualifier []string
-	isStar        []bool
-	source        Node
+	expressions       []Expression
+	aliases           []string
+	starQualifier     []string
+	isStar            []bool
+	objectExplosions  []Expression
+	isObjectExplosion []bool
+	source            Node
 }
 
-func NewMap(expressions []Expression, aliases []string, starQualifiers []string, isStar []bool, child Node) *Map {
-	return &Map{expressions: expressions, aliases: aliases, starQualifier: starQualifiers, isStar: isStar, source: child}
+func NewMap(expressions []Expression, aliases []string, starQualifiers []string, isStar []bool, objectExplosions []Expression, isObjectExplosion []bool, child Node) *Map {
+	return &Map{
+		expressions:       expressions,
+		aliases:           aliases,
+		starQualifier:     starQualifiers,
+		isStar:            isStar,
+		objectExplosions:  objectExplosions,
+		isObjectExplosion: isObjectExplosion,
+		source:            child,
+	}
 }
 
 func (node *Map) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) (physical.Node, map[string]string) {
@@ -28,26 +38,8 @@ func (node *Map) Typecheck(ctx context.Context, env physical.Environment, logica
 	var expressions []physical.Expression
 	var aliases []*string
 	var unnests []int
-	for i := range node.isStar {
-		if !node.isStar[i] {
-			unnestLevel := 0
-			curExpression := node.expressions[i]
-			for fe, ok := curExpression.(*FunctionExpression); ok && fe.Name == "unnest"; fe, ok = curExpression.(*FunctionExpression) {
-				if len(fe.Arguments) != 1 {
-					panic("unnest takes exactly 1 argument")
-				}
-				unnestLevel++
-				curExpression = fe.Arguments[0]
-			}
-			unnests = append(unnests, unnestLevel)
-
-			expressions = append(expressions, curExpression.Typecheck(ctx, env.WithRecordSchema(source.Schema), logicalEnv.WithRecordUniqueVariableNames(mapping)))
-			if node.aliases[i] != "" {
-				aliases = append(aliases, &node.aliases[i])
-			} else {
-				aliases = append(aliases, nil)
-			}
-		} else {
+	for i := range node.expressions {
+		if node.isStar[i] {
 			for _, field := range source.Schema.Fields {
 				if qualifier := node.starQualifier[i]; qualifier != "" {
 					if !strings.HasPrefix(reverseMapping[field.Name], qualifier+".") {
@@ -64,6 +56,43 @@ func (node *Map) Typecheck(ctx context.Context, env physical.Environment, logica
 				})
 				aliases = append(aliases, nil)
 				unnests = append(unnests, 0)
+			}
+		} else if node.isObjectExplosion[i] {
+			objectExpr := node.objectExplosions[i].Typecheck(ctx, env.WithRecordSchema(source.Schema), logicalEnv.WithRecordUniqueVariableNames(mapping))
+			if objectExpr.Type.TypeID != octosql.TypeIDStruct {
+				panic(fmt.Errorf("object explosion can only be invoked on an object, got %v", objectExpr.Type))
+			}
+
+			fieds := objectExpr.Type.Struct.Fields
+			for i := range fieds {
+				expressions = append(expressions, physical.Expression{
+					Type:           fieds[i].Type,
+					ExpressionType: physical.ExpressionTypeObjectFieldAccess,
+					ObjectFieldAccess: &physical.ObjectFieldAccess{
+						Object: objectExpr,
+						Field:  fieds[i].Name,
+					},
+				})
+				aliases = append(aliases, &fieds[i].Name)
+				unnests = append(unnests, 0)
+			}
+		} else {
+			unnestLevel := 0
+			curExpression := node.expressions[i]
+			for fe, ok := curExpression.(*FunctionExpression); ok && fe.Name == "unnest"; fe, ok = curExpression.(*FunctionExpression) {
+				if len(fe.Arguments) != 1 {
+					panic("unnest takes exactly 1 argument")
+				}
+				unnestLevel++
+				curExpression = fe.Arguments[0]
+			}
+			unnests = append(unnests, unnestLevel)
+
+			expressions = append(expressions, curExpression.Typecheck(ctx, env.WithRecordSchema(source.Schema), logicalEnv.WithRecordUniqueVariableNames(mapping)))
+			if node.aliases[i] != "" {
+				aliases = append(aliases, &node.aliases[i])
+			} else {
+				aliases = append(aliases, nil)
 			}
 		}
 	}

@@ -1752,9 +1752,10 @@ type SelectExpr interface {
 	SQLNode
 }
 
-func (*StarExpr) iSelectExpr()    {}
-func (*AliasedExpr) iSelectExpr() {}
-func (Nextval) iSelectExpr()      {}
+func (*StarExpr) iSelectExpr()      {}
+func (*AliasedExpr) iSelectExpr()   {}
+func (Nextval) iSelectExpr()        {}
+func (*ObjectExplode) iSelectExpr() {}
 
 // StarExpr defines a '*' or 'table.*' expression.
 type StarExpr struct {
@@ -1816,6 +1817,35 @@ func (node Nextval) Format(buf *TrackedBuffer) {
 
 func (node Nextval) walkSubtree(visit Visit) error {
 	return Walk(visit, node.Expr)
+}
+
+// ObjectExplode represents an object field access.
+type ObjectExplode struct {
+	// Metadata is not populated by the parser.
+	// It's a placeholder for analyzers to store
+	// additional data, typically info about which
+	// table or column this node references.
+	Metadata interface{}
+	Object   Expr
+}
+
+// Format formats the node.
+func (node *ObjectExplode) Format(buf *TrackedBuffer) {
+	buf.Myprintf("%v->*", node.Object)
+}
+
+func (node *ObjectExplode) walkSubtree(visit Visit) error {
+	if node == nil {
+		return nil
+	}
+	return Walk(
+		visit,
+		node.Object,
+	)
+}
+
+func (node *ObjectExplode) replace(from, to Expr) bool {
+	return false
 }
 
 // Columns represents an insert column list.
@@ -2841,8 +2871,7 @@ type ObjectFieldAccess struct {
 
 // Format formats the node.
 func (node *ObjectFieldAccess) Format(buf *TrackedBuffer) {
-	buf.Myprintf("%v.", node.Object)
-	buf.Myprintf("%v", node.Field)
+	buf.Myprintf("%v->%v", node.Object, node.Field)
 }
 
 func (node *ObjectFieldAccess) walkSubtree(visit Visit) error {

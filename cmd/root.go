@@ -457,7 +457,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&describe, "describe", false, "Describe query output schema.")
 	rootCmd.Flags().IntVar(&explain, "explain", 0, "Describe query output schema.")
 	rootCmd.Flags().BoolVar(&optimize, "optimize", true, "Whether OctoSQL should optimize the query.")
-	rootCmd.Flags().StringVar(&output, "output", "live_table", "Output format to use. Available options are live_table, batch_table, csv, json and stream_native.")
+	rootCmd.Flags().StringVarP(&output, "output", "o", "live_table", "Output format to use. Available options are live_table, batch_table, csv, json and stream_native.")
 	rootCmd.Flags().StringVar(&prof, "profile", "", "Enable profiling of the given type: cpu, memory, trace.")
 }
 

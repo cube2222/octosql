@@ -182,7 +182,7 @@ func ParseSelect(statement *sqlparser.Select) (logical.Node, *OutputOptions, err
 		}
 
 		root = logical.NewGroupBy(root, key, keyFieldNames, aggregateExprs, nonKeyAggregates, aggregateFieldNames, triggers)
-		root = logical.NewMap(outputExprs, make([]string, len(outputExprs)), make([]string, len(outputExprs)), make([]bool, len(outputExprs)), nil, nil, root)
+		root = logical.NewMap(outputExprs, make([]string, len(outputExprs)), make([]string, len(outputExprs)), make([]bool, len(outputExprs)), make([]logical.Expression, len(outputExprs)), make([]bool, len(outputExprs)), root)
 	} else {
 		expressions := make([]logical.Expression, len(statement.SelectExprs))
 		starQualifiers := make([]string, len(statement.SelectExprs))

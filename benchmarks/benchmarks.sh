@@ -1,4 +1,4 @@
-curl https://s3.amazonaws.com/nyc-tlc/trip+data/yellow_tripdata_2021-04.csv -o taxi.csv
+curl https://s3.amazonaws.com/nyc-tlc/csv_backup/yellow_tripdata_2021-04.csv -o taxi.csv
 
 echo "CREATE EXTERNAL TABLE taxi
 STORED AS CSV
@@ -16,5 +16,6 @@ hyperfine --min-runs 10 -w 2 --export-markdown benchmarks.md \
 'textql -header -sql "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi GROUP BY passenger_count" taxi.csv' \
 'datafusion-cli -f datafusion_commands.txt' \
 'dsq taxi.csv "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM {} GROUP BY passenger_count"' \
+'dsq --cache taxi.csv "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM {} GROUP BY passenger_count"' \
 'spyql "SELECT passenger_count, count_agg(*), avg_agg(total_amount) FROM csv GROUP BY passenger_count" < taxi.csv'
 

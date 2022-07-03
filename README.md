@@ -331,23 +331,24 @@ The benchmark script can be found [here](benchmarks/benchmarks.sh).
 
 It runs the `SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi.csv GROUP BY passenger_count` query against the well-known NYC Yellow Taxi Trip Dataset. Specifically, the CSV file from April 2021 is used. It's a 200MB CSV file with ~2 million rows, 18 columns, and mostly numerical values.
 
-| Command | Version |        Mean [s] | Min [s] | Max [s] |       Relative |
-|:---|--------:|----------------:|---:|---:|---------------:|
-| `octosql "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi.csv GROUP BY passenger_count"` |   0.5.0 |   2.782 ± 0.006 |    2.768 | 2.789 |           1.00 |
-| `q -d ',' -H "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi.csv GROUP BY passenger_count"` |   3.1.6 |  15.928 ± 0.034 |         15.882 | 15.992 |           5.72 |
-| `q -d ',' -H -C readwrite "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi.csv GROUP BY passenger_count"` |   3.1.6 |   1.565 ± 0.003 |           1.559 | 1.570 |           0.56 |
-| `textql -header -sql "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi GROUP BY passenger_count" taxi.csv` |   2.0.3 |  15.289 ± 0.035 |          15.234 | 15.345 |           5.49 |
-| `datafusion-cli -f datafusion_commands.txt` |   0.6.0 |   3.054 ± 0.027 |           3.013 | 3.097 |           1.10 |
-| `dsq taxi.csv "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM {} GROUP BY passenger_count"` |  0.10.0 |  20.071 ± 0.178 |          19.916 | 20.500 |           7.21 |
-| `spyql "SELECT passenger_count, count_agg(*), avg_agg(total_amount) FROM csv GROUP BY passenger_count" < taxi.csv` |   0.5.0 |  11.316 ± 0.065 |          11.227 | 11.453 |           4.06 |
+| Command                                                                                                                 | Version |        Mean [s] |                  Relative |
+|:------------------------------------------------------------------------------------------------------------------------|--------:|----------------:|--------------------------:|
+| `octosql "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi.csv GROUP BY passenger_count"`                  |   0.8.0 |   1.980 ± 0.004 |                      1.00 |
+| `q -d ',' -H "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi.csv GROUP BY passenger_count"`              |   3.1.6 |  16.042 ± 0.058 |                      8.10 |
+| `q -d ',' -H -C readwrite "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi.csv GROUP BY passenger_count"` |   3.1.6 |   1.691 ± 0.129 |                      0.85 |
+| `textql -header -sql "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM taxi GROUP BY passenger_count" taxi.csv` |   2.0.3 |  15.513 ± 0.047 |                      7.83 |
+| `datafusion-cli -f datafusion_commands.txt`                                                                             |   0.9.0 |   0.432 ± 0.002 |                      0.22 |
+| `dsq taxi.csv "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM {} GROUP BY passenger_count"`                   |  0.21.0 |  20.756 ± 0.272 |                      10.48 |
+| `dsq --cache taxi.csv "SELECT passenger_count, COUNT(*), AVG(total_amount) FROM {} GROUP BY passenger_count"`           |  0.21.0 |  0.879 ± 0.022 |                      0.44 |
+| `spyql "SELECT passenger_count, count_agg(*), avg_agg(total_amount) FROM csv GROUP BY passenger_count" < taxi.csv`      |   0.6.0 |  11.430 ± 0.099 |                      5.77 |
 
 Here we can see that OctoSQL is fairly good performance wise.
 
-q with caching beats OctoSQL by a factor of 2, but that's because caching means data loading from CSV is omitted, and the optimized SQLite format is used directly.
+q and dsq with caching beat OctoSQL, but that's because caching means data loading from CSV is omitted, and the optimized SQLite format is used directly, so the CSV parsing bit is not really benchmarked for them.
 
 Non-cached q and textql, dsq are considerably slower, most probably because they have to parse the whole CSV file to put it into SQLite and only then query it. OctoSQL runs queries directly on the CSV file, so it's able to use its optimizer to avoid loading columns which aren't used in the query.
 
-DataFusion is around the same performance as OctoSQL for this query. This doesn't reveal though what is apparent when using the datafusion-cli REPL, which is that DataFusion spends 2.7 seconds analyzing and inferring the schema, and then queries only take 0.3 seconds each. Which means that running repeat queries in DataFusion is ridiculously fast in comparison to all other tools.
+DataFusion is faster than OctoSQL for CSV queries like this one.
 
 ## Contributing
 

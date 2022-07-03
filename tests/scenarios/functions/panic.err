@@ -17,7 +17,7 @@ Flags:
       --explain int      Describe query output schema.
   -h, --help             help for octosql
       --optimize         Whether OctoSQL should optimize the query. (default true)
-      --output string    Output format to use. Available options are live_table, batch_table, csv, json and stream_native. (default "live_table")
+  -o, --output string    Output format to use. Available options are live_table, batch_table, csv, json and stream_native. (default "live_table")
       --profile string   Enable profiling of the given type: cpu, memory, trace.
   -v, --version          version for octosql
 

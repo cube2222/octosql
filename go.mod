@@ -8,7 +8,7 @@ require (
 	github.com/c-bata/go-prompt v0.2.6
 	github.com/dgraph-io/ristretto v0.0.3
 	github.com/golang/protobuf v1.5.2
-	github.com/google/btree v1.0.0
+	github.com/google/btree v1.1.2
 	github.com/gosuri/uilive v0.0.4
 	github.com/jackc/pgx v3.6.2+incompatible
 	github.com/kr/text v0.2.0

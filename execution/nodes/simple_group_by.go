@@ -33,7 +33,9 @@ func NewSimpleGroupBy(
 }
 
 func (g *SimpleGroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
-	aggregates := btree.New(BTreeDefaultDegree)
+	aggregates := btree.NewG[*aggregatesItem](BTreeDefaultDegree, func(a, b *aggregatesItem) bool {
+		return CompareValueSlices(a.GroupKey, b.GroupKey)
+	})
 
 	if err := g.source.Run(ctx, func(produceCtx ProduceContext, record Record) error {
 		ctx := ctx.WithRecord(record)
@@ -48,10 +50,9 @@ func (g *SimpleGroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend Me
 		}
 
 		{
-			item := aggregates.Get(key)
-			var itemTyped *aggregatesItem
+			itemTyped, ok := aggregates.Get(&aggregatesItem{GroupKey: key})
 
-			if item == nil {
+			if !ok {
 				newAggregates := make([]Aggregate, len(g.aggregatePrototypes))
 				for i := range g.aggregatePrototypes {
 					newAggregates[i] = g.aggregatePrototypes[i]()
@@ -59,13 +60,6 @@ func (g *SimpleGroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend Me
 
 				itemTyped = &aggregatesItem{GroupKey: key, Aggregates: newAggregates, AggregatedSetSize: make([]int, len(g.aggregatePrototypes))}
 				aggregates.ReplaceOrInsert(itemTyped)
-			} else {
-				var ok bool
-				itemTyped, ok = item.(*aggregatesItem)
-				if !ok {
-					// TODO: Check performance cost of those panics.
-					panic(fmt.Sprintf("invalid aggregates item: %v", item))
-				}
 			}
 
 			if !record.Retraction {
@@ -102,11 +96,7 @@ func (g *SimpleGroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend Me
 	}
 
 	var err error
-	aggregates.Ascend(func(item btree.Item) bool {
-		itemTyped, ok := item.(*aggregatesItem)
-		if !ok {
-			panic(fmt.Sprintf("invalid received item: %v", item))
-		}
+	aggregates.Ascend(func(itemTyped *aggregatesItem) bool {
 		key := itemTyped.GroupKey
 
 		outputValues := make([]octosql.Value, len(key)+len(g.aggregateExprs))

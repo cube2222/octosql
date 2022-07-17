@@ -1,2 +1,2 @@
-{"simple.field1":"value","simple.field2":42,"simple.field3":{"field4":"eulav","field5":24,"field6":null},"simple.field7":[42,43,{"field8":"value8"}]}
-{"simple.field1":"value","simple.field2":42,"simple.field3":{"field4":null,"field5":"eulav","field6":"value"},"simple.field7":null}
+{"field1":"value","field2":42,"field3":{"field4":"eulav","field5":24,"field6":null},"field7":[42,43,{"field8":"value8"}]}
+{"field1":"value","field2":42,"field3":{"field4":null,"field5":"eulav","field6":"value"},"field7":null}

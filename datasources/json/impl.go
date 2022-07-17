@@ -4,21 +4,21 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"os"
 	"sort"
 	"time"
 
 	"github.com/valyala/fastjson"
 
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/execution/files"
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
 
 func Creator(name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error) {
-	f, err := os.Open(name)
+	f, err := files.OpenLocalFile(context.Background(), name, files.WithPreview())
 	if err != nil {
-		return nil, physical.Schema{}, fmt.Errorf("couldn't open file: %w", err)
+		return nil, physical.Schema{}, fmt.Errorf("couldn't open local file: %w", err)
 	}
 	defer f.Close()
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/nxadm/tail"
@@ -73,10 +74,18 @@ func Tail(ctx context.Context, path string) (io.ReadCloser, error) {
 }
 
 type openFileOptions struct {
-	tail bool
+	tail    bool
+	preview bool
 }
 
 type OpenFileOption func(*openFileOptions)
+
+// WithPreview means we're opening to preview the file, but we'll still need that portion later, when opening it again.
+func WithPreview() OpenFileOption {
+	return func(options *openFileOptions) {
+		options.preview = true
+	}
+}
 
 func WithTail(tail bool) OpenFileOption {
 	return func(options *openFileOptions) {
@@ -92,7 +101,13 @@ func OpenLocalFile(ctx context.Context, path string, opts ...OpenFileOption) (io
 		opt(openFileOpts)
 	}
 
-	if !openFileOpts.tail {
+	if path == "stdin" || strings.HasPrefix(path, "stdin.") {
+		f, err := openStdin(openFileOpts.preview)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't open stdin: %w", err)
+		}
+		return io.NopCloser(f), nil
+	} else if !openFileOpts.tail {
 		f, err := os.Open(path)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't open file: %w", err)

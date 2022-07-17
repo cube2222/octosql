@@ -1,7 +1,6 @@
 package csv
 
 import (
-	"bufio"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -21,6 +20,7 @@ type DatasourceExecuting struct {
 	fields         []physical.SchemaField
 	fileFieldNames []string
 	header         bool
+	separator      rune
 }
 
 func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
@@ -35,8 +35,8 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 		usedColumns[d.fields[i].Name] = true
 	}
 
-	decoder := csv.NewReader(bufio.NewReaderSize(f, 4096*1024))
-	decoder.Comma = ','
+	decoder := csv.NewReader(f)
+	decoder.Comma = d.separator
 	decoder.ReuseRecord = true
 	if d.header {
 		_, err := decoder.Read()
@@ -52,7 +52,6 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 		}
 	}
 
-	// TODO: Fix CSV with limited schema pushed down.
 	for {
 		row, err := decoder.Read()
 		if err == io.EOF {

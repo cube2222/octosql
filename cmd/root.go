@@ -192,9 +192,10 @@ octosql "SELECT * FROM plugins.plugins"`,
 			return fmt.Errorf("couldn't get file extension handlers: %w", err)
 		}
 		fileHandlers := map[string]func(name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error){
-			"csv":     csv.Creator,
+			"csv":     csv.Creator(','),
 			"json":    json.Creator,
 			"parquet": parquet.Creator,
+			"tsv":     csv.Creator('\t'),
 		}
 		for ext, pluginName := range fileExtensionHandlers {
 			fileHandlers[ext] = func(name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error) {

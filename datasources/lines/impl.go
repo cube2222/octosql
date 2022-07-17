@@ -3,11 +3,9 @@ package lines
 import (
 	"context"
 	"fmt"
-	"os"
-
-	"github.com/pkg/errors"
 
 	"github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/execution/files"
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
@@ -24,13 +22,11 @@ func (d *Database) ListTables(ctx context.Context) ([]string, error) {
 }
 
 func (d *Database) GetTable(ctx context.Context, name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error) {
-	info, err := os.Stat(name)
+	f, err := files.OpenLocalFile(context.Background(), name, files.WithPreview())
 	if err != nil {
-		return nil, physical.Schema{}, errors.Wrap(err, "couldn't check if file exists")
+		return nil, physical.Schema{}, fmt.Errorf("couldn't open local file: %w", err)
 	}
-	if info.IsDir() {
-		return nil, physical.Schema{}, fmt.Errorf("%s is a directory", name)
-	}
+	f.Close()
 
 	separator := "\n"
 	if sep, ok := options["sep"]; ok {

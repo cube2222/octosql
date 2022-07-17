@@ -162,9 +162,6 @@ octosql "SELECT * FROM plugins.plugins"`,
 		databases["docs"] = func() (physical.Database, error) {
 			return docs.Creator(ctx)
 		}
-		databases["lines"] = func() (physical.Database, error) {
-			return lines.Creator(ctx)
-		}
 
 		for _, metadata := range installedPlugins {
 			if _, ok := databases[metadata.Reference.Name]; ok {
@@ -194,6 +191,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 		fileHandlers := map[string]func(name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error){
 			"csv":     csv.Creator(','),
 			"json":    json.Creator,
+			"lines":   lines.Creator,
 			"parquet": parquet.Creator,
 			"tsv":     csv.Creator('\t'),
 		}
@@ -204,6 +202,16 @@ octosql "SELECT * FROM plugins.plugins"`,
 					return nil, physical.Schema{}, fmt.Errorf("couldn't get plugin %s database for plugin extensions %s: %w", pluginName, ext, err)
 				}
 				return db.GetTable(ctx, name, options)
+			}
+		}
+		for name := range fileHandlers {
+			curHandler := fileHandlers[name]
+			if _, ok := databases[name]; !ok {
+				databases[name] = func() (physical.Database, error) {
+					return &fileTypeDatabaseCreator{
+						creator: curHandler,
+					}, nil
+				}
 			}
 		}
 
@@ -498,4 +506,16 @@ func typecheckExpr(ctx context.Context, expr logical.Expression, env physical.En
 		logicalEnv,
 	)
 	return physicalExpr, nil
+}
+
+type fileTypeDatabaseCreator struct {
+	creator func(name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error)
+}
+
+func (f *fileTypeDatabaseCreator) ListTables(ctx context.Context) ([]string, error) {
+	return nil, nil
+}
+
+func (f *fileTypeDatabaseCreator) GetTable(ctx context.Context, name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error) {
+	return f.creator(name, options)
 }

@@ -24,9 +24,10 @@ func NewTableFormatter(w io.Writer) *TableFormatter {
 }
 
 func (t *TableFormatter) SetSchema(schema physical.Schema) {
-	header := make([]string, len(schema.Fields))
-	for i := range schema.Fields {
-		header[i] = schema.Fields[i].Name
+	fields := withoutQualifiers(schema.Fields)
+	header := make([]string, len(fields))
+	for i := range fields {
+		header[i] = fields[i].Name
 	}
 	t.table.SetHeader(header)
 	t.table.SetAutoFormatHeaders(false)

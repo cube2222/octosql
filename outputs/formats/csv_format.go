@@ -23,11 +23,11 @@ func NewCSVFormatter(w io.Writer) *CSVFormatter {
 }
 
 func (t *CSVFormatter) SetSchema(schema physical.Schema) {
-	t.fields = schema.Fields
+	t.fields = withoutQualifiers(schema.Fields)
 
-	header := make([]string, len(schema.Fields))
-	for i := range schema.Fields {
-		header[i] = schema.Fields[i].Name
+	header := make([]string, len(t.fields))
+	for i := range t.fields {
+		header[i] = t.fields[i].Name
 	}
 	t.writer.Write(header)
 }

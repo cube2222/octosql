@@ -291,7 +291,11 @@ octosql "SELECT * FROM plugins.plugins"`,
 				physicalPlan.Schema.Fields[i].Name = reverseMapping[physicalPlan.Schema.Fields[i].Name]
 			}
 			executionPlan = &DescribeNode{
-				Schema: physicalPlan.Schema,
+				Schema: physical.Schema{
+					Fields:        formats.WithoutQualifiers(physicalPlan.Schema.Fields),
+					TimeField:     physicalPlan.Schema.TimeField,
+					NoRetractions: physicalPlan.Schema.NoRetractions,
+				},
 			}
 			outSchema = DescribeNodeSchema
 		} else {

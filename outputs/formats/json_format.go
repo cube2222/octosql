@@ -28,7 +28,7 @@ func NewJSONFormatter(w io.Writer) *JSONFormatter {
 }
 
 func (t *JSONFormatter) SetSchema(schema physical.Schema) {
-	t.fields = withoutQualifiers(schema.Fields)
+	t.fields = WithoutQualifiers(schema.Fields)
 }
 
 func (t *JSONFormatter) Write(values []octosql.Value) error {

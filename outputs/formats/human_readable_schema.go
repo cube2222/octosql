@@ -6,7 +6,7 @@ import (
 	"github.com/cube2222/octosql/physical"
 )
 
-func withoutQualifiers(fields []physical.SchemaField) []physical.SchemaField {
+func WithoutQualifiers(fields []physical.SchemaField) []physical.SchemaField {
 	shortName := func(name string) string {
 		if strings.Contains(name, ".") {
 			name = strings.SplitN(name, ".", 2)[1]

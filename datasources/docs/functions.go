@@ -3,7 +3,6 @@ package docs
 import (
 	"context"
 	"fmt"
-	"sort"
 	"time"
 
 	. "github.com/cube2222/octosql/execution"
@@ -30,27 +29,24 @@ type functionsExecuting struct {
 }
 
 func (d *functionsExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
-	fs := functions.FunctionMap()
+	fs := sortedMapNameAndDetails(functions.FunctionMap())
 
 	output := make([][]octosql.Value, 0)
-	for name, details := range fs {
-		if details.Description == "" {
+	for _, f := range fs {
+		if f.Details.Description == "" {
 			continue
 		}
 		row := make([]octosql.Value, len(d.fields))
 		for i, field := range d.fields {
 			switch field.Name {
 			case "name":
-				row[i] = octosql.NewString(name)
+				row[i] = octosql.NewString(f.Name)
 			case "description":
-				row[i] = octosql.NewString(details.Description)
+				row[i] = octosql.NewString(f.Details.Description)
 			}
 		}
 		output = append(output, row)
 	}
-	sort.Slice(output, func(i, j int) bool {
-		return output[i][0].Str < output[j][0].Str
-	})
 
 	for i := range output {
 		if err := produce(

@@ -3,7 +3,6 @@ package docs
 import (
 	"context"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/cube2222/octosql/aggregates"
@@ -30,19 +29,19 @@ type aggregateSignaturesExecuting struct {
 }
 
 func (d *aggregateSignaturesExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
-	fs := aggregates.Aggregates
+	fs := sortedMapNameAndDetails(aggregates.Aggregates)
 
 	output := make([][]octosql.Value, 0)
-	for name, details := range fs {
-		if details.Description == "" {
+	for _, f := range fs {
+		if f.Details.Description == "" {
 			continue
 		}
-		for _, descriptor := range details.Descriptors {
+		for _, descriptor := range f.Details.Descriptors {
 			row := make([]octosql.Value, len(d.fields))
 			for i, field := range d.fields {
 				switch field.Name {
 				case "name":
-					row[i] = octosql.NewString(name)
+					row[i] = octosql.NewString(f.Name)
 				case "argument_type":
 					row[i] = octosql.NewString(descriptor.ArgumentType.String())
 				case "output_type":
@@ -54,9 +53,6 @@ func (d *aggregateSignaturesExecuting) Run(ctx ExecutionContext, produce Produce
 			output = append(output, row)
 		}
 	}
-	sort.Slice(output, func(i, j int) bool {
-		return octosql.NewList(output[i]).Compare(octosql.NewList(output[j])) == -1
-	})
 
 	for i := range output {
 		if err := produce(

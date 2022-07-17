@@ -3,7 +3,6 @@ package docs
 import (
 	"context"
 	"fmt"
-	"sort"
 	"time"
 
 	. "github.com/cube2222/octosql/execution"
@@ -30,14 +29,14 @@ type functionSignaturesExecuting struct {
 }
 
 func (d *functionSignaturesExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
-	fs := functions.FunctionMap()
+	fs := sortedMapNameAndDetails(functions.FunctionMap())
 
 	output := make([][]octosql.Value, 0)
-	for name, details := range fs {
-		if details.Description == "" {
+	for _, f := range fs {
+		if f.Details.Description == "" {
 			continue
 		}
-		for _, descriptor := range details.Descriptors {
+		for _, descriptor := range f.Details.Descriptors {
 			parts := make([]octosql.Value, len(descriptor.ArgumentTypes))
 			for i := range descriptor.ArgumentTypes {
 				parts[i] = octosql.NewString(descriptor.ArgumentTypes[i].String())
@@ -46,7 +45,7 @@ func (d *functionSignaturesExecuting) Run(ctx ExecutionContext, produce ProduceF
 			for i, field := range d.fields {
 				switch field.Name {
 				case "name":
-					row[i] = octosql.NewString(name)
+					row[i] = octosql.NewString(f.Name)
 				case "argument_types":
 					row[i] = octosql.NewList(parts)
 				case "output_type":
@@ -60,9 +59,6 @@ func (d *functionSignaturesExecuting) Run(ctx ExecutionContext, produce ProduceF
 			output = append(output, row)
 		}
 	}
-	sort.Slice(output, func(i, j int) bool {
-		return octosql.NewList(output[i]).Compare(octosql.NewList(output[j])) == -1
-	})
 
 	for i := range output {
 		if err := produce(

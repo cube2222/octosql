@@ -3,8 +3,6 @@ package json
 import (
 	"bufio"
 	"fmt"
-	"io"
-	"os"
 	"time"
 
 	"github.com/valyala/fastjson"
@@ -22,24 +20,13 @@ type DatasourceExecuting struct {
 }
 
 func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
-	var reader io.Reader
-	if !d.tail {
-		f, err := os.Open(d.path)
-		if err != nil {
-			return fmt.Errorf("couldn't open file: %w", err)
-		}
-		defer f.Close()
-		reader = bufio.NewReaderSize(f, 4096*1024)
-	} else {
-		r, err := files.Tail(ctx, d.path)
-		if err != nil {
-			return fmt.Errorf("couldn't tail file: %w", err)
-		}
-		defer r.Close()
-		reader = r
+	f, err := files.OpenLocalFile(ctx, d.path, files.WithTail(d.tail))
+	if err != nil {
+		return fmt.Errorf("couldn't open local file: %w", err)
 	}
+	defer f.Close()
 
-	sc := bufio.NewScanner(reader)
+	sc := bufio.NewScanner(f)
 	sc.Buffer(nil, 1024*1024)
 
 	var p fastjson.Parser

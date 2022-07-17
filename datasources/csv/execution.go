@@ -5,13 +5,13 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"time"
 
 	"github.com/valyala/fastjson/fastfloat"
 
 	. "github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/execution/files"
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
@@ -24,9 +24,9 @@ type DatasourceExecuting struct {
 }
 
 func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
-	f, err := os.Open(d.path)
+	f, err := files.OpenLocalFile(ctx, d.path)
 	if err != nil {
-		return fmt.Errorf("couldn't open file: %w", err)
+		return fmt.Errorf("couldn't open local file: %w", err)
 	}
 	defer f.Close()
 

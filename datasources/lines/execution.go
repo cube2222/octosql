@@ -4,10 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"os"
 	"time"
 
 	. "github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/execution/files"
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
@@ -15,14 +15,16 @@ import (
 type DatasourceExecuting struct {
 	path, separator string
 	fields          []physical.SchemaField
+	tail            bool
 }
 
 func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
-	f, err := os.Open(d.path)
+	f, err := files.OpenLocalFile(ctx, d.path, files.WithTail(d.tail))
 	if err != nil {
-		return fmt.Errorf("couldn't open file: %w", err)
+		return fmt.Errorf("couldn't open local file: %w", err)
 	}
 	defer f.Close()
+
 	sc := bufio.NewScanner(f)
 	if d.separator != "\n" {
 		// Mostly copied from bufio.ScanLines.

@@ -1,9 +1,11 @@
 package files
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"sync"
 
 	"github.com/nxadm/tail"
@@ -68,4 +70,42 @@ func Tail(ctx context.Context, path string) (io.ReadCloser, error) {
 			return nil
 		},
 	}, nil
+}
+
+type openFileOptions struct {
+	tail bool
+}
+
+type OpenFileOption func(*openFileOptions)
+
+func WithTail(tail bool) OpenFileOption {
+	return func(options *openFileOptions) {
+		options.tail = tail
+	}
+}
+
+func OpenLocalFile(ctx context.Context, path string, opts ...OpenFileOption) (io.ReadCloser, error) {
+	openFileOpts := &openFileOptions{
+		tail: false,
+	}
+	for _, opt := range opts {
+		opt(openFileOpts)
+	}
+
+	if !openFileOpts.tail {
+		f, err := os.Open(path)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't open file: %w", err)
+		}
+		return &customCloser{
+			Reader: bufio.NewReaderSize(f, 4096*1024),
+			close:  f.Close,
+		}, nil
+	} else {
+		r, err := Tail(ctx, path)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't tail file: %w", err)
+		}
+		return r, nil
+	}
 }

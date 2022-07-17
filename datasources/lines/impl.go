@@ -40,6 +40,7 @@ func (d *Database) GetTable(ctx context.Context, name string, options map[string
 	return &impl{
 			path:      name,
 			separator: separator,
+			tail:      options["tail"] == "true",
 		},
 		physical.NewSchema(
 			[]physical.SchemaField{
@@ -60,6 +61,7 @@ func (d *Database) GetTable(ctx context.Context, name string, options map[string
 
 type impl struct {
 	path, separator string
+	tail            bool
 }
 
 func (i *impl) Materialize(ctx context.Context, env physical.Environment, schema physical.Schema, pushedDownPredicates []physical.Expression) (execution.Node, error) {
@@ -67,6 +69,7 @@ func (i *impl) Materialize(ctx context.Context, env physical.Environment, schema
 		path:      i.path,
 		fields:    schema.Fields,
 		separator: i.separator,
+		tail:      i.tail,
 	}, nil
 }
 

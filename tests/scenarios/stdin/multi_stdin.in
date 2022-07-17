@@ -1,0 +1,1 @@
+echo '{"hello": "world"}' | octosql "SELECT * FROM stdin.json, stdin.json"

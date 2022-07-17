@@ -27,7 +27,7 @@ octosql "SELECT customer_id, SUM(amount)
          GROUP BY customer_id"
 ```
 
-OctoSQL supports JSON, CSV and Parquet files out of the box, but you can additionally install plugins to add support for other databases.
+OctoSQL supports a [bunch of file formats](#File-Access) out of the box, but you can additionally install plugins to add support for other databases.
 ```bash
 octosql "SELECT * FROM plugins.available_plugins"
 octosql plugin install postgres
@@ -73,9 +73,54 @@ You can also download the binary for your operating system directly from the [Re
 go install -u github.com/cube2222/octosql
 ```
 
+## File Access
+
+Support for multiple file types is included by default in OctoSQL:
+- JSON (in JSONLines format, one object per line)
+- CSV
+- TSV
+- Parquet
+- Lines (reading a file line by line)
+
+If your file has a matching extension, you can use its path directly as a table:
+```
+~> octosql "SELECT * FROM my/file/path.json"
+```
+or, if the extension is not right, you can use this alternative notation, where the extension is used in place of the database name:
+```
+~> octosql "SELECT * FROM `json.my/file/path.whatever`"
+```
+
+You can also specify additional options using the following notation: `myfile.ext?key=value&key2=value2`
+
+The following options are available:
+- CSV
+  - header: true/false (default: true) - Whether the file has a header row.
+- JSON
+  - tail: true/false (default: false) - Whether to keep waiting for new content after reaching the end of the file.
+- Lines
+  - tail: true/false (default: false) - Whether to keep waiting for new content after reaching the end of the file.
+
+### Reading from Standard Input
+You can also pipe data in through stdin, and OctoSQL will expose it as the stdin.<file_type> table. For example:
+```
+~> echo '{"hello": "world"}' | octosql "SELECT * FROM stdin.json"
++---------+
+|  hello  |
++---------+
+| 'world' |
++---------+
+~> seq 100 | octosql "SELECT SUM(int(text)) FROM stdin.lines"
++------+
+| sum  |
++------+
+| 5050 |
++------+
+```
+
 ## Plugins
 
-Only support for CSV and JSON files is built-in into OctoSQL. To use other databases - like PostgreSQL or MySQL - you need to install a plugin. Installing plugins is very easy. The following command installs the latest version of the PostgreSQL plugin:
+To use databases which are not included in the core of OctoSQL - like PostgreSQL or MySQL - you need to install a plugin. Installing plugins is very easy. The following command installs the latest version of the PostgreSQL plugin:
 ```bash
 octosql plugin install postgres
 ```

@@ -68,6 +68,7 @@ func Creator(name string, options map[string]string) (physical.DatasourceImpleme
 
 	return &impl{
 			path: name,
+			tail: options["tail"] == "true",
 		},
 		physical.NewSchema(schemaFields, -1, physical.WithNoRetractions(true)),
 		nil
@@ -131,11 +132,13 @@ func getOctoSQLType(value *fastjson.Value) octosql.Type {
 
 type impl struct {
 	path string
+	tail bool
 }
 
 func (i *impl) Materialize(ctx context.Context, env physical.Environment, schema physical.Schema, pushedDownPredicates []physical.Expression) (execution.Node, error) {
 	return &DatasourceExecuting{
 		path:   i.path,
+		tail:   i.tail,
 		fields: schema.Fields,
 	}, nil
 }

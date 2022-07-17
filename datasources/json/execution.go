@@ -3,29 +3,43 @@ package json
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
 	"github.com/valyala/fastjson"
 
 	. "github.com/cube2222/octosql/execution"
+	"github.com/cube2222/octosql/execution/files"
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
 
 type DatasourceExecuting struct {
 	path   string
+	tail   bool
 	fields []physical.SchemaField
 }
 
 func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
-	f, err := os.Open(d.path)
-	if err != nil {
-		return fmt.Errorf("couldn't open file: %w", err)
+	var reader io.Reader
+	if !d.tail {
+		f, err := os.Open(d.path)
+		if err != nil {
+			return fmt.Errorf("couldn't open file: %w", err)
+		}
+		defer f.Close()
+		reader = bufio.NewReaderSize(f, 4096*1024)
+	} else {
+		r, err := files.Tail(ctx, d.path)
+		if err != nil {
+			return fmt.Errorf("couldn't tail file: %w", err)
+		}
+		defer r.Close()
+		reader = r
 	}
-	defer f.Close()
 
-	sc := bufio.NewScanner(bufio.NewReaderSize(f, 4096*1024))
+	sc := bufio.NewScanner(reader)
 	sc.Buffer(nil, 1024*1024)
 
 	var p fastjson.Parser

@@ -21,25 +21,27 @@ type Format interface {
 }
 
 type OutputPrinter struct {
-	source               Node
-	keyExprs             []Expression
-	directionMultipliers []int
-	limit                *int
+	source                Node
+	keyExprs              []Expression
+	directionMultipliers  []int
+	limit                 *int
+	noRetractionsPossible bool
 
 	schema physical.Schema
 	format func(io.Writer) Format
 	live   bool
 }
 
-func NewOutputPrinter(source Node, keyExprs []Expression, directionMultipliers []int, limit *int, schema physical.Schema, format func(io.Writer) Format, live bool) *OutputPrinter {
+func NewOutputPrinter(source Node, keyExprs []Expression, directionMultipliers []int, limit *int, noRetractionsPossible bool, schema physical.Schema, format func(io.Writer) Format, live bool) *OutputPrinter {
 	return &OutputPrinter{
-		source:               source,
-		keyExprs:             keyExprs,
-		directionMultipliers: directionMultipliers,
-		limit:                limit,
-		schema:               schema,
-		format:               format,
-		live:                 live,
+		source:                source,
+		keyExprs:              keyExprs,
+		directionMultipliers:  directionMultipliers,
+		limit:                 limit,
+		noRetractionsPossible: noRetractionsPossible,
+		schema:                schema,
+		format:                format,
+		live:                  live,
 	}
 }
 
@@ -77,6 +79,39 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 	watermark := time.Time{}
 	liveWriter := uilive.New()
 	lastUpdate := time.Now()
+
+	onlyZeroEventTimesSeen := true
+
+	printTable := func() {
+		lastUpdate = time.Now()
+		var buf bytes.Buffer
+
+		format := o.format(&buf)
+		format.SetSchema(o.schema)
+
+		i := 0
+		recordCounts.Ascend(func(item btree.Item) bool {
+			itemTyped := item.(*outputItem)
+			for j := 0; j < itemTyped.Count; j++ {
+				if o.limit != nil && i == *o.limit {
+					return false
+				}
+				i++
+
+				format.Write(itemTyped.Values)
+			}
+			return true
+		})
+
+		format.Close()
+
+		if !watermark.IsZero() {
+			fmt.Fprintf(&buf, "watermark: %s\n", watermark.Format(time.RFC3339Nano))
+		}
+
+		buf.WriteTo(liveWriter)
+		liveWriter.Flush()
+	}
 
 	if err := o.source.Run(
 		execCtx,
@@ -119,6 +154,17 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 			} else {
 				recordCounts.Delete(itemTyped)
 			}
+			if onlyZeroEventTimesSeen && !record.EventTime.IsZero() {
+				onlyZeroEventTimesSeen = false
+			}
+			if o.limit != nil && o.noRetractionsPossible && recordCounts.Len() > *o.limit {
+				// This doesn't mean we'll always keep just the records that are needed, because tree nodes might have count > 1.
+				// That said, it's a good approximation, and we'll definitely not lose something that we need to have.
+				recordCounts.DeleteMax()
+			}
+			if o.live && onlyZeroEventTimesSeen && time.Since(lastUpdate) > time.Second/4 && !record.Retraction /*This last bit just makes the output less jittery*/ {
+				printTable()
+			}
 			return nil
 		},
 		func(ctx ProduceContext, msg MetadataMessage) error {
@@ -126,32 +172,7 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 
 			// Print table
 			if o.live && time.Since(lastUpdate) > time.Second/4 {
-				lastUpdate = time.Now()
-				var buf bytes.Buffer
-
-				format := o.format(&buf)
-				format.SetSchema(o.schema)
-
-				i := 0
-				recordCounts.Ascend(func(item btree.Item) bool {
-					itemTyped := item.(*outputItem)
-					for j := 0; j < itemTyped.Count; j++ {
-						if o.limit != nil && i == *o.limit {
-							return false
-						}
-						i++
-
-						format.Write(itemTyped.Values)
-					}
-					return true
-				})
-
-				format.Close()
-
-				fmt.Fprintf(&buf, "watermark: %s\n", watermark.Format(time.RFC3339Nano))
-
-				buf.WriteTo(liveWriter)
-				liveWriter.Flush()
+				printTable()
 			}
 			return nil
 		},

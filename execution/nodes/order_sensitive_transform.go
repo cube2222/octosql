@@ -15,14 +15,16 @@ type OrderSensitiveTransform struct {
 	orderByKeyExprs             []Expression
 	orderByDirectionMultipliers []int
 	limit                       *Expression
+	noRetractionsPossible       bool
 }
 
-func NewOrderSensitiveTransform(source Node, orderByKeyExprs []Expression, orderByDirectionMultipliers []int, limit *Expression) *OrderSensitiveTransform {
+func NewOrderSensitiveTransform(source Node, orderByKeyExprs []Expression, orderByDirectionMultipliers []int, limit *Expression, noRetractionsPossible bool) *OrderSensitiveTransform {
 	return &OrderSensitiveTransform{
 		source:                      source,
 		orderByKeyExprs:             orderByKeyExprs,
 		orderByDirectionMultipliers: orderByDirectionMultipliers,
 		limit:                       limit,
+		noRetractionsPossible:       noRetractionsPossible,
 	}
 }
 
@@ -109,6 +111,11 @@ func (o *OrderSensitiveTransform) Run(execCtx ExecutionContext, produce ProduceF
 				recordCounts.ReplaceOrInsert(itemTyped)
 			} else {
 				recordCounts.Delete(itemTyped)
+			}
+			if limit != nil && o.noRetractionsPossible && recordCounts.Len() > *limit {
+				// This doesn't mean we'll always keep just the records that are needed, because tree nodes might have count > 1.
+				// That said, it's a good approximation, and we'll definitely not lose something that we need to have.
+				recordCounts.DeleteMax()
 			}
 			return nil
 		},

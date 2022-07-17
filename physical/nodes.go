@@ -478,7 +478,7 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (execution.N
 		}
 
 		if len(orderByKeyExprs) > 0 || (limit != nil && !node.OrderSensitiveTransform.Source.Schema.NoRetractions) {
-			return nodes.NewOrderSensitiveTransform(source, orderByKeyExprs, node.OrderSensitiveTransform.OrderByDirectionMultipliers, limit), nil
+			return nodes.NewOrderSensitiveTransform(source, orderByKeyExprs, node.OrderSensitiveTransform.OrderByDirectionMultipliers, limit, node.OrderSensitiveTransform.Source.Schema.NoRetractions), nil
 		}
 
 		if limit != nil {

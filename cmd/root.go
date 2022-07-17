@@ -371,12 +371,17 @@ octosql "SELECT * FROM plugins.plugins"`,
 			if limitExpression != nil {
 				val, err := (*limitExpression).Evaluate(execCtx)
 				if err != nil {
-
+					return fmt.Errorf("couldn't evaluate limit expression: %w", err)
 				}
 				if val.Int < 0 {
 					return fmt.Errorf("limit must be positive, got %d", val.Int)
 				}
 				limit = &val.Int
+
+				if len(orderByExpressions) == 0 && physicalPlan.Schema.NoRetractions {
+					// We want short-circuiting.
+					executionPlan = nodes.NewLimit(executionPlan, *limitExpression)
+				}
 			}
 
 			sink = batch.NewOutputPrinter(
@@ -384,6 +389,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 				orderByExpressions,
 				logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
 				limit,
+				physicalPlan.Schema.NoRetractions,
 				outSchema,
 				func(writer io.Writer) batch.Format {
 					return formats.NewTableFormatter(writer)
@@ -392,7 +398,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 			)
 		case "csv", "json":
 			if len(orderByExpressions) > 0 || (limitExpression != nil && !physicalPlan.Schema.NoRetractions) {
-				executionPlan = nodes.NewOrderSensitiveTransform(executionPlan, orderByExpressions, logical.DirectionsToMultipliers(outputOptions.OrderByDirections), limitExpression)
+				executionPlan = nodes.NewOrderSensitiveTransform(executionPlan, orderByExpressions, logical.DirectionsToMultipliers(outputOptions.OrderByDirections), limitExpression, physicalPlan.Schema.NoRetractions)
 			} else if limitExpression != nil {
 				executionPlan = nodes.NewLimit(executionPlan, *limitExpression)
 			}
@@ -417,7 +423,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 
 		case "stream_native":
 			if len(orderByExpressions) > 0 || (limitExpression != nil && !physicalPlan.Schema.NoRetractions) {
-				executionPlan = nodes.NewOrderSensitiveTransform(executionPlan, orderByExpressions, logical.DirectionsToMultipliers(outputOptions.OrderByDirections), limitExpression)
+				executionPlan = nodes.NewOrderSensitiveTransform(executionPlan, orderByExpressions, logical.DirectionsToMultipliers(outputOptions.OrderByDirections), limitExpression, physicalPlan.Schema.NoRetractions)
 			} else if limitExpression != nil {
 				executionPlan = nodes.NewLimit(executionPlan, *limitExpression)
 			}

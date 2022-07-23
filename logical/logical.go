@@ -3,6 +3,7 @@ package logical
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/cube2222/octosql/execution"
@@ -205,6 +206,9 @@ func (v *Variable) Typecheck(ctx context.Context, env physical.Environment, logi
 }
 
 func (v *Variable) FieldName() string {
+	if dotIndex := strings.Index(v.name, "."); dotIndex != -1 {
+		return v.name[dotIndex+1:]
+	}
 	return v.name
 }
 

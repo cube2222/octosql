@@ -772,7 +772,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 			},
 		},
 		"len": {
-			Description: "Returns the length of the string.",
+			Description: "Returns the length of the collection: string, list, object or tuple.",
 			Descriptors: []physical.FunctionDescriptor{
 				{
 					ArgumentTypes: []octosql.Type{octosql.String},
@@ -780,6 +780,51 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					Strict:        true,
 					Function: func(values []octosql.Value) (octosql.Value, error) {
 						return octosql.NewInt(len(values[0].Str)), nil
+					},
+				},
+				{
+					TypeFn: func(types []octosql.Type) (octosql.Type, bool) {
+						if len(types) != 1 {
+							return octosql.Type{}, false
+						}
+						if types[0].TypeID != octosql.TypeIDList {
+							return octosql.Type{}, false
+						}
+						return octosql.Int, true
+					},
+					Strict: true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						return octosql.NewInt(len(values[0].List)), nil
+					},
+				},
+				{
+					TypeFn: func(types []octosql.Type) (octosql.Type, bool) {
+						if len(types) != 1 {
+							return octosql.Type{}, false
+						}
+						if types[0].TypeID != octosql.TypeIDStruct {
+							return octosql.Type{}, false
+						}
+						return octosql.Int, true
+					},
+					Strict: true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						return octosql.NewInt(len(values[0].Struct)), nil
+					},
+				},
+				{
+					TypeFn: func(types []octosql.Type) (octosql.Type, bool) {
+						if len(types) != 1 {
+							return octosql.Type{}, false
+						}
+						if types[0].TypeID != octosql.TypeIDTuple {
+							return octosql.Type{}, false
+						}
+						return octosql.Int, true
+					},
+					Strict: true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						return octosql.NewInt(len(values[0].Tuple)), nil
 					},
 				},
 			},

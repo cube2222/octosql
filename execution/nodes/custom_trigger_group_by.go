@@ -32,10 +32,8 @@ func NewCustomTriggerGroupBy(
 		aggregateExprs:      aggregateExprs,
 		keyExprs:            keyExprs,
 		keyEventTimeIndex:   keyEventTimeIndex,
-		source: &EventTimeBuffer{
-			source: source,
-		},
-		triggerPrototype: triggerPrototype,
+		source:              NewEventTimeBuffer(source),
+		triggerPrototype:    triggerPrototype,
 	}
 }
 

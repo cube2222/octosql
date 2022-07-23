@@ -106,7 +106,7 @@ func OpenLocalFile(ctx context.Context, path string, opts ...OpenFileOption) (io
 		if err != nil {
 			return nil, fmt.Errorf("couldn't open stdin: %w", err)
 		}
-		return io.NopCloser(f), nil
+		return f, nil
 	} else if !openFileOpts.tail {
 		f, err := os.Open(path)
 		if err != nil {

@@ -12,6 +12,7 @@ import (
 var previewedBuffer = &bytes.Buffer{}
 var previewedBufferMutex sync.Mutex
 var alreadyOpenedNoPreview int64
+var concurrentReaders int64
 
 type stdinPreviewingReader struct {
 }
@@ -24,11 +25,24 @@ func (r *stdinPreviewingReader) Read(p []byte) (n int, err error) {
 	return
 }
 
-func openStdin(preview bool) (io.Reader, error) {
+type concurrentReaderDecrementingCloser struct {
+	io.Reader
+}
+
+func (r *concurrentReaderDecrementingCloser) Close() error {
+	atomic.AddInt64(&concurrentReaders, -1)
+	return nil
+}
+
+func openStdin(preview bool) (io.ReadCloser, error) {
+	if atomic.AddInt64(&concurrentReaders, 1) > 1 {
+		return nil, fmt.Errorf("only one simultaneous stdin reader is allowed")
+	}
+
 	if preview {
 		previewedPortionCopy := make([]byte, previewedBuffer.Len())
 		copy(previewedPortionCopy, previewedBuffer.Bytes())
-		return io.MultiReader(bytes.NewReader(previewedPortionCopy), &stdinPreviewingReader{}), nil
+		return &concurrentReaderDecrementingCloser{io.MultiReader(bytes.NewReader(previewedPortionCopy), &stdinPreviewingReader{})}, nil
 	}
 
 	if atomic.AddInt64(&alreadyOpenedNoPreview, 1) > 1 {
@@ -38,5 +52,5 @@ func openStdin(preview bool) (io.Reader, error) {
 	previewedBufferBytes := previewedBuffer.Bytes()
 	previewedBuffer = nil
 
-	return io.MultiReader(bytes.NewReader(previewedBufferBytes), os.Stdin), nil
+	return &concurrentReaderDecrementingCloser{io.MultiReader(bytes.NewReader(previewedBufferBytes), os.Stdin)}, nil
 }

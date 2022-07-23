@@ -741,7 +741,7 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 			return nil, errors.Wrap(err, "couldn't parse type to cast to")
 		}
 
-		return logical.NewCast(arg, targetType), nil
+		return logical.NewTypeCast(arg, targetType), nil
 	case *sqlparser.ObjectFieldAccess:
 		arg, err := ParseExpression(expr.Object)
 		if err != nil {

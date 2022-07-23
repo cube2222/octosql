@@ -377,16 +377,16 @@ func (c *Coalesce) Typecheck(ctx context.Context, env physical.Environment, logi
 	}
 }
 
-type Cast struct {
+type TypeCast struct {
 	arg          Expression
 	targetTypeID octosql.TypeID
 }
 
-func NewCast(arg Expression, targetTypeID octosql.TypeID) *Cast {
-	return &Cast{arg: arg, targetTypeID: targetTypeID}
+func NewTypeCast(arg Expression, targetTypeID octosql.TypeID) *TypeCast {
+	return &TypeCast{arg: arg, targetTypeID: targetTypeID}
 }
 
-func (c *Cast) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
+func (c *TypeCast) Typecheck(ctx context.Context, env physical.Environment, logicalEnv Environment) physical.Expression {
 	expr := c.arg.Typecheck(ctx, env, logicalEnv)
 
 	if expr.Type.TypeID != octosql.TypeIDUnion {
@@ -408,8 +408,8 @@ func (c *Cast) Typecheck(ctx context.Context, env physical.Environment, logicalE
 
 	return physical.Expression{
 		Type:           octosql.TypeSum(targetType, octosql.Null),
-		ExpressionType: physical.ExpressionTypeCast,
-		Cast: &physical.Cast{
+		ExpressionType: physical.ExpressionTypeTypeCast,
+		TypeCast: &physical.TypeCast{
 			Expression:   expr,
 			TargetTypeID: c.targetTypeID,
 		},

@@ -23,7 +23,7 @@ type Expression struct {
 	Coalesce          *Coalesce
 	Tuple             *Tuple
 	TypeAssertion     *TypeAssertion
-	Cast              *Cast
+	TypeCast          *TypeCast
 	ObjectFieldAccess *ObjectFieldAccess
 }
 
@@ -39,7 +39,7 @@ const (
 	ExpressionTypeCoalesce
 	ExpressionTypeTuple
 	ExpressionTypeTypeAssertion
-	ExpressionTypeCast
+	ExpressionTypeTypeCast
 	ExpressionTypeObjectFieldAccess
 )
 
@@ -63,7 +63,7 @@ func (t ExpressionType) String() string {
 		return "tuple"
 	case ExpressionTypeTypeAssertion:
 		return "type_assertion"
-	case ExpressionTypeCast:
+	case ExpressionTypeTypeCast:
 		return "cast"
 	case ExpressionTypeObjectFieldAccess:
 		return "object_field_access"
@@ -111,7 +111,7 @@ type TypeAssertion struct {
 	TargetType octosql.Type
 }
 
-type Cast struct {
+type TypeCast struct {
 	Expression   Expression
 	TargetTypeID octosql.TypeID
 }
@@ -235,13 +235,13 @@ func (expr *Expression) Materialize(ctx context.Context, env Environment) (execu
 		}
 
 		return execution.NewTypeAssertion(expectedTypeIDs, expression, expr.TypeAssertion.TargetType.String()), nil
-	case ExpressionTypeCast:
-		expression, err := expr.Cast.Expression.Materialize(ctx, env)
+	case ExpressionTypeTypeCast:
+		expression, err := expr.TypeCast.Expression.Materialize(ctx, env)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't materialize cast expression: %w", err)
 		}
 
-		return execution.NewCast(expr.Cast.TargetTypeID, expression), nil
+		return execution.NewTypeCast(expr.TypeCast.TargetTypeID, expression), nil
 	case ExpressionTypeObjectFieldAccess:
 		object, err := expr.ObjectFieldAccess.Object.Materialize(ctx, env)
 		if err != nil {
@@ -326,8 +326,8 @@ func (expr Expression) variablesUsed(acc map[string]struct{}) {
 	case ExpressionTypeTypeAssertion:
 		expr.TypeAssertion.Expression.variablesUsed(acc)
 		return
-	case ExpressionTypeCast:
-		expr.Cast.Expression.variablesUsed(acc)
+	case ExpressionTypeTypeCast:
+		expr.TypeCast.Expression.variablesUsed(acc)
 		return
 	}
 

@@ -76,19 +76,19 @@ func (c *TypeAssertion) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 	return value, nil
 }
 
-type Cast struct {
+type TypeCast struct {
 	targetTypeID octosql.TypeID
 	expr         Expression
 }
 
-func NewCast(targetTypeID octosql.TypeID, expr Expression) *Cast {
-	return &Cast{
+func NewTypeCast(targetTypeID octosql.TypeID, expr Expression) *TypeCast {
+	return &TypeCast{
 		targetTypeID: targetTypeID,
 		expr:         expr,
 	}
 }
 
-func (c *Cast) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
+func (c *TypeCast) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 	value, err := c.expr.Evaluate(ctx)
 	if err != nil {
 		return octosql.ZeroValue, fmt.Errorf("couldn't evaluate cast argument: %w", err)

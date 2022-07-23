@@ -225,10 +225,10 @@ func ExplainExpr(expr Expression, withTypeInfo bool) *graph.Node {
 		out.AddField("type", expr.TypeAssertion.TargetType.String())
 		out.AddChild("value", ExplainExpr(expr.TypeAssertion.Expression, withTypeInfo))
 
-	case ExpressionTypeCast:
+	case ExpressionTypeTypeCast:
 		out = graph.NewNode("cast")
-		out.AddField("type", octosql.Type{TypeID: expr.Cast.TargetTypeID}.String())
-		out.AddChild("value", ExplainExpr(expr.Cast.Expression, withTypeInfo))
+		out.AddField("type", octosql.Type{TypeID: expr.TypeCast.TargetTypeID}.String())
+		out.AddChild("value", ExplainExpr(expr.TypeCast.Expression, withTypeInfo))
 
 	case ExpressionTypeObjectFieldAccess:
 		out = graph.NewNode("object field access")

@@ -47,7 +47,7 @@ func Creator(separator rune) func(name string, options map[string]string) (physi
 
 		fields := make([]octosql.Type, len(fieldNames))
 		filled := make([]bool, len(fieldNames))
-		for i := 0; i < 10; i++ {
+		for i := 0; i < 100; i++ {
 			row, err := decoder.Read()
 			if err == io.EOF {
 				break

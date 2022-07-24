@@ -1,1 +1,1 @@
-seq 100 | octosql "SELECT SUM(int(text)) FROM lines.stdin"
+seq 100 | octosql "SELECT SUM(int(text)) FROM lines.stdin" -ojson

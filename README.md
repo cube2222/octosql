@@ -1,4 +1,4 @@
-![OctoSQL](images/octosql.svg)OctoSQL
+<img src="https://raw.githubusercontent.com/cube2222/octosql/main/images/logo.png" width="168">OctoSQL
 =======
 
 OctoSQL is predominantly a CLI tool which lets you query a plethora of databases and file formats using SQL through a unified interface, even do JOINs between them. (Ever needed to join a JSON file with a PostgreSQL table? OctoSQL can help you with that.)

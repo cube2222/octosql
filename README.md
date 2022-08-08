@@ -398,3 +398,7 @@ DataFusion is faster than OctoSQL for CSV queries like this one.
 ## Contributing
 
 OctoSQL doesn't accept external contributions to its source code right now, but you can raise issues or develop external plugins for database types you'd like OctoSQL to support. Create a Pull Request to add a plugin to the core plugins repository (which is contained in the plugin_repository.json file). You can find more details in the [Plugins section](#plugins)
+
+## Building From Source
+
+OctoSQL can be built from source by running `go install` inside of the cloned repository. Go 1.18+ is required.

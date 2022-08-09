@@ -72,8 +72,6 @@ func (c *TypeAssertion) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
 	}
 
 	return octosql.ZeroValue, fmt.Errorf("invalid type: %s, expected: %s", value.TypeID.String(), c.expectedTypeName)
-
-	return value, nil
 }
 
 type TypeCast struct {

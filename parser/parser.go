@@ -747,11 +747,7 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "couldn't parse object")
 		}
-		parts := strings.Split(expr.Field.String(), ".")
-		out := arg
-		for i := range parts {
-			out = logical.NewObjectFieldAccess(out, parts[i])
-		}
+		out := logical.NewObjectFieldAccess(arg, expr.Field.String())
 		return out, nil
 	default:
 		return nil, errors.Errorf("unsupported expression %+v of type %v", expr, reflect.TypeOf(expr))

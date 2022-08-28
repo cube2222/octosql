@@ -83,11 +83,6 @@ func ExplainNode(node Node, withTypeInfo bool) *graph.Node {
 
 		out.AddChild("source", ExplainNode(node.Map.Source, withTypeInfo))
 
-	case NodeTypeRequalifier:
-		out = graph.NewNode("requalifier")
-		out.AddField("new qualifier", node.Requalifier.Qualifier)
-		out.AddChild("source", ExplainNode(node.Requalifier.Source, withTypeInfo))
-
 	case NodeTypeTableValuedFunction:
 		out = graph.NewNode(node.TableValuedFunction.Name)
 		for name, value := range node.TableValuedFunction.Arguments {

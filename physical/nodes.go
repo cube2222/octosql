@@ -22,7 +22,6 @@ type Node struct {
 	LookupJoin              *LookupJoin
 	StreamJoin              *StreamJoin
 	Map                     *Map
-	Requalifier             *Requalifier
 	TableValuedFunction     *TableValuedFunction
 	Unnest                  *Unnest
 	InMemoryRecords         *InMemoryRecords
@@ -72,7 +71,7 @@ const (
 	NodeTypeStreamJoin
 	NodeTypeMap
 	_
-	NodeTypeRequalifier
+	_
 	NodeTypeTableValuedFunction
 	NodeTypeUnnest
 	_
@@ -97,8 +96,6 @@ func (t NodeType) String() string {
 		return "stream_join"
 	case NodeTypeMap:
 		return "map"
-	case NodeTypeRequalifier:
-		return "requalifier"
 	case NodeTypeTableValuedFunction:
 		return "table_valued_function"
 	case NodeTypeUnnest:
@@ -198,11 +195,6 @@ type LookupJoin struct {
 type Map struct {
 	Source      Node
 	Expressions []Expression
-}
-
-type Requalifier struct {
-	Source    Node
-	Qualifier string
 }
 
 type TableValuedFunction struct {
@@ -397,9 +389,6 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (execution.N
 		}
 
 		return nodes.NewMap(source, expressions), nil
-	case NodeTypeRequalifier:
-		return node.Requalifier.Source.Materialize(ctx, env)
-
 	case NodeTypeTableValuedFunction:
 		return node.TableValuedFunction.FunctionDescriptor.Materialize(ctx, env, node.TableValuedFunction.Arguments)
 

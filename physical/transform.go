@@ -117,15 +117,6 @@ func (t *Transformers) TransformNode(node Node) Node {
 				Expressions: expressions,
 			},
 		}
-	case NodeTypeRequalifier:
-		out = Node{
-			Schema:   schema,
-			NodeType: node.NodeType,
-			Requalifier: &Requalifier{
-				Source:    t.TransformNode(node.Requalifier.Source),
-				Qualifier: node.Requalifier.Qualifier,
-			},
-		}
 	case NodeTypeTableValuedFunction:
 		arguments := make(map[string]TableValuedFunctionArgument)
 		for name, arg := range node.TableValuedFunction.Arguments {

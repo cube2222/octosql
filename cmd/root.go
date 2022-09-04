@@ -19,6 +19,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/cube2222/octosql/aggregates"
+	"github.com/cube2222/octosql/codegen"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/datasources/csv"
 	"github.com/cube2222/octosql/datasources/docs"
@@ -334,6 +335,11 @@ octosql "SELECT * FROM plugins.plugins"`,
 				return nil
 			}
 
+			if goCompileExperimental {
+				codegen.CompileAndRun(ctx, physicalPlan)
+				return nil
+			}
+
 			executionPlan, err = physicalPlan.Materialize(
 				ctx,
 				env,
@@ -471,6 +477,7 @@ var explain int
 var optimize bool
 var output string
 var prof string
+var goCompileExperimental bool
 
 func init() {
 	rootCmd.Flags().BoolVar(&describe, "describe", false, "Describe query output schema.")
@@ -478,6 +485,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&optimize, "optimize", true, "Whether OctoSQL should optimize the query.")
 	rootCmd.Flags().StringVarP(&output, "output", "o", "live_table", "Output format to use. Available options are live_table, batch_table, csv, json and stream_native.")
 	rootCmd.Flags().StringVar(&prof, "profile", "", "Enable profiling of the given type: cpu, memory, trace.")
+	rootCmd.Flags().BoolVar(&goCompileExperimental, "gocompile", false, "Use experimental Go query compilation.")
 }
 
 func typecheckNode(ctx context.Context, node logical.Node, env physical.Environment, logicalEnv logical.Environment) (_ physical.Node, _ map[string]string, outErr error) {

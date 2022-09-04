@@ -353,6 +353,18 @@ func FunctionMap() map[string]physical.FunctionDetails {
 				},
 			},
 		},
+		"%": {
+			Descriptors: []physical.FunctionDescriptor{
+				{
+					ArgumentTypes: []octosql.Type{octosql.Int, octosql.Int},
+					OutputType:    octosql.Int,
+					Strict:        true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						return octosql.NewInt(values[0].Int % values[1].Int), nil
+					},
+				},
+			},
+		},
 		// math
 		"abs": {
 			Description: "Returns absolute value of argument.",

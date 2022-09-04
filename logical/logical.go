@@ -368,6 +368,8 @@ func (c *Coalesce) Typecheck(ctx context.Context, env physical.Environment, logi
 		outputType = octosql.TypeSum(outputType, expr.Type)
 	}
 
+	// TODO: If any argument is non-nullable, then it should break the for loop and return the current union type as non-nullable.
+
 	return physical.Expression{
 		Type:           outputType,
 		ExpressionType: physical.ExpressionTypeCoalesce,

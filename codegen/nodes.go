@@ -13,7 +13,7 @@ func (g *CodeGenerator) Node(ctx Context, node physical.Node, produce func(refer
 	case physical.NodeTypeFilter:
 		g.Node(ctx, node.Filter.Source, func(record Record) {
 			predicateValue := g.Expression(ctx.WithRecord(record), node.Filter.Predicate)
-			g.Printfln("if %s {", predicateValue.Reference)
+			g.Printfln("if %s {", predicateValue.AsType(octosql.TypeIDBoolean))
 			produce(record)
 			g.Printfln("}")
 		})
@@ -51,7 +51,7 @@ func (g *CodeGenerator) Node(ctx Context, node physical.Node, produce func(refer
 				case octosql.TypeIDInt:
 					curAggregateType = "lib.AggregateSumInt"
 				default:
-					panic("implement me")
+					panic(fmt.Sprintf("implement me: %s", node.GroupBy.AggregateExpressions[i].Type.TypeID))
 				}
 			default:
 				panic("implement me")
@@ -65,7 +65,7 @@ func (g *CodeGenerator) Node(ctx Context, node physical.Node, produce func(refer
 		g.Node(ctx, node.GroupBy.Source, func(record Record) {
 			keyValues := make([]string, len(node.GroupBy.Key))
 			for i := range node.GroupBy.Key {
-				keyValues[i] = g.Expression(ctx.WithRecord(record), node.GroupBy.Key[i]).Reference
+				keyValues[i] = g.Expression(ctx.WithRecord(record), node.GroupBy.Key[i]).DebugRawReference()
 			}
 			key := fmt.Sprintf("%s{%s}", keyType, strings.Join(keyValues, ", "))
 			aggregateValues := g.Unique("aggregateValues")
@@ -84,7 +84,7 @@ func (g *CodeGenerator) Node(ctx Context, node physical.Node, produce func(refer
 				case "sum":
 					switch node.GroupBy.AggregateExpressions[i].Type.TypeID {
 					case octosql.TypeIDInt:
-						g.Printfln("%s.aggregate%d.Sum += %s", aggregateValues, i, aggregateArgument.Reference)
+						g.Printfln("%s.aggregate%d.Sum += %s", aggregateValues, i, aggregateArgument.AsType(octosql.TypeIDInt))
 					default:
 						panic("implement me")
 					}
@@ -98,30 +98,57 @@ func (g *CodeGenerator) Node(ctx Context, node physical.Node, produce func(refer
 		key := g.Unique("key")
 		aggregate := g.Unique("aggregate")
 		g.Printfln("for %s, %s := range %s {", key, aggregate, aggregates)
+		g.Printfln("_ = %s", key)
+		g.Printfln("_ = %s", aggregate)
 		fields := make([]RecordField, len(node.GroupBy.Key)+len(node.GroupBy.Aggregates))
 		for i := range node.GroupBy.Key {
+			keyValue := g.DeclareVariable(fmt.Sprintf("key%dValue", i), node.GroupBy.Key[i].Type)
 			fields[i] = RecordField{
-				Name: node.Schema.Fields[i].Name,
-				Value: Value{
-					Type:      node.Schema.Fields[i].Type,
-					Reference: fmt.Sprintf("%s.key%d", key, i),
-				},
+				Name:  node.Schema.Fields[i].Name,
+				Value: keyValue,
 			}
 		}
 		for i := range node.GroupBy.Aggregates {
-			aggregateValue := g.Unique(fmt.Sprintf("aggregate%dValue", i))
-			g.Printfln("%s := %s.aggregate%d.Value()", aggregateValue, aggregate, i)
+			aggregateValue := g.DeclareVariable(fmt.Sprintf("aggregate%dValue", i), node.GroupBy.Aggregates[i].OutputType)
+			g.Printfln("%s = %s.aggregate%d.Value()", aggregateValue.AsType(node.GroupBy.Aggregates[i].OutputType.TypeID), aggregate, i)
 
 			fields[len(node.GroupBy.Key)+i] = RecordField{
-				Name: node.Schema.Fields[len(node.GroupBy.Key)+i].Name,
-				Value: Value{
-					Type:      node.Schema.Fields[len(node.GroupBy.Key)+i].Type,
-					Reference: aggregateValue,
-				},
+				Name:  node.Schema.Fields[len(node.GroupBy.Key)+i].Name,
+				Value: aggregateValue,
 			}
 		}
 		produce(Record{Fields: fields})
 		g.Printfln("}")
+
+	case physical.NodeTypeDatasource:
+		// TODO: Handle pushed-down predicates.
+		uniqueToColname := make(map[string]string)
+		colnameToUnique := make(map[string]string)
+		for k, v := range node.Datasource.VariableMapping {
+			trimmed := strings.TrimPrefix(k, node.Datasource.Alias+".")
+			uniqueToColname[v] = trimmed
+			colnameToUnique[trimmed] = v
+		}
+
+		fieldsOriginalNames := make([]physical.SchemaField, len(node.Schema.Fields))
+		for i := range node.Schema.Fields {
+			fieldsOriginalNames[i] = physical.SchemaField{
+				Name: uniqueToColname[node.Schema.Fields[i].Name],
+				Type: node.Schema.Fields[i].Type,
+			}
+		}
+		schemaOriginalNames := physical.NewSchema(fieldsOriginalNames, node.Schema.TimeField)
+
+		node.Datasource.DatasourceImplementation.(GenerateableDataSource).Generate(g, ctx, schemaOriginalNames, func(record Record) {
+			recordFields := make([]RecordField, len(record.Fields))
+			for i := range record.Fields {
+				recordFields[i] = RecordField{
+					Name:  colnameToUnique[record.Fields[i].Name],
+					Value: record.Fields[i].Value,
+				}
+			}
+			produce(Record{Fields: recordFields})
+		})
 
 	case physical.NodeTypeTableValuedFunction:
 		switch node.TableValuedFunction.Name {
@@ -129,12 +156,14 @@ func (g *CodeGenerator) Node(ctx Context, node physical.Node, produce func(refer
 			index := g.Unique("index")
 			start := g.Expression(ctx, node.TableValuedFunction.Arguments["start"].Expression.Expression)
 			end := g.Expression(ctx, node.TableValuedFunction.Arguments["end"].Expression.Expression)
-			g.Printfln("for %s := %s; %s < %s; %s++ {", index, start.Reference, index, end.Reference, index)
+			g.Printfln("for %s := %s; %s < %s; %s++ {", index, start.AsType(octosql.TypeIDInt), index, end.AsType(octosql.TypeIDInt), index)
+			indexValue := g.DeclareVariable("indexValue", octosql.Int)
+			g.Printfln("%s = %s", indexValue.AsType(octosql.TypeIDInt), index)
 			produce(Record{
 				Fields: []RecordField{
 					{
 						Name:  node.Schema.Fields[0].Name,
-						Value: Value{Type: octosql.Int, Reference: index},
+						Value: indexValue,
 					},
 				},
 			})

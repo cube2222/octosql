@@ -14,7 +14,7 @@ func CompileAndRun(ctx context.Context, node physical.Node) {
 	body := Generate(node)
 	os.RemoveAll("codegen/tmp/code")
 	dirName := fmt.Sprintf("codegen/tmp/code") // %d", time.Now().UnixNano())
-	if err := os.Mkdir(dirName, 0777); err != nil {
+	if err := os.MkdirAll(dirName, 0777); err != nil {
 		panic(err)
 	}
 	if err := os.WriteFile(filepath.Join(dirName, "main.go"), []byte(body), 0777); err != nil {

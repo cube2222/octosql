@@ -59,7 +59,8 @@ func Creator(name string, options map[string]string) (physical.DatasourceImpleme
 	for k, t := range fields {
 		schemaFields = append(schemaFields, physical.SchemaField{
 			Name: k,
-			Type: t,
+			Type: octosql.TypeSum(t, octosql.Null),
+			// Type: t,
 		})
 	}
 	sort.Slice(schemaFields, func(i, j int) bool {

@@ -7,47 +7,43 @@ import (
 	"github.com/cube2222/octosql/physical"
 )
 
-func (g *CodeGenerator) Expression(ctx Context, expression physical.Expression) Value {
+func (g *CodeGenerator) Expression(ctx Context, expression physical.Expression) Register {
 	switch expression.ExpressionType {
 	case physical.ExpressionTypeVariable:
-		value := ctx.VariableContext.GetValue(expression.Variable.Name)
-		return *value
+		register := ctx.VariableContext.GetValue(expression.Variable.Name)
+		return *register
 	case physical.ExpressionTypeConstant:
+		constant := g.DeclareVariable("constant", expression.Constant.Value.Type())
 		switch expression.Constant.Value.TypeID {
 		case octosql.TypeIDInt:
-			return Value{
-				Type:      octosql.Int,
-				Reference: fmt.Sprintf("%d", expression.Constant.Value.Int),
-			}
+			g.Printfln("%s = %d", constant.AsType(octosql.TypeIDInt), expression.Constant.Value.Int)
 		case octosql.TypeIDBoolean:
-			return Value{
-				Type:      octosql.Boolean,
-				Reference: fmt.Sprintf("%t", expression.Constant.Value.Boolean),
-			}
+			g.Printfln("%s = %t", constant.AsType(octosql.TypeIDBoolean), expression.Constant.Value.Boolean)
 		default:
 			panic(fmt.Sprintf("implement me: %s", expression.Constant.Value.TypeID))
 		}
+		return constant
 	case physical.ExpressionTypeFunctionCall:
-		var args []Value
+		var args []Register
 		for i := range expression.FunctionCall.Arguments {
 			args = append(args, g.Expression(ctx, expression.FunctionCall.Arguments[i]))
 		}
 		switch expression.FunctionCall.Name {
 		// TODO: Move to descriptor.
 		case "=":
-			unique := g.Unique("equals")
-			g.Printfln("%s := %s == %s", unique, args[0].Reference, args[1].Reference)
-			return Value{
-				Type:      octosql.Boolean,
-				Reference: unique,
-			}
+			unique := g.DeclareVariable("equals", octosql.Boolean)
+			// TODO: Fixme different types.
+			g.Printfln("%s = %s == %s", unique.AsType(octosql.TypeIDBoolean), args[0].DebugRawReference(), args[1].DebugRawReference())
+			return unique
 		case "%":
-			unique := g.Unique("mod")
-			g.Printfln("%s := %s %% %s", unique, args[0].Reference, args[1].Reference)
-			return Value{
-				Type:      octosql.Int,
-				Reference: unique,
-			}
+			unique := g.DeclareVariable("mod", octosql.Int)
+			g.Printfln("%s = %s %% %s", unique.AsType(octosql.TypeIDInt), args[0].AsType(octosql.TypeIDInt), args[1].AsType(octosql.TypeIDInt))
+			return unique
+		case "len":
+			unique := g.DeclareVariable("length", octosql.Int)
+			// TODO: Fixme arrays and tuples.
+			g.Printfln("%s = len(%s)", unique.AsType(octosql.TypeIDInt), args[0].AsType(octosql.TypeIDString))
+			return unique
 		default:
 			panic("implement me")
 		}

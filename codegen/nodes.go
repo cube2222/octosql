@@ -53,6 +53,13 @@ func (g *CodeGenerator) Node(ctx Context, node physical.Node, produce func(refer
 				default:
 					panic(fmt.Sprintf("implement me: %s", node.GroupBy.AggregateExpressions[i].Type.TypeID))
 				}
+			case "avg":
+				switch node.GroupBy.AggregateExpressions[i].Type.TypeID {
+				case octosql.TypeIDFloat:
+					curAggregateType = "lib.AggregateAvgFloat"
+				default:
+					panic(fmt.Sprintf("implement me: %s", node.GroupBy.AggregateExpressions[i].Type.TypeID))
+				}
 			default:
 				panic("implement me")
 			}
@@ -85,6 +92,14 @@ func (g *CodeGenerator) Node(ctx Context, node physical.Node, produce func(refer
 					switch node.GroupBy.AggregateExpressions[i].Type.TypeID {
 					case octosql.TypeIDInt:
 						g.Printfln("%s.aggregate%d.Sum += %s", aggregateValues, i, aggregateArgument.AsType(octosql.TypeIDInt))
+					default:
+						panic("implement me")
+					}
+				case "avg":
+					switch node.GroupBy.AggregateExpressions[i].Type.TypeID {
+					case octosql.TypeIDFloat:
+						g.Printfln("%s.aggregate%d.Count += 1", aggregateValues, i)
+						g.Printfln("%s.aggregate%d.Sum += %s", aggregateValues, i, aggregateArgument.AsType(octosql.TypeIDFloat))
 					default:
 						panic("implement me")
 					}

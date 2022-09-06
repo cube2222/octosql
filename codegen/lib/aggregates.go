@@ -17,3 +17,12 @@ type AggregateSumInt struct {
 func (c *AggregateSumInt) Value() int {
 	return c.Sum
 }
+
+type AggregateAvgFloat struct {
+	Sum   float64
+	Count int
+}
+
+func (c *AggregateAvgFloat) Value() float64 {
+	return c.Sum / float64(c.Count)
+}

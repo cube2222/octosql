@@ -135,7 +135,7 @@ func Generate(node physical.Node) string {
 
 	fmt.Fprintf(&fullOutput, `import "fmt"`+"\n")
 	fmt.Fprintf(&fullOutput, `import "github.com/cube2222/octosql/codegen/lib"`+"\n")
-	fmt.Fprintf(&fullOutput, `import "github.com/cube2222/octosql/octosql"`+"\n")
+	// fmt.Fprintf(&fullOutput, `import "github.com/cube2222/octosql/octosql"`+"\n")
 	for i := range g.imports {
 		fmt.Fprintf(&fullOutput, `import "%s"`+"\n", i)
 	}

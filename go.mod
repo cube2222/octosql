@@ -25,6 +25,7 @@ require (
 	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.7.0
 	github.com/tidwall/btree v1.3.1
+	github.com/traefik/yaegi v0.14.2
 	github.com/valyala/fastjson v1.6.3
 	golang.org/x/exp v0.0.0-20220414153411-bcd21879b8fd
 	google.golang.org/grpc v1.42.0

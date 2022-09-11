@@ -125,7 +125,7 @@ func (g *CodeGenerator) Node(ctx Context, node physical.Node, produce func(refer
 		}
 		for i := range node.GroupBy.Aggregates {
 			aggregateValue := g.DeclareVariable(fmt.Sprintf("aggregate%dValue", i), node.GroupBy.Aggregates[i].OutputType)
-			g.Printfln("%s = %s.aggregate%d.Value()", aggregateValue.AsType(node.GroupBy.Aggregates[i].OutputType.TypeID), aggregate, i)
+			g.SetVariable(aggregateValue, node.GroupBy.Aggregates[i].OutputType.TypeID, "%s.aggregate%d.Value()", aggregate, i)
 
 			fields[len(node.GroupBy.Key)+i] = RecordField{
 				Name:  node.Schema.Fields[len(node.GroupBy.Key)+i].Name,
@@ -173,7 +173,7 @@ func (g *CodeGenerator) Node(ctx Context, node physical.Node, produce func(refer
 			end := g.Expression(ctx, node.TableValuedFunction.Arguments["end"].Expression.Expression)
 			g.Printfln("for %s := %s; %s < %s; %s++ {", index, start.AsType(octosql.TypeIDInt), index, end.AsType(octosql.TypeIDInt), index)
 			indexValue := g.DeclareVariable("indexValue", octosql.Int)
-			g.Printfln("%s = %s", indexValue.AsType(octosql.TypeIDInt), index)
+			g.SetVariable(indexValue, octosql.TypeIDInt, "%s", index)
 			produce(Record{
 				Fields: []RecordField{
 					{

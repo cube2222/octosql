@@ -60,16 +60,19 @@ for $sc.Scan() {
 
 		g.Printfln("switch %s.Type() {", fieldValueRaw)
 		if octosql.Float.Is(schema.Fields[i].Type) == octosql.TypeRelationIs {
+			floatValueRaw := g.Unique("floatValueRaw")
+
 			g.Printfln("case fastjson.TypeNumber:")
-			g.Printfln("%s, _ = %s.Float64()", fieldValue.AsType(octosql.TypeIDFloat), fieldValueRaw)
-			g.Printfln(fieldValue.SetTypeIDCommand(octosql.TypeIDFloat))
+			g.Printfln("%s, _ := %s.Float64()", floatValueRaw, fieldValueRaw)
+
+			g.SetVariable(fieldValue, octosql.TypeIDFloat, floatValueRaw)
 		}
 		if octosql.String.Is(schema.Fields[i].Type) == octosql.TypeRelationIs {
 			g.Printfln("case fastjson.TypeString:")
 			fieldValueBytes := g.Unique("fieldValueBytes")
 			g.Printfln("%s, _ := %s.StringBytes()", fieldValueBytes, fieldValueRaw)
 			g.Printfln("%s = string(%s)", fieldValue.AsType(octosql.TypeIDString), fieldValueBytes)
-			g.Printfln(fieldValue.SetTypeIDCommand(octosql.TypeIDString))
+			g.SetVariable(fieldValue, octosql.TypeIDString, "string(%s)", fieldValueBytes)
 		}
 		g.Printfln("}")
 

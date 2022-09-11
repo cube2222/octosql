@@ -9,56 +9,20 @@ import (
 	"github.com/cube2222/octosql/physical"
 )
 
-type Register interface {
-	TypeID() string
-	AsType(typeID octosql.TypeID) string
-	DebugRawReference() string
-	SetTypeIDCommand(typeID octosql.TypeID) string
-}
-
-type ConstTypeValue struct {
-	// TODO: Is there any performance benefit in this specialization?
-	typeID    octosql.TypeID
-	reference string
-}
-
-func (c *ConstTypeValue) TypeID() string {
-	return fmt.Sprintf("octosql.TypeID(%d)", int(c.typeID))
-}
-
-func (c *ConstTypeValue) AsType(t octosql.TypeID) string {
-	if t != c.typeID {
-		panic("type mismatch")
-	}
-	return c.reference
-}
-
-func (c *ConstTypeValue) DebugRawReference() string {
-	return c.reference
-}
-
-func (c *ConstTypeValue) SetTypeIDCommand(typeID octosql.TypeID) string {
-	return ""
-}
-
-type UnionTypeValue struct {
+type Register struct {
 	objectReference string
 }
 
-func (u *UnionTypeValue) TypeID() string {
-	return fmt.Sprintf("%s.TypeID", u.objectReference)
+func (r Register) TypeID() string {
+	return fmt.Sprintf("%s.TypeID", r.objectReference)
 }
 
-func (c *UnionTypeValue) AsType(t octosql.TypeID) string {
-	return c.objectReference + "." + TypeIDFieldName(t)
+func (r Register) AsType(t octosql.TypeID) string {
+	return r.objectReference + "." + TypeIDFieldName(t)
 }
 
-func (u *UnionTypeValue) DebugRawReference() string {
-	return u.objectReference
-}
-
-func (c *UnionTypeValue) SetTypeIDCommand(typeID octosql.TypeID) string {
-	return fmt.Sprintf("%s = octosql.TypeID(%d)", c.TypeID(), int(typeID))
+func (r Register) DebugRawReference() string {
+	return r.objectReference
 }
 
 type Record struct {
@@ -135,7 +99,7 @@ func Generate(node physical.Node) string {
 
 	fmt.Fprintf(&fullOutput, `import "fmt"`+"\n")
 	fmt.Fprintf(&fullOutput, `import "github.com/cube2222/octosql/codegen/lib"`+"\n")
-	// fmt.Fprintf(&fullOutput, `import "github.com/cube2222/octosql/octosql"`+"\n")
+	fmt.Fprintf(&fullOutput, `import "github.com/cube2222/octosql/octosql"`+"\n")
 	for i := range g.imports {
 		fmt.Fprintf(&fullOutput, `import "%s"`+"\n", i)
 	}
@@ -179,16 +143,14 @@ func (g *CodeGenerator) AddImport(name string) {
 func (g *CodeGenerator) DeclareVariable(name string, t octosql.Type) Register {
 	uniqueName := g.Unique(name)
 	g.Printfln("var %s %s; _ = %s", uniqueName, GoType(t), uniqueName)
-	if t.TypeID == octosql.TypeIDUnion {
-		return &UnionTypeValue{
-			objectReference: uniqueName,
-		}
-	} else {
-		return &ConstTypeValue{
-			typeID:    t.TypeID,
-			reference: uniqueName,
-		}
+	return Register{
+		objectReference: uniqueName,
 	}
+}
+
+func (g *CodeGenerator) SetVariable(register Register, typeID octosql.TypeID, valueExprFormat string, args ...interface{}) {
+	g.Printfln("%s = %s", register.AsType(typeID), fmt.Sprintf(valueExprFormat, args...))
+	g.Printfln("%s = octosql.TypeID(%d)", register.TypeID(), int(typeID))
 }
 
 type GenerateableDataSource interface {
@@ -196,6 +158,27 @@ type GenerateableDataSource interface {
 }
 
 func GoType(t octosql.Type) string {
+	var buf bytes.Buffer
+	buf.WriteString("struct {\n")
+	buf.WriteString("TypeID octosql.TypeID\n")
+	for _, alternative := range primitiveAlternatives(t) {
+		buf.WriteString(TypeIDFieldName(alternative.TypeID))
+		buf.WriteString(" ")
+		buf.WriteString(PrimitiveGoType(alternative))
+		buf.WriteString("\n")
+	}
+	buf.WriteString("}")
+	return buf.String()
+}
+
+func primitiveAlternatives(t octosql.Type) []octosql.Type {
+	if t.TypeID != octosql.TypeIDUnion {
+		return []octosql.Type{t}
+	}
+	return t.Union.Alternatives
+}
+
+func PrimitiveGoType(t octosql.Type) string {
 	switch t.TypeID {
 	case octosql.TypeIDInt:
 		return "int"
@@ -207,18 +190,10 @@ func GoType(t octosql.Type) string {
 		return "bool"
 	case octosql.TypeIDNull:
 		return "struct{}"
-	case octosql.TypeIDUnion:
-		var buf bytes.Buffer
-		buf.WriteString("struct {\n")
-		buf.WriteString("TypeID octosql.TypeID\n")
-		for _, alternative := range t.Union.Alternatives {
-			buf.WriteString(TypeIDFieldName(alternative.TypeID))
-			buf.WriteString(" ")
-			buf.WriteString(GoType(alternative))
-			buf.WriteString("\n")
-		}
-		buf.WriteString("}")
-		return buf.String()
+	// case octosql.TypeIDStruct:
+	// case octosql.TypeIDList:
+	// case octosql.TypeIDTuple:
+	// Recurse into the original GoType function.
 	default:
 		panic(fmt.Sprintf("implement me: %s", t.TypeID))
 	}

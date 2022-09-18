@@ -16,9 +16,13 @@ import (
 )
 
 type jobIn struct {
-	// jobCtx?
-	line int
-	data []byte
+	fields []physical.SchemaField
+	ctx    context.Context
+
+	lines []int    // line numbers
+	data  [][]byte // data for each line
+
+	outChan chan<- []jobOut
 }
 
 type jobOut struct {
@@ -26,6 +30,58 @@ type jobOut struct {
 	record Record
 	err    error
 }
+
+// TODO: Test if joining two JSON files together works properly. Add a snapshot test for it.
+var parserWorkReceiveChannel = func() chan<- jobIn {
+	workerCount := runtime.GOMAXPROCS(0)
+	runtime.NumCPU()
+	inChan := make(chan jobIn, 64)
+
+	for i := 0; i < workerCount; i++ {
+		go func() {
+			var p fastjson.Parser
+
+		getWorkLoop:
+			for job := range inChan {
+				outJobs := make([]jobOut, len(job.lines))
+				for i := range outJobs {
+					out := &outJobs[i]
+					out.line = job.lines[i]
+
+					v, err := p.ParseBytes(job.data[i])
+					if err != nil {
+						out.err = fmt.Errorf("couldn't parse json: %w", err)
+						continue
+					}
+
+					if v.Type() != fastjson.TypeObject {
+						out.err = fmt.Errorf("expected JSON object, got '%s'", string(job.data[i]))
+						continue
+					}
+					o, err := v.Object()
+					if err != nil {
+						out.err = fmt.Errorf("expected JSON object, got '%s'", string(job.data[i]))
+						continue
+					}
+
+					values := make([]octosql.Value, len(job.fields))
+					for i := range values {
+						values[i], _ = getOctoSQLValue(job.fields[i].Type, o.Get(job.fields[i].Name))
+					}
+
+					out.record = NewRecord(values, false, time.Time{})
+				}
+				select {
+				case job.outChan <- outJobs:
+				case <-job.ctx.Done():
+					continue getWorkLoop
+				}
+			}
+		}()
+	}
+
+	return inChan
+}()
 
 type DatasourceExecuting struct {
 	path   string
@@ -45,54 +101,9 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 	localCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	inChan := make(chan []jobIn, 64)
 	outChan := make(chan []jobOut, 64)
 
-	workers := runtime.GOMAXPROCS(0)
-	for i := 0; i < workers; i++ {
-		go func() {
-			var p fastjson.Parser
-
-			for jobs := range inChan {
-				outJobs := make([]jobOut, len(jobs))
-				for i := range outJobs {
-					job := jobs[i]
-					out := &outJobs[i]
-					out.line = job.line
-
-					v, err := p.ParseBytes(job.data)
-					if err != nil {
-						out.err = fmt.Errorf("couldn't parse json: %w", err)
-						continue
-					}
-
-					if v.Type() != fastjson.TypeObject {
-						out.err = fmt.Errorf("expected JSON object, got '%s'", string(job.data))
-						continue
-					}
-					o, err := v.Object()
-					if err != nil {
-						out.err = fmt.Errorf("expected JSON object, got '%s'", string(job.data))
-						continue
-					}
-
-					values := make([]octosql.Value, len(d.fields))
-					for i := range values {
-						values[i], _ = getOctoSQLValue(d.fields[i].Type, o.Get(d.fields[i].Name))
-					}
-
-					out.record = NewRecord(values, false, time.Time{})
-				}
-				select {
-				case outChan <- outJobs:
-				case <-localCtx.Done():
-					return
-				}
-			}
-		}()
-	}
-
-	done := make(chan struct{})
+	done := make(chan error, 1)
 	linesRead := 0
 	go func() {
 		line := 0
@@ -100,46 +111,46 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 		if d.tail {
 			batchSize = 1
 		}
-		batch := make([]jobIn, batchSize)
-		batchIndex := 0
+		job := jobIn{
+			ctx:     localCtx,
+			fields:  d.fields,
+			lines:   make([]int, 0, batchSize),
+			data:    make([][]byte, 0, batchSize),
+			outChan: outChan,
+		}
 		for sc.Scan() {
 			data := make([]byte, len(sc.Bytes()))
 			copy(data, sc.Bytes())
-			batch[batchIndex] = jobIn{
-				line: line,
-				data: data,
-			}
-			batchIndex++
-			if batchIndex == batchSize {
-				batchIndex = 0
+			job.lines = append(job.lines, line)
+			job.data = append(job.data, data)
+
+			if len(job.lines) == batchSize {
 				select {
-				case inChan <- batch:
-					linesRead += len(batch)
+				case parserWorkReceiveChannel <- job:
+					linesRead += len(job.lines)
 				case <-localCtx.Done():
-					close(done)
 					return
 				}
-				batch = make([]jobIn, batchSize)
+				job = jobIn{
+					ctx:     localCtx,
+					fields:  d.fields,
+					lines:   make([]int, 0, batchSize),
+					data:    make([][]byte, 0, batchSize),
+					outChan: outChan,
+				}
 			}
 
 			line++
 		}
-		if batchIndex > 0 {
-			batch = batch[:batchIndex]
+		if len(job.lines) > 0 {
 			select {
-			case inChan <- batch:
-				linesRead += len(batch)
+			case parserWorkReceiveChannel <- job:
+				linesRead += len(job.lines)
 			case <-localCtx.Done():
-				close(done)
 				return
 			}
 		}
-		if sc.Err() != nil {
-			panic(sc.Err())
-			// TODO: Przekaż ten błąd na done channel.
-			// TODO: Handle me.
-		}
-		close(done)
+		done <- sc.Err()
 	}()
 
 	var queue []*Record
@@ -171,9 +182,14 @@ produceLoop:
 				break produceLoop
 			}
 		// TODO: Back-pressure? Może jakieś tokeny?
-		case <-done:
+		case readerErr := <-done:
+			if readerErr != nil {
+				return readerErr
+			}
 			fileReaderIsDone = true
-			done = nil // will block from now on
+			done = nil // will block this select branch from now on
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 	}
 	return nil

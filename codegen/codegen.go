@@ -118,6 +118,18 @@ type CodeGenerator struct {
 	uniqueVariableNames map[string]int
 }
 
+func NewGenerator() *CodeGenerator {
+	return &CodeGenerator{
+		body:                &bytes.Buffer{},
+		imports:             map[string]bool{},
+		uniqueVariableNames: map[string]int{},
+	}
+}
+
+func (g *CodeGenerator) Body() *bytes.Buffer {
+	return g.body
+}
+
 func (g *CodeGenerator) Printfln(format string, args ...interface{}) {
 	fmt.Fprintf(g.body, format+"\n", args...)
 }

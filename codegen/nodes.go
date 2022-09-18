@@ -118,6 +118,7 @@ func (g *CodeGenerator) Node(ctx Context, node physical.Node, produce func(refer
 		fields := make([]RecordField, len(node.GroupBy.Key)+len(node.GroupBy.Aggregates))
 		for i := range node.GroupBy.Key {
 			keyValue := g.DeclareVariable(fmt.Sprintf("key%dValue", i), node.GroupBy.Key[i].Type)
+			g.SetVariable(keyValue, node.GroupBy.Key[i].Type.TypeID, fmt.Sprintf("%s.key%d.%s", key, i, TypeIDFieldName(node.GroupBy.Key[i].Type.TypeID)))
 			fields[i] = RecordField{
 				Name:  node.Schema.Fields[i].Name,
 				Value: keyValue,

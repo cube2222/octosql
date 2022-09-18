@@ -44,7 +44,8 @@ func Creator(name string, options map[string]string) (physical.DatasourceImpleme
 	}
 
 	return &impl{
-			path: name,
+			path:   name,
+			schema: schema,
 		},
 		physical.NewSchema(outSchemaFields, -1, physical.WithNoRetractions(true)),
 		nil
@@ -127,7 +128,8 @@ func getOctoSQLNode(node parquet.Node) (octosql.Type, bool) {
 }
 
 type impl struct {
-	path string
+	path   string
+	schema *parquet.Schema
 }
 
 func (i *impl) Materialize(ctx context.Context, env physical.Environment, schema physical.Schema, pushedDownPredicates []physical.Expression) (execution.Node, error) {

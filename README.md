@@ -62,15 +62,50 @@ octosql "SELECT * FROM docs.functions fs"
 
 ## Installation
 
+### Homebrew
+
 You can install OctoSQL using Homebrew on MacOS or Linux:
 ```bash
 brew install cube2222/octosql/octosql
 ```
 After running it for the first time on MacOS you'll have to go into Preferences -> Security and Privacy -> Allow OctoSQL, as with any app that's not notarized.
 
-You can also download the binary for your operating system directly from the [Releases page](https://github.com/cube2222/octosql/releases), or install using the go command line tool:
-```bash
-go install -u github.com/cube2222/octosql
+### Pre-Compiled binary
+
+You can also download the binary for your operating system directly from the [Releases page](https://github.com/cube2222/octosql/releases).
+
+### Nix Package
+
+The package can be installed in the local nix-profile.
+
+```shell
+nix-env -iA nixpkgs.octosql
+```
+
+For adhoc or testing purposes a shell with the package can be spawned.
+
+```shell
+nix-shell -p octosql
+```
+
+For NixOS users it is highly recommended to install the package by adding it to the list of `systemPackages`.
+
+```nix
+environment.systemPackages = with pkgs; [
+  octosql
+  # ...
+];
+```
+
+### Building from source
+
+With Go in version >= 1.18 the application can be built from source.
+This can be achieved by cloning the repository and running `go install` from the project directory.
+
+```shell
+git clone https://github.com/cube2222/octosql
+cd octosql
+go install
 ```
 
 ## File Access

@@ -102,6 +102,9 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 	defer cancel()
 
 	outChan := make(chan []jobOut, 64)
+	// This is necessary so that the global worker pool doesn't lock up.
+	// We only allow the line reader to create parsing jobs when the output channel has space left.
+	outChanAvailableTokens := make(chan struct{}, 64)
 
 	done := make(chan error, 1)
 	linesRead := 0
@@ -126,7 +129,8 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 
 			if len(job.lines) == batchSize {
 				select {
-				case parserWorkReceiveChannel <- job:
+				case outChanAvailableTokens <- struct{}{}:
+					parserWorkReceiveChannel <- job
 					linesRead += len(job.lines)
 				case <-localCtx.Done():
 					return
@@ -144,7 +148,8 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 		}
 		if len(job.lines) > 0 {
 			select {
-			case parserWorkReceiveChannel <- job:
+			case outChanAvailableTokens <- struct{}{}:
+				parserWorkReceiveChannel <- job
 				linesRead += len(job.lines)
 			case <-localCtx.Done():
 				return
@@ -160,6 +165,7 @@ produceLoop:
 	for {
 		select {
 		case outJobs := <-outChan:
+			<-outChanAvailableTokens
 			for i := range outJobs {
 				out := outJobs[i]
 				if out.err != nil {
@@ -188,6 +194,9 @@ produceLoop:
 			}
 			fileReaderIsDone = true
 			done = nil // will block this select branch from now on
+			if fileReaderIsDone && startIndex == linesRead {
+				break produceLoop
+			}
 		case <-ctx.Done():
 			return ctx.Err()
 		}

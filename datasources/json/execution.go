@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"runtime"
 	"time"
 
 	"github.com/valyala/fastjson"
@@ -14,74 +13,6 @@ import (
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
-
-type jobIn struct {
-	fields []physical.SchemaField
-	ctx    context.Context
-
-	lines []int    // line numbers
-	data  [][]byte // data for each line
-
-	outChan chan<- []jobOut
-}
-
-type jobOut struct {
-	line   int
-	record Record
-	err    error
-}
-
-// TODO: Test if joining two JSON files together works properly. Add a snapshot test for it.
-var parserWorkReceiveChannel = func() chan<- jobIn {
-	workerCount := runtime.GOMAXPROCS(0)
-	runtime.NumCPU()
-	inChan := make(chan jobIn, 64)
-
-	for i := 0; i < workerCount; i++ {
-		go func() {
-			var p fastjson.Parser
-
-		getWorkLoop:
-			for job := range inChan {
-				outJobs := make([]jobOut, len(job.lines))
-				for i := range outJobs {
-					out := &outJobs[i]
-					out.line = job.lines[i]
-
-					v, err := p.ParseBytes(job.data[i])
-					if err != nil {
-						out.err = fmt.Errorf("couldn't parse json: %w", err)
-						continue
-					}
-
-					if v.Type() != fastjson.TypeObject {
-						out.err = fmt.Errorf("expected JSON object, got '%s'", string(job.data[i]))
-						continue
-					}
-					o, err := v.Object()
-					if err != nil {
-						out.err = fmt.Errorf("expected JSON object, got '%s'", string(job.data[i]))
-						continue
-					}
-
-					values := make([]octosql.Value, len(job.fields))
-					for i := range values {
-						values[i], _ = getOctoSQLValue(job.fields[i].Type, o.Get(job.fields[i].Name))
-					}
-
-					out.record = NewRecord(values, false, time.Time{})
-				}
-				select {
-				case job.outChan <- outJobs:
-				case <-job.ctx.Done():
-					continue getWorkLoop
-				}
-			}
-		}()
-	}
-
-	return inChan
-}()
 
 type DatasourceExecuting struct {
 	path   string
@@ -98,19 +29,34 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 
 	sc := bufio.NewScanner(f)
 	sc.Buffer(nil, 1024*1024)
+
+	// All async processing in this function and all jobs created by it use this context.
+	// This means that returning from this function will properly clean up all async processors.
 	localCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	outChan := make(chan []jobOut, 64)
+	outChan := make(chan []jobOutRecord, 128)
+
 	// This is necessary so that the global worker pool doesn't lock up.
-	// We only allow the line reader to create parsing jobs when the output channel has space left.
-	outChanAvailableTokens := make(chan struct{}, 64)
+	// We only allow the line reader to create parsing jobs when we know that the output channel has space left.
+	// The consumer will always take out a token after reading from the output channel,
+	// so filling up the token channel is equivalent to filling up the output channel.
+	// But since the line reader goes through the worker pool, it can't block on the output channel.
+	// That's why we use a token channel.
+	outChanAvailableTokens := make(chan struct{}, 128)
 
 	done := make(chan error, 1)
+
+	// linesRead is first incremented by the line reader.
+	// Then, after the line reader is done, it's read by the consumer,
+	// so it knows when it's done reading all the lines.
+	// Access is synchronized through the `done` channel.
 	linesRead := 0
+
+	// This routine reads lines and sends them in batches to the parser worker pool.
 	go func() {
 		line := 0
-		batchSize := 32
+		batchSize := 64
 		if d.tail {
 			batchSize = 1
 		}
@@ -168,7 +114,7 @@ produceLoop:
 			<-outChanAvailableTokens
 			for i := range outJobs {
 				out := outJobs[i]
-				if out.err != nil {
+				if err := out.err; err != nil {
 					return err
 				}
 				for len(queue) <= out.line-startIndex {
@@ -187,7 +133,6 @@ produceLoop:
 			if fileReaderIsDone && startIndex == linesRead {
 				break produceLoop
 			}
-		// TODO: Back-pressure? Może jakieś tokeny?
 		case readerErr := <-done:
 			if readerErr != nil {
 				return readerErr

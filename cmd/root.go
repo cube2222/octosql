@@ -229,7 +229,11 @@ octosql "SELECT * FROM plugins.plugins"`,
 		if err != nil {
 			return fmt.Errorf("couldn't parse query: %w", err)
 		}
-		logicalPlan, outputOptions, err := parser.ParseNode(statement.(sqlparser.SelectStatement))
+		selectStmt, ok := statement.(sqlparser.SelectStatement)
+		if !ok {
+			return fmt.Errorf("only SELECT statements are supported")
+		}
+		logicalPlan, outputOptions, err := parser.ParseNode(selectStmt)
 		if err != nil {
 			return fmt.Errorf("couldn't parse query: %w", err)
 		}

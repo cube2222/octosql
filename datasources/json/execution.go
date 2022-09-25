@@ -115,7 +115,7 @@ produceLoop:
 			for i := range outJobs {
 				out := outJobs[i]
 				if err := out.err; err != nil {
-					return err
+					return fmt.Errorf("couldn't parse line %d: %w", out.line+1 /*lines in OctoSQL start at zero*/, err)
 				}
 				for len(queue) <= out.line-startIndex {
 					queue = append(queue, nil)

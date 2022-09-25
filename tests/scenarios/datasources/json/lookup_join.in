@@ -1,0 +1,1 @@
+octosql "SELECT COUNT(*), SUM(j2.field2), SUM(len(j1.field3)) FROM fixtures/join1.json j1 LOOKUP JOIN fixtures/join2.json j2 ON j1.field1 = j2.field1" -o batch_table

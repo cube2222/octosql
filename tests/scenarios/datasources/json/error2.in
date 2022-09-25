@@ -1,0 +1,1 @@
+octosql "SELECT COUNT(*), SUM(field2), SUM(len(field3)) FROM fixtures/objects_bad_2.json"

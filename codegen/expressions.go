@@ -21,6 +21,8 @@ func (g *CodeGenerator) Expression(ctx Context, expression physical.Expression) 
 			g.SetVariable(constant, octosql.TypeIDInt, "%d", expression.Constant.Value.Int)
 		case octosql.TypeIDFloat:
 			g.SetVariable(constant, octosql.TypeIDFloat, "%f", expression.Constant.Value.Float)
+		case octosql.TypeIDString:
+			g.SetVariable(constant, octosql.TypeIDString, `"%s"`, expression.Constant.Value.String) // TODO: Fixme escape string.
 		default:
 			panic(fmt.Sprintf("implement me: %s", expression.Constant.Value.TypeID))
 		}

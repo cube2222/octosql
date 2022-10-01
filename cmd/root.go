@@ -22,6 +22,7 @@ import (
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/datasources/csv"
 	"github.com/cube2222/octosql/datasources/docs"
+	"github.com/cube2222/octosql/datasources/excel"
 	"github.com/cube2222/octosql/datasources/json"
 	"github.com/cube2222/octosql/datasources/lines"
 	"github.com/cube2222/octosql/datasources/parquet"
@@ -194,6 +195,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 			"lines":   lines.Creator,
 			"parquet": parquet.Creator,
 			"tsv":     csv.Creator('\t'),
+			"xlsx":    excel.Creator(),
 		}
 		for ext, pluginName := range fileExtensionHandlers {
 			fileHandlers[ext] = func(name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error) {

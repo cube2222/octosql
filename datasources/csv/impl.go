@@ -8,8 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/execution/files"
 	"github.com/cube2222/octosql/octosql"
@@ -28,7 +26,7 @@ func Creator(separator rune) func(name string, options map[string]string) (physi
 		if headerStr, ok := options["header"]; ok {
 			header, err = strconv.ParseBool(headerStr)
 			if err != nil {
-				return nil, physical.Schema{}, errors.Wrap(err, "couldn't parse header option, must be true or false")
+				return nil, physical.Schema{}, fmt.Errorf("couldn't parse header option, must be true or false: %w", err)
 			}
 		}
 

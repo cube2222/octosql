@@ -80,10 +80,10 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 				case outChanAvailableTokens <- struct{}{}:
 					parserWorkReceiveChannel <- job
 					linesRead += len(job.lines)
-					batchIndex++
 				case <-localCtx.Done():
 					return
 				}
+				batchIndex++
 				job = jobIn{
 					fields:     d.fields,
 					ctx:        localCtx,

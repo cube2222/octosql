@@ -43,8 +43,15 @@ func (g *SimpleGroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend Me
 		return CompareValueSlices(a.GroupKey, b.GroupKey)
 	})
 
+	valueSlicePool := ValueSlicePool{}
+
 	if err := g.source.Run(ctx, func(produceCtx ProduceContext, records RecordBatch) error {
 		ctx := ctx.WithRecord(records)
+		defer func() {
+			for i := range records.Values {
+				ctx.SlicePool.Put(records.Values[i])
+			}
+		}()
 
 		keyExprValues := make([][]octosql.Value, len(g.keyExprs))
 		for i, expr := range g.keyExprs {
@@ -63,16 +70,24 @@ func (g *SimpleGroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend Me
 			aggregateExprValues[i] = value
 		}
 
+		// TODO: Może bez tego będzie szybciej? Może to jest przekombinowane?
 		recordsByKey := btree.NewG[*simplePreaggregatesItem](BTreeDefaultDegree, func(a, b *simplePreaggregatesItem) bool {
 			return CompareValueSlices(a.GroupKey, b.GroupKey)
 		})
+		// This actually makes a difference.
+		itemCached := &simplePreaggregatesItem{}
 		for rowIndex := 0; rowIndex < records.Size; rowIndex++ {
 			// TODO: Caching the key slice for performance?
 			key := GroupKey(Row(keyExprValues, rowIndex))
-			itemTyped, ok := recordsByKey.Get(&simplePreaggregatesItem{GroupKey: key})
+			itemCached.GroupKey = key
+			itemTyped, ok := recordsByKey.Get(itemCached)
 			if !ok {
 				itemTyped = &simplePreaggregatesItem{
-					GroupKey: key,
+					GroupKey:        key,
+					AggregateValues: make([][]octosql.Value, len(g.aggregateExprs)),
+				}
+				for i := range itemTyped.AggregateValues {
+					itemTyped.AggregateValues[i] = valueSlicePool.Get()
 				}
 				recordsByKey.ReplaceOrInsert(itemTyped)
 			}
@@ -80,6 +95,9 @@ func (g *SimpleGroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend Me
 				itemTyped.AggregateValues[colIndex] = append(itemTyped.AggregateValues[colIndex], aggregateExprValues[colIndex][rowIndex])
 			}
 			itemTyped.Retractions = append(itemTyped.Retractions, records.Retractions[rowIndex])
+		}
+		for i := range aggregateExprValues {
+			ctx.SlicePool.Put(aggregateExprValues[i])
 		}
 
 		recordsByKey.Ascend(func(preaggregateItem *simplePreaggregatesItem) bool {
@@ -129,6 +147,9 @@ func (g *SimpleGroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend Me
 					}
 				}
 				itemTyped.Aggregates[aggIndex].Add(retractionsNonNull, aggregateValuesNonNull)
+
+				valueSlicePool.Put(preaggregateItem.AggregateValues[aggIndex])
+				preaggregateItem.AggregateValues[aggIndex] = nil
 			}
 
 			return true
@@ -177,6 +198,14 @@ func (g *SimpleGroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend Me
 
 		return true
 	})
+	if err != nil {
+		return fmt.Errorf("couldn't produce: %w", err)
+	}
+	if outValueCount > 0 {
+		if err = produce(ProduceFromExecutionContext(ctx), NewRecordBatch(outValues, make([]bool, outValueCount), make([]time.Time, outValueCount))); err != nil {
+			return fmt.Errorf("couldn't produce: %w", err)
+		}
+	}
 
 	return err
 }

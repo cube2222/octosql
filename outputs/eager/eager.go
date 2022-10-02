@@ -39,7 +39,7 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 	if err := o.source.Run(
 		execCtx,
 		func(ctx ProduceContext, record RecordBatch) error {
-			return format.Write(record.Values, 0)
+			return format.Write(record.Values, record.Size)
 		},
 		func(ctx ProduceContext, msg MetadataMessage) error {
 			return nil

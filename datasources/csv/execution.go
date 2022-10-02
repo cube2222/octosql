@@ -24,6 +24,7 @@ type DatasourceExecuting struct {
 }
 
 func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
+	// TODO: Benchmark on this vs datafusion. Small and big query from master thesis.
 	f, err := files.OpenLocalFile(ctx, d.path)
 	if err != nil {
 		return fmt.Errorf("couldn't open local file: %w", err)

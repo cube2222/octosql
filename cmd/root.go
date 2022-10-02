@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/exec"
 	"runtime/debug"
@@ -69,6 +71,10 @@ octosql "SELECT * FROM plugins.plugins"`,
 
 		logs.InitializeFileLogger()
 		defer logs.CloseLogger()
+
+		go func() {
+			http.ListenAndServe("localhost:3000", nil)
+		}()
 
 		// TODO: Fixme
 		// 	pluginManager := &manager.PluginManager{}
@@ -373,6 +379,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 			CurrentRecords: execution.RecordBatch{
 				Size: 1, // TODO: Fix this hack.
 			},
+			SlicePool: &execution.ValueSlicePool{},
 		}
 
 		switch output {

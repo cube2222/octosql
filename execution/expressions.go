@@ -54,7 +54,7 @@ func NewConstant(value octosql.Value) *Constant {
 }
 
 func (c *Constant) Evaluate(ctx ExecutionContext) ([]octosql.Value, error) {
-	out := make([]octosql.Value, ctx.CurrentRecords.Size)
+	out := ctx.SlicePool.GetSized(ctx.CurrentRecords.Size)
 	for i := range out {
 		out[i] = c.value
 	}
@@ -160,6 +160,10 @@ func (c *FunctionCall) Evaluate(ctx ExecutionContext) ([]octosql.Value, error) {
 	if err != nil {
 		return nil, fmt.Errorf("couldn't evaluate function: %w", err)
 	}
+	// TODO: Fixme
+	// for i := range argValues {
+	// 	ctx.SlicePool.Put(argValues[i])
+	// }
 	return values, nil
 }
 

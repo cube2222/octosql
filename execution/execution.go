@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cube2222/octosql/octosql"
@@ -13,10 +14,44 @@ type Node interface {
 	Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error
 }
 
+type ValueSlicePool struct {
+	pool sync.Pool
+}
+
+func (p *ValueSlicePool) Get() []octosql.Value {
+	out := p.pool.Get()
+	if out == nil {
+		return nil
+	}
+	return out.([]octosql.Value)
+}
+
+func (p *ValueSlicePool) GetSized(size int) []octosql.Value {
+	out := p.pool.Get()
+	if out == nil {
+		return make([]octosql.Value, size)
+	}
+	outTyped := out.([]octosql.Value)
+	if cap(outTyped) < size {
+		return make([]octosql.Value, size)
+	}
+	outExtended := outTyped[:size]
+	for i := range outExtended {
+		outExtended[i] = octosql.ZeroValue
+	}
+	return outExtended
+}
+
+func (p *ValueSlicePool) Put(v []octosql.Value) {
+	v = v[:0]
+	p.pool.Put(v)
+}
+
 type ExecutionContext struct {
 	context.Context
 	VariableContext *VariableContext
 	CurrentRecords  RecordBatch
+	SlicePool       *ValueSlicePool
 	// TODO: Fix the subquery expression to handle this properly.
 }
 
@@ -25,6 +60,7 @@ func (ctx ExecutionContext) WithRecord(record RecordBatch) ExecutionContext {
 		Context:         ctx.Context,
 		VariableContext: ctx.VariableContext,
 		CurrentRecords:  record,
+		SlicePool:       ctx.SlicePool,
 	}
 }
 
@@ -59,7 +95,7 @@ func ProduceFnApplyContext(fn ProduceFn, ctx ProduceContext) func(record RecordB
 }
 
 // TODO: Tune this size.
-const DesiredBatchSize = 8192
+const DesiredBatchSize = 4096
 
 type RecordBatch struct {
 	// Values are stored column-first.

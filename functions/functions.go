@@ -23,7 +23,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					},
 					Strict: true,
 					Function: func(ctx execution.ExecutionContext, values [][]octosql.Value) ([]octosql.Value, error) {
-						out := make([]octosql.Value, len(values[0]))
+						out := ctx.SlicePool.GetSized(len(values[0]))
 						for rowIndex := range out {
 							// TODO: Compare should be vectorized as well.
 							out[rowIndex] = octosql.NewBoolean(values[0][rowIndex].Compare(values[1][rowIndex]) < 0)
@@ -47,7 +47,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					},
 					Strict: true,
 					Function: func(ctx execution.ExecutionContext, values [][]octosql.Value) ([]octosql.Value, error) {
-						out := make([]octosql.Value, len(values[0]))
+						out := ctx.SlicePool.GetSized(len(values[0]))
 						for rowIndex := range out {
 							// TODO: Compare should be vectorized as well.
 							out[rowIndex] = octosql.NewBoolean(values[0][rowIndex].Compare(values[1][rowIndex]) <= 0)
@@ -65,7 +65,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					OutputType:    octosql.Boolean,
 					Strict:        true,
 					Function: func(ctx execution.ExecutionContext, values [][]octosql.Value) ([]octosql.Value, error) {
-						out := make([]octosql.Value, len(values[0]))
+						out := ctx.SlicePool.GetSized(len(values[0]))
 						for rowIndex := range out {
 							// TODO: Compare should be vectorized as well.
 							out[rowIndex] = octosql.NewBoolean(values[0][rowIndex].Equal(values[1][rowIndex]))
@@ -83,7 +83,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					OutputType:    octosql.Boolean,
 					Strict:        true,
 					Function: func(ctx execution.ExecutionContext, values [][]octosql.Value) ([]octosql.Value, error) {
-						out := make([]octosql.Value, len(values[0]))
+						out := ctx.SlicePool.GetSized(len(values[0]))
 						for rowIndex := range out {
 							// TODO: Compare should be vectorized as well.
 							out[rowIndex] = octosql.NewBoolean(!values[0][rowIndex].Equal(values[1][rowIndex]))
@@ -107,7 +107,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					},
 					Strict: true,
 					Function: func(ctx execution.ExecutionContext, values [][]octosql.Value) ([]octosql.Value, error) {
-						out := make([]octosql.Value, len(values[0]))
+						out := ctx.SlicePool.GetSized(len(values[0]))
 						for rowIndex := range out {
 							// TODO: Compare should be vectorized as well.
 							out[rowIndex] = octosql.NewBoolean(values[0][rowIndex].Compare(values[1][rowIndex]) >= 0)
@@ -131,7 +131,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					},
 					Strict: true,
 					Function: func(ctx execution.ExecutionContext, values [][]octosql.Value) ([]octosql.Value, error) {
-						out := make([]octosql.Value, len(values[0]))
+						out := ctx.SlicePool.GetSized(len(values[0]))
 						for rowIndex := range out {
 							// TODO: Compare should be vectorized as well.
 							out[rowIndex] = octosql.NewBoolean(values[0][rowIndex].Compare(values[1][rowIndex]) > 0)
@@ -181,7 +181,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					OutputType:    octosql.Int,
 					Strict:        true,
 					Function: func(ctx execution.ExecutionContext, values [][]octosql.Value) ([]octosql.Value, error) {
-						out := make([]octosql.Value, len(values[0]))
+						out := ctx.SlicePool.GetSized(len(values[0]))
 						for rowIndex := range out {
 							out[rowIndex] = octosql.NewInt(values[0][rowIndex].Int + values[1][rowIndex].Int)
 						}
@@ -193,7 +193,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					OutputType:    octosql.Float,
 					Strict:        true,
 					Function: func(ctx execution.ExecutionContext, values [][]octosql.Value) ([]octosql.Value, error) {
-						out := make([]octosql.Value, len(values[0]))
+						out := ctx.SlicePool.GetSized(len(values[0]))
 						for rowIndex := range out {
 							out[rowIndex] = octosql.NewFloat(values[0][rowIndex].Float + values[1][rowIndex].Float)
 						}
@@ -205,7 +205,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 				// 	OutputType:    octosql.Duration,
 				// 	Strict:        true,
 				// 	Function: func(ctx execution.ExecutionContext, values [][]octosql.Value) ([]octosql.Value, error) {
-				// 		out := make([]octosql.Value, len(values[0]))
+				// 		out := ctx.SlicePool.GetSized(len(values[0)
 				// 		for rowIndex := range out {
 				// 			out[rowIndex] = octosql.NewDuration(values[0][rowIndex].Duration + values[1][rowIndex].Duration)
 				// 		}
@@ -245,7 +245,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					OutputType:    octosql.Int,
 					Strict:        true,
 					Function: func(ctx execution.ExecutionContext, values [][]octosql.Value) ([]octosql.Value, error) {
-						out := make([]octosql.Value, len(values[0]))
+						out := ctx.SlicePool.GetSized(len(values[0]))
 						for rowIndex := range out {
 							out[rowIndex] = octosql.NewInt(values[0][rowIndex].Int - values[1][rowIndex].Int)
 						}
@@ -257,7 +257,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					OutputType:    octosql.Int,
 					Strict:        true,
 					Function: func(ctx execution.ExecutionContext, values [][]octosql.Value) ([]octosql.Value, error) {
-						out := make([]octosql.Value, len(values[0]))
+						out := ctx.SlicePool.GetSized(len(values[0]))
 						for rowIndex := range out {
 							out[rowIndex] = octosql.NewInt(-1 * values[0][rowIndex].Int)
 						}
@@ -269,7 +269,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					OutputType:    octosql.Float,
 					Strict:        true,
 					Function: func(ctx execution.ExecutionContext, values [][]octosql.Value) ([]octosql.Value, error) {
-						out := make([]octosql.Value, len(values[0]))
+						out := ctx.SlicePool.GetSized(len(values[0]))
 						for rowIndex := range out {
 							out[rowIndex] = octosql.NewFloat(values[0][rowIndex].Float - values[1][rowIndex].Float)
 						}
@@ -281,7 +281,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					OutputType:    octosql.Float,
 					Strict:        true,
 					Function: func(ctx execution.ExecutionContext, values [][]octosql.Value) ([]octosql.Value, error) {
-						out := make([]octosql.Value, len(values[0]))
+						out := ctx.SlicePool.GetSized(len(values[0]))
 						for rowIndex := range out {
 							out[rowIndex] = octosql.NewFloat(-1 * values[0][rowIndex].Float)
 						}
@@ -321,7 +321,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					OutputType:    octosql.Int,
 					Strict:        true,
 					Function: func(ctx execution.ExecutionContext, values [][]octosql.Value) ([]octosql.Value, error) {
-						out := make([]octosql.Value, len(values[0]))
+						out := ctx.SlicePool.GetSized(len(values[0]))
 						for rowIndex := range out {
 							out[rowIndex] = octosql.NewInt(values[0][rowIndex].Int * values[1][rowIndex].Int)
 						}
@@ -333,7 +333,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					OutputType:    octosql.Float,
 					Strict:        true,
 					Function: func(ctx execution.ExecutionContext, values [][]octosql.Value) ([]octosql.Value, error) {
-						out := make([]octosql.Value, len(values[0]))
+						out := ctx.SlicePool.GetSized(len(values[0]))
 						for rowIndex := range out {
 							out[rowIndex] = octosql.NewFloat(values[0][rowIndex].Float * values[1][rowIndex].Float)
 						}

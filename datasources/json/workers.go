@@ -65,7 +65,7 @@ var parserWorkReceiveChannel = func() chan<- jobIn {
 						}
 
 						for colIndex := range job.fields {
-							outValues[colIndex][i], _ = getOctoSQLValue(job.fields[i].Type, o.Get(job.fields[i].Name))
+							outValues[colIndex][i], _ = getOctoSQLValue(job.fields[colIndex].Type, o.Get(job.fields[colIndex].Name))
 						}
 					}
 					return outValues, nil

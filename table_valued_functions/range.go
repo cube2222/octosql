@@ -97,7 +97,7 @@ func (r *rangeNode) Run(ctx execution.ExecutionContext, produce execution.Produc
 	if err != nil {
 		return fmt.Errorf("couldn't evaluate end: %w", err)
 	}
-	outValues := make([]octosql.Value, 0, execution.DesiredBatchSize)
+	outValues := ctx.SlicePool.GetSized(execution.DesiredBatchSize)[:0]
 	for i := start[0].Int; i < end[0].Int; i++ {
 		outValues = append(outValues, octosql.NewInt(i))
 		if len(outValues) == execution.DesiredBatchSize {
@@ -107,7 +107,7 @@ func (r *rangeNode) Run(ctx execution.ExecutionContext, produce execution.Produc
 			); err != nil {
 				return fmt.Errorf("couldn't produce record: %w", err)
 			}
-			outValues = make([]octosql.Value, 0, execution.DesiredBatchSize)
+			outValues = ctx.SlicePool.GetSized(execution.DesiredBatchSize)[:0]
 		}
 	}
 	if len(outValues) > 0 {

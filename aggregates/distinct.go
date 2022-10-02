@@ -1,8 +1,11 @@
 package aggregates
 
 import (
-	"github.com/tidwall/btree"
+	"hash/fnv"
 
+	"github.com/zyedidia/generic/hashmap"
+
+	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/execution/nodes"
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
@@ -22,33 +25,36 @@ func DistinctAggregateOverloads(overloads []physical.AggregateDescriptor) []phys
 }
 
 type Distinct struct {
-	items   *btree.Generic[*distinctKey]
+	items   *hashmap.Map[octosql.Value, *distinctKey]
 	wrapped nodes.Aggregate
 }
 
 func NewDistinctPrototype(wrapped func() nodes.Aggregate) func() nodes.Aggregate {
 	return func() nodes.Aggregate {
 		return &Distinct{
-			items: btree.NewGenericOptions(func(key, than *distinctKey) bool {
-				return key.value.Compare(than.value) == -1
-			}, btree.Options{NoLocks: true}),
+			items: hashmap.New[octosql.Value, *distinctKey](
+				execution.BTreeDefaultDegree,
+				func(a, b octosql.Value) bool {
+					return a.Compare(b) == 0
+				}, func(v octosql.Value) uint64 {
+					hash := fnv.New64()
+					v.Hash(hash)
+					return hash.Sum64()
+				}),
 			wrapped: wrapped(),
 		}
 	}
 }
 
 type distinctKey struct {
-	value octosql.Value
 	count int
 }
 
 func (c *Distinct) Add(retraction bool, value octosql.Value) bool {
-	var hint btree.PathHint
-
-	item, ok := c.items.GetHint(&distinctKey{value: value}, &hint)
+	item, ok := c.items.Get(value)
 	if !ok {
-		item = &distinctKey{value: value, count: 0}
-		c.items.SetHint(item, &hint)
+		item = &distinctKey{count: 0}
+		c.items.Put(value, item)
 	}
 	if !retraction {
 		item.count++
@@ -58,10 +64,10 @@ func (c *Distinct) Add(retraction bool, value octosql.Value) bool {
 	if item.count == 1 && !retraction {
 		c.wrapped.Add(false, value)
 	} else if item.count == 0 {
-		c.items.DeleteHint(item, &hint)
+		c.items.Remove(value)
 		c.wrapped.Add(true, value)
 	}
-	return c.items.Len() == 0
+	return c.items.Size() == 0
 }
 
 func (c *Distinct) Trigger() octosql.Value {

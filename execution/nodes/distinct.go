@@ -2,8 +2,9 @@ package nodes
 
 import (
 	"fmt"
+	"hash/fnv"
 
-	"github.com/tidwall/btree"
+	"github.com/zyedidia/generic/hashmap"
 
 	. "github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
@@ -20,30 +21,33 @@ func NewDistinct(source Node) *Distinct {
 }
 
 type distinctItem struct {
-	Values []octosql.Value
-	Count  int
+	Count int
 }
 
 func (o *Distinct) Run(execCtx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
-	recordCounts := btree.NewGenericOptions(func(item, than *distinctItem) bool {
-		for i := 0; i < len(item.Values); i++ {
-			if comp := item.Values[i].Compare(than.Values[i]); comp != 0 {
-				return comp == -1
+	recordCounts := hashmap.New[[]octosql.Value, *distinctItem](
+		BTreeDefaultDegree,
+		func(a, b []octosql.Value) bool {
+			for i := range a {
+				if a[i].Compare(b[i]) != 0 {
+					return false
+				}
 			}
-		}
-
-		return false
-	}, btree.Options{
-		NoLocks: true,
-	})
+			return true
+		}, func(k []octosql.Value) uint64 {
+			hash := fnv.New64()
+			for _, v := range k {
+				v.Hash(hash)
+			}
+			return hash.Sum64()
+		})
 	o.source.Run(
 		execCtx,
 		func(ctx ProduceContext, record Record) error {
-			item, ok := recordCounts.Get(&distinctItem{Values: record.Values})
+			item, ok := recordCounts.Get(record.Values)
 			if !ok {
 				item = &distinctItem{
-					Values: record.Values,
-					Count:  0,
+					Count: 0,
 				}
 			}
 			if !record.Retraction {
@@ -52,18 +56,18 @@ func (o *Distinct) Run(execCtx ExecutionContext, produce ProduceFn, metaSend Met
 				item.Count--
 			}
 			if item.Count > 0 {
-				// New record.
 				if !record.Retraction && item.Count == 1 {
+					// New record.
 					if err := produce(ctx, record); err != nil {
 						return fmt.Errorf("couldn't produce new record: %w", err)
 					}
-					recordCounts.Set(item)
+					recordCounts.Put(record.Values, item)
 				}
 			} else {
 				if err := produce(ctx, record); err != nil {
 					return fmt.Errorf("couldn't retract record record: %w", err)
 				}
-				recordCounts.Delete(item)
+				recordCounts.Remove(record.Values)
 			}
 			return nil
 		},

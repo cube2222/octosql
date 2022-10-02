@@ -26,6 +26,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/tidwall/btree v1.3.1
 	github.com/valyala/fastjson v1.6.3
+	github.com/zyedidia/generic v1.1.0
 	golang.org/x/exp v0.0.0-20220414153411-bcd21879b8fd
 	google.golang.org/grpc v1.42.0
 	google.golang.org/protobuf v1.27.1
@@ -58,6 +59,7 @@ require (
 	github.com/pkg/term v1.2.0-beta.2 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/segmentio/encoding v0.3.5 // indirect
+	github.com/segmentio/fasthash v1.0.3 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/ulikunitz/xz v0.5.10 // indirect

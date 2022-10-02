@@ -2,9 +2,10 @@ package nodes
 
 import (
 	"fmt"
+	"hash/fnv"
 	"time"
 
-	"github.com/google/btree"
+	"github.com/zyedidia/generic/hashmap"
 
 	. "github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
@@ -32,9 +33,30 @@ func NewSimpleGroupBy(
 	}
 }
 
+type hashmapAggregatesItem struct {
+	Aggregates []Aggregate
+
+	// AggregatedSetSize omits NULL inputs.
+	AggregatedSetSize []int
+
+	// OverallRecordCount counts all records minus retractions.
+	OverallRecordCount int
+}
+
 func (g *SimpleGroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
-	aggregates := btree.NewG[*aggregatesItem](BTreeDefaultDegree, func(a, b *aggregatesItem) bool {
-		return CompareValueSlices(a.GroupKey, b.GroupKey)
+	aggregates := hashmap.New[GroupKey, *hashmapAggregatesItem](BTreeDefaultDegree, func(a, b GroupKey) bool {
+		for i := range a {
+			if a[i].Compare(b[i]) != 0 {
+				return false
+			}
+		}
+		return true
+	}, func(k GroupKey) uint64 {
+		hash := fnv.New64()
+		for _, v := range k {
+			v.Hash(hash)
+		}
+		return hash.Sum64()
 	})
 
 	if err := g.source.Run(ctx, func(produceCtx ProduceContext, record Record) error {
@@ -50,7 +72,7 @@ func (g *SimpleGroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend Me
 		}
 
 		{
-			itemTyped, ok := aggregates.Get(&aggregatesItem{GroupKey: key})
+			itemTyped, ok := aggregates.Get(key)
 
 			if !ok {
 				newAggregates := make([]Aggregate, len(g.aggregatePrototypes))
@@ -58,8 +80,8 @@ func (g *SimpleGroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend Me
 					newAggregates[i] = g.aggregatePrototypes[i]()
 				}
 
-				itemTyped = &aggregatesItem{GroupKey: key, Aggregates: newAggregates, AggregatedSetSize: make([]int, len(g.aggregatePrototypes))}
-				aggregates.ReplaceOrInsert(itemTyped)
+				itemTyped = &hashmapAggregatesItem{Aggregates: newAggregates, AggregatedSetSize: make([]int, len(g.aggregatePrototypes))}
+				aggregates.Put(key, itemTyped)
 			}
 
 			if !record.Retraction {
@@ -84,7 +106,7 @@ func (g *SimpleGroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend Me
 			}
 
 			if itemTyped.OverallRecordCount == 0 {
-				aggregates.Delete(itemTyped)
+				aggregates.Remove(key)
 			}
 		}
 
@@ -96,26 +118,35 @@ func (g *SimpleGroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend Me
 	}
 
 	var err error
-	aggregates.Ascend(func(itemTyped *aggregatesItem) bool {
-		key := itemTyped.GroupKey
-
-		outputValues := make([]octosql.Value, len(key)+len(g.aggregateExprs))
-		copy(outputValues, key)
-
-		for i := range itemTyped.Aggregates {
-			if itemTyped.AggregatedSetSize[i] > 0 {
-				outputValues[len(key)+i] = itemTyped.Aggregates[i].Trigger()
-			} else {
-				outputValues[len(key)+i] = octosql.NewNull()
+	func() {
+		type stopEach struct{}
+		defer func() {
+			msg := recover()
+			if msg == nil {
+				return
 			}
-		}
+			if _, ok := msg.(stopEach); ok {
+				return
+			}
+			panic(msg)
+		}()
+		aggregates.Each(func(key GroupKey, itemTyped *hashmapAggregatesItem) {
+			outputValues := make([]octosql.Value, len(key)+len(g.aggregateExprs))
+			copy(outputValues, key)
 
-		if err = produce(ProduceFromExecutionContext(ctx), NewRecord(outputValues, false, time.Time{})); err != nil {
-			return false
-		}
+			for i := range itemTyped.Aggregates {
+				if itemTyped.AggregatedSetSize[i] > 0 {
+					outputValues[len(key)+i] = itemTyped.Aggregates[i].Trigger()
+				} else {
+					outputValues[len(key)+i] = octosql.NewNull()
+				}
+			}
 
-		return true
-	})
+			if err = produce(ProduceFromExecutionContext(ctx), NewRecord(outputValues, false, time.Time{})); err != nil {
+				panic(stopEach{})
+			}
+		})
+	}()
 
 	return err
 }

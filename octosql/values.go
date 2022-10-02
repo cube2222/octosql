@@ -1,7 +1,10 @@
 package octosql
 
 import (
+	"encoding/binary"
 	"fmt"
+	"hash"
+	"math"
 	"strings"
 	"time"
 )
@@ -228,6 +231,63 @@ func (value Value) Compare(other Value) int {
 		}
 
 		return 0
+
+	case TypeIDUnion:
+		panic("can't have union type as concrete value instance")
+	default:
+		panic("impossible, type switch bug")
+	}
+}
+
+func (value Value) Hash(hash hash.Hash64) {
+	switch value.TypeID {
+	case TypeIDNull:
+		hash.Write([]byte{0})
+
+	case TypeIDInt:
+		var data [8]byte
+		binary.BigEndian.PutUint64(data[:], uint64(value.Int))
+		hash.Write(data[:])
+
+	case TypeIDFloat:
+		var data [8]byte
+		binary.BigEndian.PutUint64(data[:], math.Float64bits(value.Float))
+		hash.Write(data[:])
+
+	case TypeIDBoolean:
+		if value.Boolean {
+			hash.Write([]byte{1})
+		} else {
+			hash.Write([]byte{0})
+		}
+
+	case TypeIDString:
+		hash.Write([]byte(value.Str))
+
+	case TypeIDTime:
+		var data [8]byte
+		binary.BigEndian.PutUint64(data[:], uint64(value.Time.UnixNano()))
+		hash.Write(data[:])
+
+	case TypeIDDuration:
+		var data [8]byte
+		binary.BigEndian.PutUint64(data[:], uint64(value.Duration))
+		hash.Write(data[:])
+
+	case TypeIDList:
+		for i := range value.List {
+			value.List[i].Hash(hash)
+		}
+
+	case TypeIDStruct:
+		for i := range value.List {
+			value.Struct[i].Hash(hash)
+		}
+
+	case TypeIDTuple:
+		for i := range value.List {
+			value.Tuple[i].Hash(hash)
+		}
 
 	case TypeIDUnion:
 		panic("can't have union type as concrete value instance")

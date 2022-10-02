@@ -43,8 +43,6 @@ func (g *SimpleGroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend Me
 		return CompareValueSlices(a.GroupKey, b.GroupKey)
 	})
 
-	valueSlicePool := ValueSlicePool{}
-
 	if err := g.source.Run(ctx, func(produceCtx ProduceContext, records RecordBatch) error {
 		ctx := ctx.WithRecord(records)
 		defer func() {
@@ -70,90 +68,42 @@ func (g *SimpleGroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend Me
 			aggregateExprValues[i] = value
 		}
 
-		// TODO: Może bez tego będzie szybciej? Może to jest przekombinowane?
-		recordsByKey := btree.NewG[*simplePreaggregatesItem](BTreeDefaultDegree, func(a, b *simplePreaggregatesItem) bool {
-			return CompareValueSlices(a.GroupKey, b.GroupKey)
-		})
-		// This actually makes a difference.
-		itemCached := &simplePreaggregatesItem{}
 		for rowIndex := 0; rowIndex < records.Size; rowIndex++ {
-			// TODO: Caching the key slice for performance?
-			key := GroupKey(Row(keyExprValues, rowIndex))
-			itemCached.GroupKey = key
-			itemTyped, ok := recordsByKey.Get(itemCached)
-			if !ok {
-				itemTyped = &simplePreaggregatesItem{
-					GroupKey:        key,
-					AggregateValues: make([][]octosql.Value, len(g.aggregateExprs)),
-				}
-				for i := range itemTyped.AggregateValues {
-					itemTyped.AggregateValues[i] = valueSlicePool.Get()
-				}
-				recordsByKey.ReplaceOrInsert(itemTyped)
-			}
-			for colIndex := range itemTyped.AggregateValues {
-				itemTyped.AggregateValues[colIndex] = append(itemTyped.AggregateValues[colIndex], aggregateExprValues[colIndex][rowIndex])
-			}
-			itemTyped.Retractions = append(itemTyped.Retractions, records.Retractions[rowIndex])
-		}
-		for i := range aggregateExprValues {
-			ctx.SlicePool.Put(aggregateExprValues[i])
-		}
+			{
+				key := Row(keyExprValues, rowIndex)
+				itemTyped, ok := aggregates.Get(&aggregatesItem{GroupKey: key})
 
-		recordsByKey.Ascend(func(preaggregateItem *simplePreaggregatesItem) bool {
-			key := preaggregateItem.GroupKey
-			itemTyped, ok := aggregates.Get(&aggregatesItem{GroupKey: key})
-			if !ok {
-				newAggregates := make([]Aggregate, len(g.aggregatePrototypes))
-				for i := range g.aggregatePrototypes {
-					newAggregates[i] = g.aggregatePrototypes[i]()
+				if !ok {
+					newAggregates := make([]Aggregate, len(g.aggregatePrototypes))
+					for i := range g.aggregatePrototypes {
+						newAggregates[i] = g.aggregatePrototypes[i]()
+					}
+
+					itemTyped = &aggregatesItem{GroupKey: key, Aggregates: newAggregates, AggregatedSetSize: make([]int, len(g.aggregatePrototypes))}
+					aggregates.ReplaceOrInsert(itemTyped)
 				}
 
-				itemTyped = &aggregatesItem{GroupKey: key, Aggregates: newAggregates, AggregatedSetSize: make([]int, len(g.aggregatePrototypes))}
-				aggregates.ReplaceOrInsert(itemTyped)
-			}
-
-			for _, retraction := range preaggregateItem.Retractions {
-				if retraction {
-					itemTyped.OverallRecordCount--
-				} else {
+				if !records.Retractions[rowIndex] {
 					itemTyped.OverallRecordCount++
+				} else {
+					itemTyped.OverallRecordCount--
 				}
-			}
-
-			if itemTyped.OverallRecordCount == 0 {
-				aggregates.Delete(itemTyped)
-				return true
-			}
-
-			aggregateValuesNonNull := make([]octosql.Value, 0, len(preaggregateItem.Retractions))
-			retractionsNonNull := make([]bool, 0, len(preaggregateItem.Retractions))
-			for aggIndex := range preaggregateItem.AggregateValues {
-				for rowIndex, retraction := range preaggregateItem.Retractions {
-					if preaggregateItem.AggregateValues[aggIndex][rowIndex].TypeID != octosql.TypeIDNull {
-						if retraction {
-							itemTyped.AggregatedSetSize[aggIndex]--
+				for i := range g.aggregateExprs {
+					if aggregateExprValues[i][rowIndex].TypeID != octosql.TypeIDNull {
+						if !records.Retractions[rowIndex] {
+							itemTyped.AggregatedSetSize[i]++
 						} else {
-							itemTyped.AggregatedSetSize[aggIndex]++
+							itemTyped.AggregatedSetSize[i]--
 						}
+						itemTyped.Aggregates[i].Add(records.Retractions[rowIndex], aggregateExprValues[i][rowIndex])
 					}
 				}
-				aggregateValuesNonNull = aggregateValuesNonNull[:0]
-				retractionsNonNull = retractionsNonNull[:0]
-				for rowIndex, value := range preaggregateItem.AggregateValues[aggIndex] {
-					if value.TypeID != octosql.TypeIDNull {
-						aggregateValuesNonNull = append(aggregateValuesNonNull, value)
-						retractionsNonNull = append(retractionsNonNull, preaggregateItem.Retractions[rowIndex])
-					}
-				}
-				itemTyped.Aggregates[aggIndex].Add(retractionsNonNull, aggregateValuesNonNull)
 
-				valueSlicePool.Put(preaggregateItem.AggregateValues[aggIndex])
-				preaggregateItem.AggregateValues[aggIndex] = nil
+				if itemTyped.OverallRecordCount == 0 {
+					aggregates.Delete(itemTyped)
+				}
 			}
-
-			return true
-		})
+		}
 
 		return nil
 	}, func(ctx ProduceContext, msg MetadataMessage) error {

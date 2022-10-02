@@ -37,7 +37,7 @@ func NewCustomTriggerGroupBy(
 }
 
 type Aggregate interface {
-	Add(retractions []bool, values []octosql.Value) bool
+	Add(retractions bool, values octosql.Value) bool
 	Trigger() octosql.Value
 }
 

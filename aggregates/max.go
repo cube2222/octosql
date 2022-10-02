@@ -60,30 +60,29 @@ func (key *maxKey) Less(than btree.Item) bool {
 	return key.value.Compare(thanTyped.value) == -1
 }
 
-func (c *Max) Add(retractions []bool, values []octosql.Value) bool {
-	panic("implement me")
-	// item := c.items.Get(&maxKey{value: values})
-	// var itemTyped *maxKey
-	//
-	// if item == nil {
-	// 	itemTyped = &maxKey{value: values, count: 0}
-	// 	c.items.ReplaceOrInsert(itemTyped)
-	// } else {
-	// 	var ok bool
-	// 	itemTyped, ok = item.(*maxKey)
-	// 	if !ok {
-	// 		panic(fmt.Sprintf("invalid received item: %v", item))
-	// 	}
-	// }
-	// if !retractions {
-	// 	itemTyped.count++
-	// } else {
-	// 	itemTyped.count--
-	// }
-	// if itemTyped.count == 0 {
-	// 	c.items.Delete(itemTyped)
-	// }
-	// return c.items.Len() == 0
+func (c *Max) Add(retraction bool, value octosql.Value) bool {
+	item := c.items.Get(&maxKey{value: value})
+	var itemTyped *maxKey
+
+	if item == nil {
+		itemTyped = &maxKey{value: value, count: 0}
+		c.items.ReplaceOrInsert(itemTyped)
+	} else {
+		var ok bool
+		itemTyped, ok = item.(*maxKey)
+		if !ok {
+			panic(fmt.Sprintf("invalid received item: %v", item))
+		}
+	}
+	if !retraction {
+		itemTyped.count++
+	} else {
+		itemTyped.count--
+	}
+	if itemTyped.count == 0 {
+		c.items.Delete(itemTyped)
+	}
+	return c.items.Len() == 0
 }
 
 func (c *Max) Trigger() octosql.Value {

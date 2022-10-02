@@ -6,7 +6,6 @@ require (
 	github.com/Masterminds/semver v1.5.0
 	github.com/awalterschulze/gographviz v2.0.3+incompatible
 	github.com/c-bata/go-prompt v0.2.6
-	github.com/dgraph-io/ristretto v0.0.3
 	github.com/golang/protobuf v1.5.2
 	github.com/google/btree v1.1.2
 	github.com/gosuri/uilive v0.0.4
@@ -26,6 +25,7 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/tidwall/btree v1.3.1
 	github.com/valyala/fastjson v1.6.3
+	github.com/zyedidia/generic v1.1.0
 	golang.org/x/exp v0.0.0-20220414153411-bcd21879b8fd
 	google.golang.org/grpc v1.42.0
 	google.golang.org/protobuf v1.27.1
@@ -34,7 +34,6 @@ require (
 
 require (
 	github.com/andybalholm/brotli v1.0.3 // indirect
-	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cockroachdb/apd v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
@@ -58,6 +57,7 @@ require (
 	github.com/pkg/term v1.2.0-beta.2 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/segmentio/encoding v0.3.5 // indirect
+	github.com/segmentio/fasthash v1.0.3 // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/ulikunitz/xz v0.5.10 // indirect

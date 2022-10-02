@@ -2,7 +2,6 @@ package nodes
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/google/btree"
 
@@ -58,97 +57,99 @@ func (item *orderByItem) Less(than btree.Item) bool {
 }
 
 func (o *OrderSensitiveTransform) Run(execCtx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
-	var limit *int
-	if o.limit != nil {
-		val, err := (*o.limit).Evaluate(execCtx)
-		if err != nil {
-			return fmt.Errorf("couldn't evaluate limit: %w", err)
-		}
-		if val.Int == 0 {
-			return nil
-		}
-		if val.Int < 0 {
-			return fmt.Errorf("limit must be positive, got %d", val.Int)
-		}
-		limit = &val.Int
-	}
-
-	recordCounts := btree.New(BTreeDefaultDegree)
-	o.source.Run(
-		execCtx,
-		func(ctx ProduceContext, record Record) error {
-			key := make([]octosql.Value, len(o.orderByKeyExprs))
-			for i := range o.orderByKeyExprs {
-				keyValue, err := o.orderByKeyExprs[i].Evaluate(execCtx.WithRecord(record))
-				if err != nil {
-					return fmt.Errorf("couldn't evaluate order by %d key expression: %w", i, err)
-				}
-				key[i] = keyValue
-			}
-
-			item := recordCounts.Get(&orderByItem{Key: key, Values: record.Values, DirectionMultipliers: o.orderByDirectionMultipliers})
-			var itemTyped *orderByItem
-			if item == nil {
-				itemTyped = &orderByItem{
-					Key:                  key,
-					Values:               record.Values,
-					Count:                0,
-					DirectionMultipliers: o.orderByDirectionMultipliers,
-				}
-			} else {
-				var ok bool
-				itemTyped, ok = item.(*orderByItem)
-				if !ok {
-					panic(fmt.Sprintf("invalid order by item: %v", item))
-				}
-			}
-			if !record.Retraction {
-				itemTyped.Count++
-			} else {
-				itemTyped.Count--
-			}
-			if itemTyped.Count > 0 {
-				recordCounts.ReplaceOrInsert(itemTyped)
-			} else {
-				recordCounts.Delete(itemTyped)
-			}
-			if limit != nil && o.noRetractionsPossible && recordCounts.Len() > *limit {
-				// This doesn't mean we'll always keep just the records that are needed, because tree nodes might have count > 1.
-				// That said, it's a good approximation, and we'll definitely not lose something that we need to have.
-				recordCounts.DeleteMax()
-			}
-			return nil
-		},
-		func(ctx ProduceContext, msg MetadataMessage) error {
-			return nil
-		},
-	)
-
-	if err := produceOrderByItems(ProduceFromExecutionContext(execCtx), recordCounts, limit, produce); err != nil {
-		return fmt.Errorf("couldn't produce ordered items: %w", err)
-	}
-	return nil
+	panic("implement me")
+	// var limit *int
+	// if o.limit != nil {
+	// 	val, err := (*o.limit).Evaluate(execCtx)
+	// 	if err != nil {
+	// 		return fmt.Errorf("couldn't evaluate limit: %w", err)
+	// 	}
+	// 	if val.Int == 0 {
+	// 		return nil
+	// 	}
+	// 	if val.Int < 0 {
+	// 		return fmt.Errorf("limit must be positive, got %d", val.Int)
+	// 	}
+	// 	limit = &val.Int
+	// }
+	//
+	// recordCounts := btree.New(BTreeDefaultDegree)
+	// o.source.Run(
+	// 	execCtx,
+	// 	func(ctx ProduceContext, record RecordBatch) error {
+	// 		key := make([]octosql.Value, len(o.orderByKeyExprs))
+	// 		for i := range o.orderByKeyExprs {
+	// 			keyValue, err := o.orderByKeyExprs[i].Evaluate(execCtx.WithRecord(record))
+	// 			if err != nil {
+	// 				return fmt.Errorf("couldn't evaluate order by %d key expression: %w", i, err)
+	// 			}
+	// 			key[i] = keyValue
+	// 		}
+	//
+	// 		item := recordCounts.Get(&orderByItem{Key: key, Values: record.Values, DirectionMultipliers: o.orderByDirectionMultipliers})
+	// 		var itemTyped *orderByItem
+	// 		if item == nil {
+	// 			itemTyped = &orderByItem{
+	// 				Key:                  key,
+	// 				Values:               record.Values,
+	// 				Count:                0,
+	// 				DirectionMultipliers: o.orderByDirectionMultipliers,
+	// 			}
+	// 		} else {
+	// 			var ok bool
+	// 			itemTyped, ok = item.(*orderByItem)
+	// 			if !ok {
+	// 				panic(fmt.Sprintf("invalid order by item: %v", item))
+	// 			}
+	// 		}
+	// 		if !record.Retractions {
+	// 			itemTyped.Count++
+	// 		} else {
+	// 			itemTyped.Count--
+	// 		}
+	// 		if itemTyped.Count > 0 {
+	// 			recordCounts.ReplaceOrInsert(itemTyped)
+	// 		} else {
+	// 			recordCounts.Delete(itemTyped)
+	// 		}
+	// 		if limit != nil && o.noRetractionsPossible && recordCounts.Len() > *limit {
+	// 			// This doesn't mean we'll always keep just the records that are needed, because tree nodes might have count > 1.
+	// 			// That said, it's a good approximation, and we'll definitely not lose something that we need to have.
+	// 			recordCounts.DeleteMax()
+	// 		}
+	// 		return nil
+	// 	},
+	// 	func(ctx ProduceContext, msg MetadataMessage) error {
+	// 		return nil
+	// 	},
+	// )
+	//
+	// if err := produceOrderByItems(ProduceFromExecutionContext(execCtx), recordCounts, limit, produce); err != nil {
+	// 	return fmt.Errorf("couldn't produce ordered items: %w", err)
+	// }
+	// return nil
 }
 
 func produceOrderByItems(ctx ProduceContext, recordCounts *btree.BTree, limit *int, produce ProduceFn) error {
-	i := 0
-	var outErr error
-	recordCounts.Ascend(func(item btree.Item) bool {
-		if limit != nil && i >= *limit {
-			return false
-		}
-		i++
-		itemTyped, ok := item.(*orderByItem)
-		if !ok {
-			panic(fmt.Sprintf("invalid order by item: %v", item))
-		}
-		for i := 0; i < itemTyped.Count; i++ {
-			if err := produce(ctx, NewRecord(itemTyped.Values, false, time.Time{})); err != nil {
-				outErr = err
-				return false
-			}
-		}
-		return true
-	})
-	return outErr
+	panic("implement me")
+	// i := 0
+	// var outErr error
+	// recordCounts.Ascend(func(item btree.Item) bool {
+	// 	if limit != nil && i >= *limit {
+	// 		return false
+	// 	}
+	// 	i++
+	// 	itemTyped, ok := item.(*orderByItem)
+	// 	if !ok {
+	// 		panic(fmt.Sprintf("invalid order by item: %v", item))
+	// 	}
+	// 	for i := 0; i < itemTyped.Count; i++ {
+	// 		if err := produce(ctx, NewRecordBatch(itemTyped.Values, false, time.Time{})); err != nil {
+	// 			outErr = err
+	// 			return false
+	// 		}
+	// 	}
+	// 	return true
+	// })
+	// return outErr
 }

@@ -8,8 +8,11 @@ import (
 
 const BTreeDefaultDegree = 128
 
+// TODO: Everywhere we iterate over columns, use col as the variable name, not i or j.
+//       And row for iterating over rows. Or colIndex and rowIndex.
+
 type Expression interface {
-	Evaluate(ctx ExecutionContext) (octosql.Value, error)
+	Evaluate(ctx ExecutionContext) ([]octosql.Value, error)
 }
 
 type Variable struct {
@@ -23,12 +26,21 @@ func NewVariable(level, index int) *Variable {
 	}
 }
 
-func (r *Variable) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
+func (r *Variable) Evaluate(ctx ExecutionContext) ([]octosql.Value, error) {
+	if r.level == 0 {
+		return ctx.CurrentRecords.Values[r.index], nil
+	}
+
 	curVars := ctx.VariableContext
-	for i := r.level; i != 0; i-- {
+	for i := r.level - 1; i != 0; i-- {
 		curVars = curVars.Parent
 	}
-	return curVars.Values[r.index], nil
+	out := make([]octosql.Value, ctx.CurrentRecords.Size)
+	for i := range out {
+		out[i] = curVars.Values[r.index]
+	}
+
+	return out, nil
 }
 
 type Constant struct {
@@ -41,8 +53,12 @@ func NewConstant(value octosql.Value) *Constant {
 	}
 }
 
-func (c *Constant) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
-	return c.value, nil
+func (c *Constant) Evaluate(ctx ExecutionContext) ([]octosql.Value, error) {
+	out := make([]octosql.Value, ctx.CurrentRecords.Size)
+	for i := range out {
+		out[i] = c.value
+	}
+	return out, nil
 }
 
 type TypeAssertion struct {
@@ -59,21 +75,23 @@ func NewTypeAssertion(expectedTypeID []octosql.TypeID, expr Expression, expected
 	}
 }
 
-func (c *TypeAssertion) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
-	value, err := c.expr.Evaluate(ctx)
+func (c *TypeAssertion) Evaluate(ctx ExecutionContext) ([]octosql.Value, error) {
+	values, err := c.expr.Evaluate(ctx)
 	if err != nil {
-		return octosql.ZeroValue, err
+		return nil, err
 	}
 
-	for i := range c.expectedTypeIDs {
-		if value.TypeID == c.expectedTypeIDs[i] {
-			return value, nil
+checkLoop:
+	for i := range values {
+		for j := range c.expectedTypeIDs {
+			if values[i].TypeID == c.expectedTypeIDs[j] {
+				continue checkLoop
+			}
 		}
+		return nil, fmt.Errorf("invalid type: %s, expected: %s", values[i].TypeID.String(), c.expectedTypeName)
 	}
 
-	return octosql.ZeroValue, fmt.Errorf("invalid type: %s, expected: %s", value.TypeID.String(), c.expectedTypeName)
-
-	return value, nil
+	return values, nil
 }
 
 type TypeCast struct {
@@ -88,26 +106,31 @@ func NewTypeCast(targetTypeID octosql.TypeID, expr Expression) *TypeCast {
 	}
 }
 
-func (c *TypeCast) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
-	value, err := c.expr.Evaluate(ctx)
+func (c *TypeCast) Evaluate(ctx ExecutionContext) ([]octosql.Value, error) {
+	values, err := c.expr.Evaluate(ctx)
 	if err != nil {
-		return octosql.ZeroValue, fmt.Errorf("couldn't evaluate cast argument: %w", err)
+		return nil, fmt.Errorf("couldn't evaluate cast argument: %w", err)
 	}
 
-	if value.TypeID != c.targetTypeID {
-		return octosql.NewNull(), nil
+	out := make([]octosql.Value, ctx.CurrentRecords.Size)
+	for i := range values {
+		if values[i].TypeID == c.targetTypeID {
+			out[i] = values[i]
+		} else {
+			out[i] = octosql.NewNull()
+		}
 	}
 
-	return value, nil
+	return out, nil
 }
 
 type FunctionCall struct {
-	function         func([]octosql.Value) (octosql.Value, error)
+	function         func(ExecutionContext, [][]octosql.Value) ([]octosql.Value, error)
 	args             []Expression
 	nullCheckIndices []int
 }
 
-func NewFunctionCall(function func([]octosql.Value) (octosql.Value, error), args []Expression, nullCheckIndices []int) *FunctionCall {
+func NewFunctionCall(function func(ExecutionContext, [][]octosql.Value) ([]octosql.Value, error), args []Expression, nullCheckIndices []int) *FunctionCall {
 	return &FunctionCall{
 		function:         function,
 		args:             args,
@@ -115,26 +138,29 @@ func NewFunctionCall(function func([]octosql.Value) (octosql.Value, error), args
 	}
 }
 
-func (c *FunctionCall) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
-	argValues := make([]octosql.Value, len(c.args))
+func (c *FunctionCall) Evaluate(ctx ExecutionContext) ([]octosql.Value, error) {
+	argValues := make([][]octosql.Value, len(c.args))
 	for i := range c.args {
-		value, err := c.args[i].Evaluate(ctx)
+		values, err := c.args[i].Evaluate(ctx)
 		if err != nil {
-			return octosql.ZeroValue, fmt.Errorf("couldn't evaluate %d argument: %w", i, err)
+			return nil, fmt.Errorf("couldn't evaluate %d argument: %w", i, err)
 		}
-		argValues[i] = value
+		argValues[i] = values
 	}
+	outputNullBecauseOfStrictness := make([]bool, ctx.CurrentRecords.Size)
 	for _, index := range c.nullCheckIndices {
-		if argValues[index].TypeID == octosql.TypeIDNull {
-			return octosql.NewNull(), nil
+		for i := range argValues[index] {
+			if argValues[index][i].TypeID == octosql.TypeIDNull {
+				outputNullBecauseOfStrictness[i] = true
+			}
 		}
 	}
 
-	value, err := c.function(argValues)
+	values, err := c.function(ctx, argValues)
 	if err != nil {
-		return octosql.ZeroValue, fmt.Errorf("couldn't evaluate function: %w", err)
+		return nil, fmt.Errorf("couldn't evaluate function: %w", err)
 	}
-	return value, nil
+	return values, nil
 }
 
 type And struct {
@@ -147,26 +173,31 @@ func NewAnd(args []Expression) *And {
 	}
 }
 
-func (c *And) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
-	nullEncountered := false
-	for i := range c.args {
-		value, err := c.args[i].Evaluate(ctx)
-		if err != nil {
-			return octosql.ZeroValue, fmt.Errorf("couldn't evaluate %d AND argument: %w", i, err)
-		}
-		if value.TypeID == octosql.TypeIDNull {
-			nullEncountered = true
-			continue
-		}
-		if !value.Boolean {
-			return value, nil
-		}
-	}
-	if nullEncountered {
-		return octosql.NewNull(), nil
-	}
+func (c *And) Evaluate(ctx ExecutionContext) ([]octosql.Value, error) {
+	panic("implement me")
 
-	return octosql.NewBoolean(true), nil
+	// TODO: This changes the semantics of AND and makes it not short-circuit.
+	//       This could be changed by short circuiting and just evaluating a smaller number of fields in each loop by modifying the variable context passed down.
+
+	// nullEncountered := false
+	// for i := range c.args {
+	// 	value, err := c.args[i].Evaluate(ctx)
+	// 	if err != nil {
+	// 		return octosql.ZeroValue, fmt.Errorf("couldn't evaluate %d AND argument: %w", i, err)
+	// 	}
+	// 	if value.TypeID == octosql.TypeIDNull {
+	// 		nullEncountered = true
+	// 		continue
+	// 	}
+	// 	if !value.Boolean {
+	// 		return value, nil
+	// 	}
+	// }
+	// if nullEncountered {
+	// 	return octosql.NewNull(), nil
+	// }
+	//
+	// return octosql.NewBoolean(true), nil
 }
 
 type Or struct {
@@ -179,24 +210,26 @@ func NewOr(args []Expression) *Or {
 	}
 }
 
-func (c *Or) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
-	nullEncountered := false
-	for i := range c.args {
-		value, err := c.args[i].Evaluate(ctx)
-		if err != nil {
-			return octosql.ZeroValue, fmt.Errorf("couldn't evaluate %d OR argument: %w", i, err)
-		}
-		if value.Boolean {
-			return value, nil
-		}
-		if value.TypeID == octosql.TypeIDNull {
-			nullEncountered = true
-		}
-	}
-	if nullEncountered {
-		return octosql.NewNull(), nil
-	}
-	return octosql.NewBoolean(false), nil
+func (c *Or) Evaluate(ctx ExecutionContext) ([]octosql.Value, error) {
+	panic("implement me")
+
+	// nullEncountered := false
+	// for i := range c.args {
+	// 	value, err := c.args[i].Evaluate(ctx)
+	// 	if err != nil {
+	// 		return octosql.ZeroValue, fmt.Errorf("couldn't evaluate %d OR argument: %w", i, err)
+	// 	}
+	// 	if value.Boolean {
+	// 		return value, nil
+	// 	}
+	// 	if value.TypeID == octosql.TypeIDNull {
+	// 		nullEncountered = true
+	// 	}
+	// }
+	// if nullEncountered {
+	// 	return octosql.NewNull(), nil
+	// }
+	// return octosql.NewBoolean(false), nil
 }
 
 type SingleColumnQueryExpression struct {
@@ -209,21 +242,36 @@ func NewSingleColumnQueryExpression(source Node) *SingleColumnQueryExpression {
 	}
 }
 
-func (e *SingleColumnQueryExpression) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
+func (e *SingleColumnQueryExpression) Evaluate(ctx ExecutionContext) ([]octosql.Value, error) {
 	// TODO: Handle retractions.
-	var values []octosql.Value
-	e.source.Run(
-		ctx,
-		func(ctx ProduceContext, record Record) error {
-			if record.Retraction {
-				return fmt.Errorf("query expression currently can't handle retractions")
-			}
-			values = append(values, record.Values[0])
-			return nil
-		},
-		func(ctx ProduceContext, msg MetadataMessage) error { return nil },
-	)
-	return octosql.NewList(values), nil
+	// TODO: Opportunity for parallelism.
+	out := make([]octosql.Value, ctx.CurrentRecords.Size)
+	for i := range out {
+		var values []octosql.Value
+		if err := e.source.Run(
+			ExecutionContext{
+				Context:         ctx.Context,
+				VariableContext: ctx.VariableContext.WithValues(ctx.CurrentRecords.Row(i)),
+				CurrentRecords: RecordBatch{
+					Size: 1, // TODO: Fix this hack.
+				},
+			},
+			func(ctx ProduceContext, records RecordBatch) error {
+				for _, retraction := range records.Retractions {
+					if retraction {
+						return fmt.Errorf("query expression currently can't handle retractions")
+					}
+				}
+				values = append(values, records.Values[0]...)
+				return nil
+			},
+			func(ctx ProduceContext, msg MetadataMessage) error { return nil },
+		); err != nil {
+			return nil, fmt.Errorf("couldn't run query expression: %w", err)
+		}
+		out[i] = octosql.NewList(values)
+	}
+	return out, nil
 }
 
 type MultiColumnQueryExpression struct {
@@ -236,21 +284,38 @@ func NewMultiColumnQueryExpression(source Node) *MultiColumnQueryExpression {
 	}
 }
 
-func (e *MultiColumnQueryExpression) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
+func (e *MultiColumnQueryExpression) Evaluate(ctx ExecutionContext) ([]octosql.Value, error) {
 	// TODO: Handle retractions.
-	var values []octosql.Value
-	e.source.Run(
-		ctx,
-		func(ctx ProduceContext, record Record) error {
-			if record.Retraction {
-				return fmt.Errorf("query expression currently can't handle retractions")
-			}
-			values = append(values, octosql.NewStruct(record.Values))
-			return nil
-		},
-		func(ctx ProduceContext, msg MetadataMessage) error { return nil },
-	)
-	return octosql.NewList(values), nil
+	// TODO: Opportunity for parallelism.
+	out := make([]octosql.Value, ctx.CurrentRecords.Size)
+	for i := range out {
+		var values []octosql.Value
+		if err := e.source.Run(
+			ExecutionContext{
+				Context:         ctx.Context,
+				VariableContext: ctx.VariableContext.WithValues(ctx.CurrentRecords.Row(i)),
+				CurrentRecords: RecordBatch{
+					Size: 1, // TODO: Fix this hack.
+				},
+			},
+			func(ctx ProduceContext, records RecordBatch) error {
+				for _, retraction := range records.Retractions {
+					if retraction {
+						return fmt.Errorf("query expression currently can't handle retractions")
+					}
+				}
+				for row := 0; row < records.Size; row++ {
+					values = append(values, octosql.NewStruct(records.Row(row)))
+				}
+				return nil
+			},
+			func(ctx ProduceContext, msg MetadataMessage) error { return nil },
+		); err != nil {
+			return nil, fmt.Errorf("couldn't run query expression: %w", err)
+		}
+		out[i] = octosql.NewList(values)
+	}
+	return out, nil
 }
 
 type LayoutMapping struct {
@@ -419,17 +484,18 @@ func NewCoalesce(args []Expression, objectLayoutFixer *ObjectLayoutFixer) *Coale
 	}
 }
 
-func (c *Coalesce) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
-	for i := range c.args {
-		value, err := c.args[i].Evaluate(ctx)
-		if err != nil {
-			return octosql.ZeroValue, fmt.Errorf("couldn't evaluate %d OR argument: %w", i, err)
-		}
-		if value.TypeID != octosql.TypeIDNull {
-			return c.objectLayoutFixer.FixLayout(i, value), nil
-		}
-	}
-	return octosql.NewNull(), nil
+func (c *Coalesce) Evaluate(ctx ExecutionContext) ([]octosql.Value, error) {
+	panic("implement me")
+	// for i := range c.args {
+	// 	value, err := c.args[i].Evaluate(ctx)
+	// 	if err != nil {
+	// 		return octosql.ZeroValue, fmt.Errorf("couldn't evaluate %d OR argument: %w", i, err)
+	// 	}
+	// 	if value.TypeID != octosql.TypeIDNull {
+	// 		return c.objectLayoutFixer.FixLayout(i, value), nil
+	// 	}
+	// }
+	// return octosql.NewNull(), nil
 }
 
 type Tuple struct {
@@ -442,16 +508,24 @@ func NewTuple(args []Expression) *Tuple {
 	}
 }
 
-func (c *Tuple) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
-	values := make([]octosql.Value, len(c.args))
+func (c *Tuple) Evaluate(ctx ExecutionContext) ([]octosql.Value, error) {
+	values := make([][]octosql.Value, len(c.args))
 	for i := range c.args {
-		value, err := c.args[i].Evaluate(ctx)
+		curValues, err := c.args[i].Evaluate(ctx)
 		if err != nil {
-			return octosql.ZeroValue, fmt.Errorf("couldn't evaluate %d tuple argument: %w", i, err)
+			return nil, fmt.Errorf("couldn't evaluate %d tuple argument: %w", i, err)
 		}
-		values[i] = value
+		values[i] = curValues
 	}
-	return octosql.NewTuple(values), nil
+	out := make([]octosql.Value, ctx.CurrentRecords.Size)
+	for i := range out {
+		row := make([]octosql.Value, len(c.args))
+		for j := range row {
+			row[j] = values[j][i]
+		}
+		out[i] = octosql.NewTuple(row)
+	}
+	return out, nil
 }
 
 type ObjectFieldAccess struct {
@@ -466,16 +540,21 @@ func NewObjectFieldAccess(object Expression, fieldIndex int) *ObjectFieldAccess 
 	}
 }
 
-func (c *ObjectFieldAccess) Evaluate(ctx ExecutionContext) (octosql.Value, error) {
-	object, err := c.object.Evaluate(ctx)
+func (c *ObjectFieldAccess) Evaluate(ctx ExecutionContext) ([]octosql.Value, error) {
+	objects, err := c.object.Evaluate(ctx)
 	if err != nil {
-		return octosql.ZeroValue, fmt.Errorf("couldn't evaluate object field access object: %w", err)
+		return nil, fmt.Errorf("couldn't evaluate object field access object: %w", err)
 	}
-	if object.TypeID == octosql.TypeIDNull {
-		return octosql.NewNull(), nil
+	out := make([]octosql.Value, ctx.CurrentRecords.Size)
+	for i := range out {
+		if objects[i].TypeID == octosql.TypeIDNull {
+			out[i] = octosql.NewNull()
+			continue
+		}
+		out[i] = objects[i].Struct[c.fieldIndex]
 	}
 
-	return object.Struct[c.fieldIndex], nil
+	return out, nil
 }
 
 // TODO: sys.undo should create an expression which reads the current retraction status.

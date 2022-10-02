@@ -47,27 +47,29 @@ func (key *arrayKey) Less(than btree.Item) bool {
 	return key.value.Compare(thanTyped.value) == -1
 }
 
-func (c *Array) Add(retraction bool, value octosql.Value) bool {
-	item := c.items.Get(&arrayKey{value: value})
-	var itemTyped *arrayKey
+func (c *Array) Add(retractions []bool, values []octosql.Value) bool {
+	for i, value := range values {
+		item := c.items.Get(&arrayKey{value: value})
+		var itemTyped *arrayKey
 
-	if item == nil {
-		itemTyped = &arrayKey{value: value, count: 0}
-		c.items.ReplaceOrInsert(itemTyped)
-	} else {
-		var ok bool
-		itemTyped, ok = item.(*arrayKey)
-		if !ok {
-			panic(fmt.Sprintf("invalid received item: %v", item))
+		if item == nil {
+			itemTyped = &arrayKey{value: value, count: 0}
+			c.items.ReplaceOrInsert(itemTyped)
+		} else {
+			var ok bool
+			itemTyped, ok = item.(*arrayKey)
+			if !ok {
+				panic(fmt.Sprintf("invalid received item: %v", item))
+			}
 		}
-	}
-	if !retraction {
-		itemTyped.count++
-	} else {
-		itemTyped.count--
-	}
-	if itemTyped.count == 0 {
-		c.items.Delete(itemTyped)
+		if !retractions[i] {
+			itemTyped.count++
+		} else {
+			itemTyped.count--
+		}
+		if itemTyped.count == 0 {
+			c.items.Delete(itemTyped)
+		}
 	}
 	return c.items.Len() == 0
 }

@@ -12,7 +12,7 @@ type Datasource struct {
 }
 
 type Entry struct {
-	Record         Record
+	Record         RecordBatch
 	WatermarkEntry bool
 	Watermark      time.Time
 }

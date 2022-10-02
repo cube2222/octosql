@@ -51,7 +51,7 @@ func (d *functionsExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSe
 	for i := range output {
 		if err := produce(
 			ProduceFromExecutionContext(ctx),
-			NewRecord(output[i], false, time.Time{}),
+			NewRecordBatch(output[i], false, time.Time{}),
 		); err != nil {
 			return fmt.Errorf("couldn't produce record: %w", err)
 		}

@@ -55,14 +55,14 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 			if _, err := reconstruct(&value, levels{}, row); err != nil {
 				return fmt.Errorf("couldn't reconstruct value from row: %w", err)
 			}
-			if err := produce(ProduceFromExecutionContext(ctx), NewRecord(value.Struct, false, time.Time{})); err != nil {
+			if err := produce(ProduceFromExecutionContext(ctx), NewRecordBatch(value.Struct, false, time.Time{})); err != nil {
 				return fmt.Errorf("couldn't produce value: %w", err)
 			}
 		}
 	} else {
 		rowCount := int(pr.NumRows())
 		for i := 0; i < rowCount; i++ {
-			if err := produce(ProduceFromExecutionContext(ctx), NewRecord([]octosql.Value{}, false, time.Time{})); err != nil {
+			if err := produce(ProduceFromExecutionContext(ctx), NewRecordBatch([]octosql.Value{}, false, time.Time{})); err != nil {
 				return fmt.Errorf("couldn't produce value: %w", err)
 			}
 		}

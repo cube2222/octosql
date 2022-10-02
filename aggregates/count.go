@@ -26,11 +26,13 @@ func NewCountPrototype() func() nodes.Aggregate {
 	}
 }
 
-func (c *Count) Add(retraction bool, value octosql.Value) bool {
-	if !retraction {
-		c.count++
-	} else {
-		c.count--
+func (c *Count) Add(retractions []bool, values []octosql.Value) bool {
+	for _, retraction := range retractions {
+		if !retraction {
+			c.count++
+		} else {
+			c.count--
+		}
 	}
 	return c.count == 0
 }

@@ -40,9 +40,9 @@ func NewAverageIntPrototype() func() nodes.Aggregate {
 	}
 }
 
-func (c *AverageInt) Add(retraction bool, value octosql.Value) bool {
-	c.sum.Add(retraction, value)
-	return c.count.Add(retraction, value)
+func (c *AverageInt) Add(retractions []bool, values []octosql.Value) bool {
+	c.sum.Add(retractions, values)
+	return c.count.Add(retractions, values)
 }
 
 func (c *AverageInt) Trigger() octosql.Value {
@@ -63,9 +63,9 @@ func NewAverageFloatPrototype() func() nodes.Aggregate {
 	}
 }
 
-func (c *AverageFloat) Add(retraction bool, value octosql.Value) bool {
-	c.sum.Add(retraction, value)
-	return c.count.Add(retraction, value)
+func (c *AverageFloat) Add(retractions []bool, values []octosql.Value) bool {
+	c.sum.Add(retractions, values)
+	return c.count.Add(retractions, values)
 }
 
 func (c *AverageFloat) Trigger() octosql.Value {
@@ -86,9 +86,9 @@ func NewAverageDurationPrototype() func() nodes.Aggregate {
 	}
 }
 
-func (c *AverageDuration) Add(retraction bool, value octosql.Value) bool {
-	c.sum.Add(retraction, value)
-	return c.count.Add(retraction, value)
+func (c *AverageDuration) Add(retractions []bool, values []octosql.Value) bool {
+	c.sum.Add(retractions, values)
+	return c.count.Add(retractions, values)
 }
 
 func (c *AverageDuration) Trigger() octosql.Value {

@@ -12,7 +12,7 @@ import (
 
 type Format interface {
 	SetSchema(physical.Schema)
-	Write([]octosql.Value) error
+	Write(values [][]octosql.Value, count int) error
 	Close() error
 }
 
@@ -38,8 +38,8 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 
 	if err := o.source.Run(
 		execCtx,
-		func(ctx ProduceContext, record Record) error {
-			return format.Write(record.Values)
+		func(ctx ProduceContext, record RecordBatch) error {
+			return format.Write(record.Values, 0)
 		},
 		func(ctx ProduceContext, msg MetadataMessage) error {
 			return nil

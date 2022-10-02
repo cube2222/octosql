@@ -42,26 +42,30 @@ type distinctKey struct {
 	count int
 }
 
-func (c *Distinct) Add(retraction bool, value octosql.Value) bool {
-	var hint btree.PathHint
-
-	item, ok := c.items.GetHint(&distinctKey{value: value}, &hint)
-	if !ok {
-		item = &distinctKey{value: value, count: 0}
-		c.items.SetHint(item, &hint)
-	}
-	if !retraction {
-		item.count++
-	} else {
-		item.count--
-	}
-	if item.count == 1 && !retraction {
-		c.wrapped.Add(false, value)
-	} else if item.count == 0 {
-		c.items.DeleteHint(item, &hint)
-		c.wrapped.Add(true, value)
-	}
-	return c.items.Len() == 0
+func (c *Distinct) Add(retractions []bool, values []octosql.Value) bool {
+	// var distinctValues []octosql.Value
+	panic("implement me")
+	// for value := range values {
+	// 	var hint btree.PathHint
+	//
+	// 	item, ok := c.items.GetHint(&distinctKey{value: values}, &hint)
+	// 	if !ok {
+	// 		item = &distinctKey{value: values, count: 0}
+	// 		c.items.SetHint(item, &hint)
+	// 	}
+	// 	if !retractions {
+	// 		item.count++
+	// 	} else {
+	// 		item.count--
+	// 	}
+	// 	if item.count == 1 && !retractions {
+	// 		c.wrapped.Add(false, values)
+	// 	} else if item.count == 0 {
+	// 		c.items.DeleteHint(item, &hint)
+	// 		c.wrapped.Add(true, values)
+	// 	}
+	// }
+	// return c.items.Len() == 0
 }
 
 func (c *Distinct) Trigger() octosql.Value {

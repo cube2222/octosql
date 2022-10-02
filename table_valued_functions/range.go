@@ -97,10 +97,23 @@ func (r *rangeNode) Run(ctx execution.ExecutionContext, produce execution.Produc
 	if err != nil {
 		return fmt.Errorf("couldn't evaluate end: %w", err)
 	}
-	for i := start.Int; i < end.Int; i++ {
+	outValues := make([]octosql.Value, 0, execution.DesiredBatchSize)
+	for i := start[0].Int; i < end[0].Int; i++ {
+		outValues = append(outValues, octosql.NewInt(i))
+		if len(outValues) == execution.DesiredBatchSize {
+			if err := produce(
+				execution.ProduceFromExecutionContext(ctx),
+				execution.NewRecordBatch([][]octosql.Value{outValues}, make([]bool, len(outValues)), make([]time.Time, len(outValues))),
+			); err != nil {
+				return fmt.Errorf("couldn't produce record: %w", err)
+			}
+			outValues = make([]octosql.Value, 0, execution.DesiredBatchSize)
+		}
+	}
+	if len(outValues) > 0 {
 		if err := produce(
 			execution.ProduceFromExecutionContext(ctx),
-			execution.NewRecord([]octosql.Value{octosql.NewInt(i)}, false, time.Time{}),
+			execution.NewRecordBatch([][]octosql.Value{outValues}, make([]bool, len(outValues)), make([]time.Time, len(outValues))),
 		); err != nil {
 			return fmt.Errorf("couldn't produce record: %w", err)
 		}

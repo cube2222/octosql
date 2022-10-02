@@ -10,22 +10,14 @@ import (
 	"runtime/debug"
 	"runtime/trace"
 	"strings"
-	"sync"
 
-	"github.com/Masterminds/semver"
 	"github.com/pkg/profile"
 	"github.com/skratchdot/open-golang/open"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
 	"github.com/cube2222/octosql/aggregates"
-	"github.com/cube2222/octosql/config"
-	"github.com/cube2222/octosql/datasources/csv"
-	"github.com/cube2222/octosql/datasources/docs"
 	"github.com/cube2222/octosql/datasources/json"
-	"github.com/cube2222/octosql/datasources/lines"
-	"github.com/cube2222/octosql/datasources/parquet"
-	"github.com/cube2222/octosql/datasources/plugins"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/execution/nodes"
 	"github.com/cube2222/octosql/functions"
@@ -33,18 +25,13 @@ import (
 	"github.com/cube2222/octosql/logical"
 	"github.com/cube2222/octosql/logs"
 	"github.com/cube2222/octosql/optimizer"
-	"github.com/cube2222/octosql/outputs/batch"
 	"github.com/cube2222/octosql/outputs/eager"
 	"github.com/cube2222/octosql/outputs/formats"
 	"github.com/cube2222/octosql/outputs/stream"
 	"github.com/cube2222/octosql/parser"
 	"github.com/cube2222/octosql/parser/sqlparser"
 	"github.com/cube2222/octosql/physical"
-	"github.com/cube2222/octosql/plugins/executor"
-	"github.com/cube2222/octosql/plugins/manager"
-	"github.com/cube2222/octosql/plugins/repository"
 	"github.com/cube2222/octosql/table_valued_functions"
-	"github.com/cube2222/octosql/telemetry"
 )
 
 var VERSION = "dev"
@@ -83,127 +70,130 @@ octosql "SELECT * FROM plugins.plugins"`,
 		logs.InitializeFileLogger()
 		defer logs.CloseLogger()
 
-		pluginManager := &manager.PluginManager{}
-
-		pluginExecutor := executor.PluginExecutor{
-			Manager: pluginManager,
-		}
-		defer func() {
-			if err := pluginExecutor.Close(); err != nil {
-				log.Printf("couldn't close plugin executor: %s", err)
-			}
-		}()
-
-		cfg, err := config.Read()
-		if err != nil {
-			return fmt.Errorf("couldn't read config: %w", err)
-		}
-
-		installedPlugins, err := pluginManager.ListInstalledPlugins()
-		if err != nil {
-			return fmt.Errorf("couldn't list installed plugins: %w", err)
-		}
-
-		resolvedVersions := map[string]*semver.Version{}
-
-		// Fill in plugin versions.
-	dbLoop:
-		for i := range cfg.Databases {
-			if cfg.Databases[i].Version == nil {
-				constraint, _ := semver.NewConstraint("*")
-				cfg.Databases[i].Version = config.NewYamlUnmarshallableVersionConstraint(constraint)
-			}
-			for _, plugin := range installedPlugins {
-				if plugin.Reference != cfg.Databases[i].Type {
-					continue
-				}
-				for _, version := range plugin.Versions {
-					if cfg.Databases[i].Version.Raw().Check(version.Number) {
-						resolvedVersions[cfg.Databases[i].Name] = version.Number
-						continue dbLoop
-					}
-				}
-				break
-			}
-			return fmt.Errorf("database '%s' plugin '%s' used in configuration is not installed with the required version - run `octosql plugin install` to install all missing plugins", cfg.Databases[i].Name, cfg.Databases[i].Type.String())
-		}
-
+		// TODO: Fixme
+		// 	pluginManager := &manager.PluginManager{}
+		//
+		// 	pluginExecutor := executor.PluginExecutor{
+		// 		Manager: pluginManager,
+		// 	}
+		// 	defer func() {
+		// 		if err := pluginExecutor.Close(); err != nil {
+		// 			log.Printf("couldn't close plugin executor: %s", err)
+		// 		}
+		// 	}()
+		//
+		// 	cfg, err := config.Read()
+		// 	if err != nil {
+		// 		return fmt.Errorf("couldn't read config: %w", err)
+		// 	}
+		//
+		// 	installedPlugins, err := pluginManager.ListInstalledPlugins()
+		// 	if err != nil {
+		// 		return fmt.Errorf("couldn't list installed plugins: %w", err)
+		// 	}
+		//
+		// 	resolvedVersions := map[string]*semver.Version{}
+		//
+		// 	// Fill in plugin versions.
+		// dbLoop:
+		// 	for i := range cfg.Databases {
+		// 		if cfg.Databases[i].Version == nil {
+		// 			constraint, _ := semver.NewConstraint("*")
+		// 			cfg.Databases[i].Version = config.NewYamlUnmarshallableVersionConstraint(constraint)
+		// 		}
+		// 		for _, plugin := range installedPlugins {
+		// 			if plugin.Reference != cfg.Databases[i].Type {
+		// 				continue
+		// 			}
+		// 			for _, version := range plugin.Versions {
+		// 				if cfg.Databases[i].Version.Raw().Check(version.Number) {
+		// 					resolvedVersions[cfg.Databases[i].Name] = version.Number
+		// 					continue dbLoop
+		// 				}
+		// 			}
+		// 			break
+		// 		}
+		// 		return fmt.Errorf("database '%s' plugin '%s' used in configuration is not installed with the required version - run `octosql plugin install` to install all missing plugins", cfg.Databases[i].Name, cfg.Databases[i].Type.String())
+		// 	}
+		//
 		databases := make(map[string]func() (physical.Database, error))
-		for _, dbConfig := range cfg.Databases {
-			once := sync.Once{}
-			curDbConfig := dbConfig
-			var db physical.Database
-			var err error
+		// 	for _, dbConfig := range cfg.Databases {
+		// 		once := sync.Once{}
+		// 		curDbConfig := dbConfig
+		// 		var db physical.Database
+		// 		var err error
+		//
+		// 		databases[curDbConfig.Name] = func() (physical.Database, error) {
+		// 			once.Do(func() {
+		// 				db, err = pluginExecutor.RunPlugin(ctx, curDbConfig.Type, curDbConfig.Name, resolvedVersions[curDbConfig.Name], curDbConfig.Config)
+		// 			})
+		// 			if err != nil {
+		// 				return nil, fmt.Errorf("couldn't run %s plugin %s: %w", curDbConfig.Type.String(), curDbConfig.Name, err)
+		// 			}
+		// 			return db, nil
+		// 		}
+		// 	}
+		// TODO: Fixme
+		// {
+		// 	once := sync.Once{}
+		// 	var repositories []repository.Repository
+		// 	var err error
+		// 	databases["plugins"] = func() (physical.Database, error) {
+		// 		once.Do(func() {
+		// 			repositories, err = repository.GetRepositories(ctx)
+		// 		})
+		// 		if err != nil {
+		// 			return nil, fmt.Errorf("couldn't get repositories: %w", err)
+		// 		}
+		// 		return plugins.Creator(ctx, pluginManager, repositories)
+		// 	}
+		// }
+		// TODO: Fixme
+		// databases["docs"] = func() (physical.Database, error) {
+		// 	return docs.Creator(ctx)
+		// }
+		// TODO: Fixme
+		// for _, metadata := range installedPlugins {
+		// 	if _, ok := databases[metadata.Reference.Name]; ok {
+		// 		continue
+		// 	}
+		// 	curMetadata := metadata
+		//
+		// 	once := sync.Once{}
+		// 	var db physical.Database
+		// 	var err error
+		//
+		// 	databases[curMetadata.Reference.Name] = func() (physical.Database, error) {
+		// 		once.Do(func() {
+		// 			db, err = pluginExecutor.RunPlugin(ctx, curMetadata.Reference, curMetadata.Reference.Name, curMetadata.Versions[0].Number, emptyYamlNode)
+		// 		})
+		// 		if err != nil {
+		// 			return nil, fmt.Errorf("couldn't run default plugin %s database: %w", curMetadata.Reference, err)
+		// 		}
+		// 		return db, nil
+		// 	}
+		// }
 
-			databases[curDbConfig.Name] = func() (physical.Database, error) {
-				once.Do(func() {
-					db, err = pluginExecutor.RunPlugin(ctx, curDbConfig.Type, curDbConfig.Name, resolvedVersions[curDbConfig.Name], curDbConfig.Config)
-				})
-				if err != nil {
-					return nil, fmt.Errorf("couldn't run %s plugin %s: %w", curDbConfig.Type.String(), curDbConfig.Name, err)
-				}
-				return db, nil
-			}
-		}
-		{
-			once := sync.Once{}
-			var repositories []repository.Repository
-			var err error
-			databases["plugins"] = func() (physical.Database, error) {
-				once.Do(func() {
-					repositories, err = repository.GetRepositories(ctx)
-				})
-				if err != nil {
-					return nil, fmt.Errorf("couldn't get repositories: %w", err)
-				}
-				return plugins.Creator(ctx, pluginManager, repositories)
-			}
-		}
-		databases["docs"] = func() (physical.Database, error) {
-			return docs.Creator(ctx)
-		}
-
-		for _, metadata := range installedPlugins {
-			if _, ok := databases[metadata.Reference.Name]; ok {
-				continue
-			}
-			curMetadata := metadata
-
-			once := sync.Once{}
-			var db physical.Database
-			var err error
-
-			databases[curMetadata.Reference.Name] = func() (physical.Database, error) {
-				once.Do(func() {
-					db, err = pluginExecutor.RunPlugin(ctx, curMetadata.Reference, curMetadata.Reference.Name, curMetadata.Versions[0].Number, emptyYamlNode)
-				})
-				if err != nil {
-					return nil, fmt.Errorf("couldn't run default plugin %s database: %w", curMetadata.Reference, err)
-				}
-				return db, nil
-			}
-		}
-
-		fileExtensionHandlers, err := pluginManager.GetFileExtensionHandlers()
-		if err != nil {
-			return fmt.Errorf("couldn't get file extension handlers: %w", err)
-		}
+		// fileExtensionHandlers, err := pluginManager.GetFileExtensionHandlers()
+		// if err != nil {
+		// 	return fmt.Errorf("couldn't get file extension handlers: %w", err)
+		// }
 		fileHandlers := map[string]func(name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error){
-			"csv":     csv.Creator(','),
-			"json":    json.Creator,
-			"lines":   lines.Creator,
-			"parquet": parquet.Creator,
-			"tsv":     csv.Creator('\t'),
+			// "csv":   csv.Creator(','), TODO: Fixme
+			"json": json.Creator,
+			// "lines": lines.Creator, TODO: Fixme
+			// "parquet": parquet.Creator, TODO: Fixme
+			// "tsv": csv.Creator('\t'), TODO: Fixme
 		}
-		for ext, pluginName := range fileExtensionHandlers {
-			fileHandlers[ext] = func(name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error) {
-				db, err := databases[pluginName]()
-				if err != nil {
-					return nil, physical.Schema{}, fmt.Errorf("couldn't get plugin %s database for plugin extensions %s: %w", pluginName, ext, err)
-				}
-				return db.GetTable(ctx, name, options)
-			}
-		}
+		// for ext, pluginName := range fileExtensionHandlers {
+		// 	fileHandlers[ext] = func(name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error) {
+		// 		db, err := databases[pluginName]()
+		// 		if err != nil {
+		// 			return nil, physical.Schema{}, fmt.Errorf("couldn't get plugin %s database for plugin extensions %s: %w", pluginName, ext, err)
+		// 		}
+		// 		return db.GetTable(ctx, name, options)
+		// 	}
+		// }
 		for name := range fileHandlers {
 			curHandler := fileHandlers[name]
 			if _, ok := databases[name]; !ok {
@@ -290,14 +280,14 @@ octosql "SELECT * FROM plugins.plugins"`,
 			physicalLimitExpression = &physicalExpr
 		}
 
-		queryTelemetry := telemetry.GetQueryTelemetryData(physicalPlan, installedPlugins)
+		// queryTelemetry := telemetry.GetQueryTelemetryData(physicalPlan, installedPlugins)
 
 		var executionPlan execution.Node
 		var orderByExpressions []execution.Expression
 		var limitExpression *execution.Expression
 		var outSchema physical.Schema
 		if describe {
-			telemetry.SendTelemetry(ctx, VERSION, "describe", queryTelemetry)
+			// telemetry.SendTelemetry(ctx, VERSION, "describe", queryTelemetry)
 
 			for i := range physicalPlan.Schema.Fields {
 				physicalPlan.Schema.Fields[i].Name = reverseMapping[physicalPlan.Schema.Fields[i].Name]
@@ -311,7 +301,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 			}
 			outSchema = DescribeNodeSchema
 		} else {
-			telemetry.SendTelemetry(ctx, VERSION, "query", queryTelemetry)
+			// telemetry.SendTelemetry(ctx, VERSION, "query", queryTelemetry)
 
 			if optimize {
 				physicalPlan = optimizer.Optimize(physicalPlan)
@@ -380,39 +370,43 @@ octosql "SELECT * FROM plugins.plugins"`,
 		execCtx := execution.ExecutionContext{
 			Context:         ctx,
 			VariableContext: nil,
+			CurrentRecords: execution.RecordBatch{
+				Size: 1, // TODO: Fix this hack.
+			},
 		}
 
 		switch output {
 		case "live_table", "batch_table":
-			var limit *int
-			if limitExpression != nil {
-				val, err := (*limitExpression).Evaluate(execCtx)
-				if err != nil {
-					return fmt.Errorf("couldn't evaluate limit expression: %w", err)
-				}
-				if val.Int < 0 {
-					return fmt.Errorf("limit must be positive, got %d", val.Int)
-				}
-				limit = &val.Int
-
-				if len(orderByExpressions) == 0 && physicalPlan.Schema.NoRetractions {
-					// We want short-circuiting.
-					executionPlan = nodes.NewLimit(executionPlan, *limitExpression)
-				}
-			}
-
-			sink = batch.NewOutputPrinter(
-				executionPlan,
-				orderByExpressions,
-				logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
-				limit,
-				physicalPlan.Schema.NoRetractions,
-				outSchema,
-				func(writer io.Writer) batch.Format {
-					return formats.NewTableFormatter(writer)
-				},
-				output == "live_table",
-			)
+			panic("implement me")
+			// var limit *int
+			// if limitExpression != nil {
+			// 	val, err := (*limitExpression).Evaluate(execCtx)
+			// 	if err != nil {
+			// 		return fmt.Errorf("couldn't evaluate limit expression: %w", err)
+			// 	}
+			// 	if val.Int < 0 {
+			// 		return fmt.Errorf("limit must be positive, got %d", val.Int)
+			// 	}
+			// 	limit = &val.Int
+			//
+			// 	if len(orderByExpressions) == 0 && physicalPlan.Schema.NoRetractions {
+			// 		// We want short-circuiting.
+			// 		executionPlan = nodes.NewLimit(executionPlan, *limitExpression)
+			// 	}
+			// }
+			//
+			// sink = batch.NewOutputPrinter(
+			// 	executionPlan,
+			// 	orderByExpressions,
+			// 	logical.DirectionsToMultipliers(outputOptions.OrderByDirections),
+			// 	limit,
+			// 	physicalPlan.Schema.NoRetractions,
+			// 	outSchema,
+			// 	func(writer io.Writer) batch.Format {
+			// 		return formats.NewTableFormatter(writer)
+			// 	},
+			// 	output == "live_table",
+			// )
 		case "csv", "json":
 			if len(orderByExpressions) > 0 || (limitExpression != nil && !physicalPlan.Schema.NoRetractions) {
 				executionPlan = nodes.NewOrderSensitiveTransform(executionPlan, orderByExpressions, logical.DirectionsToMultipliers(outputOptions.OrderByDirections), limitExpression, physicalPlan.Schema.NoRetractions)
@@ -454,12 +448,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 		}
 
 		trace.Log(ctx, "octosql", "running query")
-		if err := sink.Run(
-			execution.ExecutionContext{
-				Context:         ctx,
-				VariableContext: nil,
-			},
-		); err != nil {
+		if err := sink.Run(execCtx); err != nil {
 			return fmt.Errorf("couldn't run query: %w", err)
 		}
 		return nil

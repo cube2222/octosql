@@ -57,7 +57,7 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 			}
 		}
 
-		if err := produce(ProduceFromExecutionContext(ctx), NewRecord(values, false, time.Time{})); err != nil {
+		if err := produce(ProduceFromExecutionContext(ctx), NewRecordBatch(values, false, time.Time{})); err != nil {
 			return fmt.Errorf("couldn't produce record: %w", err)
 		}
 		line++

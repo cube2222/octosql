@@ -32,12 +32,17 @@ func (t *CSVFormatter) SetSchema(schema physical.Schema) {
 	t.writer.Write(header)
 }
 
-func (t *CSVFormatter) Write(values []octosql.Value) error {
-	row := make([]string, len(values))
-	for i := range values {
-		row[i] = fmt.Sprintf("%v", values[i].ToRawGoValue(t.fields[i].Type))
+func (t *CSVFormatter) Write(values [][]octosql.Value, count int) error {
+	for rowIndex := 0; rowIndex < count; rowIndex++ {
+		row := make([]string, len(values))
+		for i := range values {
+			row[i] = fmt.Sprintf("%v", values[i][rowIndex].ToRawGoValue(t.fields[i].Type))
+		}
+		if err := t.writer.Write(row); err != nil {
+			return err
+		}
 	}
-	return t.writer.Write(row)
+	return nil
 }
 
 func (t *CSVFormatter) Close() error {

@@ -96,57 +96,58 @@ type poll struct {
 }
 
 func (t *poll) Run(ctx execution.ExecutionContext, produce execution.ProduceFn, metaSend execution.MetaSendFn) error {
-	offset, err := t.interval.Evaluate(ctx)
-	if err != nil {
-		return fmt.Errorf("couldn't evaluate offset: %w", err)
-	}
-
-	var lastNow time.Time
-	var lastValues [][]octosql.Value
-
-	for {
-		now := time.Now()
-
-		if !lastNow.IsZero() {
-			for i := range lastValues {
-				if err := produce(
-					execution.ProduceFromExecutionContext(ctx),
-					execution.NewRecord(lastValues[i], true, lastNow),
-				); err != nil {
-					return fmt.Errorf("couldn't produce record: %w", err)
-				}
-			}
-		}
-
-		lastNow = now
-		lastValues = nil
-
-		if err := t.source.Run(ctx, func(ctx execution.ProduceContext, record execution.Record) error {
-			values := make([]octosql.Value, len(record.Values)+1)
-			copy(values[1:], record.Values)
-			values[0] = octosql.NewTime(now)
-
-			lastValues = append(lastValues, make([]octosql.Value, len(values)))
-			copy(lastValues[len(lastValues)-1], values)
-
-			if err := produce(ctx, execution.NewRecord(values, false, now)); err != nil {
-				return fmt.Errorf("couldn't produce record: %w", err)
-			}
-
-			return nil
-		}, metaSend); err != nil {
-			return fmt.Errorf("couldn't run source: %w", err)
-		}
-
-		if err := metaSend(execution.ProduceFromExecutionContext(ctx), execution.MetadataMessage{
-			Type:      execution.MetadataMessageTypeWatermark,
-			Watermark: now,
-		}); err != nil {
-			return fmt.Errorf("couldn't send updated watermark: %w", err)
-		}
-
-		time.Sleep(offset.Duration)
-	}
-
-	return nil
+	panic("implement me")
+	// offset, err := t.interval.Evaluate(ctx)
+	// if err != nil {
+	// 	return fmt.Errorf("couldn't evaluate offset: %w", err)
+	// }
+	//
+	// var lastNow time.Time
+	// var lastValues [][]octosql.Value
+	//
+	// for {
+	// 	now := time.Now()
+	//
+	// 	if !lastNow.IsZero() {
+	// 		for i := range lastValues {
+	// 			if err := produce(
+	// 				execution.ProduceFromExecutionContext(ctx),
+	// 				execution.NewRecordBatch(lastValues[i], true, lastNow),
+	// 			); err != nil {
+	// 				return fmt.Errorf("couldn't produce record: %w", err)
+	// 			}
+	// 		}
+	// 	}
+	//
+	// 	lastNow = now
+	// 	lastValues = nil
+	//
+	// 	if err := t.source.Run(ctx, func(ctx execution.ProduceContext, record execution.RecordBatch) error {
+	// 		values := make([]octosql.Value, len(record.Values)+1)
+	// 		copy(values[1:], record.Values)
+	// 		values[0] = octosql.NewTime(now)
+	//
+	// 		lastValues = append(lastValues, make([]octosql.Value, len(values)))
+	// 		copy(lastValues[len(lastValues)-1], values)
+	//
+	// 		if err := produce(ctx, execution.NewRecordBatch(values, false, now)); err != nil {
+	// 			return fmt.Errorf("couldn't produce record: %w", err)
+	// 		}
+	//
+	// 		return nil
+	// 	}, metaSend); err != nil {
+	// 		return fmt.Errorf("couldn't run source: %w", err)
+	// 	}
+	//
+	// 	if err := metaSend(execution.ProduceFromExecutionContext(ctx), execution.MetadataMessage{
+	// 		Type:      execution.MetadataMessageTypeWatermark,
+	// 		Watermark: now,
+	// 	}); err != nil {
+	// 		return fmt.Errorf("couldn't send updated watermark: %w", err)
+	// 	}
+	//
+	// 	time.Sleep(offset.Duration)
+	// }
+	//
+	// return nil
 }

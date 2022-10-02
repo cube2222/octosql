@@ -35,11 +35,14 @@ func (d *DescribeNode) Run(ctx ExecutionContext, produce ProduceFn, metaSend Met
 	for i, field := range d.Schema.Fields {
 		if err := produce(
 			ProduceFromExecutionContext(ctx),
-			NewRecord([]octosql.Value{
-				octosql.NewString(field.Name),
-				octosql.NewString(field.Type.String()),
-				octosql.NewBoolean(i == d.Schema.TimeField),
-			}, false, time.Time{}),
+			// TODO: Fixme.
+			NewRecordBatch([][]octosql.Value{
+				{
+					octosql.NewString(field.Name),
+					octosql.NewString(field.Type.String()),
+					octosql.NewBoolean(i == d.Schema.TimeField),
+				},
+			}, []bool{false}, []time.Time{{}}),
 		); err != nil {
 			return fmt.Errorf("couldn't produce record: %w", err)
 		}

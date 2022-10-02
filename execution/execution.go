@@ -16,12 +16,15 @@ type Node interface {
 type ExecutionContext struct {
 	context.Context
 	VariableContext *VariableContext
+	CurrentRecords  RecordBatch
+	// TODO: Fix the subquery expression to handle this properly.
 }
 
-func (ctx ExecutionContext) WithRecord(record Record) ExecutionContext {
+func (ctx ExecutionContext) WithRecord(record RecordBatch) ExecutionContext {
 	return ExecutionContext{
 		Context:         ctx.Context,
-		VariableContext: ctx.VariableContext.WithRecord(record),
+		VariableContext: ctx.VariableContext,
+		CurrentRecords:  record,
 	}
 }
 
@@ -30,14 +33,14 @@ type VariableContext struct {
 	Values []octosql.Value
 }
 
-func (varCtx *VariableContext) WithRecord(record Record) *VariableContext {
+func (varCtx *VariableContext) WithValues(values []octosql.Value) *VariableContext {
 	return &VariableContext{
 		Parent: varCtx,
-		Values: record.Values,
+		Values: values,
 	}
 }
 
-type ProduceFn func(ctx ProduceContext, record Record) error
+type ProduceFn func(ctx ProduceContext, records RecordBatch) error
 
 type ProduceContext struct {
 	context.Context
@@ -49,45 +52,67 @@ func ProduceFromExecutionContext(ctx ExecutionContext) ProduceContext {
 	}
 }
 
-func ProduceFnApplyContext(fn ProduceFn, ctx ProduceContext) func(record Record) error {
-	return func(record Record) error {
+func ProduceFnApplyContext(fn ProduceFn, ctx ProduceContext) func(record RecordBatch) error {
+	return func(record RecordBatch) error {
 		return fn(ctx, record)
 	}
 }
 
-type Record struct {
-	Values     []octosql.Value
-	Retraction bool
-	EventTime  time.Time
+// TODO: Tune this size.
+const DesiredBatchSize = 8192
+
+type RecordBatch struct {
+	// Values are stored column-first.
+	Values      [][]octosql.Value
+	Retractions []bool      // TODO: If stream without retractions, then don't store.
+	EventTimes  []time.Time // TODO: If stream without event times, then don't store.
+	Size        int
 }
 
-// Functional options?
-func NewRecord(values []octosql.Value, retraction bool, eventTime time.Time) Record {
-	return Record{
-		Values:     values,
-		Retraction: retraction,
-		EventTime:  eventTime,
+func NewRecordBatch(values [][]octosql.Value, retractions []bool, eventTimes []time.Time) RecordBatch {
+	return RecordBatch{
+		Values:      values,
+		Retractions: retractions,
+		EventTimes:  eventTimes,
+		Size:        len(retractions),
 	}
 }
 
-func (record Record) String() string {
-	builder := strings.Builder{}
-	builder.WriteString("{")
-	if !record.Retraction {
-		builder.WriteString("+")
-	} else {
-		builder.WriteString("-")
+func (records RecordBatch) Row(index int) []octosql.Value {
+	return Row(records.Values, index)
+}
+
+// TODO: Check and force inlining.
+func Row(columnFirstValues [][]octosql.Value, rowIndex int) []octosql.Value {
+	out := make([]octosql.Value, len(columnFirstValues))
+	for col := range columnFirstValues {
+		out[col] = columnFirstValues[col][rowIndex]
 	}
-	builder.WriteString(record.EventTime.Format(time.RFC3339))
-	builder.WriteString("| ")
-	for i := range record.Values {
-		builder.WriteString(record.Values[i].String())
-		if i != len(record.Values)-1 {
-			builder.WriteString(", ")
+	return out
+}
+
+func (records RecordBatch) String() []string {
+	out := make([]string, len(records.Values))
+	for i := 0; i < records.Size; i++ {
+		builder := strings.Builder{}
+		builder.WriteString("{")
+		if !records.Retractions[i] {
+			builder.WriteString("+")
+		} else {
+			builder.WriteString("-")
 		}
+		builder.WriteString(records.EventTimes[i].Format(time.RFC3339))
+		builder.WriteString("| ")
+		for j := range records.Values {
+			builder.WriteString(records.Values[j][i].String())
+			if j != len(records.Values)-1 {
+				builder.WriteString(", ")
+			}
+		}
+		builder.WriteString(" |}")
+		out[i] = builder.String()
 	}
-	builder.WriteString(" |}")
-	return builder.String()
+	return out
 }
 
 type MetaSendFn func(ctx ProduceContext, msg MetadataMessage) error

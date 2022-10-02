@@ -57,7 +57,7 @@ func (d *aggregateSignaturesExecuting) Run(ctx ExecutionContext, produce Produce
 	for i := range output {
 		if err := produce(
 			ProduceFromExecutionContext(ctx),
-			NewRecord(output[i], false, time.Time{}),
+			NewRecordBatch(output[i], false, time.Time{}),
 		); err != nil {
 			return fmt.Errorf("couldn't produce record: %w", err)
 		}

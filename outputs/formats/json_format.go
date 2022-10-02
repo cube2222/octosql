@@ -31,17 +31,19 @@ func (t *JSONFormatter) SetSchema(schema physical.Schema) {
 	t.fields = WithoutQualifiers(schema.Fields)
 }
 
-func (t *JSONFormatter) Write(values []octosql.Value) error {
-	obj := t.arena.NewObject()
-	for i := range t.fields {
-		obj.Set(t.fields[i].Name, ValueToJson(t.arena, t.fields[i].Type, values[i]))
-	}
+func (t *JSONFormatter) Write(values [][]octosql.Value, count int) error {
+	for row := 0; row < count; row++ {
+		obj := t.arena.NewObject()
+		for i := range t.fields {
+			obj.Set(t.fields[i].Name, ValueToJson(t.arena, t.fields[i].Type, values[i][row]))
+		}
 
-	t.buf = obj.MarshalTo(t.buf)
-	t.buf = append(t.buf, '\n')
-	t.w.Write(t.buf)
-	t.buf = t.buf[:0]
-	t.arena.Reset()
+		t.buf = obj.MarshalTo(t.buf)
+		t.buf = append(t.buf, '\n')
+		t.w.Write(t.buf)
+		t.buf = t.buf[:0]
+		t.arena.Reset()
+	}
 	return nil
 }
 

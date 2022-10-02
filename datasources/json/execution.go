@@ -35,7 +35,7 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 	localCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	outChan := make(chan []jobOutRecord, 128)
+	outChan := make(chan jobOutRecord, 128)
 
 	// This is necessary so that the global worker pool doesn't lock up.
 	// We only allow the line reader to create parsing jobs when we know that the output channel has space left.
@@ -55,17 +55,19 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 
 	// This routine reads lines and sends them in batches to the parser worker pool.
 	go func() {
-		line := 0
+		line := 1
+		batchIndex := 0
 		batchSize := 64
 		if d.tail {
 			batchSize = 1
 		}
 		job := jobIn{
-			ctx:     localCtx,
-			fields:  d.fields,
-			lines:   make([]int, 0, batchSize),
-			data:    make([][]byte, 0, batchSize),
-			outChan: outChan,
+			fields:     d.fields,
+			ctx:        localCtx,
+			batchIndex: batchIndex,
+			lines:      make([]int, 0, batchSize),
+			data:       make([][]byte, 0, batchSize),
+			outChan:    outChan,
 		}
 		for sc.Scan() {
 			data := make([]byte, len(sc.Bytes()))
@@ -78,15 +80,17 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 				case outChanAvailableTokens <- struct{}{}:
 					parserWorkReceiveChannel <- job
 					linesRead += len(job.lines)
+					batchIndex++
 				case <-localCtx.Done():
 					return
 				}
 				job = jobIn{
-					ctx:     localCtx,
-					fields:  d.fields,
-					lines:   make([]int, 0, batchSize),
-					data:    make([][]byte, 0, batchSize),
-					outChan: outChan,
+					fields:     d.fields,
+					ctx:        localCtx,
+					batchIndex: batchIndex,
+					lines:      make([]int, 0, batchSize),
+					data:       make([][]byte, 0, batchSize),
+					outChan:    outChan,
 				}
 			}
 
@@ -104,33 +108,32 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 		done <- sc.Err()
 	}()
 
-	var queue []*Record
+	var queue []*RecordBatch
 	var startIndex int
+	var linesOutput int
 	var fileReaderIsDone bool
 produceLoop:
 	for {
 		select {
-		case outJobs := <-outChan:
+		case out := <-outChan:
 			<-outChanAvailableTokens
-			for i := range outJobs {
-				out := outJobs[i]
-				if err := out.err; err != nil {
-					return fmt.Errorf("couldn't parse line %d: %w", out.line+1 /*lines in OctoSQL start at zero*/, err)
-				}
-				for len(queue) <= out.line-startIndex {
-					queue = append(queue, nil)
-				}
-				queue[out.line-startIndex] = &out.record
-				for len(queue) > 0 && queue[0] != nil {
-					record := queue[0]
-					if err := produce(ProduceFromExecutionContext(ctx), *record); err != nil {
-						return fmt.Errorf("couldn't produce: %w", err)
-					}
-					queue = queue[1:]
-					startIndex++
-				}
+			if err := out.err; err != nil {
+				return err
 			}
-			if fileReaderIsDone && startIndex == linesRead {
+			for len(queue) <= out.batchIndex-startIndex {
+				queue = append(queue, nil)
+			}
+			queue[out.batchIndex-startIndex] = &out.recordBatch
+			for len(queue) > 0 && queue[0] != nil {
+				record := queue[0]
+				if err := produce(ProduceFromExecutionContext(ctx), *record); err != nil {
+					return fmt.Errorf("couldn't produce: %w", err)
+				}
+				queue = queue[1:]
+				startIndex++
+				linesOutput += record.Size
+			}
+			if fileReaderIsDone && linesOutput == linesRead {
 				break produceLoop
 			}
 		case readerErr := <-done:
@@ -139,7 +142,7 @@ produceLoop:
 			}
 			fileReaderIsDone = true
 			done = nil // will block this select branch from now on
-			if fileReaderIsDone && startIndex == linesRead {
+			if fileReaderIsDone && linesOutput == linesRead {
 				break produceLoop
 			}
 		case <-ctx.Done():

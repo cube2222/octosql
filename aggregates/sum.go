@@ -38,11 +38,13 @@ func NewSumIntPrototype() func() nodes.Aggregate {
 	}
 }
 
-func (c *SumInt) Add(retraction bool, value octosql.Value) bool {
-	if !retraction {
-		c.sum += value.Int
-	} else {
-		c.sum -= value.Int
+func (c *SumInt) Add(retractions []bool, values []octosql.Value) bool {
+	for row := range values {
+		if !retractions[row] {
+			c.sum += values[row].Int
+		} else {
+			c.sum -= values[row].Int
+		}
 	}
 	return c.sum == 0
 }
@@ -63,11 +65,13 @@ func NewSumFloatPrototype() func() nodes.Aggregate {
 	}
 }
 
-func (c *SumFloat) Add(retraction bool, value octosql.Value) bool {
-	if !retraction {
-		c.sum += value.Float
-	} else {
-		c.sum -= value.Float
+func (c *SumFloat) Add(retractions []bool, values []octosql.Value) bool {
+	for row := range values {
+		if !retractions[row] {
+			c.sum += values[row].Float
+		} else {
+			c.sum -= values[row].Float
+		}
 	}
 	return c.sum == 0
 }
@@ -88,11 +92,13 @@ func NewSumDurationPrototype() func() nodes.Aggregate {
 	}
 }
 
-func (c *SumDuration) Add(retraction bool, value octosql.Value) bool {
-	if !retraction {
-		c.sum += value.Duration
-	} else {
-		c.sum -= value.Duration
+func (c *SumDuration) Add(retractions []bool, values []octosql.Value) bool {
+	for row := range values {
+		if !retractions[row] {
+			c.sum += values[row].Duration
+		} else {
+			c.sum -= values[row].Duration
+		}
 	}
 	return c.sum == 0
 }

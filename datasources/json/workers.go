@@ -74,7 +74,7 @@ var parserWorkReceiveChannel = func() chan<- jobIn {
 					batchIndex: job.batchIndex,
 				}
 				if err == nil {
-					outJob.recordBatch = NewRecordBatch(values, make([]bool, len(values)), make([]time.Time, len(values)))
+					outJob.recordBatch = NewRecordBatch(values, make([]bool, len(job.data)), make([]time.Time, len(job.data)))
 				} else {
 					outJob.err = err
 				}

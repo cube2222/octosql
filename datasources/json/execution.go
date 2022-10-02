@@ -57,7 +57,7 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 	go func() {
 		line := 1
 		batchIndex := 0
-		batchSize := 64
+		batchSize := DesiredBatchSize
 		if d.tail {
 			batchSize = 1
 		}
@@ -109,7 +109,7 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 	}()
 
 	var queue []*RecordBatch
-	var startIndex int
+	var startBatchIndex int
 	var linesOutput int
 	var fileReaderIsDone bool
 produceLoop:
@@ -120,17 +120,17 @@ produceLoop:
 			if err := out.err; err != nil {
 				return err
 			}
-			for len(queue) <= out.batchIndex-startIndex {
+			for len(queue) <= out.batchIndex-startBatchIndex {
 				queue = append(queue, nil)
 			}
-			queue[out.batchIndex-startIndex] = &out.recordBatch
+			queue[out.batchIndex-startBatchIndex] = &out.recordBatch
 			for len(queue) > 0 && queue[0] != nil {
 				record := queue[0]
 				if err := produce(ProduceFromExecutionContext(ctx), *record); err != nil {
 					return fmt.Errorf("couldn't produce: %w", err)
 				}
 				queue = queue[1:]
-				startIndex++
+				startBatchIndex++
 				linesOutput += record.Size
 			}
 			if fileReaderIsDone && linesOutput == linesRead {

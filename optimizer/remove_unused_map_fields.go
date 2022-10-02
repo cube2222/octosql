@@ -72,16 +72,23 @@ func isUsed(field string, node Node) bool {
 			return expr
 		},
 		NodeTransformer: func(node Node) Node {
-			if node.NodeType != NodeTypeTableValuedFunction {
-				return node
-			}
-			for _, arg := range node.TableValuedFunction.Arguments {
-				if arg.TableValuedFunctionArgumentType != TableValuedFunctionArgumentTypeDescriptor {
-					continue
+			switch node.NodeType {
+			case NodeTypeTableValuedFunction:
+				for _, arg := range node.TableValuedFunction.Arguments {
+					if arg.TableValuedFunctionArgumentType != TableValuedFunctionArgumentTypeDescriptor {
+						continue
+					}
+					if arg.Descriptor.Descriptor == field {
+						used = true
+					}
 				}
-				if arg.Descriptor.Descriptor == field {
-					used = true
+			case NodeTypeDistinct:
+				for _, arg := range node.Schema.Fields {
+					if arg.Name == field {
+						used = true
+					}
 				}
+			default:
 			}
 
 			return node

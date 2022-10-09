@@ -2,7 +2,6 @@ package nodes
 
 import (
 	"fmt"
-	"hash/fnv"
 
 	"github.com/zyedidia/generic/hashmap"
 
@@ -35,11 +34,7 @@ func (o *Distinct) Run(execCtx ExecutionContext, produce ProduceFn, metaSend Met
 			}
 			return true
 		}, func(k []octosql.Value) uint64 {
-			hash := fnv.New64()
-			for _, v := range k {
-				v.Hash(hash)
-			}
-			return hash.Sum64()
+			return octosql.HashManyValues(k)
 		})
 	o.source.Run(
 		execCtx,

@@ -1,8 +1,6 @@
 package aggregates
 
 import (
-	"hash/fnv"
-
 	"github.com/zyedidia/generic/hashmap"
 
 	"github.com/cube2222/octosql/execution"
@@ -37,9 +35,7 @@ func NewDistinctPrototype(wrapped func() nodes.Aggregate) func() nodes.Aggregate
 				func(a, b octosql.Value) bool {
 					return a.Compare(b) == 0
 				}, func(v octosql.Value) uint64 {
-					hash := fnv.New64()
-					v.Hash(hash)
-					return hash.Sum64()
+					return v.Hash()
 				}),
 			wrapped: wrapped(),
 		}

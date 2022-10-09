@@ -2,7 +2,6 @@ package nodes
 
 import (
 	"fmt"
-	"hash/fnv"
 	"time"
 
 	"github.com/zyedidia/generic/hashmap"
@@ -52,11 +51,7 @@ func (g *SimpleGroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend Me
 		}
 		return true
 	}, func(k GroupKey) uint64 {
-		hash := fnv.New64()
-		for _, v := range k {
-			v.Hash(hash)
-		}
-		return hash.Sum64()
+		return octosql.HashManyValues(k)
 	})
 
 	if err := g.source.Run(ctx, func(produceCtx ProduceContext, record Record) error {

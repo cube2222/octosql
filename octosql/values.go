@@ -1,12 +1,12 @@
 package octosql
 
 import (
-	"encoding/binary"
 	"fmt"
-	"hash"
 	"math"
 	"strings"
 	"time"
+
+	"github.com/segmentio/fasthash/fnv1a"
 )
 
 var ZeroValue = Value{}
@@ -239,54 +239,58 @@ func (value Value) Compare(other Value) int {
 	}
 }
 
-func (value Value) Hash(hash hash.Hash64) {
+func (value Value) Hash() uint64 {
+	return value.hash(fnv1a.Init64)
+}
+
+func HashManyValues(values []Value) uint64 {
+	hash := fnv1a.Init64
+	for _, v := range values {
+		hash = v.hash(hash)
+	}
+	return hash
+}
+
+func (value Value) hash(hash uint64) uint64 {
 	switch value.TypeID {
 	case TypeIDNull:
-		hash.Write([]byte{0})
+		hash = fnv1a.AddUint64(hash, 0)
 
 	case TypeIDInt:
-		var data [8]byte
-		binary.BigEndian.PutUint64(data[:], uint64(value.Int))
-		hash.Write(data[:])
+		hash = fnv1a.AddUint64(hash, uint64(value.Int))
 
 	case TypeIDFloat:
-		var data [8]byte
-		binary.BigEndian.PutUint64(data[:], math.Float64bits(value.Float))
-		hash.Write(data[:])
+		hash = fnv1a.AddUint64(hash, math.Float64bits(value.Float))
 
 	case TypeIDBoolean:
 		if value.Boolean {
-			hash.Write([]byte{1})
+			hash = fnv1a.AddUint64(hash, 1)
 		} else {
-			hash.Write([]byte{0})
+			hash = fnv1a.AddUint64(hash, 0)
 		}
 
 	case TypeIDString:
-		hash.Write([]byte(value.Str))
+		hash = fnv1a.AddString64(hash, value.Str)
 
 	case TypeIDTime:
-		var data [8]byte
-		binary.BigEndian.PutUint64(data[:], uint64(value.Time.UnixNano()))
-		hash.Write(data[:])
+		hash = fnv1a.AddUint64(hash, uint64(value.Time.UnixNano()))
 
 	case TypeIDDuration:
-		var data [8]byte
-		binary.BigEndian.PutUint64(data[:], uint64(value.Duration))
-		hash.Write(data[:])
+		hash = fnv1a.AddUint64(hash, uint64(value.Duration))
 
 	case TypeIDList:
 		for i := range value.List {
-			value.List[i].Hash(hash)
+			hash = value.List[i].hash(hash)
 		}
 
 	case TypeIDStruct:
 		for i := range value.List {
-			value.Struct[i].Hash(hash)
+			hash = value.Struct[i].hash(hash)
 		}
 
 	case TypeIDTuple:
 		for i := range value.List {
-			value.Tuple[i].Hash(hash)
+			hash = value.Tuple[i].hash(hash)
 		}
 
 	case TypeIDUnion:
@@ -294,6 +298,8 @@ func (value Value) Hash(hash hash.Hash64) {
 	default:
 		panic("impossible, type switch bug")
 	}
+
+	return hash
 }
 
 func (value Value) Equal(other Value) bool {

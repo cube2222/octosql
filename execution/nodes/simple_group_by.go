@@ -32,6 +32,12 @@ func NewSimpleGroupBy(
 	}
 }
 
+type simplePreaggregatesItem struct {
+	GroupKey
+	AggregateValues [][]octosql.Value
+	Retractions     []bool
+}
+
 type hashmapAggregatesItem struct {
 	Aggregates []Aggregate
 
@@ -54,54 +60,65 @@ func (g *SimpleGroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend Me
 		return octosql.HashManyValues(k)
 	})
 
-	if err := g.source.Run(ctx, func(produceCtx ProduceContext, record Record) error {
-		ctx := ctx.WithRecord(record)
+	if err := g.source.Run(ctx, func(produceCtx ProduceContext, records RecordBatch) error {
+		ctx := ctx.WithRecord(records)
+		defer func() {
+			for i := range records.Values {
+				ctx.SlicePool.Put(records.Values[i])
+			}
+		}()
 
-		key := make(GroupKey, len(g.keyExprs))
+		keyExprValues := make([][]octosql.Value, len(g.keyExprs))
 		for i, expr := range g.keyExprs {
 			value, err := expr.Evaluate(ctx)
 			if err != nil {
 				return fmt.Errorf("couldn't evaluate %d group by key expression: %w", i, err)
 			}
-			key[i] = value
+			keyExprValues[i] = value
+		}
+		aggregateExprValues := make([][]octosql.Value, len(g.aggregateExprs))
+		for i, expr := range g.aggregateExprs {
+			value, err := expr.Evaluate(ctx)
+			if err != nil {
+				return fmt.Errorf("couldn't evaluate %d group by aggregate expression: %w", i, err)
+			}
+			aggregateExprValues[i] = value
 		}
 
-		{
-			itemTyped, ok := aggregates.Get(key)
+		for rowIndex := 0; rowIndex < records.Size; rowIndex++ {
+			{
+				key := Row(keyExprValues, rowIndex)
+				itemTyped, ok := aggregates.Get(key)
 
-			if !ok {
-				newAggregates := make([]Aggregate, len(g.aggregatePrototypes))
-				for i := range g.aggregatePrototypes {
-					newAggregates[i] = g.aggregatePrototypes[i]()
-				}
-
-				itemTyped = &hashmapAggregatesItem{Aggregates: newAggregates, AggregatedSetSize: make([]int, len(g.aggregatePrototypes))}
-				aggregates.Put(key, itemTyped)
-			}
-
-			if !record.Retraction {
-				itemTyped.OverallRecordCount++
-			} else {
-				itemTyped.OverallRecordCount--
-			}
-			for i, expr := range g.aggregateExprs {
-				aggregateInput, err := expr.Evaluate(ctx)
-				if err != nil {
-					return fmt.Errorf("couldn't evaluate %d aggregate expression: %w", i, err)
-				}
-
-				if aggregateInput.TypeID != octosql.TypeIDNull {
-					if !record.Retraction {
-						itemTyped.AggregatedSetSize[i]++
-					} else {
-						itemTyped.AggregatedSetSize[i]--
+				if !ok {
+					newAggregates := make([]Aggregate, len(g.aggregatePrototypes))
+					for i := range g.aggregatePrototypes {
+						newAggregates[i] = g.aggregatePrototypes[i]()
 					}
-					itemTyped.Aggregates[i].Add(record.Retraction, aggregateInput)
-				}
-			}
 
-			if itemTyped.OverallRecordCount == 0 {
-				aggregates.Remove(key)
+					itemTyped = &hashmapAggregatesItem{Aggregates: newAggregates, AggregatedSetSize: make([]int, len(g.aggregatePrototypes))}
+					aggregates.Put(key, itemTyped)
+				}
+
+				if !records.Retractions[rowIndex] {
+					itemTyped.OverallRecordCount++
+				} else {
+					itemTyped.OverallRecordCount--
+				}
+				for i := range g.aggregateExprs {
+					if aggregateExprValues[i][rowIndex].TypeID != octosql.TypeIDNull {
+						if !records.Retractions[rowIndex] {
+							itemTyped.AggregatedSetSize[i]++
+						} else {
+							itemTyped.AggregatedSetSize[i]--
+						}
+						itemTyped.Aggregates[i].Add(records.Retractions[rowIndex], aggregateExprValues[i][rowIndex])
+					}
+				}
+
+				if itemTyped.OverallRecordCount == 0 {
+					aggregates.Remove(key)
+				}
 			}
 		}
 
@@ -112,6 +129,11 @@ func (g *SimpleGroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend Me
 		return fmt.Errorf("couldn't run source: %w", err)
 	}
 
+	outValues := make([][]octosql.Value, len(g.keyExprs)+len(g.aggregateExprs))
+	for i := range outValues {
+		outValues[i] = make([]octosql.Value, 0, DesiredBatchSize)
+	}
+	outValueCount := 0
 	var err error
 	func() {
 		type stopEach struct{}
@@ -126,22 +148,40 @@ func (g *SimpleGroupBy) Run(ctx ExecutionContext, produce ProduceFn, metaSend Me
 			panic(msg)
 		}()
 		aggregates.Each(func(key GroupKey, itemTyped *hashmapAggregatesItem) {
-			outputValues := make([]octosql.Value, len(key)+len(g.aggregateExprs))
-			copy(outputValues, key)
+			for i := range key {
+				outValues[i] = append(outValues[i], key[i])
+			}
 
 			for i := range itemTyped.Aggregates {
+				colIndex := len(g.keyExprs) + i
 				if itemTyped.AggregatedSetSize[i] > 0 {
-					outputValues[len(key)+i] = itemTyped.Aggregates[i].Trigger()
+					outValues[colIndex] = append(outValues[colIndex], itemTyped.Aggregates[i].Trigger())
 				} else {
-					outputValues[len(key)+i] = octosql.NewNull()
+					outValues[colIndex] = append(outValues[colIndex], octosql.NewNull())
 				}
 			}
 
-			if err = produce(ProduceFromExecutionContext(ctx), NewRecord(outputValues, false, time.Time{})); err != nil {
-				panic(stopEach{})
+			outValueCount++
+			if outValueCount == DesiredBatchSize {
+				if err = produce(ProduceFromExecutionContext(ctx), NewRecordBatch(outValues, make([]bool, outValueCount), make([]time.Time, outValueCount))); err != nil {
+					panic(stopEach{})
+				}
+				outValues = make([][]octosql.Value, len(g.keyExprs)+len(g.aggregateExprs))
+				for i := range outValues {
+					outValues[i] = make([]octosql.Value, 0, DesiredBatchSize)
+				}
+				outValueCount = 0
 			}
 		})
 	}()
+	if err != nil {
+		return fmt.Errorf("couldn't produce: %w", err)
+	}
+	if outValueCount > 0 {
+		if err = produce(ProduceFromExecutionContext(ctx), NewRecordBatch(outValues, make([]bool, outValueCount), make([]time.Time, outValueCount))); err != nil {
+			return fmt.Errorf("couldn't produce: %w", err)
+		}
+	}
 
 	return err
 }

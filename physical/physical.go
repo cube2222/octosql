@@ -100,5 +100,5 @@ type FunctionDescriptor struct {
 	OutputType    octosql.Type
 	TypeFn        func([]octosql.Type) (octosql.Type, bool) `json:"-"`
 	Strict        bool
-	Function      func([]octosql.Value) (octosql.Value, error) `json:"-"`
+	Function      func(execution.ExecutionContext, [][]octosql.Value) ([]octosql.Value, error) `json:"-"`
 }

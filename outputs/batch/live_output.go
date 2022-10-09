@@ -16,7 +16,7 @@ import (
 
 type Format interface {
 	SetSchema(physical.Schema)
-	Write([]octosql.Value) error
+	Write([][]octosql.Value, int) error
 	Close() error
 }
 
@@ -98,7 +98,7 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 				}
 				i++
 
-				format.Write(itemTyped.Values)
+				format.Write(itemTyped.Values, 0)
 			}
 			return true
 		})
@@ -115,7 +115,7 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 
 	if err := o.source.Run(
 		execCtx,
-		func(ctx ProduceContext, record Record) error {
+		func(ctx ProduceContext, record RecordBatch) error {
 			key := make([]octosql.Value, len(o.keyExprs))
 			for i := range o.keyExprs {
 				keyValue, err := o.keyExprs[i].Evaluate(execCtx.WithRecord(record))
@@ -141,7 +141,7 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 					panic(fmt.Sprintf("invalid order by item: %v", item))
 				}
 			}
-			if !record.Retraction {
+			if !record.Retractions {
 				itemTyped.Count++
 			} else {
 				itemTyped.Count--
@@ -154,7 +154,7 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 			} else {
 				recordCounts.Delete(itemTyped)
 			}
-			if onlyZeroEventTimesSeen && !record.EventTime.IsZero() {
+			if onlyZeroEventTimesSeen && !record.EventTimes.IsZero() {
 				onlyZeroEventTimesSeen = false
 			}
 			if o.limit != nil && o.noRetractionsPossible && recordCounts.Len() > *o.limit {
@@ -162,7 +162,7 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 				// That said, it's a good approximation, and we'll definitely not lose something that we need to have.
 				recordCounts.DeleteMax()
 			}
-			if o.live && onlyZeroEventTimesSeen && time.Since(lastUpdate) > time.Second/4 && !record.Retraction /*This last bit just makes the output less jittery*/ {
+			if o.live && onlyZeroEventTimesSeen && time.Since(lastUpdate) > time.Second/4 && !record.Retractions /*This last bit just makes the output less jittery*/ {
 				printTable()
 			}
 			return nil
@@ -192,7 +192,7 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 			}
 			i++
 
-			format.Write(itemTyped.Values)
+			format.Write(itemTyped.Values, 0)
 		}
 		return true
 	})

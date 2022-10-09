@@ -19,7 +19,7 @@ func NewRecordEventTimeBuffer() *RecordEventTimeBuffer {
 
 type recordEventTimeBufferItem struct {
 	EventTime time.Time
-	Records   []Record
+	Records   []RecordBatch
 }
 
 func (e *recordEventTimeBufferItem) Less(than btree.Item) bool {
@@ -31,25 +31,26 @@ func (e *recordEventTimeBufferItem) Less(than btree.Item) bool {
 	return e.EventTime.Before(thanTyped.EventTime)
 }
 
-func (b *RecordEventTimeBuffer) AddRecord(record Record) {
-	item := b.tree.Get(&recordEventTimeBufferItem{EventTime: record.EventTime})
-	var itemTyped *recordEventTimeBufferItem
-
-	if item == nil {
-		itemTyped = &recordEventTimeBufferItem{EventTime: record.EventTime}
-		b.tree.ReplaceOrInsert(itemTyped)
-	} else {
-		var ok bool
-		itemTyped, ok = item.(*recordEventTimeBufferItem)
-		if !ok {
-			panic(fmt.Sprintf("invalid event time buffer item: %v", item))
-		}
-	}
-
-	itemTyped.Records = append(itemTyped.Records, record)
+func (b *RecordEventTimeBuffer) AddRecord(record RecordBatch) {
+	panic("implement me")
+	// item := b.tree.Get(&recordEventTimeBufferItem{EventTime: record.EventTimes})
+	// var itemTyped *recordEventTimeBufferItem
+	//
+	// if item == nil {
+	// 	itemTyped = &recordEventTimeBufferItem{EventTime: record.EventTimes}
+	// 	b.tree.ReplaceOrInsert(itemTyped)
+	// } else {
+	// 	var ok bool
+	// 	itemTyped, ok = item.(*recordEventTimeBufferItem)
+	// 	if !ok {
+	// 		panic(fmt.Sprintf("invalid event time buffer item: %v", item))
+	// 	}
+	// }
+	//
+	// itemTyped.Records = append(itemTyped.Records, record)
 }
 
-func (b *RecordEventTimeBuffer) Emit(watermark time.Time, produce func(record Record) error) error {
+func (b *RecordEventTimeBuffer) Emit(watermark time.Time, produce func(record RecordBatch) error) error {
 	min := b.tree.Min()
 	for min != nil && !min.(*recordEventTimeBufferItem).EventTime.After(watermark) {
 		b.tree.DeleteMin()

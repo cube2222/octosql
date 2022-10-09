@@ -12,7 +12,7 @@ import (
 
 type Format interface {
 	SetSchema(physical.Schema)
-	WriteRecord(Record) error
+	WriteRecord(RecordBatch) error
 	WriteMeta(MetadataMessage) error
 	Close() error
 }
@@ -30,7 +30,7 @@ func NewOutputPrinter(source Node, format Format) *OutputPrinter {
 }
 
 func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
-	if err := o.source.Run(execCtx, func(ctx ProduceContext, record Record) error {
+	if err := o.source.Run(execCtx, func(ctx ProduceContext, record RecordBatch) error {
 		return o.format.WriteRecord(record)
 	}, func(ctx ProduceContext, msg MetadataMessage) error {
 		return o.format.WriteMeta(msg)
@@ -54,8 +54,11 @@ func NewNativeFormat(schema physical.Schema) *NativeFormat {
 	}
 }
 
-func (n *NativeFormat) WriteRecord(record Record) error {
-	fmt.Fprintf(os.Stdout, record.String()+"\n")
+func (n *NativeFormat) WriteRecord(record RecordBatch) error {
+	strs := record.String()
+	for _, str := range strs {
+		fmt.Fprintf(os.Stdout, str+"\n")
+	}
 	return nil
 }
 

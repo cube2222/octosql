@@ -20,19 +20,19 @@ func NewMap(source Node, exprs []Expression) *Map {
 }
 
 func (m *Map) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
-	if err := m.source.Run(ctx, func(produceCtx ProduceContext, record Record) error {
+	if err := m.source.Run(ctx, func(produceCtx ProduceContext, record RecordBatch) error {
 		ctx := ctx.WithRecord(record)
 
 		// TODO: Reuse this slice on every produce call? NO, because of stream join for instance.
-		values := make([]octosql.Value, len(m.exprs))
+		values := make([][]octosql.Value, len(m.exprs))
 		for i, expr := range m.exprs {
-			value, err := expr.Evaluate(ctx)
+			curValues, err := expr.Evaluate(ctx)
 			if err != nil {
 				return fmt.Errorf("couldn't evaluate %d map expression: %w", i, err)
 			}
-			values[i] = value
+			values[i] = curValues
 		}
-		if err := produce(produceCtx, NewRecord(values, record.Retraction, record.EventTime)); err != nil {
+		if err := produce(produceCtx, NewRecordBatch(values, record.Retractions, record.EventTimes)); err != nil {
 			return fmt.Errorf("couldn't produce: %w", err)
 		}
 

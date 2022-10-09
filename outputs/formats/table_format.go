@@ -33,12 +33,14 @@ func (t *TableFormatter) SetSchema(schema physical.Schema) {
 	t.table.SetAutoFormatHeaders(false)
 }
 
-func (t *TableFormatter) Write(values []octosql.Value) error {
-	row := make([]string, len(values))
-	for i := range values {
-		row[i] = values[i].String()
+func (t *TableFormatter) Write(values [][]octosql.Value, count int) error {
+	for rowIndex := 0; rowIndex < count; rowIndex++ {
+		row := make([]string, len(values))
+		for i := range values {
+			row[i] = values[i][rowIndex].String()
+		}
+		t.table.Append(row)
 	}
-	t.table.Append(row)
 	return nil
 }
 

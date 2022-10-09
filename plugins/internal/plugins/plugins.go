@@ -15,27 +15,27 @@ import (
 
 const APILevel = 2
 
-func (x *Record) ToNativeRecord() execution.Record {
+func (x *Record) ToNativeRecord() execution.RecordBatch {
 	values := make([]octosql.Value, len(x.Values))
 	for i := range x.Values {
 		values[i] = x.Values[i].ToNativeValue()
 	}
-	return execution.Record{
-		Values:     values,
-		Retraction: x.Retraction,
-		EventTime:  x.EventTime.AsTime(),
+	return execution.RecordBatch{
+		Values:      values,
+		Retractions: x.Retraction,
+		EventTimes:  x.EventTime.AsTime(),
 	}
 }
 
-func NativeRecordToProto(record execution.Record) *Record {
+func NativeRecordToProto(record execution.RecordBatch) *Record {
 	values := make([]*Value, len(record.Values))
 	for i := range record.Values {
 		values[i] = NativeValueToProto(record.Values[i])
 	}
 	return &Record{
 		Values:     values,
-		Retraction: record.Retraction,
-		EventTime:  timestamppb.New(record.EventTime),
+		Retraction: record.Retractions,
+		EventTime:  timestamppb.New(record.EventTimes),
 	}
 }
 

@@ -132,49 +132,50 @@ type maxDifferenceWatermarkGenerator struct {
 }
 
 func (m *maxDifferenceWatermarkGenerator) Run(ctx execution.ExecutionContext, produce execution.ProduceFn, metaSend execution.MetaSendFn) error {
-	maxValue := time.Time{}
-	curWatermark := time.Time{}
-
-	maxDifference, err := m.maxDifference.Evaluate(ctx)
-	if err != nil {
-		return fmt.Errorf("couldn't evaluate max_diff: %w", err)
-	}
-	resolution, err := m.resolution.Evaluate(ctx)
-	if err != nil {
-		return fmt.Errorf("couldn't evaluate resolution: %w", err)
-	}
-
-	if err := m.source.Run(ctx, func(ctx execution.ProduceContext, record execution.Record) error {
-		if record.Values[m.timeFieldIndex].Time.After(curWatermark) {
-			record.EventTime = record.Values[m.timeFieldIndex].Time
-			if err := produce(ctx, record); err != nil {
-				return fmt.Errorf("couldn't produce record: %w", err)
-			}
-		}
-
-		curTimeValueRoundedDown := time.Unix(0, record.Values[m.timeFieldIndex].Time.UnixNano()/int64(resolution.Duration)*int64(resolution.Duration))
-
-		if curTimeValueRoundedDown.After(maxValue) {
-			maxValue = curTimeValueRoundedDown
-			curWatermark = curTimeValueRoundedDown.Add(-maxDifference.Duration)
-
-			if err := metaSend(ctx, execution.MetadataMessage{
-				Type:      execution.MetadataMessageTypeWatermark,
-				Watermark: curWatermark,
-			}); err != nil {
-				return fmt.Errorf("couldn't send updated watermark: %w", err)
-			}
-		}
-
-		return nil
-	}, func(ctx execution.ProduceContext, msg execution.MetadataMessage) error {
-		if msg.Type != execution.MetadataMessageTypeWatermark {
-			return metaSend(ctx, msg)
-		}
-		return nil
-	}); err != nil {
-		return fmt.Errorf("couldn't run source: %w", err)
-	}
-
-	return nil
+	panic("implement me")
+	// maxValue := time.Time{}
+	// curWatermark := time.Time{}
+	//
+	// maxDifference, err := m.maxDifference.Evaluate(ctx)
+	// if err != nil {
+	// 	return fmt.Errorf("couldn't evaluate max_diff: %w", err)
+	// }
+	// resolution, err := m.resolution.Evaluate(ctx)
+	// if err != nil {
+	// 	return fmt.Errorf("couldn't evaluate resolution: %w", err)
+	// }
+	//
+	// if err := m.source.Run(ctx, func(ctx execution.ProduceContext, record execution.RecordBatch) error {
+	// 	if record.Values[m.timeFieldIndex].Time.After(curWatermark) {
+	// 		record.EventTimes = record.Values[m.timeFieldIndex].Time
+	// 		if err := produce(ctx, record); err != nil {
+	// 			return fmt.Errorf("couldn't produce record: %w", err)
+	// 		}
+	// 	}
+	//
+	// 	curTimeValueRoundedDown := time.Unix(0, record.Values[m.timeFieldIndex].Time.UnixNano()/int64(resolution.Duration)*int64(resolution.Duration))
+	//
+	// 	if curTimeValueRoundedDown.After(maxValue) {
+	// 		maxValue = curTimeValueRoundedDown
+	// 		curWatermark = curTimeValueRoundedDown.Add(-maxDifference.Duration)
+	//
+	// 		if err := metaSend(ctx, execution.MetadataMessage{
+	// 			Type:      execution.MetadataMessageTypeWatermark,
+	// 			Watermark: curWatermark,
+	// 		}); err != nil {
+	// 			return fmt.Errorf("couldn't send updated watermark: %w", err)
+	// 		}
+	// 	}
+	//
+	// 	return nil
+	// }, func(ctx execution.ProduceContext, msg execution.MetadataMessage) error {
+	// 	if msg.Type != execution.MetadataMessageTypeWatermark {
+	// 		return metaSend(ctx, msg)
+	// 	}
+	// 	return nil
+	// }); err != nil {
+	// 	return fmt.Errorf("couldn't run source: %w", err)
+	// }
+	//
+	// return nil
 }

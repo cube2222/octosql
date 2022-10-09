@@ -24,6 +24,7 @@ type DatasourceExecuting struct {
 }
 
 func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
+	// TODO: Benchmark on this vs datafusion. Small and big query from master thesis.
 	f, err := files.OpenLocalFile(ctx, d.path)
 	if err != nil {
 		return fmt.Errorf("couldn't open local file: %w", err)
@@ -103,7 +104,7 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 			values[i] = octosql.NewString(str)
 		}
 
-		if err := produce(ProduceFromExecutionContext(ctx), NewRecord(values, false, time.Time{})); err != nil {
+		if err := produce(ProduceFromExecutionContext(ctx), NewRecordBatch(values, false, time.Time{})); err != nil {
 			return fmt.Errorf("couldn't produce record: %w", err)
 		}
 	}

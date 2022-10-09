@@ -1,10 +1,7 @@
 package nodes
 
 import (
-	"fmt"
-
 	. "github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/octosql"
 )
 
 type LookupJoin struct {
@@ -22,29 +19,30 @@ func (s *LookupJoin) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaS
 	// TODO: Add parallelism here.
 
 	// TODO: Maybe this should be fully parallel with no ordering guarantees and maybe a parallelism limit (semaphore). This way it would kinda work when the joined stream has a time field.
-	if err := s.source.Run(ctx, func(produceCtx ProduceContext, sourceRecord Record) error {
-		ctx := ctx.WithRecord(sourceRecord)
-
-		if err := s.joined.Run(ctx, func(produceCtx ProduceContext, joinedRecord Record) error {
-			outputValues := make([]octosql.Value, len(sourceRecord.Values)+len(joinedRecord.Values))
-
-			copy(outputValues, sourceRecord.Values)
-			copy(outputValues[len(sourceRecord.Values):], joinedRecord.Values)
-
-			retraction := (sourceRecord.Retraction || joinedRecord.Retraction) && !(sourceRecord.Retraction && joinedRecord.Retraction)
-
-			if err := produce(ProduceFromExecutionContext(ctx), NewRecord(outputValues, retraction, sourceRecord.EventTime)); err != nil {
-				return fmt.Errorf("couldn't produce: %w", err)
-			}
-
-			return nil
-		}, metaSend); err != nil {
-			return fmt.Errorf("couldn't run joined stream: %w", err)
-		}
-
-		return nil
-	}, metaSend); err != nil {
-		return fmt.Errorf("couldn't run source: %w", err)
-	}
-	return nil
+	panic("implement me")
+	// if err := s.source.Run(ctx, func(produceCtx ProduceContext, sourceRecord RecordBatch) error {
+	// 	ctx := ctx.WithRecord(sourceRecord)
+	//
+	// 	if err := s.joined.Run(ctx, func(produceCtx ProduceContext, joinedRecord RecordBatch) error {
+	// 		outputValues := make([]octosql.Value, len(sourceRecord.Values)+len(joinedRecord.Values))
+	//
+	// 		copy(outputValues, sourceRecord.Values)
+	// 		copy(outputValues[len(sourceRecord.Values):], joinedRecord.Values)
+	//
+	// 		retraction := (sourceRecord.Retractions || joinedRecord.Retractions) && !(sourceRecord.Retractions && joinedRecord.Retractions)
+	//
+	// 		if err := produce(ProduceFromExecutionContext(ctx), NewRecordBatch(outputValues, retraction, sourceRecord.EventTimes)); err != nil {
+	// 			return fmt.Errorf("couldn't produce: %w", err)
+	// 		}
+	//
+	// 		return nil
+	// 	}, metaSend); err != nil {
+	// 		return fmt.Errorf("couldn't run joined stream: %w", err)
+	// 	}
+	//
+	// 	return nil
+	// }, metaSend); err != nil {
+	// 	return fmt.Errorf("couldn't run source: %w", err)
+	// }
+	// return nil
 }

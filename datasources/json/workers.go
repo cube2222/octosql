@@ -19,18 +19,19 @@ type jobIn struct {
 	fields []physical.SchemaField
 	ctx    context.Context
 
-	lines []int    // line numbers
-	data  [][]byte // data for each line
+	batchIndex int
+	lines      []int    // line numbers
+	data       [][]byte // data for each line
 
 	// The channel to send job outputs to.
-	outChan chan<- []jobOutRecord
+	outChan chan<- jobOutRecord
 }
 
 // jobOutRecord is the result of parsing a single line.
 type jobOutRecord struct {
-	line   int
-	record Record
-	err    error
+	batchIndex  int
+	recordBatch RecordBatch
+	err         error
 }
 
 // The function below creates the workers and stores the job queue in a global variable.
@@ -46,32 +47,40 @@ var parserWorkReceiveChannel = func() chan<- jobIn {
 
 		getWorkLoop:
 			for job := range inChan {
-				outJobs := make([]jobOutRecord, len(job.lines))
-				for i := range outJobs {
-					out := &outJobs[i]
-					out.line = job.lines[i]
-
-					v, err := p.ParseBytes(job.data[i])
-					if err != nil {
-						out.err = fmt.Errorf("couldn't parse json: %w", err)
-						continue
+				values, err := func() ([][]octosql.Value, error) {
+					outValues := make([][]octosql.Value, len(job.fields))
+					for i := range outValues {
+						outValues[i] = make([]octosql.Value, len(job.data))
 					}
 
-					o, err := v.Object()
-					if err != nil {
-						out.err = fmt.Errorf("expected JSON object, got '%s'", string(job.data[i]))
-						continue
-					}
+					for i := range job.data {
+						v, err := p.ParseBytes(job.data[i])
+						if err != nil {
+							return nil, fmt.Errorf("couldn't parse line %d: couldn't parse json: %w", job.lines[i], err)
+						}
 
-					values := make([]octosql.Value, len(job.fields))
-					for i := range values {
-						values[i], _ = getOctoSQLValue(job.fields[i].Type, o.Get(job.fields[i].Name))
-					}
+						o, err := v.Object()
+						if err != nil {
+							return nil, fmt.Errorf("couldn't parse line %d: expected JSON object, got '%s'", job.lines[i], string(job.data[i]))
+						}
 
-					out.record = NewRecord(values, false, time.Time{})
+						for colIndex := range job.fields {
+							outValues[colIndex][i], _ = getOctoSQLValue(job.fields[colIndex].Type, o.Get(job.fields[colIndex].Name))
+						}
+					}
+					return outValues, nil
+				}()
+				outJob := jobOutRecord{
+					batchIndex: job.batchIndex,
 				}
+				if err == nil {
+					outJob.recordBatch = NewRecordBatch(values, make([]bool, len(job.data)), make([]time.Time, len(job.data)))
+				} else {
+					outJob.err = err
+				}
+
 				select {
-				case job.outChan <- outJobs:
+				case job.outChan <- outJob:
 				case <-job.ctx.Done():
 					continue getWorkLoop
 				}

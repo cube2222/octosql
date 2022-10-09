@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
-	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
@@ -99,26 +97,27 @@ func (ds *DataSource) Typecheck(ctx context.Context, env physical.Environment, l
 	}
 
 	if ds.name == "dual" {
-		uniqueDummy := logicalEnv.GetUnique("dummy")
-		return physical.Node{
-				Schema: physical.NewSchema(
-					[]physical.SchemaField{
-						{
-							Name: uniqueDummy,
-							Type: octosql.String,
-						},
-					},
-					-1,
-				),
-				NodeType: physical.NodeTypeInMemoryRecords,
-				InMemoryRecords: &physical.InMemoryRecords{
-					Records: []execution.Record{
-						execution.NewRecord([]octosql.Value{octosql.NewString("X")}, false, time.Time{}),
-					},
-				},
-			}, map[string]string{
-				"dummy": uniqueDummy,
-			}
+		panic("implement me")
+		// uniqueDummy := logicalEnv.GetUnique("dummy")
+		// return physical.Node{
+		// 		Schema: physical.NewSchema(
+		// 			[]physical.SchemaField{
+		// 				{
+		// 					Name: uniqueDummy,
+		// 					Type: octosql.String,
+		// 				},
+		// 			},
+		// 			-1,
+		// 		),
+		// 		NodeType: physical.NodeTypeInMemoryRecords,
+		// 		InMemoryRecords: &physical.InMemoryRecords{
+		// 			Records: []execution.RecordBatch{
+		// 				execution.NewRecordBatch([]octosql.Value{octosql.NewString("X")}, false, time.Time{}),
+		// 			},
+		// 		},
+		// 	}, map[string]string{
+		// 		"dummy": uniqueDummy,
+		// 	}
 	}
 
 	datasource, schema, err := env.Datasources.GetDatasource(ctx, ds.name, ds.options)

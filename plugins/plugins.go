@@ -153,7 +153,7 @@ func (e *executionServer) Run(request *plugins.RunRequest, stream plugins.Execut
 			Context:         stream.Context(),
 			VariableContext: request.VariableContext.ToNativeExecutionVariableContext(),
 		},
-		func(ctx execution.ProduceContext, record execution.Record) error {
+		func(ctx execution.ProduceContext, record execution.RecordBatch) error {
 			if err := stream.Send(&plugins.RunResponseMessage{
 				Record: plugins.NativeRecordToProto(record),
 			}); err != nil {

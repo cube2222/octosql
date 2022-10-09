@@ -253,7 +253,7 @@ type Unnest struct {
 }
 
 type InMemoryRecords struct {
-	Records []execution.Record
+	Records []execution.RecordBatch
 }
 
 type OuterJoin struct {

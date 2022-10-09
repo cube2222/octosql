@@ -55,7 +55,7 @@ func (d *installedVersionsExecuting) Run(ctx ExecutionContext, produce ProduceFn
 
 			if err := produce(
 				ProduceFromExecutionContext(ctx),
-				NewRecord(values, false, time.Time{}),
+				NewRecordBatch(values, false, time.Time{}),
 			); err != nil {
 				return fmt.Errorf("couldn't produce record: %w", err)
 			}

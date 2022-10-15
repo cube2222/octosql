@@ -78,6 +78,12 @@ octosql "SELECT * FROM plugins.plugins"`,
 			defer profile.Start(profile.TraceProfile, profile.ProfilePath(".")).Stop()
 		}
 		ctx := cmd.Context()
+		cfg, err := config.Read()
+		if err != nil {
+			return fmt.Errorf("couldn't read config: %w", err)
+		}
+		ctx = config.ContextWithConfig(ctx, cfg)
+
 		debug.SetGCPercent(1000)
 
 		logs.InitializeFileLogger()
@@ -93,11 +99,6 @@ octosql "SELECT * FROM plugins.plugins"`,
 				log.Printf("couldn't close plugin executor: %s", err)
 			}
 		}()
-
-		cfg, err := config.Read()
-		if err != nil {
-			return fmt.Errorf("couldn't read config: %w", err)
-		}
 
 		installedPlugins, err := pluginManager.ListInstalledPlugins()
 		if err != nil {
@@ -188,7 +189,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 		if err != nil {
 			return fmt.Errorf("couldn't get file extension handlers: %w", err)
 		}
-		fileHandlers := map[string]func(name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error){
+		fileHandlers := map[string]func(ctx context.Context, name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error){
 			"csv":     csv.Creator(','),
 			"json":    json.Creator,
 			"lines":   lines.Creator,
@@ -196,7 +197,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 			"tsv":     csv.Creator('\t'),
 		}
 		for ext, pluginName := range fileExtensionHandlers {
-			fileHandlers[ext] = func(name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error) {
+			fileHandlers[ext] = func(ctx context.Context, name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error) {
 				db, err := databases[pluginName]()
 				if err != nil {
 					return nil, physical.Schema{}, fmt.Errorf("couldn't get plugin %s database for plugin extensions %s: %w", pluginName, ext, err)
@@ -513,7 +514,7 @@ func typecheckExpr(ctx context.Context, expr logical.Expression, env physical.En
 }
 
 type fileTypeDatabaseCreator struct {
-	creator func(name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error)
+	creator func(ctx context.Context, name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error)
 }
 
 func (f *fileTypeDatabaseCreator) ListTables(ctx context.Context) ([]string, error) {
@@ -521,5 +522,5 @@ func (f *fileTypeDatabaseCreator) ListTables(ctx context.Context) ([]string, err
 }
 
 func (f *fileTypeDatabaseCreator) GetTable(ctx context.Context, name string, options map[string]string) (physical.DatasourceImplementation, physical.Schema, error) {
-	return f.creator(name, options)
+	return f.creator(ctx, name, options)
 }

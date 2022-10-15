@@ -10,6 +10,8 @@ import (
 	"sync"
 
 	"github.com/nxadm/tail"
+
+	"github.com/cube2222/octosql/config"
 )
 
 type customCloser struct {
@@ -113,7 +115,7 @@ func OpenLocalFile(ctx context.Context, path string, opts ...OpenFileOption) (io
 			return nil, fmt.Errorf("couldn't open file: %w", err)
 		}
 		return &customCloser{
-			Reader: bufio.NewReaderSize(f, 4096*1024),
+			Reader: bufio.NewReaderSize(f, config.FromContext(ctx).Files.BufferSizeBytes),
 			close:  f.Close,
 		}, nil
 	} else {

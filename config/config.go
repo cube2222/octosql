@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -23,6 +24,7 @@ var octosqlHomeDir = func() string {
 
 type Config struct {
 	Databases []DatabaseConfig `yaml:"databases"`
+	Files     FilesConfig      `yaml:"files"`
 }
 
 type DatabaseConfig struct {
@@ -32,20 +34,34 @@ type DatabaseConfig struct {
 	Config  yaml.Node                            `yaml:"config"`
 }
 
+type FilesConfig struct {
+	JSON            JSONConfig `yaml:"json"`
+	BufferSizeBytes int        `yaml:"buffer_size_bytes"`
+}
+
+type JSONConfig struct {
+	MaxLineSizeBytes int `yaml:"max_line_size_bytes"`
+}
+
 func Read() (*Config, error) {
+	var config Config
 	data, err := ioutil.ReadFile(filepath.Join(octosqlHomeDir, "octosql.yml"))
-	if err != nil {
-		if os.IsNotExist(err) {
-			return &Config{
-				Databases: nil,
-			}, nil
-		}
+	if err != nil && os.IsNotExist(err) {
+		config = Config{}
+	} else if err != nil {
 		return nil, fmt.Errorf("couldn't read config file: %w", err)
+	} else {
+		if err := yaml.Unmarshal(data, &config); err != nil {
+			return nil, fmt.Errorf("couldn't unmarshal yaml configuration: %w", err)
+		}
 	}
 
-	var config Config
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("couldn't unmarshal yaml configuration: %w", err)
+	// TODO: Refactor to a sensibly structured default value system.
+	if config.Files.BufferSizeBytes == 0 {
+		config.Files.BufferSizeBytes = 4096 * 1024
+	}
+	if config.Files.JSON.MaxLineSizeBytes == 0 {
+		config.Files.JSON.MaxLineSizeBytes = 1024 * 1024
 	}
 
 	return &config, nil
@@ -88,4 +104,16 @@ func (r *PluginReference) UnmarshalText(text []byte) error {
 
 func (r *PluginReference) String() string {
 	return fmt.Sprintf("%s/%s", r.Repository, r.Name)
+}
+
+// TODO: Using a custom context everywhere would be better.
+
+type contextKey struct{}
+
+func ContextWithConfig(ctx context.Context, config *Config) context.Context {
+	return context.WithValue(ctx, contextKey{}, config)
+}
+
+func FromContext(ctx context.Context) *Config {
+	return ctx.Value(contextKey{}).(*Config)
 }

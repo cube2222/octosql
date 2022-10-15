@@ -8,6 +8,7 @@ import (
 
 	"github.com/valyala/fastjson"
 
+	"github.com/cube2222/octosql/config"
 	. "github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/execution/files"
 	"github.com/cube2222/octosql/octosql"
@@ -28,7 +29,7 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 	defer f.Close()
 
 	sc := bufio.NewScanner(f)
-	sc.Buffer(nil, 1024*1024)
+	sc.Buffer(nil, config.FromContext(ctx).Files.JSON.MaxLineSizeBytes)
 
 	// All async processing in this function and all jobs created by it use this context.
 	// This means that returning from this function will properly clean up all async processors.

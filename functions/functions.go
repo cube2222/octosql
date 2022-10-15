@@ -911,6 +911,18 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					},
 				},
 				{
+					ArgumentTypes: []octosql.Type{octosql.Boolean},
+					OutputType:    octosql.Int,
+					Strict:        true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						if values[0].Boolean {
+							return octosql.NewInt(1), nil
+						} else {
+							return octosql.NewInt(0), nil
+						}
+					},
+				},
+				{
 					ArgumentTypes: []octosql.Type{octosql.Float},
 					OutputType:    octosql.Int,
 					Strict:        true,

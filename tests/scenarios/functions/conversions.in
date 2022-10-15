@@ -1,0 +1,1 @@
+octosql "SELECT int(true), int(false)"

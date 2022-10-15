@@ -424,8 +424,6 @@ func (value Value) append(builder *strings.Builder) {
 }
 
 func (value Value) ToRawGoValue(t Type) interface{} {
-	// TODO: Add complex types.
-	// TODO: Fix union handling.
 	switch value.TypeID {
 	case TypeIDNull:
 		return nil

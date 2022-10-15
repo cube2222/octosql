@@ -1,0 +1,6 @@
+octosql "SELECT 42,
+                42.42, 42.42424242424242, float(42),
+                true, false,
+                null,
+                'test' as hello,
+                INTERVAL 5 HOURS + INTERVAL 32 MINUTES + INTERVAL 42 SECONDS" -ocsv

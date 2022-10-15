@@ -54,7 +54,7 @@ type DatasourceRepository struct {
 	// Bo inaczej będzie na start strasznie dużo rzeczy ładować niepotrzebnych dla wszystkich
 	// skonfigurowanych baz danych.
 	Databases    map[string]func() (Database, error)
-	FileHandlers map[string]func(name string, options map[string]string) (DatasourceImplementation, Schema, error)
+	FileHandlers map[string]func(ctx context.Context, name string, options map[string]string) (DatasourceImplementation, Schema, error)
 }
 
 type Database interface {
@@ -78,7 +78,7 @@ func (dr *DatasourceRepository) GetDatasource(ctx context.Context, name string, 
 	if index := strings.LastIndex(name, "."); index != -1 {
 		extension := name[index+1:]
 		if handler, ok := dr.FileHandlers[extension]; ok {
-			return handler(name, options)
+			return handler(ctx, name, options)
 		}
 	}
 

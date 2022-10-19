@@ -681,10 +681,12 @@ func (tkn *Tokenizer) Scan() (int, []byte) {
 				}
 			}
 			return int(ch), nil
-		case '\'', '"':
+		case '\'':
 			return tkn.scanString(ch, STRING)
+		case '"':
+			return tkn.scanDoubleQuoteLiteralIdentifier()
 		case '`':
-			return tkn.scanLiteralIdentifier()
+			return tkn.scanBacktickLiteralIdentifier()
 		default:
 			return LEX_ERROR, []byte{byte(ch)}
 		}
@@ -759,7 +761,7 @@ func (tkn *Tokenizer) scanBitLiteral() (int, []byte) {
 	return BIT_LITERAL, buffer.Bytes()
 }
 
-func (tkn *Tokenizer) scanLiteralIdentifier() (int, []byte) {
+func (tkn *Tokenizer) scanBacktickLiteralIdentifier() (int, []byte) {
 	buffer := &bytes2.Buffer{}
 	backTickSeen := false
 	for {
@@ -776,6 +778,37 @@ func (tkn *Tokenizer) scanLiteralIdentifier() (int, []byte) {
 		switch tkn.lastChar {
 		case '`':
 			backTickSeen = true
+		case eofChar:
+			// Premature EOF.
+			return LEX_ERROR, buffer.Bytes()
+		default:
+			buffer.WriteByte(byte(tkn.lastChar))
+		}
+		tkn.next()
+	}
+	if buffer.Len() == 0 {
+		return LEX_ERROR, buffer.Bytes()
+	}
+	return ID, buffer.Bytes()
+}
+
+func (tkn *Tokenizer) scanDoubleQuoteLiteralIdentifier() (int, []byte) {
+	buffer := &bytes2.Buffer{}
+	doubleQuoteSeen := false
+	for {
+		if doubleQuoteSeen {
+			if tkn.lastChar != '"' {
+				break
+			}
+			doubleQuoteSeen = false
+			buffer.WriteByte('"')
+			tkn.next()
+			continue
+		}
+		// The previous char was not a backtick.
+		switch tkn.lastChar {
+		case '"':
+			doubleQuoteSeen = true
 		case eofChar:
 			// Premature EOF.
 			return LEX_ERROR, buffer.Bytes()

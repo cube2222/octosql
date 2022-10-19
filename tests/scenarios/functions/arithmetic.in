@@ -17,8 +17,8 @@ octosql "SELECT 1 + 2,
                 7 * INTERVAL 3 SECOND,
                 'test1' * 3,
                 3 * 'test1',
-                /(7, 3),
-                /(7.0, 3.0),
-                /(INTERVAL 7 SECOND, 3),
-                /(INTERVAL 7 SECOND, INTERVAL 3 SECOND)"
+                7 / 3,
+                7.0 / 3.0,
+                INTERVAL 7 SECOND / 3,
+                INTERVAL 7 SECOND / INTERVAL 3 SECOND"
 

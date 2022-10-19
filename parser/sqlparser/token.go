@@ -735,6 +735,9 @@ func (tkn *Tokenizer) scanIdentifier(firstBytes []byte, isDbSystemVariable bool)
 	if loweredStr == "dual" {
 		return ID, lowered
 	}
+	if buffer.String() == "/" {
+		return int('/'), nil
+	}
 	return ID, buffer.Bytes()
 }
 

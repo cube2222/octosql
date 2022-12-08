@@ -10,9 +10,12 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver"
+	"github.com/adrg/xdg"
 	"github.com/mitchellh/go-homedir"
 	"gopkg.in/yaml.v3"
 )
+
+const ApplicationName = "octosql"
 
 var octosqlHomeDir = func() string {
 	dir, err := homedir.Dir()
@@ -20,6 +23,30 @@ var octosqlHomeDir = func() string {
 		log.Fatalf("couldn't get user home directory: %s", err)
 	}
 	return filepath.Join(dir, ".octosql")
+}()
+
+var OctosqlConfigDir = func() string {
+	configDirPath, err := xdg.SearchConfigFile(ApplicationName)
+	if err != nil {
+		return octosqlHomeDir
+	}
+	return configDirPath
+}()
+
+var OctosqlCacheDir = func() string {
+	cacheDirPath, err := xdg.SearchCacheFile(ApplicationName)
+	if err != nil {
+		return octosqlHomeDir
+	}
+	return cacheDirPath
+}()
+
+var OctosqlDataDir = func() string {
+	dataDirPath, err := xdg.SearchDataFile(ApplicationName)
+	if err != nil {
+		return octosqlHomeDir
+	}
+	return dataDirPath
 }()
 
 type Config struct {
@@ -45,7 +72,7 @@ type JSONConfig struct {
 
 func Read() (*Config, error) {
 	var config Config
-	data, err := ioutil.ReadFile(filepath.Join(octosqlHomeDir, "octosql.yml"))
+	data, err := ioutil.ReadFile(filepath.Join(OctosqlConfigDir, "octosql.yml"))
 	if err != nil && os.IsNotExist(err) {
 		config = Config{}
 	} else if err != nil {

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -15,7 +14,6 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/kr/text"
-	"github.com/mitchellh/go-homedir"
 	"google.golang.org/grpc"
 	"gopkg.in/yaml.v3"
 
@@ -30,11 +28,8 @@ var tmpPluginsDir = func() string {
 	if value, ok := os.LookupEnv("OCTOSQL_PLUGIN_TMP_DIR"); ok {
 		return value
 	}
-	dir, err := homedir.Dir()
-	if err != nil {
-		log.Fatalf("couldn't get user home directory: %s", err)
-	}
-	return filepath.Join(dir, ".octosql/tmp/plugins")
+
+	return filepath.Join(config.OctosqlCacheDir, "tmp", "plugins")
 }()
 
 type Manager interface {

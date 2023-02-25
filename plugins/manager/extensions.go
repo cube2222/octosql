@@ -7,15 +7,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/mitchellh/go-homedir"
+	"github.com/cube2222/octosql/config"
 )
 
 var octosqlFileExtensionHandlersFile = func() string {
-	dir, err := homedir.Dir()
-	if err != nil {
-		log.Fatalf("couldn't get user home directory: %s", err)
-	}
-	return filepath.Join(dir, ".octosql/file_extension_handlers.json")
+	return filepath.Join(config.OctosqlConfigDir, "file_extension_handlers.json")
 }()
 
 func (*PluginManager) GetFileExtensionHandlers() (map[string]string, error) {

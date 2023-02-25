@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,15 +13,11 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver"
-	"github.com/mitchellh/go-homedir"
+	"github.com/cube2222/octosql/config"
 )
 
 var repositoriesDir = func() string {
-	dir, err := homedir.Dir()
-	if err != nil {
-		log.Fatalf("couldn't get user home directory: %s", err)
-	}
-	return filepath.Join(dir, ".octosql/repositories")
+	return filepath.Join(config.OctosqlDataDir, "repositories")
 }()
 
 var officialPluginRepositoryURL = func() string {

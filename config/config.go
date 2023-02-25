@@ -3,7 +3,6 @@ package config
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -22,7 +21,13 @@ var octosqlHomeDir = func() string {
 	if err != nil {
 		log.Fatalf("couldn't get user home directory: %s", err)
 	}
-	return filepath.Join(dir, ".octosql")
+	octosqlHomeDir := filepath.Join(dir, ".octosql")
+	if _, err := os.Stat(octosqlHomeDir); os.IsNotExist(err) {
+		if err = os.MkdirAll(octosqlHomeDir, 0755); err != nil {
+			log.Fatalf("couldn't create ~/.octosql home directory: %s", err)
+		}
+	}
+	return octosqlHomeDir
 }()
 
 var OctosqlConfigDir = func() string {
@@ -72,7 +77,7 @@ type JSONConfig struct {
 
 func Read() (*Config, error) {
 	var config Config
-	data, err := ioutil.ReadFile(filepath.Join(OctosqlConfigDir, "octosql.yml"))
+	data, err := os.ReadFile(filepath.Join(OctosqlConfigDir, "octosql.yml"))
 	if err != nil && os.IsNotExist(err) {
 		config = Config{}
 	} else if err != nil {

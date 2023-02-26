@@ -28,12 +28,12 @@ var octosqlHomeDir = func() string {
 		}
 	}
 	return octosqlHomeDir
-}()
+}
 
 var OctosqlConfigDir = func() string {
 	configDirPath, err := xdg.SearchConfigFile(ApplicationName)
 	if err != nil {
-		return octosqlHomeDir
+		return octosqlHomeDir()
 	}
 	return configDirPath
 }()
@@ -41,7 +41,7 @@ var OctosqlConfigDir = func() string {
 var OctosqlCacheDir = func() string {
 	cacheDirPath, err := xdg.SearchCacheFile(ApplicationName)
 	if err != nil {
-		return octosqlHomeDir
+		return octosqlHomeDir()
 	}
 	return cacheDirPath
 }()
@@ -49,7 +49,7 @@ var OctosqlCacheDir = func() string {
 var OctosqlDataDir = func() string {
 	dataDirPath, err := xdg.SearchDataFile(ApplicationName)
 	if err != nil {
-		return octosqlHomeDir
+		return octosqlHomeDir()
 	}
 	return dataDirPath
 }()

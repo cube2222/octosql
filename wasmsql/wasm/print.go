@@ -9,37 +9,55 @@ import (
 	"github.com/tetratelabs/wazero/api"
 
 	"github.com/cube2222/octosql/octosql"
+	"github.com/cube2222/octosql/physical"
 )
 
 type Print struct {
-	VariableName string // TODO: Use Expression
-	Type         Type
-
+	Schema physical.Schema
 	Source Node
 }
 
+// Note:
+// So basically in the schema we have the list of fields + types.
+// In the variable mapping we have a mapping from schema names to locals.
+
 func (o *Print) Run(ctx *GenerationContext) error {
 	printLibraryFunc, printIndex := ctx.RegisterEnvFunction("print", func(ctx context.Context, mod api.Module, stack []uint64) {
-		switch o.Type.TypeID {
+		out := ""
+
+		index := uint32(stack[0])
+		if index > 0 {
+			out += ", "
+		}
+
+		switch o.Schema.Fields[index].Type.TypeID {
 		case octosql.TypeIDInt:
-			fmt.Println(uint32(stack[0]))
+			out += fmt.Sprintf("%d", uint32(stack[1]))
 		default:
 			panic("unsupported type")
 		}
-	}, []api.ValueType{api.ValueTypeI32}, nil)
+
+		if index == uint32(len(o.Schema.Fields)-1) {
+			out += "\n"
+		}
+		fmt.Print(out)
+	}, []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, nil)
 
 	if err := o.Source.Run(ctx, func(ctx ProduceContext, variables map[string]VariableMetadata) error {
-		varMeta, ok := variables[o.VariableName]
-		if !ok {
-			return fmt.Errorf("unknown variable: %s", o.VariableName)
-		}
+		for i, field := range o.Schema.Fields {
+			varMeta, ok := variables[field.Name]
+			if !ok {
+				return fmt.Errorf("unknown variable: %s", field.Name)
+			}
 
-		// print
-		{
 			// TODO: The function index should probably go last, for simplicities sake.
 			// push function index
 			ctx.AppendCode(wasm.OpcodeI32Const)
 			ctx.AppendCode(leb128.EncodeUint32(printIndex)...)
+
+			// get value
+			ctx.AppendCode(wasm.OpcodeI32Const)
+			ctx.AppendCode(leb128.EncodeUint32(uint32(i))...)
 
 			// get value
 			ctx.AppendCode(wasm.OpcodeLocalGet)

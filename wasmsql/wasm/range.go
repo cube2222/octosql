@@ -8,11 +8,12 @@ import (
 )
 
 type Range struct {
+	LocalName  string
 	Start, End int32 // TODO: Change to expressions.
 }
 
 func (r *Range) Run(ctx *GenerationContext, produce func(ProduceContext, map[string]VariableMetadata) error) error {
-	iIndex := ctx.AddLocal("i", wasm.ValueTypeI32)
+	iIndex := ctx.AddLocal(r.LocalName, wasm.ValueTypeI32)
 
 	// initialize i
 	{
@@ -32,7 +33,7 @@ func (r *Range) Run(ctx *GenerationContext, produce func(ProduceContext, map[str
 	if err := produce(ProduceContext{
 		GenerationContext: ctx,
 	}, map[string]VariableMetadata{
-		"i": {
+		r.LocalName: {
 			ValueMetadata: ValueMetadata{
 				Type:     Type(octosql.Int),
 				Nullable: false,

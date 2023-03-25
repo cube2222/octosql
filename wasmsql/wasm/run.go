@@ -13,12 +13,12 @@ import (
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 
-	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/wasmsql/rustlib"
 )
 
 // TODO: Run wasm-opt on the wasm?
+
 func Run(physicalPlan physical.Node) error {
 	ctx := context.Background()
 
@@ -42,7 +42,7 @@ func Run(physicalPlan physical.Node) error {
 		importedFunctionsSeen++
 	}
 
-	node, err := Materialize(ctx, physicalPlan, physical.Environment{
+	node, err := MaterializeNode(ctx, physicalPlan, physical.Environment{
 		VariableContext: &physical.VariableContext{},
 	})
 	if err != nil {
@@ -53,9 +53,9 @@ func Run(physicalPlan physical.Node) error {
 	// node = &Range{Start: 1, End: 500000}
 	// node = &Map{
 	// 	Exprs: []Expression{
-	// 		&Add{
-	// 			Left:  &Variable{Name: "i"},
-	// 			Right: &Variable{Name: "i"},
+	// 		&AddIntegers{
+	// 			Left:  &ReadLocal{Name: "i"},
+	// 			Right: &ReadLocal{Name: "i"},
 	// 		},
 	// 	},
 	// 	OutFieldName: []string{
@@ -65,7 +65,7 @@ func Run(physicalPlan physical.Node) error {
 	// }
 	// var outputBuf bytes.Buffer
 	// sink := &Output{VariableName: "i", Writer: &outputBuf, Source: node}
-	sink := &Print{VariableName: "i", Type: Type(octosql.Int), Source: node}
+	sink := &Print{Schema: physicalPlan.Schema, Source: node}
 	genCtx := &GenerationContext{
 		LibraryFunctionIndices: libraryFunctionIndices,
 		ZeroTypeIndex:          uint32(len(decodedModule.TypeSection)),

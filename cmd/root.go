@@ -45,6 +45,7 @@ import (
 	"github.com/cube2222/octosql/plugins/repository"
 	"github.com/cube2222/octosql/table_valued_functions"
 	"github.com/cube2222/octosql/telemetry"
+	"github.com/cube2222/octosql/wasmsql/wasm"
 )
 
 var VERSION = "dev"
@@ -338,6 +339,8 @@ octosql "SELECT * FROM plugins.plugins"`,
 				}
 				return nil
 			}
+
+			return wasm.Run(physicalPlan)
 
 			executionPlan, err = physicalPlan.Materialize(
 				ctx,

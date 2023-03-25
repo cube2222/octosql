@@ -1,0 +1,23 @@
+#cargo-features = ["profile-rustflags"]
+
+[package]
+name = "rustlib"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[lib]
+crate-type = ["cdylib"]
+name = "rustlib"
+path = "lib.rs"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+#rustflags = ["-Clinker-flavor=wasmsql-ld", "-Clink-arg=--no-gc-sections", "-Clink-arg=--relocatable", "-Clink-arg=-O3"]
+# , "-Clink-arg=--lto-O3"
+
+#[target.wasm32-wasi]
+

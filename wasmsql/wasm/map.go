@@ -7,7 +7,6 @@ import (
 	"github.com/tetratelabs/wabin/wasm"
 	"golang.org/x/exp/maps"
 
-	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
 )
 
@@ -33,10 +32,6 @@ func (m *Map) Run(ctx *GenerationContext, produce func(ProduceContext, map[strin
 			ctx.AppendCode(leb128.EncodeUint32(localIndices[i])...)
 
 			newVariables[m.Schema.Fields[i].Name] = VariableMetadata{
-				ValueMetadata: ValueMetadata{
-					Type:     Type(octosql.Int),
-					Nullable: false,
-				},
 				Index: localIndices[i],
 			}
 		}

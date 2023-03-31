@@ -3,8 +3,6 @@ package wasm
 import (
 	"github.com/tetratelabs/wabin/leb128"
 	"github.com/tetratelabs/wabin/wasm"
-
-	"github.com/cube2222/octosql/octosql"
 )
 
 type Range struct {
@@ -34,10 +32,6 @@ func (r *Range) Run(ctx *GenerationContext, produce func(ProduceContext, map[str
 		GenerationContext: ctx,
 	}, map[string]VariableMetadata{
 		r.LocalName: {
-			ValueMetadata: ValueMetadata{
-				Type:     Type(octosql.Int),
-				Nullable: false,
-			},
 			Index: iIndex,
 		},
 	}); err != nil {

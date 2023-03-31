@@ -48,8 +48,7 @@ type ValueMetadata struct {
 }
 
 type VariableMetadata struct {
-	ValueMetadata ValueMetadata
-	Index         uint32
+	Index uint32
 }
 
 type FuncArity struct {

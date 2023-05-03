@@ -5,6 +5,7 @@
 
 use std::alloc::{Layout};
 use std::mem;
+// use serde_json;
 
 extern "C" {
     fn hostfunc0_0(fn_index: u32);
@@ -39,15 +40,16 @@ pub extern "C" fn hello() -> u32 {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn to_uppercase(ptr: u32, length: u32) -> u32 {
-    let bytes = Vec::from_raw_parts(ptr as *mut u8, length as usize, length as usize);
-    let str = String::from_utf8_unchecked(bytes);
+pub unsafe extern "C" fn upper(string_header_ptr: u32) -> u32 {
+    let ptr = *(string_header_ptr as *const u32);
+    let length = *((string_header_ptr +4) as *const u32);
 
-    let uppercased = Box::into_raw(str.to_uppercase().into_bytes().into_boxed_slice()) as *mut u8 as u32;
+    let out: Vec<_> = String::from_raw_parts(ptr as *mut u8, length as usize, length as usize).to_uppercase().into();
+    let new_body_ptr = Box::into_raw(out.into_boxed_slice()) as *mut u8 as u32;
 
-    mem::forget(str); // We don't want to free the original string.
+    let new_header_ptr = Box::into_raw(Box::new([new_body_ptr, length])) as *mut u8 as u32;
 
-    uppercased
+    new_header_ptr
 }
 
 #[no_mangle]

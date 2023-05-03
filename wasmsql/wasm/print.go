@@ -2,9 +2,12 @@ package wasm
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"math"
 
+	"github.com/tetratelabs/wabin/leb128"
+	"github.com/tetratelabs/wabin/wasm"
 	"github.com/tetratelabs/wazero/api"
 
 	"github.com/cube2222/octosql/octosql"
@@ -34,6 +37,21 @@ func (o *Print) Run(ctx *GenerationContext) error {
 			out += fmt.Sprintf("%d", uint32(stack[1]))
 		case octosql.TypeIDFloat:
 			out += fmt.Sprintf("%f", math.Float32frombits(uint32(stack[1])))
+		case octosql.TypeIDString:
+			strHeaderData, ok := mod.Memory().Read(uint32(stack[1]), 8)
+			if !ok {
+				panic("problem reading output buffer")
+			}
+			strBytesPtr := binary.LittleEndian.Uint32(strHeaderData[:4])
+			strBytesLen := binary.LittleEndian.Uint32(strHeaderData[4:])
+
+			strBytes, ok := mod.Memory().Read(strBytesPtr, strBytesLen)
+			if !ok {
+				panic("problem reading output buffer")
+			}
+			out += "'"
+			out += string(strBytes)
+			out += "'"
 		default:
 			panic("unsupported type")
 		}
@@ -56,21 +74,21 @@ func (o *Print) Run(ctx *GenerationContext) error {
 			varMeta = varMeta
 			printLibraryFunc = printLibraryFunc
 
-			// // TODO: The function index should probably go last, for simplicities sake.
-			// // push function index
-			// ctx.AppendCode(wasm.OpcodeI32Const)
-			// ctx.AppendCode(leb128.EncodeUint32(printIndex)...)
-			//
-			// // get value
-			// ctx.AppendCode(wasm.OpcodeI32Const)
-			// ctx.AppendCode(leb128.EncodeUint32(uint32(i))...)
-			//
-			// // get value
-			// ctx.AppendCode(wasm.OpcodeLocalGet)
-			// ctx.AppendCode(leb128.EncodeUint32(varMeta.Index)...)
-			//
-			// // call
-			// ctx.AppendLibraryCall(printLibraryFunc)
+			// TODO: The function index should probably go last, for simplicities sake.
+			// push function index
+			ctx.AppendCode(wasm.OpcodeI32Const)
+			ctx.AppendCode(leb128.EncodeUint32(printIndex)...)
+
+			// get value
+			ctx.AppendCode(wasm.OpcodeI32Const)
+			ctx.AppendCode(leb128.EncodeUint32(uint32(i))...)
+
+			// get value
+			ctx.AppendCode(wasm.OpcodeLocalGet)
+			ctx.AppendCode(leb128.EncodeUint32(varMeta.Index)...)
+
+			// call
+			ctx.AppendLibraryCall(printLibraryFunc)
 		}
 
 		return nil

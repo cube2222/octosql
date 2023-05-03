@@ -35,6 +35,10 @@ func (t Type) PrimitiveWASMType() wasm.ValueType {
 		// When operating on floats, we just reinterpret before using it.
 		// This way we get pure byte registers, basically.
 		return wasm.ValueTypeI32
+	case octosql.TypeIDString:
+		// TODO: Support strings next.
+		// Points at string header, which is 8 bytes: [ptr, len]
+		return wasm.ValueTypeI32
 	}
 	panic("invalid value type")
 }

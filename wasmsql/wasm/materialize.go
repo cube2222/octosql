@@ -112,7 +112,15 @@ func MaterializeExpr(ctx context.Context, expr physical.Expression, env physical
 				panic(fmt.Sprintf("invalid type for addition: %s", expr.FunctionCall.Arguments[0].Type.TypeID))
 			}
 		default:
-			panic(fmt.Sprintf("invalid function call: %s", expr.FunctionCall.Name))
+			args := make([]Expression, len(expr.FunctionCall.Arguments))
+			for i := range expr.FunctionCall.Arguments {
+				arg, err := MaterializeExpr(ctx, expr.FunctionCall.Arguments[i], env)
+				if err != nil {
+					return nil, fmt.Errorf("couldn't materialize argument: %w", err)
+				}
+				args[i] = arg
+			}
+			return &CallBuiltinFunc{Name: expr.FunctionCall.Name, Arguments: args}, nil
 		}
 	default:
 		panic(fmt.Sprintf("invalid expression type: %s", expr.ExpressionType))

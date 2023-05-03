@@ -90,6 +90,21 @@ func (v *AddFloats) Evaluate(ctx *GenerationContext, variables map[string]Variab
 	return nil
 }
 
+type CallBuiltinFunc struct {
+	Name      string
+	Arguments []Expression
+}
+
+func (v *CallBuiltinFunc) Evaluate(ctx *GenerationContext, variables map[string]VariableMetadata) error {
+	for _, arg := range v.Arguments {
+		if err := arg.Evaluate(ctx, variables); err != nil {
+			return fmt.Errorf("couldn't evaluate argument: %w", err)
+		}
+	}
+	ctx.AppendLibraryCall(v.Name)
+	return nil
+}
+
 // type BooleanExpression interface {
 // 	Evaluate(*GenerationContext, map[string]VariableMetadata) error
 // }

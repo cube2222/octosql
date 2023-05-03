@@ -77,6 +77,37 @@ func (d *Datasource) Run(ctx *GenerationContext, produce func(ProduceContext, ma
 				binary.LittleEndian.PutUint32(data[valueOffset:valueOffset+4], uint32(value.Int))
 			case octosql.TypeIDFloat:
 				binary.LittleEndian.PutUint32(data[valueOffset:valueOffset+4], math.Float32bits(float32(value.Float)))
+			case octosql.TypeIDString:
+				// TODO Abstract all of this away at some point. Maybe just an "allocate string" function?
+				strBytes := []byte(value.Str)
+				malloc := mod.ExportedFunction("sql_malloc")
+				stack[0] = 8 // string header size
+				if err := malloc.CallWithStack(ctx, stack); err != nil {
+					panic(err)
+				}
+				strHeaderPtr := uint32(stack[0])
+
+				stack[0] = uint64(len(strBytes))
+				if err := malloc.CallWithStack(ctx, stack); err != nil {
+					panic(err)
+				}
+				strBytesPtr := uint32(stack[0])
+
+				strHeaderData, ok := mod.Memory().Read(uint32(strHeaderPtr), 8)
+				if !ok {
+					panic("problem reading output buffer")
+				}
+				binary.LittleEndian.PutUint32(strHeaderData[:4], uint32(strBytesPtr))
+				binary.LittleEndian.PutUint32(strHeaderData[4:], uint32(len(strBytes)))
+
+				strBytesData, ok := mod.Memory().Read(uint32(strBytesPtr), uint32(len(strBytes)))
+				if !ok {
+					panic("problem reading output buffer")
+				}
+				copy(strBytesData, strBytes)
+
+				binary.LittleEndian.PutUint32(data[valueOffset:valueOffset+4], uint32(strHeaderPtr))
+
 			default:
 				panic(fmt.Sprintf("unsupported typeID: %s", d.Schema.Fields[i].Type.TypeID))
 			}

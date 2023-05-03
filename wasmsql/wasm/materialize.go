@@ -3,7 +3,6 @@ package wasm
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
@@ -47,30 +46,34 @@ func MaterializeNode(ctx context.Context, node physical.Node, env physical.Envir
 			Schema:  node.Schema,
 		}, nil
 	case physical.NodeTypeDatasource:
-		uniqueToColname := make(map[string]string)
-		for k, v := range node.Datasource.VariableMapping {
-			uniqueToColname[v] = strings.TrimPrefix(k, node.Datasource.Alias+".")
-		}
-		predicatesOriginalNames := physical.RenameExpressionSliceRecordVariables(uniqueToColname, node.Datasource.Predicates)
-
-		fieldsOriginalNames := make([]physical.SchemaField, len(node.Schema.Fields))
-		for i := range node.Schema.Fields {
-			fieldsOriginalNames[i] = physical.SchemaField{
-				Name: uniqueToColname[node.Schema.Fields[i].Name],
-				Type: node.Schema.Fields[i].Type,
-			}
-		}
-		schemaOriginalNames := physical.NewSchema(fieldsOriginalNames, node.Schema.TimeField)
-
-		materialized, err := node.Datasource.DatasourceImplementation.Materialize(ctx, env, schemaOriginalNames, predicatesOriginalNames)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't materialize datasource: %w", err)
-		}
-
-		return &Datasource{
+		return &JSON{
 			Schema: node.Schema,
-			Source: materialized,
 		}, nil
+	// case physical.NodeTypeDatasource:
+	// 	uniqueToColname := make(map[string]string)
+	// 	for k, v := range node.Datasource.VariableMapping {
+	// 		uniqueToColname[v] = strings.TrimPrefix(k, node.Datasource.Alias+".")
+	// 	}
+	// 	predicatesOriginalNames := physical.RenameExpressionSliceRecordVariables(uniqueToColname, node.Datasource.Predicates)
+	//
+	// 	fieldsOriginalNames := make([]physical.SchemaField, len(node.Schema.Fields))
+	// 	for i := range node.Schema.Fields {
+	// 		fieldsOriginalNames[i] = physical.SchemaField{
+	// 			Name: uniqueToColname[node.Schema.Fields[i].Name],
+	// 			Type: node.Schema.Fields[i].Type,
+	// 		}
+	// 	}
+	// 	schemaOriginalNames := physical.NewSchema(fieldsOriginalNames, node.Schema.TimeField)
+	//
+	// 	materialized, err := node.Datasource.DatasourceImplementation.Materialize(ctx, env, schemaOriginalNames, predicatesOriginalNames)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("couldn't materialize datasource: %w", err)
+	// 	}
+	//
+	// 	return &Datasource{
+	// 		Schema: node.Schema,
+	// 		Source: materialized,
+	// 	}, nil
 	default:
 		panic(fmt.Sprintf("invalid node type: %s", node.NodeType))
 	}

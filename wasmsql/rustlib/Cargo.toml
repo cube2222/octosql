@@ -5,6 +5,9 @@ name = "rustlib"
 version = "0.1.0"
 edition = "2021"
 
+[dependencies]
+serde_json = "1.0.96"
+
 [lib]
 crate-type = ["cdylib"]
 name = "rustlib"

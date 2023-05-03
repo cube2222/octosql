@@ -2,12 +2,14 @@ package wasm
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"os"
 	"time"
 
 	wasmbinary "github.com/tetratelabs/wabin/binary"
+	"github.com/tetratelabs/wabin/leb128"
 	"github.com/tetratelabs/wabin/wasm"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -40,6 +42,15 @@ func Run(physicalPlan physical.Node) error {
 		}
 		libraryFunctionIndices[f.Name] = importedFunctionsSeen
 		importedFunctionsSeen++
+	}
+	var callCtorsIndex uint32
+	var callDtorsIndex uint32
+	for _, nameAssociation := range decodedModule.NameSection.FunctionNames {
+		if nameAssociation.Name == "__wasm_call_ctors" {
+			callCtorsIndex = nameAssociation.Index
+		} else if nameAssociation.Name == "__wasm_call_dtors" {
+			callDtorsIndex = nameAssociation.Index
+		}
 	}
 
 	node, err := MaterializeNode(ctx, physicalPlan, physical.Environment{
@@ -74,9 +85,13 @@ func Run(physicalPlan physical.Node) error {
 			Body func(ctx context.Context, mod api.Module, stack []uint64)
 		}{},
 	}
+	genCtx.AppendCode(wasm.OpcodeCall)
+	genCtx.AppendCode(leb128.EncodeUint32(callCtorsIndex)...)
 	if err := sink.Run(genCtx); err != nil {
 		return err
 	}
+	genCtx.AppendCode(wasm.OpcodeCall)
+	genCtx.AppendCode(leb128.EncodeUint32(callDtorsIndex)...)
 	genCtx.AppendCode(wasm.OpcodeEnd)
 
 	// add execution entrypoint
@@ -153,15 +168,31 @@ func Run(physicalPlan physical.Node) error {
 	}
 	envBuilder.NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
-			log.Println("debug", uint32(stack[0]), uint32(stack[1]))
+			if uint32(stack[0]) == 42 {
+				strHeaderData, ok := mod.Memory().Read(uint32(stack[1]), 8)
+				if !ok {
+					panic("problem reading output buffer")
+				}
+				strBytesPtr := binary.LittleEndian.Uint32(strHeaderData[:4])
+				strBytesLen := binary.LittleEndian.Uint32(strHeaderData[4:])
+
+				strBytes, ok := mod.Memory().Read(strBytesPtr, strBytesLen)
+				if !ok {
+					panic("problem reading output buffer")
+				}
+				log.Println("debug 42", string(strBytes))
+			} else {
+				log.Println("debug", uint32(stack[0]), uint32(stack[1]))
+			}
+
 		}), []api.ValueType{api.ValueTypeI32, api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32}).
-		Export(fmt.Sprintf("debug"))
+		Export("debug")
 	if _, err := envBuilder.Instantiate(ctx); err != nil {
 		return err
 	}
 
 	start := time.Now()
-	mod, err := r.Instantiate(ctx, bin)
+	mod, err := r.InstantiateWithConfig(ctx, bin, wazero.NewModuleConfig().WithFSConfig(wazero.NewFSConfig().WithDirMount("/", "/")))
 	log.Println("instantiated in", time.Since(start))
 	if err != nil {
 		return err

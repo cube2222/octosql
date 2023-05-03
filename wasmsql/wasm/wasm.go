@@ -23,7 +23,6 @@ type ProduceContext struct {
 	*GenerationContext
 }
 
-// TODO: Change to struct, so that i.e. objects are supported.
 type Type octosql.Type
 
 func (t Type) PrimitiveWASMType() wasm.ValueType {

@@ -10,6 +10,9 @@ extern "C" {
     fn hostfunc0_0(fn_index: u32);
     fn hostfunc1_0(fn_index: u32, arg0: u32);
     fn hostfunc2_0(fn_index: u32, arg0: u32, arg1: u32);
+    fn hostfunc0_1(fn_index: u32) -> u32;
+    fn hostfunc1_1(fn_index: u32, arg0: u32) -> u32;
+    fn hostfunc2_1(fn_index: u32, arg0: u32, arg1: u32) -> u32;
     fn debug(name: u32, x: u32) -> u32;
 }
 
@@ -18,6 +21,9 @@ pub unsafe extern "C" fn force_import_keep() {
     hostfunc0_0(0);
     hostfunc1_0(0, 0);
     hostfunc2_0(0, 0, 0);
+    hostfunc0_1(0);
+    hostfunc1_1(0, 0);
+    hostfunc2_1(0, 0, 0);
     debug(0, 0);
 }
 

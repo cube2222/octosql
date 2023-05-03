@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/tetratelabs/wabin/leb128"
-	"github.com/tetratelabs/wabin/wasm"
 	"github.com/tetratelabs/wazero/api"
 
 	"github.com/cube2222/octosql/octosql"
@@ -50,21 +48,26 @@ func (o *Print) Run(ctx *GenerationContext) error {
 				return fmt.Errorf("unknown variable: %s", field.Name)
 			}
 
-			// TODO: The function index should probably go last, for simplicities sake.
-			// push function index
-			ctx.AppendCode(wasm.OpcodeI32Const)
-			ctx.AppendCode(leb128.EncodeUint32(printIndex)...)
+			printIndex = printIndex
+			i = i
+			varMeta = varMeta
+			printLibraryFunc = printLibraryFunc
 
-			// get value
-			ctx.AppendCode(wasm.OpcodeI32Const)
-			ctx.AppendCode(leb128.EncodeUint32(uint32(i))...)
-
-			// get value
-			ctx.AppendCode(wasm.OpcodeLocalGet)
-			ctx.AppendCode(leb128.EncodeUint32(varMeta.Index)...)
-
-			// call
-			ctx.AppendLibraryCall(printLibraryFunc)
+			// // TODO: The function index should probably go last, for simplicities sake.
+			// // push function index
+			// ctx.AppendCode(wasm.OpcodeI32Const)
+			// ctx.AppendCode(leb128.EncodeUint32(printIndex)...)
+			//
+			// // get value
+			// ctx.AppendCode(wasm.OpcodeI32Const)
+			// ctx.AppendCode(leb128.EncodeUint32(uint32(i))...)
+			//
+			// // get value
+			// ctx.AppendCode(wasm.OpcodeLocalGet)
+			// ctx.AppendCode(leb128.EncodeUint32(varMeta.Index)...)
+			//
+			// // call
+			// ctx.AppendLibraryCall(printLibraryFunc)
 		}
 
 		return nil

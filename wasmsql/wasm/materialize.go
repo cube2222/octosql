@@ -40,6 +40,11 @@ func MaterializeNode(ctx context.Context, node physical.Node, env physical.Envir
 		default:
 			panic("invalid table valued function")
 		}
+	case physical.NodeTypeInMemoryRecords:
+		return &InMemoryRecords{
+			Records: node.InMemoryRecords.Records,
+			Schema:  node.Schema,
+		}, nil
 	default:
 		panic(fmt.Sprintf("invalid node type: %s", node.NodeType))
 	}

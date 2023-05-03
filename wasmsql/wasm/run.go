@@ -119,7 +119,9 @@ func Run(physicalPlan physical.Node) error {
 
 	envBuilder := r.NewHostModuleBuilder("env")
 	for paramCount := uint32(0); paramCount < 3; paramCount++ {
-		for resultCount := uint32(0); resultCount < 1; resultCount++ {
+		for resultCount := uint32(0); resultCount < 2; resultCount++ {
+			paramCount := paramCount
+			resultCount := resultCount
 			params := make([]wasm.ValueType, paramCount+1)
 			for i := range params {
 				params[i] = wasm.ValueTypeI32
@@ -131,13 +133,17 @@ func Run(physicalPlan physical.Node) error {
 
 			funcs := genCtx.FunctionsByArity[FuncArity{Params: paramCount, Results: resultCount}]
 
-			debug := true
+			debug := false
 			envBuilder = envBuilder.NewFunctionBuilder().
 				WithGoModuleFunction(api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
 					if debug {
-						log.Printf("env function '%s' called", funcs[uint32(stack[0])].Name)
+						fmt.Printf("env function '%s(%d) -> %d' called\n", funcs[uint32(stack[0])].Name, paramCount, resultCount)
 					}
-					funcs[uint32(stack[0])].Body(ctx, mod, stack[1:])
+					var funcStack []uint64
+					if paramCount > 0 {
+						funcStack = stack[1:]
+					}
+					funcs[uint32(stack[0])].Body(ctx, mod, funcStack)
 					for i := uint32(0); i < resultCount; i++ {
 						stack[i] = stack[i+1]
 					}
@@ -155,7 +161,7 @@ func Run(physicalPlan physical.Node) error {
 	}
 
 	start := time.Now()
-	mod, err := r.InstantiateModuleFromBinary(ctx, bin)
+	mod, err := r.Instantiate(ctx, bin)
 	log.Println("instantiated in", time.Since(start))
 	if err != nil {
 		return err

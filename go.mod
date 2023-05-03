@@ -7,7 +7,6 @@ require (
 	github.com/adrg/xdg v0.4.0
 	github.com/awalterschulze/gographviz v2.0.3+incompatible
 	github.com/c-bata/go-prompt v0.2.6
-	github.com/davecgh/go-spew v1.1.1
 	github.com/dgraph-io/ristretto v0.0.3
 	github.com/golang/protobuf v1.5.2
 	github.com/google/btree v1.1.2
@@ -28,7 +27,7 @@ require (
 	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.8.0
 	github.com/tetratelabs/wabin v0.0.0-20230304001439-f6f874872834
-	github.com/tetratelabs/wazero v1.0.0-pre.8
+	github.com/tetratelabs/wazero v1.1.0
 	github.com/tidwall/btree v1.3.1
 	github.com/valyala/fastjson v1.6.3
 	github.com/zyedidia/generic v1.1.0
@@ -42,6 +41,7 @@ require (
 	github.com/andybalholm/brotli v1.0.3 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cockroachdb/apd v1.1.0 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/frankban/quicktest v1.14.0 // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect

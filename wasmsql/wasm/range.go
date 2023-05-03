@@ -28,6 +28,8 @@ func (r *Range) Run(ctx *GenerationContext, produce func(ProduceContext, map[str
 	ctx.AppendCode(wasm.OpcodeLoop)
 	ctx.AppendCode(leb128.EncodeUint32(ctx.ZeroTypeIndex)...)
 
+	// TODO: We should actually have a block here, wrapping the produce call, so that i.e. nested filters can break to it.
+
 	if err := produce(ProduceContext{
 		GenerationContext: ctx,
 	}, map[string]VariableMetadata{

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"math"
 
 	"github.com/tetratelabs/wabin/leb128"
 	"github.com/tetratelabs/wabin/wasm"
@@ -74,6 +75,8 @@ func (d *Datasource) Run(ctx *GenerationContext, produce func(ProduceContext, ma
 			switch d.Schema.Fields[i].Type.TypeID {
 			case octosql.TypeIDInt:
 				binary.LittleEndian.PutUint32(data[valueOffset:valueOffset+4], uint32(value.Int))
+			case octosql.TypeIDFloat:
+				binary.LittleEndian.PutUint32(data[valueOffset:valueOffset+4], math.Float32bits(float32(value.Float)))
 			default:
 				panic(fmt.Sprintf("unsupported typeID: %s", d.Schema.Fields[i].Type.TypeID))
 			}

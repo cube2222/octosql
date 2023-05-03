@@ -3,6 +3,7 @@ package wasm
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/cube2222/octosql/octosql"
 	"github.com/cube2222/octosql/physical"
@@ -45,6 +46,31 @@ func MaterializeNode(ctx context.Context, node physical.Node, env physical.Envir
 			Records: node.InMemoryRecords.Records,
 			Schema:  node.Schema,
 		}, nil
+	case physical.NodeTypeDatasource:
+		uniqueToColname := make(map[string]string)
+		for k, v := range node.Datasource.VariableMapping {
+			uniqueToColname[v] = strings.TrimPrefix(k, node.Datasource.Alias+".")
+		}
+		predicatesOriginalNames := physical.RenameExpressionSliceRecordVariables(uniqueToColname, node.Datasource.Predicates)
+
+		fieldsOriginalNames := make([]physical.SchemaField, len(node.Schema.Fields))
+		for i := range node.Schema.Fields {
+			fieldsOriginalNames[i] = physical.SchemaField{
+				Name: uniqueToColname[node.Schema.Fields[i].Name],
+				Type: node.Schema.Fields[i].Type,
+			}
+		}
+		schemaOriginalNames := physical.NewSchema(fieldsOriginalNames, node.Schema.TimeField)
+
+		materialized, err := node.Datasource.DatasourceImplementation.Materialize(ctx, env, schemaOriginalNames, predicatesOriginalNames)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't materialize datasource: %w", err)
+		}
+
+		return &Datasource{
+			Schema: node.Schema,
+			Source: materialized,
+		}, nil
 	default:
 		panic(fmt.Sprintf("invalid node type: %s", node.NodeType))
 	}
@@ -56,6 +82,8 @@ func MaterializeExpr(ctx context.Context, expr physical.Expression, env physical
 		switch expr.Constant.Value.TypeID {
 		case octosql.TypeIDInt:
 			return &ConstantInteger{Value: int32(expr.Constant.Value.Int)}, nil
+		case octosql.TypeIDFloat:
+			return &ConstantFloat{Value: float32(expr.Constant.Value.Float)}, nil
 		default:
 			panic(fmt.Sprintf("invalid constant type: %s", expr.Constant.Value.TypeID))
 		}
@@ -73,7 +101,16 @@ func MaterializeExpr(ctx context.Context, expr physical.Expression, env physical
 				return nil, fmt.Errorf("couldn't materialize right argument: %w", err)
 			}
 			// TODO: Support addition of other types.
-			return &AddIntegers{Left: left, Right: right}, nil
+
+			switch expr.FunctionCall.Arguments[0].Type.TypeID {
+			case octosql.TypeIDInt:
+				// TODO: Support mixed-type additions (like time + duration).
+				return &AddIntegers{Left: left, Right: right}, nil
+			case octosql.TypeIDFloat:
+				return &AddFloats{Left: left, Right: right}, nil
+			default:
+				panic(fmt.Sprintf("invalid type for addition: %s", expr.FunctionCall.Arguments[0].Type.TypeID))
+			}
 		default:
 			panic(fmt.Sprintf("invalid function call: %s", expr.FunctionCall.Name))
 		}

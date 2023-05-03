@@ -2,6 +2,7 @@ package wasm
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/tetratelabs/wabin/leb128"
 	"github.com/tetratelabs/wabin/wasm"
@@ -20,6 +21,17 @@ type ConstantInteger struct {
 func (c *ConstantInteger) Evaluate(ctx *GenerationContext, variables map[string]VariableMetadata) error {
 	ctx.AppendCode(wasm.OpcodeI32Const)
 	ctx.AppendCode(leb128.EncodeInt32(c.Value)...)
+
+	return nil
+}
+
+type ConstantFloat struct {
+	Value float32
+}
+
+func (c *ConstantFloat) Evaluate(ctx *GenerationContext, variables map[string]VariableMetadata) error {
+	ctx.AppendCode(wasm.OpcodeI32Const)
+	ctx.AppendCode(leb128.EncodeUint32(math.Float32bits(c.Value))...)
 
 	return nil
 }
@@ -54,6 +66,26 @@ func (v *AddIntegers) Evaluate(ctx *GenerationContext, variables map[string]Vari
 	}
 
 	ctx.AppendCode(wasm.OpcodeI32Add)
+
+	return nil
+}
+
+type AddFloats struct {
+	Left, Right Expression
+}
+
+func (v *AddFloats) Evaluate(ctx *GenerationContext, variables map[string]VariableMetadata) error {
+	if err := v.Left.Evaluate(ctx, variables); err != nil {
+		return fmt.Errorf("couldn't evaluate left argument: %w", err)
+	}
+	ctx.AppendCode(wasm.OpcodeF32ReinterpretI32)
+	if err := v.Right.Evaluate(ctx, variables); err != nil {
+		return fmt.Errorf("couldn't evaluate right argument: %w", err)
+	}
+	ctx.AppendCode(wasm.OpcodeF32ReinterpretI32)
+
+	ctx.AppendCode(wasm.OpcodeF32Add)
+	ctx.AppendCode(wasm.OpcodeI32ReinterpretF32)
 
 	return nil
 }

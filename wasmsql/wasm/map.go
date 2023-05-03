@@ -20,7 +20,7 @@ type Map struct {
 func (m *Map) Run(ctx *GenerationContext, produce func(ProduceContext, map[string]VariableMetadata) error) error {
 	localIndices := make([]uint32, len(m.Exprs))
 	for i := range m.Exprs {
-		localIndices[i] = ctx.AddLocal(fmt.Sprintf("map_expr_%d", i), wasm.ValueTypeI32) // TODO: Fix type
+		localIndices[i] = ctx.AddLocal(fmt.Sprintf("map_expr_%d", i), Type(m.Schema.Fields[i].Type).PrimitiveWASMType())
 	}
 	if err := m.Source.Run(ctx, func(ctx ProduceContext, variables map[string]VariableMetadata) error {
 		newVariables := maps.Clone(variables)

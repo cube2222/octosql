@@ -27,7 +27,13 @@ type Type octosql.Type
 
 func (t Type) PrimitiveWASMType() wasm.ValueType {
 	switch t.TypeID {
+	// TODO: Fixme use 64 bit types
 	case octosql.TypeIDInt:
+		return wasm.ValueTypeI32
+	case octosql.TypeIDFloat:
+		// We always use i32, actually.
+		// When operating on floats, we just reinterpret before using it.
+		// This way we get pure byte registers, basically.
 		return wasm.ValueTypeI32
 	}
 	panic("invalid value type")
@@ -36,6 +42,8 @@ func (t Type) PrimitiveWASMType() wasm.ValueType {
 func (t Type) ByteSize() uint32 {
 	switch t.TypeID {
 	case octosql.TypeIDInt:
+		return 4
+	case octosql.TypeIDFloat:
 		return 4
 	}
 	panic("invalid value type")

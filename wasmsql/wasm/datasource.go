@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"math"
 
 	"github.com/tetratelabs/wabin/leb128"
 	"github.com/tetratelabs/wabin/wasm"
@@ -15,32 +14,54 @@ import (
 	"github.com/cube2222/octosql/physical"
 )
 
-type InMemoryRecords struct {
-	Schema  physical.Schema
-	Records []execution.Record
+// TODO:
+//   Should start the datasource on `start_reading_records` - possibly async, maybe in batches.
+//   Should somehow pass those to be readable by this datasource.
+//   Unfortunately, we have to convert push-based into pull-based here, but this is a low-effort wrapper solution.
+//   Natively written datasources could be much faster.
+//   Maybe we could try having at least a natively-written JSON datasource?
+
+type Datasource struct {
+	Schema physical.Schema
+	Source execution.Node
 }
 
-func (d *InMemoryRecords) Run(ctx *GenerationContext, produce func(ProduceContext, map[string]VariableMetadata) error) error {
+func (d *Datasource) Run(ctx *GenerationContext, produce func(ProduceContext, map[string]VariableMetadata) error) error {
 	recordPtr := ctx.AddLocal("record_ptr", wasm.ValueTypeI32)
 
 	localIndices := make([]uint32, len(d.Schema.Fields))
 	var recordSize uint32
 	for i := range d.Schema.Fields {
-		wasmType := Type(d.Schema.Fields[i].Type)
-		localIndices[i] = ctx.AddLocal(fmt.Sprintf("in_memory_expr_%d", i), wasmType.PrimitiveWASMType())
-		recordSize += wasmType.ByteSize()
+		localIndices[i] = ctx.AddLocal(fmt.Sprintf("in_memory_expr_%d", i), wasm.ValueTypeI32) // TODO: Fix type
+		// TODO: recordSize += d.Schema.Fields[i].Type.Size()
+		recordSize += 4
 	}
 
-	curRecordIndex := 0
+	var cancelDatasource context.CancelFunc = func() {}
+	var recordBatchChannel <-chan []execution.Record
+	var curBatch []execution.Record
+	curBatchRecordIndex := 0
 
 	startReadingLibraryFunc, startReadingIndex := ctx.RegisterEnvFunction("start_reading_records", func(ctx context.Context, mod api.Module, stack []uint64) {
-		curRecordIndex = 0
+		// TODO: Start a goroutine with the datasource and back-pressure here?
+		//   Could send the records in batches of i.e. 1k.
+		//   We could then even pass the batches into wasm one batch at a time, without calling the "next_record" function so often.
+		//   We have no way to pass values of pushed-down variables (VariableContext), though...
+		//   Would need to pass those explicitly somehow.
+		cancelDatasource()
+		curBatch = nil
+		curBatchRecordIndex = 0
+		recordBatchChannel, cancelDatasource = d.startDatasource()
 	}, nil, nil)
 
 	nextRecordLibraryFunc, nextRecordIndex := ctx.RegisterEnvFunction("next_record", func(ctx context.Context, mod api.Module, stack []uint64) {
-		if curRecordIndex >= len(d.Records) {
-			stack[0] = 1
-			return
+		if curBatch == nil || curBatchRecordIndex >= len(curBatch) {
+			curBatch = <-recordBatchChannel
+			if curBatch == nil {
+				stack[0] = 1
+				return
+			}
+			curBatchRecordIndex = 0
 		}
 
 		data, ok := mod.Memory().Read(uint32(stack[0]), recordSize)
@@ -49,19 +70,17 @@ func (d *InMemoryRecords) Run(ctx *GenerationContext, produce func(ProduceContex
 		}
 		var valueOffset uint32
 		for i := range d.Schema.Fields {
-			value := d.Records[curRecordIndex].Values[i]
+			value := curBatch[curBatchRecordIndex].Values[i]
 			switch d.Schema.Fields[i].Type.TypeID {
 			case octosql.TypeIDInt:
 				binary.LittleEndian.PutUint32(data[valueOffset:valueOffset+4], uint32(value.Int))
-			case octosql.TypeIDFloat:
-				binary.LittleEndian.PutUint32(data[valueOffset:valueOffset+4], math.Float32bits(float32(value.Float)))
 			default:
 				panic(fmt.Sprintf("unsupported typeID: %s", d.Schema.Fields[i].Type.TypeID))
 			}
-			valueOffset += Type(d.Schema.Fields[i].Type).ByteSize()
+			valueOffset += 4 // TODO: Fix type size
 		}
 
-		curRecordIndex++
+		curBatchRecordIndex++
 		stack[0] = 0
 
 	}, []api.ValueType{api.ValueTypeI32}, []api.ValueType{api.ValueTypeI32})
@@ -128,7 +147,7 @@ func (d *InMemoryRecords) Run(ctx *GenerationContext, produce func(ProduceContex
 					ctx.AppendCode(wasm.OpcodeLocalSet)
 					ctx.AppendCode(leb128.EncodeUint32(localIndices[i])...)
 
-					valueOffset += Type(d.Schema.Fields[i].Type).ByteSize()
+					valueOffset += 4 // TODO: Fix type size
 				}
 			}
 
@@ -158,4 +177,38 @@ func (d *InMemoryRecords) Run(ctx *GenerationContext, produce func(ProduceContex
 	ctx.AppendCode(wasm.OpcodeEnd)
 
 	return nil
+}
+
+func (d *Datasource) startDatasource() (<-chan []execution.Record, context.CancelFunc) {
+	recordBatches := make(chan []execution.Record, 8)
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		defer close(recordBatches)
+		batch := make([]execution.Record, 0, 1000)
+		if err := d.Source.Run(execution.ExecutionContext{Context: ctx}, func(ctx execution.ProduceContext, record execution.Record) error {
+			batch = append(batch, record)
+
+			if len(batch) == cap(batch) {
+				select {
+				case recordBatches <- batch:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+				batch = make([]execution.Record, 0, 1000)
+			}
+
+			return nil
+		}, func(ctx execution.ProduceContext, msg execution.MetadataMessage) error { return nil }); err != nil {
+			panic(err)
+		}
+		if len(batch) > 0 {
+			select {
+			case recordBatches <- batch:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	return recordBatches, cancel
 }

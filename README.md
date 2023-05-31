@@ -326,7 +326,7 @@ WITH
                               offset=>INTERVAL 0 SECONDS) c),
   counts_per_user AS (SELECT window_end, user_id, COUNT(*) as clicks
                       FROM with_tumble
-                      GROUP BY window_end, user_id, TRIGGER ON WATERMARK, COUNTING 500)
+                      GROUP BY window_end, user_id TRIGGER ON WATERMARK, COUNTING 500)
 SELECT window_end, user_id, clicks
 FROM counts_per_user
 ```

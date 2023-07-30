@@ -174,7 +174,7 @@ func fieldReader(field arrow.Field, builder array.Builder) (ValueReaderFunc, err
 		if err != nil {
 			return nil, fmt.Errorf("couldn't construct list reader: %w", err)
 		}
-		// TODO: Handle structs, lists, and unions.
+		// TODO: Handle structs and unions. Also, large variants, like LARGE_LIST and LARGE_STRING.
 	default:
 		return nil, fmt.Errorf("unsupported type: %v", field)
 	}

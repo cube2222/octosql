@@ -2,6 +2,7 @@ package json
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 
@@ -12,7 +13,7 @@ import (
 	"github.com/apache/arrow/go/v13/arrow/memory"
 )
 
-const batchSize = 32 * 1024
+const batchSize = 8 * 1024
 
 type ValueReaderFunc func(value *fastjson.Value) error
 
@@ -20,47 +21,115 @@ func ReadJSON(allocator memory.Allocator, r io.Reader, schema *arrow.Schema, pro
 	sc := bufio.NewScanner(r)
 	sc.Buffer(nil, 1024*1024*8)
 
-	recordBuilder := array.NewRecordBuilder(allocator, schema)
-	recordBuilder.Reserve(batchSize)
+	// All async processing in this function and all jobs created by it use this context.
+	// This means that returning from this function will properly clean up all async processors.
+	ctx := context.Background()
+	localCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	readerFunc, err := recordReader(schema, recordBuilder)
-	if err != nil {
-		return fmt.Errorf("couldn't construct record reader function: %w", err)
-	}
+	outChan := make(chan jobOutRecord, 16)
 
-	var p fastjson.Parser
-	count := 0
-	for sc.Scan() {
-		line := sc.Bytes()
-		value, err := p.ParseBytes(line)
-		if err != nil {
-			return err
+	// This is necessary so that the global worker pool doesn't lock up.
+	// We only allow the line reader to create parsing jobs when we know that the output channel has space left.
+	// The consumer will always take out a token after reading from the output channel,
+	// so filling up the token channel is equivalent to filling up the output channel.
+	// But since the line reader goes through the worker pool, it can't block on the output channel.
+	// That's why we use a token channel.
+	outChanAvailableTokens := make(chan struct{}, 16)
+
+	done := make(chan error, 1)
+
+	// batchesRead is first incremented by the line reader.
+	// Then, after the line reader is done, it's read by the consumer,
+	// so it knows when it's done reading all the lines.
+	// Access is synchronized through the `done` channel.
+	batchesRead := 0
+
+	// This routine reads lines and sends them in batches to the parser worker pool.
+	go func() {
+		line := 0
+		job := jobIn{
+			sequenceNumber: 0,
+			ctx:            localCtx,
+			schema:         schema,
+			lines:          make([][]byte, 0, batchSize),
+			outChan:        outChan,
 		}
-		if err := readerFunc(value); err != nil {
-			return fmt.Errorf("couldn't read record: %w", err)
-		}
-		count++
-		if count == batchSize {
-			record := recordBuilder.NewRecord()
-			if err := produce(record); err != nil {
-				return fmt.Errorf("couldn't produce record: %w", err)
+		for sc.Scan() {
+			data := make([]byte, len(sc.Bytes()))
+			copy(data, sc.Bytes())
+			job.lines = append(job.lines, data)
+
+			if len(job.lines) == batchSize {
+				select {
+				case outChanAvailableTokens <- struct{}{}:
+					parserWorkReceiveChannel <- job
+					batchesRead++
+				case <-localCtx.Done():
+					return
+				}
+				job = jobIn{
+					sequenceNumber: batchesRead,
+					ctx:            localCtx,
+					schema:         schema,
+					lines:          make([][]byte, 0, batchSize),
+					outChan:        outChan,
+				}
 			}
-			record.Release()
-			count = 0
-			recordBuilder.Reserve(batchSize)
-		}
-	}
 
-	if count > 0 {
-		record := recordBuilder.NewRecord()
-		if err := produce(record); err != nil {
-			return fmt.Errorf("couldn't produce record: %w", err)
+			line++
 		}
-		record.Release()
-	}
+		if len(job.lines) > 0 {
+			select {
+			case outChanAvailableTokens <- struct{}{}:
+				parserWorkReceiveChannel <- job
+				batchesRead++
+			case <-localCtx.Done():
+				return
+			}
+		}
+		done <- sc.Err()
+	}()
 
-	if err := sc.Err(); err != nil {
-		return fmt.Errorf("couldn't read line: %w", err)
+	var queue []arrow.Record
+	var startIndex int
+	var fileReaderIsDone bool
+produceLoop:
+	for {
+		select {
+		case out := <-outChan:
+			<-outChanAvailableTokens
+
+			if err := out.err; err != nil {
+				return fmt.Errorf("couldn't parse json: %w", err)
+			}
+			for len(queue) <= out.sequenceNumber-startIndex {
+				queue = append(queue, nil)
+			}
+			queue[out.sequenceNumber-startIndex] = out.record
+			for len(queue) > 0 && queue[0] != nil {
+				record := queue[0]
+				if err := produce(record); err != nil {
+					return fmt.Errorf("couldn't produce: %w", err)
+				}
+				queue = queue[1:]
+				startIndex++
+			}
+			if fileReaderIsDone && startIndex == batchesRead {
+				break produceLoop
+			}
+		case readerErr := <-done:
+			if readerErr != nil {
+				return readerErr
+			}
+			fileReaderIsDone = true
+			done = nil // will block this select branch from now on
+			if fileReaderIsDone && startIndex == batchesRead {
+				break produceLoop
+			}
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 
 	return nil

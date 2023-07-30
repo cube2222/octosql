@@ -71,7 +71,7 @@ func recordReader(schema *arrow.Schema, recordBuilder *array.RecordBuilder) (Val
 	readers := make([]ValueReaderFunc, len(schema.Fields()))
 	for i, field := range fields {
 		var err error
-		readers[i], err = valueReader(field.Type, recordBuilder.Field(i))
+		readers[i], err = valueReader(field, recordBuilder.Field(i))
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create value reader for field %v: %w", field.Name, err)
 		}
@@ -88,17 +88,37 @@ func recordReader(schema *arrow.Schema, recordBuilder *array.RecordBuilder) (Val
 	}, nil
 }
 
-func valueReader(dt arrow.DataType, builder array.Builder) (ValueReaderFunc, error) {
-	switch dt.ID() {
+func valueReader(dt arrow.Field, builder array.Builder) (ValueReaderFunc, error) {
+	var reader ValueReaderFunc
+	switch dt.Type.ID() {
+	case arrow.BOOL:
+		reader = boolReader(builder)
 	case arrow.INT64:
-		return nullableReader(intReader, builder.(*array.Int64Builder)), nil
+		reader = intReader(builder)
 	case arrow.FLOAT64:
-		return nullableReader(floatReader, builder.(*array.Float64Builder)), nil
+		reader = floatReader(builder)
 	case arrow.STRING:
-		return nullableReader(stringReader, builder.(*array.StringBuilder)), nil
-		// TODO: Handle bools, unions, structs and lists.
+		reader = stringReader(builder)
+		// TODO: Handle structs, lists, and unions.
 	default:
 		return nil, fmt.Errorf("unsupported type: %v", dt)
+	}
+
+	if dt.Nullable {
+		reader = nullableReader(builder, reader)
+	}
+	return reader, nil
+}
+
+func boolReader(builder array.Builder) ValueReaderFunc {
+	boolBuilder := builder.(*array.BooleanBuilder)
+	return func(value *fastjson.Value) error {
+		v, err := value.Bool()
+		if err != nil {
+			return fmt.Errorf("couldn't read bool: %w", err)
+		}
+		boolBuilder.Append(v)
+		return nil
 	}
 }
 
@@ -138,8 +158,7 @@ func stringReader(builder array.Builder) ValueReaderFunc {
 	}
 }
 
-func nullableReader(readerFuncMaker func(builder array.Builder) ValueReaderFunc, builder array.Builder) ValueReaderFunc {
-	reader := readerFuncMaker(builder)
+func nullableReader(builder array.Builder, reader ValueReaderFunc) ValueReaderFunc {
 	return func(value *fastjson.Value) error {
 		if value == nil || value.Type() == fastjson.TypeNull {
 			builder.AppendNull()

@@ -5,6 +5,7 @@ import (
 	"github.com/apache/arrow/go/v13/arrow/array"
 	"github.com/apache/arrow/go/v13/arrow/bitutil"
 	"github.com/apache/arrow/go/v13/arrow/memory"
+	"github.com/brentp/intintmap"
 	"github.com/cube2222/octosql/arrowexec/execution"
 	"github.com/segmentio/fasthash/fnv1a"
 )
@@ -23,7 +24,8 @@ type GroupBy struct {
 
 func (g *GroupBy) Run(ctx execution.Context, produce execution.ProduceFunc) error {
 	entryCount := 0
-	entryIndices := make(map[uint64]uint) // Hash -> index.
+	entryIndices := intintmap.New(16, 0.6)
+	// entryIndices := make(map[uint64]uint)
 	aggregates := make([]Aggregate, len(g.AggregateConstructors))
 	for i := range aggregates {
 		aggregates[i] = g.AggregateConstructors[i](g.Source.Schema.Field(g.AggregateExprs[i]).Type)
@@ -52,11 +54,11 @@ func (g *GroupBy) Run(ctx execution.Context, produce execution.ProduceFunc) erro
 		rows := record.NumRows()
 		for rowIndex := uint(0); rowIndex < uint(rows); rowIndex++ {
 			hash := getKeyHash(rowIndex)
-			entryIndex, ok := entryIndices[hash]
+			entryIndex, ok := entryIndices.Get(int64(hash))
 			if !ok {
-				entryIndex = uint(entryCount)
+				entryIndex = int64(entryCount)
 				entryCount++
-				entryIndices[hash] = entryIndex
+				entryIndices.Put(int64(hash), entryIndex)
 				for _, addKey := range newKeyAdders {
 					addKey(rowIndex)
 				}
@@ -64,7 +66,7 @@ func (g *GroupBy) Run(ctx execution.Context, produce execution.ProduceFunc) erro
 				// ok, double-check equality
 				equal := true
 				for _, checkKey := range keyEqualityCheckers {
-					equal = equal && checkKey(entryIndex, rowIndex)
+					equal = equal && checkKey(uint(entryIndex), rowIndex)
 					if !equal {
 						break
 					}
@@ -75,7 +77,7 @@ func (g *GroupBy) Run(ctx execution.Context, produce execution.ProduceFunc) erro
 			}
 
 			for _, consume := range aggColumnConsumers {
-				consume(entryIndex, rowIndex)
+				consume(uint(entryIndex), rowIndex)
 			}
 		}
 

@@ -16,9 +16,11 @@ type GroupBy struct {
 	OutSchema *arrow.Schema
 	Source    execution.NodeWithMeta
 
-	KeyExprs              []int // For now, let's just use indices here.
+	// Both keys and aggregate columns have to be calculated by a preceding map.
+
+	KeyColumns            []int
 	AggregateConstructors []func(dt arrow.DataType) Aggregate
-	AggregateExprs        []int // For now, let's just use indices here.
+	AggregateColumns      []int
 }
 
 func (g *GroupBy) Run(ctx execution.Context, produce execution.ProduceFunc) error {
@@ -26,27 +28,27 @@ func (g *GroupBy) Run(ctx execution.Context, produce execution.ProduceFunc) erro
 	entryIndices := intintmap.New(16, 0.6)
 	aggregates := make([]Aggregate, len(g.AggregateConstructors))
 	for i := range aggregates {
-		aggregates[i] = g.AggregateConstructors[i](g.Source.Schema.Field(g.AggregateExprs[i]).Type)
+		aggregates[i] = g.AggregateConstructors[i](g.Source.Schema.Field(g.AggregateColumns[i]).Type)
 	}
-	key := make([]Key, len(g.KeyExprs))
+	key := make([]Key, len(g.KeyColumns))
 	for i := range key {
-		key[i] = MakeKey(g.Source.Schema.Field(g.KeyExprs[i]).Type)
+		key[i] = MakeKey(g.Source.Schema.Field(g.KeyColumns[i]).Type)
 	}
 
 	if err := g.Source.Node.Run(ctx, func(ctx execution.ProduceContext, record execution.Record) error {
-		getKeyHash := MakeKeyHasher(g.Source.Schema, record, g.KeyExprs)
+		getKeyHash := MakeKeyHasher(g.Source.Schema, record, g.KeyColumns)
 
 		aggColumnConsumers := make([]func(entryIndex uint, rowIndex uint), len(aggregates))
 		for i := range aggColumnConsumers {
-			aggColumnConsumers[i] = aggregates[i].MakeColumnConsumer(record.Column(g.AggregateExprs[i]))
+			aggColumnConsumers[i] = aggregates[i].MakeColumnConsumer(record.Column(g.AggregateColumns[i]))
 		}
 		newKeyAdders := make([]func(rowIndex uint), len(key))
 		for i := range newKeyAdders {
-			newKeyAdders[i] = key[i].MakeNewKeyAdder(record.Column(g.KeyExprs[i]))
+			newKeyAdders[i] = key[i].MakeNewKeyAdder(record.Column(g.KeyColumns[i]))
 		}
 		keyEqualityCheckers := make([]func(entryIndex uint, rowIndex uint) bool, len(key))
 		for i := range keyEqualityCheckers {
-			keyEqualityCheckers[i] = key[i].MakeKeyEqualityChecker(record.Column(g.KeyExprs[i]))
+			keyEqualityCheckers[i] = key[i].MakeKeyEqualityChecker(record.Column(g.KeyColumns[i]))
 		}
 
 		rows := record.NumRows()

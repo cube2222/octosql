@@ -18,6 +18,7 @@ type RecordVariable struct {
 }
 
 func (r *RecordVariable) Evaluate(ctx Context, record Record) (arrow.Array, error) {
+	// TODO: Retain array?
 	return record.Column(r.index), nil
 }
 

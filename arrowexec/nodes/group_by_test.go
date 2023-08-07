@@ -13,6 +13,7 @@ import (
 )
 
 func TestGroupBy(t *testing.T) {
+	ctx := context.Background()
 	allocator := memory.NewGoAllocator()
 
 	schema := arrow.NewSchema(
@@ -56,15 +57,15 @@ func TestGroupBy(t *testing.T) {
 			),
 			Source: node,
 
-			KeyExprs:       []int{0},
-			AggregateExprs: []int{1},
+			KeyColumns:       []int{0},
+			AggregateColumns: []int{1},
 			AggregateConstructors: []func(dt arrow.DataType) Aggregate{
 				MakeSum,
 			},
 		},
 	}
 
-	if err := node.Node.Run(context.Background(), func(ctx execution.ProduceContext, record execution.Record) error {
+	if err := node.Node.Run(execution.Context{Context: ctx}, func(ctx execution.ProduceContext, record execution.Record) error {
 		log.Println(record)
 		return nil
 	}); err != nil {
@@ -92,13 +93,13 @@ func BenchmarkGroupBy(b *testing.B) {
 		aBuilder := array.NewInt64Builder(allocator)
 		bBuilder := array.NewInt64Builder(allocator)
 
-		for i := 0; i < execution.BatchSize; i++ {
-			aBuilder.Append(int64((arrayIndex*execution.BatchSize + i) % groups))
-			bBuilder.Append(int64(arrayIndex*execution.BatchSize + i))
+		for i := 0; i < execution.IdealBatchSize; i++ {
+			aBuilder.Append(int64((arrayIndex*execution.IdealBatchSize + i) % groups))
+			bBuilder.Append(int64(arrayIndex*execution.IdealBatchSize + i))
 		}
 
 		records = append(records, execution.Record{
-			Record: array.NewRecord(schema, []arrow.Array{aBuilder.NewArray(), bBuilder.NewArray()}, execution.BatchSize),
+			Record: array.NewRecord(schema, []arrow.Array{aBuilder.NewArray(), bBuilder.NewArray()}, execution.IdealBatchSize),
 		})
 	}
 
@@ -124,8 +125,8 @@ func BenchmarkGroupBy(b *testing.B) {
 				),
 				Source: node,
 
-				KeyExprs:       []int{0},
-				AggregateExprs: []int{1},
+				KeyColumns:       []int{0},
+				AggregateColumns: []int{1},
 				AggregateConstructors: []func(dt arrow.DataType) Aggregate{
 					MakeSum,
 				},
@@ -133,7 +134,7 @@ func BenchmarkGroupBy(b *testing.B) {
 		}
 		b.StartTimer()
 
-		if err := node.Node.Run(ctx, func(ctx execution.ProduceContext, record execution.Record) error {
+		if err := node.Node.Run(execution.Context{Context: ctx}, func(ctx execution.ProduceContext, record execution.Record) error {
 			outArrays = append(outArrays, record.Record.Columns()[0])
 			return nil
 		}); err != nil {
@@ -161,7 +162,7 @@ func BenchmarkGroupByString(b *testing.B) {
 	for arrayIndex := 0; arrayIndex < rounds; arrayIndex++ {
 		aBuilder := array.NewStringBuilder(allocator)
 
-		for i := 0; i < execution.BatchSize; i++ {
+		for i := 0; i < execution.IdealBatchSize; i++ {
 			switch rand.Intn(4) {
 			case 0:
 				aBuilder.Append("aaa")
@@ -175,7 +176,7 @@ func BenchmarkGroupByString(b *testing.B) {
 		}
 
 		records = append(records, execution.Record{
-			Record: array.NewRecord(schema, []arrow.Array{aBuilder.NewArray()}, execution.BatchSize),
+			Record: array.NewRecord(schema, []arrow.Array{aBuilder.NewArray()}, execution.IdealBatchSize),
 		})
 	}
 
@@ -201,8 +202,8 @@ func BenchmarkGroupByString(b *testing.B) {
 				),
 				Source: node,
 
-				KeyExprs:       []int{0},
-				AggregateExprs: []int{0},
+				KeyColumns:       []int{0},
+				AggregateColumns: []int{0},
 				AggregateConstructors: []func(dt arrow.DataType) Aggregate{
 					MakeCount,
 				},
@@ -210,7 +211,7 @@ func BenchmarkGroupByString(b *testing.B) {
 		}
 		b.StartTimer()
 
-		if err := node.Node.Run(ctx, func(ctx execution.ProduceContext, record execution.Record) error {
+		if err := node.Node.Run(execution.Context{Context: ctx}, func(ctx execution.ProduceContext, record execution.Record) error {
 			outArrays = append(outArrays, record.Record.Columns()[0])
 			return nil
 		}); err != nil {

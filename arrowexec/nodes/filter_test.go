@@ -68,9 +68,9 @@ func BenchmarkNaiveFilter(b *testing.B) {
 		Node: &GroupBy{
 			OutSchema:             schema,
 			Source:                node,
-			KeyExprs:              []int{0},
+			KeyColumns:            []int{0},
 			AggregateConstructors: []func(dt arrow.DataType) Aggregate{MakeCount},
-			AggregateExprs:        []int{1},
+			AggregateColumns:      []int{1},
 		},
 		Schema: schema,
 	}
@@ -132,9 +132,9 @@ func BenchmarkRebatchingFilter(b *testing.B) {
 		Node: &GroupBy{
 			OutSchema:             schema,
 			Source:                node,
-			KeyExprs:              []int{0},
+			KeyColumns:            []int{0},
 			AggregateConstructors: []func(dt arrow.DataType) Aggregate{MakeCount},
-			AggregateExprs:        []int{1},
+			AggregateColumns:      []int{1},
 		},
 		Schema: schema,
 	}

@@ -251,7 +251,7 @@ func (key *KeyInt) GetBatch(length int, offset int) arrow.Array {
 }
 
 type KeyString struct {
-	// TODO: Refactor to use custom array data.
+	// TODO: Use a LargeStringArray, instead of a StringArray.
 	// We use a custom set of buffers, rather than using the builder, because accessing elements of the builder is slow.
 	offsetsData     *memory.Buffer // TODO: Release these buffers at some point.
 	offsetsState    []int32        // This uses the above data as the storage underneath.

@@ -5,13 +5,21 @@ import (
 )
 
 type TestNode struct {
-	Records []execution.Record
+	Records     []execution.Record
+	Repetitions int
 }
 
 func (t *TestNode) Run(ctx execution.Context, produce execution.ProduceFunc) error {
-	for i := range t.Records {
-		if err := produce(execution.ProduceContext(ctx), t.Records[i]); err != nil {
-			return err
+	reps := 1
+	if t.Repetitions > 0 {
+		reps = t.Repetitions
+	}
+
+	for rep := 0; rep < reps; rep++ {
+		for i := range t.Records {
+			if err := produce(execution.ProduceContext{Context: ctx}, t.Records[i]); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

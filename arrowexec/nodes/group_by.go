@@ -85,11 +85,11 @@ func (g *GroupBy) Run(ctx execution.Context, produce execution.ProduceFunc) erro
 		return err
 	}
 
-	for batchIndex := 0; batchIndex < (entryCount/execution.BatchSize)+1; batchIndex++ {
-		offset := batchIndex * execution.BatchSize
+	for batchIndex := 0; batchIndex < (entryCount/execution.IdealBatchSize)+1; batchIndex++ {
+		offset := batchIndex * execution.IdealBatchSize
 		length := entryCount - offset
-		if length > execution.BatchSize {
-			length = execution.BatchSize
+		if length > execution.IdealBatchSize {
+			length = execution.IdealBatchSize
 		}
 
 		columns := make([]arrow.Array, len(g.OutSchema.Fields()))
@@ -102,7 +102,7 @@ func (g *GroupBy) Run(ctx execution.Context, produce execution.ProduceFunc) erro
 
 		record := array.NewRecord(g.OutSchema, columns, int64(length))
 
-		if err := produce(ctx, execution.Record{Record: record}); err != nil {
+		if err := produce(execution.ProduceContext{Context: ctx}, execution.Record{Record: record}); err != nil {
 			return err
 		}
 	}

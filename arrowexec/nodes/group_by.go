@@ -36,7 +36,7 @@ func (g *GroupBy) Run(ctx execution.Context, produce execution.ProduceFunc) erro
 	}
 
 	if err := g.Source.Node.Run(ctx, func(ctx execution.ProduceContext, record execution.Record) error {
-		getKeyHash := MakeKeyHasher(g.Source.Schema, record, g.KeyColumns)
+		getKeyHash := MakeKeyHasher(record, g.KeyColumns)
 
 		aggColumnConsumers := make([]func(entryIndex uint, rowIndex uint), len(aggregates))
 		for i := range aggColumnConsumers {
@@ -174,10 +174,10 @@ func (agg *SumInt) GetBatch(length int, offset int) arrow.Array {
 	return array.NewInt64Data(array.NewData(arrow.PrimitiveTypes.Int64, length, []*memory.Buffer{nil, agg.data}, nil, 0 /*TODO: Fixme*/, offset))
 }
 
-func MakeKeyHasher(schema *arrow.Schema, record execution.Record, keyIndices []int) func(rowIndex uint) uint64 {
+func MakeKeyHasher(record execution.Record, keyIndices []int) func(rowIndex uint) uint64 {
 	subHashers := make([]func(hash uint64, rowIndex uint) uint64, len(keyIndices))
 	for i, colIndex := range keyIndices {
-		switch schema.Field(colIndex).Type.ID() {
+		switch record.Column(colIndex).DataType().ID() {
 		case arrow.INT64:
 			typedArr := record.Column(colIndex).(*array.Int64).Int64Values()
 			subHashers[i] = func(hash uint64, rowIndex uint) uint64 {

@@ -69,13 +69,14 @@ func (f *RebatchingFilter) Run(ctx execution.Context, produce execution.ProduceF
 		if err != nil {
 			return fmt.Errorf("couldn't evaluate filter predicate: %w", err)
 		}
+		typedSelection := selection.(*array.Boolean)
 
 		g, _ := errgroup.WithContext(ctx.Context)
 		columns := record.Columns()
 		for i, column := range columns {
 			rewriter := MakeColumnRewriter(recordBuilder.Field(i), column)
 			g.Go(func() error {
-				Rewrite(selection, rewriter)
+				Rewrite(typedSelection, rewriter)
 				return nil
 			})
 		}
@@ -117,10 +118,9 @@ func MakeColumnRewriter(builder array.Builder, arr arrow.Array) func(rowIndex in
 	}
 }
 
-func Rewrite(selection arrow.Array, rewriteFunc func(rowIndex int)) {
-	typedSelection := selection.(*array.Boolean)
-	for i := 0; i < typedSelection.Len(); i++ {
-		if typedSelection.Value(i) {
+func Rewrite(selection *array.Boolean, rewriteFunc func(rowIndex int)) {
+	for i := 0; i < selection.Len(); i++ {
+		if selection.Value(i) {
 			rewriteFunc(i)
 		}
 	}

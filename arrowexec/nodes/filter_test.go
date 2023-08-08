@@ -12,7 +12,7 @@ import (
 )
 
 // selectivity as a tenth of a percent (so 1000 means 100%)
-const selectivity = 35
+const selectivity = 950
 const rounds = 1024
 
 var predicateArr = func() arrow.Array {
@@ -28,6 +28,7 @@ var predicateArr = func() arrow.Array {
 }()
 
 func BenchmarkNaiveFilter(b *testing.B) {
+	b.StopTimer()
 	groupBuilder := array.NewInt64Builder(memory.DefaultAllocator)
 	for i := 0; i < execution.IdealBatchSize; i++ {
 		groupBuilder.Append(1)
@@ -74,6 +75,7 @@ func BenchmarkNaiveFilter(b *testing.B) {
 		},
 		Schema: schema,
 	}
+	b.StartTimer()
 
 	for i := 0; i < b.N; i++ {
 		var outRecords []execution.Record
@@ -92,6 +94,7 @@ func BenchmarkNaiveFilter(b *testing.B) {
 }
 
 func BenchmarkRebatchingFilter(b *testing.B) {
+	b.StopTimer()
 	groupBuilder := array.NewInt64Builder(memory.DefaultAllocator)
 	for i := 0; i < execution.IdealBatchSize; i++ {
 		groupBuilder.Append(1)
@@ -128,16 +131,17 @@ func BenchmarkRebatchingFilter(b *testing.B) {
 		},
 		Schema: schema,
 	}
-	node = execution.NodeWithMeta{
-		Node: &GroupBy{
-			OutSchema:             schema,
-			Source:                node,
-			KeyColumns:            []int{0},
-			AggregateConstructors: []func(dt arrow.DataType) Aggregate{MakeCount},
-			AggregateColumns:      []int{1},
-		},
-		Schema: schema,
-	}
+	// node = execution.NodeWithMeta{
+	// 	Node: &GroupBy{
+	// 		OutSchema:             schema,
+	// 		Source:                node,
+	// 		KeyColumns:            []int{0},
+	// 		AggregateConstructors: []func(dt arrow.DataType) Aggregate{MakeCount},
+	// 		AggregateColumns:      []int{1},
+	// 	},
+	// 	Schema: schema,
+	// }
+	b.StartTimer()
 
 	for i := 0; i < b.N; i++ {
 		var outRecords []execution.Record

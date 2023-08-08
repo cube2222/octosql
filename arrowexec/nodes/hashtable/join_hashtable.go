@@ -16,6 +16,9 @@ import (
 
 type JoinTable struct {
 	partitions []JoinTablePartition
+
+	keyIndices, joinedKeyIndices []int
+	tableIsLeftSide              bool
 }
 
 type JoinTablePartition struct {
@@ -24,14 +27,27 @@ type JoinTablePartition struct {
 	values           execution.Record
 }
 
-// BuildJoinTable groups the records by their key hashes, and returns them with an index of partition starts.
-func BuildJoinTable(records []execution.Record, indices []int) *JoinTable {
+func BuildJoinTable(records []execution.Record, keyIndices, joinedKeyIndices []int, tableIsLeftSide bool) *JoinTable {
+	if len(keyIndices) != len(joinedKeyIndices) {
+		panic("table key and joined key indices don't have the same length")
+	}
+
+	partitions := buildJoinTablePartitions(records, keyIndices)
+	return &JoinTable{
+		partitions:       partitions,
+		keyIndices:       keyIndices,
+		joinedKeyIndices: joinedKeyIndices,
+		tableIsLeftSide:  tableIsLeftSide,
+	}
+}
+
+func buildJoinTablePartitions(records []execution.Record, keyIndices []int) []JoinTablePartition {
 	partitions := 7 // TODO: Make it the first prime number larger than the core count.
 
 	// TODO: Handle case where there are 0 records.
 	keyHashers := make([]func(rowIndex uint) uint64, len(records))
 	for i, record := range records {
-		keyHashers[i] = helpers.MakeKeyHasher(record, indices)
+		keyHashers[i] = helpers.MakeKeyHasher(record, keyIndices)
 	}
 
 	var overallRowCount int
@@ -68,8 +84,8 @@ func BuildJoinTable(records []execution.Record, indices []int) *JoinTable {
 			sorts.ByUint64(SortHashPosition(hashPositionsOrderedPartition))
 
 			hashIndex := buildHashIndex(hashPositionsOrderedPartition)
-			hashesArray := buildHashesArray(overallRowCount, hashPositionsOrderedPartition)
-			record := buildRecords(records, overallRowCount, hashPositionsOrderedPartition)
+			hashesArray := buildHashesArray(hashPositionsOrderedPartition)
+			record := buildRecords(records, hashPositionsOrderedPartition)
 
 			joinTablePartitions[part] = JoinTablePartition{
 				hashStartIndices: hashIndex,
@@ -81,12 +97,13 @@ func BuildJoinTable(records []execution.Record, indices []int) *JoinTable {
 	}
 	wg.Wait()
 
-	return &JoinTable{
-		partitions: joinTablePartitions,
-	}
+	return joinTablePartitions
 }
 
 func buildHashIndex(hashPositionsOrdered []hashRowPosition) *intintmap.Map {
+	if len(hashPositionsOrdered) == 0 {
+		return intintmap.New(1, 0.6)
+	}
 	hashIndex := intintmap.New(1024, 0.6)
 	hashIndex.Put(int64(hashPositionsOrdered[0].hash), 0)
 	for i := 1; i < len(hashPositionsOrdered); i++ {
@@ -103,19 +120,19 @@ type hashRowPosition struct {
 	rowIndex    int
 }
 
-func buildHashesArray(overallRowCount int, hashPositionsOrdered []hashRowPosition) *array.Uint64 {
+func buildHashesArray(hashPositionsOrdered []hashRowPosition) *array.Uint64 {
 	hashesBuilder := array.NewUint64Builder(memory.NewGoAllocator()) // TODO: Get allocator from argument.
-	hashesBuilder.Reserve(overallRowCount)
+	hashesBuilder.Reserve(len(hashPositionsOrdered))
 	for _, hashPosition := range hashPositionsOrdered {
 		hashesBuilder.UnsafeAppend(hashPosition.hash)
 	}
 	return hashesBuilder.NewUint64Array()
 }
 
-func buildRecords(records []execution.Record, overallRowCount int, hashPositionsOrdered []hashRowPosition) arrow.Record {
+func buildRecords(records []execution.Record, hashPositionsOrdered []hashRowPosition) arrow.Record {
 	// TODO: Get allocator from argument.
 	recordBuilder := array.NewRecordBuilder(memory.NewGoAllocator(), records[0].Schema())
-	recordBuilder.Reserve(overallRowCount)
+	recordBuilder.Reserve(len(hashPositionsOrdered))
 
 	var g errgroup.Group
 	g.SetLimit(runtime.GOMAXPROCS(0))
@@ -155,4 +172,95 @@ func (h SortHashPosition) Swap(i, j int) {
 
 func (h SortHashPosition) Key(i int) uint64 {
 	return h[i].hash
+}
+
+func (t *JoinTable) JoinWithRecord(record execution.Record, produce func(execution.Record)) {
+	var outFields []arrow.Field
+	if t.tableIsLeftSide {
+		outFields = append(outFields, t.partitions[0].values.Schema().Fields()...)
+		outFields = append(outFields, record.Schema().Fields()...)
+	} else {
+		outFields = append(outFields, record.Schema().Fields()...)
+		outFields = append(outFields, t.partitions[0].values.Schema().Fields()...)
+	}
+	outSchema := arrow.NewSchema(outFields, nil)
+
+	recordKeyHasher := helpers.MakeKeyHasher(record, t.joinedKeyIndices)
+
+	partitionKeyEqualityCheckers := make([]func(joinedRowIndex int, tableRowIndex int) bool, len(t.partitions))
+	for partitionIndex := range t.partitions {
+		partitionKeyEqualityCheckers[partitionIndex] = helpers.MakeKeyEqualityChecker(record, t.partitions[partitionIndex].values, t.keyIndices, t.joinedKeyIndices)
+	}
+
+	recordBuilder := array.NewRecordBuilder(memory.NewGoAllocator(), outSchema)
+	curOutRecordRowCount := 0
+
+	partitionColumnRewriters := make([]func(joinedRowIndex int, tableRowIndex int), len(t.partitions))
+	for partitionIndex := range t.partitions {
+		partitionColumnRewriters[partitionIndex] = t.makeRecordRewriterForPartition(record, recordBuilder, partitionIndex)
+	}
+
+	numRows := int(record.NumRows())
+	for recordRowIndex := 0; recordRowIndex < numRows; recordRowIndex++ {
+		keyHash := recordKeyHasher(uint(recordRowIndex))
+
+		partitionIndex := int(keyHash % uint64(len(t.partitions)))
+		partition := t.partitions[partitionIndex]
+
+		firstMatchingHashIndex, ok := partition.hashStartIndices.Get(int64(keyHash))
+		if !ok {
+			continue
+		}
+
+		for tableRowIndex := int(firstMatchingHashIndex); tableRowIndex < partition.hashes.Len(); tableRowIndex++ {
+			if partition.hashes.Value(tableRowIndex) != keyHash {
+				break
+			}
+			if partitionKeyEqualityCheckers[partitionIndex](recordRowIndex, tableRowIndex) {
+				partitionColumnRewriters[partitionIndex](recordRowIndex, tableRowIndex)
+				curOutRecordRowCount++
+
+				if curOutRecordRowCount >= execution.IdealBatchSize {
+					produce(execution.Record{Record: recordBuilder.NewRecord()})
+					curOutRecordRowCount = 0
+				}
+			}
+		}
+	}
+	if curOutRecordRowCount > 0 {
+		produce(execution.Record{Record: recordBuilder.NewRecord()})
+	}
+	return
+}
+
+func (t *JoinTable) makeRecordRewriterForPartition(joinedRecord execution.Record, recordBuilder *array.RecordBuilder, partitionIndex int) func(joinedRowIndex int, tableRowIndex int) {
+	partition := t.partitions[partitionIndex]
+
+	var joinedRecordColumnOffset, tableColumnOffset int
+	if t.tableIsLeftSide {
+		tableColumnOffset = 0
+		joinedRecordColumnOffset = len(partition.values.Columns())
+	} else {
+		joinedRecordColumnOffset = 0
+		tableColumnOffset = len(joinedRecord.Columns())
+	}
+
+	joinedRecordColumnRewriters := make([]func(rowIndex int), len(joinedRecord.Columns()))
+	for columnIndex := range joinedRecord.Columns() {
+		joinedRecordColumnRewriters[columnIndex] = helpers.MakeColumnRewriter(recordBuilder.Field(joinedRecordColumnOffset+columnIndex), joinedRecord.Column(columnIndex))
+	}
+
+	tableColumnRewriters := make([]func(rowIndex int), len(partition.values.Columns()))
+	for columnIndex := range partition.values.Columns() {
+		tableColumnRewriters[columnIndex] = helpers.MakeColumnRewriter(recordBuilder.Field(tableColumnOffset+columnIndex), partition.values.Column(columnIndex))
+	}
+
+	return func(joinedRowIndex int, tableRowIndex int) {
+		for _, columnRewriter := range joinedRecordColumnRewriters {
+			columnRewriter(joinedRowIndex)
+		}
+		for _, columnRewriter := range tableColumnRewriters {
+			columnRewriter(tableRowIndex)
+		}
+	}
 }

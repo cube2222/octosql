@@ -9,7 +9,7 @@ import (
 	"github.com/apache/arrow/go/v13/arrow/memory"
 	"github.com/brentp/intintmap"
 	"github.com/cube2222/octosql/arrowexec/execution"
-	"github.com/segmentio/fasthash/fnv1a"
+	"github.com/cube2222/octosql/arrowexec/nodes/helpers"
 )
 
 type GroupBy struct {
@@ -36,7 +36,7 @@ func (g *GroupBy) Run(ctx execution.Context, produce execution.ProduceFunc) erro
 	}
 
 	if err := g.Source.Node.Run(ctx, func(ctx execution.ProduceContext, record execution.Record) error {
-		getKeyHash := MakeKeyHasher(record, g.KeyColumns)
+		getKeyHash := helpers.MakeKeyHasher(record, g.KeyColumns)
 
 		aggColumnConsumers := make([]func(entryIndex uint, rowIndex uint), len(aggregates))
 		for i := range aggColumnConsumers {
@@ -172,33 +172,6 @@ func (agg *SumInt) MakeColumnConsumer(arr arrow.Array) func(entryIndex uint, row
 
 func (agg *SumInt) GetBatch(length int, offset int) arrow.Array {
 	return array.NewInt64Data(array.NewData(arrow.PrimitiveTypes.Int64, length, []*memory.Buffer{nil, agg.data}, nil, 0 /*TODO: Fixme*/, offset))
-}
-
-func MakeKeyHasher(record execution.Record, keyIndices []int) func(rowIndex uint) uint64 {
-	subHashers := make([]func(hash uint64, rowIndex uint) uint64, len(keyIndices))
-	for i, colIndex := range keyIndices {
-		switch record.Column(colIndex).DataType().ID() {
-		case arrow.INT64:
-			typedArr := record.Column(colIndex).(*array.Int64).Int64Values()
-			subHashers[i] = func(hash uint64, rowIndex uint) uint64 {
-				return fnv1a.AddUint64(hash, uint64(typedArr[rowIndex]))
-			}
-		case arrow.STRING:
-			typedArr := record.Column(colIndex).(*array.String)
-			subHashers[i] = func(hash uint64, rowIndex uint) uint64 {
-				return fnv1a.AddString64(hash, typedArr.Value(int(rowIndex)))
-			}
-		default:
-			panic("unsupported")
-		}
-	}
-	return func(rowIndex uint) uint64 {
-		hash := fnv1a.Init64
-		for _, hasher := range subHashers {
-			hash = hasher(hash, rowIndex)
-		}
-		return hash
-	}
 }
 
 func MakeKey(dt arrow.DataType) Key {

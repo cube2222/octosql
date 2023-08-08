@@ -3,11 +3,11 @@ package nodes
 import (
 	"fmt"
 
-	"github.com/apache/arrow/go/v13/arrow"
 	"github.com/apache/arrow/go/v13/arrow/array"
 	"github.com/apache/arrow/go/v13/arrow/compute"
 	"github.com/apache/arrow/go/v13/arrow/memory"
 	"github.com/cube2222/octosql/arrowexec/execution"
+	"github.com/cube2222/octosql/arrowexec/nodes/helpers"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -74,7 +74,7 @@ func (f *RebatchingFilter) Run(ctx execution.Context, produce execution.ProduceF
 		g, _ := errgroup.WithContext(ctx.Context)
 		columns := record.Columns()
 		for i, column := range columns {
-			rewriter := MakeColumnRewriter(recordBuilder.Field(i), column)
+			rewriter := helpers.MakeColumnRewriter(recordBuilder.Field(i), column)
 			g.Go(func() error {
 				Rewrite(typedSelection, rewriter)
 				return nil
@@ -102,20 +102,6 @@ func (f *RebatchingFilter) Run(ctx execution.Context, produce execution.ProduceF
 	}
 
 	return nil
-}
-
-func MakeColumnRewriter(builder array.Builder, arr arrow.Array) func(rowIndex int) {
-	// TODO: Should this operate on row ranges instead of single rows? Would make low-selectivity workloads faster, as well as nested types.
-	switch builder.Type().ID() {
-	case arrow.INT64:
-		typedBuilder := builder.(*array.Int64Builder)
-		typedArr := arr.(*array.Int64)
-		return func(rowIndex int) {
-			typedBuilder.Append(typedArr.Value(rowIndex))
-		}
-	default:
-		panic(fmt.Errorf("unsupported type for filtering: %v", builder.Type().ID()))
-	}
 }
 
 func Rewrite(selection *array.Boolean, rewriteFunc func(rowIndex int)) {

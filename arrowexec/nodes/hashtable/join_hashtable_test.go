@@ -32,7 +32,7 @@ func TestPartition(t *testing.T) {
 		})
 	}
 
-	table := BuildHashTable(records, []int{0, 1})
+	table := BuildJoinTable(records, []int{0, 1})
 
 	log.Println("hashes:", table)
 }
@@ -61,7 +61,7 @@ func BenchmarkPartitionIntegers(b *testing.B) {
 	b.StartTimer()
 
 	for i := 0; i < b.N; i++ {
-		table := BuildHashTable(records, []int{0, 1})
+		table := BuildJoinTable(records, []int{0, 1})
 		table = table
 	}
 }

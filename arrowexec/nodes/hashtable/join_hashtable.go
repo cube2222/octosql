@@ -14,14 +14,20 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type JoinHashTable struct {
+type JoinTable struct {
+	partitions []JoinTablePartition
+}
+
+type JoinTablePartition struct {
 	hashStartIndices *intintmap.Map
 	hashes           *array.Uint64
 	values           execution.Record
 }
 
-// BuildHashTable groups the records by their key hashes, and returns them with an index of partition starts.
-func BuildHashTable(records []execution.Record, indices []int) *JoinHashTable {
+// BuildJoinTable groups the records by their key hashes, and returns them with an index of partition starts.
+func BuildJoinTable(records []execution.Record, indices []int) *JoinTable {
+	partitions := 7 // TODO: Make it the first prime number larger than the core count.
+
 	// TODO: Handle case where there are 0 records.
 	keyHashers := make([]func(rowIndex uint) uint64, len(records))
 	for i, record := range records {
@@ -33,46 +39,50 @@ func BuildHashTable(records []execution.Record, indices []int) *JoinHashTable {
 		overallRowCount += int(record.NumRows())
 	}
 
-	hashPositionsOrdered := make([]hashRowPosition, overallRowCount)
-	i := 0
+	hashPositionsOrdered := make([][]hashRowPosition, partitions)
+	for i := range hashPositionsOrdered {
+		hashPositionsOrdered[i] = make([]hashRowPosition, 0, overallRowCount/partitions)
+	}
+
 	for recordIndex, record := range records {
 		numRows := int(record.NumRows())
 		for rowIndex := 0; rowIndex < numRows; rowIndex++ {
 			hash := keyHashers[recordIndex](uint(rowIndex))
-			hashPositionsOrdered[i] = hashRowPosition{
+			partition := int(hash % uint64(partitions))
+			hashPositionsOrdered[partition] = append(hashPositionsOrdered[partition], hashRowPosition{
 				hash:        hash,
 				recordIndex: recordIndex,
 				rowIndex:    rowIndex,
-			}
-			i++
+			})
 		}
 	}
 
-	sorts.ByUint64(SortHashPosition(hashPositionsOrdered))
-
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(partitions)
+	joinTablePartitions := make([]JoinTablePartition, partitions)
+	for part := 0; part < partitions; part++ {
+		part := part
 
-	var hashIndex *intintmap.Map
-	go func() {
-		hashIndex = buildHashIndex(hashPositionsOrdered)
-		wg.Done()
-	}()
+		go func() {
+			hashPositionsOrderedPartition := hashPositionsOrdered[part]
+			sorts.ByUint64(SortHashPosition(hashPositionsOrderedPartition))
 
-	var hashesArray *array.Uint64
-	go func() {
-		hashesArray = buildHashesArray(overallRowCount, hashPositionsOrdered)
-		wg.Done()
-	}()
+			hashIndex := buildHashIndex(hashPositionsOrderedPartition)
+			hashesArray := buildHashesArray(overallRowCount, hashPositionsOrderedPartition)
+			record := buildRecords(records, overallRowCount, hashPositionsOrderedPartition)
 
-	record := buildRecords(records, overallRowCount, hashPositionsOrdered)
-
+			joinTablePartitions[part] = JoinTablePartition{
+				hashStartIndices: hashIndex,
+				hashes:           hashesArray,
+				values:           execution.Record{Record: record},
+			}
+			wg.Done()
+		}()
+	}
 	wg.Wait()
 
-	return &JoinHashTable{
-		hashStartIndices: hashIndex,
-		hashes:           hashesArray,
-		values:           execution.Record{Record: record},
+	return &JoinTable{
+		partitions: joinTablePartitions,
 	}
 }
 

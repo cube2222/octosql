@@ -9,7 +9,7 @@ import (
 	"github.com/apache/arrow/go/v13/arrow/memory"
 	"github.com/brentp/intintmap"
 	"github.com/cube2222/octosql/arrowexec/execution"
-	"github.com/cube2222/octosql/arrowexec/nodes/helpers"
+	"github.com/cube2222/octosql/arrowexec/helpers"
 )
 
 type GroupBy struct {

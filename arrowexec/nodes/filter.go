@@ -7,7 +7,7 @@ import (
 	"github.com/apache/arrow/go/v13/arrow/compute"
 	"github.com/apache/arrow/go/v13/arrow/memory"
 	"github.com/cube2222/octosql/arrowexec/execution"
-	"github.com/cube2222/octosql/arrowexec/nodes/helpers"
+	"github.com/cube2222/octosql/arrowexec/helpers"
 	"golang.org/x/sync/errgroup"
 )
 

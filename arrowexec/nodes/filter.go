@@ -30,13 +30,13 @@ import (
 
 // NaiveFilter uses the arrow libraries selection function.
 type NaiveFilter struct {
-	Source    execution.NodeWithMeta
-	Predicate execution.Expression
+	source    execution.NodeWithMeta
+	predicate execution.Expression
 }
 
 func (f *NaiveFilter) Run(ctx execution.Context, produce execution.ProduceFunc) error {
-	return f.Source.Node.Run(ctx, func(produceCtx execution.ProduceContext, record execution.Record) error {
-		selection, err := f.Predicate.Evaluate(produceCtx.Context, record)
+	return f.source.Node.Run(ctx, func(produceCtx execution.ProduceContext, record execution.Record) error {
+		selection, err := f.predicate.Evaluate(produceCtx.Context, record)
 		if err != nil {
 			return fmt.Errorf("couldn't evaluate filter predicate: %w", err)
 		}
@@ -58,14 +58,21 @@ func (f *NaiveFilter) Run(ctx execution.Context, produce execution.ProduceFunc) 
 
 // RebatchingFilter has a custom routine for filtering records, it re-batches the filtered records so that they aren't too far off the ideal batch size.
 type RebatchingFilter struct {
-	Source    execution.NodeWithMeta
-	Predicate execution.Expression
+	source    *execution.NodeWithMeta
+	predicate execution.Expression
+}
+
+func NewFilter(source *execution.NodeWithMeta, predicate execution.Expression) *RebatchingFilter {
+	return &RebatchingFilter{
+		source:    source,
+		predicate: predicate,
+	}
 }
 
 func (f *RebatchingFilter) Run(ctx execution.Context, produce execution.ProduceFunc) error {
-	recordBuilder := array.NewRecordBuilder(memory.NewGoAllocator(), f.Source.Schema) // TODO: Get allocator as argument.
-	if err := f.Source.Node.Run(ctx, func(produceCtx execution.ProduceContext, record execution.Record) error {
-		selection, err := f.Predicate.Evaluate(produceCtx.Context, record)
+	recordBuilder := array.NewRecordBuilder(memory.NewGoAllocator(), f.source.Schema) // TODO: Get allocator as argument.
+	if err := f.source.Node.Run(ctx, func(produceCtx execution.ProduceContext, record execution.Record) error {
+		selection, err := f.predicate.Evaluate(produceCtx.Context, record)
 		if err != nil {
 			return fmt.Errorf("couldn't evaluate filter predicate: %w", err)
 		}

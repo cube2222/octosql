@@ -4,27 +4,43 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"io"
 
+	"github.com/cube2222/octosql/arrowexec/execution"
+	"github.com/cube2222/octosql/execution/files"
 	"github.com/valyala/fastjson"
 
 	"github.com/apache/arrow/go/v13/arrow"
 	"github.com/apache/arrow/go/v13/arrow/array"
-	"github.com/apache/arrow/go/v13/arrow/memory"
 )
 
 const batchSize = 8 * 1024
 
 type ValueReaderFunc func(value *fastjson.Value) error
 
-func ReadJSON(allocator memory.Allocator, r io.Reader, schema *arrow.Schema, produce func(record arrow.Record) error) error {
-	sc := bufio.NewScanner(r)
-	sc.Buffer(nil, 1024*1024*8)
+type Node struct {
+	path   string
+	schema *arrow.Schema
+}
+
+func NewNode(path string, schema *arrow.Schema) *Node {
+	return &Node{
+		path:   path,
+		schema: schema,
+	}
+}
+
+func (node *Node) Run(ctx execution.Context, produce execution.ProduceFunc) error {
+	f, err := files.OpenLocalFile(ctx.Context, node.path)
+	if err != nil {
+		return fmt.Errorf("couldn't open file: %w", err)
+	}
+
+	sc := bufio.NewScanner(f)
+	sc.Buffer(nil, 1024*1024*8) // TODO: config.FromContext(ctx.Context).Files.JSON.MaxLineSizeBytes)
 
 	// All async processing in this function and all jobs created by it use this context.
 	// This means that returning from this function will properly clean up all async processors.
-	ctx := context.Background()
-	localCtx, cancel := context.WithCancel(ctx)
+	localCtx, cancel := context.WithCancel(ctx.Context)
 	defer cancel()
 
 	outChan := make(chan jobOutRecord, 16)
@@ -51,7 +67,7 @@ func ReadJSON(allocator memory.Allocator, r io.Reader, schema *arrow.Schema, pro
 		job := jobIn{
 			sequenceNumber: 0,
 			ctx:            localCtx,
-			schema:         schema,
+			schema:         node.schema,
 			lines:          make([][]byte, 0, batchSize),
 			outChan:        outChan,
 		}
@@ -71,7 +87,7 @@ func ReadJSON(allocator memory.Allocator, r io.Reader, schema *arrow.Schema, pro
 				job = jobIn{
 					sequenceNumber: batchesRead,
 					ctx:            localCtx,
-					schema:         schema,
+					schema:         node.schema,
 					lines:          make([][]byte, 0, batchSize),
 					outChan:        outChan,
 				}
@@ -109,7 +125,7 @@ produceLoop:
 			queue[out.sequenceNumber-startIndex] = out.record
 			for len(queue) > 0 && queue[0] != nil {
 				record := queue[0]
-				if err := produce(record); err != nil {
+				if err := produce(execution.ProduceContext{Context: ctx}, execution.Record{Record: record}); err != nil {
 					return fmt.Errorf("couldn't produce: %w", err)
 				}
 				queue = queue[1:]
@@ -127,8 +143,8 @@ produceLoop:
 			if fileReaderIsDone && startIndex == batchesRead {
 				break produceLoop
 			}
-		case <-ctx.Done():
-			return ctx.Err()
+		case <-ctx.Context.Done():
+			return ctx.Context.Err()
 		}
 	}
 

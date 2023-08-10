@@ -1,7 +1,12 @@
 package execution
 
 import (
+	"fmt"
+
 	"github.com/apache/arrow/go/v13/arrow"
+	"github.com/apache/arrow/go/v13/arrow/array"
+	"github.com/apache/arrow/go/v13/arrow/compute"
+	"github.com/apache/arrow/go/v13/arrow/memory"
 	"github.com/apache/arrow/go/v13/arrow/scalar"
 )
 
@@ -15,6 +20,12 @@ type Expression interface {
 
 type RecordVariable struct {
 	index int
+}
+
+func NewRecordVariable(index int) *RecordVariable {
+	return &RecordVariable{
+		index: index,
+	}
 }
 
 func (r *RecordVariable) Evaluate(ctx Context, record Record) (arrow.Array, error) {
@@ -38,3 +49,39 @@ func (c *ConstArray) Evaluate(ctx Context, record Record) (arrow.Array, error) {
 // type ParentScopeVariable struct {
 //
 // }
+
+type ArrowComputeFunctionCall struct {
+	Name      string
+	Arguments []Expression
+}
+
+func (f *ArrowComputeFunctionCall) Evaluate(ctx Context, record Record) (arrow.Array, error) {
+	// TODO: Optimize all of this if it's too slow.
+	args := make([]compute.Datum, len(f.Arguments))
+	for i, arg := range f.Arguments {
+		arr, err := arg.Evaluate(ctx, record)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't evaluate argument %d: %w", i, err)
+		}
+		args[i] = &compute.ArrayDatum{Value: arr.Data()}
+	}
+
+	fn, ok := compute.GetFunctionRegistry().GetFunction(f.Name)
+	if !ok {
+		panic("Bug: array function not found")
+	}
+	out, err := fn.Execute(ctx.Context, nil, args...)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't execute function: %w", err)
+	}
+	return array.MakeFromData(out.(*compute.ArrayDatum).Value), nil
+}
+
+type Constant struct {
+	Value scalar.Scalar
+}
+
+func (c *Constant) Evaluate(ctx Context, record Record) (arrow.Array, error) {
+	// TODO: Cache this for the IdealBatchSize.
+	return scalar.MakeArrayFromScalar(c.Value, int(record.NumRows()), memory.NewGoAllocator()) // TODO: Add allocator to execution context.
+}

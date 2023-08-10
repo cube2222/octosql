@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/Masterminds/semver"
+	"github.com/cube2222/octosql/arrowexec/app"
 	"github.com/pkg/profile"
 	"github.com/skratchdot/open-golang/open"
 	"github.com/spf13/cobra"
@@ -338,6 +339,8 @@ octosql "SELECT * FROM plugins.plugins"`,
 				}
 				return nil
 			}
+
+			return app.RunNode(ctx, physicalPlan, env)
 
 			executionPlan, err = physicalPlan.Materialize(
 				ctx,

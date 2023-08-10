@@ -16,6 +16,13 @@ func MakeColumnRewriter(builder array.Builder, arr arrow.Array) func(rowIndex in
 		return func(rowIndex int) {
 			typedBuilder.Append(typedArr.Value(rowIndex))
 		}
+	case arrow.FLOAT64:
+		typedBuilder := builder.(*array.Float64Builder)
+		typedArr := arr.(*array.Float64)
+		return func(rowIndex int) {
+			typedBuilder.Append(typedArr.Value(rowIndex))
+		}
+	// TODO: Add more types.
 	default:
 		panic(fmt.Errorf("unsupported type for filtering: %v", builder.Type().ID()))
 	}

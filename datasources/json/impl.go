@@ -7,8 +7,11 @@ import (
 	"sort"
 	"time"
 
+	"github.com/apache/arrow/go/v13/arrow"
+	"github.com/cube2222/octosql/arrowexec/json"
 	"github.com/valyala/fastjson"
 
+	arrowexecution "github.com/cube2222/octosql/arrowexec/execution"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/execution/files"
 	"github.com/cube2222/octosql/octosql"
@@ -145,4 +148,8 @@ func (i *impl) Materialize(ctx context.Context, env physical.Environment, schema
 
 func (i *impl) PushDownPredicates(newPredicates, pushedDownPredicates []physical.Expression) (rejected, pushedDown []physical.Expression, changed bool) {
 	return newPredicates, []physical.Expression{}, false
+}
+
+func (i *impl) MaterializeArrow(ctx context.Context, env physical.Environment, schema *arrow.Schema, pushedDownPredicates []physical.Expression) (arrowexecution.Node, error) {
+	return json.NewNode(i.path, schema), nil
 }

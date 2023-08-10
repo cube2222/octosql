@@ -124,8 +124,8 @@ func BenchmarkRebatchingFilter(b *testing.B) {
 	}
 	node = execution.NodeWithMeta{
 		Node: &RebatchingFilter{
-			Source: node,
-			Predicate: &execution.ConstArray{
+			source: node,
+			predicate: &execution.ConstArray{
 				Array: predicateArr,
 			},
 		},

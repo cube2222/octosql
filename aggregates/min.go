@@ -15,17 +15,17 @@ var MinOverloads = []physical.AggregateDescriptor{
 	{
 		ArgumentType: octosql.Int,
 		OutputType:   octosql.Int,
-		Prototype:    NewMinPrototype(),
+		// Prototype:    NewMinPrototype(),
 	},
 	{
 		ArgumentType: octosql.Float,
 		OutputType:   octosql.Float,
-		Prototype:    NewMinPrototype(),
+		// Prototype:    NewMinPrototype(),
 	},
 	{
 		ArgumentType: octosql.Duration,
 		OutputType:   octosql.Duration,
-		Prototype:    NewMinPrototype(),
+		// Prototype:    NewMinPrototype(),
 	},
 }
 

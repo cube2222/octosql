@@ -100,7 +100,7 @@ func (r *rangeNode) Run(ctx execution.ExecutionContext, produce execution.Produc
 	for i := start.Int; i < end.Int; i++ {
 		if err := produce(
 			execution.ProduceFromExecutionContext(ctx),
-			execution.NewRecord([]octosql.Value{octosql.NewInt(i)}, false, time.Time{}),
+			execution.NewRecord([]octosql.Value{octosql.NewInt(i % 10)}, false, time.Time{}),
 		); err != nil {
 			return fmt.Errorf("couldn't produce record: %w", err)
 		}

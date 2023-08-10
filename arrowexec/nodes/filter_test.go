@@ -48,15 +48,15 @@ func BenchmarkNaiveFilter(b *testing.B) {
 		nil,
 	)
 
-	var node execution.NodeWithMeta
-	node = execution.NodeWithMeta{
+	var node *execution.NodeWithMeta
+	node = &execution.NodeWithMeta{
 		Node: &TestNode{
 			Records:     []execution.Record{{Record: array.NewRecord(schema, []arrow.Array{groupArr, numbersArr}, execution.IdealBatchSize)}},
 			Repetitions: rounds,
 		},
 		Schema: schema,
 	}
-	node = execution.NodeWithMeta{
+	node = &execution.NodeWithMeta{
 		Node: &NaiveFilter{
 			Source: node,
 			Predicate: &execution.ConstArray{
@@ -65,7 +65,7 @@ func BenchmarkNaiveFilter(b *testing.B) {
 		},
 		Schema: schema,
 	}
-	node = execution.NodeWithMeta{
+	node = &execution.NodeWithMeta{
 		Node: &GroupBy{
 			OutSchema:             schema,
 			Source:                node,
@@ -114,15 +114,15 @@ func BenchmarkRebatchingFilter(b *testing.B) {
 		nil,
 	)
 
-	var node execution.NodeWithMeta
-	node = execution.NodeWithMeta{
+	var node *execution.NodeWithMeta
+	node = &execution.NodeWithMeta{
 		Node: &TestNode{
 			Records:     []execution.Record{{Record: array.NewRecord(schema, []arrow.Array{groupArr, numbersArr}, execution.IdealBatchSize)}},
 			Repetitions: rounds,
 		},
 		Schema: schema,
 	}
-	node = execution.NodeWithMeta{
+	node = &execution.NodeWithMeta{
 		Node: &RebatchingFilter{
 			source: node,
 			predicate: &execution.ConstArray{
@@ -131,7 +131,7 @@ func BenchmarkRebatchingFilter(b *testing.B) {
 		},
 		Schema: schema,
 	}
-	// node = execution.NodeWithMeta{
+	// node = &execution.NodeWithMeta{
 	// 	Node: &GroupBy{
 	// 		OutSchema:             schema,
 	// 		Source:                node,

@@ -9,7 +9,7 @@ import (
 )
 
 func RunNode(ctx context.Context, node physical.Node, env physical.Environment) error {
-	execNode, err := node.MaterializeArrow(ctx, env)
+	execNode, err := node.Materialize(ctx, env)
 	if err != nil {
 		return fmt.Errorf("couldn't materialize node: %w", err)
 	}

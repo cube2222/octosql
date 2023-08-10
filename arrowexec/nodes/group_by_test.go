@@ -39,14 +39,14 @@ func TestGroupBy(t *testing.T) {
 		})
 	}
 
-	var node execution.NodeWithMeta
-	node = execution.NodeWithMeta{
+	var node *execution.NodeWithMeta
+	node = &execution.NodeWithMeta{
 		Node: &TestNode{
 			Records: records,
 		},
 		Schema: schema,
 	}
-	node = execution.NodeWithMeta{
+	node = &execution.NodeWithMeta{
 		Node: &GroupBy{
 			OutSchema: arrow.NewSchema(
 				[]arrow.Field{
@@ -107,14 +107,14 @@ func BenchmarkGroupBy(b *testing.B) {
 		var outArrays []arrow.Array
 
 		b.StopTimer()
-		var node execution.NodeWithMeta
-		node = execution.NodeWithMeta{
+		var node *execution.NodeWithMeta
+		node = &execution.NodeWithMeta{
 			Node: &TestNode{
 				Records: records,
 			},
 			Schema: schema,
 		}
-		node = execution.NodeWithMeta{
+		node = &execution.NodeWithMeta{
 			Node: &GroupBy{
 				OutSchema: arrow.NewSchema(
 					[]arrow.Field{
@@ -184,14 +184,14 @@ func BenchmarkGroupByString(b *testing.B) {
 		var outArrays []arrow.Array
 
 		b.StopTimer()
-		var node execution.NodeWithMeta
-		node = execution.NodeWithMeta{
+		var node *execution.NodeWithMeta
+		node = &execution.NodeWithMeta{
 			Node: &TestNode{
 				Records: records,
 			},
 			Schema: schema,
 		}
-		node = execution.NodeWithMeta{
+		node = &execution.NodeWithMeta{
 			Node: &GroupBy{
 				OutSchema: arrow.NewSchema(
 					[]arrow.Field{

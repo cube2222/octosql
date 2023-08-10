@@ -47,7 +47,7 @@ func buildJoinTablePartitions(records []execution.Record, keyIndices []int) []Jo
 	// TODO: Handle case where there are 0 records.
 	keyHashers := make([]func(rowIndex uint) uint64, len(records))
 	for i, record := range records {
-		keyHashers[i] = helpers2.MakeKeyHasher(record, keyIndices)
+		keyHashers[i] = helpers2.MakeRecordKeyHasher(record, keyIndices)
 	}
 
 	var overallRowCount int
@@ -185,7 +185,7 @@ func (t *JoinTable) JoinWithRecord(record execution.Record, produce func(executi
 	}
 	outSchema := arrow.NewSchema(outFields, nil)
 
-	recordKeyHasher := helpers2.MakeKeyHasher(record, t.joinedKeyIndices)
+	recordKeyHasher := helpers2.MakeRecordKeyHasher(record, t.joinedKeyIndices)
 
 	partitionKeyEqualityCheckers := make([]func(joinedRowIndex int, tableRowIndex int) bool, len(t.partitions))
 	for partitionIndex := range t.partitions {

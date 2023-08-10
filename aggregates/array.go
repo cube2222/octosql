@@ -16,7 +16,7 @@ var ArrayOverloads = []physical.AggregateDescriptor{
 		TypeFn: func(t octosql.Type) (octosql.Type, bool) {
 			return octosql.Type{TypeID: octosql.TypeIDList, List: struct{ Element *octosql.Type }{Element: &t}}, true
 		},
-		Prototype: NewArrayPrototype(),
+		// Prototype: NewArrayPrototype(),
 	},
 }
 

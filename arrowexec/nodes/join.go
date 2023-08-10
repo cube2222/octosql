@@ -8,7 +8,7 @@ import (
 )
 
 type StreamJoin struct {
-	Left, Right                     execution.NodeWithMeta
+	Left, Right                     *execution.NodeWithMeta
 	LeftKeyIndices, RightKeyIndices []int
 }
 

@@ -30,7 +30,7 @@ import (
 
 // NaiveFilter uses the arrow libraries selection function.
 type NaiveFilter struct {
-	source    execution.NodeWithMeta
+	source    *execution.NodeWithMeta
 	predicate execution.Expression
 }
 

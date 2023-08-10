@@ -12,17 +12,17 @@ var SumOverloads = []physical.AggregateDescriptor{
 	{
 		ArgumentType: octosql.Int,
 		OutputType:   octosql.Int,
-		Prototype:    NewSumIntPrototype(),
+		// Prototype:    NewSumIntPrototype(),
 	},
 	{
 		ArgumentType: octosql.Float,
 		OutputType:   octosql.Float,
-		Prototype:    NewSumFloatPrototype(),
+		// Prototype:    NewSumFloatPrototype(),
 	},
 	{
 		ArgumentType: octosql.Duration,
 		OutputType:   octosql.Duration,
-		Prototype:    NewSumDurationPrototype(),
+		// Prototype:    NewSumDurationPrototype(),
 	},
 }
 

@@ -7,17 +7,25 @@ import (
 	"github.com/segmentio/fasthash/fnv1a"
 )
 
-func MakeKeyHasher(record execution.Record, keyIndices []int) func(rowIndex uint) uint64 {
-	subHashers := make([]func(hash uint64, rowIndex uint) uint64, len(keyIndices))
-	for i, colIndex := range keyIndices {
-		switch record.Column(colIndex).DataType().ID() {
+func MakeRecordKeyHasher(record execution.Record, keyIndices []int) func(rowIndex uint) uint64 {
+	columns := make([]arrow.Array, len(keyIndices))
+	for i := range columns {
+		columns[i] = record.Column(keyIndices[i])
+	}
+	return MakeRowHasher(columns)
+}
+
+func MakeRowHasher(columns []arrow.Array) func(rowIndex uint) uint64 {
+	subHashers := make([]func(hash uint64, rowIndex uint) uint64, len(columns))
+	for i := range columns {
+		switch columns[i].DataType().ID() {
 		case arrow.INT64:
-			typedArr := record.Column(colIndex).(*array.Int64).Int64Values()
+			typedArr := columns[i].(*array.Int64).Int64Values()
 			subHashers[i] = func(hash uint64, rowIndex uint) uint64 {
 				return fnv1a.AddUint64(hash, uint64(typedArr[rowIndex]))
 			}
 		case arrow.STRING:
-			typedArr := record.Column(colIndex).(*array.String)
+			typedArr := columns[i].(*array.String)
 			subHashers[i] = func(hash uint64, rowIndex uint) uint64 {
 				return fnv1a.AddString64(hash, typedArr.Value(int(rowIndex)))
 			}

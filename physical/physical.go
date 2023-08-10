@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cube2222/octosql/execution"
-	"github.com/cube2222/octosql/execution/nodes"
+	"github.com/cube2222/octosql/arrowexec/nodes"
+	oldExec "github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
 )
 
@@ -86,7 +86,7 @@ func (dr *DatasourceRepository) GetDatasource(ctx context.Context, name string, 
 }
 
 type DatasourceImplementation interface {
-	Materialize(ctx context.Context, env Environment, schema Schema, pushedDownPredicates []Expression) (execution.Node, error)
+	Materialize(ctx context.Context, env Environment, schema Schema, pushedDownPredicates []Expression) (oldExec.Node, error)
 	PushDownPredicates(newPredicates, pushedDownPredicates []Expression) (rejected, pushedDown []Expression, changed bool)
 }
 

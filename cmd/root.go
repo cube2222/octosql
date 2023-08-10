@@ -19,14 +19,13 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
-	"github.com/cube2222/octosql/aggregates"
+	"github.com/cube2222/octosql/arrowexec/aggregates"
 	"github.com/cube2222/octosql/config"
 	"github.com/cube2222/octosql/datasources/csv"
 	"github.com/cube2222/octosql/datasources/docs"
 	"github.com/cube2222/octosql/datasources/json"
 	"github.com/cube2222/octosql/datasources/lines"
 	"github.com/cube2222/octosql/datasources/parquet"
-	"github.com/cube2222/octosql/datasources/plugins"
 	"github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/execution/nodes"
 	"github.com/cube2222/octosql/functions"
@@ -43,8 +42,6 @@ import (
 	"github.com/cube2222/octosql/physical"
 	"github.com/cube2222/octosql/plugins/executor"
 	"github.com/cube2222/octosql/plugins/manager"
-	"github.com/cube2222/octosql/plugins/repository"
-	"github.com/cube2222/octosql/table_valued_functions"
 	"github.com/cube2222/octosql/telemetry"
 )
 
@@ -147,20 +144,20 @@ octosql "SELECT * FROM plugins.plugins"`,
 				return db, nil
 			}
 		}
-		{
-			once := sync.Once{}
-			var repositories []repository.Repository
-			var err error
-			databases["plugins"] = func() (physical.Database, error) {
-				once.Do(func() {
-					repositories, err = repository.GetRepositories(ctx)
-				})
-				if err != nil {
-					return nil, fmt.Errorf("couldn't get repositories: %w", err)
-				}
-				return plugins.Creator(ctx, pluginManager, repositories)
-			}
-		}
+		// {
+		// 	once := sync.Once{}
+		// 	var repositories []repository.Repository
+		// 	var err error
+		// 	databases["plugins"] = func() (physical.Database, error) {
+		// 		once.Do(func() {
+		// 			repositories, err = repository.GetRepositories(ctx)
+		// 		})
+		// 		if err != nil {
+		// 			return nil, fmt.Errorf("couldn't get repositories: %w", err)
+		// 		}
+		// 		return plugins.Creator(ctx, pluginManager, repositories)
+		// 	}
+		// }
 		databases["docs"] = func() (physical.Database, error) {
 			return docs.Creator(ctx)
 		}
@@ -240,10 +237,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 			return fmt.Errorf("couldn't parse query: %w", err)
 		}
 		tableValuedFunctions := map[string]logical.TableValuedFunctionDescription{
-			"max_diff_watermark": table_valued_functions.MaxDiffWatermark,
-			"tumble":             table_valued_functions.Tumble,
-			"range":              table_valued_functions.Range,
-			"poll":               table_valued_functions.Poll,
+			// Fixme: "range":              table_valued_functions.Range,
 		}
 		uniqueNameGenerator := map[string]int{}
 		physicalPlan, mapping, err := typecheckNode(
@@ -261,36 +255,36 @@ octosql "SELECT * FROM plugins.plugins"`,
 		}
 		reverseMapping := logical.ReverseMapping(mapping)
 
-		physicalOrderByExpressions := make([]physical.Expression, len(outputOptions.OrderByExpressions))
-		for i := range outputOptions.OrderByExpressions {
-			physicalExpr, err := typecheckExpr(ctx, outputOptions.OrderByExpressions[i], env.WithRecordSchema(physicalPlan.Schema), logical.Environment{
-				CommonTableExpressions: map[string]logical.CommonTableExpression{},
-				TableValuedFunctions:   tableValuedFunctions,
-				UniqueVariableNames: &logical.VariableMapping{
-					Mapping: mapping,
-				},
-				UniqueNameGenerator: uniqueNameGenerator,
-			})
-			if err != nil {
-				return fmt.Errorf("couldn't typecheck order by expression with index %d: %w", i, err)
-			}
-			physicalOrderByExpressions[i] = physicalExpr
-		}
-		var physicalLimitExpression *physical.Expression
-		if outputOptions.Limit != nil {
-			physicalExpr, err := typecheckExpr(ctx, *outputOptions.Limit, env.WithRecordSchema(physicalPlan.Schema), logical.Environment{
-				CommonTableExpressions: map[string]logical.CommonTableExpression{},
-				TableValuedFunctions:   tableValuedFunctions,
-				UniqueVariableNames: &logical.VariableMapping{
-					Mapping: mapping,
-				},
-				UniqueNameGenerator: uniqueNameGenerator,
-			})
-			if err != nil {
-				return fmt.Errorf("couldn't typecheck limit expression with index: %w", err)
-			}
-			physicalLimitExpression = &physicalExpr
-		}
+		// physicalOrderByExpressions := make([]physical.Expression, len(outputOptions.OrderByExpressions))
+		// for i := range outputOptions.OrderByExpressions {
+		// 	physicalExpr, err := typecheckExpr(ctx, outputOptions.OrderByExpressions[i], env.WithRecordSchema(physicalPlan.Schema), logical.Environment{
+		// 		CommonTableExpressions: map[string]logical.CommonTableExpression{},
+		// 		TableValuedFunctions:   tableValuedFunctions,
+		// 		UniqueVariableNames: &logical.VariableMapping{
+		// 			Mapping: mapping,
+		// 		},
+		// 		UniqueNameGenerator: uniqueNameGenerator,
+		// 	})
+		// 	if err != nil {
+		// 		return fmt.Errorf("couldn't typecheck order by expression with index %d: %w", i, err)
+		// 	}
+		// 	physicalOrderByExpressions[i] = physicalExpr
+		// }
+		// var physicalLimitExpression *physical.Expression
+		// if outputOptions.Limit != nil {
+		// 	physicalExpr, err := typecheckExpr(ctx, *outputOptions.Limit, env.WithRecordSchema(physicalPlan.Schema), logical.Environment{
+		// 		CommonTableExpressions: map[string]logical.CommonTableExpression{},
+		// 		TableValuedFunctions:   tableValuedFunctions,
+		// 		UniqueVariableNames: &logical.VariableMapping{
+		// 			Mapping: mapping,
+		// 		},
+		// 		UniqueNameGenerator: uniqueNameGenerator,
+		// 	})
+		// 	if err != nil {
+		// 		return fmt.Errorf("couldn't typecheck limit expression with index: %w", err)
+		// 	}
+		// 	physicalLimitExpression = &physicalExpr
+		// }
 
 		queryTelemetry := telemetry.GetQueryTelemetryData(physicalPlan, installedPlugins)
 
@@ -341,40 +335,6 @@ octosql "SELECT * FROM plugins.plugins"`,
 			}
 
 			return app.RunNode(ctx, physicalPlan, env)
-
-			executionPlan, err = physicalPlan.Materialize(
-				ctx,
-				env,
-			)
-			if err != nil {
-				return fmt.Errorf("couldn't materialize physical plan: %w", err)
-			}
-
-			orderByExpressions = make([]execution.Expression, len(physicalOrderByExpressions))
-			for i, physicalExpr := range physicalOrderByExpressions {
-				execExpr, err := physicalExpr.Materialize(ctx, env.WithRecordSchema(physicalPlan.Schema))
-				if err != nil {
-					return fmt.Errorf("couldn't materialize output order by expression with index %d: %v", i, err)
-				}
-				orderByExpressions[i] = execExpr
-			}
-			if physicalLimitExpression != nil {
-				execExpr, err := physicalLimitExpression.Materialize(ctx, env.WithRecordSchema(physicalPlan.Schema))
-				if err != nil {
-					return fmt.Errorf("couldn't materialize output limit expression with index: %w", err)
-				}
-				limitExpression = &execExpr
-			}
-
-			outFields := make([]physical.SchemaField, len(physicalPlan.Schema.Fields))
-			copy(outFields, physicalPlan.Schema.Fields)
-			outSchema = physical.Schema{
-				Fields:    outFields,
-				TimeField: physicalPlan.Schema.TimeField,
-			}
-			for i := range outFields {
-				outFields[i].Name = reverseMapping[outFields[i].Name]
-			}
 		}
 
 		var sink interface {

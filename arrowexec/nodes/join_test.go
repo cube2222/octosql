@@ -63,14 +63,14 @@ func TestJoin(t *testing.T) {
 		Record: rightRecordBuilder.NewRecord(),
 	})
 
-	leftRecordsNode := execution.NodeWithMeta{
+	leftRecordsNode := &execution.NodeWithMeta{
 		Node: &TestNode{
 			Records:     leftRecords,
 			Repetitions: 2,
 		},
 		Schema: leftSchema,
 	}
-	rightRecordsNode := execution.NodeWithMeta{
+	rightRecordsNode := &execution.NodeWithMeta{
 		Node: &TestNode{
 			Records:     rightRecords,
 			Repetitions: 2,
@@ -141,13 +141,13 @@ func BenchmarkJoin_BigTable(b *testing.B) {
 	}
 	b.StartTimer()
 
-	leftRecordsNode := execution.NodeWithMeta{
+	leftRecordsNode := &execution.NodeWithMeta{
 		Node: &TestNode{
 			Records: leftRecords,
 		},
 		Schema: leftSchema,
 	}
-	rightRecordsNode := execution.NodeWithMeta{
+	rightRecordsNode := &execution.NodeWithMeta{
 		Node: &TestNode{
 			Records: rightRecords,
 		},
@@ -222,13 +222,13 @@ func BenchmarkJoin_SmallTable(b *testing.B) {
 	}
 	b.StartTimer()
 
-	leftRecordsNode := execution.NodeWithMeta{
+	leftRecordsNode := &execution.NodeWithMeta{
 		Node: &TestNode{
 			Records: leftRecords,
 		},
 		Schema: leftSchema,
 	}
-	rightRecordsNode := execution.NodeWithMeta{
+	rightRecordsNode := &execution.NodeWithMeta{
 		Node: &TestNode{
 			Records: rightRecords,
 		},

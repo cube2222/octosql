@@ -10,7 +10,7 @@ var CountOverloads = []physical.AggregateDescriptor{
 	{
 		ArgumentType: octosql.Any,
 		OutputType:   octosql.Int,
-		Prototype:    NewCountPrototype(),
+		// Prototype:    NewCountPrototype(),
 	},
 }
 

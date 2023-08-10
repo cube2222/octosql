@@ -1,6 +1,7 @@
 package nodes
 
 import (
+	"fmt"
 	"unsafe"
 
 	"github.com/apache/arrow/go/v13/arrow"
@@ -14,13 +15,14 @@ import (
 
 type GroupBy struct {
 	OutSchema *arrow.Schema
-	Source    execution.NodeWithMeta
+	Source    *execution.NodeWithMeta
 
 	// Both keys and aggregate columns have to be calculated by a preceding map.
 
-	KeyColumns            []int
-	AggregateConstructors []func(dt arrow.DataType) Aggregate
-	AggregateColumns      []int
+	KeyExprs              []execution.Expression // TODO: Also embed arrow type in the expression.
+	KeyTypes              []arrow.DataType
+	AggregateExprs        []execution.Expression
+	AggregateConstructors []func() Aggregate
 }
 
 func (g *GroupBy) Run(ctx execution.Context, produce execution.ProduceFunc) error {
@@ -28,27 +30,46 @@ func (g *GroupBy) Run(ctx execution.Context, produce execution.ProduceFunc) erro
 	entryIndices := intintmap.New(16, 0.6)
 	aggregates := make([]Aggregate, len(g.AggregateConstructors))
 	for i := range aggregates {
-		aggregates[i] = g.AggregateConstructors[i](g.Source.Schema.Field(g.AggregateColumns[i]).Type)
+		aggregates[i] = g.AggregateConstructors[i]()
 	}
-	key := make([]Key, len(g.KeyColumns))
+	key := make([]Key, len(g.KeyExprs))
 	for i := range key {
-		key[i] = MakeKey(g.Source.Schema.Field(g.KeyColumns[i]).Type)
+		key[i] = MakeKey(g.KeyTypes[i])
 	}
 
-	if err := g.Source.Node.Run(ctx, func(ctx execution.ProduceContext, record execution.Record) error {
-		getKeyHash := helpers.MakeKeyHasher(record, g.KeyColumns)
+	if err := g.Source.Node.Run(ctx, func(produceCtx execution.ProduceContext, record execution.Record) error {
+
+		keyArrays := make([]arrow.Array, len(g.KeyExprs))
+		for i := range keyArrays { // TODO: Parallelize.
+			arr, err := g.KeyExprs[i].Evaluate(produceCtx.Context, record)
+			if err != nil {
+				return fmt.Errorf("couldn't evaluate key expression: %w", err)
+			}
+			keyArrays[i] = arr
+		}
+
+		aggregateArrays := make([]arrow.Array, len(g.AggregateExprs))
+		for i := range aggregateArrays { // TODO: Parallelize.
+			arr, err := g.AggregateExprs[i].Evaluate(produceCtx.Context, record)
+			if err != nil {
+				return fmt.Errorf("couldn't evaluate aggregate expression: %w", err)
+			}
+			aggregateArrays[i] = arr
+		}
+
+		getKeyHash := helpers.MakeRowHasher(keyArrays)
 
 		aggColumnConsumers := make([]func(entryIndex uint, rowIndex uint), len(aggregates))
 		for i := range aggColumnConsumers {
-			aggColumnConsumers[i] = aggregates[i].MakeColumnConsumer(record.Column(g.AggregateColumns[i]))
+			aggColumnConsumers[i] = aggregates[i].MakeColumnConsumer(aggregateArrays[i])
 		}
 		newKeyAdders := make([]func(rowIndex uint), len(key))
 		for i := range newKeyAdders {
-			newKeyAdders[i] = key[i].MakeNewKeyAdder(record.Column(g.KeyColumns[i]))
+			newKeyAdders[i] = key[i].MakeNewKeyAdder(keyArrays[i])
 		}
 		keyEqualityCheckers := make([]func(entryIndex uint, rowIndex uint) bool, len(key))
 		for i := range keyEqualityCheckers {
-			keyEqualityCheckers[i] = key[i].MakeKeyEqualityChecker(record.Column(g.KeyColumns[i]))
+			keyEqualityCheckers[i] = key[i].MakeKeyEqualityChecker(keyArrays[i])
 		}
 
 		rows := record.NumRows()
@@ -104,6 +125,7 @@ func (g *GroupBy) Run(ctx execution.Context, produce execution.ProduceFunc) erro
 
 		record := array.NewRecord(g.OutSchema, columns, int64(length))
 
+		// TODO: Schema can probably omit some keys/aggregates from the output, if they're not used.
 		if err := produce(execution.ProduceContext{Context: ctx}, execution.Record{Record: record}); err != nil {
 			return err
 		}
@@ -115,31 +137,6 @@ func (g *GroupBy) Run(ctx execution.Context, produce execution.ProduceFunc) erro
 type Aggregate interface {
 	MakeColumnConsumer(array arrow.Array) func(entryIndex uint, rowIndex uint)
 	GetBatch(length int, offset int) arrow.Array
-}
-
-func MakeCount(dt arrow.DataType) Aggregate {
-	return &Count{
-		data: memory.NewResizableBuffer(memory.NewGoAllocator()), // TODO: Get allocator as argument.
-	}
-}
-
-type Count struct {
-	data  *memory.Buffer
-	state []int64 // This uses the above data as the storage underneath.
-}
-
-func (agg *Count) MakeColumnConsumer(arr arrow.Array) func(entryIndex uint, rowIndex uint) {
-	return func(entryIndex uint, rowIndex uint) {
-		if entryIndex >= uint(len(agg.state)) {
-			agg.data.Resize(arrow.Int64Traits.BytesRequired(bitutil.NextPowerOf2(int(entryIndex) + 1)))
-			agg.state = arrow.Int64Traits.CastFromBytes(agg.data.Bytes())
-		}
-		agg.state[entryIndex]++
-	}
-}
-
-func (agg *Count) GetBatch(length int, offset int) arrow.Array {
-	return array.NewInt64Data(array.NewData(arrow.PrimitiveTypes.Int64, length, []*memory.Buffer{nil, agg.data}, nil, 0 /*TODO: Fixme*/, offset))
 }
 
 func MakeSum(dt arrow.DataType) Aggregate { // TODO: octosql.Type?

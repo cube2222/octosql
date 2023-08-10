@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cube2222/octosql/execution"
+	"github.com/apache/arrow/go/v13/arrow"
+	"github.com/cube2222/octosql/arrowexec/execution"
 	"github.com/cube2222/octosql/octosql"
 )
 
@@ -121,152 +122,205 @@ type ObjectFieldAccess struct {
 	Field  string
 }
 
-func (expr *Expression) Materialize(ctx context.Context, env Environment) (execution.Expression, error) {
+func (expr *Expression) Materialize(ctx context.Context, env Environment, recordSchema *arrow.Schema) (execution.Expression, error) {
 	switch expr.ExpressionType {
-	case ExpressionTypeVariable:
-		level := 0
-		index := 0
-	ctxLoop:
-		for varCtx := env.VariableContext; varCtx != nil; varCtx = varCtx.Parent {
-			for i, field := range varCtx.Fields {
-				if field.Name == expr.Variable.Name {
-					index = i
-					break ctxLoop
-				}
-			}
-			level++
-		}
-		return execution.NewVariable(level, index), nil
-
 	case ExpressionTypeConstant:
-		return execution.NewConstant(expr.Constant.Value), nil
-	case ExpressionTypeFunctionCall:
-		expressions := make([]execution.Expression, len(expr.FunctionCall.Arguments))
-		for i := range expr.FunctionCall.Arguments {
-			expression, err := expr.FunctionCall.Arguments[i].Materialize(ctx, env)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't materialize function argument with index %d: %w", i, err)
-			}
-			expressions[i] = expression
-		}
-		var nullCheckIndices []int
-		if expr.FunctionCall.FunctionDescriptor.Strict {
-			for i := range expr.FunctionCall.Arguments {
-				if octosql.Null.Is(expr.FunctionCall.Arguments[i].Type) == octosql.TypeRelationIs {
-					nullCheckIndices = append(nullCheckIndices, i)
+		return &execution.Constant{
+			Value: OctoSQLValueToArrowScalar(expr.Constant.Value),
+		}, nil
+	case ExpressionTypeVariable:
+		switch expr.Variable.IsLevel0 {
+		case true:
+			for i, field := range recordSchema.Fields() {
+				if field.Name == expr.Variable.Name {
+					return execution.NewRecordVariable(i), nil
 				}
 			}
+			panic("unreachable")
+		default:
+			panic("implement me")
 		}
-		return execution.NewFunctionCall(expr.FunctionCall.FunctionDescriptor.Function, expressions, nullCheckIndices), nil
-	case ExpressionTypeAnd:
-		expressions := make([]execution.Expression, len(expr.And.Arguments))
-		for i := range expr.And.Arguments {
-			expression, err := expr.And.Arguments[i].Materialize(ctx, env)
+	case ExpressionTypeFunctionCall:
+		args := make([]execution.Expression, len(expr.FunctionCall.Arguments))
+		for i := range expr.FunctionCall.Arguments {
+			arg, err := expr.FunctionCall.Arguments[i].Materialize(ctx, env, recordSchema)
 			if err != nil {
-				return nil, fmt.Errorf("couldn't materialize 'and' expression with index %d: %w", i, err)
+				return nil, fmt.Errorf("couldn't materialize argument: %w", err)
 			}
-			expressions[i] = expression
-		}
-		return execution.NewAnd(expressions), nil
-	case ExpressionTypeOr:
-		expressions := make([]execution.Expression, len(expr.Or.Arguments))
-		for i := range expr.Or.Arguments {
-			expression, err := expr.Or.Arguments[i].Materialize(ctx, env)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't materialize 'or' expression with index %d: %w", i, err)
-			}
-			expressions[i] = expression
-		}
-		return execution.NewOr(expressions), nil
-	case ExpressionTypeQueryExpression:
-		source, err := expr.QueryExpression.Source.Materialize(ctx, env)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't materialize query expression source: %w", err)
-		}
-		singleColumn := false
-		if len(expr.QueryExpression.Source.Schema.Fields) == 1 {
-			singleColumn = true
+			args[i] = arg
 		}
 
-		if !singleColumn {
-			return execution.NewMultiColumnQueryExpression(source), nil
-		} else {
-			return execution.NewSingleColumnQueryExpression(source), nil
+		switch expr.FunctionCall.Name {
+		case "=":
+			// TODO: Support equality of other types.
+			return &execution.ArrowComputeFunctionCall{
+				Name:      "equal",
+				Arguments: args,
+			}, nil
+			// default:
+		// args := make([]Expression, len(expr.FunctionCall.Arguments))
+		// for i := range expr.FunctionCall.Arguments {
+		// 	arg, err := Materialize(ctx, expr.FunctionCall.Arguments[i], env)
+		// 	if err != nil {
+		// 		return nil, fmt.Errorf("couldn't materialize argument: %w", err)
+		// 	}
+		// 	args[i] = arg
+		// }
+		// return &CallBuiltinFunc{Name: expr.FunctionCall.Name, Arguments: args}, nil
+		default:
+			panic("implement me")
 		}
-	case ExpressionTypeCoalesce:
-		expressions := make([]execution.Expression, len(expr.Coalesce.Arguments))
-		for i := range expr.Coalesce.Arguments {
-			expression, err := expr.Coalesce.Arguments[i].Materialize(ctx, env)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't materialize COALESCE argument with index %d: %w", i, err)
-			}
-			expressions[i] = expression
-		}
-		sourceTypes := make([]octosql.Type, len(expr.Coalesce.Arguments))
-		for i := range expr.Coalesce.Arguments {
-			sourceTypes[i] = expr.Coalesce.Arguments[i].Type
-		}
-
-		return execution.NewCoalesce(expressions, execution.NewObjectLayoutFixer(expr.Type, sourceTypes)), nil
-	case ExpressionTypeTuple:
-		expressions := make([]execution.Expression, len(expr.Tuple.Arguments))
-		for i := range expr.Tuple.Arguments {
-			expression, err := expr.Tuple.Arguments[i].Materialize(ctx, env)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't materialize tuple argument with index %d: %w", i, err)
-			}
-			expressions[i] = expression
-		}
-		return execution.NewTuple(expressions), nil
-	case ExpressionTypeTypeAssertion:
-		expression, err := expr.TypeAssertion.Expression.Materialize(ctx, env)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't materialize type asserted expression: %w", err)
-		}
-
-		var expectedTypeIDs []octosql.TypeID
-		if expr.TypeAssertion.TargetType.TypeID != octosql.TypeIDUnion {
-			expectedTypeIDs = []octosql.TypeID{expr.TypeAssertion.TargetType.TypeID}
-		} else {
-			expectedTypeIDs = make([]octosql.TypeID, len(expr.TypeAssertion.TargetType.Union.Alternatives))
-			for i := range expr.TypeAssertion.TargetType.Union.Alternatives {
-				expectedTypeIDs[i] = expr.TypeAssertion.TargetType.Union.Alternatives[i].TypeID
-			}
-		}
-
-		return execution.NewTypeAssertion(expectedTypeIDs, expression, expr.TypeAssertion.TargetType.String()), nil
-	case ExpressionTypeTypeCast:
-		expression, err := expr.TypeCast.Expression.Materialize(ctx, env)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't materialize cast expression: %w", err)
-		}
-
-		return execution.NewTypeCast(expr.TypeCast.TargetTypeID, expression), nil
-	case ExpressionTypeObjectFieldAccess:
-		object, err := expr.ObjectFieldAccess.Object.Materialize(ctx, env)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't materialize object field access object: %w", err)
-		}
-
-		fields := expr.ObjectFieldAccess.Object.Type.Struct.Fields
-		if expr.ObjectFieldAccess.Object.Type.TypeID == octosql.TypeIDUnion {
-			// Nullable object case
-			fields = expr.ObjectFieldAccess.Object.Type.Union.Alternatives[1].Struct.Fields
-		}
-
-		fieldIndex := 0
-		for i, field := range fields {
-			if field.Name == expr.ObjectFieldAccess.Field {
-				fieldIndex = i
-				break
-			}
-		}
-
-		return execution.NewObjectFieldAccess(object, fieldIndex), nil
+	default:
+		panic(fmt.Sprintf("invalid expression type: %s", expr.ExpressionType))
 	}
-
-	panic("unexhaustive expression type match")
 }
+
+// func (expr *Expression) Materialize(ctx context.Context, env Environment) (execution.Expression, error) {
+// 	switch expr.ExpressionType {
+// 	case ExpressionTypeVariable:
+// 		level := 0
+// 		index := 0
+// 	ctxLoop:
+// 		for varCtx := env.VariableContext; varCtx != nil; varCtx = varCtx.Parent {
+// 			for i, field := range varCtx.Fields {
+// 				if field.Name == expr.Variable.Name {
+// 					index = i
+// 					break ctxLoop
+// 				}
+// 			}
+// 			level++
+// 		}
+// 		return execution.NewVariable(level, index), nil
+//
+// 	case ExpressionTypeConstant:
+// 		return execution.NewConstant(expr.Constant.Value), nil
+// 	case ExpressionTypeFunctionCall:
+// 		expressions := make([]execution.Expression, len(expr.FunctionCall.Arguments))
+// 		for i := range expr.FunctionCall.Arguments {
+// 			expression, err := expr.FunctionCall.Arguments[i].Materialize(ctx, env)
+// 			if err != nil {
+// 				return nil, fmt.Errorf("couldn't materialize function argument with index %d: %w", i, err)
+// 			}
+// 			expressions[i] = expression
+// 		}
+// 		var nullCheckIndices []int
+// 		if expr.FunctionCall.FunctionDescriptor.Strict {
+// 			for i := range expr.FunctionCall.Arguments {
+// 				if octosql.Null.Is(expr.FunctionCall.Arguments[i].Type) == octosql.TypeRelationIs {
+// 					nullCheckIndices = append(nullCheckIndices, i)
+// 				}
+// 			}
+// 		}
+// 		return execution.NewFunctionCall(expr.FunctionCall.FunctionDescriptor.Function, expressions, nullCheckIndices), nil
+// 	case ExpressionTypeAnd:
+// 		expressions := make([]execution.Expression, len(expr.And.Arguments))
+// 		for i := range expr.And.Arguments {
+// 			expression, err := expr.And.Arguments[i].Materialize(ctx, env)
+// 			if err != nil {
+// 				return nil, fmt.Errorf("couldn't materialize 'and' expression with index %d: %w", i, err)
+// 			}
+// 			expressions[i] = expression
+// 		}
+// 		return execution.NewAnd(expressions), nil
+// 	case ExpressionTypeOr:
+// 		expressions := make([]execution.Expression, len(expr.Or.Arguments))
+// 		for i := range expr.Or.Arguments {
+// 			expression, err := expr.Or.Arguments[i].Materialize(ctx, env)
+// 			if err != nil {
+// 				return nil, fmt.Errorf("couldn't materialize 'or' expression with index %d: %w", i, err)
+// 			}
+// 			expressions[i] = expression
+// 		}
+// 		return execution.NewOr(expressions), nil
+// 	case ExpressionTypeQueryExpression:
+// 		source, err := expr.QueryExpression.Source.Materialize(ctx, env)
+// 		if err != nil {
+// 			return nil, fmt.Errorf("couldn't materialize query expression source: %w", err)
+// 		}
+// 		singleColumn := false
+// 		if len(expr.QueryExpression.Source.Schema.Fields) == 1 {
+// 			singleColumn = true
+// 		}
+//
+// 		if !singleColumn {
+// 			return execution.NewMultiColumnQueryExpression(source), nil
+// 		} else {
+// 			return execution.NewSingleColumnQueryExpression(source), nil
+// 		}
+// 	case ExpressionTypeCoalesce:
+// 		expressions := make([]execution.Expression, len(expr.Coalesce.Arguments))
+// 		for i := range expr.Coalesce.Arguments {
+// 			expression, err := expr.Coalesce.Arguments[i].Materialize(ctx, env)
+// 			if err != nil {
+// 				return nil, fmt.Errorf("couldn't materialize COALESCE argument with index %d: %w", i, err)
+// 			}
+// 			expressions[i] = expression
+// 		}
+// 		sourceTypes := make([]octosql.Type, len(expr.Coalesce.Arguments))
+// 		for i := range expr.Coalesce.Arguments {
+// 			sourceTypes[i] = expr.Coalesce.Arguments[i].Type
+// 		}
+//
+// 		return execution.NewCoalesce(expressions, execution.NewObjectLayoutFixer(expr.Type, sourceTypes)), nil
+// 	case ExpressionTypeTuple:
+// 		expressions := make([]execution.Expression, len(expr.Tuple.Arguments))
+// 		for i := range expr.Tuple.Arguments {
+// 			expression, err := expr.Tuple.Arguments[i].Materialize(ctx, env)
+// 			if err != nil {
+// 				return nil, fmt.Errorf("couldn't materialize tuple argument with index %d: %w", i, err)
+// 			}
+// 			expressions[i] = expression
+// 		}
+// 		return execution.NewTuple(expressions), nil
+// 	case ExpressionTypeTypeAssertion:
+// 		expression, err := expr.TypeAssertion.Expression.Materialize(ctx, env)
+// 		if err != nil {
+// 			return nil, fmt.Errorf("couldn't materialize type asserted expression: %w", err)
+// 		}
+//
+// 		var expectedTypeIDs []octosql.TypeID
+// 		if expr.TypeAssertion.TargetType.TypeID != octosql.TypeIDUnion {
+// 			expectedTypeIDs = []octosql.TypeID{expr.TypeAssertion.TargetType.TypeID}
+// 		} else {
+// 			expectedTypeIDs = make([]octosql.TypeID, len(expr.TypeAssertion.TargetType.Union.Alternatives))
+// 			for i := range expr.TypeAssertion.TargetType.Union.Alternatives {
+// 				expectedTypeIDs[i] = expr.TypeAssertion.TargetType.Union.Alternatives[i].TypeID
+// 			}
+// 		}
+//
+// 		return execution.NewTypeAssertion(expectedTypeIDs, expression, expr.TypeAssertion.TargetType.String()), nil
+// 	case ExpressionTypeTypeCast:
+// 		expression, err := expr.TypeCast.Expression.Materialize(ctx, env)
+// 		if err != nil {
+// 			return nil, fmt.Errorf("couldn't materialize cast expression: %w", err)
+// 		}
+//
+// 		return execution.NewTypeCast(expr.TypeCast.TargetTypeID, expression), nil
+// 	case ExpressionTypeObjectFieldAccess:
+// 		object, err := expr.ObjectFieldAccess.Object.Materialize(ctx, env)
+// 		if err != nil {
+// 			return nil, fmt.Errorf("couldn't materialize object field access object: %w", err)
+// 		}
+//
+// 		fields := expr.ObjectFieldAccess.Object.Type.Struct.Fields
+// 		if expr.ObjectFieldAccess.Object.Type.TypeID == octosql.TypeIDUnion {
+// 			// Nullable object case
+// 			fields = expr.ObjectFieldAccess.Object.Type.Union.Alternatives[1].Struct.Fields
+// 		}
+//
+// 		fieldIndex := 0
+// 		for i, field := range fields {
+// 			if field.Name == expr.ObjectFieldAccess.Field {
+// 				fieldIndex = i
+// 				break
+// 			}
+// 		}
+//
+// 		return execution.NewObjectFieldAccess(object, fieldIndex), nil
+// 	}
+//
+// 	panic("unexhaustive expression type match")
+// }
 
 func VariableNameMatchesField(varName, fieldName string) bool {
 	if varName == fieldName {

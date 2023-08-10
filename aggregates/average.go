@@ -12,17 +12,17 @@ var AverageOverloads = []physical.AggregateDescriptor{
 	{
 		ArgumentType: octosql.Int,
 		OutputType:   octosql.Int,
-		Prototype:    NewAverageIntPrototype(),
+		// Prototype:    NewAverageIntPrototype(),
 	},
 	{
 		ArgumentType: octosql.Float,
 		OutputType:   octosql.Float,
-		Prototype:    NewAverageFloatPrototype(),
+		// Prototype:    NewAverageFloatPrototype(),
 	},
 	{
 		ArgumentType: octosql.Duration,
 		OutputType:   octosql.Duration,
-		Prototype:    NewAverageDurationPrototype(),
+		// Prototype:    NewAverageDurationPrototype(),
 	},
 }
 

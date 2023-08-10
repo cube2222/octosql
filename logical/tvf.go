@@ -213,10 +213,10 @@ descriptorLoop:
 			Schema:   outSchema,
 			NodeType: physical.NodeTypeTableValuedFunction,
 			TableValuedFunction: &physical.TableValuedFunction{
-				Name:      node.name,
-				Arguments: physicalArguments,
+				Name:               node.name,
+				Arguments:          physicalArguments,
 				FunctionDescriptor: physical.TableValuedFunctionDescriptor{
-					Materialize: descriptor.Materialize,
+					// Fixme: Materialize: descriptor.Materialize,
 				},
 			},
 		}, outputMapping
@@ -255,10 +255,10 @@ descriptorLoop2:
 			Schema:   outSchema,
 			NodeType: physical.NodeTypeTableValuedFunction,
 			TableValuedFunction: &physical.TableValuedFunction{
-				Name:      node.name,
-				Arguments: physicalArguments,
+				Name:               node.name,
+				Arguments:          physicalArguments,
 				FunctionDescriptor: physical.TableValuedFunctionDescriptor{
-					Materialize: descriptor.Materialize,
+					// Fixme: Materialize: descriptor.Materialize,
 				},
 			},
 		}, outputMapping

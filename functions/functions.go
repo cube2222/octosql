@@ -53,19 +53,32 @@ func FunctionMap() map[string]physical.FunctionDetails {
 		// 		},
 		// 	},
 		// },
-		// "=": {
-		// 	Descriptors: []physical.FunctionDescriptor{
-		// 		// TODO: Specializations for concrete primitive types.
-		// 		{
-		// 			ArgumentTypes: []octosql.Type{octosql.Any, octosql.Any},
-		// 			OutputType:    octosql.Boolean,
-		// 			Strict:        true,
-		// 			Function: func(values []octosql.Value) (octosql.Value, error) {
-		// 				return octosql.NewBoolean(values[0].Equal(values[1])), nil
-		// 			},
-		// 		},
-		// 	},
-		// },
+		"=": {
+			Descriptors: []physical.FunctionDescriptor{
+				// TODO: Fix this for Arrow and unions.
+				{
+					ArgumentTypes: []octosql.Type{octosql.Any, octosql.Any},
+					OutputType:    octosql.Boolean,
+					Strict:        true,
+					Function: func(arguments []arrow.Array) (arrow.Array, error) {
+						args := make([]compute.Datum, len(arguments))
+						for i, arg := range arguments {
+							args[i] = &compute.ArrayDatum{Value: arg.Data()}
+						}
+
+						fn, ok := compute.GetFunctionRegistry().GetFunction("equal")
+						if !ok {
+							panic("Bug: equal function not found")
+						}
+						out, err := fn.Execute(context.Background(), nil, args...)
+						if err != nil {
+							return nil, fmt.Errorf("couldn't execute function: %w", err)
+						}
+						return array.MakeFromData(out.(*compute.ArrayDatum).Value), nil
+					},
+				},
+			},
+		},
 		// "!=": {
 		// 	Descriptors: []physical.FunctionDescriptor{
 		// 		// TODO: Specializations for concrete primitive types.

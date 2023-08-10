@@ -56,6 +56,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 		"=": {
 			Descriptors: []physical.FunctionDescriptor{
 				// TODO: Fix this for Arrow and unions.
+				//       I think you could just equal the subarray of each type separately, but then also check the TypeID array?
 				{
 					ArgumentTypes: []octosql.Type{octosql.Any, octosql.Any},
 					OutputType:    octosql.Boolean,

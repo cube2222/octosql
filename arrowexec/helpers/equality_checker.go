@@ -22,6 +22,12 @@ func MakeKeyEqualityChecker(leftRecord, rightRecord execution.Record, leftKeyInd
 			columnEqualityCheckers[i] = func(leftRowIndex, rightRowIndex int) bool {
 				return leftTypedArr[leftRowIndex] == rightTypedArr[rightRowIndex]
 			}
+		case arrow.FLOAT64:
+			leftTypedArr := leftRecord.Column(leftKeyIndices[i]).(*array.Float64).Float64Values()
+			rightTypedArr := rightRecord.Column(rightKeyIndices[i]).(*array.Float64).Float64Values()
+			columnEqualityCheckers[i] = func(leftRowIndex, rightRowIndex int) bool {
+				return leftTypedArr[leftRowIndex] == rightTypedArr[rightRowIndex]
+			}
 		case arrow.STRING:
 			// TODO: Move to large string array.
 			leftTypedArr := leftRecord.Column(leftKeyIndices[i]).(*array.String)
@@ -29,6 +35,7 @@ func MakeKeyEqualityChecker(leftRecord, rightRecord execution.Record, leftKeyInd
 			columnEqualityCheckers[i] = func(leftRowIndex, rightRowIndex int) bool {
 				return leftTypedArr.Value(leftRowIndex) == rightTypedArr.Value(rightRowIndex)
 			}
+			// TODO: Handle all types.
 		default:
 			panic("unsupported type for equality checker")
 		}

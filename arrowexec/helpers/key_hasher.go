@@ -1,6 +1,8 @@
 package helpers
 
 import (
+	"math"
+
 	"github.com/apache/arrow/go/v13/arrow"
 	"github.com/apache/arrow/go/v13/arrow/array"
 	"github.com/cube2222/octosql/arrowexec/execution"
@@ -23,6 +25,11 @@ func MakeRowHasher(columns []arrow.Array) func(rowIndex uint) uint64 {
 			typedArr := columns[i].(*array.Int64).Int64Values()
 			subHashers[i] = func(hash uint64, rowIndex uint) uint64 {
 				return fnv1a.AddUint64(hash, uint64(typedArr[rowIndex]))
+			}
+		case arrow.FLOAT64:
+			typedArr := columns[i].(*array.Float64).Float64Values()
+			subHashers[i] = func(hash uint64, rowIndex uint) uint64 {
+				return fnv1a.AddUint64(hash, math.Float64bits(typedArr[rowIndex]))
 			}
 		case arrow.STRING:
 			typedArr := columns[i].(*array.String)

@@ -70,7 +70,7 @@ var parserWorkReceiveChannel = func() chan<- jobIn {
 					sequenceNumber: job.sequenceNumber,
 				}
 				if err == nil {
-					outJob.record = recordBuilder.NewRecord()
+					outJob.record = recordBuilder.NewRecord() // TODO: If all fields are optimized out, then this doesn't properly carry the count of rows. Put it into execution.Record.
 				} else {
 					outJob.err = err
 				}

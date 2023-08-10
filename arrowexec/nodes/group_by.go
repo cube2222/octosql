@@ -177,6 +177,10 @@ func MakeKey(dt arrow.DataType) Key {
 		return &KeyInt{
 			data: memory.NewResizableBuffer(memory.NewGoAllocator()), // TODO: Get allocator as argument.
 		}
+	case arrow.FLOAT64:
+		return &KeyFloat{
+			data: memory.NewResizableBuffer(memory.NewGoAllocator()), // TODO: Get allocator as argument.
+		}
 	case arrow.STRING:
 		return &KeyString{
 			stringData:  memory.NewResizableBuffer(memory.NewGoAllocator()), // TODO: Get allocator as argument.
@@ -220,6 +224,35 @@ func (key *KeyInt) MakeKeyEqualityChecker(arr arrow.Array) func(entryIndex uint,
 
 func (key *KeyInt) GetBatch(length int, offset int) arrow.Array {
 	return array.NewInt64Data(array.NewData(arrow.PrimitiveTypes.Int64, length, []*memory.Buffer{nil, key.data}, nil, 0 /*TODO: Fixme*/, offset))
+}
+
+type KeyFloat struct {
+	data  *memory.Buffer // TODO: Release these buffers at some point.
+	state []float64      // This uses the above data as the storage underneath.
+	count int
+}
+
+func (key *KeyFloat) MakeNewKeyAdder(arr arrow.Array) func(rowIndex uint) {
+	typedArr := arr.(*array.Float64).Float64Values()
+	return func(rowIndex uint) {
+		if key.count >= len(key.state) {
+			key.data.Resize(arrow.Float64Traits.BytesRequired(bitutil.NextPowerOf2(key.count + 1)))
+			key.state = arrow.Float64Traits.CastFromBytes(key.data.Bytes())
+		}
+		key.state[key.count] = typedArr[rowIndex]
+		key.count++
+	}
+}
+
+func (key *KeyFloat) MakeKeyEqualityChecker(arr arrow.Array) func(entryIndex uint, rowIndex uint) bool {
+	typedArr := arr.(*array.Float64).Float64Values()
+	return func(entryIndex uint, rowIndex uint) bool {
+		return typedArr[rowIndex] == key.state[entryIndex]
+	}
+}
+
+func (key *KeyFloat) GetBatch(length int, offset int) arrow.Array {
+	return array.NewFloat64Data(array.NewData(arrow.PrimitiveTypes.Float64, length, []*memory.Buffer{nil, key.data}, nil, 0 /*TODO: Fixme*/, offset))
 }
 
 type KeyString struct {

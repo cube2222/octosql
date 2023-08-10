@@ -240,6 +240,10 @@ func floatReader(builder array.Builder) ValueReaderFunc {
 func stringReader(builder array.Builder) ValueReaderFunc {
 	stringBuilder := builder.(*array.StringBuilder)
 	return func(value *fastjson.Value) error {
+		if value == nil { // TODO: This should only be activated if field is null?
+			stringBuilder.AppendNull()
+			return nil
+		}
 		v, err := value.StringBytes()
 		if err != nil {
 			return fmt.Errorf("couldn't read string: %w", err)

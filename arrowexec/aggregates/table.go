@@ -9,4 +9,8 @@ var Aggregates = map[string]physical.AggregateDetails{
 		Description: "Counts all items in the group.",
 		Descriptors: CountOverloads,
 	},
+	"sum": {
+		Description: "Sums all items in the group.",
+		Descriptors: SumOverloads,
+	},
 }

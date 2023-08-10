@@ -150,26 +150,9 @@ func (expr *Expression) Materialize(ctx context.Context, env Environment, record
 			args[i] = arg
 		}
 
-		switch expr.FunctionCall.Name {
-		case "=":
-			// TODO: Support equality of other types.
-			return &execution.ArrowComputeFunctionCall{
-				Name:      "equal",
-				Arguments: args,
-			}, nil
-			// default:
-		// args := make([]Expression, len(expr.FunctionCall.Arguments))
-		// for i := range expr.FunctionCall.Arguments {
-		// 	arg, err := Materialize(ctx, expr.FunctionCall.Arguments[i], env)
-		// 	if err != nil {
-		// 		return nil, fmt.Errorf("couldn't materialize argument: %w", err)
-		// 	}
-		// 	args[i] = arg
-		// }
-		// return &CallBuiltinFunc{Name: expr.FunctionCall.Name, Arguments: args}, nil
-		default:
-			panic("implement me")
-		}
+		// TODO: Specify null check indices.
+
+		return execution.NewFunctionCall(expr.FunctionCall.FunctionDescriptor.Function, args, nil, expr.FunctionCall.FunctionDescriptor.Strict), nil
 	default:
 		panic(fmt.Sprintf("invalid expression type: %s", expr.ExpressionType))
 	}

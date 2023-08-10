@@ -4,8 +4,6 @@ import (
 	"fmt"
 
 	"github.com/apache/arrow/go/v13/arrow"
-	"github.com/apache/arrow/go/v13/arrow/array"
-	"github.com/apache/arrow/go/v13/arrow/compute"
 	"github.com/apache/arrow/go/v13/arrow/memory"
 	"github.com/apache/arrow/go/v13/arrow/scalar"
 )
@@ -50,32 +48,65 @@ func (c *ConstArray) Evaluate(ctx Context, record Record) (arrow.Array, error) {
 //
 // }
 
-type ArrowComputeFunctionCall struct {
-	Name      string
-	Arguments []Expression
+type FunctionCall struct {
+	function         func([]arrow.Array) (arrow.Array, error)
+	args             []Expression
+	nullCheckIndices []int
+	strict           bool
 }
 
-func (f *ArrowComputeFunctionCall) Evaluate(ctx Context, record Record) (arrow.Array, error) {
-	// TODO: Optimize all of this if it's too slow.
-	args := make([]compute.Datum, len(f.Arguments))
-	for i, arg := range f.Arguments {
+func NewFunctionCall(function func([]arrow.Array) (arrow.Array, error), args []Expression, nullCheckIndices []int, strict bool) *FunctionCall {
+	return &FunctionCall{
+		function:         function,
+		args:             args,
+		nullCheckIndices: nullCheckIndices,
+		strict:           strict,
+	}
+}
+
+func (f *FunctionCall) Evaluate(ctx Context, record Record) (arrow.Array, error) {
+	args := make([]arrow.Array, len(f.args))
+	for i, arg := range f.args {
 		arr, err := arg.Evaluate(ctx, record)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't evaluate argument %d: %w", i, err)
 		}
-		args[i] = &compute.ArrayDatum{Value: arr.Data()}
+		args[i] = arr
 	}
 
-	fn, ok := compute.GetFunctionRegistry().GetFunction(f.Name)
-	if !ok {
-		panic("Bug: array function not found")
+	if f.strict {
+		// TODO: Handle validity bitmaps.
 	}
-	out, err := fn.Execute(ctx.Context, nil, args...)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't execute function: %w", err)
-	}
-	return array.MakeFromData(out.(*compute.ArrayDatum).Value), nil
+
+	return f.function(args)
 }
+
+// type ArrowComputeFunctionCall struct {
+// 	Name      string
+// 	Arguments []Expression
+// }
+//
+// func (f *ArrowComputeFunctionCall) Evaluate(ctx Context, record Record) (arrow.Array, error) {
+// 	// TODO: Optimize all of this if it's too slow.
+// 	args := make([]compute.Datum, len(f.Arguments))
+// 	for i, arg := range f.Arguments {
+// 		arr, err := arg.Evaluate(ctx, record)
+// 		if err != nil {
+// 			return nil, fmt.Errorf("couldn't evaluate argument %d: %w", i, err)
+// 		}
+// 		args[i] = &compute.ArrayDatum{Value: arr.Data()}
+// 	}
+//
+// 	fn, ok := compute.GetFunctionRegistry().GetFunction(f.Name)
+// 	if !ok {
+// 		panic("Bug: array function not found")
+// 	}
+// 	out, err := fn.Execute(ctx.Context, nil, args...)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("couldn't execute function: %w", err)
+// 	}
+// 	return array.MakeFromData(out.(*compute.ArrayDatum).Value), nil
+// }
 
 type Constant struct {
 	Value scalar.Scalar

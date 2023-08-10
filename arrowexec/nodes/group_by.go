@@ -139,38 +139,6 @@ type Aggregate interface {
 	GetBatch(length int, offset int) arrow.Array
 }
 
-func MakeSum(dt arrow.DataType) Aggregate { // TODO: octosql.Type?
-	switch dt.ID() {
-	case arrow.INT64:
-		return &SumInt{
-			data: memory.NewResizableBuffer(memory.NewGoAllocator()), // TODO: Get allocator as argument.
-		}
-	default:
-		panic("unsupported type for sum")
-	}
-	// TODO: Implement for nullable, probably a wrapping aggregate column consumer that just ignores nulls. Actually, that wrapper would set the null bitmap.
-}
-
-type SumInt struct {
-	data  *memory.Buffer
-	state []int64 // This uses the above data as the storage underneath.
-}
-
-func (agg *SumInt) MakeColumnConsumer(arr arrow.Array) func(entryIndex uint, rowIndex uint) {
-	typedArr := arr.(*array.Int64).Int64Values()
-	return func(entryIndex uint, rowIndex uint) {
-		if entryIndex >= uint(len(agg.state)) {
-			agg.data.Resize(arrow.Int64Traits.BytesRequired(bitutil.NextPowerOf2(int(entryIndex) + 1)))
-			agg.state = arrow.Int64Traits.CastFromBytes(agg.data.Bytes())
-		}
-		agg.state[entryIndex] += typedArr[rowIndex]
-	}
-}
-
-func (agg *SumInt) GetBatch(length int, offset int) arrow.Array {
-	return array.NewInt64Data(array.NewData(arrow.PrimitiveTypes.Int64, length, []*memory.Buffer{nil, agg.data}, nil, 0 /*TODO: Fixme*/, offset))
-}
-
 func MakeKey(dt arrow.DataType) Key {
 	switch dt.ID() {
 	case arrow.INT64:

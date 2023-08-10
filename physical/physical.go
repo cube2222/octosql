@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/apache/arrow/go/v13/arrow"
 	"github.com/cube2222/octosql/arrowexec/nodes"
 	oldExec "github.com/cube2222/octosql/execution"
 	"github.com/cube2222/octosql/octosql"
@@ -100,5 +101,5 @@ type FunctionDescriptor struct {
 	OutputType    octosql.Type
 	TypeFn        func([]octosql.Type) (octosql.Type, bool) `json:"-"`
 	Strict        bool
-	Function      func([]octosql.Value) (octosql.Value, error) `json:"-"`
+	Function      func([]arrow.Array) (arrow.Array, error) `json:"-"`
 }

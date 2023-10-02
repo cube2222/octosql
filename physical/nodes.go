@@ -419,6 +419,40 @@ func (node *Node) Materialize(ctx context.Context, env Environment) (*execution.
 			},
 			Schema: OctoSQLToArrowSchema(node.Schema),
 		}, nil
+	case NodeTypeStreamJoin:
+		left, err := node.StreamJoin.Left.Materialize(ctx, env)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't materialize stream join left source: %w", err)
+		}
+		right, err := node.StreamJoin.Right.Materialize(ctx, env)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't materialize stream join right source: %w", err)
+		}
+		leftKey := make([]execution.Expression, len(node.StreamJoin.LeftKey))
+		for i := range node.StreamJoin.LeftKey {
+			expr, err := node.StreamJoin.LeftKey[i].Materialize(ctx, env, OctoSQLToArrowSchema(node.StreamJoin.Left.Schema))
+			if err != nil {
+				return nil, fmt.Errorf("couldn't materialize stream join left key expression with index %d: %w", i, err)
+			}
+			leftKey[i] = expr
+		}
+		rightKey := make([]execution.Expression, len(node.StreamJoin.RightKey))
+		for i := range node.StreamJoin.RightKey {
+			expr, err := node.StreamJoin.RightKey[i].Materialize(ctx, env, OctoSQLToArrowSchema(node.StreamJoin.Right.Schema))
+			if err != nil {
+				return nil, fmt.Errorf("couldn't materialize stream join right key expression with index %d: %w", i, err)
+			}
+			rightKey[i] = expr
+		}
+		return &execution.NodeWithMeta{
+			Node: &nodes.StreamJoin{
+				Left:     left,
+				Right:    right,
+				LeftKey:  leftKey,
+				RightKey: rightKey,
+			},
+			Schema: OctoSQLToArrowSchema(node.Schema),
+		}, nil
 	default:
 		panic(fmt.Sprintf("invalid node type: %s", node.NodeType))
 	}

@@ -1,15 +1,17 @@
 package nodes
 
 import (
+	"fmt"
 	"runtime"
 
+	"github.com/apache/arrow/go/v13/arrow"
 	"github.com/cube2222/octosql/arrowexec/execution"
 	"github.com/cube2222/octosql/arrowexec/nodes/hashtable"
 )
 
 type StreamJoin struct {
-	Left, Right                     *execution.NodeWithMeta
-	LeftKeyIndices, RightKeyIndices []int
+	Left, Right       *execution.NodeWithMeta
+	LeftKey, RightKey []execution.Expression
 }
 
 func (s *StreamJoin) Run(ctx execution.Context, produce execution.ProduceFunc) error {
@@ -23,7 +25,7 @@ func (s *StreamJoin) Run(ctx execution.Context, produce execution.ProduceFunc) e
 			leftRecordChannel <- record
 			return nil
 		}); err != nil {
-			panic("implement me")
+			panic(fmt.Errorf("implement error handling: %w", err))
 		}
 	}()
 
@@ -33,7 +35,7 @@ func (s *StreamJoin) Run(ctx execution.Context, produce execution.ProduceFunc) e
 			rightRecordChannel <- record
 			return nil
 		}); err != nil {
-			panic("implement me")
+			panic(fmt.Errorf("implement error handling: %w", err))
 		}
 	}()
 
@@ -56,26 +58,39 @@ receiveLoop:
 		}
 	}
 	var tableRecords, joinedRecords []execution.Record
-	var tableKeyIndices, joinedKeyIndices []int
+	var tableKeyExprs, joinedKeyExprs []execution.Expression
 	var joinedRecordChannel chan execution.Record
 	var tableIsLeft bool
 	if leftClosed {
 		tableRecords = leftRecords
 		joinedRecords = rightRecords
-		tableKeyIndices = s.LeftKeyIndices
-		joinedKeyIndices = s.RightKeyIndices
+		tableKeyExprs = s.LeftKey
+		joinedKeyExprs = s.RightKey
 		joinedRecordChannel = rightRecordChannel
 		tableIsLeft = true
 	} else {
 		tableRecords = rightRecords
 		joinedRecords = leftRecords
-		tableKeyIndices = s.RightKeyIndices
-		joinedKeyIndices = s.LeftKeyIndices
+		tableKeyExprs = s.RightKey
+		joinedKeyExprs = s.LeftKey
 		joinedRecordChannel = leftRecordChannel
 		tableIsLeft = false
 	}
 
-	table := hashtable.BuildJoinTable(tableRecords, tableKeyIndices, joinedKeyIndices, tableIsLeft)
+	tableKeyColumns := make([][]arrow.Array, len(tableRecords))
+	// TODO: Parallelize.
+	for recordIndex, record := range tableRecords {
+		tableKeyColumns[recordIndex] = make([]arrow.Array, len(tableKeyExprs))
+		for i, expr := range tableKeyExprs {
+			exprValue, err := expr.Evaluate(ctx, record)
+			if err != nil {
+				return fmt.Errorf("couldn't evaluate key expression: %w", err)
+			}
+			tableKeyColumns[recordIndex][i] = exprValue
+		}
+	}
+
+	table := hashtable.BuildJoinTable(tableRecords, tableKeyColumns, tableIsLeft)
 
 	outputRecordChannelChan := make(chan (<-chan execution.Record), runtime.GOMAXPROCS(0))
 	go func() {
@@ -85,8 +100,16 @@ receiveLoop:
 			outputRecordChannelChan <- outputRecordChannel
 
 			go func() {
+				keys := make([]arrow.Array, len(joinedKeyExprs))
+				for i, expr := range joinedKeyExprs {
+					exprValue, err := expr.Evaluate(ctx, joinedRecord)
+					if err != nil {
+						panic("implement me")
+					}
+					keys[i] = exprValue
+				}
 				defer close(outputRecordChannel)
-				table.JoinWithRecord(joinedRecord, func(record execution.Record) {
+				table.JoinWithRecord(joinedRecord, keys, func(record execution.Record) {
 					outputRecordChannel <- record
 				})
 			}()

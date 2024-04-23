@@ -15,6 +15,11 @@ var SumOverloads = []physical.AggregateDescriptor{
 		Prototype:    NewSumIntPrototype(),
 	},
 	{
+		ArgumentType: octosql.Int64,
+		OutputType:   octosql.Int64,
+		Prototype:    NewSumInt64Prototype(),
+	},
+	{
 		ArgumentType: octosql.Float,
 		OutputType:   octosql.Float,
 		Prototype:    NewSumFloatPrototype(),
@@ -49,6 +54,31 @@ func (c *SumInt) Add(retraction bool, value octosql.Value) bool {
 
 func (c *SumInt) Trigger() octosql.Value {
 	return octosql.NewInt(c.sum)
+}
+
+type SumInt64 struct {
+	sum int64
+}
+
+func NewSumInt64Prototype() func() nodes.Aggregate {
+	return func() nodes.Aggregate {
+		return &SumInt64{
+			sum: 0,
+		}
+	}
+}
+
+func (c *SumInt64) Add(retraction bool, value octosql.Value) bool {
+	if !retraction {
+		c.sum += value.Int64
+	} else {
+		c.sum -= value.Int64
+	}
+	return c.sum == 0
+}
+
+func (c *SumInt64) Trigger() octosql.Value {
+	return octosql.NewInt64(c.sum)
 }
 
 type SumFloat struct {

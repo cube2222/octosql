@@ -164,6 +164,14 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					},
 				},
 				{
+					ArgumentTypes: []octosql.Type{octosql.Int64, octosql.Int64},
+					OutputType:    octosql.Int64,
+					Strict:        true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						return octosql.NewInt64(values[0].Int64 + values[1].Int64), nil
+					},
+				},
+				{
 					ArgumentTypes: []octosql.Type{octosql.Float, octosql.Float},
 					OutputType:    octosql.Float,
 					Strict:        true,
@@ -224,6 +232,22 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					},
 				},
 				{
+					ArgumentTypes: []octosql.Type{octosql.Int64, octosql.Int64},
+					OutputType:    octosql.Int64,
+					Strict:        true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						return octosql.NewInt64(values[0].Int64 - values[1].Int64), nil
+					},
+				},
+				{
+					ArgumentTypes: []octosql.Type{octosql.Int64},
+					OutputType:    octosql.Int64,
+					Strict:        true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						return octosql.NewInt64(-values[0].Int64), nil
+					},
+				},
+				{
 					ArgumentTypes: []octosql.Type{octosql.Float, octosql.Float},
 					OutputType:    octosql.Float,
 					Strict:        true,
@@ -273,6 +297,14 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					Strict:        true,
 					Function: func(values []octosql.Value) (octosql.Value, error) {
 						return octosql.NewInt(values[0].Int * values[1].Int), nil
+					},
+				},
+				{
+					ArgumentTypes: []octosql.Type{octosql.Int64, octosql.Int64},
+					OutputType:    octosql.Int,
+					Strict:        true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						return octosql.NewInt64(values[0].Int64 * values[1].Int64), nil
 					},
 				},
 				{
@@ -328,6 +360,14 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					},
 				},
 				{
+					ArgumentTypes: []octosql.Type{octosql.Int64, octosql.Int64},
+					OutputType:    octosql.Int64,
+					Strict:        true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						return octosql.NewInt64(values[0].Int64 / values[1].Int64), nil
+					},
+				},
+				{
 					ArgumentTypes: []octosql.Type{octosql.Float, octosql.Float},
 					OutputType:    octosql.Float,
 					Strict:        true,
@@ -366,6 +406,17 @@ func FunctionMap() map[string]physical.FunctionDetails {
 							return values[0], nil
 						}
 						return octosql.NewInt(values[0].Int * -1), nil
+					},
+				},
+				{
+					ArgumentTypes: []octosql.Type{octosql.Int64},
+					OutputType:    octosql.Int64,
+					Strict:        true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						if values[0].Int64 > 0 {
+							return values[0], nil
+						}
+						return octosql.NewInt64(values[0].Int64 * -1), nil
 					},
 				},
 				{
@@ -911,6 +962,14 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					},
 				},
 				{
+					ArgumentTypes: []octosql.Type{octosql.Int64},
+					OutputType:    octosql.Int,
+					Strict:        true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						return octosql.NewInt(int(values[0].Int64)), nil
+					},
+				},
+				{
 					ArgumentTypes: []octosql.Type{octosql.Boolean},
 					OutputType:    octosql.Int,
 					Strict:        true,
@@ -953,6 +1012,70 @@ func FunctionMap() map[string]physical.FunctionDetails {
 				},
 			},
 		},
+		"int64": {
+			Description: "Converts the argument to an int64.",
+			Descriptors: []physical.FunctionDescriptor{
+				{
+					// This case will catch any types which may be int at the start of non-exact matching.
+					// So the int function can be used as a type cast.
+					ArgumentTypes: []octosql.Type{octosql.Int},
+					OutputType:    octosql.Int64,
+					Strict:        true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						return octosql.NewInt64(int64(values[0].Int)), nil
+					},
+				},
+				{
+					ArgumentTypes: []octosql.Type{octosql.Int64},
+					OutputType:    octosql.Int64,
+					Strict:        true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						return values[0], nil
+					},
+				},
+				{
+					ArgumentTypes: []octosql.Type{octosql.Boolean},
+					OutputType:    octosql.Int64,
+					Strict:        true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						if values[0].Boolean {
+							return octosql.NewInt64(1), nil
+						} else {
+							return octosql.NewInt64(0), nil
+						}
+					},
+				},
+				{
+					ArgumentTypes: []octosql.Type{octosql.Float},
+					OutputType:    octosql.Int64,
+					Strict:        true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						return octosql.NewInt64(int64(values[0].Float)), nil
+					},
+				},
+				{
+					ArgumentTypes: []octosql.Type{octosql.String},
+					OutputType:    octosql.Int64,
+					Strict:        true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						n, err := strconv.ParseInt(values[0].Str, 10, 64)
+						if err != nil {
+							log.Printf("couldn't parse string '%s' as int64: %s", values[0].Str, err)
+							return octosql.NewNull(), nil
+						}
+						return octosql.NewInt64(n), nil
+					},
+				},
+				{
+					ArgumentTypes: []octosql.Type{octosql.Duration},
+					OutputType:    octosql.Int64,
+					Strict:        true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						return octosql.NewInt64(int64(values[0].Duration)), nil
+					},
+				},
+			},
+		},
 		"float": {
 			Description: "Converts the argument to an float.",
 			Descriptors: []physical.FunctionDescriptor{
@@ -972,6 +1095,14 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					Strict:        true,
 					Function: func(values []octosql.Value) (octosql.Value, error) {
 						return octosql.NewFloat(float64(values[0].Int)), nil
+					},
+				},
+				{
+					ArgumentTypes: []octosql.Type{octosql.Int64},
+					OutputType:    octosql.Float,
+					Strict:        true,
+					Function: func(values []octosql.Value) (octosql.Value, error) {
+						return octosql.NewFloat(float64(values[0].Int64)), nil
 					},
 				},
 				{

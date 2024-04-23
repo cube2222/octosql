@@ -61,6 +61,8 @@ func NativeValueToProto(value octosql.Value) *Value {
 	case octosql.TypeIDNull:
 	case octosql.TypeIDInt:
 		out.Int = int64(value.Int)
+	case octosql.TypeIDInt64:
+		out.Int = value.Int64
 	case octosql.TypeIDFloat:
 		out.Float = value.Float
 	case octosql.TypeIDBoolean:
@@ -104,6 +106,8 @@ func (x *Value) ToNativeValue() octosql.Value {
 	case octosql.TypeIDNull:
 	case octosql.TypeIDInt:
 		out.Int = int(x.Int)
+	case octosql.TypeIDInt64:
+		out.Int64 = x.Int
 	case octosql.TypeIDFloat:
 		out.Float = x.Float
 	case octosql.TypeIDBoolean:
@@ -173,7 +177,7 @@ func NativeTypeToProto(t octosql.Type) *Type {
 		TypeId: int32(t.TypeID),
 	}
 	switch t.TypeID {
-	case octosql.TypeIDNull, octosql.TypeIDInt, octosql.TypeIDFloat, octosql.TypeIDBoolean, octosql.TypeIDString, octosql.TypeIDTime, octosql.TypeIDDuration, octosql.TypeIDAny:
+	case octosql.TypeIDNull, octosql.TypeIDInt, octosql.TypeIDInt64, octosql.TypeIDFloat, octosql.TypeIDBoolean, octosql.TypeIDString, octosql.TypeIDTime, octosql.TypeIDDuration, octosql.TypeIDAny:
 	case octosql.TypeIDList:
 		if t.List.Element != nil {
 			out.List = NativeTypeToProto(*t.List.Element)
@@ -210,7 +214,7 @@ func (x *Type) ToNativeType() octosql.Type {
 		TypeID: octosql.TypeID(x.TypeId),
 	}
 	switch octosql.TypeID(x.TypeId) {
-	case octosql.TypeIDNull, octosql.TypeIDInt, octosql.TypeIDFloat, octosql.TypeIDBoolean, octosql.TypeIDString, octosql.TypeIDTime, octosql.TypeIDDuration, octosql.TypeIDAny:
+	case octosql.TypeIDNull, octosql.TypeIDInt, octosql.TypeIDInt64, octosql.TypeIDFloat, octosql.TypeIDBoolean, octosql.TypeIDString, octosql.TypeIDTime, octosql.TypeIDDuration, octosql.TypeIDAny:
 	case octosql.TypeIDList:
 		if x.List != nil {
 			t := x.List.ToNativeType()

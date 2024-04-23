@@ -15,6 +15,7 @@ var ZeroValue = Value{}
 type Value struct {
 	TypeID   TypeID
 	Int      int
+	Int64    int64
 	Float    float64
 	Boolean  bool
 	Str      string
@@ -35,6 +36,13 @@ func NewInt(value int) Value {
 	return Value{
 		TypeID: TypeIDInt,
 		Int:    value,
+	}
+}
+
+func NewInt64(value int64) Value {
+	return Value{
+		TypeID: TypeIDInt64,
+		Int64:  value,
 	}
 }
 
@@ -113,6 +121,15 @@ func (value Value) Compare(other Value) int {
 		if value.Int < other.Int {
 			return -1
 		} else if value.Int > other.Int {
+			return 1
+		} else {
+			return 0
+		}
+
+	case TypeIDInt64:
+		if value.Int64 < other.Int64 {
+			return -1
+		} else if value.Int64 > other.Int64 {
 			return 1
 		} else {
 			return 0
@@ -259,6 +276,9 @@ func (value Value) hash(hash uint64) uint64 {
 	case TypeIDInt:
 		hash = fnv1a.AddUint64(hash, uint64(value.Int))
 
+	case TypeIDInt64:
+		hash = fnv1a.AddUint64(hash, uint64(value.Int64))
+
 	case TypeIDFloat:
 		hash = fnv1a.AddUint64(hash, math.Float64bits(value.Float))
 
@@ -368,6 +388,9 @@ func (value Value) append(builder *strings.Builder) {
 	case TypeIDInt:
 		builder.WriteString(fmt.Sprint(value.Int))
 
+	case TypeIDInt64:
+		builder.WriteString(fmt.Sprint(value.Int64))
+
 	case TypeIDFloat:
 		builder.WriteString(fmt.Sprint(value.Float))
 
@@ -429,6 +452,8 @@ func (value Value) ToRawGoValue(t Type) interface{} {
 		return nil
 	case TypeIDInt:
 		return value.Int
+	case TypeIDInt64:
+		return value.Int64
 	case TypeIDFloat:
 		return value.Float
 	case TypeIDBoolean:

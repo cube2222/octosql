@@ -766,6 +766,8 @@ func ParseType(t sqlparser.ConvertType) (octosql.TypeID, error) {
 			return octosql.TypeIDNull, nil
 		case "int":
 			return octosql.TypeIDInt, nil
+		case "int64":
+			return octosql.TypeIDInt64, nil
 		case "float":
 			return octosql.TypeIDFloat, nil
 		case "boolean":

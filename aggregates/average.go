@@ -15,6 +15,11 @@ var AverageOverloads = []physical.AggregateDescriptor{
 		Prototype:    NewAverageIntPrototype(),
 	},
 	{
+		ArgumentType: octosql.Int64,
+		OutputType:   octosql.Int64,
+		Prototype:    NewAverageInt64Prototype(),
+	},
+	{
 		ArgumentType: octosql.Float,
 		OutputType:   octosql.Float,
 		Prototype:    NewAverageFloatPrototype(),
@@ -47,6 +52,29 @@ func (c *AverageInt) Add(retraction bool, value octosql.Value) bool {
 
 func (c *AverageInt) Trigger() octosql.Value {
 	return octosql.NewInt(c.sum.Trigger().Int / c.count.Trigger().Int)
+}
+
+type AverageInt64 struct {
+	sum   SumInt64
+	count Count
+}
+
+func NewAverageInt64Prototype() func() nodes.Aggregate {
+	return func() nodes.Aggregate {
+		return &AverageInt64{
+			sum:   SumInt64{},
+			count: Count{},
+		}
+	}
+}
+
+func (c *AverageInt64) Add(retraction bool, value octosql.Value) bool {
+	c.sum.Add(retraction, value)
+	return c.count.Add(retraction, value)
+}
+
+func (c *AverageInt64) Trigger() octosql.Value {
+	return octosql.NewInt64(c.sum.Trigger().Int64 / int64(c.count.Trigger().Int))
 }
 
 type AverageFloat struct {

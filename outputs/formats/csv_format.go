@@ -51,6 +51,8 @@ func FormatCSVValue(builder *strings.Builder, value octosql.Value) {
 	case octosql.TypeIDNull:
 	case octosql.TypeIDInt:
 		builder.WriteString(strconv.FormatInt(int64(value.Int), 10))
+	case octosql.TypeIDInt64:
+		builder.WriteString(strconv.FormatInt(value.Int64, 10))
 	case octosql.TypeIDFloat:
 		builder.WriteString(strconv.FormatFloat(value.Float, 'f', -1, 64))
 	case octosql.TypeIDBoolean:

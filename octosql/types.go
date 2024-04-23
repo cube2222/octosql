@@ -21,6 +21,7 @@ const (
 	TypeIDTuple
 	TypeIDUnion
 	TypeIDAny // TODO: Remove this type?
+	TypeIDInt64
 )
 
 func (t TypeID) String() string {
@@ -29,6 +30,8 @@ func (t TypeID) String() string {
 		return "Null"
 	case TypeIDInt:
 		return "Int"
+	case TypeIDInt64:
+		return "Int64"
 	case TypeIDFloat:
 		return "Float"
 	case TypeIDBoolean:
@@ -228,6 +231,7 @@ func (t Type) String() string {
 var (
 	Null     = Type{TypeID: TypeIDNull}
 	Int      = Type{TypeID: TypeIDInt}
+	Int64    = Type{TypeID: TypeIDInt64}
 	Float    = Type{TypeID: TypeIDFloat}
 	Boolean  = Type{TypeID: TypeIDBoolean}
 	String   = Type{TypeID: TypeIDString}

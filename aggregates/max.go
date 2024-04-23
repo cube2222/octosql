@@ -18,6 +18,11 @@ var MaxOverloads = []physical.AggregateDescriptor{
 		Prototype:    NewMaxPrototype(),
 	},
 	{
+		ArgumentType: octosql.Int64,
+		OutputType:   octosql.Int64,
+		Prototype:    NewMaxPrototype(),
+	},
+	{
 		ArgumentType: octosql.Float,
 		OutputType:   octosql.Float,
 		Prototype:    NewMaxPrototype(),

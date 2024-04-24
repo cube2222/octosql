@@ -71,7 +71,7 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 			if octosql.Int.Is(d.fields[i].Type) == octosql.TypeRelationIs {
 				integer, err := fastfloat.ParseInt64(str)
 				if err == nil {
-					values[i] = octosql.NewInt(int(integer))
+					values[i] = octosql.NewInt(integer)
 					continue
 				}
 			}

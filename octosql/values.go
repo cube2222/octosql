@@ -14,7 +14,7 @@ var ZeroValue = Value{}
 // Value represents a single row value. The zero value of it is conveniently NULL.
 type Value struct {
 	TypeID   TypeID
-	Int      int
+	Int      int64
 	Float    float64
 	Boolean  bool
 	Str      string
@@ -31,7 +31,7 @@ func NewNull() Value {
 	}
 }
 
-func NewInt(value int) Value {
+func NewInt(value int64) Value {
 	return Value{
 		TypeID: TypeIDInt,
 		Int:    value,

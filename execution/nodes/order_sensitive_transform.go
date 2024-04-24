@@ -58,7 +58,7 @@ func (item *orderByItem) Less(than btree.Item) bool {
 }
 
 func (o *OrderSensitiveTransform) Run(execCtx ExecutionContext, produce ProduceFn, metaSend MetaSendFn) error {
-	var limit *int
+	var limit *int64
 	if o.limit != nil {
 		val, err := (*o.limit).Evaluate(execCtx)
 		if err != nil {
@@ -112,7 +112,7 @@ func (o *OrderSensitiveTransform) Run(execCtx ExecutionContext, produce ProduceF
 			} else {
 				recordCounts.Delete(itemTyped)
 			}
-			if limit != nil && o.noRetractionsPossible && recordCounts.Len() > *limit {
+			if limit != nil && o.noRetractionsPossible && int64(recordCounts.Len()) > *limit {
 				// This doesn't mean we'll always keep just the records that are needed, because tree nodes might have count > 1.
 				// That said, it's a good approximation, and we'll definitely not lose something that we need to have.
 				recordCounts.DeleteMax()
@@ -130,8 +130,8 @@ func (o *OrderSensitiveTransform) Run(execCtx ExecutionContext, produce ProduceF
 	return nil
 }
 
-func produceOrderByItems(ctx ProduceContext, recordCounts *btree.BTree, limit *int, produce ProduceFn) error {
-	i := 0
+func produceOrderByItems(ctx ProduceContext, recordCounts *btree.BTree, limit *int64, produce ProduceFn) error {
+	i := int64(0)
 	var outErr error
 	recordCounts.Ascend(func(item btree.Item) bool {
 		if limit != nil && i >= *limit {

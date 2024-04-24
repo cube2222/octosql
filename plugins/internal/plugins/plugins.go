@@ -103,7 +103,7 @@ func (x *Value) ToNativeValue() octosql.Value {
 	switch octosql.TypeID(x.TypeId) {
 	case octosql.TypeIDNull:
 	case octosql.TypeIDInt:
-		out.Int = int(x.Int)
+		out.Int = x.Int
 	case octosql.TypeIDFloat:
 		out.Float = x.Float
 	case octosql.TypeIDBoolean:

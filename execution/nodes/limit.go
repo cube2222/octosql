@@ -30,7 +30,7 @@ func (m *Limit) Run(ctx ExecutionContext, produce ProduceFn, metaSend MetaSendFn
 
 	limitNodeID := ulid.MustNew(ulid.Now(), rand.Reader).String()
 
-	i := 0
+	i := int64(0)
 	if err := m.source.Run(ctx, func(produceCtx ProduceContext, record Record) error {
 		if err := produce(produceCtx, record); err != nil {
 			return fmt.Errorf("couldn't produce: %w", err)

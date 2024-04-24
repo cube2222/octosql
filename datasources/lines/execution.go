@@ -45,7 +45,7 @@ func (d *DatasourceExecuting) Run(ctx ExecutionContext, produce ProduceFn, metaS
 		})
 	}
 
-	line := 0
+	line := int64(0)
 	for sc.Scan() {
 		values := make([]octosql.Value, len(d.fields))
 		for i := range d.fields {

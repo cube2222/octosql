@@ -385,7 +385,7 @@ octosql "SELECT * FROM plugins.plugins"`,
 
 		switch output {
 		case "live_table", "batch_table":
-			var limit *int
+			var limit *int64
 			if limitExpression != nil {
 				val, err := (*limitExpression).Evaluate(execCtx)
 				if err != nil {

@@ -293,7 +293,7 @@ func assignValue(dst *octosql.Value, src parquet.Value) error {
 	case parquet.Boolean:
 		*dst = octosql.NewBoolean(src.Boolean())
 	case parquet.Int32:
-		*dst = octosql.NewInt(src.Int64())
+		*dst = octosql.NewInt(int64(src.Int32()))
 	case parquet.Int64:
 		*dst = octosql.NewInt(src.Int64())
 	case parquet.Int96:

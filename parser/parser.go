@@ -629,7 +629,7 @@ func ParseExpression(expr sqlparser.Expr) (logical.Expression, error) {
 		case sqlparser.IntVal:
 			var i int64
 			i, err = strconv.ParseInt(string(expr.Val), 10, 64)
-			value = octosql.NewInt(int(i))
+			value = octosql.NewInt(i)
 		case sqlparser.FloatVal:
 			var val float64
 			val, err = strconv.ParseFloat(string(expr.Val), 64)

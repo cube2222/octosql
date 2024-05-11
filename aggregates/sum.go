@@ -27,7 +27,7 @@ var SumOverloads = []physical.AggregateDescriptor{
 }
 
 type SumInt struct {
-	sum int
+	sum int64
 }
 
 func NewSumIntPrototype() func() nodes.Aggregate {

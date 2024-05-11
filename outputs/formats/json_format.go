@@ -60,7 +60,7 @@ func ValueToJson(arena *fastjson.Arena, t octosql.Type, value octosql.Value) *fa
 	case octosql.TypeIDNull:
 		return arena.NewNull()
 	case octosql.TypeIDInt:
-		return arena.NewNumberInt(value.Int)
+		return arena.NewNumberInt(int(value.Int))
 	case octosql.TypeIDFloat:
 		return arena.NewNumberFloat64(value.Float)
 	case octosql.TypeIDBoolean:

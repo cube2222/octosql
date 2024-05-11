@@ -15,7 +15,7 @@ var CountOverloads = []physical.AggregateDescriptor{
 }
 
 type Count struct {
-	count int
+	count int64
 }
 
 func NewCountPrototype() func() nodes.Aggregate {

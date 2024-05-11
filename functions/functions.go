@@ -304,7 +304,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					OutputType:    octosql.String,
 					Strict:        true,
 					Function: func(values []octosql.Value) (octosql.Value, error) {
-						return octosql.NewString(strings.Repeat(values[0].Str, values[1].Int)), nil
+						return octosql.NewString(strings.Repeat(values[0].Str, int(values[1].Int))), nil
 					},
 				},
 				{
@@ -312,7 +312,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					OutputType:    octosql.String,
 					Strict:        true,
 					Function: func(values []octosql.Value) (octosql.Value, error) {
-						return octosql.NewString(strings.Repeat(values[1].Str, values[0].Int)), nil
+						return octosql.NewString(strings.Repeat(values[1].Str, int(values[0].Int))), nil
 					},
 				},
 			},
@@ -718,7 +718,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					OutputType:    octosql.String,
 					Strict:        true,
 					Function: func(values []octosql.Value) (octosql.Value, error) {
-						if len(values[0].Str) <= values[1].Int {
+						if int64(len(values[0].Str)) <= values[1].Int {
 							return octosql.NewString(""), nil
 						}
 						return octosql.NewString(values[0].Str[values[1].Int:]), nil
@@ -729,12 +729,12 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					OutputType:    octosql.String,
 					Strict:        true,
 					Function: func(values []octosql.Value) (octosql.Value, error) {
-						if len(values[0].Str) <= values[1].Int {
+						if int64(len(values[0].Str)) <= values[1].Int {
 							return octosql.NewString(""), nil
 						}
 						end := values[1].Int + values[2].Int
-						if end > len(values[0].Str) {
-							end = len(values[0].Str)
+						if end > int64(len(values[0].Str)) {
+							end = int64(len(values[0].Str))
 						}
 						return octosql.NewString(values[0].Str[values[1].Int:end]), nil
 					},
@@ -766,7 +766,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 						if i == -1 {
 							return octosql.NewNull(), nil
 						}
-						return octosql.NewInt(i), nil
+						return octosql.NewInt(int64(i)), nil
 					},
 				},
 			},
@@ -779,7 +779,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					OutputType:    octosql.Int,
 					Strict:        true,
 					Function: func(values []octosql.Value) (octosql.Value, error) {
-						return octosql.NewInt(len(values[0].Str)), nil
+						return octosql.NewInt(int64(len(values[0].Str))), nil
 					},
 				},
 				{
@@ -794,7 +794,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					},
 					Strict: true,
 					Function: func(values []octosql.Value) (octosql.Value, error) {
-						return octosql.NewInt(len(values[0].List)), nil
+						return octosql.NewInt(int64(len(values[0].List))), nil
 					},
 				},
 				{
@@ -809,7 +809,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					},
 					Strict: true,
 					Function: func(values []octosql.Value) (octosql.Value, error) {
-						return octosql.NewInt(len(values[0].Struct)), nil
+						return octosql.NewInt(int64(len(values[0].Struct))), nil
 					},
 				},
 				{
@@ -824,7 +824,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					},
 					Strict: true,
 					Function: func(values []octosql.Value) (octosql.Value, error) {
-						return octosql.NewInt(len(values[0].Tuple)), nil
+						return octosql.NewInt(int64(len(values[0].Tuple))), nil
 					},
 				},
 			},
@@ -891,7 +891,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					OutputType:    octosql.Int,
 					Strict:        true,
 					Function: func(values []octosql.Value) (octosql.Value, error) {
-						return octosql.NewInt(int(values[0].Time.Unix())), nil
+						return octosql.NewInt(values[0].Time.Unix()), nil
 					},
 				},
 			},
@@ -927,7 +927,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					OutputType:    octosql.Int,
 					Strict:        true,
 					Function: func(values []octosql.Value) (octosql.Value, error) {
-						return octosql.NewInt(int(values[0].Float)), nil
+						return octosql.NewInt(int64(values[0].Float)), nil
 					},
 				},
 				{
@@ -935,7 +935,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					OutputType:    octosql.Int,
 					Strict:        true,
 					Function: func(values []octosql.Value) (octosql.Value, error) {
-						n, err := strconv.Atoi(values[0].Str)
+						n, err := strconv.ParseInt(values[0].Str, 10, 64)
 						if err != nil {
 							log.Printf("couldn't parse string '%s' as int: %s", values[0].Str, err)
 							return octosql.NewNull(), nil
@@ -948,7 +948,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					OutputType:    octosql.Int,
 					Strict:        true,
 					Function: func(values []octosql.Value) (octosql.Value, error) {
-						return octosql.NewInt(int(values[0].Duration)), nil
+						return octosql.NewInt(int64(values[0].Duration)), nil
 					},
 				},
 			},
@@ -1033,7 +1033,7 @@ func FunctionMap() map[string]physical.FunctionDetails {
 					},
 					Strict: true,
 					Function: func(values []octosql.Value) (octosql.Value, error) {
-						if values[1].Int >= len(values[0].List) {
+						if values[1].Int >= int64(len(values[0].List)) {
 							return octosql.NewNull(), nil
 						}
 						return values[0].List[values[1].Int], nil

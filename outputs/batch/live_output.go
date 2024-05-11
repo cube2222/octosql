@@ -24,7 +24,7 @@ type OutputPrinter struct {
 	source                Node
 	keyExprs              []Expression
 	directionMultipliers  []int
-	limit                 *int
+	limit                 *int64
 	noRetractionsPossible bool
 
 	schema physical.Schema
@@ -32,7 +32,7 @@ type OutputPrinter struct {
 	live   bool
 }
 
-func NewOutputPrinter(source Node, keyExprs []Expression, directionMultipliers []int, limit *int, noRetractionsPossible bool, schema physical.Schema, format func(io.Writer) Format, live bool) *OutputPrinter {
+func NewOutputPrinter(source Node, keyExprs []Expression, directionMultipliers []int, limit *int64, noRetractionsPossible bool, schema physical.Schema, format func(io.Writer) Format, live bool) *OutputPrinter {
 	return &OutputPrinter{
 		source:                source,
 		keyExprs:              keyExprs,
@@ -89,7 +89,7 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 		format := o.format(&buf)
 		format.SetSchema(o.schema)
 
-		i := 0
+		i := int64(0)
 		recordCounts.Ascend(func(item btree.Item) bool {
 			itemTyped := item.(*outputItem)
 			for j := 0; j < itemTyped.Count; j++ {
@@ -157,7 +157,7 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 			if onlyZeroEventTimesSeen && !record.EventTime.IsZero() {
 				onlyZeroEventTimesSeen = false
 			}
-			if o.limit != nil && o.noRetractionsPossible && recordCounts.Len() > *o.limit {
+			if o.limit != nil && o.noRetractionsPossible && int64(recordCounts.Len()) > *o.limit {
 				// This doesn't mean we'll always keep just the records that are needed, because tree nodes might have count > 1.
 				// That said, it's a good approximation, and we'll definitely not lose something that we need to have.
 				recordCounts.DeleteMax()
@@ -183,7 +183,7 @@ func (o *OutputPrinter) Run(execCtx ExecutionContext) error {
 	var buf bytes.Buffer
 	format := o.format(&buf)
 	format.SetSchema(o.schema)
-	i := 0
+	i := int64(0)
 	recordCounts.Ascend(func(item btree.Item) bool {
 		itemTyped := item.(*outputItem)
 		for j := 0; j < itemTyped.Count; j++ {
